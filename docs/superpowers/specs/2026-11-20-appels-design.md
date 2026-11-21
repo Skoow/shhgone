@@ -59,6 +59,16 @@ Les apps natives utiliseront les mêmes messages : WebRTC existe sur iOS et Andr
 
 Défense en profondeur sur les adresses IP : tout candidat qui n'est pas « relay » est jeté, à l'envoi comme à la réception, dans le SDP comme en candidat seul, même si le navigateur respecte déjà la politique « relais seulement ».
 
+**Ajouts du 21 novembre** (aucun changement de message, de serveur ni de relais) :
+
+- **Qui parle** : la tuile de qui parle s'allume. Le niveau du son déjà reçu (ou capté, pour soi) est mesuré dans le navigateur, 10 fois par seconde (`web/src/salon/parole.ts`) ; rien n'est envoyé ni gardé.
+- **Caméra de face ou de dos** : bouton affiché quand l'appareil a plusieurs caméras. La nouvelle image est obtenue avant d'arrêter l'ancienne ; refusée ou absente, rien ne change. Image de face en miroir pour soi seulement.
+- **Écran gardé allumé** pendant l'appel (Screen Wake Lock, repris au retour sur l'onglet).
+- **Micro ou caméra arrêtés d'eux-mêmes** (débranchés, autorisation retirée, pris par une autre application) : sans micro, on quitte l'appel en le disant (`appel_fin`) et un message l'explique ; sans caméra, l'appel continue en audio et les autres le voient.
+- **Onglet fermé** : on raccroche en le disant (`pagehide`), au lieu de laisser les autres attendre 40 s.
+
+Apps natives : les mêmes comportements existent dans les API du système (niveau audio, choix de caméra, écran allumé) ; rien à changer au protocole.
+
 Débit : vidéo 640 × 360, 24 images par seconde, 500 kbit/s au plus vers chaque participant. File d'envoi de la signalisation cadencée sous la limite du serveur pour les trames volatiles.
 
 ## 5. Serveur (`server/internal/api/handlers_salon_appel.go`)

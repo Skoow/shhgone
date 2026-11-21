@@ -56,6 +56,9 @@ describe("gen-logo", () => {
     expect(g.solid).toMatch(/^M[-\d. ]+A[-\d. ]+A[-\d. ]+$/);
     const end = g.solid.split(" ").slice(-2).join(" ");
     expect(g.rest.startsWith(`M${end}A`)).toBe(true);
+    // S tracé jusqu'au bout (coupe au-delà d'un demi-tour de la panse basse) : grand arc.
+    const plein = sGeom({ ...MARK, cut: 150, n: 2, r0: 1, r1: 0.5, drift: 0, ext: 1 });
+    expect(plein.solid.split("A")[2]!.split(" ")[3]).toBe("1");
   });
 
   it("marque : S dans la tuile (marge ≥ 2 u), points qui s'effacent, variante 16 px à trois points plus gros", () => {

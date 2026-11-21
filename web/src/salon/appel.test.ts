@@ -2,11 +2,13 @@
 import { describe, it, expect } from "vitest";
 import { Appel, APPEL_MAX, MORCEAU, PRESENCE_PERDUE_MS, candidatRelais, filtrerSdp, type DepsAppel, type MessageAppel } from "./appel";
 
-type Piste = { kind: "audio" | "video"; enabled: boolean; arretee: boolean; stop(): void };
-const piste = (kind: "audio" | "video"): Piste => ({
+type Piste = { kind: "audio" | "video"; enabled: boolean; arretee: boolean; face?: string; onended: (() => void) | null; stop(): void };
+const piste = (kind: "audio" | "video", face?: string): Piste => ({
   kind,
   enabled: true,
   arretee: false,
+  face,
+  onended: null,
   stop() {
     this.arretee = true;
   },
@@ -105,6 +107,7 @@ class Monde {
   pcs = new Map<number, FauxPC[]>();
   refuseMedia = new Set<number>();
   refuseRelais = new Set<number>();
+  refuseFace = new Set<string>();
   moteurOccupe = false;
   /** Sièges dont plus rien ne sort (onglet fermé sans prévenir). */
   muets = new Set<number>();
@@ -127,7 +130,8 @@ class Monde {
       },
       media: async (o) => {
         if (this.refuseMedia.has(siege)) throw new Error("NotAllowedError");
-        const f = new FauxFlux([...(o.audio ? [piste("audio")] : []), ...(o.video ? [piste("video")] : [])]);
+        if (o.video && this.refuseFace.has(o.face)) throw new Error("OverconstrainedError");
+        const f = new FauxFlux([...(o.audio ? [piste("audio")] : []), ...(o.video ? [piste("video", o.face)] : [])]);
         this.locaux.set(siege, [...(this.locaux.get(siege) ?? []), f]);
         return f as unknown as MediaStream;
       },
@@ -278,6 +282,80 @@ describe("appel à deux", () => {
     expect(a.camera).toBe(true);
     expect((w.pc(0).transceivers[1]?.sender.track as Piste).kind).toBe("video");
     expect(b.participants[0]?.video).toBe(true);
+  });
+});
+
+describe("appareils (ajouts du 21 novembre)", () => {
+  async function deux() {
+    const w = new Monde();
+    const a = w.membre(0);
+    const b = w.membre(1);
+    await a.rejoindre(true);
+    await b.rejoindre(false);
+    await w.avancer(5_000);
+    return { w, a, b };
+  }
+
+  it("retourner la caméra : de face puis de dos, l'ancienne image arrêtée, la nouvelle envoyée", async () => {
+    const { w, a } = await deux();
+    const avant = w.locaux.get(0)![0]!.getVideoTracks()[0]!;
+    expect([a.face, avant.face]).toEqual(["user", "user"]);
+    await a.retournerCamera();
+    const apres = w.locaux.get(0)![0]!.getVideoTracks()[0]!;
+    expect(a.face).toBe("environment");
+    expect(apres.face).toBe("environment");
+    expect(avant.arretee).toBe(true);
+    expect(w.locaux.get(0)![0]!.getVideoTracks()).toHaveLength(1);
+    expect(w.pc(0).transceivers[1]?.sender.track).toBe(apres);
+    // La caméra rallumée plus tard reprend le même côté.
+    await a.basculerCamera();
+    await a.basculerCamera();
+    expect(w.locaux.get(0)![0]!.getVideoTracks()[0]!.face).toBe("environment");
+  });
+
+  it("autre caméra absente ou refusée, ou caméra éteinte : rien ne change", async () => {
+    const { w, a } = await deux();
+    const cam = w.locaux.get(0)![0]!.getVideoTracks()[0]!;
+    w.refuseFace.add("environment");
+    await a.retournerCamera();
+    expect(a.face).toBe("user");
+    expect(cam.arretee).toBe(false);
+    expect(w.pc(0).transceivers[1]?.sender.track).toBe(cam);
+    w.refuseFace.clear();
+    await a.basculerCamera();
+    const demandes = w.locaux.get(0)!.length;
+    await a.retournerCamera();
+    expect(w.locaux.get(0)!.length).toBe(demandes);
+    expect(a.face).toBe("user");
+  });
+
+  it("caméra arrêtée d'elle-même : l'appel continue en audio et l'autre le sait", async () => {
+    const { w, a, b } = await deux();
+    const cam = w.locaux.get(0)![0]!.getVideoTracks()[0]!;
+    cam.onended?.();
+    await w.avancer(2_000);
+    expect(a.etat).toBe("dans");
+    expect(a.camera).toBe(false);
+    expect(w.pc(0).transceivers[1]?.sender.track).toBe(null);
+    expect(b.participants[0]?.video).toBe(false);
+  });
+
+  it("micro arrêté de lui-même : on quitte l'appel en le disant, tout est éteint", async () => {
+    const { w, a, b } = await deux();
+    const pistes = w.locaux.get(0)![0]!.getTracks();
+    pistes.find((p) => p.kind === "audio")!.onended?.();
+    expect([a.etat, a.erreur]).toEqual(["sonne", "perdu"]);
+    expect(pistes.every((p) => p.arretee)).toBe(true);
+    expect(w.envoyes.some((e) => e.de === 0 && e.m.k === "appel_fin")).toBe(true);
+    expect(b.participants).toEqual([]);
+  });
+
+  it("une piste arrêtée par nous (raccrocher) ne déclenche rien après coup", async () => {
+    const { w, a } = await deux();
+    const pistes = w.locaux.get(0)![0]!.getTracks();
+    a.quitter();
+    expect(pistes.every((p) => p.onended === null)).toBe(true);
+    expect(a.erreur).toBe(null);
   });
 });
 

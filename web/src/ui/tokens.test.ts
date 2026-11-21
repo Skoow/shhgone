@@ -455,7 +455,7 @@ describe("Icon.ts (UI §6, jeu maison UI8)", () => {
   const ICONS = [
     "paperclip", "camera", "mic", "square", "type", "x", "pencil", "grip-vertical", "arrow-up",
     "arrow-down", "lock", "lock-open", "shield-check", "shield-alert", "triangle-alert", "copy",
-    "check", "share-2", "qr-code", "refresh-cw", "eye", "eye-off", "clock", "timer", "pause", "play",
+    "check", "share-2", "qr-code", "refresh-cw", "switch-camera", "eye", "eye-off", "clock", "timer", "pause", "play",
     "download", "file", "file-text", "image", "music", "film", "trash-2", "flag", "chevron-left",
     "wifi-off", "clipboard-x", "circle-help", "minus", "plus", "info", "link-2", "key-round",
     "server", "user-x", "hard-drive", "code-xml", "chevron-down", "arrow-right", "shield-x",

@@ -47,7 +47,7 @@ export function sGeom({ cx, cyU, rx, ry, W, a0 = -30, cut = -40, a1 = 160, n, r0
   const pu = (d) => [cx + rx * Math.cos(rad(d)), cyU + ry * Math.sin(rad(d))];
   const pl = (d) => [cx + rx * Math.cos(rad(d)), cyL + ry * Math.sin(rad(d))];
   const A = (large, sweep, p) => `A${f(rx)} ${f(ry)} 0 ${large} ${sweep} ${P(...p)}`;
-  const solid = `M${P(...pu(a0))}${A(1, 0, pu(90))}${A(0, 1, pl(cut))}`;
+  const solid = `M${P(...pu(a0))}${A(1, 0, pu(90))}${A(cut + 90 > 180 ? 1 : 0, 1, pl(cut))}`;
   const rest = `M${P(...pl(cut))}${A(a1 - cut > 180 ? 1 : 0, 1, pl(a1))}`;
   // Reste de l'épine échantillonné (abscisse curviligne), puis prolongé à la tangente.
   const STEPS = 2400, pts = [];

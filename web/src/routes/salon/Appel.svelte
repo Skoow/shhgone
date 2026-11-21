@@ -3,12 +3,15 @@
   // Bandeau « Appel en cours » pour qui n'y est pas, puis, dans l'appel : une tuile par
   // participant (image, ou initiale quand la caméra est éteinte), micro, caméra, raccrocher. La
   // conversation reste utilisable dessous. Chaque <video> distant porte aussi le son.
+  // Ajouts du 21 novembre : la tuile de qui parle s'allume (salon/parole.ts, mesure locale) ;
+  // caméra de face ou de dos quand l'appareil en a deux ; écran gardé allumé pendant l'appel.
   import { t } from "../../i18n/i18n.svelte";
   import * as S from "../../salon/salon.svelte";
   import { APPEL_MAX } from "../../salon/appel";
+  import { ecouterParole } from "../../salon/parole";
   import Button from "../../ui/Button.svelte";
   import IconButton from "../../ui/IconButton.svelte";
-  import { Mic, MicOff, Video, VideoOff, PhoneOff } from "../../ui/Icon";
+  import { Mic, MicOff, Video, VideoOff, PhoneOff, SwitchCamera } from "../../ui/Icon";
 
   const vue = S.vue;
   const conv = S.conversation()!;
@@ -18,6 +21,53 @@
   const micro = $derived((void vue.rev, S.appel()?.micro ?? true));
   const camera = $derived((void vue.rev, S.appel()?.camera ?? false));
   const local = $derived((void vue.rev, S.appel()?.local ?? null));
+  const face = $derived((void vue.rev, S.appel()?.face ?? "user"));
+
+  /** Plusieurs caméras (téléphone) : bouton pour passer de l'une à l'autre. Lu une fois la caméra autorisée. */
+  let deuxCameras = $state(false);
+  $effect(() => {
+    if (!camera || deuxCameras) return;
+    void navigator.mediaDevices
+      ?.enumerateDevices?.()
+      .then((l) => (deuxCameras = l.filter((d) => d.kind === "videoinput").length > 1))
+      .catch(() => {});
+  });
+
+  // Écran gardé allumé pendant l'appel (repris au retour sur l'onglet, que le navigateur le relâche).
+  $effect(() => {
+    if (etat !== "dans" || !("wakeLock" in navigator)) return;
+    let verrou: WakeLockSentinel | null = null;
+    let fini = false;
+    const prendre = () => {
+      if (fini || document.visibilityState !== "visible") return;
+      void navigator.wakeLock
+        .request("screen")
+        .then((v) => (fini ? void v.release() : (verrou = v)))
+        .catch(() => {});
+    };
+    prendre();
+    document.addEventListener("visibilitychange", prendre);
+    return () => {
+      fini = true;
+      document.removeEventListener("visibilitychange", prendre);
+      void verrou?.release().catch(() => {});
+    };
+  });
+
+  /** Allume la tuile (attribut data-parle) tant que son flux porte une voix. */
+  function parole(node: HTMLElement, f: MediaStream | null) {
+    let arret = () => {};
+    const suivre = (x: MediaStream | null) => {
+      arret();
+      node.removeAttribute("data-parle");
+      arret = x ? ecouterParole(x, (oui) => node.toggleAttribute("data-parle", oui)) : () => {};
+    };
+    suivre(f);
+    return {
+      update: suivre,
+      destroy: () => arret(),
+    };
+  }
 
   function nom(s: number): string {
     const n = conv.nom(s);
@@ -57,16 +107,16 @@
 {:else if etat === "dans"}
   <section class="appel" aria-label={t("salon.appel.titre")} data-appel="dans">
     <ul class="tuiles" data-n={participants.length + 1}>
-      <li class="tuile moi">
+      <li class="tuile moi" use:parole={micro ? local : null}>
         {#if camera && local}
-          <video use:flux={local} muted playsinline autoplay aria-hidden="true"></video>
+          <video use:flux={local} muted playsinline autoplay class:miroir={face === "user"} aria-hidden="true"></video>
         {:else}
           <span class="pastille" aria-hidden="true">{initiale(vue.monPseudo ?? "")}</span>
         {/if}
         <span class="nom">{vue.monPseudo} ({t("salon.room.you")}){#if !micro}<span class="muet"><MicOff size={14} /></span>{/if}</span>
       </li>
       {#each participants as p (p.siege)}
-        <li class={["tuile", `c${conv.couleur(p.siege)}`]} data-siege={p.siege} data-lien={p.lien}>
+        <li class={["tuile", `c${conv.couleur(p.siege)}`]} data-siege={p.siege} data-lien={p.lien} use:parole={p.flux}>
           <!-- Toujours présent : il joue le son même quand la caméra est éteinte. -->
           <video use:flux={p.flux} playsinline autoplay class:cache={!p.video} aria-hidden="true"></video>
           {#if !p.video}<span class="pastille" aria-hidden="true">{initiale(nom(p.siege))}</span>{/if}
@@ -86,6 +136,11 @@
       <IconButton label={t(camera ? "salon.appel.camera.eteindre" : "salon.appel.camera.allumer")} variant="secondary" aria-pressed={camera} onpress={() => void S.appel()?.basculerCamera()}>
         {#if camera}<Video size={20} />{:else}<VideoOff size={20} />{/if}
       </IconButton>
+      {#if camera && deuxCameras}
+        <IconButton label={t("salon.appel.camera.retourner")} variant="secondary" onpress={() => void S.appel()?.retournerCamera()}>
+          <SwitchCamera size={20} />
+        </IconButton>
+      {/if}
       <IconButton label={t("salon.appel.raccrocher")} variant="danger" onpress={() => S.appel()?.quitter()}>
         <PhoneOff size={20} />
       </IconButton>
@@ -164,13 +219,28 @@
   .tuile[data-lien="lie"] {
     border-color: var(--line-strong);
   }
+  /* Qui parle : liseré et halo menthe (mesure locale, salon/parole.ts). */
+  .tuile {
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  /* Attribut posé par l'action `parole` (hors du gabarit) : :global pour que Svelte le garde. */
+  .tuile:global([data-parle]) {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgb(95 227 181 / 0.35);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tuile {
+      transition: none;
+    }
+  }
   video {
     width: 100%;
     height: 100%;
     object-fit: cover;
     background: var(--bg-deep);
   }
-  .moi video {
+  /* Caméra de face : vue en miroir, comme dans une glace ; de dos : à l'endroit. */
+  .moi video.miroir {
     transform: scaleX(-1);
   }
   /* Caméra éteinte : l'élément reste (il joue le son) mais ne montre rien. */

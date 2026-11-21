@@ -44,8 +44,8 @@ export type DepsAppel = {
   envoyer(m: MessageAppel): boolean;
   /** Identifiants temporaires du relais TURN. */
   relais(): Promise<Relais>;
-  /** Micro (et caméra si `video`) ; « micro seul » si `audio` est faux n'existe pas : au moins l'un des deux. */
-  media(o: { audio: boolean; video: boolean }): Promise<MediaStream>;
+  /** Micro et/ou caméra (au moins l'un des deux) ; `face` : caméra de face (« user ») ou de dos (« environment »). */
+  media(o: { audio: boolean; video: boolean; face: Face }): Promise<MediaStream>;
   pair(config: RTCConfiguration): RTCPeerConnection;
   flux(): MediaStream;
   alea(): Uint8Array;
@@ -56,7 +56,9 @@ export type DepsAppel = {
 };
 
 export type Participant = { siege: number; video: boolean; flux: MediaStream | null; lien: "connexion" | "lie" | "coupe" };
-export type ErreurAppel = "micro" | "relais" | "complet";
+/** « perdu » : le micro s'est arrêté en cours d'appel (débranché, autorisation retirée). */
+export type ErreurAppel = "micro" | "relais" | "complet" | "perdu";
+export type Face = "user" | "environment";
 
 type Paire = {
   pc: RTCPeerConnection;
@@ -128,6 +130,8 @@ export class Appel {
   #dernierePresence = 0;
   micro = true;
   camera = false;
+  /** Caméra de face ou de dos (téléphone) ; l'image de face est montrée en miroir. */
+  face: Face = "user";
   erreur: ErreurAppel | null = null;
 
   constructor(d: DepsAppel) {
@@ -169,7 +173,7 @@ export class Appel {
     this.#d.change();
     let flux: MediaStream;
     try {
-      flux = await this.#d.media({ audio: true, video });
+      flux = await this.#d.media({ audio: true, video, face: this.face });
     } catch {
       this.#entree = false;
       this.erreur = "micro";
@@ -188,6 +192,7 @@ export class Appel {
     this.#local = flux;
     this.micro = true;
     this.camera = flux.getVideoTracks().length > 0;
+    for (const t of flux.getTracks()) this.#surveiller(t);
     this.#entree = false;
     this.#dans = true;
     if (this.#id === null) this.#adopter(hex(this.#d.alea()));
@@ -238,6 +243,7 @@ export class Appel {
     if (!local || !this.#dans) return;
     if (this.camera) {
       for (const t of local.getVideoTracks()) {
+        t.onended = null;
         t.stop();
         local.removeTrack(t);
       }
@@ -246,7 +252,7 @@ export class Appel {
     } else {
       let piste: MediaStreamTrack | undefined;
       try {
-        piste = (await this.#d.media({ audio: false, video: true })).getVideoTracks()[0];
+        piste = (await this.#d.media({ audio: false, video: true, face: this.face })).getVideoTracks()[0];
       } catch {
         piste = undefined;
       }
@@ -260,11 +266,65 @@ export class Appel {
         return;
       }
       local.addTrack(piste);
+      this.#surveiller(piste);
       this.camera = true;
       for (const p of this.#paires.values()) void p.video?.replaceTrack(piste).catch(() => {});
     }
     this.#annoncer(true);
     this.#d.change();
+  }
+
+  /**
+   * Caméra de face ↔ de dos (téléphone). La nouvelle image est obtenue avant d'arrêter l'ancienne :
+   * si l'autre caméra est refusée ou absente, rien ne change.
+   */
+  async retournerCamera(): Promise<void> {
+    const local = this.#local;
+    if (!local || !this.#dans || !this.camera) return;
+    const face: Face = this.face === "user" ? "environment" : "user";
+    let piste: MediaStreamTrack | undefined;
+    try {
+      piste = (await this.#d.media({ audio: false, video: true, face })).getVideoTracks()[0];
+    } catch {
+      piste = undefined;
+    }
+    if (!piste) return;
+    if (this.#local !== local || !this.#dans || !this.camera) {
+      piste.stop();
+      return;
+    }
+    for (const t of local.getVideoTracks()) {
+      t.onended = null;
+      t.stop();
+      local.removeTrack(t);
+    }
+    local.addTrack(piste);
+    this.#surveiller(piste);
+    this.face = face;
+    for (const p of this.#paires.values()) void p.video?.replaceTrack(piste).catch(() => {});
+    this.#d.change();
+  }
+
+  /**
+   * Une piste locale qui s'arrête d'elle-même (micro débranché, caméra prise par une autre app,
+   * autorisation retirée) : sans micro, on quitte l'appel en le disant ; sans caméra, on continue
+   * en audio et les autres le savent.
+   */
+  #surveiller(t: MediaStreamTrack): void {
+    t.onended = () => {
+      const local = this.#local;
+      if (!local || !this.#dans || !local.getTracks().includes(t)) return;
+      if (t.kind === "audio") {
+        this.erreur = "perdu";
+        this.quitter();
+        return;
+      }
+      local.removeTrack(t);
+      this.camera = local.getVideoTracks().length > 0;
+      if (!this.camera) for (const p of this.#paires.values()) void p.video?.replaceTrack(null).catch(() => {});
+      this.#annoncer(true);
+      this.#d.change();
+    };
   }
 
   // --- Événements du salon --------------------------------------------------------------------------
@@ -524,11 +584,15 @@ export class Appel {
   }
 
   #lacher(): void {
-    for (const t of this.#local?.getTracks() ?? []) t.stop();
+    for (const t of this.#local?.getTracks() ?? []) {
+      t.onended = null;
+      t.stop();
+    }
     this.#local = null;
     this.#relais = null;
     this.micro = true;
     this.camera = false;
+    this.face = "user";
   }
 
   #finSiVide(): void {

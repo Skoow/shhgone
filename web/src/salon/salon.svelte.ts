@@ -394,6 +394,10 @@ function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
   x.stop.push(c.ecouter((ev) => surEvenement(x, ev)));
 }
 
+// Onglet fermé ou quitté (aussi vers le cache de retour arrière) : on raccroche en le disant,
+// au lieu de laisser les autres attendre 40 s qu'on soit compté absent.
+if (typeof addEventListener === "function") addEventListener("pagehide", () => s?.appel?.quitter());
+
 /** Appel branché sur ce client : messages chiffrés par le salon, média par le relais seulement (appel.ts). */
 function nouvelAppel(x: Session, c: ClientSalon): Appel {
   return new Appel({
@@ -403,7 +407,7 @@ function nouvelAppel(x: Session, c: ClientSalon): Appel {
     media: (o) =>
       navigator.mediaDevices.getUserMedia({
         audio: o.audio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true } : false,
-        video: o.video ? { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 }, facingMode: "user" } : false,
+        video: o.video ? { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 }, facingMode: o.face } : false,
       }),
     pair: (cfg) => new RTCPeerConnection(cfg),
     flux: () => new MediaStream(),

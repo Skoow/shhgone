@@ -186,7 +186,7 @@ async function inviter(browser: Browser, use: object, lien: string, mdp: string,
   return { ctx, page, erreurs };
 }
 
-test("appel vidéo à trois : tout passe par le relais, micro, caméra, raccrocher", async ({ page, context, shh, smtp, browser }, info) => {
+test("appel vidéo à trois : tout passe par le relais, qui parle, micro, caméra, raccrocher, onglet fermé", async ({ page, context, shh, smtp, browser }, info) => {
   const r = randomBytes(4).toString("hex");
   await espionner(context);
 
@@ -250,6 +250,10 @@ test("appel vidéo à trois : tout passe par le relais, micro, caméra, raccroch
     // A voit l'image de B (caméra allumée) : la vidéo distante avance.
     const videoDeB = tuiles(page).filter({ hasText: `Hugo${r.slice(4, 8)}` }).locator("video");
     await expect.poll(() => videoDeB.evaluate((v: HTMLVideoElement) => v.videoWidth > 0 && v.currentTime > 0), { timeout: 30_000 }).toBe(true);
+    // Qui parle (21 novembre) : le son factice de Chromium (bips) allume la tuile de qui l'envoie.
+    await expect.poll(() => tuiles(page).and(page.locator("[data-parle]")).count(), { timeout: 30_000 }).toBeGreaterThan(0);
+    // Un seul appareil photo factice : pas de bouton pour changer de caméra.
+    await expect(bouton(b.page, "Changer de caméra (face ou dos)")).toHaveCount(0);
     // C est entré sans caméra : pas d'image, son initiale à la place.
     await expect(tuiles(page).filter({ hasText: `Nora${r.slice(2, 6)}` }).locator(".pastille")).toBeVisible();
 
@@ -266,8 +270,11 @@ test("appel vidéo à trois : tout passe par le relais, micro, caméra, raccroch
     await expect(appel(page)).toHaveCount(0);
     await expect(page.getByText("Appel en cours (2)")).toBeVisible({ timeout: 30_000 });
     for (const p of [b.page, c.page]) await expect(tuiles(p)).toHaveCount(2, { timeout: 30_000 });
+    // Onglet de C fermé sans raccrocher (21 novembre) : B le voit partir tout de suite, sans
+    // attendre les 40 s d'absence.
+    await c.page.close();
+    await expect(tuiles(b.page)).toHaveCount(1, { timeout: 10_000 });
     await bouton(b.page, "Raccrocher").click();
-    await bouton(c.page, "Raccrocher").click();
     // Plus personne : le bandeau disparaît, les boutons d'appel reviennent.
     await expect(bouton(page, "Appel audio")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/Appel en cours/)).toHaveCount(0);
