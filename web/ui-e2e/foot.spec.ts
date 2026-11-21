@@ -80,6 +80,9 @@ test.describe("fr-FR", () => {
     await expect(f).toBeAttached();
     const reason = f.locator("[data-foot-busy]");
     await expect(reason).toContainText("désactivés pendant l'envoi");
+    // Plus de bandeau visible (21 novembre) : la raison est lue par les lecteurs d'écran et en bulle.
+    await expect(reason).toHaveClass(/sr-only/);
+    await expect(footLink(page, "Sécurité")).toHaveAttribute("title", /désactivés pendant l'envoi/);
     // Liens : désactivés, décrits par la raison, gardés au clavier (audit M22) ; un clic ne quitte pas la page.
     const sec = footLink(page, "Sécurité");
     await expect(sec).toHaveAttribute("aria-disabled", "true");
@@ -141,4 +144,14 @@ test.describe("fr-FR", () => {
     await expect(zone).toHaveText(/^\s*Déposez des fichiers n'importe où sur la page\s*ou cliquez ici pour les choisir\s*$/);
     expect(await composerFits(page)).toBe(true);
   });
+});
+
+test("page courte sur grand écran : le pied de page touche le bas de l'écran, sans bande vide dessous (21 novembre)", async ({ page, shh }) => {
+  await page.setViewportSize({ width: 2000, height: 1300 });
+  await page.goto(shh.origin + "/envois");
+  const f = foot(page);
+  await expect(f).toBeVisible();
+  const b = (await f.boundingBox())!;
+  const bas = await page.evaluate(() => Math.max(innerHeight, document.documentElement.scrollHeight));
+  expect(Math.abs(b.y + b.height - bas)).toBeLessThan(2);
 });

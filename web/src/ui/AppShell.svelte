@@ -67,7 +67,7 @@
   // Lien désactivé pendant l'envoi : annoncé comme tel, avec sa raison, et GARDÉ dans le parcours
   // clavier comme la langue et le nettoyage (audit M22 : sur « Lien prêt », Tab sautait les liens
   // mais pas les boutons ; un élément désactivé reste trouvable, sa raison se lit).
-  const off = $derived(busy ? { "aria-disabled": "true" as const, "aria-describedby": "foot-busy" } : {});
+  const off = $derived(busy ? { "aria-disabled": "true" as const, "aria-describedby": "foot-busy", title: t("foot.busy") } : {});
 
   const here = (name: string) => (router.current.name === name ? "page" : undefined);
 
@@ -175,8 +175,9 @@
 <footer class={["foot", { busy }]} data-foot>
   <div class="wrap foot-in">
     {#if busy}
-      <!-- Envoi en cours : raison lisible des liens et réglages désactivés. -->
-      <p id="foot-busy" class="busy-note" data-foot-busy>{t("foot.busy")}</p>
+      <!-- Envoi en cours : la raison des liens désactivés, lue par les lecteurs d'écran (aria-describedby)
+           et en bulle au survol ; plus de bandeau visible (propriétaire, 21 novembre). -->
+      <p id="foot-busy" class="sr-only" data-foot-busy>{t("foot.busy")}</p>
     {/if}
     <div class="brand">
       <a class="foot-logo" href={href("/")} aria-label={t("shell.home")} {...off} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/"))}><Logo /></a>
@@ -354,7 +355,15 @@
   .logo[aria-disabled="true"] {
     cursor: not-allowed;
   }
+  /* Page courte : le pied de page descend en bas de l'écran au lieu de laisser une bande vide
+     dessous (propriétaire, 21 novembre). */
+  :global(#app:has(> footer[data-foot])) {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
   main {
+    flex: 1 0 auto;
     min-height: 60dvh;
     padding-block: var(--sp-5);
   }
@@ -513,17 +522,7 @@
     color: var(--text-2);
     font-size: var(--fs-micro);
   }
-  /* Envoi en cours : liens et réglages désactivés (raison dite en tête du pied). */
-  .busy-note {
-    grid-column: 1 / -1;
-    margin: 0;
-    padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-md);
-    background: rgb(255 255 255 / 0.04);
-    box-shadow: inset 0 0 0 1px var(--hair);
-    color: var(--text-2);
-    font-size: var(--fs-small);
-  }
+  /* Envoi en cours : liens et réglages désactivés (raison lue par les lecteurs d'écran, et en bulle). */
   .foot [aria-disabled="true"] {
     color: var(--text-disabled);
     cursor: not-allowed;

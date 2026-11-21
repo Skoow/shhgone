@@ -87,6 +87,17 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("dialog", { name: "Ajouter" })).toBeVisible();
   });
 
+  test("ordinateur : la légende de l'animation est centrée dans son cadre (21 novembre)", async ({ page, shh }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(shh.origin + "/");
+    const cadre = page.locator("[data-demo-now]");
+    await cadre.scrollIntoViewIfNeeded();
+    await expect(cadre.locator(".cap")).toBeVisible();
+    const c = (await cadre.boundingBox())!;
+    const t = (await cadre.locator(".cap").boundingBox())!;
+    expect(Math.abs(t.x + t.width / 2 - (c.x + c.width / 2))).toBeLessThan(2);
+  });
+
   test("320 px : rien ne déborde ; capture", async ({ page, shh }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await page.goto(shh.origin + "/");

@@ -1002,6 +1002,9 @@
     display: grid;
     gap: 6px;
     align-content: center;
+    /* Centré dans le cadre (propriétaire, 21 novembre) : un <p> est borné à 65ch (base.css) et
+       restait collé à gauche sur ordinateur. */
+    justify-self: center;
     margin: 0;
     animation: cap-in 420ms var(--ease-out) both;
   }
