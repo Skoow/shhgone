@@ -23,10 +23,20 @@ Ce kit réduit les risques ; il ne rend pas le service invulnérable. Les limite
 
 Chez l'hébergeur et le registraire :
 
-- serveur loué **hors UE** (Suisse ou Islande, §15.1), trafic sortant inclus vérifié, aucun CDN ni proxy devant ;
+- serveur **dédié** loué (spécification §15.1 ; proposition du 22 novembre, §17.1 : en France, chez OVH), jamais un VPS (voir « Hébergeur et certificat » plus bas), trafic sortant inclus vérifié, aucun CDN ni proxy devant ;
 - instantanés et sauvegardes de la machine **désactivés** chez l'hébergeur, aucun agent de surveillance de l'hébergeur ;
 - **aucun outil qui ouvre `shares.db` pendant que le serveur tourne** (seule exception, pour `comptes.db` et non `shares.db` : la sauvegarde quotidienne du compte, §12.4, qui la lit une seconde environ) (sauvegarde à chaud, réplication de type Litestream, `sqlite3` pour « regarder ») : un lecteur d'un autre processus empêche le vidage du journal de la base (`shares.db-wal`), qui garde alors les lignes des partages et des salons déjà effacés. Le tableau de bord d'administration l'affiche (« Vidages de la base ratés ») ; le compte doit rester à 0 (audit adverse du 13 novembre, stockage, F3) ;
-- DNS : `A` et `AAAA` vers le serveur ; **DNSSEC** activé ; `CAA 0 issue "letsencrypt.org"` ; double authentification et verrou de transfert (§15.4).
+- DNS : `A` et `AAAA` vers le serveur ; **DNSSEC** activé ; `CAA 0 issue "letsencrypt.org"`, puis, après le premier certificat, lié à **notre** compte ACME : `CAA 0 issue "letsencrypt.org; accounturi=<URI du compte>"` (l'URI est dans le fichier du compte, sous `<SHH_DATA_ROOT>/caddy/acme/acme-v02.api.letsencrypt.org-directory/users/`) et `CAA 0 issuewild ";"` (aucun certificat générique) ; double authentification et verrou de transfert (§15.4).
+
+### Hébergeur et certificat (22 novembre)
+
+Ce que l'hébergeur (ou qui prend la machine) peut faire, et ce qui l'en empêche ou le fait voir :
+
+- **Le contenu reste hors de portée** : fichiers, messages, noms de fichiers, clés et mots de passe des utilisateurs sont chiffrés dans le navigateur ; le serveur ne les a jamais en clair, même en mémoire. Lire la mémoire ne donne que des métadonnées passagères (adresses des connexions en cours, tailles, heures, l'adresse e-mail le temps d'envoyer un code).
+- **Le volume chiffré se déverrouille par SSH seulement** (§5), jamais par la console KVM/IPMI de l'hébergeur, qui peut voir ce qu'on y tape. La phrase n'est écrite nulle part. Couper l'accès IPMI dans l'espace client quand il ne sert pas.
+- **Dédié plutôt que VPS** : sur un VPS, l'hébergeur lit la mémoire de la machine (donc la clé du volume ouvert et la clé TLS) d'une simple commande ; sur un dédié, il lui faut une intervention physique. Chiffrement de la mémoire par le processeur (AMD SME/TSME, Intel TME) : à activer dans le BIOS si le modèle l'a (pas le Xeon-D 2141I du SYS-2, trop ancien).
+- **Le vrai risque est la clé du certificat TLS** : avec elle (ou avec le DNS), on peut se faire passer pour Shhgone et servir un site modifié qui volerait les clés. Défenses : DNSSEC, verrou de transfert, CAA lié à notre compte ACME (plus haut), et **surveillance des journaux publics de certificats** : `alerte.sh` envoie une alerte URGENT `certificat-inconnu` si un certificat émis ces 3 derniers jours pour le nom n'est pas celui que sert le site (crt.sh, une fois par jour ; seul le nom du domaine, public, est envoyé). Si l'alerte n'est pas un renouvellement de Caddy : révoquer le certificat, changer les clés, vérifier le DNS, prévenir les utilisateurs (§6).
+- **Limite qui reste** (dite dans la page Sécurité) : le site est servi par le serveur à chaque visite ; un serveur pris peut servir un autre code. Les applications natives prévues (D42-20), signées et installées une fois, et le build reproductible (§28.1, empreintes publiées) la réduisent.
 
 Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plus) :
 

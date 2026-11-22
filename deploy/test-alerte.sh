@@ -36,6 +36,10 @@ sain() {
 	SHH_ALERTE_CERT_FIN="$(jour 60) 12:00:00 GMT"
 	export SHH_ALERTE_RDAP
 	SHH_ALERTE_RDAP="echo '{\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"2026-01-01T00:00:00Z\"},{\"eventAction\":\"expiration\",\"eventDate\":\"$(jour 300)T00:00:00Z\"}]}'"
+	# Certificate Transparency (format de crt.sh) : le certificat servi (série 0a:1b, émis hier) et
+	# un ancien de 40 jours (renouvelé depuis) : rien de suspect.
+	export SHH_ALERTE_CERT_SERIE='0A1B' SHH_ALERTE_CT
+	SHH_ALERTE_CT="echo '[{\"id\":1,\"entry_timestamp\":\"x\",\"not_before\":\"$(jour -1)T10:00:00\",\"serial_number\":\"0a1b\"},{\"id\":2,\"not_before\":\"$(jour -40)T10:00:00\",\"serial_number\":\"ffee\"}]'"
 	export SHH_ALERTE_DNS='echo "192.0.2.10 STREAM exemple.test"' SHH_ALERTE_IPS='echo "1: lo inet 127.0.0.1/8"; echo "2: eth0 inet 192.0.2.10/24"'
 	export SHH_ALERTE_SAUVEGARDE_OK="$work/sauvegarde-ok"
 	echo $((NOW - 3600)) >"$work/sauvegarde-ok"
@@ -80,11 +84,12 @@ export SHH_ALERTE_DF='printf "Use%% IUse%%\n 93%%  95%%\n"' SHH_ALERTE_SMART='ec
 export SHH_ALERTE_MEMINFO='printf "MemTotal: 1000 kB\nMemAvailable: 50 kB\n"'
 SHH_ALERTE_CERT_FIN="$(jour 3) 12:00:00 GMT"
 SHH_ALERTE_RDAP="echo '{\"events\":[{\"eventDate\":\"$(jour 2)T00:00:00Z\",\"eventAction\":\"expiration\"}]}'"
+SHH_ALERTE_CT="echo '[{\"not_before\":\"$(jour -1)T10:00:00\",\"serial_number\":\"0a1b\"},{\"serial_number\":\"c0ffee\",\"not_before\":\"$(jour -2)T08:00:00\"}]'"
 export SHH_ALERTE_DNS='echo "203.0.113.99 STREAM exemple.test"' SHH_SERVEUR_ECHEANCE
 SHH_SERVEUR_ECHEANCE=$(jour 5)
 echo $((NOW - 30 * 3600)) >"$work/sauvegarde-ok"
 lance urgent
-attendu urgent "Bilan bilan,URGENT certificat,URGENT conteneur,URGENT disque-données,URGENT disque-données-inodes,URGENT disque-système,URGENT disque-système-inodes,URGENT dns,URGENT domaine,URGENT hebergement,URGENT memoire,URGENT sauvegarde,URGENT serveur,URGENT smart,Rappel restauration"
+attendu urgent "Bilan bilan,URGENT certificat,URGENT certificat-inconnu,URGENT conteneur,URGENT disque-données,URGENT disque-données-inodes,URGENT disque-système,URGENT disque-système-inodes,URGENT dns,URGENT domaine,URGENT hebergement,URGENT memoire,URGENT sauvegarde,URGENT serveur,URGENT smart,Rappel restauration"
 grep -q "203.0.113.99\|192.0.2.10" "$work/urgent.out" && ko "urgent : une adresse IP dans l'alerte"
 grep -q "Constats en cours" "$work/urgent.out" || ko "urgent : bilan sans les constats"
 # Une heure plus tard : les urgences reviennent (période 1 h), pas le bilan ; la sauvegarde

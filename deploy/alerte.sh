@@ -15,6 +15,9 @@
 #     dns            le nom de domaine ne pointe plus vers cette machine
 #     sauvegarde     aucune sauvegarde réussie depuis 26 h
 #     smart          un disque annonce une panne (smartctl)
+#   et, une fois par jour :
+#     certificat-inconnu  un certificat émis pour le nom ces 3 derniers jours n'est pas celui que
+#                    sert le site (journaux publics Certificate Transparency, via crt.sh)
 #   à prévoir (« À prévoir ») :
 #     disque-bientot  75 % ou plus, ou plein (95 %) dans moins de 14 jours au rythme du jour
 #     certificat-bientot  moins de 21 jours (Caddy renouvelle à 30 : le renouvellement échoue)
@@ -49,7 +52,7 @@
 # Essais (deploy/test-alerte.sh) : SHH_ENV_FILE, SHH_ALERTE_ETAT, SHH_ALERTE_MAINTENANT (heure
 # Unix), et une commande ou un fichier de remplacement par contrôle : SHH_ALERTE_SANTE,
 # SHH_ALERTE_DF (sortie « pcent ipcent » d'un dossier), SHH_ALERTE_MEMINFO, SHH_ALERTE_LOADAVG,
-# SHH_ALERTE_NPROC, SHH_ALERTE_DOCKER, SHH_ALERTE_CERT_FIN, SHH_ALERTE_RDAP, SHH_ALERTE_DNS,
+# SHH_ALERTE_NPROC, SHH_ALERTE_DOCKER, SHH_ALERTE_CERT_FIN, SHH_ALERTE_CERT_SERIE, SHH_ALERTE_CT, SHH_ALERTE_RDAP, SHH_ALERTE_DNS,
 # SHH_ALERTE_IPS, SHH_ALERTE_SAUVEGARDE_OK, SHH_ALERTE_SMART, SHH_ALERTE_APT,
 # SHH_ALERTE_REBOOT, SHH_ALERTE_RETARD, SHH_ALERTE_NTP, SHH_ALERTE_UNITES.
 set -euo pipefail
@@ -193,8 +196,13 @@ fi
 # --- Certificat, domaine, DNS, hébergement ------------------------------------------------------
 jours_cert="" jours_dom="" jours_serv=""
 if [ -n "${SHH_DOMAIN:-}" ]; then
-	fin_cert=${SHH_ALERTE_CERT_FIN:-$(openssl s_client -connect "$SHH_DOMAIN:443" -servername "$SHH_DOMAIN" </dev/null 2>/dev/null |
-		openssl x509 -noout -enddate 2>/dev/null | sed -n 's/^notAfter=//p' || true)}
+	cert_servi=""
+	if [ -z "${SHH_ALERTE_CERT_FIN:-}" ] || [ -z "${SHH_ALERTE_CERT_SERIE:-}" ]; then
+		cert_servi=$(openssl s_client -connect "$SHH_DOMAIN:443" -servername "$SHH_DOMAIN" </dev/null 2>/dev/null |
+			openssl x509 -noout -enddate -serial 2>/dev/null || true)
+	fi
+	fin_cert=${SHH_ALERTE_CERT_FIN:-$(printf '%s\n' "$cert_servi" | sed -n 's/^notAfter=//p')}
+	serie_servie=${SHH_ALERTE_CERT_SERIE:-$(printf '%s\n' "$cert_servi" | sed -n 's/^serial=//p')}
 	jours_cert=""
 	if [ -n "$fin_cert" ]; then jours_cert=$(jours_jusqua "$fin_cert"); fi
 	if [ -z "$jours_cert" ]; then
@@ -226,6 +234,34 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 		envoyer domaine $HEURE "le domaine $SHH_DOMAIN expire dans $jours_dom jour(s) : le renouveler maintenant"
 	elif [ "$jours_dom" -lt 45 ]; then
 		envoyer domaine-bientot $SEMAINE "le domaine $SHH_DOMAIN expire dans $jours_dom jours : vérifier le renouvellement automatique et le moyen de paiement"
+	fi
+
+	# Certificats émis pour le nom (journaux publics Certificate Transparency, via crt.sh, une
+	# fois par jour) : tout certificat émis ces 3 derniers jours qui n'est pas celui que sert
+	# Caddy est suspect (DNS détourné, autorité trompée, clé du serveur volée qui sert ailleurs).
+	# Une erreur de renouvellement suivie d'un nouvel essai le même jour peut aussi le déclencher.
+	ct_cache="$etat/ct"
+	if [ -f "$ct_cache" ] && [ $((now - $(stat -c %Y "$ct_cache"))) -lt $JOUR ] && [ -z "${SHH_ALERTE_CT:-}" ]; then
+		ct=$(cat "$ct_cache")
+	else
+		ct=$(lire SHH_ALERTE_CT curl -sS --fail --max-time 60 --proto '=https' \
+			"https://crt.sh/?q=$SHH_DOMAIN&output=json&exclude=expired")
+		printf '%s' "$ct" >"$ct_cache"
+	fi
+	norm() { tr 'A-F' 'a-f' | tr -d ':' | sed 's/^0*//'; }
+	serie_ok=$(printf '%s' "$serie_servie" | norm)
+	if [ -n "$ct" ] && [ -n "$serie_ok" ]; then
+		inconnus=0
+		while IFS='|' read -r debut serie; do
+			if [ -z "$debut" ] || [ -z "$serie" ]; then continue; fi
+			t=$(date -u -d "$debut" +%s 2>/dev/null) || continue
+			[ $((now - t)) -le $((3 * JOUR)) ] || continue
+			[ "$(printf '%s' "$serie" | norm)" = "$serie_ok" ] || inconnus=$((inconnus + 1))
+		done < <(printf '%s' "$ct" | tr '{' '\n' | tr '}' '\n' | grep '"serial_number"' |
+			sed -n 's/.*"not_before" *: *"\([^"]*\)".*"serial_number" *: *"\([^"]*\)".*/\1|\2/p; t; s/.*"serial_number" *: *"\([^"]*\)".*"not_before" *: *"\([^"]*\)".*/\2|\1/p' || true)
+		if [ "$inconnus" -gt 0 ]; then
+			envoyer certificat-inconnu $JOUR "$inconnus certificat(s) émis pour $SHH_DOMAIN ces 3 derniers jours, autre(s) que celui que sert le site : vérifier sur crt.sh ; si ce n'est pas un renouvellement de Caddy, le DNS ou la clé est compromis (README, « Hébergeur et certificat »)"
+		fi
 	fi
 
 	# DNS : le nom pointe-t-il vers une adresse de cette machine ? (Rien n'est écrit ni envoyé.)
