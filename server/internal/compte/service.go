@@ -1,6 +1,7 @@
 package compte
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
 	"database/sql"
 	"errors"
@@ -22,6 +23,7 @@ import (
 type Service struct {
 	db   *sql.DB
 	cles Cles
+	wa   *Ceremonies // nil : ligne de commande (bannissements), aucune cérémonie
 	lim  *limits.Limiter
 	now  func() time.Time
 	max  int
@@ -50,11 +52,14 @@ type Service struct {
 // Config : base ouverte par OuvrirBase, sous-clé de K_serveur, limites (le même limiteur que
 // l'API), horloge, SHH_COMPTES_MAX, SHH_COMPTES_JOUR.
 type Config struct {
-	DB      *sql.DB
-	Cles    Cles
-	Limites *limits.Limiter
-	Now     func() time.Time
-	Max     int
+	DB   *sql.DB
+	Cles Cles
+	// Ceremonies : configuration WebAuthn figée (NouvellesCeremonies depuis SHH_ORIGIN) ; nil
+	// pour la ligne de commande d'administration, qui n'inscrit ni ne connecte personne.
+	Ceremonies *Ceremonies
+	Limites    *limits.Limiter
+	Now        func() time.Time
+	Max        int
 	// Jour : comptes créés au plus par jour pour tout le serveur (0 : 500, la valeur par défaut
 	// de SHH_COMPTES_JOUR).
 	Jour int
@@ -81,7 +86,7 @@ func NewService(c Config) (*Service, error) {
 	if c.Jour == 0 {
 		c.Jour = ComptesJourDefaut
 	}
-	s := &Service{db: c.DB, cles: c.Cles, lim: c.Limites, now: c.Now, max: c.Max, jour: c.Jour,
+	s := &Service{db: c.DB, cles: c.Cles, wa: c.Ceremonies, lim: c.Limites, now: c.Now, max: c.Max, jour: c.Jour,
 		fermerSalons: c.FermerSalons, salonsActifs: c.SalonsActifs, salonsVivants: c.SalonsVivants,
 		detruireSalon: c.DetruireSalon, refs: map[[16]byte]refSalon{}}
 	s.et.m = map[[32]byte]*etape{}
@@ -145,6 +150,9 @@ func heureSuivante(t time.Time) time.Duration { return t.Truncate(time.Hour).Add
 
 // jourSuivant : délai jusqu'au jour UTC suivant (fenêtres des limites au jour).
 func jourSuivant(t time.Time) time.Duration { return time.Unix(jourDe(t)+jourS, 0).Sub(t) }
+
+// tirer : octets aléatoires (crypto/rand ne renvoie pas d'erreur sous Linux).
+func tirer(b []byte) { rand.Read(b) }
 
 func boolInt(b bool) int {
 	if b {

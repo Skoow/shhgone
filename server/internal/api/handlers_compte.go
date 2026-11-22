@@ -33,6 +33,10 @@ const (
 )
 
 func (a compteAPI) routes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/compte/inscription/debut", a.inscriptionDebut)
+	mux.HandleFunc("POST /api/compte/inscription/fin", a.inscriptionFin)
+	mux.HandleFunc("POST /api/compte/connexion/debut", a.connexionDebut)
+	mux.HandleFunc("POST /api/compte/connexion/fin", a.connexionFin)
 	mux.HandleFunc("POST /api/compte/recup", a.recup)
 	mux.HandleFunc("GET /api/compte/sessions", a.sessions)
 	mux.HandleFunc("POST /api/compte/sessions/fermer", a.fermer)

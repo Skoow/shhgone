@@ -76,7 +76,8 @@ func TestBrancherComptesActive(t *testing.T) {
 	dir, secrets := t.TempDir(), t.TempDir()
 	cle := filepath.Join(secrets, "cle")
 	os.WriteFile(cle, bytes.Repeat([]byte{9}, 32), 0o400)
-	cfg := config.Config{DataDir: dir, Salons: true, Comptes: true, ComptesCleFile: cle, ComptesMax: 10, ComptesJour: 500}
+	cfg := config.Config{DataDir: dir, Salons: true, Comptes: true, ComptesCleFile: cle, ComptesMax: 10, ComptesJour: 500,
+		Origin: "http://localhost:8080"}
 	cpt, err := setupComptes(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +99,7 @@ func TestBrancherComptesSalons(t *testing.T) {
 	cle := filepath.Join(secrets, "cle")
 	os.WriteFile(cle, bytes.Repeat([]byte{9}, 32), 0o400)
 	cfg := config.Config{DataDir: dir, Salons: true, SalonsMax: 10, StorageMaxBytes: 1 << 40, Now: time.Now,
-		Comptes: true, ComptesCleFile: cle, ComptesMax: 10}
+		Comptes: true, ComptesCleFile: cle, ComptesMax: 10, Origin: "http://localhost:8080"}
 	db, err := store.Open(filepath.Join(dir, "shares.db"))
 	if err != nil {
 		t.Fatal(err)

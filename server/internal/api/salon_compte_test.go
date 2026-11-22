@@ -46,13 +46,13 @@ func newEnvSalonCompte(t *testing.T) envSalonCompte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cc := compte.Config{DB: db, Cles: c, Limites: e.srv.lim, Now: e.clk.Now, Max: 100}
+	cc := compte.Config{DB: db, Cles: c, Ceremonies: ceremoniesTest(t), Limites: e.srv.lim, Now: e.clk.Now, Max: 100}
 	BrancherSalonsDuCompte(&cc, m)
 	if svc, err = compte.NewService(cc); err != nil {
 		t.Fatal(err)
 	}
 	e.h = newHandler(e.srv, htmlStatic(), Salons{Origin: "https://shhdrop.app", M: m, Comptes: svc})
-	return envSalonCompte{envCompte{e, db, c}, m, svc, db}
+	return envSalonCompte{envCompte{e, db, c, svc}, m, svc, db}
 }
 
 // creerAvec : POST /api/salons depuis remote, avec la session s ("" : sans en-tête).

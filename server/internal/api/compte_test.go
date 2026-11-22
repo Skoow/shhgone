@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/skoow/shhdrop/server/internal/compte"
+	"github.com/skoow/shhdrop/server/internal/compte/webauthntest"
 )
 
 // Routes du compte (conception du compte §8.6, §21.6.2 ; conception du compte par passkey §6.4).
@@ -23,6 +25,20 @@ type envCompte struct {
 	*env
 	cdb  *sql.DB // comptes.db
 	cles compte.Cles
+	svc  *compte.Service
+}
+
+// origineCompte : SHH_ORIGIN des tests du compte (rp.id localhost : les navigateurs refusent une
+// adresse IP comme rp.id).
+const origineCompte = "http://localhost:8080"
+
+func ceremoniesTest(t *testing.T) *compte.Ceremonies {
+	t.Helper()
+	wa, err := compte.NouvellesCeremonies(origineCompte, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return wa
 }
 
 func newEnvCompte(t *testing.T) envCompte {
@@ -35,12 +51,13 @@ func newEnvCompte(t *testing.T) envCompte {
 	t.Cleanup(func() { db.Close() })
 	var c compte.Cles
 	rand.Read(c.Pseudo[:])
-	s, err := compte.NewService(compte.Config{DB: db, Cles: c, Limites: e.srv.lim, Now: e.clk.Now, Max: 100})
+	s, err := compte.NewService(compte.Config{DB: db, Cles: c, Ceremonies: ceremoniesTest(t), Limites: e.srv.lim,
+		Now: e.clk.Now, Max: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
 	e.h = newHandler(e.srv, htmlStatic(), Salons{Comptes: s})
-	return envCompte{e, db, c}
+	return envCompte{e, db, c, s}
 }
 
 func coffre(magic string, gen uint64) []byte {
@@ -54,37 +71,82 @@ func coffre(magic string, gen uint64) []byte {
 func coffreB64(magic string, gen uint64) string { return enc.EncodeToString(coffre(magic, gen)) }
 
 // inscrit : un compte de test. aR : A_r de sa clé de récupération (base64url) ; session : jeton
-// d'une session récente.
+// d'une session récente ; auth, pk : l'authentificateur logiciel et sa passkey.
 type inscrit struct {
 	h, session, aR string
+	auth           *webauthntest.Authentificateur
+	pk             *webauthntest.Passkey
 }
 
-// inscrire : un compte écrit directement dans comptes.db (ligne du compte et d'une passkey,
-// comme inscription/fin), puis une session ouverte par POST recup (réelle, récente). La
-// cérémonie WebAuthn d'inscription est testée à part (lots S3, S4).
+// debutInscription : preuve ALTCHA puis inscription/debut ; rend l'étape et les options.
+func (e envCompte) debutInscription(t *testing.T, remote string) (string, json.RawMessage) {
+	t.Helper()
+	alt, shown := e.captchaFor(t, remote)
+	w := e.do(req{method: "POST", path: "/api/compte/inscription/debut", remote: remote,
+		body: mustJSON(map[string]any{"altcha": alt, "hp": "", "shown_at": shown})})
+	expect(t, w, 200, "")
+	var d struct {
+		Etape   string          `json:"etape"`
+		Options json.RawMessage `json:"options"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &d); err != nil || len(d.Etape) != 43 || len(d.Options) < 100 {
+		t.Fatalf("inscription/debut : %q", w.Body.String())
+	}
+	return d.Etape, d.Options
+}
+
+// corpsFin : corps d'inscription/fin (enveloppes et coffres aléatoires : le serveur ne les
+// ouvre jamais) ; aR : A_r tiré pour ce compte.
+func corpsFin(etape string, cred []byte, pseudo string, aR []byte) map[string]any {
+	vr := sha256.Sum256(aR)
+	return map[string]any{"etape": etape, "credential": json.RawMessage(cred), "p_canon": pseudo,
+		"env": enc.EncodeToString(rnd(60)), "v_r": enc.EncodeToString(vr[:]), "env_r": enc.EncodeToString(rnd(60)),
+		"blob_profil": coffreB64("SHH-PROF1", 1), "blob_prive": coffreB64("SHH-ACCT1", 1), "persistante": false,
+		"etiquette": "", "cred_etiquette": enc.EncodeToString(rnd(64))}
+}
+
+// inscrire : parcours complet par HTTP (ALTCHA, inscription/debut, pseudo/verifier, passkey de
+// l'authentificateur logiciel, inscription/fin), comme le site.
 func (e envCompte) inscrire(t *testing.T, remote, pseudo string) inscrit {
 	t.Helper()
-	h, aR := rnd(16), rnd(32)
-	vr := sha256.Sum256(aR)
-	pe, err := e.cles.EmpreintePseudo([]byte(pseudo))
+	etape, opts := e.debutInscription(t, remote)
+	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/verifier", remote: remote,
+		body: mustJSON(map[string]any{"etape": etape, "p_canon": pseudo})}), 200, `{"libre":true}`)
+	a := webauthntest.Nouveau(webauthntest.ES256)
+	cred, p, err := a.Creer(opts, origineCompte, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	now := e.clk.Now().UTC()
-	jour := now.Unix() / 86400 * 86400
-	mois := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).Unix()
-	if _, err := e.cdb.Exec(`INSERT INTO comptes(h, p_empreinte, pseudo_jour, v_r, env_r, blob_profil, gen_profil, blob_prive,
-		gen_prive, cree_jour, compte_des, vu_mois) VALUES(?,?,0,?,?,?,1,?,1,?,?,?)`, h, pe[:], vr[:], rnd(60),
-		coffre("SHH-PROF1", 1), coffre("SHH-ACCT1", 1), jour, jour, mois); err != nil {
+	aR := rnd(32)
+	w := e.do(req{method: "POST", path: "/api/compte/inscription/fin", remote: remote, body: mustJSON(corpsFin(etape, cred, pseudo, aR))})
+	expect(t, w, 201, "")
+	d := jsonOf(t, w)
+	s, _ := d["session"].(string)
+	h, _ := d["h"].(string)
+	if len(s) != 43 || len(h) != 22 || len(d) != 2 || h != enc.EncodeToString(p.UserHandle) {
+		t.Fatalf("inscription/fin : %q", w.Body.String())
+	}
+	return inscrit{h: h, session: s, aR: enc.EncodeToString(aR), auth: a, pk: p}
+}
+
+// connecter : connexion/debut puis connexion/fin avec la passkey de in ; rend la réponse.
+func (e envCompte) connecter(t *testing.T, remote string, in inscrit) map[string]any {
+	t.Helper()
+	w := e.do(req{method: "POST", path: "/api/compte/connexion/debut", remote: remote, body: []byte(`{}`)})
+	expect(t, w, 200, "")
+	var d struct {
+		Etape   string          `json:"etape"`
+		Options json.RawMessage `json:"options"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &d)
+	cred, err := in.auth.Obtenir(d.Options, origineCompte, in.pk)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.cdb.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, env, etiquette, ajoutee_mois)
-		VALUES(?,?,?,-7,1,?,NULL,?)`, rnd(32), h, rnd(77), rnd(60), mois); err != nil {
-		t.Fatal(err)
-	}
-	in := inscrit{h: enc.EncodeToString(h), aR: enc.EncodeToString(aR)}
-	in.session = e.recup(t, remote, in)
-	return in
+	w = e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: remote, body: mustJSON(map[string]any{
+		"etape": d.Etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""})})
+	expect(t, w, 200, "")
+	return jsonOf(t, w)
 }
 
 // recup : POST recup réussi ; rend le jeton de session.
@@ -125,7 +187,8 @@ func TestRoutesCompteAbsentes(t *testing.T) {
 }
 
 var routesCompte = [][2]string{
-	{"POST", "/api/compte/recup"},
+	{"POST", "/api/compte/inscription/debut"}, {"POST", "/api/compte/inscription/fin"},
+	{"POST", "/api/compte/connexion/debut"}, {"POST", "/api/compte/connexion/fin"}, {"POST", "/api/compte/recup"},
 	{"GET", "/api/compte/sessions"}, {"POST", "/api/compte/sessions/fermer"}, {"POST", "/api/compte/deconnexion"},
 	{"POST", "/api/compte/sessions/etiquette"},
 	{"GET", "/api/compte/coffre/profil"}, {"PUT", "/api/compte/coffre/profil"}, {"GET", "/api/compte/coffre/prive"},
@@ -170,7 +233,7 @@ func TestRecupHTTP(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	w = e.do(req{method: "GET", path: "/api/compte/sessions", hdr: sess(d["session"].(string))})
-	if strings.Count(w.Body.String(), `"par_recup":true`) != 2 {
+	if strings.Count(w.Body.String(), `"par_recup":true`) != 1 || strings.Count(w.Body.String(), `"par_recup":false`) != 1 {
 		t.Fatal(w.Body.String())
 	}
 	for _, b := range []string{
@@ -340,7 +403,7 @@ func TestEtatExportSuppressionHTTP(t *testing.T) {
 	expect(t, w, 200, "")
 	x := jsonOf(t, w)
 	if cles(x) != "anciennete_depuis,banni_jusqu,banni_motif,cree_le,passkeys,salons_actifs,sessions,vu_mois" ||
-		strings.Contains(w.Body.String(), "lea") || !strings.Contains(w.Body.String(), `"par_recup":true`) ||
+		strings.Contains(w.Body.String(), "lea") || !strings.Contains(w.Body.String(), `"par_recup":false`) ||
 		!strings.Contains(w.Body.String(), `"be":true,"prf":true,"cle_pub":"`) {
 		t.Fatal(w.Body.String())
 	}

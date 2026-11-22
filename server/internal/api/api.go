@@ -725,7 +725,13 @@ var errKeys = errors.New("clés JSON invalides")
 // ensuite par Decode. `null` à la place d'un objet (structure qui n'est pas derrière un
 // pointeur : le corps entier, ou un champ objet obligatoire) → errKeys (relecture C-2 Task 17 :
 // sinon un corps `null` passait pour `{}`) ; un champ pointeur facultatif peut valoir `null`.
+//
+// json.RawMessage (objet WebAuthn du compte par passkey, lu ensuite par sa bibliothèque) : une
+// valeur JSON quelconque, lue sans contrôle des clés (sansNull refuse déjà tout null du corps).
 func strictKeys(dec *json.Decoder, t reflect.Type) error {
+	if t == typeRawMessage {
+		return passerValeur(dec)
+	}
 	nullable := t == nil || t.Kind() == reflect.Pointer
 	for t != nil && t.Kind() == reflect.Pointer {
 		t = t.Elem()
@@ -783,6 +789,28 @@ func strictKeys(dec *json.Decoder, t reflect.Type) error {
 		return errKeys
 	}
 	return nil // valeur simple
+}
+
+var typeRawMessage = reflect.TypeFor[json.RawMessage]()
+
+// passerValeur : lit une valeur JSON entière (objets et tableaux imbriqués compris).
+func passerValeur(dec *json.Decoder) error {
+	n := 0
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tok {
+		case json.Delim('{'), json.Delim('['):
+			n++
+		case json.Delim('}'), json.Delim(']'):
+			n--
+		}
+		if n == 0 {
+			return nil
+		}
+	}
 }
 
 // jsonFields : nom JSON exact → type, pour les champs exportés d'une structure.

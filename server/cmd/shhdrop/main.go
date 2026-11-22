@@ -315,7 +315,12 @@ func setupComptes(cfg config.Config) (*comptes, error) {
 // compte (fermeture, nombre, liste, destruction).
 func brancherComptes(cfg config.Config, cpt *comptes, lim *limits.Limiter, sm *salon.Manager) error {
 	if cfg.Comptes && cpt != nil {
-		cc := compte.Config{DB: cpt.db, Cles: cpt.cles, Limites: lim, Now: cfg.Now, Max: cfg.ComptesMax, Jour: cfg.ComptesJour}
+		wa, err := compte.NouvellesCeremonies(cfg.Origin, cfg.WebAuthnOriginesApps)
+		if err != nil {
+			return shown(err.Error())
+		}
+		cc := compte.Config{DB: cpt.db, Cles: cpt.cles, Ceremonies: wa, Limites: lim, Now: cfg.Now, Max: cfg.ComptesMax,
+			Jour: cfg.ComptesJour}
 		if sm != nil {
 			api.BrancherSalonsDuCompte(&cc, sm)
 		}

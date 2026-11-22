@@ -132,6 +132,8 @@
 
 ## Lot S4 — Routes : inscription, connexion, récupération
 
+**État : fait le 22 novembre (recup et limites venues dès S2). Écarts signalés : dans les requêtes, « aucune enveloppe » s'écrit env: "" (jamais null : JSON strict sans null, §8.6) ; la difficulté ALTCHA double par compte créé pendant l'heure qui suit (captcha.RecordCreate existant, commun aux créations), pas « dans la journée ».**
+
 *Livrable seul (`SHH_COMPTES=1` : comptes créables par un client de test). Dépend de : S3.*
 
 **Files :**
@@ -144,8 +146,8 @@
 - `POST connexion/debut` `{}` → `{ etape, options }` ; `POST connexion/fin` → `{ session, h, cred_id, env, blob_profil, gen_profil, blob_prive, gen_prive }`, `vu_mois` mis à jour ;
 - `POST recup` `{ a_r, persistante, etiquette }` → recherche par `v_r` = SHA-256(`a_r`) (index unique, pas de comparaison en boucle) → session **récente**, `par_recup = 1` ; erreur `identifiants` (403, même corps que passkey inconnue).
 
-- [ ] **Step 1 : tests** — parcours complets avec l'authentificateur logiciel ; `TestRecupVecteurs` (les `a_r` de `compte-v3.json` retrouvent un compte créé avec les `v_r` correspondants) ; `env`, `env_r` ≠ 60 octets refusés ; `v_r` en double refusé ; `A_r` absent de toute réponse, de tout journal et de la base (`TestAucunSequestre` : aucune route ne rend `K_compte`, `KEK_*`, `R`, `A_r`) ; quotas §7.2 un par un ; `allowedMaps` à jour.
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go` et `make test-e2e`. **Step 5 :** commit `feat(serveur): inscription et connexion par passkey, récupération par clé`.
+- [x] **Step 1 : tests** — parcours complets avec l'authentificateur logiciel ; `TestRecupVecteurs` (les `a_r` de `compte-v3.json` retrouvent un compte créé avec les `v_r` correspondants) ; `env`, `env_r` ≠ 60 octets refusés ; `v_r` en double refusé ; `A_r` absent de toute réponse, de tout journal et de la base (`TestAucunSequestre` : aucune route ne rend `K_compte`, `KEK_*`, `R`, `A_r`) ; quotas §7.2 un par un ; `allowedMaps` à jour.
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go` et `make test-e2e`. **Step 5 :** commit `feat(serveur): inscription et connexion par passkey, récupération par clé`.
 
 ## Lot S5 — Passkeys du compte, réauthentification, nouvelle clé de récupération
 
