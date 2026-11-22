@@ -22,7 +22,21 @@
 import { b64u } from "../engine/pure";
 import { jetonFinaliser, jetonPreparer } from "./moteur";
 import { emettre, lireCles, lireEtat, netParDefaut, type CleJetons, type Net, type OffrePayante } from "./api";
-import { garderCleVue, garderJeton, lireClesVues, lireJetons, lirePasses, nouvelId, retirerCleVue, retirerJeton, type CleVue } from "./pass";
+import {
+  garderCleVue,
+  garderEtat,
+  garderJeton,
+  lireClesVues,
+  lireEtatGarde,
+  lireJetons,
+  lirePasses,
+  nouvelId,
+  oublierEtat,
+  retirerCleVue,
+  retirerJeton,
+  type CleVue,
+  type EtatGarde,
+} from "./pass";
 
 /** Jetons demandés par requête (au plus 5 côté serveur). */
 export const JETONS_PAR_LOT = 3;
@@ -48,13 +62,25 @@ export function delaiAleatoire(u: Uint32Array = crypto.getRandomValues(new Uint3
 
 /**
  * Formules payantes utilisables sur cet appareil : pass gardés que le serveur dit payés et non
- * échus. Aucune requête sans pass gardé.
+ * échus. Aucune requête sans pass gardé. L'état de chaque pass (POST /etat, qui envoie P) est
+ * demandé au plus une fois par jour UTC : gardé chiffré sur l'appareil (pass.ts, garderEtat) et
+ * resservi le même jour, sauf événement qui l'a oublié (pass rangé de nouveau ou oublié, émission
+ * refusée, résiliation). Sans cela, chaque chargement datait le pass pour le serveur.
  */
 export async function formulesDisponibles(idb: IDBFactory, n: Net = netParDefaut(), maintenant: Date = new Date()): Promise<OffrePayante[]> {
   const out = new Set<OffrePayante>();
+  const auj = jour(maintenant);
   for (const g of await lirePasses(idb)) {
-    const e = await lireEtat(g.pass, n);
-    if (e?.etat === "payee" && e.offre !== null && e.fin !== null && e.fin > jour(maintenant)) out.add(e.offre);
+    const garde = await lireEtatGarde(idb, g.id);
+    let e: EtatGarde | null = garde !== null && garde.jour === auj ? garde : null;
+    if (e === null) {
+      const lu = await lireEtat(g.pass, n);
+      if (lu !== null) {
+        e = { ...lu, jour: auj };
+        await garderEtat(idb, g.id, e).catch(() => undefined);
+      }
+    }
+    if (e?.etat === "payee" && e.offre !== null && e.fin !== null && e.fin > auj) out.add(e.offre);
   }
   return (["plus", "pro"] as const).filter((x) => out.has(x));
 }
@@ -140,6 +166,8 @@ async function obtenirLot(idb: IDBFactory, offre: OffrePayante, n: Net, maintena
         demandes.map((d) => d.requete),
         n,
       );
+      // Refus (révoqué, échu, réserve épuisée) : l'état gardé de ce pass n'est plus sûr.
+      if (rep === "aucun") await oublierEtat(idb, g.id).catch(() => undefined);
       if (rep === "aucun" || rep === null || rep.offre !== offre) continue;
       const jetons: string[] = [];
       for (let i = 0; i < demandes.length; i++) jetons.push(b64u(await jetonFinaliser(cle.spki, cles.emetteur, demandes[i]!.etat, rep.reponses[i]!)));

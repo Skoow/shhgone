@@ -8,7 +8,7 @@
   import { getLang, t } from "../i18n/i18n.svelte";
   import { lireEtat, lireOffre, resilier, type EtatPaiement } from "../paiement/api";
   import { telechargerNote } from "../paiement/note";
-  import { garder, idbDuNavigateur, lirePasses, oublier, type PassGarde } from "../paiement/pass";
+  import { garder, idbDuNavigateur, lirePasses, oublier, oublierEtat, type PassGarde } from "../paiement/pass";
 
   let { rapide = 3000, lent = 30000 }: { rapide?: number; lent?: number } = $props();
   const lang = $derived(getLang());
@@ -33,6 +33,8 @@
         const r = await lireEtat(cible.pass);
         if (!vivant) return;
         if (r !== null) e = r;
+        // Retour de paiement : l'état gardé pour l'écran d'envoi (jetons.ts) est relu au prochain chargement.
+        if (r !== null) await oublierEtat(idb, cible.id).catch(() => {});
         if (r !== null && r.etat === "payee" && enAttente) {
           enAttente = false;
           await garder(idb, { ...cible, enAttente: false }).catch(() => {});
@@ -56,6 +58,8 @@
   async function arreter(): Promise<void> {
     if (!g) return;
     const r = await resilier(g.pass);
+    const idb = idbDuNavigateur();
+    if (idb) await oublierEtat(idb, g.id).catch(() => {});
     arret = r === "erreur" ? "erreur" : "ok";
     if (r !== "erreur" && e) e = { ...e, renouvelle: false };
   }

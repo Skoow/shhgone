@@ -22,7 +22,7 @@ import {
   reapprovisionner,
   refusCles,
 } from "./jetons";
-import { garder, garderJeton, lireClesVues, lireJetons, lirePasses, nouvelId, tirerPass } from "./pass";
+import { garder, garderJeton, lireClesVues, lireJetons, lirePasses, nouvelId, oublier, oublierEtat, tirerPass } from "./pass";
 
 const PP = JSON.parse(readFileSync(new URL("../../../engine/vectors/privacypass.json", import.meta.url), "utf8"));
 const sk = createPrivateKey({ key: Buffer.from(PP.sk_pkcs8_hex, "hex"), format: "der", type: "pkcs8" });
@@ -72,7 +72,9 @@ describe("portefeuille de jetons", () => {
     const idb = fakeIndexedDB();
     await avecPass(idb);
     expect(await formulesDisponibles(idb, serveur().n, MAINTENANT)).toEqual(["plus"]);
-    expect(await formulesDisponibles(idb, serveur("revoquee").n, MAINTENANT)).toEqual([]);
+    // Le même jour, l'état gardé est resservi ; le lendemain UTC, il est relu : révoqué.
+    expect(await formulesDisponibles(idb, serveur("revoquee").n, MAINTENANT)).toEqual(["plus"]);
+    expect(await formulesDisponibles(idb, serveur("revoquee").n, new Date("2026-11-21T10:00:00Z"))).toEqual([]);
   });
 
   it("un lot obtenu en aveugle, un jeton rendu, les autres gardés puis pris d'abord", async () => {
@@ -209,6 +211,65 @@ describe("S16 : émission en avance, à une heure aléatoire", () => {
     annuler2();
     expect(minuteries[1]!.annulee).toBe(true);
     annuler(); // sans effet sur une minuterie déjà partie
+  });
+});
+
+// État du pass gardé sur l'appareil (signalement du 22 novembre, S16 suite) : POST /etat (avec P)
+// une fois par jour UTC et par pass, ou après un événement qui le change, pas à chaque chargement.
+describe("état du pass gardé jusqu'au lendemain UTC", () => {
+  const etats = (appels: string[]) => appels.filter((a) => a.endsWith("/api/paiement/etat")).length;
+
+  it("un seul POST /etat le même jour ; un nouveau le lendemain UTC ; gardé chiffré", async () => {
+    const idb = fakeIndexedDB();
+    await avecPass(idb);
+    const { n, appels } = serveur();
+    expect(await formulesDisponibles(idb, n, MAINTENANT)).toEqual(["plus"]);
+    expect(await formulesDisponibles(idb, n, new Date("2026-11-20T23:59:59Z"))).toEqual(["plus"]);
+    expect(etats(appels)).toBe(1);
+    const disque = JSON.stringify([...idb.raw().values()].flatMap((s) => [...s.values()].flatMap((m) => [...m.entries()])), (_k, x) => (x instanceof Uint8Array ? Buffer.from(x).toString("latin1") : x));
+    expect(disque).not.toContain("payee");
+    expect(disque).not.toContain("2026-12-20");
+    expect(await formulesDisponibles(idb, n, new Date("2026-11-21T00:00:01Z"))).toEqual(["plus"]);
+    expect(etats(appels)).toBe(2);
+    expect(await lirePasses(idb)).toHaveLength(1); // l'état gardé n'est pas un pass
+  });
+
+  it("pass rangé de nouveau (retour de paiement) ou oublié : état redemandé", async () => {
+    const idb = fakeIndexedDB();
+    await avecPass(idb);
+    const { n, appels } = serveur();
+    await formulesDisponibles(idb, n, MAINTENANT);
+    const g = (await lirePasses(idb))[0]!;
+    await garder(idb, g);
+    await formulesDisponibles(idb, n, MAINTENANT);
+    expect(etats(appels)).toBe(2);
+    await oublierEtat(idb, g.id);
+    await formulesDisponibles(idb, n, MAINTENANT);
+    expect(etats(appels)).toBe(3);
+    await oublier(idb, g.id);
+    expect(await formulesDisponibles(idb, n, MAINTENANT)).toEqual([]);
+    expect(etats(appels)).toBe(3);
+  });
+
+  it("émission refusée (pass révoqué ou épuisé) : état oublié, redemandé au chargement suivant", async () => {
+    const idb = fakeIndexedDB();
+    await avecPass(idb);
+    const ok = serveur();
+    await formulesDisponibles(idb, ok.n, MAINTENANT);
+    await expect(prendreJeton(idb, "plus", serveur("payee", 0).n, MAINTENANT)).rejects.toThrow("aucun_jeton");
+    const rev = serveur("revoquee");
+    expect(await formulesDisponibles(idb, rev.n, MAINTENANT)).toEqual([]);
+    expect(etats(rev.appels)).toBe(1);
+  });
+
+  it("serveur muet : rien gardé, redemandé ensuite", async () => {
+    const idb = fakeIndexedDB();
+    await avecPass(idb);
+    const muet = { origin: "https://shh.test", fetch: (async () => new Response("", { status: 503 })) as unknown as typeof fetch } as Net;
+    expect(await formulesDisponibles(idb, muet, MAINTENANT)).toEqual([]);
+    const { n, appels } = serveur();
+    expect(await formulesDisponibles(idb, n, MAINTENANT)).toEqual(["plus"]);
+    expect(etats(appels)).toBe(1);
   });
 });
 
