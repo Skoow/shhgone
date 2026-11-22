@@ -139,7 +139,8 @@ func (s *Service) Export(c Courante) (Export, error) {
 	for _, v := range vs {
 		x.Sessions = append(x.Sessions, SessionExport{v.Ajoutee, v.Persistante, v.ParRecup})
 	}
-	rows, err := s.db.Query(`SELECT ajoutee_mois, be, env IS NOT NULL, cle_pub FROM passkeys WHERE h=? ORDER BY ajoutee_mois, cred_id`, c.H[:])
+	rows, err := s.db.Query(`SELECT ajoutee_mois, be, EXISTS (SELECT 1 FROM enveloppes e WHERE e.cred_id = passkeys.cred_id),
+		cle_pub FROM passkeys WHERE h=? ORDER BY ajoutee_mois, cred_id`, c.H[:])
 	if err != nil {
 		return Export{}, err
 	}

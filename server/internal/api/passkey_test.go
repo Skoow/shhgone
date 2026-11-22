@@ -25,15 +25,18 @@ func TestInscriptionConnexionHTTP(t *testing.T) {
 	const ip = "203.0.113.80:1"
 	in := e.inscrire(t, ip, "lea")
 	c := e.connecter(t, ip, in)
-	if cles(c) != "blob_prive,blob_profil,cred_id,env,gen_prive,gen_profil,h,session" || c["h"] != in.h ||
-		c["cred_id"] != enc.EncodeToString(in.pk.ID) || len(c["env"].(string)) != 80 || c["gen_prive"] != float64(1) {
+	if cles(c) != "blob_prive,blob_profil,cred_id,enveloppes,gen_prive,gen_profil,h,session" || c["h"] != in.h ||
+		c["cred_id"] != enc.EncodeToString(in.pk.ID) || c["gen_prive"] != float64(1) {
 		t.Fatal(c)
 	}
-	// Passkey sans enveloppe PRF : env null.
-	if _, err := e.cdb.Exec(`UPDATE passkeys SET env=NULL`); err != nil {
+	if es, ok := c["enveloppes"].([]any); !ok || len(es) != 1 || len(es[0].(string)) != 80 {
+		t.Fatal(c)
+	}
+	// Passkey sans enveloppe PRF : enveloppes [] (jamais null).
+	if _, err := e.cdb.Exec(`DELETE FROM enveloppes`); err != nil {
 		t.Fatal(err)
 	}
-	if c := e.connecter(t, ip, in); c["env"] != nil {
+	if c := e.connecter(t, ip, in); c["enveloppes"] == nil || len(c["enveloppes"].([]any)) != 0 {
 		t.Fatal(c)
 	}
 	// Défi rejoué : la deuxième fin avec la même étape est refusée (usage unique).

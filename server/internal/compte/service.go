@@ -174,8 +174,9 @@ func (o *octets16) Scan(v any) error {
 }
 
 // Passkey : ce que le serveur garde d'une passkey (conception §6.3) : identifiant, clé publique
-// COSE, algorithme, BE, enveloppe PRF (60 octets ou nil), libellé chiffré (64 octets ou nil).
-// Jamais d'AAGUID, de transports, d'attestation, de compteur ni de BS.
+// COSE, algorithme, BE, libellé chiffré (64 octets ou nil). Env : première enveloppe PRF donnée
+// à la création (60 octets ou nil), rangée dans enveloppes. Jamais d'AAGUID, de transports,
+// d'attestation, de compteur ni de BS.
 type Passkey struct {
 	CredID    []byte
 	ClePub    []byte
@@ -187,10 +188,11 @@ type Passkey struct {
 
 // Limites des passkeys (conception §6.3).
 const (
-	CredIDMax    = 1023
-	ClePubMax    = 1024
-	PasskeysMax  = 10
-	EnveloppeLen = 60
+	CredIDMax     = 1023
+	ClePubMax     = 1024
+	PasskeysMax   = 10
+	EnveloppeLen  = 60
+	EnveloppesMax = 4 // par passkey (correction du 22 novembre, « enveloppes multiples »)
 )
 
 func algOK(a int64) bool { return a == -7 || a == -8 || a == -257 }
@@ -266,14 +268,23 @@ func (s *Service) creerCompteTx(tx *sql.Tx, h [16]byte, nc NouveauCompte, pk Pas
 	if err := insererPasskeyTx(tx, h, pk, now); err != nil {
 		return [32]byte{}, err
 	}
-	return s.creerSessionTx(tx, h, o, false, now)
+	tok, err := s.creerSessionTx(tx, h, o, false, now)
+	if err == nil {
+		s.lierPasskey(tok, pk.CredID)
+	}
+	return tok, err
 }
 
 // insererPasskeyTx : une ligne passkeys pour h (mois d'ajout seulement).
 func insererPasskeyTx(tx *sql.Tx, h [16]byte, pk Passkey, now time.Time) error {
-	_, err := tx.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, env, etiquette, ajoutee_mois)
-		VALUES(?,?,?,?,?,?,?,?)`, pk.CredID, h[:], pk.ClePub, pk.Alg, boolInt(pk.BE), nulle(pk.Env),
-		nulle(pk.Etiquette), moisDe(now))
+	if _, err := tx.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, etiquette, ajoutee_mois)
+		VALUES(?,?,?,?,?,?,?)`, pk.CredID, h[:], pk.ClePub, pk.Alg, boolInt(pk.BE), nulle(pk.Etiquette), moisDe(now)); err != nil {
+		return err
+	}
+	if pk.Env == nil {
+		return nil
+	}
+	_, err := tx.Exec(`INSERT INTO enveloppes(cred_id, n, env) VALUES(?,0,?)`, pk.CredID, pk.Env)
 	return err
 }
 

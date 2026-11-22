@@ -174,8 +174,8 @@ func (s *Service) passkeyDe(credID []byte) ([16]byte, Passkey, error) {
 	var h [16]byte
 	var p Passkey
 	var be int
-	err := s.db.QueryRow(`SELECT h, cred_id, cle_pub, alg, be, env, etiquette FROM passkeys WHERE cred_id=?`, credID).Scan(
-		(*octets16)(&h), &p.CredID, &p.ClePub, &p.Alg, &be, &p.Env, &p.Etiquette)
+	err := s.db.QueryRow(`SELECT h, cred_id, cle_pub, alg, be, etiquette FROM passkeys WHERE cred_id=?`, credID).Scan(
+		(*octets16)(&h), &p.CredID, &p.ClePub, &p.Alg, &be, &p.Etiquette)
 	if errors.Is(err, sql.ErrNoRows) {
 		return h, p, ErrIdentifiants
 	}
@@ -187,7 +187,7 @@ func (s *Service) passkeyDe(credID []byte) ([16]byte, Passkey, error) {
 // signature fausse, userHandle d'un autre compte, BE changé : ErrIdentifiants (même réponse),
 // compté dans les échecs de la connexion (20 par heure, 60 par /48). Juste : session, enveloppe
 // PRF de cette passkey (ou nil) et coffres ; vu_mois mis à jour. Un compte banni se connecte
-// (export et suppression, §13).
+// (export et suppression, §13). La session est liée à cette passkey (passkeys/enveloppe).
 func (s *Service) ConnexionFin(ip netip.Addr, jeton [32]byte, credential []byte, o OptionsSession) (Ouverture, error) {
 	if s.wa == nil {
 		return Ouverture{}, errSansCeremonies
@@ -206,12 +206,7 @@ func (s *Service) ConnexionFin(ip netip.Addr, jeton [32]byte, credential []byte,
 	if e == nil {
 		return Ouverture{}, ErrEtape
 	}
-	var pk Passkey
-	h, credID, err := s.wa.finAssertion(e.defi, credential, func(id []byte) ([16]byte, Passkey, error) {
-		hh, p, err := s.passkeyDe(id)
-		pk = p
-		return hh, p, err
-	}, nil, nil)
+	h, credID, err := s.wa.finAssertion(e.defi, credential, s.passkeyDe, nil, nil)
 	if errors.Is(err, ErrIdentifiants) {
 		s.lim.NoterEchecConnexion(ip)
 		s.cpt.echecs.Add(1)
@@ -219,7 +214,10 @@ func (s *Service) ConnexionFin(ip netip.Addr, jeton [32]byte, credential []byte,
 	if err != nil {
 		return Ouverture{}, err
 	}
-	ov := Ouverture{H: h, CredID: credID, Env: pk.Env}
+	ov := Ouverture{H: h, CredID: credID}
+	if ov.Enveloppes, err = s.enveloppesDe(credID); err != nil {
+		return Ouverture{}, err
+	}
 	var vuMois int64
 	if err := s.db.QueryRow(`SELECT blob_profil, gen_profil, blob_prive, gen_prive, vu_mois FROM comptes WHERE h=?`, h[:]).Scan(
 		&ov.BlobProfil, &ov.GenProfil, &ov.BlobPrive, &ov.GenPrive, &vuMois); err != nil {
@@ -231,6 +229,25 @@ func (s *Service) ConnexionFin(ip netip.Addr, jeton [32]byte, credential []byte,
 	if ov.Jeton, err = s.ouvrirSession(h, vuMois, o, false, now); err != nil {
 		return Ouverture{}, err
 	}
+	s.lierPasskey(ov.Jeton, credID)
 	s.cpt.connexions.Add(1)
 	return ov, nil
+}
+
+// enveloppesDe : les enveloppes PRF de la passkey cred_id (ordre n ; vide : aucune).
+func (s *Service) enveloppesDe(credID []byte) ([][]byte, error) {
+	rows, err := s.db.Query(`SELECT env FROM enveloppes WHERE cred_id=? ORDER BY n`, credID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := [][]byte{}
+	for rows.Next() {
+		var e []byte
+		if err := rows.Scan(&e); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }

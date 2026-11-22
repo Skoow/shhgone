@@ -22,9 +22,14 @@ import (
 // exact (4, 16, 64 ou 256 Kio + 45 octets) avec leur gen ; ancienneté. Aucune adresse, aucun
 // mot de passe, aucun TOTP, aucun séquestre (retirés le 22 novembre).
 // passkeys : cred_id (1 à 1 023) ; h ; clé publique COSE (≤ 1 024) ; algorithme (−7, −8,
-// −257) ; be (passkey synchronisable) ; env (K_compte enveloppée par la sortie PRF de cette
-// passkey, 60, ou rien) ; etiquette (libellé chiffré par l'appareil, 64, ou rien) ; mois
-// d'ajout. Jamais d'AAGUID, de transports, d'attestation, de compteur, de BS ni de date d'usage.
+// −257) ; be (passkey synchronisable) ; etiquette (libellé chiffré par l'appareil, 64, ou
+// rien) ; mois d'ajout. Jamais d'AAGUID, de transports, d'attestation, de compteur, de BS ni de
+// date d'usage.
+// enveloppes : K_compte enveloppée par une sortie PRF de la passkey cred_id (60), au plus 4 par
+// passkey (n de 0 à 3) : une même passkey peut rendre des sorties différentes selon le chemin
+// (local, QR) ou la version (iCloud, 1Password) ; chaque sortie observée a son enveloppe
+// (correction du 22 novembre, « enveloppes multiples »). Ni date, ni ordre d'usage ; effacées
+// avec la passkey, jamais une à une.
 // sessions : t_v (SHA-256 du jeton) ; sid (identifiant montré) ; h (effacées avec le compte) ;
 // etiquette (nom d'appareil chiffré par le client, 64) ; mois d'ajout ; jour d'échéance ;
 // par_recup (session ouverte par la clé de récupération, R4).
@@ -53,10 +58,14 @@ CREATE TABLE IF NOT EXISTS passkeys(
   cle_pub BLOB NOT NULL CHECK(typeof(cle_pub)='blob' AND length(cle_pub) BETWEEN 1 AND 1024),
   alg INTEGER NOT NULL CHECK(alg IN (-7,-8,-257)),
   be INTEGER NOT NULL CHECK(be IN (0,1)),
-  env BLOB CHECK(env IS NULL OR (` + blobN("env", 60) + `)),
   etiquette BLOB CHECK(etiquette IS NULL OR (` + blobN("etiquette", 64) + `)),
   ajoutee_mois INTEGER NOT NULL CHECK(` + moisCheck("ajoutee_mois") + `)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS passkeys_h ON passkeys(h);
+CREATE TABLE IF NOT EXISTS enveloppes(
+  cred_id BLOB NOT NULL REFERENCES passkeys(cred_id) ON DELETE CASCADE,
+  n INTEGER NOT NULL CHECK(typeof(n)='integer' AND n BETWEEN 0 AND 3),
+  env BLOB NOT NULL CHECK(` + blobN("env", 60) + `),
+  PRIMARY KEY(cred_id, n)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS sessions(
   t_v BLOB PRIMARY KEY CHECK(` + blobN("t_v", 32) + `),
   sid BLOB NOT NULL CHECK(` + blobN("sid", 16) + `),

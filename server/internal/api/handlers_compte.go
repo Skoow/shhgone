@@ -99,6 +99,10 @@ func failCompte(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusConflict, "derniere")
 	case errors.Is(err, compte.ErrPasskeysMax):
 		writeErr(w, http.StatusConflict, "passkeys_max")
+	case errors.Is(err, compte.ErrEnveloppesMax):
+		writeErr(w, http.StatusConflict, "enveloppes_max")
+	case errors.Is(err, compte.ErrSansPasskey):
+		writeErr(w, http.StatusForbidden, "sans_passkey")
 	case errors.Is(err, compte.ErrPseudoPris):
 		writeErr(w, http.StatusConflict, "pseudo_pris")
 	case errors.Is(err, compte.ErrBusy):

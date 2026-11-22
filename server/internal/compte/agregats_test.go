@@ -36,7 +36,8 @@ func TestAgregatsQueDesEntiers(t *testing.T) {
 	b.clk.Add(200 * 24 * time.Hour)
 	h3, _, _ := b.inscrire(t, "ccc")
 	// a : 240 j, b : 200 j, c : 0 j. a : une passkey liée à l'appareil (be = 0) et sans PRF.
-	b.db.Exec(`UPDATE passkeys SET be=0, env=NULL WHERE h=?`, h1[:])
+	b.db.Exec(`UPDATE passkeys SET be=0 WHERE h=?`, h1[:])
+	b.db.Exec(`DELETE FROM enveloppes WHERE cred_id IN (SELECT cred_id FROM passkeys WHERE h=?)`, h1[:])
 	b.db.Exec(`UPDATE sessions SET persistante=1 WHERE h=?`, h3[:])
 	b.ban(t, b.compte(t, 1), 30, 10)
 	r := b.ban(t, b.compte(t, 2), 365, 10)

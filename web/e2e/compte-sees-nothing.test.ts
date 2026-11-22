@@ -177,8 +177,12 @@ describe("le serveur ne voit rien : compte par passkey", () => {
     jetons.push(cf.corps.session);
     const kekC = W.kekPrf(g.sortie!) as Bytes;
     A.kekPrf.push(kekC);
-    expect(await ouvrirEnv(kekC, W.adEnveloppePrf(A.h, A.pk.id), unb64u(cf.corps.env))).toEqual(A.kCompte);
+    expect(cf.corps.enveloppes).toHaveLength(1);
+    expect(await ouvrirEnv(kekC, W.adEnveloppePrf(A.h, A.pk.id), unb64u(cf.corps.enveloppes[0]))).toEqual(A.kCompte);
     const S = cf.corps.session as string;
+    // Enveloppe de plus pour la passkey qui a signé (enveloppes multiples) : seule l'enveloppe part.
+    const env2 = await envelopper(kekC, W.adEnveloppePrf(A.h, A.pk.id), A.kCompte);
+    expect((await json("POST", "/api/compte/passkeys/enveloppe", { env: b64u(env2) }, S)).corps).toEqual({});
 
     // ---- Coffre privé : liens repères ----------------------------------------------------------
     const now = Date.now();

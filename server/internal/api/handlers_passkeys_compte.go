@@ -38,7 +38,8 @@ func (a compteAPI) reauthDebut(w http.ResponseWriter, r *http.Request) {
 	ecrireEtapeOptions(w, e, opts)
 }
 
-// reauthFin : { etape, credential } → {} (session récente 5 min).
+// reauthFin : { etape, credential } → { enveloppes } (session récente 5 min, liée à la passkey
+// qui a signé ; enveloppes : les siennes, comme connexion/fin).
 func (a compteAPI) reauthFin(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		Etape      string          `json:"etape"`
@@ -54,11 +55,14 @@ func (a compteAPI) reauthFin(w http.ResponseWriter, r *http.Request) {
 		failCompte(w, errBadRequest)
 		return
 	}
-	if err := a.c.ReauthFin(ipOf(r), c, e, cr); err != nil {
+	es, err := a.c.ReauthFin(ipOf(r), c, e, cr)
+	if err != nil {
 		failCompte(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, struct{}{})
+	writeJSON(w, http.StatusOK, struct {
+		Enveloppes []string `json:"enveloppes"`
+	}{enveloppesJSON(es)})
 }
 
 // passkeys : GET → { passkeys: [{ cred_id, ajoutee, etiquette, be, prf }] } (etiquette : "" si
@@ -141,23 +145,24 @@ func credID(s string) ([]byte, error) {
 	return b, nil
 }
 
-// passkeysEnveloppe : { cred_id, env } → {}.
+// passkeysEnveloppe : { env } → {} : une enveloppe de plus pour la passkey liée à la session
+// (celle de la dernière assertion : connexion/fin ou reauth/fin ; jamais un cred_id du corps) ;
+// 409 enveloppes_max à la cinquième ; 403 sans_passkey pour une session ouverte par la clé de
+// récupération (reauth d'abord) ; la même enveloppe deux fois : 200.
 func (a compteAPI) passkeysEnveloppe(w http.ResponseWriter, r *http.Request) {
 	var b struct {
-		CredID string `json:"cred_id"`
-		Env    string `json:"env"`
+		Env string `json:"env"`
 	}
 	c, ok := a.sessionEtCorps(w, r, &b)
 	if !ok {
 		return
 	}
-	id, err1 := credID(b.CredID)
-	env, err2 := secret(b.Env, compte.EnveloppeLen)
-	if err1 != nil || err2 != nil {
+	env, err := secret(b.Env, compte.EnveloppeLen)
+	if err != nil {
 		failCompte(w, errBadRequest)
 		return
 	}
-	if err := a.c.PasskeysEnveloppe(c, id, env); err != nil {
+	if err := a.c.PasskeysEnveloppe(c, env); err != nil {
 		failCompte(w, err)
 		return
 	}

@@ -1,6 +1,7 @@
 package compte
 
 import (
+	"bytes"
 	"cmp"
 	"crypto/rand"
 	"crypto/sha256"
@@ -34,9 +35,13 @@ const (
 	sessionsMax      = 20
 )
 
-// activite : dernier usage et fin de la « session récente », en mémoire.
+// activite : dernier usage et fin de la « session récente », en mémoire ; cred : la passkey qui
+// a signé la dernière assertion de cette session (inscription, connexion, reauth), seule à qui
+// une enveloppe PRF peut être ajoutée (passkeys/enveloppe) ; nil : session ouverte par la clé de
+// récupération, ou perdue au redémarrage (reauth la rétablit).
 type activite struct {
 	vu, recente time.Time
+	cred        []byte
 }
 
 // activites : t_v → activité (allowedMaps de stats_test.go), son propre verrou (appelé sous
@@ -217,13 +222,28 @@ func (s *Service) Session(jeton [32]byte) (Courante, error) {
 	return c, nil
 }
 
-// rendreRecente : la session courante est « récente » pendant 5 min (reauth juste).
-func (s *Service) rendreRecente(c Courante) {
+// rendreRecente : la session courante est « récente » pendant 5 min (reauth juste) ; cred
+// (non nil) : la passkey qui vient de signer lui est liée.
+func (s *Service) rendreRecente(c Courante, cred []byte) {
 	now := s.now()
 	a := s.act.lire(c.tv, now)
 	a.recente = now.Add(dureeRecente)
+	if cred != nil {
+		a.cred = bytes.Clone(cred)
+	}
 	s.act.ecrire(c.tv, a)
 }
+
+// lierPasskey : la session du jeton tok (qui vient d'être créée) est liée à la passkey cred.
+func (s *Service) lierPasskey(tok [32]byte, cred []byte) {
+	tv := sha256.Sum256(tok[:])
+	a := s.act.lire(tv, s.now())
+	a.cred = bytes.Clone(cred)
+	s.act.ecrire(tv, a)
+}
+
+// credDe : la passkey liée à la session c (nil : aucune).
+func (s *Service) credDe(c Courante) []byte { return s.act.lire(c.tv, s.now()).cred }
 
 // Deconnexion : la session courante est oubliée.
 func (s *Service) Deconnexion(c Courante) error {

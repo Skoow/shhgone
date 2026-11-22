@@ -59,8 +59,13 @@ func inscrireTest(t *testing.T, db *sql.DB, cles compte.Cles, pseudo string) [16
 		h[:], pe[:], coffreTest("SHH-PROF1"), coffreTest("SHH-ACCT1"), jour, jour, mois); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, env, etiquette, ajoutee_mois)
-		VALUES(randomblob(32),?,randomblob(77),-7,1,randomblob(60),NULL,?)`, h[:], mois); err != nil {
+	cred := make([]byte, 32)
+	rand.Read(cred)
+	if _, err := db.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, etiquette, ajoutee_mois)
+		VALUES(?,?,randomblob(77),-7,1,NULL,?)`, cred, h[:], mois); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO enveloppes(cred_id, n, env) VALUES(?,0,randomblob(60))`, cred); err != nil {
 		t.Fatal(err)
 	}
 	return h

@@ -79,7 +79,8 @@ func TestExport(t *testing.T) {
 		t.Fatalf("%+v", x)
 	}
 	var pub, env, vr, envr, cred, pe, bp, bv []byte
-	b.db.QueryRow(`SELECT cle_pub, env, cred_id FROM passkeys`).Scan(&pub, &env, &cred)
+	b.db.QueryRow(`SELECT cle_pub, cred_id FROM passkeys`).Scan(&pub, &cred)
+	b.db.QueryRow(`SELECT env FROM enveloppes`).Scan(&env)
 	b.db.QueryRow(`SELECT v_r, env_r, p_empreinte, blob_profil, blob_prive FROM comptes`).Scan(&vr, &envr, &pe, &bp, &bv)
 	if !bytes.Equal(x.Passkeys[0].ClePub, pub) {
 		t.Fatal("clé publique de l'export")

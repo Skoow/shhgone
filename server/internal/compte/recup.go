@@ -13,14 +13,14 @@ import (
 // le serveur cherche v_r = SHA-256(A_r) par l'index unique (aucune comparaison en boucle, aucune
 // clé du serveur) et rend Env_r, que seul R ouvre. A_r n'est ni gardé, ni journalisé, ni rendu.
 
-// Ouverture : réponse d'une connexion (par passkey ou par la clé de récupération). Env :
-// enveloppe PRF de la passkey utilisée (nil : passkey sans enveloppe) ; EnvR : enveloppe de la
-// clé de récupération (rendue seulement par Recup). Rien qui ouvre un coffre à lui seul.
+// Ouverture : réponse d'une connexion (par passkey ou par la clé de récupération). Enveloppes :
+// enveloppes PRF de la passkey utilisée (0 à 4, ordre n) ; EnvR : enveloppe de la clé de
+// récupération (rendue seulement par Recup). Rien qui ouvre un coffre à lui seul.
 type Ouverture struct {
 	Jeton      [32]byte
 	H          [16]byte
 	CredID     []byte
-	Env        []byte
+	Enveloppes [][]byte
 	EnvR       []byte
 	BlobProfil []byte
 	GenProfil  uint64

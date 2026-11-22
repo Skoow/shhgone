@@ -68,7 +68,7 @@ func (s *Service) Agregats() (AgregatsComptes, error) {
 	}
 	a.Neufs = a.Anciennete[0]
 	a.Confirmes = a.Comptes - a.Neufs
-	if err := s.db.QueryRow(`SELECT count(*), coalesce(sum(env IS NOT NULL), 0) FROM passkeys`).Scan(
+	if err := s.db.QueryRow(`SELECT count(*), (SELECT count(DISTINCT cred_id) FROM enveloppes) FROM passkeys`).Scan(
 		&a.Passkeys, &a.PasskeysPRF); err != nil {
 		return AgregatsComptes{}, err
 	}

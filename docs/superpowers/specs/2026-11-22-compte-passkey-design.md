@@ -179,7 +179,7 @@ Aucune construction maison. HKDF-SHA-256 du moteur Rust (RustCrypto `hkdf`, `sha
 
 ### 5.3 Connexion
 
-`get` (découvrable, `prf.eval.first = E_prf`) → `connexion/fin` rend `cred_id`, `env` (ou `null`), les coffres → `K_compte` ← `Env_i` avec `P_i`. Échec de l'ouverture (étiquette GCM fausse : sortie PRF différente) ou `env` nul : clé locale de l'appareil si elle existe (§5.5), sinon clé de récupération demandée une fois. Retour en arrière du coffre : règle de §37.2 inchangée (plus grand `gen` vu).
+`get` (découvrable, `prf.eval.first = E_prf`) → `connexion/fin` rend `cred_id`, `enveloppes` (liste de 0 à 4, §17 « enveloppes multiples »), les coffres → `K_compte` ← la première des `Env_i` qui s'ouvre avec `P_i`. Aucune ne s'ouvre (étiquette GCM fausse : sortie PRF différente) ou liste vide : clé locale de l'appareil si elle existe (§5.5), sinon clé de récupération demandée une fois ; `K_compte` ouverte, si `P_i` existe, l'appareil ajoute son enveloppe (`passkeys/enveloppe`). Retour en arrière du coffre : règle de §37.2 inchangée (plus grand `gen` vu).
 
 ### 5.4 Récupération
 
@@ -233,7 +233,8 @@ Si, à la création, la passkey n'a pas PRF : rien ne change pour la personne (e
 | Table | Colonnes | Pourquoi |
 |---|---|---|
 | `comptes` | `h` BLOB(16) clé ; `p_empreinte` BLOB(32) unique ; `pseudo_jour` ; `v_r` BLOB(32) unique ; `env_r` BLOB(60) ; `blob_profil`, `gen_profil` ; `blob_prive`, `gen_prive` ; `cree_jour` ; `compte_des` ; `vu_mois` | **retirées** : `e_canon`, `e_envoi`, `v_mdp`, `env_mdp`, `cle_profil`, `totp`, `totp_retrait_jour`, `recup_jour` |
-| `passkeys` | `cred_id` BLOB(1 à 1 023) clé ; `h` BLOB(16) → `comptes` `ON DELETE CASCADE` ; `cle_pub` BLOB (COSE, ≤ 1 024) ; `alg` INTEGER ; `be` 0/1 ; `env` BLOB(60) NULL ; `etiquette` BLOB(64) NULL (chiffrée par l'appareil) ; `ajoutee_mois` INTEGER | connexion, enveloppe, liste. **Jamais** : AAGUID (modèle du gestionnaire), transports, attestation, compteur, `BS`, date de dernier usage |
+| `passkeys` | `cred_id` BLOB(1 à 1 023) clé ; `h` BLOB(16) → `comptes` `ON DELETE CASCADE` ; `cle_pub` BLOB (COSE, ≤ 1 024) ; `alg` INTEGER ; `be` 0/1 ; `env` BLOB(60) NULL ; `etiquette` BLOB(64) NULL (chiffrée par l'appareil) ; `ajoutee_mois` INTEGER (**`env` retirée**, §17) | connexion, liste. **Jamais** : AAGUID (modèle du gestionnaire), transports, attestation, compteur, `BS`, date de dernier usage |
+| `enveloppes` | `cred_id` BLOB → `passkeys` `ON DELETE CASCADE` ; `n` INTEGER 0 à 3 ; `env` BLOB(60) ; clé (`cred_id`, `n`) | enveloppes PRF de la passkey, **4 au plus** (§17). **Jamais** : date, ordre ou appareil d'usage |
 | `sessions` | inchangée, plus `par_recup` 0/1 | montrer aux autres appareils qu'une session vient de la clé de récupération (R4) |
 | `bannis` | `id` BLOB(8) ; **`h` BLOB(16)** → `comptes` `ON DELETE CASCADE` (remplace `e_canon`) ; `debut_jour` ; `jusqu_jour` ; `actif` ; `motif` ; `salons_fermes` | il n'y a plus d'adresse à bannir (R2) |
 
@@ -249,14 +250,14 @@ Les objets WebAuthn suivent les formats JSON de WebAuthn niveau 3 (`PublicKeyCre
 |---|---|---|---|
 | `POST inscription/debut` | ALTCHA (champs de `POST /api/shares`) | `{ altcha, hp, shown_at }` | `{ etape, options }` (`user.id` = `h`) |
 | `POST pseudo/verifier` | étape ou session (inchangée) | `{ etape?, p_canon }` | `{ libre }` ; libre → **réservé à l'étape** jusqu'à son échéance (évite une passkey créée pour un pseudo pris entre-temps) |
-| `POST inscription/fin` | étape | `{ etape, credential, p_canon, env, v_r, env_r, blob_profil, blob_prive, persistante, etiquette, cred_etiquette }` (`env` : chaîne ou `null`) | 201 `{ session, h }` ; `pseudo_pris` (409, étape gardée) |
+| `POST inscription/fin` | étape | `{ etape, credential, p_canon, env, v_r, env_r, blob_profil, blob_prive, persistante, etiquette, cred_etiquette }` (`env`, `etiquette`, `cred_etiquette` : `""` pour « aucune », jamais `null` ; `env` devient l'enveloppe `n = 0`) | 201 `{ session, h }` ; `pseudo_pris` (409, étape gardée) |
 | `POST connexion/debut` | — | `{}` | `{ etape, options }` |
-| `POST connexion/fin` | étape | `{ etape, credential, persistante, etiquette }` | `{ session, h, cred_id, env, blob_profil, gen_profil, blob_prive, gen_prive }` ; met `vu_mois` à jour |
+| `POST connexion/fin` | étape | `{ etape, credential, persistante, etiquette }` | `{ session, h, cred_id, enveloppes, blob_profil, gen_profil, blob_prive, gen_prive }` (`enveloppes` : celles de la passkey qui a signé, ordre `n`, `[]` si aucune) ; met `vu_mois` à jour ; la session est **liée** à cette passkey |
 | `POST recup` | `A_r` | `{ a_r, persistante, etiquette }` | `{ session, h, env_r, blob_profil, gen_profil, blob_prive, gen_prive }` (session **récente**) |
-| `POST reauth/debut`, `reauth/fin` | session | `{}` puis `{ etape, credential }` | `{ options }` puis `{}` (session récente, 5 min) ; la passkey doit être du compte |
+| `POST reauth/debut`, `reauth/fin` | session | `{}` puis `{ etape, credential }` | `{ options }` puis `{ enveloppes }` (session récente, 5 min ; session liée à la passkey qui a signé) ; la passkey doit être du compte |
 | `GET passkeys` | session | — | `{ passkeys: [{ cred_id, ajoutee: "2026-11", etiquette, be, prf, courante }] }` |
-| `POST passkeys/debut`, `passkeys/fin` | session récente | `{}` puis `{ etape, credential, env, etiquette }` | `{ options }` puis `{}` |
-| `POST passkeys/enveloppe` | session | `{ cred_id, env }` | `{}` (PRF obtenue par un `get` après le `create`, ou plus tard sur un appareil qui l'offre) |
+| `POST passkeys/debut`, `passkeys/fin` | session récente | `{}` puis `{ etape, credential, env, etiquette }` (`env` : `""` ou enveloppe `n = 0`) | `{ options }` puis `{}` |
+| `POST passkeys/enveloppe` | session liée à une passkey | `{ env }` (**pas de `cred_id`** : la passkey est celle qui a signé la dernière assertion de cette session, `connexion/fin` ou `reauth/fin`) | `{}` ; même enveloppe déjà là : `{}` sans effet ; cinquième : `enveloppes_max` (409) ; session sans passkey liée (ouverte par `recup`, serveur redémarré, passkey retirée) : `sans_passkey` (403), faire `reauth` d'abord. Aucune route n'en retire : elles partent avec la passkey |
 | `POST passkeys/nommer` | session | `{ cred_id, etiquette }` | `{}` |
 | `POST passkeys/retirer` | session récente | `{ cred_id }` | `{}` ; `derniere` (409) pour la dernière |
 | `POST recup/renouveler` | session récente | `{ v_r, env_r }` | `{}` |
@@ -455,3 +456,4 @@ Ordre : P1 → S1 → S2 → W1 → W2 → T1 → D1, chaque lot avec ses tests 
 - Alphabet du caractère de contrôle : 37 symboles de Crockford (le texte d'origine en listait 41).
 - « Aucune sortie » : faux, reCAPTCHA et le paiement sortent encore ; seule la sortie SMTP disparaît.
 - `rp.id` : il découle de `SHH_ORIGIN`. Quand les comptes sont activés, `deploy.sh` refuse tout `SHH_ORIGIN` autre que `https://shhgone.com`, et le démarrage refuse une ancienne variable `SHH_SMTP_*` ou `SHH_MAIL_FROM` au lieu de l'ignorer. Les tests du compte tournent sur `localhost` (les navigateurs refusent une adresse IP comme `rp.id`).
+- **Enveloppes multiples** (décision du propriétaire, 22 novembre) : une seule colonne `passkeys.env` ne suffit pas. Une même passkey synchronisée peut donner des sorties PRF différentes selon le gestionnaire ou l'appareil (R6, R10), et la dernière enveloppe posée écraserait celle d'un autre appareil. La colonne est remplacée par la table `enveloppes` (§6.3), avec 4 enveloppes au plus par passkey, sans date ni ordre d'usage. `connexion/fin` et `reauth/fin` rendent la liste `enveloppes`, que l'appareil essaie une à une. `passkeys/enveloppe` n'ajoute que pour la passkey qui a signé l'assertion de **cette** session : le lien est gardé en mémoire avec la session, jamais pris dans le corps, pour qu'une session ne pose rien sur une autre passkey. Une enveloppe fait exactement 60 octets, la cinquième renvoie 409 et un doublon est sans effet. Aucune route ne retire d'enveloppe. Le lien entre session et passkey est perdu au redémarrage du serveur : `sans_passkey` (403), puis `reauth`.

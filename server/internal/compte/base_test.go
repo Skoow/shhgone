@@ -45,14 +45,15 @@ func lignes(t *testing.T, db *sql.DB, q string, args ...any) []string {
 func TestSchemaComptes(t *testing.T) {
 	db, _ := ouvrir(t)
 	const wantMaster = "index:bannis_h,index:comptes_p_empreinte,index:comptes_v_r,index:passkeys_h," +
-		"index:sessions_h,index:sessions_sid,table:bannis,table:comptes,table:passkeys,table:sessions"
+		"index:sessions_h,index:sessions_sid,table:bannis,table:comptes,table:enveloppes,table:passkeys,table:sessions"
 	if got := strings.Join(lignes(t, db, `SELECT type || ':' || name FROM sqlite_master ORDER BY 1`), ","); got != wantMaster {
 		t.Fatalf("sqlite_master = %s\nattendu        %s", got, wantMaster)
 	}
 	want := map[string]string{
 		"comptes": "h:BLOB,p_empreinte:BLOB,pseudo_jour:INTEGER,v_r:BLOB,env_r:BLOB,blob_profil:BLOB,gen_profil:INTEGER," +
 			"blob_prive:BLOB,gen_prive:INTEGER,cree_jour:INTEGER,compte_des:INTEGER,vu_mois:INTEGER",
-		"passkeys": "cred_id:BLOB,h:BLOB,cle_pub:BLOB,alg:INTEGER,be:INTEGER,env:BLOB,etiquette:BLOB,ajoutee_mois:INTEGER",
+		"passkeys":   "cred_id:BLOB,h:BLOB,cle_pub:BLOB,alg:INTEGER,be:INTEGER,etiquette:BLOB,ajoutee_mois:INTEGER",
+		"enveloppes": "cred_id:BLOB,n:INTEGER,env:BLOB",
 		"sessions": "t_v:BLOB,sid:BLOB,h:BLOB,etiquette:BLOB,cree_mois:INTEGER,expire_jour:INTEGER,persistante:INTEGER," +
 			"par_recup:INTEGER",
 		"bannis": "id:BLOB,h:BLOB,debut_jour:INTEGER,jusqu_jour:INTEGER,actif:INTEGER,motif:INTEGER,salons_fermes:INTEGER",
@@ -178,24 +179,25 @@ func TestDatesAuJour(t *testing.T) {
 	}
 }
 
-// Passkeys : longueurs (cred_id 1 à 1 023, clé publique ≤ 1 024, enveloppe 60, libellé 64),
-// algorithmes −7, −8, −257 seulement, mois d'ajout ; effacées avec le compte.
+// Passkeys : longueurs (cred_id 1 à 1 023, clé publique ≤ 1 024, libellé 64), algorithmes −7,
+// −8, −257 seulement, mois d'ajout ; effacées avec le compte. Enveloppes : 60 octets, n de 0 à 3
+// (4 par passkey), passkey existante, effacées avec la passkey (et donc avec le compte).
 func TestPasskeysContraintes(t *testing.T) {
 	db, _ := ouvrir(t)
 	if err := insCompte(db, h1, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	ins := func(v ...string) error {
-		_, err := db.Exec(`INSERT INTO passkeys(cred_id,h,cle_pub,alg,be,env,etiquette,ajoutee_mois) VALUES(` +
+		_, err := db.Exec(`INSERT INTO passkeys(cred_id,h,cle_pub,alg,be,etiquette,ajoutee_mois) VALUES(` +
 			strings.Join(v, ",") + `)`)
 		return err
 	}
-	ok := []string{"randomblob(32)", "x'" + h1 + "'", "randomblob(77)", "-7", "1", "randomblob(60)", "randomblob(64)", itoa(mois)}
+	ok := []string{"randomblob(32)", "x'" + h1 + "'", "randomblob(77)", "-7", "1", "randomblob(64)", itoa(mois)}
 	if err := ins(ok...); err != nil {
 		t.Fatal("passkey valide refusée :", err)
 	}
 	for i, bads := range [][]string{{"randomblob(1024)", "x''", "'id'"}, {"x'" + strings.Repeat("00", 16) + "'"},
-		{"randomblob(1025)", "x''"}, {"-35", "1", "-47", "-7.5"}, {"2", "-1"}, {"randomblob(59)", "randomblob(61)"},
+		{"randomblob(1025)", "x''"}, {"-35", "1", "-47", "-7.5"}, {"2", "-1"},
 		{"randomblob(63)", "randomblob(65)"}, {itoa(mois + 86400), itoa(mois + 1)}} {
 		for _, bad := range bads {
 			v := append([]string(nil), ok...)
@@ -213,15 +215,54 @@ func TestPasskeysContraintes(t *testing.T) {
 		}
 	}
 	v := append([]string(nil), ok...)
-	v[0], v[5], v[6] = "randomblob(1023)", "NULL", "NULL"
+	v[0], v[5] = "x'"+strings.Repeat("ab", 1023)+"'", "NULL"
 	if err := ins(v...); err != nil {
-		t.Error("passkey sans PRF ni libellé refusée :", err)
+		t.Error("passkey sans libellé refusée :", err)
+	}
+	// Enveloppes de la passkey de 1 023 octets.
+	cred := "x'" + strings.Repeat("ab", 1023) + "'"
+	env := func(c, n, e string) error {
+		_, err := db.Exec(`INSERT INTO enveloppes(cred_id,n,env) VALUES(` + c + `,` + n + `,` + e + `)`)
+		return err
+	}
+	for n := range 4 {
+		if err := env(cred, itoa(int64(n)), "randomblob(60)"); err != nil {
+			t.Fatalf("enveloppe %d refusée : %v", n, err)
+		}
+	}
+	for _, bad := range [][3]string{{cred, "4", "randomblob(60)"}, {cred, "-1", "randomblob(60)"},
+		{cred, "0", "randomblob(60)"}, {cred, "1.5", "randomblob(60)"}, {cred, "'1'", "randomblob(60)"},
+		{"randomblob(32)", "0", "randomblob(60)"}} {
+		if err := env(bad[0], bad[1], bad[2]); err == nil {
+			t.Errorf("enveloppe %v acceptée", bad[1:])
+		}
+	}
+	if _, err := db.Exec(`DELETE FROM enveloppes WHERE cred_id=` + cred + ` AND n=3`); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"randomblob(59)", "randomblob(61)", "NULL", "'x'"} {
+		if err := env(cred, "3", e); err == nil {
+			t.Errorf("enveloppe %s acceptée", e)
+		}
+	}
+	if _, err := db.Exec(`DELETE FROM passkeys WHERE cred_id=` + cred); err != nil {
+		t.Fatal(err)
+	}
+	if n := lignes(t, db, `SELECT count(*) FROM enveloppes`); n[0] != "0" {
+		t.Error("enveloppes d'une passkey retirée restantes :", n)
+	}
+	v[0] = "x'01'"
+	if err := ins(v...); err != nil {
+		t.Fatal(err)
+	}
+	if err := env("x'01'", "0", "randomblob(60)"); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := db.Exec(`DELETE FROM comptes WHERE h=x'` + h1 + `'`); err != nil {
 		t.Fatal(err)
 	}
-	if n := lignes(t, db, `SELECT count(*) FROM passkeys`); n[0] != "0" {
-		t.Error("passkeys d'un compte supprimé restantes :", n)
+	if n := lignes(t, db, `SELECT (SELECT count(*) FROM passkeys) || '/' || (SELECT count(*) FROM enveloppes)`); n[0] != "0/0" {
+		t.Error("passkeys ou enveloppes d'un compte supprimé restantes :", n)
 	}
 }
 

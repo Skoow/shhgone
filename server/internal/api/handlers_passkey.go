@@ -147,9 +147,10 @@ func (a compteAPI) connexionDebut(w http.ResponseWriter, r *http.Request) {
 	ecrireEtapeOptions(w, e, opts)
 }
 
-// connexionFin : { etape, credential, persistante, etiquette } → { session, h, cred_id, env,
-// blob_profil, gen_profil, blob_prive, gen_prive } ; env : null si la passkey n'a pas
-// d'enveloppe PRF (l'appareil ouvre alors K_compte autrement, conception §5.5).
+// connexionFin : { etape, credential, persistante, etiquette } → { session, h, cred_id,
+// enveloppes, blob_profil, gen_profil, blob_prive, gen_prive } ; enveloppes : les enveloppes PRF
+// de la passkey qui a signé (0 à 4, base64url de 60 octets) : l'appareil les essaie toutes ;
+// aucune ne s'ouvre : K_compte autrement (conception §5.5), puis passkeys/enveloppe.
 func (a compteAPI) connexionFin(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		Etape       string          `json:"etape"`
@@ -173,20 +174,24 @@ func (a compteAPI) connexionFin(w http.ResponseWriter, r *http.Request) {
 		failCompte(w, err)
 		return
 	}
-	var env *string
-	if ov.Env != nil {
-		s := b64.EncodeToString(ov.Env)
-		env = &s
-	}
 	writeJSON(w, http.StatusOK, struct {
-		Session    string  `json:"session"`
-		H          string  `json:"h"`
-		CredID     string  `json:"cred_id"`
-		Env        *string `json:"env"`
-		BlobProfil string  `json:"blob_profil"`
-		GenProfil  uint64  `json:"gen_profil"`
-		BlobPrive  string  `json:"blob_prive"`
-		GenPrive   uint64  `json:"gen_prive"`
-	}{b64.EncodeToString(ov.Jeton[:]), b64.EncodeToString(ov.H[:]), b64.EncodeToString(ov.CredID), env,
+		Session    string   `json:"session"`
+		H          string   `json:"h"`
+		CredID     string   `json:"cred_id"`
+		Enveloppes []string `json:"enveloppes"`
+		BlobProfil string   `json:"blob_profil"`
+		GenProfil  uint64   `json:"gen_profil"`
+		BlobPrive  string   `json:"blob_prive"`
+		GenPrive   uint64   `json:"gen_prive"`
+	}{b64.EncodeToString(ov.Jeton[:]), b64.EncodeToString(ov.H[:]), b64.EncodeToString(ov.CredID), enveloppesJSON(ov.Enveloppes),
 		b64.EncodeToString(ov.BlobProfil), ov.GenProfil, b64.EncodeToString(ov.BlobPrive), ov.GenPrive})
+}
+
+// enveloppesJSON : enveloppes en base64url ([] si aucune, jamais null).
+func enveloppesJSON(es [][]byte) []string {
+	out := make([]string, 0, len(es))
+	for _, e := range es {
+		out = append(out, b64.EncodeToString(e))
+	}
+	return out
 }

@@ -27,7 +27,8 @@ type PasskeyVue struct {
 
 // passkeysDe : les passkeys du compte h (ordre d'ajout).
 func (s *Service) passkeysDe(h [16]byte) ([]Passkey, []PasskeyVue, error) {
-	rows, err := s.db.Query(`SELECT cred_id, cle_pub, alg, be, env, etiquette, ajoutee_mois FROM passkeys WHERE h=?
+	rows, err := s.db.Query(`SELECT cred_id, cle_pub, alg, be, etiquette, ajoutee_mois,
+		EXISTS (SELECT 1 FROM enveloppes e WHERE e.cred_id = passkeys.cred_id) FROM passkeys WHERE h=?
 		ORDER BY ajoutee_mois, cred_id`, h[:])
 	if err != nil {
 		return nil, nil, err
@@ -39,13 +40,14 @@ func (s *Service) passkeysDe(h [16]byte) ([]Passkey, []PasskeyVue, error) {
 		var p Passkey
 		var be int
 		var m int64
-		if err := rows.Scan(&p.CredID, &p.ClePub, &p.Alg, &be, &p.Env, &p.Etiquette, &m); err != nil {
+		var prf bool
+		if err := rows.Scan(&p.CredID, &p.ClePub, &p.Alg, &be, &p.Etiquette, &m, &prf); err != nil {
 			return nil, nil, err
 		}
 		p.BE = be == 1
 		ps = append(ps, p)
 		vs = append(vs, PasskeyVue{CredID: p.CredID, Ajoutee: time.Unix(m, 0).UTC().Format("2006-01"), Etiquette: p.Etiquette,
-			BE: p.BE, PRF: p.Env != nil})
+			BE: p.BE, PRF: prf})
 	}
 	return ps, vs, rows.Err()
 }
@@ -87,14 +89,15 @@ func (s *Service) ReauthDebut(ip netip.Addr, c Courante) ([32]byte, json.RawMess
 }
 
 // ReauthFin : reauth/fin : la passkey doit être du compte de la session ; juste, la session est
-// récente 5 min. L'étape sert une fois ; échecs comptés comme ceux de la connexion.
-func (s *Service) ReauthFin(ip netip.Addr, c Courante, jeton [32]byte, credential []byte) error {
+// récente 5 min et liée à cette passkey (passkeys/enveloppe) ; rend ses enveloppes PRF. L'étape
+// sert une fois ; échecs comptés comme ceux de la connexion.
+func (s *Service) ReauthFin(ip netip.Addr, c Courante, jeton [32]byte, credential []byte) ([][]byte, error) {
 	if s.wa == nil {
-		return errSansCeremonies
+		return nil, errSansCeremonies
 	}
 	now := s.now()
 	if !s.lim.AllowEchecConnexion(ip) {
-		return ErrLimit{heureSuivante(now)}
+		return nil, ErrLimit{heureSuivante(now)}
 	}
 	s.mu.Lock()
 	e := s.et.trouverLocked(jeton, etapeReauth, now)
@@ -105,21 +108,22 @@ func (s *Service) ReauthFin(ip netip.Addr, c Courante, jeton [32]byte, credentia
 	}
 	s.mu.Unlock()
 	if e == nil {
-		return ErrEtape
+		return nil, ErrEtape
 	}
 	ps, _, err := s.passkeysDe(c.H)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if _, _, err := s.wa.finAssertion(e.defi, credential, nil, &c.H, ps); err != nil {
+	_, cred, err := s.wa.finAssertion(e.defi, credential, nil, &c.H, ps)
+	if err != nil {
 		if errors.Is(err, ErrIdentifiants) {
 			s.lim.NoterEchecConnexion(ip)
 			s.cpt.echecs.Add(1)
 		}
-		return err
+		return nil, err
 	}
-	s.rendreRecente(c)
-	return nil
+	s.rendreRecente(c, cred)
+	return s.enveloppesDe(cred)
 }
 
 // PasskeysDebut : passkeys/debut (session récente ; 10 par heure par compte ; 10 passkeys au
@@ -217,13 +221,67 @@ func (s *Service) majPasskey(c Courante, col string, credID, v []byte) error {
 	return nil
 }
 
-// PasskeysEnveloppe : passkeys/enveloppe (session) : enveloppe PRF de K_compte pour une passkey
-// du compte (obtenue par un get après le create, ou plus tard sur un appareil qui l'offre, R10).
-func (s *Service) PasskeysEnveloppe(c Courante, credID, env []byte) error {
+// ErrSansPasskey : la session n'est liée à aucune passkey (ouverte par la clé de récupération,
+// ou serveur redémarré depuis) : reauth/debut et reauth/fin d'abord.
+var ErrSansPasskey = errors.New("sans_passkey")
+
+// ErrEnveloppesMax : la passkey a déjà ses 4 enveloppes.
+var ErrEnveloppesMax = errors.New("enveloppes_max")
+
+// PasskeysEnveloppe : passkeys/enveloppe (session) : une enveloppe PRF de plus pour la passkey
+// qui a signé la dernière assertion de CETTE session (jamais un cred_id venu du corps), après
+// une ouverture réussie par un autre moyen (sortie PRF différente : R6, R10 ; correction du
+// 22 novembre, « enveloppes multiples »). La même enveloppe déjà là : rien à faire ; une
+// cinquième : ErrEnveloppesMax. Aucune route n'en retire : elles partent avec la passkey (une
+// session volée ne peut pas effacer le bon chemin d'ouverture).
+func (s *Service) PasskeysEnveloppe(c Courante, env []byte) error {
 	if len(env) != EnveloppeLen {
 		return ErrRequete
 	}
-	return s.majPasskey(c, "env", credID, env)
+	cred := s.credDe(c)
+	if cred == nil {
+		return ErrSansPasskey
+	}
+	return s.tx(func(tx *sql.Tx) error {
+		var x int
+		switch err := tx.QueryRow(`SELECT 1 FROM passkeys WHERE cred_id=? AND h=?`, cred, c.H[:]).Scan(&x); {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrSansPasskey // retirée depuis : reauth d'abord
+		case err != nil:
+			return err
+		}
+		rows, err := tx.Query(`SELECT n, env FROM enveloppes WHERE cred_id=?`, cred)
+		if err != nil {
+			return err
+		}
+		pris := [EnveloppesMax]bool{}
+		for rows.Next() {
+			var n int
+			var e []byte
+			if err := rows.Scan(&n, &e); err != nil {
+				rows.Close()
+				return err
+			}
+			if bytes.Equal(e, env) {
+				rows.Close()
+				return nil // idempotent
+			}
+			if n >= 0 && n < EnveloppesMax {
+				pris[n] = true
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		for n, p := range pris {
+			if !p {
+				_, err := tx.Exec(`INSERT INTO enveloppes(cred_id, n, env) VALUES(?,?,?)`, cred, n, env)
+				return err
+			}
+		}
+		return ErrEnveloppesMax
+	})
 }
 
 // PasskeysNommer : passkeys/nommer (session) : libellé chiffré par l'appareil (64 octets).

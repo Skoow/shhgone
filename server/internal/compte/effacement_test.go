@@ -34,12 +34,13 @@ func TestSuppressionEfface(t *testing.T) {
 	var vr, envr, pe, bp, bv, cred, pub, env []byte
 	b.db.QueryRow(`SELECT v_r, env_r, p_empreinte, blob_profil, blob_prive FROM comptes WHERE h=?`, h[:]).Scan(
 		&vr, &envr, &pe, &bp, &bv)
-	b.db.QueryRow(`SELECT cred_id, cle_pub, env FROM passkeys WHERE h=?`, h[:]).Scan(&cred, &pub, &env)
+	b.db.QueryRow(`SELECT cred_id, cle_pub FROM passkeys WHERE h=?`, h[:]).Scan(&cred, &pub)
+	b.db.QueryRow(`SELECT env FROM enveloppes WHERE cred_id=?`, cred).Scan(&env)
 	b.clk.Add(5 * time.Minute)
 	if _, err := b.s.Supprimer(b.session(t, j)); !errors.Is(err, ErrRecent) {
 		t.Fatal("non récente :", err)
 	}
-	b.s.rendreRecente(b.session(t, j))
+	b.s.rendreRecente(b.session(t, j), nil)
 	n, err := b.s.Supprimer(b.session(t, j))
 	if err != nil || n != 2 || len(fermes) != 2 || fermes[0] != h || fermes[1] != h {
 		t.Fatal(n, err, fermes)
