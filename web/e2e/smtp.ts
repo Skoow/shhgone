@@ -1,3 +1,6 @@
+// OBSOLÈTE depuis le 22 novembre (compte par passkey, plus aucun e-mail) : gardé seulement pour que
+// les parcours ui-e2e du compte par e-mail (ui-e2e/compte.spec.ts, salon.spec.ts) compilent encore
+// jusqu'à leur réécriture (lot T1) ; le serveur refuse désormais toute variable SHH_SMTP_*.
 // Faux serveur SMTP pour les tests de bout en bout du compte (plan du compte, lot 16) : boucle
 // locale, texte clair (le serveur ne l'accepte que vers 127.0.0.1, config.comptesFromEnv),
 // AUTH PLAIN annoncée (net/smtp n'envoie le mot de passe hors TLS que vers la boucle locale).

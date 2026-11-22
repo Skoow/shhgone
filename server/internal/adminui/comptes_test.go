@@ -36,7 +36,7 @@ type bancComptes struct {
 	actions   []string // « cle action duree motif »
 	resultat  Resultat
 	errAction error
-	recus     [][]byte // tampons reçus (email, lien) : effacés après la réponse
+	recus     [][]byte // tampons reçus (lien) : effacés après la réponse
 	bannis    []string
 	errBannir error
 	errBan    error
@@ -75,19 +75,9 @@ func nouveauBancComptes(avecComptes bool) *bancComptes {
 				b.bannis = append(b.bannis, "action "+id+" "+action+" "+jusqu)
 				return b.avant, b.apres, b.errBan
 			},
-			Chercher: func(email []byte) (*compte.BanVue, compte.CompteVue, error) {
-				b.recus = append(b.recus, email)
-				b.bannis = append(b.bannis, "chercher "+string(email))
-				return &vue, compte.CompteVue{Existe: true, Palier: "neuf", AncienneteJours: 3, Banni: true}, b.errBan
-			},
-			Bannir: func(email, lien []byte, duree int, motif uint8) (Resultat, error) {
-				if email != nil {
-					b.recus = append(b.recus, email)
-				}
-				if lien != nil {
-					b.recus = append(b.recus, lien)
-				}
-				b.bannis = append(b.bannis, "bannir "+string(email)+"|"+string(lien)+" "+itoa(duree)+" "+itoa(int(motif)))
+			Bannir: func(lien []byte, duree int, motif uint8) (Resultat, error) {
+				b.recus = append(b.recus, lien)
+				b.bannis = append(b.bannis, "bannir "+string(lien)+" "+itoa(duree)+" "+itoa(int(motif)))
 				return Resultat{Banni: "compte", Ban: &vue, SalonsFermes: 2}, b.errBannir
 			},
 		}
@@ -114,7 +104,7 @@ func (b *bancComptes) get(path string) (int, string) {
 // d'URL, ou comptes désactivés (SHH_COMPTES=0) : le refus uniforme, aucun crochet appelé.
 func TestRefusUniformeLot7(t *testing.T) {
 	routes := [][2]string{{"GET", "/api/signalements"}, {"POST", "/api/salons/action"}, {"POST", "/api/bannis"},
-		{"POST", "/api/bannis/action"}, {"POST", "/api/bannis/chercher"}, {"POST", "/api/bannir"}, {"GET", "/api/comptes"}}
+		{"POST", "/api/bannis/action"}, {"POST", "/api/bannir"}, {"GET", "/api/comptes"}}
 	b := nouveauBancComptes(true)
 	ref := b.faire(req{method: "GET", path: "/api/nimporte"})
 	pareil := func(nom string, q req, bb *bancComptes) {
@@ -228,8 +218,9 @@ func TestBannirDepuisRefSignale(t *testing.T) {
 }
 
 // Bannissements : liste (filtre et page dans le corps : aucun paramètre d'URL n'est accepté),
-// actions (l'état d'avant est rendu), recherche et bannissement par adresse ou par lien.
-// L'adresse et le lien ne sont jamais repris, et leurs tampons sont effacés après la réponse.
+// actions (l'état d'avant est rendu), bannissement par lien de salon. Le lien n'est jamais
+// repris, et son tampon est effacé après la réponse. Plus de recherche ni de bannissement par
+// adresse (conception du compte par passkey §7.4) : ces formes sont refusées.
 func TestRoutesBannissements(t *testing.T) {
 	b := nouveauBancComptes(true)
 	code, corps := b.post("/api/bannis", `{"filtre":"actifs","page":2}`)
@@ -246,21 +237,11 @@ func TestRoutesBannissements(t *testing.T) {
 	if _, corps := b.post("/api/bannis/action", `{"id":"B-1","action":"lever"}`); !strings.HasSuffix(corps, `"apres":null}`) {
 		t.Fatal(corps)
 	}
-	code, corps = b.post("/api/bannis/chercher", `{"email":"`+adresseTapee+`"}`)
-	if code != 200 || strings.Contains(strings.ToLower(corps), "dupont") ||
-		!strings.Contains(corps, `"compte":{"existe":true,"palier":"neuf","anciennete_jours":3,"banni":true}`) {
-		t.Fatal(code, corps)
-	}
-	code, corps = b.post("/api/bannir", `{"email":"`+adresseTapee+`","duree_jours":365,"motif":10}`)
-	if code != 200 || strings.Contains(strings.ToLower(corps), "dupont") || !strings.HasPrefix(corps, `{"banni":"compte","ban":{`) {
-		t.Fatal(code, corps)
-	}
 	code, corps = b.post("/api/bannir", `{"lien":"`+lienColle+`","duree_jours":30,"motif":4}`)
 	if code != 200 || strings.Contains(corps, "AAAAAAAA") {
 		t.Fatal(code, corps)
 	}
-	want := []string{"liste actifs 2", "action B-1 suspendre ", "action B-1 lever ", "chercher " + adresseTapee,
-		"bannir " + adresseTapee + "| 365 10", "bannir |" + lienColle + " 30 4"}
+	want := []string{"liste actifs 2", "action B-1 suspendre ", "action B-1 lever ", "bannir " + lienColle + " 30 4"}
 	if strings.Join(b.bannis, ";") != strings.Join(want, ";") {
 		t.Fatalf("%q", b.bannis)
 	}
@@ -272,13 +253,13 @@ func TestRoutesBannissements(t *testing.T) {
 	n := len(b.bannis)
 	for _, c := range []struct{ path, corps, body string }{
 		{"/api/bannir", `{"email":"a@b.fr","lien":"x","duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
+		{"/api/bannir", `{"email":"` + adresseTapee + `","duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
 		{"/api/bannir", `{"duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
-		{"/api/bannir", `{"email":"a\u0040b.fr","duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
-		{"/api/bannir", `{"email":"a@b.fr","duree_jours":30,"motif":1,"x":1}`, `{"error":"bad_request"}`},
-		{"/api/bannir", `{"email":12,"duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
-		{"/api/bannis/chercher", `{"email":""}`, `{"error":"bad_request"}`},
+		{"/api/bannir", `{"lien":"a\u0040b","duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
+		{"/api/bannir", `{"lien":"x","duree_jours":30,"motif":1,"x":1}`, `{"error":"bad_request"}`},
+		{"/api/bannir", `{"lien":12,"duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
 		{"/api/bannis", `{"filtre":"x","page":"1"}`, `{"error":"bad_request"}`},
-		{"/api/bannir", `{"email":"` + strings.Repeat("a", 9000) + `","duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
+		{"/api/bannir", `{"lien":"` + strings.Repeat("a", 9000) + `","duree_jours":30,"motif":1}`, `{"error":"bad_request"}`},
 	} {
 		if code, corps := b.post(c.path, c.corps); code != 400 || corps != c.body {
 			t.Errorf("%s %.60s : %d %s", c.path, c.corps, code, corps)
@@ -293,7 +274,6 @@ func TestRoutesBannissements(t *testing.T) {
 		body string
 	}{
 		{compte.ErrRequete, 400, `{"error":"bad_request"}`},
-		{compte.ErrAdresse, 400, `{"error":"adresse_invalide"}`},
 		{ErrLienInvalide, 400, `{"error":"lien_invalide"}`},
 		{ErrIntrouvable, 200, `{"introuvable":true}`},
 		{compte.ErrEtape, 200, `{"introuvable":true}`},
@@ -303,11 +283,12 @@ func TestRoutesBannissements(t *testing.T) {
 		{errors.New("base /data/comptes.db IDSECRET"), 500, `{"error":"internal"}`},
 	} {
 		b.errBannir = c.err
-		if code, corps := b.post("/api/bannir", `{"email":"a@b.fr","duree_jours":30,"motif":1}`); code != c.code || corps != c.body {
+		if code, corps := b.post("/api/bannir", `{"lien":"x","duree_jours":30,"motif":1}`); code != c.code || corps != c.body {
 			t.Errorf("%v : %d %s", c.err, code, corps)
 		}
 	}
-	if code, corps := b.get("/api/comptes"); code != 200 || !strings.Contains(corps, `"comptes":3`) || !strings.Contains(corps, `"courriel":{`) {
+	if code, corps := b.get("/api/comptes"); code != 200 || !strings.Contains(corps, `"comptes":3`) || strings.Contains(corps, `"courriel"`) ||
+		!strings.Contains(corps, `"passkeys":0`) {
 		t.Fatal(code, corps)
 	}
 }
@@ -319,8 +300,6 @@ func TestPageSansIdentite(t *testing.T) {
 	b.signales = []Signale{{Cle: cleSecrete, Categories: [10]int{0: 1}, Expire: b.clk.Add(time.Hour), Places: 2}}
 	var tout strings.Builder
 	for _, q := range [][3]string{{"GET", "/api/signalements", ""}, {"GET", "/api/comptes", ""}, {"POST", "/api/bannis", `{}`},
-		{"POST", "/api/bannis/chercher", `{"email":"` + adresseTapee + `"}`},
-		{"POST", "/api/bannir", `{"email":"` + adresseTapee + `","duree_jours":30,"motif":1}`},
 		{"POST", "/api/bannir", `{"lien":"` + lienColle + `","duree_jours":30,"motif":1}`},
 		{"GET", "/", ""}, {"GET", "/admin.js", ""}, {"GET", "/admin.css", ""}} {
 		w := b.faire(req{method: q[0], path: q[1], corps: q[2], hdr: [][2]string{bon()}})
@@ -331,7 +310,8 @@ func TestPageSansIdentite(t *testing.T) {
 	}
 	s := strings.ToLower(tout.String())
 	for _, interdit := range []string{strings.ToLower(cleSecrete), "dupont", "exemple.fr", "aaaaaaaaaaaa", "e_canon",
-		"p_empreinte", "pseudo\":", "\"h\":"} {
+		"p_empreinte", "pseudo\":", "\"h\":", "cred_id", "chercher", "recherche par adresse", "bannir par adresse",
+		"adresse e-mail", "e-mails envoyés", "totp", "double auth"} {
 		if strings.Contains(s, interdit) {
 			t.Errorf("réponse ou page contient %q", interdit)
 		}

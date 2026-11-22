@@ -7,7 +7,6 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"errors"
-	"net/netip"
 	"slices"
 	"sync"
 	"time"
@@ -95,6 +94,7 @@ type SessionVue struct {
 	Etiquette   []byte // 64 octets chiffrés par le client, ou nil
 	Courante    bool
 	Persistante bool
+	ParRecup    bool // ouverte par la clé de récupération (R4)
 }
 
 func plafond(creeMois int64) int64 { return creeMois + joursPlafond*jourS }
@@ -108,7 +108,8 @@ func echeance(persistante bool, creeMois int64, now time.Time) int64 {
 
 // creerSessionTx : nouvelle session de h (récente) ; au-delà de 20, les plus anciennes sont
 // fermées.
-func (s *Service) creerSessionTx(tx *sql.Tx, h [16]byte, o OptionsSession, now time.Time) ([32]byte, error) {
+// parRecup : session ouverte par la clé de récupération (montrée aux autres appareils, R4).
+func (s *Service) creerSessionTx(tx *sql.Tx, h [16]byte, o OptionsSession, parRecup bool, now time.Time) ([32]byte, error) {
 	var jeton [32]byte
 	var sid [16]byte
 	rand.Read(jeton[:])
@@ -122,9 +123,9 @@ func (s *Service) creerSessionTx(tx *sql.Tx, h [16]byte, o OptionsSession, now t
 	if o.Etiquette != nil {
 		etiq = o.Etiquette
 	}
-	if _, err := tx.Exec(`INSERT INTO sessions(t_v, sid, h, etiquette, cree_mois, expire_jour, persistante)
-		VALUES(?,?,?,?,?,?,?)`, tv[:], sid[:], h[:], etiq, m, echeance(o.Persistante, m, now),
-		boolInt(o.Persistante)); err != nil {
+	if _, err := tx.Exec(`INSERT INTO sessions(t_v, sid, h, etiquette, cree_mois, expire_jour, persistante, par_recup)
+		VALUES(?,?,?,?,?,?,?,?)`, tv[:], sid[:], h[:], etiq, m, echeance(o.Persistante, m, now),
+		boolInt(o.Persistante), boolInt(parRecup)); err != nil {
 		return jeton, err
 	}
 	s.act.ecrire(tv, activite{vu: now, recente: now.Add(dureeRecente)})
@@ -216,45 +217,12 @@ func (s *Service) Session(jeton [32]byte) (Courante, error) {
 	return c, nil
 }
 
-// Reauth : mot de passe redemandé (A_auth), et code de l'application si la double
-// authentification est active (totp vide : totp_requis), pour une session récente pendant
-// 5 min. Échecs du mot de passe comptés comme ceux de la connexion (même limite par connexion,
-// même preuve par compte) ; échecs du code comme ceux de la double authentification.
-func (s *Service) Reauth(ip netip.Addr, c Courante, aAuth [32]byte, totp string) error {
+// rendreRecente : la session courante est « récente » pendant 5 min (reauth juste).
+func (s *Service) rendreRecente(c Courante) {
 	now := s.now()
-	if !s.lim.AllowEchecConnexion(ip) {
-		return ErrLimit{heureSuivante(now)}
-	}
-	var vm, ec, scelle []byte
-	if err := s.db.QueryRow(`SELECT v_mdp, e_canon, totp FROM comptes WHERE h=?`, c.H[:]).Scan(&vm, &ec, &scelle); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrSession
-		}
-		return err
-	}
-	v := hmacMdp(&s.cles.Poivre, &c.H, &aAuth)
-	if subtle.ConstantTimeCompare(v[:], vm) != 1 {
-		s.lim.NoterEchecConnexion(ip, [32]byte(ec))
-		return ErrIdentifiants
-	}
-	if scelle != nil {
-		if totp == "" {
-			return ErrTOTPRequis
-		}
-		s.mu.Lock()
-		err := s.verifierTOTPLocked(c.H, scelle, totp, now)
-		s.mu.Unlock()
-		if err != nil {
-			return err
-		}
-		if err := annulerRetrait(s.db, c.H); err != nil {
-			return err
-		}
-	}
 	a := s.act.lire(c.tv, now)
 	a.recente = now.Add(dureeRecente)
 	s.act.ecrire(c.tv, a)
-	return nil
 }
 
 // Deconnexion : la session courante est oubliée.
@@ -266,7 +234,7 @@ func (s *Service) Deconnexion(c Courante) error {
 
 // Sessions : la liste des appareils du compte (§8.5).
 func (s *Service) Sessions(c Courante) ([]SessionVue, error) {
-	rows, err := s.db.Query(`SELECT sid, cree_mois, etiquette, persistante, t_v FROM sessions WHERE h=?
+	rows, err := s.db.Query(`SELECT sid, cree_mois, etiquette, persistante, par_recup, t_v FROM sessions WHERE h=?
 		ORDER BY cree_mois, sid`, c.H[:])
 	if err != nil {
 		return nil, err
@@ -276,13 +244,13 @@ func (s *Service) Sessions(c Courante) ([]SessionVue, error) {
 	for rows.Next() {
 		var v SessionVue
 		var m int64
-		var pers int
+		var pers, recup int
 		var tv []byte
-		if err := rows.Scan((*octets16)(&v.Sid), &m, &v.Etiquette, &pers, &tv); err != nil {
+		if err := rows.Scan((*octets16)(&v.Sid), &m, &v.Etiquette, &pers, &recup, &tv); err != nil {
 			return nil, err
 		}
 		v.Ajoutee = time.Unix(m, 0).UTC().Format("2006-01")
-		v.Persistante = pers == 1
+		v.Persistante, v.ParRecup = pers == 1, recup == 1
 		v.Courante = subtle.ConstantTimeCompare(tv, c.tv[:]) == 1
 		out = append(out, v)
 	}
@@ -309,7 +277,7 @@ func (s *Service) FermerAutres(c Courante) error {
 
 // EtiquetterSession : nom d'appareil de la session courante (64 octets chiffrés par le client
 // avec K_etiquette, §8.5). Lot 10 : à la connexion, l'appareil n'a pas encore K_compte (il
-// l'ouvre avec Env_mdp, rendu par la réponse) ; il pose donc le nom juste après. Seule la
+// l'ouvre avec l'enveloppe rendue par la réponse) ; il pose donc le nom juste après. Seule la
 // session de la requête change ; le serveur ne voit que des octets chiffrés.
 func (s *Service) EtiquetterSession(c Courante, etiquette []byte) error {
 	if len(etiquette) != 64 {

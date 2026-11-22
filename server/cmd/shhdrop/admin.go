@@ -17,7 +17,6 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/config"
-	"github.com/skoow/shhdrop/server/internal/courriel"
 	"github.com/skoow/shhdrop/server/internal/limits"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
@@ -36,7 +35,7 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 	usage := func(msg string) int {
 		fmt.Fprintln(stderr, msg)
 		fmt.Fprintln(stderr, "usage: shhdrop admin freeze|unfreeze|destroy - (lien lu sur l'entrée standard)|wipe --yes")
-		fmt.Fprintln(stderr, "       shhdrop admin bannir - [--duree 30|365|1095] [--motif 1..10] (lien de salon ou adresse sur l'entrée standard)")
+		fmt.Fprintln(stderr, "       shhdrop admin bannir - [--duree 30|365|1095] [--motif 1..10] (lien de salon sur l'entrée standard)")
 		fmt.Fprintln(stderr, "       shhdrop admin paiement revoquer <commande> (32 caractères hexadécimaux, lus chez le prestataire)")
 		fmt.Fprintln(stderr, "       shhdrop admin bannis liste [actifs|suspendus|bientot] | suspendre|reactiver|lever|annuler <B-…> | echeance <B-…> <AAAA-MM-JJ>")
 		return 2
@@ -185,16 +184,12 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 	return 0
 }
 
-// postierNul : la ligne de commande n'envoie aucun e-mail (aucune connexion sortante).
-type postierNul struct{}
-
-func (postierNul) Mettre(courriel.Message) error { return courriel.ErrPlein }
-func (postierNul) Plein() bool                   { return true }
-
 // runBannis : « bannir - » et « bannis … » (conception du compte §13, §21.11, §21.14.5 ;
-// plan lot 7). Exige SHH_COMPTES=1 (clé du serveur) et une comptes.db existante. Le lien ou
-// l'adresse se lit sur l'entrée standard, jamais en argument (historique du shell,
-// /proc/<pid>/cmdline) ; la sortie ne les reprend jamais : seulement l'identifiant B-….
+// plan lot 7 ; conception du compte par passkey §7.4 : par compte seulement, plus d'adresse).
+// Exige SHH_COMPTES=1 (clé du serveur) et une comptes.db existante. Le lien se lit sur l'entrée
+// standard, jamais en argument (historique du shell, /proc/<pid>/cmdline) ; la sortie ne le
+// reprend jamais : seulement l'identifiant B-…. Le recours d'une personne bannie passe par cet
+// identifiant (« bannis lever|annuler|… <B-…> »).
 // Les salons du compte sont détruits hors ligne (le serveur en marche ferme leurs connexions
 // à sa passe suivante). La limite de 20 bannissements par heure ne vaut ici que pour cette
 // commande (mémoire du processus) : qui l'exécute a déjà la machine.
@@ -204,7 +199,7 @@ func runBannis(args []string, cfg config.Config, stdin io.Reader, stdout, stderr
 	var filtre, id, jusqu, action string
 	if args[0] == "bannir" {
 		if len(args) < 2 || args[1] != "-" {
-			return usage("bannir lit le lien du salon ou l'adresse sur l'entrée standard : shhdrop admin bannir -")
+			return usage("bannir lit le lien du salon sur l'entrée standard : shhdrop admin bannir -")
 		}
 		for r := args[2:]; len(r) > 0; r = r[2:] {
 			if len(r) < 2 {
@@ -264,7 +259,7 @@ func runBannis(args []string, cfg config.Config, stdin io.Reader, stdout, stderr
 		return fail(shownf("%s ne contient pas comptes.db : aucun compte (rien n'a été fait)", dir))
 	}
 	cdb, err := compte.OuvrirBase(chemin)
-	if errors.Is(err, compte.ErrBasePlusRecente) {
+	if errors.Is(err, compte.ErrBasePlusRecente) || errors.Is(err, compte.ErrBaseEmail) {
 		return fail(shown(err.Error()))
 	}
 	if err != nil {
@@ -281,7 +276,7 @@ func runBannis(args []string, cfg config.Config, stdin io.Reader, stdout, stderr
 	if now == nil {
 		now = time.Now
 	}
-	cs, err := compte.NewService(compte.Config{DB: cdb, Cles: cles, Courriel: postierNul{}, Limites: limits.New(now), Now: now,
+	cs, err := compte.NewService(compte.Config{DB: cdb, Cles: cles, Limites: limits.New(now), Now: now,
 		Max: max(1, cfg.ComptesMax),
 		FermerSalons: func(h [16]byte) (int, error) {
 			if err := store.RequireCurrent(svc.DB); err != nil {
@@ -310,61 +305,47 @@ func etatBan(v compte.BanVue) string {
 	return fmt.Sprintf("%s %s, du %s au %s, motif %d, salons fermés : %d", v.ID, e, v.Debut, v.Jusqu, v.Motif, v.SalonsFermes)
 }
 
-// bannirCmd : lien de salon (#c<43>) ou adresse (tout ce qui contient « @ »).
+// bannirCmd : lien de salon (#c<43>) : son compte créateur est banni.
 func bannirCmd(cs *compte.Service, svc *share.Service, lu []byte, duree int, motif uint8, dir string,
 	stdout, stderr io.Writer, usage func(string) int, fail func(error) int) int {
 	ligne, ok := seuleLigne(lu)
 	if !ok {
 		return usage(errUneLigne.Error())
 	}
-	var c compte.Cible
-	if bytes.IndexByte(ligne, '@') >= 0 {
-		c.Email = ligne
-	} else {
-		k, estSalon, err := cleAccesDuLien(ligne)
-		if err != nil || !estSalon {
-			clear(k)
-			return usage("lien de salon (#c<clé>) ou adresse e-mail attendus")
-		}
-		if err := store.RequireCurrent(svc.DB); err != nil {
-			clear(k)
-			return fail(err)
-		}
-		var cb []byte
-		err = svc.DB.QueryRow(`SELECT compte FROM salons WHERE access_v=?`, share.Verifier(k)).Scan(&cb)
+	k, estSalon, err := cleAccesDuLien(ligne)
+	if err != nil || !estSalon {
 		clear(k)
-		if errors.Is(err, sql.ErrNoRows) {
-			fmt.Fprintf(stderr, "introuvable : aucun salon pour ce lien (%s ; rien n'a été fait)\n", dir)
-			return 1
-		}
-		if err != nil {
-			return fail(err)
-		}
-		if len(cb) != 16 {
-			fmt.Fprintf(stderr, "aucun compte à bannir : salon créé sans compte ; « shhdrop admin destroy - » le détruit (%s)\n", dir)
-			return 1
-		}
-		h := [16]byte(cb)
-		c.H = &h
+		return usage("lien de salon (#c<clé>) attendu")
 	}
-	b, err := cs.Bannir(c, duree, motif)
+	if err := store.RequireCurrent(svc.DB); err != nil {
+		clear(k)
+		return fail(err)
+	}
+	var cb []byte
+	err = svc.DB.QueryRow(`SELECT compte FROM salons WHERE access_v=?`, share.Verifier(k)).Scan(&cb)
+	clear(k)
+	if errors.Is(err, sql.ErrNoRows) {
+		fmt.Fprintf(stderr, "introuvable : aucun salon pour ce lien (%s ; rien n'a été fait)\n", dir)
+		return 1
+	}
+	if err != nil {
+		return fail(err)
+	}
+	if len(cb) != 16 {
+		fmt.Fprintf(stderr, "aucun compte à bannir : salon créé sans compte ; « shhdrop admin destroy - » le détruit (%s)\n", dir)
+		return 1
+	}
+	b, err := cs.Bannir([16]byte(cb), duree, motif)
 	var deja compte.ErrDejaBanni
 	switch {
 	case errors.As(err, &deja):
 		fmt.Fprintf(stderr, "déjà banni : %s (agir sur lui : shhdrop admin bannis …)\n", etatBan(deja.Vue))
 		return 1
-	case errors.Is(err, compte.ErrAdresse):
-		return usage("adresse e-mail invalide")
 	case errors.Is(err, compte.ErrEtape):
 		fmt.Fprintf(stderr, "aucun compte à bannir : le compte du salon n'existe plus (%s)\n", dir)
 		return 1
 	case err != nil:
 		return fail(err)
-	}
-	if !b.Compte {
-		fmt.Fprintf(stdout, "adresse bannie %s jusqu'au %s (motif %d) : aucun compte, l'inscription est refusée (%s)\n",
-			b.Vue.ID, b.Vue.Jusqu, b.Vue.Motif, dir)
-		return 0
 	}
 	pl := "salons fermés"
 	if b.SalonsFermes == 1 {

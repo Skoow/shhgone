@@ -91,6 +91,8 @@
 
 ## Lot S2 — Configuration, `comptes.db` schéma 3, retrait du compte par e-mail
 
+**État : fait le 22 novembre. Écarts : la route POST recup (S4) et les nouvelles limites de §7.2 (limits/compte.go) sont venues dès ce lot (recup ne dépend pas de WebAuthn ; elle sert aux tests de session récente) ; la partie Go du tableau de bord (S7 : plus de recherche ni de bannissement par adresse) aussi, sans quoi le serveur ne compilait plus. Gardés exprès : server/internal/compte/jetables*.txt (lus par le site, web/src/listes/jetables.ts, jusqu'à W1), web/e2e/smtp.ts et totp.ts (ui-e2e du compte par e-mail, à refaire en T1 ; web/e2e/server.ts refuse leurs options au lancement). web/e2e/compte-sees-nothing.test.ts réduit dans ce lot, refait au lot S5 avec un authentificateur logiciel.**
+
 *Livrable seul : le serveur démarre en `SHH_COMPTES=1` sans SMTP ; les anciennes routes ont disparu (404) ; aucune nouvelle route encore. Dépend de : P1.*
 
 **Files :**
@@ -103,11 +105,11 @@
 - Schéma 3 exact (conception §6.3) : `comptes(h, p_empreinte, pseudo_jour, v_r, env_r, blob_profil, gen_profil, blob_prive, gen_prive, cree_jour, compte_des, vu_mois)`, `passkeys(cred_id, h, cle_pub, alg, be, env, etiquette, ajoutee_mois)`, `sessions(… , par_recup)`, `bannis(id, h, debut_jour, jusqu_jour, actif, motif, salons_fermes)` ; BLOB et INTEGER seulement, `WITHOUT ROWID`, `secure_delete`, `ON DELETE CASCADE`.
 - Démarrage sur une `comptes.db` de schéma 2 : **vide** → recréée ; **non vide** → refus avec message, jamais d'effacement (conception §15).
 
-- [ ] **Step 1 : tests** — `TestSchemaComptes` v3 (colonnes exactes ; aucune colonne `e_*`, `v_mdp`, `env_mdp`, `cle_profil`, `totp*`, `recup_jour`, `aaguid`, `compteur`, `bs`, `vu_jour`) ; `TestSchema2NonVideRefuse`, `TestSchema2VideRecree` ; `TestConfigSMTPRefuse` (chaque ancienne variable) ; `TestComptesJour` (bornes) ; `TestNoOutgoingHTTP` : **plus d'exception SMTP** (restent `captcha/recaptcha.go` et `paiement/http.go`, voir Signalements point 1) ; `allowedMaps` sans les maps de `courriel` et des quotas d'e-mails ; `TestBannisParH` (cascade à la suppression du compte) ; `TestPageSansIdentite` du tableau de bord sans « Recherche par adresse » ni « Bannir par adresse ».
-- [ ] **Step 2 :** `cd server && go test -race ./...` → FAIL.
-- [ ] **Step 3 :** implémenter les retraits et le schéma ; `export` sans adresse ni double authentification ; `GET /api/compte` sans `totp`, `recup_jusqu`, `retrait_totp_le` ; `supprimer` sans attente (`attente` retiré).
-- [ ] **Step 4 :** `make test-go` ; `make test-e2e` (les e2e du compte par e-mail sont retirés dans ce lot : `web/e2e/compte-sees-nothing.test.ts` réduit au démarrage et aux 404 des anciennes routes, refait en T1).
-- [ ] **Step 5 :** commit `refactor(serveur): compte sans e-mail — schéma 3, retrait de SMTP, du TOTP, du séquestre et de la récupération par e-mail`.
+- [x] **Step 1 : tests** — `TestSchemaComptes` v3 (colonnes exactes ; aucune colonne `e_*`, `v_mdp`, `env_mdp`, `cle_profil`, `totp*`, `recup_jour`, `aaguid`, `compteur`, `bs`, `vu_jour`) ; `TestSchema2NonVideRefuse`, `TestSchema2VideRecree` ; `TestConfigSMTPRefuse` (chaque ancienne variable) ; `TestComptesJour` (bornes) ; `TestNoOutgoingHTTP` : **plus d'exception SMTP** (restent `captcha/recaptcha.go` et `paiement/http.go`, voir Signalements point 1) ; `allowedMaps` sans les maps de `courriel` et des quotas d'e-mails ; `TestBannisParH` (cascade à la suppression du compte) ; `TestPageSansIdentite` du tableau de bord sans « Recherche par adresse » ni « Bannir par adresse ».
+- [x] **Step 2 :** `cd server && go test -race ./...` → FAIL.
+- [x] **Step 3 :** implémenter les retraits et le schéma ; `export` sans adresse ni double authentification ; `GET /api/compte` sans `totp`, `recup_jusqu`, `retrait_totp_le` ; `supprimer` sans attente (`attente` retiré).
+- [x] **Step 4 :** `make test-go` ; `make test-e2e` (les e2e du compte par e-mail sont retirés dans ce lot : `web/e2e/compte-sees-nothing.test.ts` réduit au démarrage et aux 404 des anciennes routes, refait en T1).
+- [x] **Step 5 :** commit `refactor(serveur): compte sans e-mail — schéma 3, retrait de SMTP, du TOTP, du séquestre et de la récupération par e-mail`.
 
 ## Lot S3 — Cérémonies WebAuthn (go-webauthn, configuration figée)
 

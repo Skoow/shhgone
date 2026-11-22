@@ -38,9 +38,7 @@ func newEnvSalonCompte(t *testing.T) envSalonCompte {
 	}
 	t.Cleanup(func() { db.Close() })
 	var c compte.Cles
-	for _, k := range [][]byte{c.Email[:], c.Poivre[:], c.Sequestre[:], c.TOTP[:], c.Pseudo[:]} {
-		rand.Read(k)
-	}
+	rand.Read(c.Pseudo[:])
 	var svc *compte.Service
 	m, err := salon.NewManager(salon.Config{DB: e.db, Pieces: &blob.Store{Dir: filepath.Join(e.dir, "salon-pieces")},
 		DossierConversations: filepath.Join(e.dir, "salons"), Now: e.clk.Now, Max: 200, StorageMax: 1 << 40,
@@ -48,14 +46,13 @@ func newEnvSalonCompte(t *testing.T) envSalonCompte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &postier{}
-	cc := compte.Config{DB: db, Cles: c, Courriel: p, Limites: e.srv.lim, Now: e.clk.Now, Max: 100}
+	cc := compte.Config{DB: db, Cles: c, Limites: e.srv.lim, Now: e.clk.Now, Max: 100}
 	BrancherSalonsDuCompte(&cc, m)
 	if svc, err = compte.NewService(cc); err != nil {
 		t.Fatal(err)
 	}
 	e.h = newHandler(e.srv, htmlStatic(), Salons{Origin: "https://shhdrop.app", M: m, Comptes: svc})
-	return envSalonCompte{envCompte{e, p}, m, svc, db}
+	return envSalonCompte{envCompte{e, db, c}, m, svc, db}
 }
 
 // creerAvec : POST /api/salons depuis remote, avec la session s ("" : sans en-tête).
@@ -71,13 +68,9 @@ func (e envSalonCompte) creerAvec(t *testing.T, k keys, s, remote string, max in
 }
 
 // reconnecter : nouvelle session (la session simple ne dure que 2 h sans usage).
-func (e envSalonCompte) reconnecter(t *testing.T, in inscrit, email string) string {
+func (e envSalonCompte) reconnecter(t *testing.T, in inscrit) string {
 	t.Helper()
-	w := e.do(req{method: "POST", path: "/api/compte/connexion", remote: remoteA, body: mustJSON(map[string]any{
-		"email": email, "a_auth": in.aAuth, "persistante": false, "etiquette": ""})})
-	expect(t, w, 200, "")
-	s, _ := jsonOf(t, w)["session"].(string)
-	return s
+	return e.recup(t, remoteA, in)
 }
 
 const remoteA, remoteB = "198.51.100.1:1", "198.51.100.2:1"
@@ -96,9 +89,9 @@ func TestCreationSansSessionRefusee(t *testing.T) {
 	}
 	// Le quota du jour n'a pas été pris (5 créations par connexion) : 5 créations passent
 	// encore pour cette connexion, une fois connecté (compte confirmé : 3 salons à la fois).
-	in := e.inscrire(t, remoteA, "lea@exemple.fr", "lea")
+	in := e.inscrire(t, remoteA, "lea")
 	e.clk.Add(8 * 24 * time.Hour)
-	s := e.reconnecter(t, in, "lea@exemple.fr")
+	s := e.reconnecter(t, in)
 	for i := range 3 {
 		if code, body := e.creerAvec(t, newKeys(), s, remoteA, 4); code != 201 {
 			t.Fatalf("création %d : %d %s", i, code, body)
@@ -129,7 +122,7 @@ func TestCreationSansComptesInchangee(t *testing.T) {
 // Palier neuf : 4 places au plus, un salon vivant ; refus 409 avec les limites.
 func TestPalierNeufHTTP(t *testing.T) {
 	e := newEnvSalonCompte(t)
-	in := e.inscrire(t, remoteA, "lea@exemple.fr", "lea")
+	in := e.inscrire(t, remoteA, "lea")
 	const palier = `{"error":"palier","salons":1,"places":4,"heures":24}`
 	if code, body := e.creerAvec(t, newKeys(), in.session, remoteA, 5); code != 409 || body != palier {
 		t.Fatal("5 places :", code, body)
@@ -158,9 +151,9 @@ func TestPalierNeufHTTP(t *testing.T) {
 // Palier confirmé (7 jours pleins) : 3 salons, 10 places ; le 4e refusé.
 func TestPalierConfirmeHTTP(t *testing.T) {
 	e := newEnvSalonCompte(t)
-	in := e.inscrire(t, remoteA, "lea@exemple.fr", "lea")
+	in := e.inscrire(t, remoteA, "lea")
 	e.clk.Add(7 * 24 * time.Hour)
-	s := e.reconnecter(t, in, "lea@exemple.fr")
+	s := e.reconnecter(t, in)
 	for i := range 3 {
 		if code, body := e.creerAvec(t, newKeys(), s, remoteA, 10); code != 201 {
 			t.Fatal(i, code, body)
@@ -172,14 +165,13 @@ func TestPalierConfirmeHTTP(t *testing.T) {
 	}
 }
 
-// Adresse bannie : 403 banni, avec l'échéance ; rien de créé.
+// Compte banni : 403 banni, avec l'échéance ; rien de créé.
 func TestCreationBannieRefusee(t *testing.T) {
 	e := newEnvSalonCompte(t)
-	in := e.inscrire(t, remoteA, "lea@exemple.fr", "lea")
+	in := e.inscrire(t, remoteA, "lea")
 	h, _ := enc.DecodeString(in.h)
 	jour := e.clk.Now().Unix() / 86400 * 86400
-	if _, err := e.cdb.Exec(`INSERT INTO bannis SELECT ?, e_canon, ?, ?, 1, 6, 0 FROM comptes WHERE h=?`,
-		rnd(8), jour, jour+30*86400, h); err != nil {
+	if _, err := e.cdb.Exec(`INSERT INTO bannis VALUES(?, ?, ?, ?, 1, 6, 0)`, rnd(8), h, jour, jour+30*86400); err != nil {
 		t.Fatal(err)
 	}
 	code, body := e.creerAvec(t, newKeys(), in.session, remoteA, 4)
@@ -192,9 +184,9 @@ func TestCreationBannieRefusee(t *testing.T) {
 // Un signalement d'un salon du compte le remet au palier neuf.
 func TestSignalementRemetAZeroHTTP(t *testing.T) {
 	e := newEnvSalonCompte(t)
-	in := e.inscrire(t, remoteA, "lea@exemple.fr", "lea")
+	in := e.inscrire(t, remoteA, "lea")
 	e.clk.Add(8 * 24 * time.Hour)
-	in.session = e.reconnecter(t, in, "lea@exemple.fr")
+	in.session = e.reconnecter(t, in)
 	k := newKeys()
 	if code, body := e.creerAvec(t, k, in.session, remoteA, 4); code != 201 {
 		t.Fatal(code, body)
@@ -217,7 +209,7 @@ func TestSignalementRemetAZeroHTTP(t *testing.T) {
 // Supprimer son compte ferme ses salons pour tous (salons_fermes).
 func TestSuppressionFermeSalons(t *testing.T) {
 	e := newEnvSalonCompte(t)
-	in := e.inscrire(t, remoteA, "lea@exemple.fr", "lea")
+	in := e.inscrire(t, remoteA, "lea")
 	k := newKeys()
 	if code, body := e.creerAvec(t, k, in.session, remoteA, 4); code != 201 {
 		t.Fatal(code, body)
@@ -233,7 +225,7 @@ func TestSuppressionFermeSalons(t *testing.T) {
 // proof_v, sel) ; detruire par la ref : même effet que « Détruire » du créateur.
 func TestSalonsDuCompteSansIdentifiant(t *testing.T) {
 	e := newEnvSalonCompte(t)
-	in := e.inscrire(t, remoteA, "lea@exemple.fr", "lea")
+	in := e.inscrire(t, remoteA, "lea")
 	k := newKeys()
 	if code, body := e.creerAvec(t, k, in.session, remoteA, 4); code != 201 {
 		t.Fatal(code, body)
@@ -269,7 +261,7 @@ func TestSalonsDuCompteSansIdentifiant(t *testing.T) {
 		t.Fatal("expire_vers :", exp, err)
 	}
 	// Un autre compte : 404, le salon reste.
-	in2 := e.inscrire(t, remoteB, "leo@exemple.fr", "leo")
+	in2 := e.inscrire(t, remoteB, "leo")
 	expect(t, e.do(req{method: "POST", path: "/api/compte/salons/detruire", hdr: sess(in2.session),
 		body: mustJSON(map[string]string{"ref": ref})}), 404, notFound)
 	expect(t, e.do(req{method: "GET", path: "/api/salons/meta", hdr: acces(k)}), 200, "")
@@ -290,7 +282,7 @@ func TestSalonsDuCompteSansIdentifiant(t *testing.T) {
 // du salon, l'en-tête est ignoré (même réponse, octet pour octet).
 func TestSessionJamaisLueAilleurs(t *testing.T) {
 	e := newEnvSalonCompte(t)
-	in := e.inscrire(t, remoteA, "lea@exemple.fr", "lea")
+	in := e.inscrire(t, remoteA, "lea")
 	k := newKeys()
 	if code, body := e.creerAvec(t, k, in.session, remoteA, 4); code != 201 {
 		t.Fatal(code, body)

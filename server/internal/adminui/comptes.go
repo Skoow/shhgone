@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/skoow/shhdrop/server/internal/compte"
-	"github.com/skoow/shhdrop/server/internal/courriel"
 )
 
 // Tableau de bord finalisé (conception du compte §21.14 ; plan lot 7) : salons signalés en
@@ -46,7 +45,7 @@ type signaleVue struct {
 
 // Resultat : réponse d'une action sur un salon signalé ou d'un bannissement. Detruit
 // (« salon », Reste : un effacement de fichier se finit en arrière-plan) ; Banni (« compte »,
-// « adresse » : sans compte, ou « aucun » : salon sans compte), Ban ; Anciennete (« rendue »).
+// ou « aucun » : salon sans compte), Ban ; Anciennete (« rendue »).
 type Resultat struct {
 	Detruit      string         `json:"detruit,omitempty"`
 	Reste        bool           `json:"reste,omitempty"`
@@ -56,30 +55,28 @@ type Resultat struct {
 	Anciennete   string         `json:"anciennete,omitempty"`
 }
 
-// Agregats : GET /api/comptes : agrégats des comptes, salons vivants créés par un compte,
-// envois d'e-mails.
+// Agregats : GET /api/comptes : agrégats des comptes, salons vivants créés par un compte.
 type Agregats struct {
 	compte.AgregatsComptes
-	SalonsDeComptes int            `json:"salons_de_comptes"`
-	Courriel        courriel.Stats `json:"courriel"`
+	SalonsDeComptes int `json:"salons_de_comptes"`
 }
 
 // Comptes : crochets du compte (SHH_COMPTES=1 ; nil sinon : routes refusées comme inconnues).
-// Les tampons email et lien sont effacés par la page au retour : les crochets n'en gardent
-// aucune copie.
+// Le tampon du lien est effacé par la page au retour : les crochets n'en gardent aucune copie.
+// Plus de recherche ni de bannissement par adresse (compte sans e-mail, 22 novembre) : le recours
+// passe par l'identifiant B-… que la personne bannie voit (conception du compte par passkey §7.4).
 type Comptes struct {
 	Agregats func() (Agregats, error)
 	Liste    func(filtre string, page int) ([]compte.BanVue, int, error)
 	Action   func(id, action, jusqu string) (avant compte.BanVue, apres *compte.BanVue, err error)
-	Chercher func(email []byte) (*compte.BanVue, compte.CompteVue, error)
-	// Bannir : exactement un de email et lien (lien d'invitation d'un salon).
-	Bannir func(email, lien []byte, dureeJours int, motif uint8) (Resultat, error)
+	// Bannir : le compte créateur du salon de ce lien d'invitation.
+	Bannir func(lien []byte, dureeJours int, motif uint8) (Resultat, error)
 }
 
 // dureeRef : une ref de salon signalé vaut 10 min (conception §21.14.3).
 const dureeRef = 10 * time.Minute
 
-// maxCorps : corps JSON d'une requête du lot 7 (une adresse ou un lien au plus).
+// maxCorps : corps JSON d'une requête du lot 7 (un lien au plus).
 const maxCorps = 8 << 10
 
 // refs : ref aléatoire (16 octets) → identifiant interne d'un salon signalé, en mémoire,
@@ -199,7 +196,7 @@ func lireJSON(r *http.Request, v any) (tampon []byte, ok bool) {
 	return tampon, true
 }
 
-// brut : contenu d'une chaîne JSON sans échappement (une adresse ou un lien n'en ont pas
+// brut : contenu d'une chaîne JSON sans échappement (un lien n'en a pas
 // besoin) ni caractère de contrôle, en octets (sous-tranche de m, effacée avec lui) ; nil si
 // absente ou d'une autre forme.
 func brut(m json.RawMessage) ([]byte, bool) {
@@ -230,8 +227,6 @@ func erreurAction(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, compte.ErrRequete):
 		write(w, http.StatusBadRequest, []byte(`{"error":"bad_request"}`))
-	case errors.Is(err, compte.ErrAdresse):
-		write(w, http.StatusBadRequest, []byte(`{"error":"adresse_invalide"}`))
 	case errors.Is(err, ErrLienInvalide):
 		write(w, http.StatusBadRequest, []byte(`{"error":"lien_invalide"}`))
 	case errors.Is(err, ErrIntrouvable), errors.Is(err, compte.ErrEtape):
@@ -343,50 +338,22 @@ func (a *admin) bannisAction(w http.ResponseWriter, r *http.Request) {
 	}{avant, apres})
 }
 
-// bannisChercher : { email } → { ban (ou null), compte }. L'adresse : en octets, tampons
-// effacés au retour ; jamais reprise dans la réponse.
-func (a *admin) bannisChercher(w http.ResponseWriter, r *http.Request) {
-	var q struct {
-		Email json.RawMessage `json:"email"`
-	}
-	tampon, ok := lireJSON(r, &q)
-	defer clear(tampon)
-	defer clear(q.Email)
-	e, okE := brut(q.Email)
-	if !ok || !okE || len(e) == 0 {
-		requeteFausse(w)
-		return
-	}
-	b, c, err := a.c.Comptes.Chercher(e)
-	if err != nil {
-		erreurAction(w, err)
-		return
-	}
-	writeJSON(w, struct {
-		Ban    *compte.BanVue   `json:"ban"`
-		Compte compte.CompteVue `json:"compte"`
-	}{b, c})
-}
-
-// bannir : { email | lien, duree_jours, motif }.
+// bannir : { lien, duree_jours, motif } (lien d'invitation d'un salon : son créateur est banni).
 func (a *admin) bannir(w http.ResponseWriter, r *http.Request) {
 	var q struct {
-		Email json.RawMessage `json:"email"`
 		Lien  json.RawMessage `json:"lien"`
 		Duree int             `json:"duree_jours"`
 		Motif uint8           `json:"motif"`
 	}
 	tampon, ok := lireJSON(r, &q)
 	defer clear(tampon)
-	defer clear(q.Email)
 	defer clear(q.Lien)
-	e, okE := brut(q.Email)
 	l, okL := brut(q.Lien)
-	if !ok || !okE || !okL || (e == nil) == (l == nil) || !dureeOK(q.Duree) || !motifOK(q.Motif) {
+	if !ok || !okL || l == nil || !dureeOK(q.Duree) || !motifOK(q.Motif) {
 		requeteFausse(w)
 		return
 	}
-	res, err := a.c.Comptes.Bannir(e, l, q.Duree, q.Motif)
+	res, err := a.c.Comptes.Bannir(l, q.Duree, q.Motif)
 	if err != nil {
 		erreurAction(w, err)
 		return

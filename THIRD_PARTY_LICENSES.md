@@ -212,4 +212,4 @@ Versions exactes dans `server/go.mod` et `server/go.sum` ; liste des modules com
 
 - Source : https://github.com/disposable-email-domains/disposable-email-domains (fichier `disposable_email_blocklist.conf`, branche `main`), copie du 14 novembre 2026, 10 181 domaines, SHA-256 de la source `8a303e28fe2704fc20e73bd320cb9f47e8b3658adc0ebb046260d5acf59c27c2`.
 - Licence : CC0 1.0 Universal (domaine public), texte : https://creativecommons.org/publicdomain/zero/1.0/legalcode.
-- Utilisation : embarquée dans le binaire (`go:embed`), refus des adresses jetables à l'inscription et au changement d'adresse (conception du compte §5.3). Mise à jour sur le poste du développeur seulement : `node web/scripts/maj-jetables.mjs` ; le serveur ne la télécharge jamais.
+- Utilisation : depuis le 22 novembre (compte par passkey, sans e-mail), plus lue par le serveur ; seulement par le site du compte par e-mail (`web/src/listes/jetables.ts`), jusqu'à son retrait au lot W1 du plan `2026-11-22-compte-passkey.md`, avec ce fichier. Plus de mise à jour (script retiré).

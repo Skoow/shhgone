@@ -166,8 +166,7 @@ type file struct {
 //	POST /api/salons/action         { ref, action, duree_jours?, motif? }
 //	POST /api/bannis                { filtre, page } (liste ; jamais de paramètre d'URL)
 //	POST /api/bannis/action         { id, action, jusqu? }
-//	POST /api/bannis/chercher       { email }
-//	POST /api/bannir                { email | lien, duree_jours, motif }
+//	POST /api/bannir                { lien, duree_jours, motif }
 //	GET  /api/comptes               agrégats des comptes
 //
 // Tout /api/* exige « Authorization: Bearer <jeton> ». Jeton absent, faux, de mauvaise
@@ -298,7 +297,7 @@ func (a *admin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.actionSalon(w, r)
-	case "POST /api/bannis", "POST /api/bannis/action", "POST /api/bannis/chercher", "POST /api/bannir", "GET /api/comptes":
+	case "POST /api/bannis", "POST /api/bannis/action", "POST /api/bannir", "GET /api/comptes":
 		if a.c.Comptes == nil {
 			refuse(w)
 			return
@@ -308,8 +307,6 @@ func (a *admin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			a.bannisListe(w, r)
 		case "/api/bannis/action":
 			a.bannisAction(w, r)
-		case "/api/bannis/chercher":
-			a.bannisChercher(w, r)
 		case "/api/bannir":
 			a.bannir(w, r)
 		default:

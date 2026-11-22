@@ -23,7 +23,6 @@ import (
 	"github.com/skoow/shhdrop/server/internal/captcha"
 	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/config"
-	"github.com/skoow/shhdrop/server/internal/courriel"
 	"github.com/skoow/shhdrop/server/internal/janitor"
 	"github.com/skoow/shhdrop/server/internal/limits"
 	"github.com/skoow/shhdrop/server/internal/salon"
@@ -282,13 +281,12 @@ func setupSalons(cfg config.Config, db *sql.DB, svc *share.Service, lim *limits.
 	return m, nil
 }
 
-// comptes : clés du serveur et base des comptes (conception du compte §8), puis, au
-// branchement (brancherComptes), l'envoyeur d'e-mails et le service servi par l'API.
+// comptes : clé du serveur et base des comptes (conception du compte par passkey §6), puis, au
+// branchement (brancherComptes), le service servi par l'API.
 type comptes struct {
 	db   *sql.DB
 	cles compte.Cles
 	svc  *compte.Service
-	env  *courriel.Envoyeur
 }
 
 // setupComptes : sans SHH_COMPTES=1, rien (nil : aucun fichier lu ni créé). Sinon K_serveur lu
@@ -303,7 +301,7 @@ func setupComptes(cfg config.Config) (*comptes, error) {
 		return nil, shown(err.Error())
 	}
 	db, err := compte.OuvrirBase(filepath.Join(cfg.DataDir, "comptes.db"))
-	if errors.Is(err, compte.ErrBasePlusRecente) {
+	if errors.Is(err, compte.ErrBasePlusRecente) || errors.Is(err, compte.ErrBaseEmail) {
 		return nil, shown(err.Error())
 	}
 	if err != nil {
@@ -312,21 +310,12 @@ func setupComptes(cfg config.Config) (*comptes, error) {
 	return &comptes{db: db, cles: cles}, nil
 }
 
-// brancherComptes : envoyeur d'e-mails (créé seulement avec SHH_COMPTES=1 : sans lui, aucune
-// connexion sortante, TestCourrielSeulementAvecComptes) et service du compte, sur le limiteur
-// de l'API. Le mot de passe SMTP est lu une fois, sans son saut de ligne final. sm (SHH_SALONS=1,
-// sinon nil) : crochets des salons du compte (fermeture, nombre, liste, destruction).
+// brancherComptes : service du compte (aucune connexion sortante : plus d'e-mail depuis le
+// 22 novembre), sur le limiteur de l'API. sm (SHH_SALONS=1, sinon nil) : crochets des salons du
+// compte (fermeture, nombre, liste, destruction).
 func brancherComptes(cfg config.Config, cpt *comptes, lim *limits.Limiter, sm *salon.Manager) error {
 	if cfg.Comptes && cpt != nil {
-		mdp, err := lireMdpSMTP(cfg.SMTP.PasswordFile)
-		if err != nil {
-			return err
-		}
-		env, err := courriel.Nouveau(cfg.SMTP, mdp)
-		if err != nil {
-			return shown(err.Error())
-		}
-		cc := compte.Config{DB: cpt.db, Cles: cpt.cles, Courriel: env, Limites: lim, Now: cfg.Now, Max: cfg.ComptesMax}
+		cc := compte.Config{DB: cpt.db, Cles: cpt.cles, Limites: lim, Now: cfg.Now, Max: cfg.ComptesMax, Jour: cfg.ComptesJour}
 		if sm != nil {
 			api.BrancherSalonsDuCompte(&cc, sm)
 		}
@@ -334,30 +323,9 @@ func brancherComptes(cfg config.Config, cpt *comptes, lim *limits.Limiter, sm *s
 		if err != nil {
 			return err
 		}
-		cpt.env, cpt.svc = env, svc
+		cpt.svc = svc
 	}
 	return nil
-}
-
-// lireMdpSMTP : contenu de SHH_SMTP_PASSWORD_FILE, sans un saut de ligne final (« \n » ou
-// « \r\n », laissé par un éditeur ou par echo) ; vide ou plus de 1 Kio : refus. Message : le
-// chemin seulement.
-func lireMdpSMTP(chemin string) ([]byte, error) {
-	b, err := os.ReadFile(chemin)
-	if err != nil {
-		return nil, shownf("SHH_SMTP_PASSWORD_FILE %s illisible", chemin)
-	}
-	if n := len(b); n > 0 && b[n-1] == '\n' {
-		b = b[:n-1]
-		if n := len(b); n > 0 && b[n-1] == '\r' {
-			b = b[:n-1]
-		}
-	}
-	if len(b) == 0 || len(b) > 1024 {
-		clear(b)
-		return nil, shownf("SHH_SMTP_PASSWORD_FILE %s : mot de passe vide ou trop long", chemin)
-	}
-	return b, nil
 }
 
 // usedAtStart : place déjà prise sous SHH_STORAGE_MAX au démarrage (checkStorage) : partages
@@ -546,7 +514,7 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	// s'ouvre pas, le serveur public tourne quand même.
 	ad := adminDeps{svc: svc, sm: sm, db: db, gate: gate, lim: lim, probes: probes, start: start}
 	if cpt != nil {
-		ad.cpt, ad.env = cpt.svc, cpt.env
+		ad.cpt = cpt.svc
 	}
 	defer startAdmin(cfg, out, ad)()
 	jctx, jcancel := context.WithCancel(ctx)
@@ -562,13 +530,6 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	// Salon : entretien chaque seconde, passe mémoire et passe disque dans deux boucles
 	// (échéances, sièges hors ligne, pièces, salons échus, lignes supprimées par
 	// l'administrateur), arrêté avant la fermeture de la base.
-	// Compte : envoi des e-mails, un à la fois, arrêté avec le reste (la file est oubliée).
-	cdone := make(chan struct{})
-	if cpt != nil && cpt.env != nil {
-		go func() { cpt.env.Run(jctx); close(cdone) }()
-	} else {
-		close(cdone)
-	}
 	// Compte : passe quotidienne (inactifs depuis 13 mois pleins, soit 14 au plus : effacement.go, sessions et bannissements échus),
 	// au démarrage puis au premier tour de chaque jour UTC.
 	edone := make(chan struct{})
@@ -596,7 +557,6 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 		<-wdone
 		<-rdone
 		<-vdone
-		<-cdone
 		<-edone
 		<-pdone
 	}()

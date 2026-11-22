@@ -11,9 +11,9 @@ import (
 )
 
 // Conception §21.5 : liste des pseudos réservés, sous leurs formes canoniques (squelette
-// UTS #39 : « m » devient « rn »), exactement celles de constants.reserves de compte.json.
+// UTS #39 : « m » devient « rn »), exactement celles de constants.reserves de compte-v3.json.
 func TestPseudoReserve(t *testing.T) {
-	v := lireVecteurs(t)
+	v := lireVecteursV3(t)
 	var want []string
 	for _, r := range v.Constants.Reserves {
 		want = append(want, string(unhex(t, r.PCanonHex)))
@@ -37,7 +37,7 @@ func TestPseudoReserve(t *testing.T) {
 // Les p_canon des vecteurs pseudo sont acceptés (ou refusés comme réservés), et l'empreinte
 // vaut HMAC-SHA-256(K_pseudo, « pseudo » ‖ 0 ‖ p_canon) ; même entrée, même empreinte.
 func TestPseudoVecteurs(t *testing.T) {
-	v := lireVecteurs(t)
+	v := lireVecteursV3(t)
 	c := clesTest(3)
 	n, plusLong := 0, 0
 	for _, p := range v.Pseudo {

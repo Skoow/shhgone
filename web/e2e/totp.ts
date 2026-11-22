@@ -1,3 +1,6 @@
+// OBSOLÈTE depuis le 22 novembre (compte par passkey, plus aucun e-mail) : gardé seulement pour que
+// les parcours ui-e2e du compte par e-mail (ui-e2e/compte.spec.ts, salon.spec.ts) compilent encore
+// jusqu'à leur réécriture (lot T1) ; le serveur refuse désormais toute variable SHH_SMTP_*.
 // Application d'authentification jouée par les tests (RFC 6238 : HMAC-SHA-1 de node:crypto,
 // 6 chiffres, pas de 30 s ; clé en base32 RFC 4648). Partagée par compte-sees-nothing.test.ts
 // (vitest) et ui-e2e/compte.spec.ts (Playwright).

@@ -16,7 +16,6 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/config"
-	"github.com/skoow/shhdrop/server/internal/courriel"
 	"github.com/skoow/shhdrop/server/internal/limits"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
@@ -33,9 +32,8 @@ type adminDeps struct {
 	lim    *limits.Limiter
 	probes api.Probes // alerte des signalements, compteurs d'usage, transferts en cours
 	start  time.Time  // démarrage du processus, en mémoire seulement
-	// Lot 7 : service du compte et envoyeur d'e-mails (SHH_COMPTES=1 ; nil sinon).
+	// Lot 7 : service du compte (SHH_COMPTES=1 ; nil sinon).
 	cpt *compte.Service
-	env *courriel.Envoyeur
 }
 
 // buildID : empreinte du commit compilé, posée à la compilation (-ldflags "-X main.buildID=…",
@@ -90,9 +88,8 @@ func adminConfig(cfg config.Config, d adminDeps) adminui.Config {
 			Agregats: func() (adminui.Agregats, error) { return adminAgregats(d) },
 			Liste:    d.cpt.ListeBans,
 			Action:   d.cpt.ActionBan,
-			Chercher: d.cpt.ChercherBan,
-			Bannir: func(email, lien []byte, duree int, motif uint8) (adminui.Resultat, error) {
-				return adminBannir(d, email, lien, duree, motif)
+			Bannir: func(lien []byte, duree int, motif uint8) (adminui.Resultat, error) {
+				return adminBannir(d, lien, duree, motif)
 			},
 		}
 	}
@@ -175,7 +172,7 @@ func bannirCompte(d adminDeps, h *[16]byte, duree int, motif uint8) (adminui.Res
 	if h == nil || d.cpt == nil {
 		return adminui.Resultat{Banni: "aucun"}, nil
 	}
-	b, err := d.cpt.Bannir(compte.Cible{H: h}, duree, motif)
+	b, err := d.cpt.Bannir(*h, duree, motif)
 	if errors.Is(err, compte.ErrEtape) {
 		return adminui.Resultat{Banni: "aucun"}, nil // compte supprimé entre-temps
 	}
@@ -185,20 +182,9 @@ func bannirCompte(d adminDeps, h *[16]byte, duree int, motif uint8) (adminui.Res
 	return adminui.Resultat{Banni: "compte", Ban: &b.Vue, SalonsFermes: b.SalonsFermes}, nil
 }
 
-// adminBannir : par adresse (recours, page de contact) ou par lien d'invitation d'un salon
-// (traité en octets : seule K_accès_s en est tirée, effacée au retour).
-func adminBannir(d adminDeps, email, lien []byte, duree int, motif uint8) (adminui.Resultat, error) {
-	if email != nil {
-		b, err := d.cpt.Bannir(compte.Cible{Email: email}, duree, motif)
-		if err != nil {
-			return adminui.Resultat{}, err
-		}
-		r := adminui.Resultat{Banni: "adresse", Ban: &b.Vue, SalonsFermes: b.SalonsFermes}
-		if b.Compte {
-			r.Banni = "compte"
-		}
-		return r, nil
-	}
+// adminBannir : par lien d'invitation d'un salon (traité en octets : seule K_accès_s en est
+// tirée, effacée au retour) ; plus de bannissement par adresse (compte sans e-mail).
+func adminBannir(d adminDeps, lien []byte, duree int, motif uint8) (adminui.Resultat, error) {
 	k, estSalon, err := cleAccesDuLien(lien)
 	if err != nil || !estSalon {
 		clear(k)
@@ -218,7 +204,7 @@ func adminBannir(d adminDeps, email, lien []byte, duree int, motif uint8) (admin
 	return bannirCompte(d, h, duree, motif)
 }
 
-// adminAgregats : agrégats des comptes, salons vivants créés par un compte, envois d'e-mails.
+// adminAgregats : agrégats des comptes, salons vivants créés par un compte.
 func adminAgregats(d adminDeps) (adminui.Agregats, error) {
 	a, err := d.cpt.Agregats()
 	if err != nil {
@@ -229,9 +215,6 @@ func adminAgregats(d adminDeps) (adminui.Agregats, error) {
 		if r.SalonsDeComptes, err = d.sm.SalonsAvecCompte(); err != nil {
 			return adminui.Agregats{}, err
 		}
-	}
-	if d.env != nil {
-		r.Courriel = d.env.Stats()
 	}
 	return r, nil
 }

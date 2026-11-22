@@ -21,8 +21,8 @@ func ecrireCle(t *testing.T, contenu []byte, mode os.FileMode) string {
 	return p
 }
 
-// Conception §5.2, §21.2.2 : cinq sous-clés HKDF-SHA-256 (sel vide) de K_serveur, deux à deux
-// différentes, égales à hkdf.Key calculé ici avec les étiquettes du plan.
+// Conception §5.2, §21.2.2 : une seule sous-clé HKDF-SHA-256 (sel vide) de K_serveur depuis le
+// 22 novembre (K_pseudo), égale à hkdf.Key calculé ici avec l'étiquette du plan.
 func TestLireClesDerivations(t *testing.T) {
 	k := bytes.Repeat([]byte{0x42}, 32)
 	for _, mode := range []os.FileMode{0o600, 0o400} {
@@ -30,7 +30,7 @@ func TestLireClesDerivations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("droits %o : %v", mode, err)
 		}
-		got := map[string][32]byte{"email": c.Email, "mdp": c.Poivre, "totp": c.TOTP, "sequestre": c.Sequestre, "pseudo": c.Pseudo}
+		got := map[string][32]byte{"pseudo": c.Pseudo}
 		vus := map[[32]byte]string{}
 		for nom, v := range got {
 			want, err := hkdf.Key(sha256.New, k, nil, "shhdrop/v2/serveur/compte/"+nom, 32)

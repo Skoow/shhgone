@@ -9,14 +9,8 @@ import (
 	"time"
 )
 
-// Limites du compte (conception du compte §8.8, plan lot 3) : bornes exactes, oubli à la
-// rotation, aucune adresse gardée.
-
-func canonDe(s string) [32]byte {
-	var c [32]byte
-	copy(c[:], s)
-	return c
-}
+// Limites du compte (conception du compte §8.8 ; conception du compte par passkey §7.2) : bornes
+// exactes, oubli à la rotation, aucune adresse ni h gardés en clair.
 
 func hDe(s string) [16]byte {
 	var h [16]byte
@@ -24,143 +18,93 @@ func hDe(s string) [16]byte {
 	return h
 }
 
-func TestAllowInscription(t *testing.T) {
+// Comptes créés : 3 par jour par connexion, 10 par /48 ; compté seulement par NoterCompte (un
+// refus de création ne coûte rien) ; le nombre du jour se lit (difficulté de la preuve).
+func TestComptesCrees(t *testing.T) {
 	now := t0
 	l := newLim(&now)
+	a := ip("2001:db8:1:1::1")
 	for i := 0; i < InscriptionsPer64; i++ {
-		if !l.AllowInscription(ip("2001:db8:1:1::1")) {
-			t.Fatalf("inscription %d refusée", i+1)
+		if !l.PeutCreerCompte(a) || l.ComptesCreesDuJour(a) != i {
+			t.Fatalf("compte %d refusé", i+1)
 		}
+		l.NoterCompte(a)
 	}
-	if l.AllowInscription(ip("2001:db8:1:1::2")) {
-		t.Fatal("4e inscription du jour pour la même connexion acceptée")
+	if l.PeutCreerCompte(ip("2001:db8:1:1::2")) || l.ComptesCreesDuJour(a) != 3 {
+		t.Fatal("4e compte du jour pour la même connexion accepté")
 	}
-	// Le /48 : 10 au plus, toutes connexions confondues.
 	n := InscriptionsPer64
 	for i := 2; n < InscriptionsPer48; i++ {
-		if !l.AllowInscription(ip(fmt.Sprintf("2001:db8:1:%x::1", i))) {
-			t.Fatalf("inscription %d du /48 refusée", n+1)
+		b := ip(fmt.Sprintf("2001:db8:1:%x::1", i))
+		if !l.PeutCreerCompte(b) {
+			t.Fatalf("compte %d du /48 refusé", n+1)
 		}
+		l.NoterCompte(b)
 		n++
 	}
-	if l.AllowInscription(ip("2001:db8:1:ff::1")) {
-		t.Fatal("11e inscription du /48 acceptée")
+	if l.PeutCreerCompte(ip("2001:db8:1:ff::1")) {
+		t.Fatal("11e compte du /48 accepté")
 	}
-	if !l.AllowInscription(ip("2001:db8:2::1")) {
+	if !l.PeutCreerCompte(ip("2001:db8:2::1")) || l.ComptesCreesDuJour(ip("2001:db8:2::1")) != 0 {
 		t.Fatal("autre /48 refusé")
 	}
 	now = t0.Add(24 * time.Hour)
-	if !l.AllowInscription(ip("2001:db8:1:1::1")) {
-		t.Fatal("quota d'inscriptions non remis à zéro à minuit")
+	if !l.PeutCreerCompte(a) || l.ComptesCreesDuJour(a) != 0 {
+		t.Fatal("quota de comptes non remis à zéro à minuit")
 	}
 	if InscriptionsPer64 != 3 || InscriptionsPer48 != 10 {
-		t.Fatal("bornes de la conception §8.8 : 3 par connexion, 10 par /48")
+		t.Fatal("bornes : 3 par connexion, 10 par /48")
 	}
 }
 
-func TestAllowCourrielParAdresse(t *testing.T) {
-	now := t0
-	l := newLim(&now)
-	a := canonDe("lea@exemple.fr")
-	// Un même bloc (IPv4 : l'adresse elle-même) : 3 par jour vers la même adresse.
-	for i := 0; i < CourrielsParAdresseEtBloc; i++ {
-		if !l.AllowCourriel(ip("192.0.2.1"), a, MotifInscription) {
-			t.Fatalf("e-mail %d refusé", i+1)
+// allowN : f permis n fois, puis refusé.
+func allowN(t *testing.T, nom string, n int, f func() bool) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		if !f() {
+			t.Fatalf("%s : %d refusé", nom, i+1)
 		}
 	}
-	if l.AllowCourriel(ip("192.0.2.1"), a, MotifInscription) {
-		t.Fatal("4e e-mail du jour depuis le même bloc vers la même adresse accepté")
-	}
-	// Un /48 découpé en /64 : toujours le même bloc.
-	b := canonDe("bob@exemple.fr")
-	for i := 0; i < CourrielsParAdresseEtBloc; i++ {
-		l.AllowCourriel(ip(fmt.Sprintf("2001:db8:9:%x::1", i)), b, MotifInscription)
-	}
-	if l.AllowCourriel(ip("2001:db8:9:ff::1"), b, MotifInscription) {
-		t.Fatal("autre /64 du même /48 : la limite par (adresse, bloc) ne tient pas")
-	}
-	// D'autres blocs : jusqu'à 9 par adresse en tout, pour ce motif.
-	for i := CourrielsParAdresseEtBloc; i < CourrielsParAdresse; i++ {
-		if !l.AllowCourriel(ip(fmt.Sprintf("198.51.100.%d", i/CourrielsParAdresseEtBloc)), a, MotifInscription) {
-			t.Fatalf("e-mail %d refusé", i+1)
-		}
-	}
-	if l.AllowCourriel(ip("203.0.113.50"), a, MotifInscription) {
-		t.Fatal("10e e-mail du jour vers la même adresse accepté")
-	}
-	// Audit S4 : l'inscription épuisée par un tiers ne ferme ni la récupération ni le
-	// changement d'adresse, depuis aucun bloc.
-	for _, m := range []Motif{MotifRecuperation, MotifAdresse} {
-		for i := 0; i < CourrielsParAdresseEtBloc; i++ {
-			if !l.AllowCourriel(ip("192.0.2.1"), a, m) {
-				t.Fatalf("motif %d : e-mail %d refusé après l'épuisement de l'inscription", m, i+1)
-			}
-		}
-		if l.AllowCourriel(ip("192.0.2.1"), a, m) {
-			t.Fatalf("motif %d : 4e e-mail depuis le même bloc accepté", m)
-		}
-		if !l.AllowCourriel(ip("203.0.113.7"), a, m) {
-			t.Fatalf("motif %d : la victime, depuis son bloc, est bloquée par un tiers", m)
-		}
-	}
-	// Motif inconnu : refusé, rien de compté.
-	if l.AllowCourriel(ip("203.0.113.8"), canonDe("c"), 0) || l.AllowCourriel(ip("203.0.113.8"), canonDe("c"), 9) {
-		t.Fatal("motif inconnu accepté")
-	}
-	if !l.AllowCourriel(ip("198.51.100.1"), canonDe("autre@exemple.fr"), MotifInscription) {
-		t.Fatal("autre adresse refusée")
-	}
-	now = t0.Add(24 * time.Hour)
-	if !l.AllowCourriel(ip("198.51.100.1"), a, MotifInscription) {
-		t.Fatal("limite par adresse non remise à zéro à minuit")
-	}
-	if CourrielsParAdresseEtBloc != 3 || CourrielsParAdresse != 9 {
-		t.Fatal("bornes (audit du 20 novembre, S4) : 3 par adresse et par bloc, 9 par adresse, par motif")
+	if f() {
+		t.Fatalf("%s : %d accepté", nom, n+1)
 	}
 }
 
-func TestAllowCourrielParConnexion(t *testing.T) {
+// inscription/debut 20 par heure, connexion/debut 60 par minute, passkeys/debut 10 par heure et
+// par compte (conception §7.2).
+func TestDebutsDeCeremonie(t *testing.T) {
 	now := t0
 	l := newLim(&now)
-	for i := 0; i < CourrielsPer64; i++ {
-		if !l.AllowCourriel(ip("2001:db8:1:1::1"), canonDe(fmt.Sprint(i)), MotifInscription) {
-			t.Fatalf("e-mail %d refusé", i+1)
-		}
+	a := ip("192.0.2.1")
+	allowN(t, "inscription/debut", InscriptionsDebutParHeure, func() bool { return l.AllowInscriptionDebut(a) })
+	allowN(t, "connexion/debut", ConnexionsDebutParMinute, func() bool { return l.AllowConnexionDebut(a) })
+	allowN(t, "passkeys/debut", AjoutsPasskeyParHeure, func() bool { return l.AllowAjoutPasskey(hDe("a")) })
+	if !l.AllowInscriptionDebut(ip("192.0.2.2")) || !l.AllowConnexionDebut(ip("192.0.2.2")) || !l.AllowAjoutPasskey(hDe("b")) {
+		t.Fatal("autre connexion ou autre compte refusé")
 	}
-	if l.AllowCourriel(ip("2001:db8:1:1::9"), canonDe("x"), MotifInscription) {
-		t.Fatal("11e e-mail du jour pour la même connexion accepté")
+	// Les ajouts de passkey ne prennent rien aux écritures des coffres (même table, sortes séparées).
+	allowN(t, "coffre", EcrituresCoffreParHeure, func() bool { return l.AllowEcritureCoffre(hDe("a")) })
+	now = t0.Add(time.Minute)
+	if !l.AllowConnexionDebut(a) || l.AllowInscriptionDebut(a) {
+		t.Fatal("connexion/debut non oublié à la minute, ou inscription/debut oublié")
 	}
-	// Un refus ne compte nulle part : l'adresse « x » n'a rien consommé.
-	for i := 0; i < CourrielsParAdresseEtBloc; i++ {
-		if !l.AllowCourriel(ip(fmt.Sprintf("2001:db8:1:%x::1", 10+i)), canonDe("x"), MotifInscription) {
-			t.Fatal("un refus a été compté pour l'adresse")
-		}
+	now = t0.Add(time.Hour)
+	if !l.AllowInscriptionDebut(a) || !l.AllowAjoutPasskey(hDe("a")) {
+		t.Fatal("limites de l'heure non oubliées")
 	}
-	// Le /48 : CourrielsPer48 au plus.
-	n := CourrielsPer64 + CourrielsParAdresseEtBloc
-	for i := 0; n < CourrielsPer48; i++ {
-		if !l.AllowCourriel(ip(fmt.Sprintf("2001:db8:1:%x::1", 100+i)), canonDe(fmt.Sprint("y", i)), MotifInscription) {
-			t.Fatalf("e-mail %d du /48 refusé", n+1)
-		}
-		n++
-	}
-	if l.AllowCourriel(ip("2001:db8:1:fff::1"), canonDe("z"), MotifInscription) {
-		t.Fatal("e-mail au-delà du plafond du /48 accepté")
-	}
-	if CourrielsPer64 != 10 || CourrielsPer48 != 30 {
-		t.Fatal("bornes : 10 par connexion (conception §8.8), 30 par /48 (ajout du lot 3)")
+	if InscriptionsDebutParHeure != 20 || ConnexionsDebutParMinute != 60 || AjoutsPasskeyParHeure != 10 {
+		t.Fatal("bornes de la conception §7.2")
 	}
 }
 
 func TestEchecsConnexion(t *testing.T) {
 	now := t0
 	l := newLim(&now)
-	c := canonDe("lea@exemple.fr")
 	for i := 0; i < EchecsConnexionPer64; i++ {
 		if !l.AllowEchecConnexion(ip("192.0.2.1")) {
 			t.Fatalf("connexion refusée après %d échecs", i)
 		}
-		l.NoterEchecConnexion(ip("192.0.2.1"), canonDe(fmt.Sprint(i)))
+		l.NoterEchecConnexion(ip("192.0.2.1"))
 	}
 	if l.AllowEchecConnexion(ip("192.0.2.1")) {
 		t.Fatal("connexion permise après 20 échecs dans l'heure")
@@ -168,9 +112,8 @@ func TestEchecsConnexion(t *testing.T) {
 	if !l.AllowEchecConnexion(ip("192.0.2.2")) {
 		t.Fatal("autre connexion refusée")
 	}
-	// Le /48 : 60 échecs, toutes connexions confondues.
 	for i := 0; i < EchecsConnexionPer48; i++ {
-		l.NoterEchecConnexion(ip(fmt.Sprintf("2001:db8:5:%x::1", i)), c)
+		l.NoterEchecConnexion(ip(fmt.Sprintf("2001:db8:5:%x::1", i)))
 	}
 	if l.AllowEchecConnexion(ip("2001:db8:5:ffff::1")) {
 		t.Fatal("connexion permise après 60 échecs du /48 dans l'heure")
@@ -180,62 +123,34 @@ func TestEchecsConnexion(t *testing.T) {
 		t.Fatal("échecs de connexion non oubliés à l'heure suivante")
 	}
 	if EchecsConnexionPer64 != 20 || EchecsConnexionPer48 != 60 {
-		t.Fatal("bornes de la conception §8.8 : 20 par connexion, 60 par /48")
+		t.Fatal("bornes de la conception §7.2 : 20 par connexion, 60 par /48")
 	}
 }
 
-func TestPreuveRequise(t *testing.T) {
+// Clé de récupération : 10 essais par heure par connexion, 30 par /48, justes ou faux.
+func TestAllowRecup(t *testing.T) {
 	now := t0
 	l := newLim(&now)
-	c := canonDe("lea@exemple.fr")
-	for i := 0; i < EchecsAvantPreuve; i++ {
-		if l.PreuveRequise(c) {
-			t.Fatalf("preuve exigée après %d échecs", i)
+	allowN(t, "recup", RecupPer64, func() bool { return l.AllowRecup(ip("192.0.2.1")) })
+	n := 0
+	for i := 0; n < RecupPer48; i++ {
+		b := ip(fmt.Sprintf("2001:db8:7:%x::1", i))
+		for k := 0; k < RecupPer64 && n < RecupPer48; k++ {
+			if !l.AllowRecup(b) {
+				t.Fatalf("essai %d du /48 refusé", n+1)
+			}
+			n++
 		}
-		// Échecs venus de connexions différentes : comptés pour le compte.
-		l.NoterEchecConnexion(ip(fmt.Sprintf("192.0.2.%d", i+1)), c)
 	}
-	if !l.PreuveRequise(c) {
-		t.Fatal("preuve non exigée après 5 échecs dans l'heure")
-	}
-	if l.PreuveRequise(canonDe("autre@exemple.fr")) {
-		t.Fatal("preuve exigée pour un autre compte")
-	}
-	// Jamais de verrouillage : la connexion à ce compte reste permise (avec preuve).
-	if !l.AllowEchecConnexion(ip("198.51.100.7")) {
-		t.Fatal("le compte a verrouillé une connexion neuve")
+	if l.AllowRecup(ip("2001:db8:7:ffff::1")) {
+		t.Fatal("31e essai du /48 accepté")
 	}
 	now = t0.Add(time.Hour)
-	if l.PreuveRequise(c) {
-		t.Fatal("échecs du compte non oubliés à l'heure suivante")
+	if !l.AllowRecup(ip("192.0.2.1")) {
+		t.Fatal("essais non oubliés à l'heure suivante")
 	}
-	if EchecsAvantPreuve != 5 {
-		t.Fatal("borne de la conception §8.8 : preuve après 5 échecs")
-	}
-}
-
-func TestAllowTOTP(t *testing.T) {
-	now := t0
-	l := newLim(&now)
-	h := hDe("compte-a")
-	for i := 0; i < EchecsTOTPParHeure; i++ {
-		if !l.AllowTOTP(h) {
-			t.Fatalf("TOTP refusé après %d échecs", i)
-		}
-		l.NoterEchecTOTP(h)
-	}
-	if l.AllowTOTP(h) {
-		t.Fatal("TOTP permis après 10 échecs dans l'heure")
-	}
-	if !l.AllowTOTP(hDe("compte-b")) {
-		t.Fatal("autre compte refusé")
-	}
-	now = t0.Add(time.Hour)
-	if !l.AllowTOTP(h) {
-		t.Fatal("échecs TOTP non oubliés à l'heure suivante")
-	}
-	if EchecsTOTPParHeure != 10 {
-		t.Fatal("borne de la conception §8.8 : 10 échecs par heure")
+	if RecupPer64 != 10 || RecupPer48 != 30 {
+		t.Fatal("bornes de la conception §7.2 : 10 par connexion, 30 par /48")
 	}
 }
 
@@ -308,13 +223,15 @@ func TestAllowBannir(t *testing.T) {
 	}
 }
 
-// compteMaps : les compteurs du compte, par nom de champ (réflexion : un champ ajouté au
-// Limiter sans être listé ici fait échouer TestLimitesCompteOublieesALaRotation).
+// mapsCompte : les compteurs du compte, par nom de champ ; tout champ ajouté au Limiter sans
+// être listé ici fait échouer TestLimitesCompteOublieesALaRotation (-1).
+var mapsCompte = []string{"insc64", "insc48", "inscD64", "echec64", "echec48", "recup64", "recup48", "coffreCpt",
+	"pseudoCpt", "cnx64"}
+
 func compteMaps(l *Limiter) map[string]int {
 	v := reflect.ValueOf(l).Elem()
 	out := map[string]int{}
-	for _, n := range []string{"insc64", "insc48", "mail64", "mail48", "mailAdr", "mailAdr48", "echec64", "echec48",
-		"echecCpt", "totpCpt", "coffreCpt", "pseudoCpt"} {
+	for _, n := range mapsCompte {
 		f := v.FieldByName(n)
 		if !f.IsValid() {
 			out[n] = -1
@@ -325,14 +242,25 @@ func compteMaps(l *Limiter) map[string]int {
 	return out
 }
 
+// Plus aucune limite d'e-mail ni de TOTP (22 novembre).
+func TestPlusDeLimitesEmail(t *testing.T) {
+	ty := reflect.TypeFor[Limiter]()
+	for _, n := range []string{"mail64", "mail48", "mailAdr", "mailAdr48", "echecCpt", "totpCpt"} {
+		if _, ok := ty.FieldByName(n); ok {
+			t.Errorf("champ %s du compte par e-mail encore là", n)
+		}
+	}
+}
+
 func remplir(l *Limiter) {
-	c := canonDe("lea@exemple.fr")
-	l.AllowInscription(ip("192.0.2.1"))
-	l.AllowCourriel(ip("192.0.2.1"), c, MotifInscription)
-	l.NoterEchecConnexion(ip("192.0.2.1"), c)
-	l.NoterEchecTOTP(hDe("a"))
+	a := ip("192.0.2.1")
+	l.NoterCompte(a)
+	l.AllowInscriptionDebut(a)
+	l.NoterEchecConnexion(a)
+	l.AllowRecup(a)
 	l.AllowEcritureCoffre(hDe("a"))
 	l.AllowPseudoVerifier([]byte("etape"))
+	l.AllowConnexionDebut(a)
 	l.AllowBannir()
 }
 
@@ -345,16 +273,21 @@ func TestLimitesCompteOublieesALaRotation(t *testing.T) {
 			t.Fatalf("%s : %d entrées après remplissage (champ absent : -1)", n, v)
 		}
 	}
+	// À la minute suivante : connexion/debut vidé.
+	now = t0.Add(time.Minute)
+	l.AllowBannir()
+	if m := compteMaps(l); m["cnx64"] != 0 || m["inscD64"] != 1 {
+		t.Fatal("minute :", m)
+	}
 	// À l'heure suivante : les compteurs de l'heure sont vides, ceux du jour restent.
 	now = t0.Add(time.Hour)
 	l.AllowBannir() // déclenche la rotation
-	horaires := map[string]bool{"echec64": true, "echec48": true, "echecCpt": true, "totpCpt": true,
-		"coffreCpt": true, "pseudoCpt": true}
+	jour := map[string]bool{"insc64": true, "insc48": true}
 	for n, v := range compteMaps(l) {
-		if horaires[n] && v != 0 {
+		if !jour[n] && v != 0 {
 			t.Errorf("%s non vidé à l'heure suivante (%d)", n, v)
 		}
-		if !horaires[n] && v != 1 {
+		if jour[n] && v != 1 {
 			t.Errorf("%s vidé avant minuit (%d)", n, v)
 		}
 	}
@@ -375,26 +308,25 @@ func TestLimitesCompteOublieesALaRotation(t *testing.T) {
 	}
 }
 
-// TestAucuneAdresseGardee : aucune clé de map du compte ne contient l'empreinte d'adresse,
-// le h, l'adresse IP ou son préfixe, en clair ou en hexadécimal ; les clés sont des HMAC sous
-// le secret du jour (qui tourne à minuit).
+// TestAucuneAdresseGardee : aucune clé de map du compte ne contient le h, l'adresse IP ou son
+// préfixe, en clair ou en hexadécimal ; les clés sont des HMAC sous le secret du jour (qui
+// tourne à minuit).
 func TestAucuneAdresseGardee(t *testing.T) {
 	now := t0
 	l := newLim(&now)
-	c := canonDe("lea@exemple.fr-empreinte-32-oct")
 	h := hDe("h-du-compte-16oc")
 	a := ip("2001:db8:1:2::1")
-	l.AllowInscription(a)
-	l.AllowCourriel(a, c, MotifInscription)
-	l.NoterEchecConnexion(a, c)
-	l.NoterEchecTOTP(h)
+	l.NoterCompte(a)
+	l.AllowInscriptionDebut(a)
+	l.NoterEchecConnexion(a)
+	l.AllowRecup(a)
+	l.AllowConnexionDebut(a)
 	l.AllowEcritureCoffre(h)
+	l.AllowAjoutPasskey(h)
 	l.AllowPseudoVerifier(h[:])
-	reperes := []string{string(c[:]), hex.EncodeToString(c[:]), string(h[:]), hex.EncodeToString(h[:]),
-		"2001:db8:1:2", "2001:db8:1::", "lea@exemple.fr"}
+	reperes := []string{string(h[:]), hex.EncodeToString(h[:]), "2001:db8:1:2", "2001:db8:1::"}
 	v := reflect.ValueOf(l).Elem()
-	for _, n := range []string{"insc64", "insc48", "mail64", "mail48", "mailAdr", "mailAdr48", "echec64", "echec48",
-		"echecCpt", "totpCpt", "coffreCpt", "pseudoCpt"} {
+	for _, n := range mapsCompte {
 		it := v.FieldByName(n).MapRange()
 		for it.Next() {
 			k := it.Key().String()
@@ -408,18 +340,18 @@ func TestAucuneAdresseGardee(t *testing.T) {
 			}
 		}
 	}
-	// Mêmes valeurs le lendemain : clés différentes (secret du jour).
+	// Même h le lendemain : clé différente (secret du jour).
 	before := map[string]bool{}
-	it := v.FieldByName("mailAdr").MapRange()
+	it := v.FieldByName("coffreCpt").MapRange()
 	for it.Next() {
 		before[it.Key().String()] = true
 	}
 	now = t0.Add(24 * time.Hour)
-	l.AllowCourriel(a, c, MotifInscription)
-	it = v.FieldByName("mailAdr").MapRange()
+	l.AllowEcritureCoffre(h)
+	it = v.FieldByName("coffreCpt").MapRange()
 	for it.Next() {
 		if before[it.Key().String()] {
-			t.Fatal("clé de l'adresse identique d'un jour à l'autre")
+			t.Fatal("clé du compte identique d'un jour à l'autre")
 		}
 	}
 }

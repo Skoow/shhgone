@@ -9,46 +9,54 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Schéma de comptes.db (conception §21.6.1 ; règles de §8.2 : mêmes PRAGMA que shares.db,
-// WITHOUT ROWID, 0600). Seulement des BLOB et des INTEGER (aucune colonne texte : une adresse
-// ne peut pas y entrer) ; longueurs exactes ; dates au jour (minuit UTC, multiple de 86 400)
-// ou au mois (premier du mois, minuit UTC), jamais d'heure. Cette base survit aux
-// redémarrages et est sauvegardée (§21.13), contrairement à shares.db.
+// Schéma de comptes.db, version 3 (conception du compte par passkey §6.3 ; règles de la
+// conception du compte §8.2 : mêmes PRAGMA que shares.db, WITHOUT ROWID, 0600). Seulement des
+// BLOB et des INTEGER ; longueurs exactes ; dates au jour (minuit UTC, multiple de 86 400) ou
+// au mois (premier du mois, minuit UTC), jamais d'heure. Cette base survit aux redémarrages et
+// est sauvegardée (§21.13), contrairement à shares.db.
 //
-// comptes : h (16, tiré par le serveur) ; e_canon, e_envoi (empreintes à clé de l'adresse) ;
-// v_mdp (HMAC de A_auth) ; env_mdp (Env_mdp, 60) ; cle_profil (séquestre de s_profil, 60) ;
-// p_empreinte (empreinte à clé du pseudo) ; pseudo_jour (jour du dernier changement de pseudo,
-// 0 tant qu'il n'a jamais changé) ; coffres de profil et privé au palier exact
-// (4, 16, 64 ou 256 Kio + 45 octets d'en-tête, de nonce et d'étiquette) avec leur gen ; totp
-// (secret chiffré, 48) ; attentes de sécurité (R3, R4) ; ancienneté. Pas de colonne « banni »
-// (version 1 du schéma, retirée au lot 7) : le statut se lit dans bannis (actif, non échu),
-// seule source, que l'adresse ait un compte ou non.
+// comptes : h (16, tiré par le serveur, user.id de WebAuthn) ; p_empreinte (empreinte à clé du
+// pseudo) ; pseudo_jour (jour du dernier changement de pseudo, 0 tant qu'il n'a jamais changé) ;
+// v_r (SHA-256 de A_r, index unique : la clé de récupération seule retrouve le compte) ; env_r
+// (K_compte enveloppée par la clé de récupération, 60) ; coffres de profil et privé au palier
+// exact (4, 16, 64 ou 256 Kio + 45 octets) avec leur gen ; ancienneté. Aucune adresse, aucun
+// mot de passe, aucun TOTP, aucun séquestre (retirés le 22 novembre).
+// passkeys : cred_id (1 à 1 023) ; h ; clé publique COSE (≤ 1 024) ; algorithme (−7, −8,
+// −257) ; be (passkey synchronisable) ; env (K_compte enveloppée par la sortie PRF de cette
+// passkey, 60, ou rien) ; etiquette (libellé chiffré par l'appareil, 64, ou rien) ; mois
+// d'ajout. Jamais d'AAGUID, de transports, d'attestation, de compteur, de BS ni de date d'usage.
 // sessions : t_v (SHA-256 du jeton) ; sid (identifiant montré) ; h (effacées avec le compte) ;
-// etiquette (nom d'appareil chiffré par le client, 64) ; mois d'ajout ; jour d'échéance.
-// bannis : id (8, montré au fondateur) ; e_canon ; début et échéance ; actif ; motif
-// (catégorie 1 à 10, §21.10.1) ; salons fermés. Gardée après la suppression du compte.
+// etiquette (nom d'appareil chiffré par le client, 64) ; mois d'ajout ; jour d'échéance ;
+// par_recup (session ouverte par la clé de récupération, R4).
+// bannis : id (8, montré au fondateur) ; h (effacé avec le compte : un nouveau compte se crée
+// sans coût, R2) ; début et échéance ; actif ; motif (catégorie 1 à 10, §21.10.1) ; salons
+// fermés.
 var schemaComptes = `
 CREATE TABLE IF NOT EXISTS comptes(
   h BLOB PRIMARY KEY CHECK(` + blobN("h", 16) + `),
-  e_canon BLOB NOT NULL CHECK(` + blobN("e_canon", 32) + `),
-  e_envoi BLOB NOT NULL CHECK(` + blobN("e_envoi", 32) + `),
-  v_mdp BLOB NOT NULL CHECK(` + blobN("v_mdp", 32) + `),
-  env_mdp BLOB NOT NULL CHECK(` + blobN("env_mdp", 60) + `),
-  cle_profil BLOB NOT NULL CHECK(` + blobN("cle_profil", 60) + `),
   p_empreinte BLOB NOT NULL CHECK(` + blobN("p_empreinte", 32) + `),
   pseudo_jour INTEGER NOT NULL CHECK(` + jourCheck("pseudo_jour") + `),
+  v_r BLOB NOT NULL CHECK(` + blobN("v_r", 32) + `),
+  env_r BLOB NOT NULL CHECK(` + blobN("env_r", 60) + `),
   blob_profil BLOB NOT NULL CHECK(` + coffreCheck("blob_profil") + `),
   gen_profil INTEGER NOT NULL CHECK(gen_profil >= 0),
   blob_prive BLOB NOT NULL CHECK(` + coffreCheck("blob_prive") + `),
   gen_prive INTEGER NOT NULL CHECK(gen_prive >= 0),
-  totp BLOB CHECK(totp IS NULL OR (` + blobN("totp", 48) + `)),
-  totp_retrait_jour INTEGER CHECK(totp_retrait_jour IS NULL OR (` + jourCheck("totp_retrait_jour") + `)),
-  recup_jour INTEGER CHECK(recup_jour IS NULL OR (` + jourCheck("recup_jour") + `)),
   cree_jour INTEGER NOT NULL CHECK(` + jourCheck("cree_jour") + `),
   compte_des INTEGER NOT NULL CHECK(` + jourCheck("compte_des") + `),
   vu_mois INTEGER NOT NULL CHECK(` + moisCheck("vu_mois") + `)) WITHOUT ROWID;
-CREATE UNIQUE INDEX IF NOT EXISTS comptes_e_canon ON comptes(e_canon);
 CREATE UNIQUE INDEX IF NOT EXISTS comptes_p_empreinte ON comptes(p_empreinte);
+CREATE UNIQUE INDEX IF NOT EXISTS comptes_v_r ON comptes(v_r);
+CREATE TABLE IF NOT EXISTS passkeys(
+  cred_id BLOB PRIMARY KEY CHECK(typeof(cred_id)='blob' AND length(cred_id) BETWEEN 1 AND 1023),
+  h BLOB NOT NULL REFERENCES comptes(h) ON DELETE CASCADE,
+  cle_pub BLOB NOT NULL CHECK(typeof(cle_pub)='blob' AND length(cle_pub) BETWEEN 1 AND 1024),
+  alg INTEGER NOT NULL CHECK(alg IN (-7,-8,-257)),
+  be INTEGER NOT NULL CHECK(be IN (0,1)),
+  env BLOB CHECK(env IS NULL OR (` + blobN("env", 60) + `)),
+  etiquette BLOB CHECK(etiquette IS NULL OR (` + blobN("etiquette", 64) + `)),
+  ajoutee_mois INTEGER NOT NULL CHECK(` + moisCheck("ajoutee_mois") + `)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS passkeys_h ON passkeys(h);
 CREATE TABLE IF NOT EXISTS sessions(
   t_v BLOB PRIMARY KEY CHECK(` + blobN("t_v", 32) + `),
   sid BLOB NOT NULL CHECK(` + blobN("sid", 16) + `),
@@ -56,18 +64,19 @@ CREATE TABLE IF NOT EXISTS sessions(
   etiquette BLOB CHECK(etiquette IS NULL OR (` + blobN("etiquette", 64) + `)),
   cree_mois INTEGER NOT NULL CHECK(` + moisCheck("cree_mois") + `),
   expire_jour INTEGER NOT NULL CHECK(` + jourCheck("expire_jour") + `),
-  persistante INTEGER NOT NULL CHECK(persistante IN (0,1))) WITHOUT ROWID;
+  persistante INTEGER NOT NULL CHECK(persistante IN (0,1)),
+  par_recup INTEGER NOT NULL CHECK(par_recup IN (0,1))) WITHOUT ROWID;
 CREATE UNIQUE INDEX IF NOT EXISTS sessions_sid ON sessions(sid);
 CREATE INDEX IF NOT EXISTS sessions_h ON sessions(h);
 CREATE TABLE IF NOT EXISTS bannis(
   id BLOB PRIMARY KEY CHECK(` + blobN("id", 8) + `),
-  e_canon BLOB NOT NULL CHECK(` + blobN("e_canon", 32) + `),
+  h BLOB NOT NULL REFERENCES comptes(h) ON DELETE CASCADE,
   debut_jour INTEGER NOT NULL CHECK(` + jourCheck("debut_jour") + `),
   jusqu_jour INTEGER NOT NULL CHECK(` + jourCheck("jusqu_jour") + `),
   actif INTEGER NOT NULL CHECK(actif IN (0,1)),
   motif INTEGER NOT NULL CHECK(motif BETWEEN 1 AND 10),
   salons_fermes INTEGER NOT NULL CHECK(salons_fermes >= 0)) WITHOUT ROWID;
-CREATE UNIQUE INDEX IF NOT EXISTS bannis_e_canon ON bannis(e_canon)`
+CREATE UNIQUE INDEX IF NOT EXISTS bannis_h ON bannis(h)`
 
 func blobN(col string, n int) string {
 	return fmt.Sprintf("typeof(%s)='blob' AND length(%s)=%d", col, col, n)
@@ -84,23 +93,30 @@ func moisCheck(col string) string {
 }
 
 // coffreCheck : « SHH-ACCT1 » ou « SHH-PROF1 » (9) ‖ gen (8) ‖ nonce (12) ‖ chiffré du clair
-// bourré au palier ‖ étiquette (16) : palier + 45 octets (engine/vectors/compte.json).
+// bourré au palier ‖ étiquette (16) : palier + 45 octets (engine/vectors/compte-v3.json).
 func coffreCheck(col string) string {
 	return fmt.Sprintf("typeof(%s)='blob' AND length(%s) IN (%d,%d,%d,%d)", col, col,
 		4096+45, 16384+45, 65536+45, 262144+45)
 }
 
-// VersionBase : version du schéma de comptes.db (PRAGMA user_version). 2 : colonne
-// comptes.banni retirée (lot 7) ; une base de la version 1 est migrée à l'ouverture.
-const VersionBase = 2
+// VersionBase : version du schéma de comptes.db (PRAGMA user_version). 3 : compte par passkey
+// (22 novembre). Les versions 1 et 2 (compte par e-mail) ne sont jamais migrées : le service
+// n'a jamais été ouvert (conception du compte par passkey §15).
+const VersionBase = 3
 
 // ErrBasePlusRecente : comptes.db écrite par une version plus récente ; message fixe, sans chemin.
 var ErrBasePlusRecente = errors.New("comptes.db créée par une version plus récente de Shhgone : refus d'ouvrir " +
 	"(retour arrière : réinstaller la version récente ; ne jamais effacer cette base, elle garde les comptes)")
 
+// ErrBaseEmail : comptes.db de schéma 1 ou 2 (compte par e-mail) qui contient des comptes ;
+// jamais effacée en silence (conception du compte par passkey §15). Message fixe, sans chemin.
+var ErrBaseEmail = errors.New("comptes.db contient des comptes par e-mail (schéma 1 ou 2, retiré le 22 novembre) : " +
+	"refus d'ouvrir ; la sauvegarder, puis la retirer à la main si ces comptes ne servent plus")
+
 // OuvrirBase ouvre (ou crée) comptes.db : fichier créé en 0600 avant SQLite, droits resserrés
 // (base, -wal, -shm), mêmes PRAGMA que shares.db, une seule connexion, schéma exact. Une base
-// d'une version plus récente n'est pas touchée. chemin : absolu, sans « ? », « # » ni « % »
+// d'une version plus récente n'est pas touchée ; une base de schéma 1 ou 2 sans compte est
+// recréée, avec des comptes refusée (ErrBaseEmail). chemin : absolu, sans « ? », « # » ni « % »
 // (SHH_DATA_DIR, vérifié par config).
 func OuvrirBase(chemin string) (*sql.DB, error) {
 	f, err := os.OpenFile(chemin, os.O_RDWR|os.O_CREATE, 0o600)
@@ -125,10 +141,13 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 		db.Close()
 		return nil, ErrBasePlusRecente
 	}
-	if v == 1 {
-		if err := migrerV1(db); err != nil {
+	if v == 1 || v == 2 {
+		if err := retirerSchemaEmail(db); err != nil {
 			db.Close()
-			return nil, fmt.Errorf("migration de comptes.db : %w", err)
+			if errors.Is(err, ErrBaseEmail) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("retrait du schéma 2 de comptes.db : %w", err)
 		}
 	}
 	if _, err := db.Exec(schemaComptes); err != nil {
@@ -146,15 +165,34 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 	return db, nil
 }
 
-// migrerV1 : version 1 → 2 : colonne comptes.banni effacée (toujours 0 : le statut était déjà
-// lu dans bannis), si elle existe ; pages libérées écrasées (secure_delete).
-func migrerV1(db *sql.DB) error {
+// retirerSchemaEmail : base de schéma 1 ou 2. Un compte au moins : ErrBaseEmail, rien n'est
+// touché. Aucun compte : les tables de l'ancien schéma (et leurs index) sont effacées dans une
+// transaction (pages écrasées : secure_delete) ; sessions et bannissements d'une base sans
+// compte ne désignent plus personne qui puisse se connecter.
+func retirerSchemaEmail(db *sql.DB) error {
 	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('comptes') WHERE name='banni'`).Scan(&n); err != nil || n == 0 {
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='comptes'`).Scan(&n); err != nil {
 		return err
 	}
-	_, err := db.Exec(`ALTER TABLE comptes DROP COLUMN banni`)
-	return err
+	if n == 1 {
+		if err := db.QueryRow(`SELECT count(*) FROM comptes`).Scan(&n); err != nil {
+			return err
+		}
+		if n > 0 {
+			return ErrBaseEmail
+		}
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	for _, t := range []string{"sessions", "bannis", "comptes"} {
+		if _, err := tx.Exec(`DROP TABLE IF EXISTS ` + t); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // serrer : base et annexes en 0600 (SQLite crée -wal et -shm avec les droits de la base).

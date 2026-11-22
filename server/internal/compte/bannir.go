@@ -9,13 +9,15 @@ import (
 	"time"
 )
 
-// Bannissement révisé (conception §13, §21.11, §21.14.4 ; plan lot 7). Une ligne bannis par
-// adresse (e_canon), désignée devant le fondateur par un identifiant aléatoire de 8 octets
-// (« B-XXXX-XXXX-XXXXX ») : jamais une adresse, une empreinte, un h ni un pseudo. Le statut
-// « banni » se lit seulement là (actif et non échu), que l'adresse ait un compte ou non.
+// Bannissement (conception du compte §13, §21.11, §21.14.4 ; conception du compte par passkey
+// §7.4). Une ligne bannis par compte (h), désignée devant le fondateur par un identifiant
+// aléatoire de 8 octets (« B-XXXX-XXXX-XXXXX ») : jamais un h, une empreinte ni un pseudo. Le
+// statut « banni » se lit seulement là (actif et non échu). Supprimer le compte efface la ligne
+// (cascade) : sans adresse, un nouveau compte se crée sans coût (R2), elle ne protégeait plus
+// rien.
 
 // Durées permises au moment de bannir (§21.11) : 30 jours, 1 an, 3 ans (défaut). Le
-// bannissement porte sur l'empreinte de l'adresse e-mail (e_canon), jamais sur une adresse IP.
+// bannissement porte sur le compte, jamais sur une adresse IP.
 var dureesBan = [...]int{30, 365, 1095}
 
 // DureeBanDefaut : 3 ans (décision du propriétaire du 14 novembre, confirmée le 22 novembre).
@@ -27,15 +29,6 @@ const (
 	pagesMax = 100000
 )
 
-// Cible : ce qui désigne le banni. Email : adresse tapée par le fondateur (tampon de
-// l'appelant, effacé par lui ; la normalisation en fait une chaîne, que Go ne permet pas
-// d'effacer : au mieux). H : compte trouvé par un lien de salon ou une ref de salon signalé.
-// Exactement un des deux.
-type Cible struct {
-	Email []byte
-	H     *[16]byte
-}
-
 // BanVue : un bannissement tel que le fondateur le voit. Dates au jour (« 2029-11-14 »).
 type BanVue struct {
 	ID           string `json:"id"`
@@ -46,16 +39,14 @@ type BanVue struct {
 	SalonsFermes int    `json:"salons_fermes"`
 }
 
-// Ban : résultat d'un bannissement. Compte : l'adresse avait un compte (sessions et salons
-// fermés) ; sinon seule l'adresse est retenue (inscription refusée).
+// Ban : résultat d'un bannissement (sessions et salons du compte fermés).
 type Ban struct {
 	Vue          BanVue
-	Compte       bool
 	SalonsFermes int
 }
 
-// CompteVue : ce que le fondateur peut savoir d'un compte (recherche par adresse, créateur
-// d'un salon signalé) : existe, palier, ancienneté en jours, banni. Rien qui le désigne.
+// CompteVue : ce que le fondateur peut savoir d'un compte (créateur d'un salon signalé) :
+// existe, palier, ancienneté en jours, banni. Rien qui le désigne.
 type CompteVue struct {
 	Existe          bool   `json:"existe"`
 	Palier          string `json:"palier"`
@@ -63,7 +54,7 @@ type CompteVue struct {
 	Banni           bool   `json:"banni"`
 }
 
-// ErrDejaBanni : l'adresse a déjà un bannissement en cours (actif ou suspendu) : agir sur lui
+// ErrDejaBanni : le compte a déjà un bannissement en cours (actif ou suspendu) : agir sur lui
 // (Vue) plutôt qu'en créer un second.
 type ErrDejaBanni struct{ Vue BanVue }
 
@@ -109,7 +100,7 @@ func dureeOK(j int) bool {
 // ligneBan : une ligne de bannis.
 type ligneBan struct {
 	id                          [8]byte
-	canon                       []byte
+	h                           [16]byte
 	debut, jusqu, motif, fermes int64
 	actif                       bool
 }
@@ -119,14 +110,14 @@ func (l ligneBan) vue() BanVue {
 		Motif: uint8(l.motif), SalonsFermes: int(l.fermes)}
 }
 
-const colonnesBan = `id, e_canon, debut_jour, jusqu_jour, actif, motif, salons_fermes`
+const colonnesBan = `id, h, debut_jour, jusqu_jour, actif, motif, salons_fermes`
 
 type scanner interface{ Scan(...any) error }
 
 func scanBan(r scanner) (ligneBan, error) {
 	var l ligneBan
 	var id []byte
-	if err := r.Scan(&id, &l.canon, &l.debut, &l.jusqu, &l.actif, &l.motif, &l.fermes); err != nil {
+	if err := r.Scan(&id, (*octets16)(&l.h), &l.debut, &l.jusqu, &l.actif, &l.motif, &l.fermes); err != nil {
 		return l, err
 	}
 	if len(id) != 8 {
@@ -136,53 +127,24 @@ func scanBan(r scanner) (ligneBan, error) {
 	return l, nil
 }
 
-// canonDe : e_canon de l'adresse tapée (ErrAdresse si elle n'en est pas une).
-func (s *Service) canonDe(email []byte) ([32]byte, error) {
-	a, err := Normaliser(string(email))
-	if err != nil {
-		return [32]byte{}, ErrAdresse
-	}
-	c, _ := s.cles.Empreintes(a)
-	return c, nil
-}
-
-// Bannir (§13, §21.11) : durée de 30, 365 ou 1 095 jours, motif 1 à 10 (catégorie de
-// §21.10.1). Dans une transaction : ligne bannis (active), sessions du compte fermées ; puis
-// salons du compte fermés (crochet du salon), leur nombre gardé dans la ligne. Une création
-// en cours a lu le palier sous le même verrou que la fermeture (salon.Manager.FermerDuCompte) :
-// elle finit avant, et son salon est fermé, ou lit le bannissement. Compte inconnu (Cible.H) :
-// ErrEtape. Adresse déjà bannie (non échue) : ErrDejaBanni. Au-delà de 20 par heure : ErrLimit.
-func (s *Service) Bannir(c Cible, dureeJours int, motif uint8) (Ban, error) {
-	if (c.Email == nil) == (c.H == nil) || !dureeOK(dureeJours) || !motifOK(motif) {
+// Bannir (§13, §21.11) le compte h (trouvé par un lien de salon ou une ref de salon signalé) :
+// durée de 30, 365 ou 1 095 jours, motif 1 à 10 (catégorie de §21.10.1). Dans une transaction :
+// ligne bannis (active), sessions du compte fermées ; puis salons du compte fermés (crochet du
+// salon), leur nombre gardé dans la ligne. Une création en cours a lu le palier sous le même
+// verrou que la fermeture (salon.Manager.FermerDuCompte) : elle finit avant, et son salon est
+// fermé, ou lit le bannissement. Compte inconnu : ErrEtape. Déjà banni (non échu) :
+// ErrDejaBanni. Au-delà de 20 par heure : ErrLimit.
+func (s *Service) Bannir(h [16]byte, dureeJours int, motif uint8) (Ban, error) {
+	if !dureeOK(dureeJours) || !motifOK(motif) {
 		return Ban{}, ErrRequete
 	}
 	now := s.now()
-	var canon [32]byte
-	var h [16]byte
-	compte := false
-	if c.H != nil {
-		h, compte = *c.H, true
-		var e []byte
-		if err := s.db.QueryRow(`SELECT e_canon FROM comptes WHERE h=?`, h[:]).Scan(&e); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return Ban{}, ErrEtape
-			}
-			return Ban{}, err
+	var x int
+	if err := s.db.QueryRow(`SELECT 1 FROM comptes WHERE h=?`, h[:]).Scan(&x); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Ban{}, ErrEtape
 		}
-		copy(canon[:], e)
-	} else {
-		var err error
-		if canon, err = s.canonDe(c.Email); err != nil {
-			return Ban{}, err
-		}
-		var hb []byte
-		switch err := s.db.QueryRow(`SELECT h FROM comptes WHERE e_canon=?`, canon[:]).Scan(&hb); {
-		case err == nil:
-			copy(h[:], hb)
-			compte = true
-		case !errors.Is(err, sql.ErrNoRows):
-			return Ban{}, err
-		}
+		return Ban{}, err
 	}
 	if !s.lim.AllowBannir() {
 		return Ban{}, ErrLimit{heureSuivante(now)}
@@ -191,24 +153,21 @@ func (s *Service) Bannir(c Cible, dureeJours int, motif uint8) (Ban, error) {
 	var l ligneBan
 	var fermees [][32]byte
 	err := s.tx(func(tx *sql.Tx) error {
-		switch v, err := scanBan(tx.QueryRow(`SELECT `+colonnesBan+` FROM bannis WHERE e_canon=?`, canon[:])); {
+		switch v, err := scanBan(tx.QueryRow(`SELECT `+colonnesBan+` FROM bannis WHERE h=?`, h[:])); {
 		case err == nil && v.jusqu > auj:
 			return ErrDejaBanni{v.vue()}
 		case err == nil: // échu, pas encore effacé par la passe quotidienne
-			if _, err := tx.Exec(`DELETE FROM bannis WHERE e_canon=?`, canon[:]); err != nil {
+			if _, err := tx.Exec(`DELETE FROM bannis WHERE h=?`, h[:]); err != nil {
 				return err
 			}
 		case !errors.Is(err, sql.ErrNoRows):
 			return err
 		}
 		rand.Read(l.id[:])
-		l.canon, l.debut, l.jusqu, l.actif, l.motif = canon[:], auj, auj+int64(dureeJours)*jourS, true, int64(motif)
-		if _, err := tx.Exec(`INSERT INTO bannis(`+colonnesBan+`) VALUES(?,?,?,?,1,?,0)`, l.id[:], canon[:], l.debut,
+		l.h, l.debut, l.jusqu, l.actif, l.motif = h, auj, auj+int64(dureeJours)*jourS, true, int64(motif)
+		if _, err := tx.Exec(`INSERT INTO bannis(`+colonnesBan+`) VALUES(?,?,?,?,1,?,0)`, l.id[:], h[:], l.debut,
 			l.jusqu, l.motif); err != nil {
 			return err
-		}
-		if !compte {
-			return nil
 		}
 		var err error
 		fermees, err = fermerSessionsTx(tx, h, nil)
@@ -220,14 +179,13 @@ func (s *Service) Bannir(c Cible, dureeJours int, motif uint8) (Ban, error) {
 	for _, tv := range fermees {
 		s.act.oublier(tv)
 	}
-	r := Ban{Compte: compte}
-	if compte {
-		n, err := s.fermerEtCompter(h, l.id)
-		if err != nil {
-			return Ban{}, err
-		}
-		r.SalonsFermes, l.fermes = n, int64(n)
+	s.oublierDefisDe(h)
+	var r Ban
+	n, err := s.fermerEtCompter(h, l.id)
+	if err != nil {
+		return Ban{}, err
 	}
+	r.SalonsFermes, l.fermes = n, int64(n)
 	s.vider()
 	r.Vue = l.vue()
 	return r, nil
@@ -280,7 +238,7 @@ func (s *Service) ActionBan(id, action, jusqu string) (avant BanVue, apres *BanV
 	}
 	// Toute action sur un bannissement compte dans la même limite que bannir (20 par heure) :
 	// sans elle, un jeton d'administration volé levait ou suspendait tous les bannissements
-	// un par un, et un bannissement levé ne se rétablit qu'avec l'adresse (audit du lot 7).
+	// un par un (audit du lot 7).
 	if !s.lim.AllowBannir() {
 		return BanVue{}, nil, ErrLimit{heureSuivante(now)}
 	}
@@ -305,22 +263,14 @@ func (s *Service) ActionBan(id, action, jusqu string) (avant BanVue, apres *BanV
 			_, err = tx.Exec(`UPDATE bannis SET jusqu_jour=? WHERE id=?`, j, k[:])
 		case "lever", "annuler":
 			if _, err = tx.Exec(`DELETE FROM bannis WHERE id=?`, k[:]); err == nil && action == "annuler" {
-				_, err = tx.Exec(`UPDATE comptes SET compte_des=cree_jour WHERE e_canon=?`, l.canon)
+				_, err = tx.Exec(`UPDATE comptes SET compte_des=cree_jour WHERE h=?`, l.h[:])
 			}
 			return err
 		}
 		if err != nil || action != "reactiver" || avant.Actif {
 			return err
 		}
-		var hb []byte
-		switch err := tx.QueryRow(`SELECT h FROM comptes WHERE e_canon=?`, l.canon).Scan(&hb); {
-		case errors.Is(err, sql.ErrNoRows):
-			return nil
-		case err != nil:
-			return err
-		}
-		h = new([16]byte)
-		copy(h[:], hb)
+		h = &l.h
 		fermees, err = fermerSessionsTx(tx, *h, nil)
 		return err
 	})
@@ -345,9 +295,9 @@ func (s *Service) ActionBan(id, action, jusqu string) (avant BanVue, apres *BanV
 	return avant, &v, nil
 }
 
-// lireBanCanon : bannissement en cours (non échu) de l'adresse, ou nil.
-func (s *Service) lireBanCanon(canon []byte, auj int64) (*BanVue, error) {
-	l, err := scanBan(s.db.QueryRow(`SELECT `+colonnesBan+` FROM bannis WHERE e_canon=? AND jusqu_jour>?`, canon, auj))
+// lireBanH : bannissement en cours (non échu) du compte h, ou nil.
+func (s *Service) lireBanH(h [16]byte, auj int64) (*BanVue, error) {
+	l, err := scanBan(s.db.QueryRow(`SELECT `+colonnesBan+` FROM bannis WHERE h=? AND jusqu_jour>?`, h[:], auj))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -358,11 +308,12 @@ func (s *Service) lireBanCanon(canon []byte, auj int64) (*BanVue, error) {
 	return &v, nil
 }
 
-// vueCompte : CompteVue du compte choisi par q (Existe faux : aucun compte).
-func (s *Service) vueCompte(q string, arg any, now time.Time) (CompteVue, error) {
+// VueCompte : palier, ancienneté et bannissement du compte h (créateur d'un salon signalé) ;
+// compte inconnu : Existe faux.
+func (s *Service) VueCompte(h [16]byte) (CompteVue, error) {
+	now := s.now()
 	var des int64
-	var canon []byte
-	err := s.db.QueryRow(`SELECT compte_des, e_canon FROM comptes WHERE `+q, arg).Scan(&des, &canon)
+	err := s.db.QueryRow(`SELECT compte_des FROM comptes WHERE h=?`, h[:]).Scan(&des)
 	if errors.Is(err, sql.ErrNoRows) {
 		return CompteVue{}, nil
 	}
@@ -371,31 +322,9 @@ func (s *Service) vueCompte(q string, arg any, now time.Time) (CompteVue, error)
 	}
 	p, _, _ := palier(des, now)
 	v := CompteVue{Existe: true, Palier: p, AncienneteJours: int((jourDe(now) - des) / jourS)}
-	b, err := s.lireBanCanon(canon, jourDe(now))
+	b, err := s.lireBanH(h, jourDe(now))
 	v.Banni = b != nil && b.Actif
 	return v, err
-}
-
-// VueCompte : palier, ancienneté et bannissement du compte h (créateur d'un salon signalé) ;
-// compte inconnu : Existe faux.
-func (s *Service) VueCompte(h [16]byte) (CompteVue, error) {
-	return s.vueCompte(`h=?`, h[:], s.now())
-}
-
-// ChercherBan (recours, §21.14.4) : le bannissement en cours de l'adresse (ou nil) et ce qu'on
-// peut dire de son compte. L'adresse n'est gardée nulle part.
-func (s *Service) ChercherBan(email []byte) (*BanVue, CompteVue, error) {
-	canon, err := s.canonDe(email)
-	if err != nil {
-		return nil, CompteVue{}, err
-	}
-	now := s.now()
-	b, err := s.lireBanCanon(canon[:], jourDe(now))
-	if err != nil {
-		return nil, CompteVue{}, err
-	}
-	v, err := s.vueCompte(`e_canon=?`, canon[:], now)
-	return b, v, err
 }
 
 // ListeBans : bannissements en cours (non échus), du plus récent au plus ancien, 50 par page ;

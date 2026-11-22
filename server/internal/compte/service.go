@@ -1,43 +1,38 @@
 package compte
 
 import (
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/netip"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/skoow/shhdrop/server/internal/courriel"
 	"github.com/skoow/shhdrop/server/internal/limits"
 )
 
-// Service : inscription par code e-mail, connexion, sessions, pseudo, coffres (plan du compte,
-// lot 4 ; conception §8, §21). Le serveur ne reçoit jamais le mot de passe (A_auth seulement,
-// tiré d'Argon2id sur l'appareil), ne garde aucune adresse sur disque (empreintes à clé), et
-// ne dit jamais, avant le code juste reçu par e-mail, si une adresse a un compte.
+// Service : compte par passkey (conception du compte par passkey §6 ; sessions, pseudo,
+// coffres, ancienneté, bannissement et suppression de la conception du compte, inchangés). Le
+// serveur ne reçoit jamais la sortie PRF d'une passkey, la clé de récupération R ni K_compte ;
+// il garde les clés publiques des passkeys, des enveloppes chiffrées par l'appareil et
+// v_r = SHA-256(A_r).
 //
-// Mémoire seulement : étapes (etapes.go) et activité des sessions (sessions.go), perdues au
-// redémarrage. Disque : comptes.db (base.go), dates au jour ou au mois.
+// Mémoire seulement : défis WebAuthn et étapes (defis.go), activité des sessions
+// (sessions.go), perdus au redémarrage. Disque : comptes.db (base.go), dates au jour ou au mois.
 type Service struct {
 	db   *sql.DB
 	cles Cles
-	post Postier
 	lim  *limits.Limiter
 	now  func() time.Time
 	max  int
-	// cleCode : clé tirée au démarrage ; les codes e-mail en mémoire n'y sont qu'en HMAC.
-	cleCode [32]byte
+	// jour : comptes créés au plus par jour UTC, pour tout le serveur (SHH_COMPTES_JOUR,
+	// conception §7.2 : coupe-circuit) ; creesJour et jourCrees sous mu.
+	jour                 int
+	creesJour, jourCrees int64
 
 	mu  sync.Mutex
 	et  etapes
 	act activites
-	pas map[[16]byte]pasTOTP // dernier pas TOTP accepté par compte (rejeu), sous mu
 
 	// Crochets du salon (lot 6) : fermer les salons créés par un compte, les compter, les
 	// lister, en détruire un. nil (salon désactivé, tests) : aucun salon relié.
@@ -52,22 +47,17 @@ type Service struct {
 	cpt compteurs
 }
 
-// Postier : la file d'e-mails (courriel.Envoyeur ; un faux dans les tests). Plein : la file
-// refuserait un message maintenant (une étape sans e-mail répond alors busy comme les autres).
-type Postier interface {
-	Mettre(courriel.Message) error
-	Plein() bool
-}
-
-// Config : base ouverte par OuvrirBase, sous-clés de K_serveur, file d'e-mails, limites (le
-// même limiteur que l'API), horloge, SHH_COMPTES_MAX.
+// Config : base ouverte par OuvrirBase, sous-clé de K_serveur, limites (le même limiteur que
+// l'API), horloge, SHH_COMPTES_MAX, SHH_COMPTES_JOUR.
 type Config struct {
-	DB       *sql.DB
-	Cles     Cles
-	Courriel Postier
-	Limites  *limits.Limiter
-	Now      func() time.Time
-	Max      int
+	DB      *sql.DB
+	Cles    Cles
+	Limites *limits.Limiter
+	Now     func() time.Time
+	Max     int
+	// Jour : comptes créés au plus par jour pour tout le serveur (0 : 500, la valeur par défaut
+	// de SHH_COMPTES_JOUR).
+	Jour int
 	// Crochets du salon (SHH_SALONS=1 ; api.BrancherSalonsDuCompte), nil sinon : fermer les
 	// salons créés par un compte, les compter, les lister (SalonVivant : l'identifiant interne
 	// ne sort jamais du serveur), en détruire un (salon inconnu, fini ou d'un autre compte :
@@ -77,78 +67,57 @@ type Config struct {
 	DetruireSalon              func(h [16]byte, id string) error
 }
 
-// NewService : rien n'est lu ni écrit ; la clé des codes est tirée ici.
+// ComptesJourDefaut : plafond global de comptes créés par jour (conception §7.2).
+const ComptesJourDefaut = 500
+
+// NewService : rien n'est lu ni écrit.
 func NewService(c Config) (*Service, error) {
-	if c.DB == nil || c.Courriel == nil || c.Limites == nil || c.Max < 1 {
+	if c.DB == nil || c.Limites == nil || c.Max < 1 || c.Jour < 0 {
 		return nil, errors.New("compte : configuration incomplète")
 	}
 	if c.Now == nil {
 		c.Now = time.Now
 	}
-	s := &Service{db: c.DB, cles: c.Cles, post: c.Courriel, lim: c.Limites, now: c.Now, max: c.Max,
+	if c.Jour == 0 {
+		c.Jour = ComptesJourDefaut
+	}
+	s := &Service{db: c.DB, cles: c.Cles, lim: c.Limites, now: c.Now, max: c.Max, jour: c.Jour,
 		fermerSalons: c.FermerSalons, salonsActifs: c.SalonsActifs, salonsVivants: c.SalonsVivants,
 		detruireSalon: c.DetruireSalon, refs: map[[16]byte]refSalon{}}
-	rand.Read(s.cleCode[:]) // crypto/rand ne renvoie pas d'erreur sous Linux
 	s.et.m = map[[32]byte]*etape{}
-	s.pas = map[[16]byte]pasTOTP{}
 	s.act.m, s.act.debut = map[[32]byte]activite{}, c.Now()
 	return s, nil
 }
 
-// Erreurs fixes (conception §8.6, §21.6.2) ; l'API les traduit en codes HTTP. Aucune ne cite
-// une adresse, un pseudo ni une valeur reçue.
+// Erreurs fixes (conception du compte §8.6 ; conception du compte par passkey §6.4) ; l'API les
+// traduit en codes HTTP. Aucune ne cite un pseudo ni une valeur reçue. ErrIdentifiants : même
+// erreur pour une passkey inconnue, une signature fausse, un userHandle qui ne correspond pas
+// et une clé de récupération inconnue.
 var (
-	ErrRequete       = errors.New("bad_request")
-	ErrAdresse       = errors.New("adresse_invalide")
-	ErrJetable       = errors.New("jetable")
-	ErrIdentifiants  = errors.New("identifiants")
-	ErrPreuveRequise = errors.New("preuve_requise")
-	ErrTOTPRequis    = errors.New("totp_requis")
-	ErrRecent        = errors.New("recent")
-	ErrEtape         = errors.New("not_found")
-	ErrSession       = errors.New("session")
-	ErrBusy          = errors.New("busy")
-	ErrDejaInscrit   = errors.New("deja_inscrit")
-	ErrPseudoPris    = errors.New("pseudo_pris")
+	ErrRequete      = errors.New("bad_request")
+	ErrIdentifiants = errors.New("identifiants")
+	ErrRecent       = errors.New("recent")
+	ErrEtape        = errors.New("not_found")
+	ErrSession      = errors.New("session")
+	ErrBusy         = errors.New("busy")
+	ErrPseudoPris   = errors.New("pseudo_pris")
+	ErrDerniere     = errors.New("derniere")
 )
-
-// ErrCodeFaux : code e-mail faux ; Restants essais (0 : l'étape est morte).
-type ErrCodeFaux struct{ Restants int }
-
-func (e ErrCodeFaux) Error() string { return "code_faux" }
 
 // ErrLimit : limite atteinte, à réessayer après Retry.
 type ErrLimit struct{ Retry time.Duration }
 
 func (e ErrLimit) Error() string { return "limit" }
 
-// ErrBanni : adresse bannie jusqu'au jour Jusqu (« 2029-11-14 »), dit seulement après le code
-// juste (conception §21.3).
+// ErrBanni : compte banni jusqu'au jour Jusqu (« 2029-11-14 »).
 type ErrBanni struct{ Jusqu string }
 
 func (e ErrBanni) Error() string { return "banni" }
-
-// ErrAttente : refus pendant les 7 jours qui suivent une récupération par e-mail (R4) ;
-// permis à partir du jour Jusqu (« 2026-11-21 »).
-type ErrAttente struct{ Jusqu string }
-
-func (e ErrAttente) Error() string { return "attente" }
 
 // ErrConflit : if_gen périmé ; Gen est celui du serveur (409 conflict).
 type ErrConflit struct{ Gen uint64 }
 
 func (e ErrConflit) Error() string { return "conflict" }
-
-// Donnees : ce que l'appareil envoie à inscription/fin (§21.6.2). Ni mot de passe, ni
-// K_compte, ni clé du coffre privé (TestSequestreSeulementProfil).
-type Donnees struct {
-	AAuth      [32]byte
-	EnvMdp     [60]byte
-	SProfil    [32]byte // séquestré (exception R-D1, validée le 14 novembre)
-	PCanon     []byte
-	BlobProfil []byte
-	BlobPrive  []byte
-}
 
 // OptionsSession : « Rester connecté » et nom d'appareil chiffré par le client (64 octets ou
 // rien).
@@ -158,20 +127,6 @@ type OptionsSession struct {
 }
 
 func (o OptionsSession) valide() bool { return o.Etiquette == nil || len(o.Etiquette) == 64 }
-
-// Ouverture : réponse d'une connexion. Double authentification active : seule Etape est
-// remplie (aucune session n'existe encore, lot 5).
-type Ouverture struct {
-	Jeton      [32]byte
-	H          [16]byte
-	EnvMdp     [60]byte
-	SProfil    [32]byte
-	BlobProfil []byte
-	GenProfil  uint64
-	BlobPrive  []byte
-	GenPrive   uint64
-	Etape      *[32]byte
-}
 
 // Dates de comptes.db : jour (minuit UTC) ou mois (premier du mois, minuit UTC).
 const jourS = 86400
@@ -190,283 +145,6 @@ func heureSuivante(t time.Time) time.Duration { return t.Truncate(time.Hour).Add
 
 // jourSuivant : délai jusqu'au jour UTC suivant (fenêtres des limites au jour).
 func jourSuivant(t time.Time) time.Duration { return time.Unix(jourDe(t)+jourS, 0).Sub(t) }
-
-// hmacMdp : v_mdp = HMAC-SHA-256(K_poivre, h ‖ A_auth) (§5.2). Variable : les tests comptent
-// ses appels (même calcul pour une adresse inconnue).
-var hmacMdp = func(cle *[32]byte, h *[16]byte, a *[32]byte) [32]byte {
-	m := hmac.New(sha256.New, cle[:])
-	m.Write(h[:])
-	m.Write(a[:])
-	return [32]byte(m.Sum(nil))
-}
-
-// adresse : normalisation (§5.1) ; toute erreur de forme est adresse_invalide.
-func adresse(email string) (Adresse, error) {
-	a, err := Normaliser(email)
-	if err != nil {
-		return Adresse{}, ErrAdresse
-	}
-	return a, nil
-}
-
-func domaine(a Adresse) string { _, d, _ := strings.Cut(a.Canon, "@"); return d }
-
-func langueOK(l string) bool { return l == "fr" || l == "en" }
-
-// InscriptionDebut (§8.6, §21.3) : envoie **toujours** un code à l'adresse exacte, que
-// l'adresse soit libre, prise ou bannie ; rien n'est lu dans la base qui dépende de l'adresse.
-// Refus (qui ne disent rien d'une personne) : adresse invalide, jetable (ou sous-domaine d'un
-// jetable), limites, plafond des comptes, file pleine. L'anti-robot est vérifié avant, par
-// l'API.
-func (s *Service) InscriptionDebut(ip netip.Addr, email, langue string) (h [16]byte, jeton [32]byte, err error) {
-	a, err := adresse(email)
-	if err != nil {
-		return h, jeton, err
-	}
-	if !langueOK(langue) {
-		return h, jeton, ErrRequete
-	}
-	if Jetable(domaine(a)) {
-		return h, jeton, ErrJetable
-	}
-	now := s.now()
-	if !s.lim.AllowInscription(ip) {
-		return h, jeton, ErrLimit{jourSuivant(now)}
-	}
-	n, err := s.nComptes()
-	if err != nil {
-		return h, jeton, err
-	}
-	if n >= s.max {
-		return h, jeton, ErrBusy
-	}
-	canon, envoi := s.cles.Empreintes(a)
-	if !s.lim.AllowCourriel(ip, canon, limits.MotifInscription) {
-		return h, jeton, ErrLimit{jourSuivant(now)}
-	}
-	rand.Read(h[:])
-	e := &etape{sorte: etapeInscription, h: h, canon: canon, envoi: envoi, langue: langue}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	jeton, err = s.nouvelleEtapeLocked(e, now)
-	if err != nil {
-		return h, jeton, err
-	}
-	if err := s.envoyerCodeLocked(e, a.Exacte, now); err != nil {
-		s.et.retirer(jeton)
-		return [16]byte{}, [32]byte{}, err
-	}
-	return h, jeton, nil
-}
-
-// Renvoyer : nouveau code pour une étape d'inscription (RenvoyerOubli, RenvoyerEmail : pour une
-// récupération ou un changement d'adresse, mêmes règles), 60 s au moins après le précédent, à
-// l'adresse exacte de l'étape, retapée par le client. Écart au plan (§8.6 : `{ etape }`) : le
-// serveur ne garde pas l'adresse en clair le temps de l'étape (15 min), seulement e_envoi ;
-// le client renvoie l'adresse, comparée à e_envoi en temps constant. L'ancien code ne vaut
-// plus ; les essais repartent à 5 (le nombre d'e-mails par adresse est borné à 3 par jour).
-func (s *Service) Renvoyer(ip netip.Addr, jeton [32]byte, email string) error {
-	return s.renvoyer(ip, jeton, email, etapeInscription, nil)
-}
-
-// renvoyer : h non nil : l'étape doit être celle de ce compte (changement d'adresse).
-func (s *Service) renvoyer(ip netip.Addr, jeton [32]byte, email string, sorte sorteEtape, h *[16]byte) error {
-	a, err := adresse(email)
-	if err != nil {
-		return ErrEtape
-	}
-	canon, envoi := s.cles.Empreintes(a)
-	now := s.now()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e := s.et.trouver(jeton, sorte, now)
-	if e == nil || subtle.ConstantTimeCompare(envoi[:], e.envoi[:]) != 1 ||
-		(h != nil && subtle.ConstantTimeCompare(h[:], e.h[:]) != 1) {
-		return ErrEtape
-	}
-	if d := e.envoye.Add(attenteRenvoi).Sub(now); d > 0 {
-		return ErrLimit{d}
-	}
-	if !s.lim.AllowCourriel(ip, canon, motifDe(sorte)) {
-		return ErrLimit{jourSuivant(now)}
-	}
-	return s.envoyerCodeLocked(e, a.Exacte, now)
-}
-
-// InscriptionFin : code juste → l'état de l'adresse est dit (§21.3) : bannie (ErrBanni),
-// déjà inscrite (ErrDejaInscrit), pseudo pris ou interdit (ErrPseudoPris, l'étape reste
-// valable), sinon le compte et une session sont créés dans une même transaction.
-func (s *Service) InscriptionFin(jeton [32]byte, code string, d Donnees, o OptionsSession) ([32]byte, error) {
-	now := s.now()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e := s.et.trouver(jeton, etapeInscription, now)
-	if e == nil {
-		return [32]byte{}, ErrEtape
-	}
-	if err := s.verifierCodeLocked(jeton, e, code); err != nil {
-		return [32]byte{}, err
-	}
-	if !o.valide() || !coffreValide(Profil, d.BlobProfil, 1) || !coffreValide(Prive, d.BlobPrive, 1) {
-		return [32]byte{}, ErrRequete
-	}
-	pe, err := s.cles.EmpreintePseudo(d.PCanon)
-	switch {
-	case errors.Is(err, ErrPseudoCanon):
-		return [32]byte{}, ErrRequete
-	case err != nil:
-		pe = [32]byte{} // interdit : même réponse qu'un pseudo pris, après les mêmes contrôles
-	}
-	cle, err := sceller(&s.cles.Sequestre, e.h, d.SProfil)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	var tok [32]byte
-	err = s.tx(func(tx *sql.Tx) error {
-		if j, banni, err := bannieTx(tx, e.canon, now); err != nil {
-			return err
-		} else if banni {
-			return ErrBanni{dateJour(j)}
-		}
-		var x int
-		switch err := tx.QueryRow(`SELECT 1 FROM comptes WHERE e_canon=?`, e.canon[:]).Scan(&x); {
-		case err == nil:
-			return ErrDejaInscrit
-		case !errors.Is(err, sql.ErrNoRows):
-			return err
-		}
-		// « Pris » dit l'existence d'un compte : même limite que pseudo/verifier, par étape (audit, M3).
-		if k := cleEtape(jeton); !s.lim.AllowPseudoVerifier(k[:]) {
-			return ErrLimit{heureSuivante(now)}
-		}
-		if pris, err := pseudoPrisTx(tx, pe); err != nil {
-			return err
-		} else if pris || pe == [32]byte{} {
-			return ErrPseudoPris
-		}
-		var n int
-		if err := tx.QueryRow(`SELECT count(*) FROM comptes`).Scan(&n); err != nil {
-			return err
-		}
-		if n >= s.max {
-			return ErrBusy
-		}
-		v := hmacMdp(&s.cles.Poivre, &e.h, &d.AAuth)
-		j := jourDe(now)
-		if _, err := tx.Exec(`INSERT INTO comptes(h, e_canon, e_envoi, v_mdp, env_mdp, cle_profil, p_empreinte,
-			pseudo_jour, blob_profil, gen_profil, blob_prive, gen_prive, totp, totp_retrait_jour, recup_jour,
-			cree_jour, compte_des, vu_mois) VALUES(?,?,?,?,?,?,?,0,?,1,?,1,NULL,NULL,NULL,?,?,?)`,
-			e.h[:], e.canon[:], e.envoi[:], v[:], d.EnvMdp[:], cle[:], pe[:], d.BlobProfil, d.BlobPrive,
-			j, j, moisDe(now)); err != nil {
-			return err
-		}
-		tok, err = s.creerSessionTx(tx, e.h, o, now)
-		return err
-	})
-	if !errors.Is(err, ErrPseudoPris) && !errors.Is(err, ErrBusy) {
-		s.et.retirer(jeton) // succès, adresse prise ou bannie, erreur : l'étape a servi
-	}
-	if err != nil {
-		return [32]byte{}, err
-	}
-	s.cpt.inscriptions.Add(1)
-	return tok, nil
-}
-
-// ligneConnexion : ce que la connexion lit d'un compte.
-type ligneConnexion struct {
-	h                     [16]byte
-	vMdp                  [32]byte
-	envMdp                [60]byte
-	cleProfil             [60]byte
-	blobProfil, blobPrive []byte
-	genProfil, genPrive   uint64
-	totp                  bool
-	vuMois                int64
-}
-
-// Connexion (§8.6, §8.7, §8.8) : adresse inconnue, mot de passe faux (compte banni compris)
-// donnent la même erreur après le même calcul (un HMAC de v_mdp, sur un h nul si l'adresse est
-// inconnue, comparé en temps constant). Au-delà de 5 échecs dans l'heure pour cette adresse
-// (existante ou non), preuve ALTCHA exigée (preuve : vérifiée par l'API) ; jamais de
-// verrouillage. Double authentification active : une étape, aucune session avant le code de
-// l'application (ConnexionTOTP). Un compte
-// banni se connecte (export et suppression, §13).
-func (s *Service) Connexion(ip netip.Addr, email string, aAuth [32]byte, o OptionsSession, preuve bool) (Ouverture, error) {
-	a, err := adresse(email)
-	if err != nil {
-		return Ouverture{}, err
-	}
-	if !o.valide() {
-		return Ouverture{}, ErrRequete
-	}
-	now := s.now()
-	if !s.lim.AllowEchecConnexion(ip) {
-		return Ouverture{}, ErrLimit{heureSuivante(now)}
-	}
-	canon, _ := s.cles.Empreintes(a)
-	if !preuve && s.lim.PreuveRequise(canon) {
-		return Ouverture{}, ErrPreuveRequise
-	}
-	var l ligneConnexion
-	var vm, em, cp []byte
-	var totp sql.NullInt64
-	err = s.db.QueryRow(`SELECT h, v_mdp, env_mdp, cle_profil, blob_profil, gen_profil, blob_prive, gen_prive,
-		totp IS NOT NULL, vu_mois FROM comptes WHERE e_canon=?`, canon[:]).Scan(
-		(*octets16)(&l.h), &vm, &em, &cp, &l.blobProfil, &l.genProfil, &l.blobPrive, &l.genPrive, &totp, &l.vuMois)
-	trouve := err == nil
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return Ouverture{}, err
-	}
-	if trouve {
-		copy(l.vMdp[:], vm)
-		copy(l.envMdp[:], em)
-		copy(l.cleProfil[:], cp)
-		l.totp = totp.Int64 == 1
-	}
-	v := hmacMdp(&s.cles.Poivre, &l.h, &aAuth)
-	if subtle.ConstantTimeCompare(v[:], l.vMdp[:])&boolInt(trouve) != 1 {
-		s.lim.NoterEchecConnexion(ip, canon)
-		s.cpt.echecs.Add(1)
-		return Ouverture{}, ErrIdentifiants
-	}
-	if l.totp {
-		e := &etape{sorte: etapeConnexionTOTP, h: l.h, options: o, essaisTOTP: essaisCode}
-		s.mu.Lock()
-		jeton, err := s.nouvelleEtapeLocked(e, now)
-		s.mu.Unlock()
-		if err != nil {
-			return Ouverture{}, err
-		}
-		return Ouverture{Etape: &jeton}, nil
-	}
-	return s.ouvrir(l, o, now)
-}
-
-// ouvrir : séquestre ouvert, session créée, vu_mois mis à jour (une fois par mois).
-func (s *Service) ouvrir(l ligneConnexion, o OptionsSession, now time.Time) (Ouverture, error) {
-	sp, err := ouvrirSequestre(&s.cles.Sequestre, l.h, l.cleProfil)
-	if err != nil {
-		return Ouverture{}, fmt.Errorf("séquestre illisible : %w", err)
-	}
-	var tok [32]byte
-	err = s.tx(func(tx *sql.Tx) error {
-		if m := moisDe(now); l.vuMois != m {
-			if _, err := tx.Exec(`UPDATE comptes SET vu_mois=? WHERE h=?`, m, l.h[:]); err != nil {
-				return err
-			}
-		}
-		var err error
-		tok, err = s.creerSessionTx(tx, l.h, o, now)
-		return err
-	})
-	if err != nil {
-		return Ouverture{}, err
-	}
-	s.cpt.connexions.Add(1)
-	return Ouverture{Jeton: tok, H: l.h, EnvMdp: l.envMdp, SProfil: sp, BlobProfil: l.blobProfil,
-		GenProfil: l.genProfil, BlobPrive: l.blobPrive, GenPrive: l.genPrive}, nil
-}
 
 func boolInt(b bool) int {
 	if b {
@@ -487,22 +165,121 @@ func (o *octets16) Scan(v any) error {
 	return nil
 }
 
-// bannieTx : un bannissement actif et non échu pour e_canon (suspendu ou échu : non) ; rend
-// son échéance.
-func bannieTx(tx *sql.Tx, canon [32]byte, now time.Time) (int64, bool, error) {
-	var j int64
-	err := tx.QueryRow(`SELECT jusqu_jour FROM bannis WHERE e_canon=? AND actif=1 AND jusqu_jour>?`,
-		canon[:], jourDe(now)).Scan(&j)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, false, nil
-	}
-	return j, err == nil, err
+// Passkey : ce que le serveur garde d'une passkey (conception §6.3) : identifiant, clé publique
+// COSE, algorithme, BE, enveloppe PRF (60 octets ou nil), libellé chiffré (64 octets ou nil).
+// Jamais d'AAGUID, de transports, d'attestation, de compteur ni de BS.
+type Passkey struct {
+	CredID    []byte
+	ClePub    []byte
+	Alg       int64
+	BE        bool
+	Env       []byte
+	Etiquette []byte
 }
 
-func (s *Service) nComptes() (int, error) {
+// Limites des passkeys (conception §6.3).
+const (
+	CredIDMax    = 1023
+	ClePubMax    = 1024
+	PasskeysMax  = 10
+	EnveloppeLen = 60
+)
+
+func algOK(a int64) bool { return a == -7 || a == -8 || a == -257 }
+
+// valide : forme de ce qui entre en base (les CHECK du schéma le redisent).
+func (p Passkey) valide() bool {
+	return len(p.CredID) >= 1 && len(p.CredID) <= CredIDMax && len(p.ClePub) >= 1 && len(p.ClePub) <= ClePubMax &&
+		algOK(p.Alg) && (p.Env == nil || len(p.Env) == EnveloppeLen) && (p.Etiquette == nil || len(p.Etiquette) == 64)
+}
+
+// NouveauCompte : ce que l'appareil envoie à inscription/fin, hors passkey (conception §6.4) :
+// pseudo canonique (jamais gardé : seulement son empreinte), v_r, Env_r, les deux coffres.
+// Rien qui ouvre un coffre : ni sortie PRF, ni R, ni A_r, ni K_compte.
+type NouveauCompte struct {
+	PCanon     []byte
+	VR         [32]byte
+	EnvR       [60]byte
+	BlobProfil []byte
+	BlobPrive  []byte
+}
+
+// nulle : la passkey ou les blobs en NULL SQL.
+func nulle(b []byte) any {
+	if b == nil {
+		return nil
+	}
+	return b
+}
+
+// creerCompteTx : compte h, sa première passkey et une session, dans la transaction tx. Pseudo
+// pris, réservé ou interdit : ErrPseudoPris ; v_r déjà pris : ErrRequete (128 bits aléatoires :
+// une erreur du client, jamais un hasard) ; cred_id déjà connu : ErrRequete ; plafond
+// SHH_COMPTES_MAX : ErrBusy.
+func (s *Service) creerCompteTx(tx *sql.Tx, h [16]byte, nc NouveauCompte, pk Passkey, o OptionsSession, now time.Time) ([32]byte, error) {
+	if !o.valide() || !pk.valide() || !coffreValide(Profil, nc.BlobProfil, 1) || !coffreValide(Prive, nc.BlobPrive, 1) {
+		return [32]byte{}, ErrRequete
+	}
+	pe, err := s.empreintePseudo(nc.PCanon)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	if pris, err := pseudoPrisTx(tx, pe); err != nil {
+		return [32]byte{}, err
+	} else if pris || pe == [32]byte{} {
+		return [32]byte{}, ErrPseudoPris
+	}
+	var x int
+	for _, q := range []struct {
+		sql string
+		arg []byte
+	}{{`SELECT 1 FROM comptes WHERE v_r=?`, nc.VR[:]}, {`SELECT 1 FROM passkeys WHERE cred_id=?`, pk.CredID},
+		{`SELECT 1 FROM comptes WHERE h=?`, h[:]}} {
+		switch err := tx.QueryRow(q.sql, q.arg).Scan(&x); {
+		case err == nil:
+			return [32]byte{}, ErrRequete
+		case !errors.Is(err, sql.ErrNoRows):
+			return [32]byte{}, err
+		}
+	}
 	var n int
-	err := s.db.QueryRow(`SELECT count(*) FROM comptes`).Scan(&n)
-	return n, err
+	if err := tx.QueryRow(`SELECT count(*) FROM comptes`).Scan(&n); err != nil {
+		return [32]byte{}, err
+	}
+	if n >= s.max {
+		return [32]byte{}, ErrBusy
+	}
+	j, m := jourDe(now), moisDe(now)
+	if _, err := tx.Exec(`INSERT INTO comptes(h, p_empreinte, pseudo_jour, v_r, env_r, blob_profil, gen_profil,
+		blob_prive, gen_prive, cree_jour, compte_des, vu_mois) VALUES(?,?,0,?,?,?,1,?,1,?,?,?)`,
+		h[:], pe[:], nc.VR[:], nc.EnvR[:], nc.BlobProfil, nc.BlobPrive, j, j, m); err != nil {
+		return [32]byte{}, err
+	}
+	if err := insererPasskeyTx(tx, h, pk, now); err != nil {
+		return [32]byte{}, err
+	}
+	return s.creerSessionTx(tx, h, o, false, now)
+}
+
+// insererPasskeyTx : une ligne passkeys pour h (mois d'ajout seulement).
+func insererPasskeyTx(tx *sql.Tx, h [16]byte, pk Passkey, now time.Time) error {
+	_, err := tx.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, env, etiquette, ajoutee_mois)
+		VALUES(?,?,?,?,?,?,?,?)`, pk.CredID, h[:], pk.ClePub, pk.Alg, boolInt(pk.BE), nulle(pk.Env),
+		nulle(pk.Etiquette), moisDe(now))
+	return err
+}
+
+// bannieTx : un bannissement actif et non échu pour le compte h (suspendu ou échu : non) ; rend
+// son échéance et son motif.
+func bannieTx(q interface {
+	QueryRow(string, ...any) *sql.Row
+}, h [16]byte, now time.Time) (jusqu, motif int64, banni bool, err error) {
+	err = q.QueryRow(`SELECT jusqu_jour, motif FROM bannis WHERE h=? AND actif=1 AND jusqu_jour>?`,
+		h[:], jourDe(now)).Scan(&jusqu, &motif)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, false, nil
+	}
+	return jusqu, motif, err == nil, err
 }
 
 // tx : f dans une transaction (validée si f ne rend pas d'erreur).
@@ -528,14 +305,24 @@ func pseudoPrisTx(tx *sql.Tx, pe [32]byte) (bool, error) {
 	return err == nil, err
 }
 
-// pseudoLibre : p_canon libre ? Réservé ou interdit : pris (même réponse, même requête).
-func (s *Service) pseudoLibre(pCanon []byte) (bool, error) {
+// empreintePseudo : p_empreinte de p_canon ; forme fausse : ErrRequete ; réservé ou interdit :
+// l'empreinte nulle (même réponse qu'un pseudo pris, après les mêmes contrôles).
+func (s *Service) empreintePseudo(pCanon []byte) ([32]byte, error) {
 	pe, err := s.cles.EmpreintePseudo(pCanon)
 	switch {
 	case errors.Is(err, ErrPseudoCanon):
-		return false, ErrRequete
+		return [32]byte{}, ErrRequete
 	case err != nil:
-		pe = [32]byte{}
+		return [32]byte{}, nil
+	}
+	return pe, nil
+}
+
+// pseudoLibre : p_canon libre ? Réservé ou interdit : pris (même réponse, même requête).
+func (s *Service) pseudoLibre(pCanon []byte) (bool, error) {
+	pe, err := s.empreintePseudo(pCanon)
+	if err != nil {
+		return false, err
 	}
 	var pris bool
 	err = s.tx(func(tx *sql.Tx) error {
@@ -547,14 +334,16 @@ func (s *Service) pseudoLibre(pCanon []byte) (bool, error) {
 }
 
 // PseudoVerifierEtape : pseudo/verifier pendant une inscription (étape vivante), 30 par heure
-// et par étape (§21.5).
+// et par étape (§21.5). Libre : le pseudo est réservé à cette étape jusqu'à son échéance
+// (conception du compte par passkey §6.4 : évite une passkey créée pour un pseudo pris
+// entre-temps) ; réservé par une autre inscription vivante : pris (même réponse).
 func (s *Service) PseudoVerifierEtape(jeton [32]byte, pCanon []byte) (bool, error) {
 	if len(pCanon) == 0 {
 		return false, ErrRequete
 	}
 	now := s.now()
 	s.mu.Lock()
-	e := s.et.trouver(jeton, etapeInscription, now)
+	e := s.et.trouverLocked(jeton, etapeInscription, now)
 	s.mu.Unlock()
 	if e == nil {
 		return false, ErrEtape
@@ -563,7 +352,24 @@ func (s *Service) PseudoVerifierEtape(jeton [32]byte, pCanon []byte) (bool, erro
 	if !s.lim.AllowPseudoVerifier(k[:]) {
 		return false, ErrLimit{heureSuivante(now)}
 	}
-	return s.pseudoLibre(pCanon)
+	libre, err := s.pseudoLibre(pCanon)
+	if err != nil || !libre {
+		return false, err
+	}
+	pe, err := s.empreintePseudo(pCanon)
+	if err != nil {
+		return false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.et.trouverLocked(jeton, etapeInscription, now) == nil {
+		return false, ErrEtape
+	}
+	if s.pseudoReserveLocked(pe, k, now) {
+		return false, nil
+	}
+	e.pe = pe
+	return true, nil
 }
 
 // PseudoVerifier : pseudo/verifier avec une session, 30 par heure et par compte. Le pseudo du
@@ -601,16 +407,13 @@ const PseudoEcart = 123 * jourS
 
 // ChangerPseudo : au plus un changement par PseudoEcart, l'attente ne courant qu'à partir d'un
 // premier changement (décision du propriétaire, 14 novembre : pseudo_jour vaut 0 tant que le
-// pseudo n'a jamais changé ; le premier, depuis le pseudo provisoire de l'inscription, est donc
-// libre) ; l'ancien pseudo est libéré aussitôt (§21.5). Pris, réservé ou interdit : ErrPseudoPris
-// (le nouveau doit toujours être libre). Le même pseudo que le sien : rien à faire.
+// pseudo n'a jamais changé ; le premier, depuis le pseudo de l'inscription, est donc libre) ;
+// l'ancien pseudo est libéré aussitôt (§21.5). Pris, réservé ou interdit : ErrPseudoPris (le
+// nouveau doit toujours être libre). Le même pseudo que le sien : rien à faire.
 func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
-	pe, err := s.cles.EmpreintePseudo(pCanon)
-	switch {
-	case errors.Is(err, ErrPseudoCanon):
-		return ErrRequete
-	case err != nil:
-		pe = [32]byte{}
+	pe, err := s.empreintePseudo(pCanon)
+	if err != nil {
+		return err
 	}
 	now := s.now()
 	return s.tx(func(tx *sql.Tx) error {
@@ -640,4 +443,42 @@ func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
 		_, err := tx.Exec(`UPDATE comptes SET p_empreinte=?, pseudo_jour=? WHERE h=?`, pe[:], jourDe(now), c.H[:])
 		return err
 	})
+}
+
+// fermerSessionsTx : ferme les sessions du compte h, sauf sauf (nil : toutes) ; rend leurs t_v
+// (activité à oublier après la transaction).
+func fermerSessionsTx(tx *sql.Tx, h [16]byte, sauf *[32]byte) ([][32]byte, error) {
+	rows, err := tx.Query(`SELECT t_v FROM sessions WHERE h=?`, h[:])
+	if err != nil {
+		return nil, err
+	}
+	var tvs [][32]byte
+	for rows.Next() {
+		var tv []byte
+		if err := rows.Scan(&tv); err != nil || len(tv) != 32 {
+			rows.Close()
+			return nil, errors.Join(err, errors.New("compte : t_v"))
+		}
+		if sauf == nil || [32]byte(tv) != *sauf {
+			tvs = append(tvs, [32]byte(tv))
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, tv := range tvs {
+		if _, err := tx.Exec(`DELETE FROM sessions WHERE t_v=?`, tv[:]); err != nil {
+			return nil, err
+		}
+	}
+	return tvs, nil
+}
+
+// vider : WAL replié et ramené à zéro après un effacement (§8.2 : WAL vidé après chaque
+// effacement ; secure_delete a déjà écrasé les pages libérées). Au mieux : une erreur (base
+// occupée par la commande d'administration) laisse le travail au prochain point de reprise et
+// à la passe quotidienne (Effacer).
+func (s *Service) vider() {
+	s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
 }

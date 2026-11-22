@@ -6,6 +6,7 @@
 package internal_test
 
 import (
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -83,27 +84,22 @@ var allowedMaps = map[string]string{
 	"salon/pieces.go:lus":               "§9.5 budget de lecture par (jeton de membre, pièce) (§24, M1), effacé avec la pièce",
 	"salon/manager.go:vivants":          "§9.5 salons vivants par bloc (§39.3.6, 12 novembre) : id interne → clé de bloc, jusqu'à la fin du salon",
 	"salon/manager.go:parBloc":          "§9.5 salons vivants par bloc (§39.3.6, 12 novembre) : clé de bloc → nombre, jusqu'à la fin du salon",
-	"compte/jetables.go:jetables":       "constante (liste de domaines jetables, conception du compte §5.3), lue une fois au démarrage, aucun compteur",
-	// Limites du compte (conception du compte §8.3, §8.8 ; plan lot 3) : clés HMAC du jour, aucune
-	// adresse ni empreinte en clair, vidées à l'heure ou à minuit UTC.
-	"limits/limits.go:insc64":    "conception du compte §8.8 inscriptions du jour par connexion (3), minuit UTC",
-	"limits/limits.go:insc48":    "conception du compte §8.8 inscriptions du jour par /48 (10), minuit UTC",
-	"limits/limits.go:mail64":    "conception du compte §8.8 e-mails du jour par connexion (10), minuit UTC",
-	"limits/limits.go:mail48":    "plan lot 3 e-mails du jour par /48 (30), minuit UTC",
-	"limits/limits.go:mailAdr":   "conception du compte §8.3, §8.8 e-mails du jour par adresse et par motif (9, audit S4), HMAC du jour de e_canon, minuit UTC",
-	"limits/limits.go:mailAdr48": "conception du compte §8.8 e-mails du jour par (adresse, /48) et par motif (3, audit S4), HMAC du jour, minuit UTC",
-	"limits/limits.go:echec64":   "conception du compte §8.8 échecs de connexion de l'heure par connexion (20)",
-	"limits/limits.go:echec48":   "conception du compte §8.8 échecs de connexion de l'heure par /48 (60)",
-	"limits/limits.go:echecCpt":  "conception du compte §8.3, §8.8 échecs de connexion de l'heure par compte (preuve après 5), HMAC du jour de e_canon",
-	"limits/limits.go:totpCpt":   "conception du compte §8.8 échecs TOTP de l'heure par compte (10), HMAC du jour de h",
-	"limits/limits.go:coffreCpt": "conception du compte §8.8, §21.6.2 écritures des coffres de l'heure par compte (60), HMAC du jour de h",
+	// Limites du compte (conception du compte §8.8 ; conception du compte par passkey §7.2) : clés
+	// HMAC du jour, aucune adresse IP ni h en clair, vidées à la minute, à l'heure ou à minuit UTC.
+	"limits/limits.go:insc64":    "conception du compte par passkey §7.2 comptes créés du jour par connexion (3), minuit UTC",
+	"limits/limits.go:insc48":    "conception du compte par passkey §7.2 comptes créés du jour par /48 (10), minuit UTC",
+	"limits/limits.go:inscD64":   "conception du compte par passkey §7.2 inscription/debut de l'heure par connexion (20)",
+	"limits/limits.go:cnx64":     "conception du compte par passkey §7.2 connexion/debut de la minute par connexion (60)",
+	"limits/limits.go:echec64":   "conception du compte par passkey §7.2 échecs de connexion par passkey de l'heure par connexion (20)",
+	"limits/limits.go:echec48":   "conception du compte par passkey §7.2 échecs de connexion par passkey de l'heure par /48 (60)",
+	"limits/limits.go:recup64":   "conception du compte par passkey §7.2 essais de la clé de récupération de l'heure par connexion (10)",
+	"limits/limits.go:recup48":   "conception du compte par passkey §7.2 essais de la clé de récupération de l'heure par /48 (30)",
+	"limits/limits.go:coffreCpt": "conception du compte §8.8, §21.6.2 écritures des coffres de l'heure par compte (60) et ajouts de passkey (10, conception du compte par passkey §7.2), HMAC du jour de h",
 	"limits/limits.go:pseudoCpt": "conception du compte §21.5 vérifications de pseudo de l'heure (30), HMAC du jour de h ou de l'étape",
-	// Compte (conception du compte §8.3 ; plan lot 4) : mémoire seulement, perdue au redémarrage.
-	"compte/etapes.go:m":   "conception du compte §8.3 étapes en attente (inscription : e_canon, e_envoi, HMAC du code, essais ; connexion : double authentification), clé SHA-256 du jeton d'étape, 15 min (5 min), 20 000 au plus ; aucune adresse en clair",
-	"compte/sessions.go:m": "conception du compte §8.3 dernier usage et « session récente » d'une session, clé t_v (SHA-256 du jeton), oublié 2 h sans usage",
-	// Lot 5 : rejeu de la double authentification.
+	// Compte (conception du compte par passkey §6.2) : mémoire seulement, perdue au redémarrage.
+	"compte/defis.go:m":      "conception du compte par passkey §6.2 cérémonies WebAuthn en cours (défi, rp.id, passkeys permises, h tiré, empreinte du pseudo réservé), clé SHA-256 du jeton d'étape, usage unique, 5 min, 20 000 au plus ; aucune sortie PRF ni clé",
+	"compte/sessions.go:m":   "conception du compte §8.3 dernier usage et « session récente » d'une session, clé t_v (SHA-256 du jeton), oublié 2 h sans usage",
 	"compte/service.go:refs": "conception du compte §21.6.2 salons du compte (GET salons) : ref aléatoire de 16 octets → h et identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants (et finis depuis moins de 10 min) de chaque compte ; perdue au redémarrage",
-	"compte/service.go:pas":  "conception du compte §8.3 dernier pas TOTP accepté par compte (rejeu), clé h, oublié dès qu'aucun code de ce pas ne peut plus passer (± 1 pas) ; perdu au redémarrage",
 	// Lot 7 : tableau de bord finalisé.
 	"adminui/comptes.go:m": "conception du compte §21.14.3 salons signalés en cours (tableau de bord) : ref aléatoire de 16 octets → identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants signalés ; perdue au redémarrage",
 }
@@ -216,8 +212,9 @@ func TestNoUnlistedCounter(t *testing.T) {
 }
 
 // sortants : appels qui ouvrent une connexion sortante (spec §35.1) ; interdits partout, sauf
-// captcha/recaptcha.go (repli de §26) et, pour le seul client SMTP, internal/courriel/smtp.go
-// (conception du compte §3.2, §15 ; plan lot 3).
+// captcha/recaptcha.go (repli de §26) et internal/paiement/http.go (prestataires de paiement).
+// Plus aucune sortie SMTP depuis le 22 novembre (compte par passkey) : net/smtp est interdit
+// partout.
 var sortants = map[string]bool{
 	"http.Client": true, "http.Get": true, "http.Post": true, "http.PostForm": true, "http.Head": true,
 	"http.DefaultClient": true, "http.NewRequest": true, "http.NewRequestWithContext": true,
@@ -227,11 +224,6 @@ var sortants = map[string]bool{
 	"smtp.Dial": true, "smtp.SendMail": true, "smtp.NewClient": true,
 	"tls.Dial": true, "tls.DialWithDialer": true, "tls.Dialer": true, "tls.Client": true,
 }
-
-// smtpPermis : ce que internal/courriel/smtp.go, et lui seul, peut appeler parmi sortants :
-// la connexion TCP (STARTTLS) ou TLS vers SHH_SMTP_HOST et le client SMTP posé dessus. Rien
-// d'autre : ni client HTTP, ni smtp.SendMail (qui accepterait le texte clair), ni tls.Dial.
-var smtpPermis = map[string]bool{"net.Dialer": true, "tls.Dialer": true, "smtp.NewClient": true}
 
 // paquetsReseau : imports qui ne doivent jamais être renommés (un alias tromperait la recherche
 // par nom de paquet ci-dessous).
@@ -243,24 +235,23 @@ var paquetsReseau = map[string]bool{"net": true, "net/http": true, "net/smtp": t
 // ni net.Dial, ni tls.Dial, ni http.Get ou http.DefaultClient.
 var paiementPermis = map[string]bool{"http.Client": true, "http.Transport": true, "http.NewRequestWithContext": true}
 
-// TestNoOutgoingHTTP : aucun client sortant hors de captcha/recaptcha.go et, pour SMTP
-// seulement, internal/courriel/smtp.go ; pour les prestataires de paiement seulement,
-// internal/paiement/http.go.
+// TestNoOutgoingHTTP : aucun client sortant hors de captcha/recaptcha.go et, pour les
+// prestataires de paiement seulement, internal/paiement/http.go ; aucun client SMTP nulle part
+// (plus d'exception SMTP, conception du compte par passkey §8).
 func TestNoOutgoingHTTP(t *testing.T) {
-	smtpVu, paiementVu := false, false
+	paiementVu := false
 	for _, g := range sources(t, "..") {
 		if strings.HasSuffix(g.rel, "internal/captcha/recaptcha.go") {
 			continue
 		}
-		smtpGo := g.rel == "internal/courriel/smtp.go"
 		paiementGo := g.rel == "internal/paiement/http.go"
 		for _, imp := range g.f.Imports {
 			p, _ := strconv.Unquote(imp.Path.Value)
 			if paquetsReseau[p] && imp.Name != nil {
 				t.Errorf("%s : import renommé de %s (interdit : la recherche des clients sortants se fait par nom)", g.rel, p)
 			}
-			if p == "net/smtp" && !smtpGo {
-				t.Errorf("%s : net/smtp hors de internal/courriel/smtp.go (seul client SMTP)", g.rel)
+			if p == "net/smtp" {
+				t.Errorf("%s : net/smtp (plus aucune sortie SMTP depuis le 22 novembre)", g.rel)
 			}
 		}
 		ast.Inspect(g.f, func(n ast.Node) bool {
@@ -271,8 +262,6 @@ func TestNoOutgoingHTTP(t *testing.T) {
 			if id, ok := sel.X.(*ast.Ident); ok {
 				k := id.Name + "." + sel.Sel.Name
 				switch {
-				case smtpGo && smtpPermis[k]:
-					smtpVu = smtpVu || k == "smtp.NewClient"
 				case paiementGo && paiementPermis[k]:
 					paiementVu = paiementVu || k == "http.Client"
 				case sortants[k]:
@@ -281,9 +270,6 @@ func TestNoOutgoingHTTP(t *testing.T) {
 			}
 			return true
 		})
-	}
-	if !smtpVu {
-		t.Error("internal/courriel/smtp.go n'appelle plus smtp.NewClient : exemption périmée, à retirer")
 	}
 	if !paiementVu {
 		t.Error("internal/paiement/http.go ne crée plus de http.Client : exemption périmée, à retirer")
@@ -339,46 +325,18 @@ func litChamp(e ast.Expr, nom string) bool {
 	return vu
 }
 
-// TestCourrielSeulementAvecComptes : avec SHH_COMPTES=0, aucune connexion sortante n'est
-// possible. Le seul envoyeur (courriel.Nouveau) n'est créé qu'à l'intérieur d'un « if » qui
-// lit Comptes (cfg.Comptes), dans son corps « alors », hors du paquet courriel et de ses tests.
-func TestCourrielSeulementAvecComptes(t *testing.T) {
-	for _, g := range sources(t, "..") {
-		if strings.HasPrefix(g.rel, "internal/courriel/") {
-			continue
-		}
-		var pile []ast.Node
-		ast.Inspect(g.f, func(n ast.Node) bool {
-			if n == nil {
-				pile = pile[:len(pile)-1]
-				return true
-			}
-			pile = append(pile, n)
-			sel, ok := n.(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
-			if id, ok := sel.X.(*ast.Ident); !ok || id.Name != "courriel" || sel.Sel.Name != "Nouveau" {
-				return true
-			}
-			for i := len(pile) - 2; i >= 0; i-- {
-				if st, ok := pile[i].(*ast.IfStmt); ok && litComptes(st.Cond) && pile[i+1] == st.Body {
-					return true
-				}
-			}
-			t.Errorf("%s : courriel.Nouveau hors d'un « if …Comptes » (avec SHH_COMPTES=0, aucune sortie)", g.rel)
-			return true
-		})
+// TestPlusDeCourriel : le paquet internal/courriel n'existe plus, et aucune source du serveur
+// n'importe un paquet d'envoi d'e-mails (conception du compte par passkey §8).
+func TestPlusDeCourriel(t *testing.T) {
+	if _, err := os.Stat("courriel"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("internal/courriel existe encore :", err)
 	}
-}
-
-func litComptes(e ast.Expr) bool {
-	vu := false
-	ast.Inspect(e, func(n ast.Node) bool {
-		if s, ok := n.(*ast.SelectorExpr); ok && s.Sel.Name == "Comptes" {
-			vu = true
+	for _, g := range sources(t, "..") {
+		for _, imp := range g.f.Imports {
+			p, _ := strconv.Unquote(imp.Path.Value)
+			if strings.HasSuffix(p, "/courriel") || p == "net/smtp" || p == "net/mail" {
+				t.Errorf("%s : import %s (plus d'e-mail)", g.rel, p)
+			}
 		}
-		return !vu
-	})
-	return vu
+	}
 }
