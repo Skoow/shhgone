@@ -108,6 +108,8 @@ func TestPasskeysDuCompteHTTP(t *testing.T) {
 	expect(t, e.do(req{method: "POST", path: "/api/compte/passkeys/retirer", hdr: sess(S), body: mustJSON(map[string]any{"cred_id": id2})}), 403, `{"error":"recent"}`)
 	expect(t, e.do(req{method: "POST", path: "/api/compte/recup/renouveler", hdr: sess(S), body: mustJSON(map[string]any{
 		"v_r": enc.EncodeToString(rnd(32)), "env_r": enc.EncodeToString(rnd(60))})}), 403, `{"error":"recent"}`)
+	expect(t, e.do(req{method: "POST", path: "/api/compte/passkeys/enveloppe", hdr: sess(S),
+		body: mustJSON(map[string]any{"env": enc.EncodeToString(rnd(60))})}), 403, `{"error":"recent"}`)
 	// Reauth avec la passkey d'un autre compte : identifiants ; avec la sienne : récente.
 	if code, body := e.reauth(t, S, autre.auth, autre.pk); code != 403 || body != `{"error":"identifiants"}` {
 		t.Fatal("reauth par une passkey d'un autre compte :", code, body)

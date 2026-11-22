@@ -235,6 +235,11 @@ var ErrEnveloppesMax = errors.New("enveloppes_max")
 // cinquième : ErrEnveloppesMax. Aucune route n'en retire : elles partent avec la passkey (une
 // session volée ne peut pas effacer le bon chemin d'ouverture).
 func (s *Service) PasskeysEnveloppe(c Courante, env []byte) error {
+	// Session récente exigée : sinon une session volée remplirait les 4 places d'enveloppes
+	// inutiles, et aucune route ne les retire (connexion/fin et reauth/fin en donnent une).
+	if !c.Recente {
+		return ErrRecent
+	}
 	if len(env) != EnveloppeLen {
 		return ErrRequete
 	}
