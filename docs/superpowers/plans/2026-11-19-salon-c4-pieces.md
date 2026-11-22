@@ -10,7 +10,7 @@
 
 **Spec :** salon v3 §3.4, §4.4, §7.2, §10 (vocaux, lien pièce ↔ trame), §14.3, §14.6 ; spec principale §39.5 ; « Protocole » et Task 13 du plan C-2.
 
-## Points à trancher (décisions prises par défaut, à valider par le propriétaire)
+## Points tranchés (décisions prises par défaut, validées par le propriétaire le 22 novembre)
 
 1. **Élevée, manque du moteur — la graine R d'une pièce.** La v3 §3.4 dit « R voyage dans un message MLS », mais le moteur des partages ne rendait jamais R à JavaScript (graine opaque). **Corrigé ici :** `seedBytes(seed)` (copie de R, à effacer) et `seedFromBytes(r)` (graine d'ouverture seulement, comme après `open` : elle ne chiffre jamais de manifeste) dans `engine/wasm` ; jamais appelées par les partages (règle de sources). Coût : quelques centaines d'octets du module des partages (150 086 → mesuré dans le rapport, plafond 156 000).
 2. **Moyenne — assemblage du conteneur.** Le serveur des pièces n'accepte que des segments entiers (pas de `?from`) : le client assemble chaque segment (en-tête, morceaux de l'élément, morceau du manifeste, aléa ailleurs) dans un tampon de 4 Mio au plus, puis `finalize {fill_from: 0, fill_to: 0}`.

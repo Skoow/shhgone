@@ -8,7 +8,7 @@
 
 **Spec :** salon v3 §3.6.1 (exigences 9, 17, 22 à 36), §5, §9 point 4, §14.4, §14.7, §15 ; spec principale §39.5, §39.13 ; `2026-11-13-salon-places-duree-design.md`.
 
-## Points à trancher (décisions prises par défaut, à valider par le propriétaire)
+## Points tranchés (décisions prises par défaut, validées par le propriétaire le 22 novembre)
 
 1. **Moyenne — règle courante d'un arrivant.** Un arrivant ne lit rien d'avant son entrée, donc pas le dernier message `regle`. **Retenu :** la règle courante est celle du dernier message `regle` lu, sinon celle du dernier message reçu, sinon 5 min (défaut de l'écran) ; chaque message garde la sienne (elle voyage avec lui).
 2. **Moyenne — renouvellement et codes (§14.7, H2).** Le renouvellement `0x10` passe par un `Salon` neuf (exigence 22) : les codes des invités changent (nouvelle identité), celui du créateur non (clé de rôle). L'écran l'annonce (« Les codes de vérification ont changé avec le renouvellement ») et annule les vérifications. Le `0x10` n'est pas signé par le créateur (H2, non codé).
