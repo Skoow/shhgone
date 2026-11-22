@@ -366,6 +366,11 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     // L'ancienne page de la créatrice est délogée ; la nouvelle a les droits (exclure C).
     await expect(titre(page, "Fin du salon")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Votre place de créateur a été reprise", { exact: false })).toBeVisible();
+    // Restes, point 3 : lien de gestion encore dans l'historique local de A → « Détruire le salon » proposé.
+    await expect(bouton(page, "Détruire le salon")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Pour détruire le salon, ouvrez votre lien de gestion", { exact: false })).toHaveCount(0);
+    await capture(page, "salon-fin-deloge");
+    expect(await axe(page)).toEqual([]);
     if (!(await pageE.getByRole("complementary", { name: "Participants" }).isVisible())) await bouton(pageE, "Participants").click();
     await expect(pageE.getByRole("button", { name: `Exclure ${pseudoC}`, exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(pageE.getByText("Vous avez créé ce salon\u202f?")).toHaveCount(0);
@@ -405,8 +410,8 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     ];
     const dir = shh.server.dataDir;
     expect(scanDir(dir, reperes)).toEqual([]);
-    // Destruction par le lien de gestion ouvert SEUL (exigence C-3 32), dans un autre navigateur :
-    // il ne fait entrer personne, dit l'état du salon, détruit. Fin chez A, C et E, plus rien sur le disque.
+    // Lien de gestion ouvert SEUL (exigence C-3 32), dans un autre navigateur : il ne fait entrer
+    // personne, dit l'état du salon, propose de le détruire (confirmation annulée ici).
     const ctxD: BrowserContext = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
     try {
       const pageD = await ctxD.newPage();
@@ -417,11 +422,17 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
       await expect(fil(pageD)).toHaveCount(0);
       expect(await axe(pageD)).toEqual([]);
       await bouton(pageD, "Détruire le salon").first().click();
-      await pageD.getByRole("button", { name: "Détruire le salon" }).last().click(); // confirmation
-      await expect(titre(pageD, "Fin du salon")).toBeVisible({ timeout: 30_000 });
+      await bouton(pageD, "Annuler").click(); // confirmation ouverte, puis annulée
+      await expect(bouton(pageD, "Détruire le salon")).toBeVisible();
     } finally {
       await ctxD.close();
     }
+    // Destruction par la créatrice délogée, depuis son écran de fin (restes, point 3) : seul
+    // J_gestion part ; fin chez C et E, plus rien sur le disque.
+    await bouton(page, "Détruire le salon").first().click();
+    await page.getByRole("button", { name: "Détruire le salon" }).last().click(); // confirmation
+    await expect(page.getByText("Ce salon a été détruit.", { exact: false })).toBeVisible({ timeout: 30_000 });
+    await expect(bouton(page, "Reprendre la main ici")).toHaveCount(0);
     await expect(titre(pageC, "Fin du salon")).toBeVisible({ timeout: 30_000 });
     await expect(pageC.getByText("Ce salon a été détruit.", { exact: false })).toBeVisible();
     await capture(pageC, "salon-fin");

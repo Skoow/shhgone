@@ -80,6 +80,12 @@ export const vue = $state({
    * « horsligne », « fait », ou null. Le secret lui-même n'est jamais dans cet état.
    */
   gestionCollee: null as "proposee" | "deja" | "autre" | "horsligne" | "erreur" | "fait" | null,
+  /**
+   * Créateur délogé (écran de fin) : « possible » si le lien de gestion est encore sur l'appareil
+   * (historique local, ou lien de gestion ouvert dans cet onglet) ; « lien » sinon (il faut
+   * rouvrir le lien de gestion) ; null hors de ce cas.
+   */
+  detruireFin: null as "possible" | "lien" | null,
 });
 
 /**
@@ -87,6 +93,49 @@ export const vue = $state({
  * une clé de lien n'y va jamais) ; oublié avec le salon (oublier).
  */
 let lienReprise: string | null = null;
+/**
+ * S_gestion encore sur l'appareil pour ce lien d'invitation : historique local, sinon lien de
+ * gestion ouvert seul dans cet onglet (« #s », gardé en mémoire). Copie à mettre à zéro, ou undefined.
+ */
+async function gestionLocale(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  return (await gestionGardee(kLien).catch(() => undefined)) ?? gestionColle?.slice();
+}
+
+/**
+ * Créateur délogé (exigence C-3 35) : « Détruire le salon » depuis l'écran de fin, avec le lien de
+ * gestion encore sur l'appareil (relu à la demande, jamais gardé pour cela) ; seul J_gestion part.
+ * Rend vrai si le salon est détruit.
+ */
+export async function detruireApresDelogement(): Promise<boolean> {
+  const f = lienReprise ? lireFragment(lienReprise.slice(lienReprise.lastIndexOf("#"))) : null;
+  if (!f) return false;
+  const g = await gestionLocale(f.cle);
+  f.cle.fill(0);
+  if (!g) {
+    vue.detruireFin = "lien";
+    return false;
+  }
+  const eng = s?.eng ?? (await loadSalonEngine().catch(() => null));
+  if (!eng) {
+    g.fill(0);
+    return false;
+  }
+  const j = eng.jetonGestion(g);
+  g.fill(0);
+  try {
+    await api.detruire(net(), { jGestion: j });
+    vue.fin = "detruit";
+    vue.reprise = false;
+    vue.detruireFin = null;
+    lienReprise = null;
+    return true;
+  } catch {
+    return false;
+  } finally {
+    j.fill(0);
+  }
+}
+
 /** « Reprendre la main ici » : rouvre le lien d'invitation (mot de passe redemandé). */
 export function reprendreLaMain(): void {
   const l = lienReprise;
@@ -148,7 +197,7 @@ export function oublier(): void {
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, reprise: false, appels: false, gestionCollee: null });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, reprise: false, appels: false, gestionCollee: null, detruireFin: null });
   lienReprise = null;
   oublierGestionCollee();
 }
@@ -541,6 +590,17 @@ function surEvenement(x: Session, ev: EvClient): void {
       // rouvre le lien d'invitation (mot de passe redemandé, lien de gestion relu dans l'historique).
       lienReprise = ev.raison === "remplace" && x.sGestion ? lienSalon(location.origin, "c", x.kLien, import.meta.env.BASE_URL) : null;
       vue.reprise = lienReprise !== null;
+      // « Détruire le salon » proposé si le lien de gestion est encore sur l'appareil (restes, point 3).
+      vue.detruireFin = null;
+      if (lienReprise) {
+        const k = x.kLien.slice();
+        void gestionLocale(k)
+          .then((g) => {
+            if (s === x && vue.reprise) vue.detruireFin = g ? "possible" : "lien";
+            g?.fill(0);
+          })
+          .finally(() => k.fill(0));
+      }
       // Secrets effacés tout de suite ; ce qui est à l'écran reste jusqu'à ce que la personne parte
       // (sauf exclusion : tout disparaît, spec §39.13.1b).
       x.client = undefined;
