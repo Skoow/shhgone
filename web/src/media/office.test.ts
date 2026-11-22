@@ -200,7 +200,7 @@ describe("bureautique (spec §35.2)", () => {
     const src = await sourceParts("meta.odt");
     const entries = [...src].map(([n, b]): [string, Uint8Array<ArrayBuffer>, { store?: boolean }] => [n, b as Uint8Array<ArrayBuffer>, { store: n === "mimetype" }]);
     entries.push(["settings.xml", new TextEncoder().encode(settings), {}]);
-    const { parts, text } = await open(await clean("s.odt", zipBytes(entries)));
+    const { text } = await open(await clean("s.odt", zipBytes(entries)));
     expect(text("settings.xml")).toBe(settings);
   });
 

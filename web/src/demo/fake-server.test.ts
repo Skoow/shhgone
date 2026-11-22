@@ -1,7 +1,7 @@
 // Fidélité du faux serveur de la démo (UI §14.3, A44) : le VRAI client (createShare,
 // openShare, destroyShare, shareStatus) tourne contre lui, avec les cas d'erreur de la spec §13,
 // et ses requêtes subissent le contrôle du test « le serveur ne voit rien ».
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { findIn, needle } from "../../e2e/scan";
 import { CHUNK_CT, HEADER, b64u, segmentSize, utf8 } from "../engine/pure";
 import {

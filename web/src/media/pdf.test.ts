@@ -1,19 +1,14 @@
 // Nettoyage des PDF (spec §35.2, Task 9b) sur les fichiers d'essai de scripts/gen-fixtures.mjs.
 // La lisibilité se vérifie par la structure (chaque entrée de chaque table xref pointe toujours
-// sur « N G obj », même longueur, texte de page intact) ; les images, par le décodeur de pdf.js.
+// sur « N G obj », même longueur, texte de page intact) ; les images intégrées restent octet pour
+// octet (décision du propriétaire, 10 novembre).
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { cleanJpeg } from "./jpeg";
 import { cleanPdf } from "./pdf";
 import { stripMetadata, type StripResult } from "./strip";
 import { found } from "./test-markers";
 
-// Décodeur JPEG de pdf.js (déjà en dépendance, sans déclaration de types) : preuve que les
-// images neutralisées en place restent décodables, pixels identiques.
-const DECODERS = "pdfjs-dist/image_decoders/pdf.image_decoders.mjs";
-type Jpeg = { parse(b: Uint8Array): void; width: number; height: number; getData(o: { width: number; height: number; forceRGB: boolean }): Uint8ClampedArray };
-const { JpegImage } = (await import(/* @vite-ignore */ DECODERS)) as { JpegImage: new () => Jpeg };
 const fx = (n: string) => new Uint8Array(readFileSync(new URL(`./fixtures/${n}`, import.meta.url)));
 /** Propriétés du document (/Info des révisions, XMP du catalogue) : retirées. */
 const MARKERS = ["ReperAuteur", "ReperAncien", "ReperCreateur", "ReperLogiciel", "20010203", "FEFF005200650070"];
@@ -152,26 +147,6 @@ function imagePdf(filter: string, img: Uint8Array, extra: [number, string, Uint8
   for (const p of parts) (out.set(p, o), (o += p.length));
   return out;
 }
-const PHOTO = ["ReperMake", "ReperModel", "ReperXMP", "ReperIPTC", "ReperCOM", "ReperJFXX", "ReperMPF", "ReperSecond", "ReperMotion", "2001:02:03"];
-const GPS = new Uint8Array([0, 0, 0, 12, 0, 0, 0, 1, 0, 0, 0, 34, 0, 0, 0, 1, 0, 0, 0, 56, 0, 0, 0, 1]);
-const pixels = (b: Uint8Array) => {
-  const j = new JpegImage();
-  j.parse(b);
-  return j.getData({ width: j.width, height: j.height, forceRGB: true });
-};
-/** Segments APPn (Adobe excepté) et COM retirés d'un JPEG : reste décodable. */
-function withoutApp(b: Uint8Array): Uint8Array {
-  const out: number[] = [0xff, 0xd8];
-  let o = 2;
-  while (b[o + 1] !== 0xda) {
-    const len = (b[o + 2]! << 8) | b[o + 3]!;
-    const m = b[o + 1]!;
-    if (!((m >= 0xe0 && m <= 0xef && m !== 0xee) || m === 0xfe)) out.push(...b.subarray(o, o + 2 + len));
-    o += 2 + len;
-  }
-  return new Uint8Array([...out, ...b.subarray(o)]);
-}
-
 describe("PDF : images intégrées (revue du 10 novembre)", () => {
   const photo = fx("iphone-like.jpg");
 
