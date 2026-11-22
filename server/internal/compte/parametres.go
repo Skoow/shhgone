@@ -32,20 +32,23 @@ func palier(compteDes int64, now time.Time) (string, Limites, string) {
 }
 
 // Etat : GET /api/compte. Une chaîne vide vaut « aucune » (null en JSON) ; BanniMotif 0 : aucun.
-// Plus de TOTP, d'attente de récupération ni de retrait de TOTP (22 novembre).
+// Plus de TOTP, d'attente de récupération ni de retrait de TOTP (22 novembre). BanniID :
+// l'identifiant B-… du bannissement, montré à la personne pour son recours (elle le donne à
+// l'adresse de contact ; le fondateur agit par lui, conception du compte par passkey §7.4).
 type Etat struct {
 	H                          [16]byte
 	CreeLe, Palier, ConfirmeLe string
 	Limites                    Limites
 	SalonsActifs               int
 	Banni                      bool
-	BanniJusqu                 string
+	BanniID, BanniJusqu        string
 	BanniMotif                 uint8
 }
 
 // ligneEtat : ce que l'état et l'export lisent du compte.
 type ligneEtat struct {
 	cree, des, vuMois      int64
+	banniID                []byte
 	banniJusqu, banniMotif int64
 	banni                  bool
 }
@@ -59,7 +62,7 @@ func (s *Service) lireEtat(h [16]byte, now time.Time) (ligneEtat, error) {
 	if err != nil {
 		return l, err
 	}
-	l.banniJusqu, l.banniMotif, l.banni, err = bannieTx(s.db, h, now)
+	l.banniID, l.banniJusqu, l.banniMotif, l.banni, err = bannieTx(s.db, h, now)
 	return l, err
 }
 
@@ -84,7 +87,7 @@ func (s *Service) Etat(c Courante) (Etat, error) {
 	et := Etat{H: c.H, CreeLe: dateJour(l.cree), SalonsActifs: n, Banni: l.banni}
 	et.Palier, et.Limites, et.ConfirmeLe = palier(l.des, now)
 	if l.banni {
-		et.BanniJusqu, et.BanniMotif = dateJour(l.banniJusqu), uint8(l.banniMotif)
+		et.BanniID, et.BanniJusqu, et.BanniMotif = idBan([8]byte(l.banniID)), dateJour(l.banniJusqu), uint8(l.banniMotif)
 	}
 	return et, nil
 }

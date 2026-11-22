@@ -530,11 +530,12 @@ func (a compteAPI) etat(w http.ResponseWriter, r *http.Request) {
 		Limites      limites `json:"limites"`
 		SalonsActifs int     `json:"salons_actifs"`
 		Banni        bool    `json:"banni"`
+		BanniID      *string `json:"banni_id"`
 		BanniJusqu   *string `json:"banni_jusqu"`
 		BanniMotif   *uint8  `json:"banni_motif"`
 	}{b64.EncodeToString(et.H[:]), et.CreeLe, et.Palier, ouNull(et.ConfirmeLe),
 		limites{et.Limites.Salons, et.Limites.Places, et.Limites.Heures}, et.SalonsActifs, et.Banni,
-		ouNull(et.BanniJusqu), motifOuNull(et.BanniMotif)})
+		ouNull(et.BanniID), ouNull(et.BanniJusqu), motifOuNull(et.BanniMotif)})
 }
 
 // export : GET export (§12.4 ; conception du compte par passkey §3.6) : données du serveur :

@@ -175,12 +175,14 @@
 
 ## Lot S7 — Tableau de bord et administration
 
+**État : fait le 22 novembre : la partie Go et la page (plus de recherche ni de bannissement par adresse ; agrégats des passkeys) sont venues au lot S2 ; ce lot ajoute banni_id à GET /api/compte (l'identifiant B-… que la personne bannie donne pour son recours, §7.4).**
+
 *Dépend de : S2.*
 
 **Files :** Modify : `server/internal/adminui/{comptes.go,comptes_test.go,page/*}`, `server/cmd/shhdrop/{admin.go,admin_comptes_test.go}`
 
-- [ ] **Step 1 : tests** — « Bannir par adresse » et « Recherche par adresse » absents ; `shhdrop admin bannis … <id>` agit par l'identifiant `B-…` ; « Bannir par lien de salon » et « par salon signalé » inchangés ; `TestPageSansIdentite` (jamais `h`, empreinte, pseudo, `cred_id`).
-- [ ] **Step 2-5 :** FAIL, implémenter, `make test-go`, commit `refactor(admin): bannissement par compte, plus de recherche par adresse`.
+- [x] **Step 1 : tests** — « Bannir par adresse » et « Recherche par adresse » absents ; `shhdrop admin bannis … <id>` agit par l'identifiant `B-…` ; « Bannir par lien de salon » et « par salon signalé » inchangés ; `TestPageSansIdentite` (jamais `h`, empreinte, pseudo, `cred_id`).
+- [x] **Step 2-5 :** FAIL, implémenter, `make test-go`, commit `refactor(admin): bannissement par compte, plus de recherche par adresse`.
 
 ## Lot S8 — Déploiement : relais SMTP et secrets d'e-mail retirés
 

@@ -279,7 +279,8 @@ func TestVingtBannissementsParHeure(t *testing.T) {
 	b.ban(t, hs[20], 30, 10)
 }
 
-// Le motif et l'échéance sont montrés à la personne à la connexion (GET /api/compte, R16).
+// Le motif, l'échéance et l'identifiant B-… (recours, conception du compte par passkey §7.4) sont
+// montrés à la personne à la connexion (GET /api/compte, R16).
 func TestMotifMontreALaConnexion(t *testing.T) {
 	b := nouveauBanc(t)
 	h, _, _ := b.inscrire(t, "lea")
@@ -289,7 +290,7 @@ func TestMotifMontreALaConnexion(t *testing.T) {
 		t.Fatal(err)
 	}
 	et, err := b.s.Etat(b.session(t, o.Jeton))
-	if err != nil || !et.Banni || et.BanniJusqu != r.Vue.Jusqu || et.BanniMotif != 6 {
+	if err != nil || !et.Banni || et.BanniJusqu != r.Vue.Jusqu || et.BanniMotif != 6 || et.BanniID != r.Vue.ID {
 		t.Fatal(et, err)
 	}
 }

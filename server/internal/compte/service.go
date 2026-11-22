@@ -278,16 +278,16 @@ func insererPasskeyTx(tx *sql.Tx, h [16]byte, pk Passkey, now time.Time) error {
 }
 
 // bannieTx : un bannissement actif et non échu pour le compte h (suspendu ou échu : non) ; rend
-// son échéance et son motif.
+// son identifiant, son échéance et son motif.
 func bannieTx(q interface {
 	QueryRow(string, ...any) *sql.Row
-}, h [16]byte, now time.Time) (jusqu, motif int64, banni bool, err error) {
-	err = q.QueryRow(`SELECT jusqu_jour, motif FROM bannis WHERE h=? AND actif=1 AND jusqu_jour>?`,
-		h[:], jourDe(now)).Scan(&jusqu, &motif)
+}, h [16]byte, now time.Time) (id []byte, jusqu, motif int64, banni bool, err error) {
+	err = q.QueryRow(`SELECT id, jusqu_jour, motif FROM bannis WHERE h=? AND actif=1 AND jusqu_jour>?`,
+		h[:], jourDe(now)).Scan(&id, &jusqu, &motif)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, 0, false, nil
+		return nil, 0, 0, false, nil
 	}
-	return jusqu, motif, err == nil, err
+	return id, jusqu, motif, err == nil && len(id) == 8, err
 }
 
 // tx : f dans une transaction (validée si f ne rend pas d'erreur).
