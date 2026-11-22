@@ -28,7 +28,7 @@
 
 ### Task 2 : pièces (envoi, lecture)
 **Files :** Create `web/src/salon/pieces.ts`, `web/e2e/salon-pieces-ui.test.ts` ; Modify `web/src/salon/api.ts`, `web/src/salon/client.ts`.
-- [ ] test de bout en bout : fichier envoyé par un membre, message `piece` reçu par l'autre, octets relus identiques ; vocal (palier vocal) ; retrait de la pièce avec sa trame.
+- [x] test de bout en bout : fichier envoyé par un membre, message `piece` reçu par l'autre, octets relus identiques ; vocal (palier vocal) ; retrait de la pièce avec sa trame.
 
 ### Task 3 : écrans
 **Files :** Create `web/src/routes/salon/Piece.svelte`, `web/src/routes/salon/Fichiers.svelte` ; Modify `Conversation.svelte`, `Membres.svelte`, `Explication.svelte`, i18n.
@@ -36,7 +36,7 @@
 
 ### Task 4 : Playwright
 **Files :** Modify `web/ui-e2e/salon.spec.ts`.
-- [ ] une image envoyée par A est affichée chez B, un document téléchargé chez B a les mêmes octets ; le nom du fichier et son contenu ne sont pas dans le dossier de données ni dans les sorties du serveur.
+- [x] une image envoyée par A est affichée chez B, un document téléchargé chez B a les mêmes octets ; le nom du fichier et son contenu ne sont pas dans le dossier de données ni dans les sorties du serveur.
 
 ## État (19 novembre)
 
@@ -48,4 +48,4 @@ Version finale (19 novembre), faits et testés :
 - **Point 5, albums et archive** : albums en grille (mise en page seule) ; « Tout sélectionner » et « Télécharger (N) » dans « Fichiers », une archive `.zip` stockée faite sur l'appareil (200 Mio au plus), chaque fichier accusé « Téléchargé ».
 - Plafond brotli du module du salon relevé à 435 000 octets (430 211 mesurés ; justification dans `check-dist.mjs`).
 
-Restes : mode sélection par appui long dans la conversation (seulement dans « Fichiers ») ; lecture d'une vidéo de plus de 16 Mo sans tout charger en mémoire ; fiche « Infos » avec l'heure de chaque accusé.
+Restes (22 novembre) : **faits** : mode sélection par appui long dans la conversation (et « Sélectionner » au clavier, « Télécharger (N) » en .zip, albums compris) ; fiche « Infos » avec l'heure de chaque accusé ; pièces relues par lots de 8 Mio (pic de mémoire d'une vidéo divisé par deux). **Reste, avec sa raison** : lire une vidéo de plus de 16 Mo PENDANT son téléchargement : MediaSource n'accepte que du MP4 fragmenté ou du WebM (les vidéos de téléphone sont du MP4 ordinaire, à réécrire par une bibliothèque de démultiplexage absente du projet) et n'existe pas dans Safari sur iPhone ; la seule voie générale est un service worker qui déchiffre à la demande les requêtes partielles de `<video>`, donc qui tient les clés : à décider par le propriétaire (surface d'attaque nouvelle), non fait. Test manquant signalé (faible) : `seedFromBytes` d'une mauvaise longueur → `graine_invalide` n'a pas de test (case ci-dessus laissée vide).

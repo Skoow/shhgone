@@ -53,15 +53,15 @@ Chaque point : gravité, endroit, problème, correction retenue.
 
 **Files :** Create `web/src/salon/protocole.ts`, `web/src/salon/protocole.test.ts`.
 
-- [ ] **Step 1 :** tests : chaque type serveur de taille exacte est lu (`0x01` siège, heure, trame ; `0x02`/`0x0A` siège et nonce ; `0x03` ; `0x05` raison ; `0x07` présence et minute ; `0x08` ; `0x09` siège `0xFF` → `undefined`, `r` ; `0x0B` secondes ; `0x0C` ; `0x0D` créateur, n annonces de 25 octets ; `0x0E` ; `0x0F` ; `0x10` départ, secondes, places) ; taille fausse ou type inconnu → `null` ; accueil de 51 octets (jeton ‖ `depuis`, reprise = `0xFFFFFFFFFFFFFFFF`) ; `0x01` avec et sans pièce ; `0x02`, `0x03`, `0x04`, `0x05`.
-- [ ] **Step 2 :** FAIL, puis code, puis PASS.
+- [x] **Step 1 :** tests : chaque type serveur de taille exacte est lu (`0x01` siège, heure, trame ; `0x02`/`0x0A` siège et nonce ; `0x03` ; `0x05` raison ; `0x07` présence et minute ; `0x08` ; `0x09` siège `0xFF` → `undefined`, `r` ; `0x0B` secondes ; `0x0C` ; `0x0D` créateur, n annonces de 25 octets ; `0x0E` ; `0x0F` ; `0x10` départ, secondes, places) ; taille fausse ou type inconnu → `null` ; accueil de 51 octets (jeton ‖ `depuis`, reprise = `0xFFFFFFFFFFFFFFFF`) ; `0x01` avec et sans pièce ; `0x02`, `0x03`, `0x04`, `0x05`.
+- [x] **Step 2 :** FAIL, puis code, puis PASS.
 
 ### Task 2 : routes JSON du salon et création avec session
 
 **Files :** Create `web/src/salon/api.ts`, `web/src/salon/api.test.ts` ; Modify `web/src/account/api.ts` (`creerSalon`), `web/src/account/api.test.ts`, `web/src/account/session.svelte.ts` (`creerSalonDuCompte`), `web/src/source-rules.test.ts`.
 
-- [ ] **Step 1 :** tests (fetch simulé) : `meta`, `rejoindre` (avec `X-Shh-Manage` = jeton de gestion pour le créateur), `gestion`, `detruire`, `signaler`, `reglages`, `exclure` ; JSON strict, en-têtes exacts, `credentials: "omit"`, `redirect: "error"` ; erreurs typées `SalonError(status, code, attemptsLeft?, retryS?)` ; coupure → `Error("reseau")`. `account/api.ts creerSalon` : `X-Shh-Session` ajouté aux en-têtes du salon, réponse `{ expires_in_s }` ; refus `palier` (409, `salons`, `places`, `heures`), `banni`, `compte_requis`.
-- [ ] **Step 2 :** FAIL, code, PASS ; règle de sources : `WebSocket` seulement dans `salon/client.ts`, `fetch` du salon seulement dans `salon/api.ts`.
+- [x] **Step 1 :** tests (fetch simulé) : `meta`, `rejoindre` (avec `X-Shh-Manage` = jeton de gestion pour le créateur), `gestion`, `detruire`, `signaler`, `reglages`, `exclure` ; JSON strict, en-têtes exacts, `credentials: "omit"`, `redirect: "error"` ; erreurs typées `SalonError(status, code, attemptsLeft?, retryS?)` ; coupure → `Error("reseau")`. `account/api.ts creerSalon` : `X-Shh-Session` ajouté aux en-têtes du salon, réponse `{ expires_in_s }` ; refus `palier` (409, `salons`, `places`, `heures`), `banni`, `compte_requis`.
+- [x] **Step 2 :** FAIL, code, PASS ; règle de sources : `WebSocket` seulement dans `salon/client.ts`, `fetch` du salon seulement dans `salon/api.ts`.
 
 ### Task 3 : client du salon
 
@@ -98,8 +98,8 @@ Rôles (repris du client de test `web/e2e/salon-client.ts`, plus les exigences C
 
 **Files :** Create `web/ui-e2e/salon.spec.ts` ; Modify `web/ui-e2e/comptes-site.ts` si besoin, `web/scripts/check-dist.mjs` (+ test) ; `deploy/Dockerfile`, `web/scripts/build-engine.mjs`, `.github/workflows/ci.yml` (point 4).
 
-- [ ] **Step 1 :** test : un compte (inscription par l'interface, faux SMTP), création du salon, lien et mot de passe lus sur « Salon prêt », le créateur entre ; un second contexte de navigateur ouvre le lien, tape le mot de passe, choisit un pseudonyme, entre ; échange de messages dans les deux sens, réaction, réponse, modification, retrait, « écrit », coches « vu », présence ; puis recherche, dans le dossier de données et les sorties du serveur, des textes, pseudonymes, mot de passe, lien et clés : aucun.
-- [ ] **Step 2 :** chromium-desktop et chromium-mobile verts.
+- [x] **Step 1 :** test : un compte (inscription par l'interface, faux SMTP), création du salon, lien et mot de passe lus sur « Salon prêt », le créateur entre ; un second contexte de navigateur ouvre le lien, tape le mot de passe, choisit un pseudonyme, entre ; échange de messages dans les deux sens, réaction, réponse, modification, retrait, « écrit », coches « vu », présence ; puis recherche, dans le dossier de données et les sorties du serveur, des textes, pseudonymes, mot de passe, lien et clés : aucun.
+- [x] **Step 2 :** chromium-desktop et chromium-mobile verts.
 - [ ] **Step 3 :** `npm test`, `npm run check`, `npm run test:e2e`, `build:demo` + `check-dist --demo`, `go vet`, `go test -race` ; commit.
 
 ## État (19 novembre)
