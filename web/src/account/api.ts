@@ -6,11 +6,12 @@
 //   création d'un salon (creerSalon, conception §10.4 ; écrans du salon, plan C-3) ;
 // - JSON strict : clés exactes, jamais `null` (le serveur le refuse), secrets en base64url sans
 //   bourrage ; rien dans l'URL ; sans cookie (credentials: "omit"), sans redirection ;
-// - un seul essai : aucune route du compte n'est rejouée d'elle-même (un code, une écriture de
+// - un seul essai : aucune route du compte n'est rejouée d'elle-même (une écriture de
 //   coffre ou une connexion ne se renvoient qu'à la demande de l'écran).
-// Erreurs : CompteError (code du serveur, essais restants, date, gen, Retry-After) ; coupure
+// Erreurs : CompteError (code du serveur, date, gen, Retry-After) ; coupure
 // réseau : Error("reseau") ; réponse 2xx mal formée : Error("reponse_invalide").
 import { b64u, unb64u } from "../engine/pure";
+import { sansSortiePrf } from "./webauthn";
 
 export type Net = { origin: string; fetch: typeof fetch };
 
@@ -20,7 +21,6 @@ export function netParDefaut(): Net {
 }
 
 export class CompteError extends Error {
-  readonly attemptsLeft?: number;
   readonly jusqu?: string;
   readonly gen?: number;
   readonly retryAfterS?: number;
@@ -29,7 +29,7 @@ export class CompteError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    extra: { attemptsLeft?: number; jusqu?: string; gen?: number; retryAfterS?: number; palier?: { salons: number; places: number; heures: number } } = {},
+    extra: { jusqu?: string; gen?: number; retryAfterS?: number; palier?: { salons: number; places: number; heures: number } } = {},
   ) {
     super(code);
     Object.assign(this, extra);
@@ -75,7 +75,6 @@ async function erreur(r: Response): Promise<CompteError> {
   const int = (x: unknown) => (Number.isSafeInteger(x) ? (x as number) : undefined);
   const ra = r.headers.get("Retry-After")?.trim() ?? "";
   return new CompteError(r.status, typeof j.error === "string" ? j.error : `http_${r.status}`, {
-    attemptsLeft: int(j.attempts_left),
     jusqu: typeof j.jusqu === "string" ? j.jusqu : undefined,
     gen: int(j.gen),
     retryAfterS: int(j.retry_after_s) ?? (/^\d{1,9}$/.test(ra) ? Number(ra) : undefined),
@@ -120,63 +119,89 @@ async function appel(n: Net, method: "GET" | "POST" | "PUT", route: string, opts
   }
 }
 
-// --- Inscription -----------------------------------------------------------------------------
+// --- Inscription (conception du compte par passkey §6.4) ------------------------------------------
 
 /** Preuve anti-robot ALTCHA (mêmes champs que POST /api/shares). */
 export type Preuve = { altcha: string; hp: string; shown_at: string };
 
-export async function inscriptionDebut(n: Net, b: { email: string; langue: string } & Preuve): Promise<{ h: Bytes; etape: string }> {
-  const o = await appel(n, "POST", "inscription/debut", { body: { email: b.email, langue: b.langue, altcha: b.altcha, hp: b.hp, shown_at: b.shown_at } });
-  return { h: octets(o, "h", 16), etape: jeton(o, "etape") };
+/** Options WebAuthn (JSON niveau 3) et étape qui porte le défi (5 min, usage unique). */
+export type Ceremonie = { etape: string; options: Obj };
+
+function ceremonie(o: Obj): Ceremonie {
+  const opts = o.options;
+  if (typeof opts !== "object" || opts === null || Array.isArray(opts)) throw invalide();
+  return { etape: jeton(o, "etape"), options: opts as Obj };
 }
 
-export async function inscriptionRenvoyer(n: Net, etape: string, email: string): Promise<void> {
-  await appel(n, "POST", "inscription/renvoyer", { body: { etape, email } });
+/** Rien de la sortie PRF ne part : credential nettoyé ici aussi (webauthn.ts l'a déjà fait). */
+const cred = (c: Obj) => sansSortiePrf(c);
+const opt = (b: Bytes | null) => (b === null ? "" : b64u(b));
+
+export async function inscriptionDebut(n: Net, p: Preuve): Promise<Ceremonie> {
+  return ceremonie(await appel(n, "POST", "inscription/debut", { body: { altcha: p.altcha, hp: p.hp, shown_at: p.shown_at } }));
 }
 
 export type FinInscription = {
   etape: string;
-  code: string;
-  aAuth: Bytes;
-  envMdp: Bytes;
-  sProfil: Bytes;
+  credential: Obj;
   pCanon: string;
+  /** Enveloppe PRF de la passkey (60 octets) ou null (passkey sans PRF). */
+  env: Bytes | null;
+  vR: Bytes;
+  envR: Bytes;
   blobProfil: Bytes;
   blobPrive: Bytes;
   persistante: boolean;
-  /** Nom d'appareil chiffré (64 octets) ou null (aucun). */
+  /** Nom d'appareil chiffré (64 octets) ou null. */
   etiquette: Bytes | null;
+  /** Libellé de la passkey chiffré (64 octets) ou null. */
+  credEtiquette: Bytes | null;
 };
 
-export async function inscriptionFin(n: Net, b: FinInscription): Promise<{ session: string }> {
+export async function inscriptionFin(n: Net, b: FinInscription): Promise<{ session: string; h: Bytes }> {
   const o = await appel(n, "POST", "inscription/fin", {
     body: {
       etape: b.etape,
-      code: b.code,
-      a_auth: b64u(b.aAuth),
-      env_mdp: b64u(b.envMdp),
-      s_profil: b64u(b.sProfil),
+      credential: cred(b.credential),
       p_canon: b.pCanon,
+      env: opt(b.env),
+      v_r: b64u(b.vR),
+      env_r: b64u(b.envR),
       blob_profil: b64u(b.blobProfil),
       blob_prive: b64u(b.blobPrive),
       persistante: b.persistante,
-      etiquette: b.etiquette === null ? "" : b64u(b.etiquette),
+      etiquette: opt(b.etiquette),
+      cred_etiquette: opt(b.credEtiquette),
     },
   });
-  return { session: jeton(o, "session") };
+  return { session: jeton(o, "session"), h: octets(o, "h", 16) };
 }
 
-// --- Connexion -------------------------------------------------------------------------------
+// --- Connexion, récupération -------------------------------------------------------------------
 
-/** Ce que rend une connexion réussie (§21.6.2). */
-export type Ouverture = { session: string; h: Bytes; envMdp: Bytes; sProfil: Bytes; blobProfil: Bytes; genProfil: number; blobPrive: Bytes; genPrive: number };
+/** Enveloppes PRF d'une passkey : 0 à 4, 60 octets chacune. */
+function enveloppes(o: Obj, k: string): Bytes[] {
+  const l = o[k];
+  if (!Array.isArray(l) || l.length > 4) throw invalide();
+  return l.map((_, i) => octets(l as unknown as Obj, String(i), 60));
+}
 
-function ouverture(o: Obj): Ouverture {
+export async function connexionDebut(n: Net): Promise<Ceremonie> {
+  return ceremonie(await appel(n, "POST", "connexion/debut", { body: {} }));
+}
+
+/** Ce que rend une connexion par passkey : enveloppes PRF de la passkey qui a signé (0 à 4). */
+export type Ouverture = { session: string; h: Bytes; credId: Bytes; enveloppes: Bytes[]; blobProfil: Bytes; genProfil: number; blobPrive: Bytes; genPrive: number };
+
+export async function connexionFin(n: Net, b: { etape: string; credential: Obj; persistante: boolean; etiquette: Bytes | null }): Promise<Ouverture> {
+  const o = await appel(n, "POST", "connexion/fin", { body: { etape: b.etape, credential: cred(b.credential), persistante: b.persistante, etiquette: opt(b.etiquette) } });
+  const id = octets(o, "cred_id");
+  if (id.length < 1 || id.length > 1023) throw invalide();
   return {
     session: jeton(o, "session"),
     h: octets(o, "h", 16),
-    envMdp: octets(o, "env_mdp", 60),
-    sProfil: octets(o, "s_profil", 32),
+    credId: id,
+    enveloppes: enveloppes(o, "enveloppes"),
     blobProfil: octets(o, "blob_profil"),
     genProfil: entier(o, "gen_profil"),
     blobPrive: octets(o, "blob_prive"),
@@ -184,94 +209,126 @@ function ouverture(o: Obj): Ouverture {
   };
 }
 
-export async function connexion(
-  n: Net,
-  b: { email: string; aAuth: Bytes; persistante: boolean; etiquette: Bytes | null; preuve?: Preuve },
-): Promise<Ouverture | { totp: string }> {
-  const body: Obj = { email: b.email, a_auth: b64u(b.aAuth), persistante: b.persistante, etiquette: b.etiquette === null ? "" : b64u(b.etiquette) };
-  if (b.preuve) Object.assign(body, { altcha: b.preuve.altcha, hp: b.preuve.hp, shown_at: b.preuve.shown_at });
-  const o = await appel(n, "POST", "connexion", { body });
-  if (o.totp_requis === true) return { totp: jeton(o, "etape") };
-  return ouverture(o);
+/** Par la clé de récupération : A_r seulement (jamais R ni KEK_r) ; session récente, marquée « par la clé ». */
+export type OuvertureRecup = { session: string; h: Bytes; envR: Bytes; blobProfil: Bytes; genProfil: number; blobPrive: Bytes; genPrive: number };
+
+export async function recup(n: Net, b: { aR: Bytes; persistante: boolean; etiquette: Bytes | null }): Promise<OuvertureRecup> {
+  const o = await appel(n, "POST", "recup", { body: { a_r: b64u(b.aR), persistante: b.persistante, etiquette: opt(b.etiquette) } });
+  return {
+    session: jeton(o, "session"),
+    h: octets(o, "h", 16),
+    envR: octets(o, "env_r", 60),
+    blobProfil: octets(o, "blob_profil"),
+    genProfil: entier(o, "gen_profil"),
+    blobPrive: octets(o, "blob_prive"),
+    genPrive: entier(o, "gen_prive"),
+  };
 }
 
-export async function connexionTotp(n: Net, etape: string, code: string): Promise<Ouverture> {
-  return ouverture(await appel(n, "POST", "connexion/totp", { body: { etape, code } }));
+// --- Réauthentification, passkeys, clé de récupération (session) ------------------------------
+
+export async function reauthDebut(n: Net, session: string): Promise<Ceremonie> {
+  return ceremonie(await appel(n, "POST", "reauth/debut", { session, body: {} }));
 }
 
-// --- Mot de passe oublié ---------------------------------------------------------------------
-
-export async function oubliDebut(n: Net, b: { email: string; langue: string } & Preuve): Promise<{ etape: string }> {
-  const o = await appel(n, "POST", "oubli/debut", { body: { email: b.email, langue: b.langue, altcha: b.altcha, hp: b.hp, shown_at: b.shown_at } });
-  return { etape: jeton(o, "etape") };
+/** Session récente (5 min), liée à la passkey qui a signé ; rend ses enveloppes PRF. */
+export async function reauthFin(n: Net, session: string, etape: string, credential: Obj): Promise<Bytes[]> {
+  return enveloppes(await appel(n, "POST", "reauth/fin", { session, body: { etape, credential: cred(credential) } }), "enveloppes");
 }
 
-export async function oubliRenvoyer(n: Net, etape: string, email: string): Promise<void> {
-  await appel(n, "POST", "oubli/renvoyer", { body: { etape, email } });
+/** Une passkey du compte : mois d'ajout, libellé chiffré (ou aucun), synchronisable, avec enveloppe PRF. */
+export type PasskeyServeur = { credId: Bytes; ajoutee: string; etiquette: Bytes | null; be: boolean; prf: boolean };
+
+export async function passkeys(n: Net, session: string): Promise<PasskeyServeur[]> {
+  const o = await appel(n, "GET", "passkeys", { session });
+  if (!Array.isArray(o.passkeys)) throw invalide();
+  return o.passkeys.map((v: unknown) => {
+    if (typeof v !== "object" || v === null) throw invalide();
+    const p = v as Obj;
+    const id = octets(p, "cred_id");
+    if (id.length < 1 || typeof p.ajoutee !== "string" || !MOIS.test(p.ajoutee) || typeof p.be !== "boolean" || typeof p.prf !== "boolean") throw invalide();
+    const e = octets(p, "etiquette");
+    if (e.length !== 0 && e.length !== 64) throw invalide();
+    return { credId: id, ajoutee: p.ajoutee, etiquette: e.length === 0 ? null : e, be: p.be, prf: p.prf };
+  });
+}
+
+export async function passkeysDebut(n: Net, session: string): Promise<Ceremonie> {
+  return ceremonie(await appel(n, "POST", "passkeys/debut", { session, body: {} }));
+}
+
+export async function passkeysFin(n: Net, session: string, b: { etape: string; credential: Obj; env: Bytes | null; etiquette: Bytes | null }): Promise<void> {
+  await appel(n, "POST", "passkeys/fin", { session, body: { etape: b.etape, credential: cred(b.credential), env: opt(b.env), etiquette: opt(b.etiquette) } });
 }
 
 /**
- * `{ h, gen_prive }` : code juste ; `gen_prive` est indispensable (le nouveau coffre privé porte
- * gen_prive + 1 dans ses données authentifiées). `{ attente_jusqu }` : retrait de la double
- * authentification demandé (§21.2.4).
+ * Une enveloppe PRF de plus pour la passkey liée à la session (celle qui a signé la dernière
+ * assertion). Session récente exigée : 403 recent ou sans_passkey (reauth d'abord) ; 409
+ * enveloppes_max à la cinquième ; la même deux fois : sans effet.
  */
-export async function oubliVerifier(n: Net, b: { etape: string; code: string; totp: string; totpPerdu: boolean }): Promise<{ h: Bytes; genPrive: number } | { attenteJusqu: string }> {
-  const o = await appel(n, "POST", "oubli/verifier", { body: { etape: b.etape, code: b.code, totp: b.totp, totp_perdu: b.totpPerdu } });
-  if (typeof o.attente_jusqu === "string") return { attenteJusqu: o.attente_jusqu };
-  return { h: octets(o, "h", 16), genPrive: entier(o, "gen_prive") };
+export async function passkeysEnveloppe(n: Net, session: string, env: Bytes): Promise<void> {
+  if (env.length !== 60) throw new Error("enveloppe_invalide");
+  await appel(n, "POST", "passkeys/enveloppe", { session, body: { env: b64u(env) } });
 }
 
-export async function oubliFin(
-  n: Net,
-  b: { etape: string; aAuth: Bytes; envMdp: Bytes; blobPrive: Bytes; persistante: boolean; etiquette: Bytes | null },
-): Promise<{ session: string; h: Bytes; sProfil: Bytes; blobProfil: Bytes; genProfil: number; genPrive: number }> {
-  const o = await appel(n, "POST", "oubli/fin", {
-    body: { etape: b.etape, a_auth: b64u(b.aAuth), env_mdp: b64u(b.envMdp), blob_prive: b64u(b.blobPrive), persistante: b.persistante, etiquette: b.etiquette === null ? "" : b64u(b.etiquette) },
-  });
-  return { session: jeton(o, "session"), h: octets(o, "h", 16), sProfil: octets(o, "s_profil", 32), blobProfil: octets(o, "blob_profil"), genProfil: entier(o, "gen_profil"), genPrive: entier(o, "gen_prive") };
+export async function passkeysNommer(n: Net, session: string, credId: Bytes, etiquette: Bytes): Promise<void> {
+  await appel(n, "POST", "passkeys/nommer", { session, body: { cred_id: b64u(credId), etiquette: b64u(etiquette) } });
+}
+
+/** Session récente ; la dernière passkey : 409 derniere. */
+export async function passkeysRetirer(n: Net, session: string, credId: Bytes): Promise<void> {
+  await appel(n, "POST", "passkeys/retirer", { session, body: { cred_id: b64u(credId) } });
+}
+
+/** Nouvelle clé de récupération (session récente) : v_r et Env_r seulement ; l'ancienne ne sert plus. */
+export async function recupRenouveler(n: Net, session: string, vR: Bytes, envR: Bytes): Promise<void> {
+  await appel(n, "POST", "recup/renouveler", { session, body: { v_r: b64u(vR), env_r: b64u(envR) } });
 }
 
 // --- État du compte (session) --------------------------------------------------------------------
 
-/** GET /api/compte (§8.6, §21.6.2) : dates au jour (« 2026-11-14 ») ou null ; motif 1 à 10 ou null. */
+/** GET /api/compte : dates au jour (« 2026-11-14 ») ou null ; motif 1 à 10 ou null ; banniId (« B-… ») ou null. */
 export type EtatServeur = {
   creeLe: string;
   palier: "neuf" | "confirme";
   confirmeLe: string | null;
   limites: { salons: number; places: number; heures: number };
   salonsActifs: number;
-  totp: boolean;
-  recupJusqu: string | null;
-  retraitTotpLe: string | null;
+  banniId: string | null;
   banniJusqu: string | null;
   banniMotif: number | null;
 };
 
 const JOUR = /^\d{4}-\d{2}-\d{2}$/;
+const MOIS = /^\d{4}-\d{2}$/;
 function jour(o: Obj, k: string): string {
   const v = o[k];
   if (typeof v !== "string" || !JOUR.test(v)) throw invalide();
   return v;
 }
-const jourOuNull = (o: Obj, k: string) => (o[k] === null ? null : jour(o, k));
+const jourOuNull = (o: Obj, k: string) => (o[k] === null || o[k] === undefined ? null : jour(o, k));
+function motif(o: Obj): number | null {
+  const m = o.banni_motif;
+  if (m === null || m === undefined) return null;
+  if (!(Number.isInteger(m) && (m as number) >= 1 && (m as number) <= 10)) throw invalide();
+  return m as number;
+}
 
 export async function etat(n: Net, session: string): Promise<EtatServeur> {
   const o = await appel(n, "GET", "", { session });
   const l = o.limites;
-  if (typeof l !== "object" || l === null || (o.palier !== "neuf" && o.palier !== "confirme") || typeof o.totp !== "boolean") throw invalide();
-  const m = o.banni_motif;
-  if (m !== null && !(Number.isInteger(m) && (m as number) >= 1 && (m as number) <= 10)) throw invalide();
+  if (typeof l !== "object" || l === null || (o.palier !== "neuf" && o.palier !== "confirme")) throw invalide();
+  const id = o.banni_id;
+  if (id !== null && id !== undefined && (typeof id !== "string" || !/^B-[A-Za-z0-9_-]{1,64}$/.test(id))) throw invalide();
   return {
     creeLe: jour(o, "cree_le"),
     palier: o.palier,
     confirmeLe: jourOuNull(o, "confirme_le"),
     limites: { salons: entier(l as Obj, "salons"), places: entier(l as Obj, "places"), heures: entier(l as Obj, "heures") },
     salonsActifs: entier(o, "salons_actifs"),
-    totp: o.totp,
-    recupJusqu: jourOuNull(o, "recup_jusqu"),
-    retraitTotpLe: jourOuNull(o, "retrait_totp_le"),
+    banniId: typeof id === "string" ? id : null,
     banniJusqu: jourOuNull(o, "banni_jusqu"),
-    banniMotif: m as number | null,
+    banniMotif: motif(o),
   };
 }
 
@@ -317,61 +374,10 @@ export async function deconnexion(n: Net, session: string): Promise<void> {
   await appel(n, "POST", "deconnexion", { session, body: {}, keepalive: true });
 }
 
-// --- Paramètres (lot 13 ; routes du lot 5, handlers_compte.go) ---------------------------------
-// Toutes avec la session ; celles qui changent la sécurité exigent une session « récente » (moins
-// de 5 min depuis une connexion ou un reauth) : sinon 403 `recent`, et l'écran redemande le mot
-// de passe. Le mot de passe ne part jamais : seulement A_auth et l'enveloppe de K_compte.
+// --- Appareils, export, suppression (session) -------------------------------------------------
 
-/** Session « récente » : A_auth du mot de passe actuel, code de l'application ("" si inactive). */
-export async function reauth(n: Net, session: string, aAuth: Bytes, totp: string): Promise<void> {
-  await appel(n, "POST", "reauth", { session, body: { a_auth: b64u(aAuth), totp } });
-}
-
-/** Nouveau mot de passe ; le serveur ferme toujours les autres sessions. */
-export async function changerMdp(n: Net, session: string, aAuth: Bytes, envMdp: Bytes): Promise<void> {
-  await appel(n, "POST", "mdp", { session, body: { a_auth: b64u(aAuth), env_mdp: b64u(envMdp) } });
-}
-
-/** Adresses exactes ; le code part à la nouvelle seulement (§21.3). */
-export async function emailDebut(n: Net, session: string, b: { actuel: string; nouveau: string; langue: string }): Promise<{ etape: string }> {
-  const o = await appel(n, "POST", "email/debut", { session, body: { email_actuel: b.actuel, email_nouveau: b.nouveau, langue: b.langue } });
-  return { etape: jeton(o, "etape") };
-}
-
-export async function emailRenvoyer(n: Net, session: string, etape: string, email: string): Promise<void> {
-  await appel(n, "POST", "email/renvoyer", { session, body: { etape, email } });
-}
-
-/** A_auth et enveloppe recalculés avec le sel de la NOUVELLE adresse (§6). */
-export async function emailFin(n: Net, session: string, b: { etape: string; code: string; aAuth: Bytes; envMdp: Bytes; totp: string }): Promise<void> {
-  await appel(n, "POST", "email/fin", { session, body: { etape: b.etape, code: b.code, a_auth: b64u(b.aAuth), env_mdp: b64u(b.envMdp), totp: b.totp } });
-}
-
-const BASE32 = /^[A-Z2-7]{16,128}$/;
-
-/** Seule réponse du serveur qui contient le secret TOTP (base32, sans bourrage). */
-export async function totpDebut(n: Net, session: string): Promise<{ etape: string; secret: string }> {
-  const o = await appel(n, "POST", "totp/debut", { session, body: {} });
-  if (typeof o.secret !== "string" || !BASE32.test(o.secret)) throw invalide();
-  return { etape: jeton(o, "etape"), secret: o.secret };
-}
-
-export async function totpFin(n: Net, session: string, etape: string, code: string): Promise<void> {
-  await appel(n, "POST", "totp/fin", { session, body: { etape, code } });
-}
-
-export async function totpRetirer(n: Net, session: string): Promise<void> {
-  await appel(n, "POST", "totp/retirer", { session, body: {} });
-}
-
-/** « Ce n'est pas vous ? Annuler » (§21.2.4) : session, même non récente. */
-export async function totpAnnulerRetrait(n: Net, session: string): Promise<void> {
-  await appel(n, "POST", "totp/annuler-retrait", { session, body: {} });
-}
-
-/** Une session du compte (§8.5) : mois d'ajout, nom chiffré par l'appareil (ou aucun). */
-export type SessionAppareil = { sid: string; ajoutee: string; etiquette: Bytes | null; courante: boolean; persistante: boolean };
-const MOIS = /^\d{4}-\d{2}$/;
+/** Une session du compte (§8.5) : mois d'ajout, nom chiffré par l'appareil (ou aucun), ouverte par la clé de récupération. */
+export type SessionAppareil = { sid: string; ajoutee: string; etiquette: Bytes | null; courante: boolean; persistante: boolean; parRecup: boolean };
 
 export async function sessions(n: Net, session: string): Promise<SessionAppareil[]> {
   const o = await appel(n, "GET", "sessions", { session });
@@ -380,10 +386,10 @@ export async function sessions(n: Net, session: string): Promise<SessionAppareil
     if (typeof v !== "object" || v === null) throw invalide();
     const s = v as Obj;
     octets(s, "sid", 16);
-    if (typeof s.ajoutee !== "string" || !MOIS.test(s.ajoutee) || typeof s.courante !== "boolean" || typeof s.persistante !== "boolean") throw invalide();
+    if (typeof s.ajoutee !== "string" || !MOIS.test(s.ajoutee) || typeof s.courante !== "boolean" || typeof s.persistante !== "boolean" || typeof s.par_recup !== "boolean") throw invalide();
     const e = octets(s, "etiquette");
     if (e.length !== 0 && e.length !== 64) throw invalide();
-    return { sid: s.sid as string, ajoutee: s.ajoutee, etiquette: e.length === 0 ? null : e, courante: s.courante, persistante: s.persistante };
+    return { sid: s.sid as string, ajoutee: s.ajoutee, etiquette: e.length === 0 ? null : e, courante: s.courante, persistante: s.persistante, parRecup: s.par_recup };
   });
 }
 
@@ -391,39 +397,38 @@ export async function fermerSession(n: Net, session: string, quoi: { sid: string
   await appel(n, "POST", "sessions/fermer", { session, body: "sid" in quoi ? { sid: quoi.sid } : { autres: true } });
 }
 
-/** GET export (§12.4) : ce que le serveur garde du compte, sans adresse. */
+/** GET export (§12.4, conception du compte par passkey §3.6) : ce que le serveur garde du compte. */
 export type ExportServeur = {
   creeLe: string;
   ancienneteDepuis: string;
   vuMois: string;
-  totp: boolean;
-  retraitTotpLe: string | null;
-  recupJusqu: string | null;
   banniJusqu: string | null;
   banniMotif: number | null;
   salonsActifs: number;
-  sessions: { ajoutee: string; persistante: boolean }[];
+  sessions: { ajoutee: string; persistante: boolean; parRecup: boolean }[];
+  passkeys: { ajoutee: string; be: boolean; prf: boolean; clePub: string }[];
 };
 
 export async function exporter(n: Net, session: string): Promise<ExportServeur> {
   const o = await appel(n, "GET", "export", { session });
-  const m = o.banni_motif;
-  if (typeof o.totp !== "boolean" || typeof o.vu_mois !== "string" || !MOIS.test(o.vu_mois) || !Array.isArray(o.sessions)) throw invalide();
-  if (m !== null && !(Number.isInteger(m) && (m as number) >= 1 && (m as number) <= 10)) throw invalide();
+  if (typeof o.vu_mois !== "string" || !MOIS.test(o.vu_mois) || !Array.isArray(o.sessions) || !Array.isArray(o.passkeys)) throw invalide();
   return {
     creeLe: jour(o, "cree_le"),
     ancienneteDepuis: jour(o, "anciennete_depuis"),
     vuMois: o.vu_mois,
-    totp: o.totp,
-    retraitTotpLe: jourOuNull(o, "retrait_totp_le"),
-    recupJusqu: jourOuNull(o, "recup_jusqu"),
     banniJusqu: jourOuNull(o, "banni_jusqu"),
-    banniMotif: m as number | null,
+    banniMotif: motif(o),
     salonsActifs: entier(o, "salons_actifs"),
     sessions: o.sessions.map((v: unknown) => {
       const s = v as Obj;
-      if (typeof s !== "object" || s === null || typeof s.ajoutee !== "string" || !MOIS.test(s.ajoutee) || typeof s.persistante !== "boolean") throw invalide();
-      return { ajoutee: s.ajoutee, persistante: s.persistante };
+      if (typeof s !== "object" || s === null || typeof s.ajoutee !== "string" || !MOIS.test(s.ajoutee) || typeof s.persistante !== "boolean" || typeof s.par_recup !== "boolean") throw invalide();
+      return { ajoutee: s.ajoutee, persistante: s.persistante, parRecup: s.par_recup };
+    }),
+    passkeys: o.passkeys.map((v: unknown) => {
+      const p = v as Obj;
+      if (typeof p !== "object" || p === null || typeof p.ajoutee !== "string" || !MOIS.test(p.ajoutee) || typeof p.be !== "boolean" || typeof p.prf !== "boolean") throw invalide();
+      octets(p, "cle_pub");
+      return { ajoutee: p.ajoutee, be: p.be, prf: p.prf, clePub: p.cle_pub as string };
     }),
   };
 }

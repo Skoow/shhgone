@@ -1,18 +1,20 @@
-// Faux serveur du compte de la démo (demo/fake-compte.ts) : mêmes réponses que handlers_compte.go
-// pour le client account/api.ts ; TOTP contre les vecteurs de la RFC 6238 ; codes à 5 essais ;
-// adresse déjà prise refusée seulement après le code juste ; session « récente » ; rejeu refusé.
+// Faux serveur du compte de la démo (demo/fake-compte.ts) et passkey simulée (demo/passkeys.ts) :
+// mêmes réponses que les routes du compte par passkey pour le client account/api.ts ; credential
+// avec sortie PRF refusé ; enveloppes (4 au plus, pour la passkey de la session) ; clé de
+// récupération (v_r = SHA-256(A_r)) ; session récente ; état de l'onglet rechargé tel quel.
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import * as A from "../account/api";
-import { codeTotp, createFauxCompte, verifierTotp, type InstantaneCompte } from "./fake-compte";
+import { b64u } from "../engine/pure";
+import { createFauxCompte, type InstantaneCompte } from "./fake-compte";
+import { passkeysSimulees } from "./passkeys";
+import { optionsAssertion, optionsCreation } from "../account/webauthn";
 
+type Bytes = Uint8Array<ArrayBuffer>;
 const PREUVE = { altcha: "demo", hp: "", shown_at: "demo" };
-const octets = (n: number, v = 7) => new Uint8Array(n).fill(v) as Uint8Array<ArrayBuffer>;
-/** Coffre privé factice dont les octets 9 à 16 portent `gen` (comme le vrai, données authentifiées). */
-const coffre = (gen: number) => {
-  const b = new Uint8Array(40) as Uint8Array<ArrayBuffer>;
-  new DataView(b.buffer).setBigUint64(9, BigInt(gen));
-  return b;
-};
+const octets = (n: number, v = 7) => new Uint8Array(n).fill(v) as Bytes;
+const AR = octets(32, 9);
+const VR = new Uint8Array(createHash("sha256").update(AR).digest()) as Bytes;
 
 function monter(now = () => 1_700_000_000_000, restore: InstantaneCompte | null = null) {
   let dernier: InstantaneCompte | null = null;
@@ -21,108 +23,94 @@ function monter(now = () => 1_700_000_000_000, restore: InstantaneCompte | null 
   return { f, net, sauve: () => dernier };
 }
 
-async function inscrire(net: A.Net, f: ReturnType<typeof createFauxCompte>, email = "Lea@Exemple.fr", pCanon = "léa") {
-  const { etape } = await A.inscriptionDebut(net, { email, langue: "fr", ...PREUVE });
-  const code = f.dernierCode()!.code;
-  return A.inscriptionFin(net, { etape, code, aAuth: octets(32, 1), envMdp: octets(60, 2), sProfil: octets(32, 3), pCanon, blobProfil: octets(50), blobPrive: coffre(1), persistante: false, etiquette: null });
+/** Credential JSON tel que webauthn.ts l'enverrait, pour une passkey simulée. */
+async function cred(c: Credential): Promise<Record<string, unknown>> {
+  const r = c as unknown as { rawId: ArrayBuffer; response: Record<string, ArrayBuffer> };
+  const b = (x: ArrayBuffer) => b64u(new Uint8Array(x) as Bytes);
+  const response: Record<string, string> = {};
+  for (const [k, v] of Object.entries(r.response)) response[k] = b(v);
+  return { id: b(r.rawId), rawId: b(r.rawId), type: "public-key", response, clientExtensionResults: {} };
+}
+const E = new Uint8Array(32).fill(0xe1);
+const creation = (o: Record<string, unknown>) => optionsCreation(o, "Lea", E);
+const assertion = (o: Record<string, unknown>) => optionsAssertion(o, E);
+
+async function inscrire(net: A.Net, pk = passkeysSimulees(), pCanon = "lea") {
+  const { etape, options } = await A.inscriptionDebut(net, PREUVE);
+  expect(await A.pseudoVerifier(net, { etape }, pCanon)).toBe(true);
+  const c = await pk.credentials.create({ publicKey: creation(options) });
+  const r = await A.inscriptionFin(net, { etape, credential: await cred(c), pCanon, env: octets(60, 1), vR: VR, envR: octets(60, 2), blobProfil: octets(50), blobPrive: octets(40), persistante: false, etiquette: null, credEtiquette: octets(64) });
+  return { ...r, pk };
 }
 
 describe("faux serveur du compte (démo)", () => {
-  it("TOTP : vecteurs SHA-1 de la RFC 6238 (6 chiffres), fenêtre ± 1 pas, rejeu refusé", async () => {
-    const secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"; // « 12345678901234567890 »
-    expect(await codeTotp(secret, 59_000)).toBe("287082");
-    expect(await codeTotp(secret, 1_111_111_109_000)).toBe("081804");
-    expect(await codeTotp(secret, 1_234_567_890_000)).toBe("005924");
-    expect(await codeTotp(secret, 2_000_000_000_000)).toBe("279037");
-    const pas = await verifierTotp(secret, "081804", 1_111_111_109_000 + 30_000, -1); // pas suivant : accepté (fenêtre)
-    expect(pas).toBe(Math.floor(1_111_111_109 / 30));
-    expect(await verifierTotp(secret, "081804", 1_111_111_109_000, pas)).toBe(-1); // déjà servi
-    expect(await verifierTotp(secret, "081804", 1_111_111_109_000 + 90_000, -1)).toBe(-1); // hors fenêtre
+  it("inscription, connexion par la passkey simulée (enveloppes rendues), récupération par v_r", async () => {
+    const { net } = monter();
+    const { session, h, pk } = await inscrire(net);
+    expect(session).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    await A.deconnexion(net, session);
+    const d = await A.connexionDebut(net);
+    const g = await pk.credentials.get({ publicKey: assertion(d.options) });
+    const o = await A.connexionFin(net, { etape: d.etape, credential: await cred(g), persistante: false, etiquette: null });
+    expect(o.h).toEqual(h);
+    expect(o.enveloppes).toEqual([octets(60, 1)]);
+    const r = await A.recup(net, { aR: AR, persistante: false, etiquette: null });
+    expect(r.envR).toEqual(octets(60, 2));
+    await expect(A.recup(net, { aR: octets(32, 1), persistante: false, etiquette: null })).rejects.toMatchObject({ code: "identifiants" });
+    expect((await A.sessions(net, r.session)).filter((s) => s.parRecup)).toHaveLength(1);
   });
 
-  it("inscription : code à 6 chiffres « envoyé » à l'adresse tapée ; 5 essais puis l'étape disparaît", async () => {
-    const { f, net } = monter();
-    const { etape } = await A.inscriptionDebut(net, { email: "lea@exemple.fr", langue: "fr", ...PREUVE });
-    expect(f.dernierCode()).toEqual({ email: "lea@exemple.fr", code: expect.stringMatching(/^\d{6}$/) });
-    const fin = (code: string) => A.inscriptionFin(net, { etape, code, aAuth: octets(32), envMdp: octets(60), sProfil: octets(32), pCanon: "léa", blobProfil: octets(10), blobPrive: coffre(1), persistante: false, etiquette: null });
-    const faux = f.dernierCode()!.code === "000000" ? "111111" : "000000";
-    for (const reste of [4, 3, 2, 1]) await expect(fin(faux)).rejects.toMatchObject({ status: 403, code: "code_faux", attemptsLeft: reste });
-    await expect(fin(faux)).rejects.toMatchObject({ status: 404, code: "not_found" });
-    await expect(fin(f.dernierCode()!.code)).rejects.toMatchObject({ status: 404 });
+  it("credential avec sortie PRF : refusé (comme le vrai serveur) ; étape à usage unique", async () => {
+    const { net } = monter();
+    const { etape, options } = await A.inscriptionDebut(net, PREUVE);
+    const c = await cred(await passkeysSimulees().credentials.create({ publicKey: creation(options) }));
+    const f = await net.fetch("https://demo.test/api/compte/inscription/fin", { method: "POST", body: JSON.stringify({ etape, credential: { ...c, clientExtensionResults: { prf: { results: { first: "x" } } } } }) });
+    expect(f.status).toBe(400);
+    expect((await net.fetch("https://demo.test/api/compte/inscription/fin", { method: "POST", body: JSON.stringify({ etape, credential: null }) })).status).toBe(400);
   });
 
-  it("adresse déjà prise : même réponse au début, refus seulement après le code juste ; pseudo unique", async () => {
-    const { f, net } = monter();
-    await inscrire(net, f);
-    const { etape } = await A.inscriptionDebut(net, { email: "lea@exemple.fr", langue: "fr", ...PREUVE });
-    await expect(A.inscriptionFin(net, { etape, code: f.dernierCode()!.code, aAuth: octets(32), envMdp: octets(60), sProfil: octets(32), pCanon: "autre", blobProfil: octets(10), blobPrive: coffre(1), persistante: false, etiquette: null })).rejects.toMatchObject({ status: 409, code: "deja_inscrit" });
-    await expect(inscrire(net, f, "autre@exemple.fr", "léa")).rejects.toMatchObject({ status: 409, code: "pseudo_pris" });
-  });
-
-  it("connexion : adresse sans casse, A_auth comparé ; mauvais : « identifiants » ; ouverture complète", async () => {
-    const { f, net } = monter();
-    await inscrire(net, f);
-    await expect(A.connexion(net, { email: "lea@exemple.fr", aAuth: octets(32, 9), persistante: false, etiquette: null })).rejects.toMatchObject({ status: 403, code: "identifiants" });
-    const o = await A.connexion(net, { email: "LEA@exemple.fr", aAuth: octets(32, 1), persistante: true, etiquette: null });
-    expect("session" in o && o.genPrive).toBe(1);
-    const e = await A.etat(net, (o as A.Ouverture).session);
-    expect(e).toMatchObject({ palier: "neuf", totp: false, creeLe: "2023-11-14" });
-  });
-
-  it("session récente exigée (5 min) ; reauth la rafraîchit ; mot de passe changé : autres sessions fermées", async () => {
+  it("enveloppes : passkey de la session, sans doublon, 4 au plus ; sans passkey liée : sans_passkey ; plus récente : recent", async () => {
     let t = 1_700_000_000_000;
-    const { f, net } = monter(() => t);
-    const { session } = await inscrire(net, f);
-    const o = (await A.connexion(net, { email: "lea@exemple.fr", aAuth: octets(32, 1), persistante: false, etiquette: null })) as A.Ouverture;
+    const { net } = monter(() => t);
+    const { session, pk } = await inscrire(net);
+    await A.passkeysEnveloppe(net, session, octets(60, 1)); // doublon : sans effet
+    for (const v of [3, 4, 5]) await A.passkeysEnveloppe(net, session, octets(60, v));
+    await expect(A.passkeysEnveloppe(net, session, octets(60, 6))).rejects.toMatchObject({ code: "enveloppes_max" });
+    const r = await A.recup(net, { aR: AR, persistante: false, etiquette: null });
+    await expect(A.passkeysEnveloppe(net, r.session, octets(60, 8))).rejects.toMatchObject({ code: "sans_passkey" });
     t += 6 * 60_000;
-    await expect(A.changerMdp(net, session, octets(32, 5), octets(60, 6))).rejects.toMatchObject({ status: 403, code: "recent" });
-    await A.reauth(net, session, octets(32, 1), "");
-    await A.changerMdp(net, session, octets(32, 5), octets(60, 6));
-    await expect(A.etat(net, o.session)).rejects.toMatchObject({ status: 401, code: "session" });
-    await expect(A.etat(net, session)).resolves.toBeTruthy();
+    await expect(A.passkeysEnveloppe(net, session, octets(60, 9))).rejects.toMatchObject({ code: "recent" });
+    const d = await A.reauthDebut(net, session);
+    expect(await A.reauthFin(net, session, d.etape, await cred(await pk.credentials.get({ publicKey: assertion(d.options) })))).toHaveLength(4);
   });
 
-  it("double authentification : activation par un vrai code, connexion en deux temps, rejeu refusé", async () => {
-    let t = 1_700_000_000_000;
-    const { f, net } = monter(() => t);
-    const { session } = await inscrire(net, f);
-    const { etape, secret } = await A.totpDebut(net, session);
-    await expect(A.totpFin(net, session, etape, "000000")).rejects.toMatchObject({ code: "totp_faux" });
-    const code = await codeTotp(secret, t);
-    await A.totpFin(net, session, etape, code);
-    const r = await A.connexion(net, { email: "lea@exemple.fr", aAuth: octets(32, 1), persistante: false, etiquette: null });
-    expect(r).toEqual({ totp: expect.any(String) });
-    await expect(A.connexionTotp(net, (r as { totp: string }).totp, code)).rejects.toMatchObject({ code: "totp_faux" }); // déjà servi
-    t += 30_000;
-    const o = await A.connexionTotp(net, (r as { totp: string }).totp, await codeTotp(secret, t));
-    expect(o.session).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  it("passkeys : ajout (session récente, exclusion), renommage, retrait jamais de la dernière ; nouvelle clé", async () => {
+    const { net } = monter();
+    const { session, pk } = await inscrire(net);
+    const d = await A.passkeysDebut(net, session);
+    await expect(pk.credentials.create({ publicKey: creation(d.options) })).rejects.toMatchObject({ name: "InvalidStateError" });
+    const autre = passkeysSimulees();
+    await A.passkeysFin(net, session, { etape: d.etape, credential: await cred(await autre.credentials.create({ publicKey: creation(d.options) })), env: null, etiquette: null });
+    const l = await A.passkeys(net, session);
+    expect(l.map((p) => p.prf)).toEqual([true, false]);
+    await A.passkeysNommer(net, session, l[1]!.credId, octets(64, 3));
+    await A.passkeysRetirer(net, session, l[1]!.credId);
+    await expect(A.passkeysRetirer(net, session, l[0]!.credId)).rejects.toMatchObject({ code: "derniere" });
+    await A.recupRenouveler(net, session, octets(32, 4), octets(60, 4));
+    await expect(A.recup(net, { aR: AR, persistante: false, etiquette: null })).rejects.toMatchObject({ code: "identifiants" });
   });
 
-  it("mot de passe oublié : code seulement pour une adresse connue ; nouveau coffre gen + 1 ; sessions fermées", async () => {
-    const { f, net } = monter();
-    const { session } = await inscrire(net, f);
-    const avant = f.dernierCode();
-    await A.oubliDebut(net, { email: "inconnu@exemple.fr", langue: "fr", ...PREUVE });
-    expect(f.dernierCode()).toEqual(avant); // aucun code « envoyé » à une adresse sans compte
-    const { etape } = await A.oubliDebut(net, { email: "lea@exemple.fr", langue: "fr", ...PREUVE });
-    const v = await A.oubliVerifier(net, { etape, code: f.dernierCode()!.code, totp: "", totpPerdu: false });
-    expect(v).toMatchObject({ genPrive: 1 });
-    await expect(A.oubliFin(net, { etape, aAuth: octets(32, 8), envMdp: octets(60, 8), blobPrive: coffre(1), persistante: false, etiquette: null })).rejects.toMatchObject({ code: "bad_request" });
-    const fin = await A.oubliFin(net, { etape, aAuth: octets(32, 8), envMdp: octets(60, 8), blobPrive: coffre(2), persistante: false, etiquette: null });
-    expect(fin.genPrive).toBe(2);
-    await expect(A.etat(net, session)).rejects.toMatchObject({ code: "session" });
-    await expect(A.connexion(net, { email: "lea@exemple.fr", aAuth: octets(32, 1), persistante: false, etiquette: null })).rejects.toMatchObject({ code: "identifiants" });
-  });
-
-  it("état de l'onglet : rechargé tel quel ; jamais de mot de passe, pseudo seulement en p_canon ; suppression libère le pseudo", async () => {
-    const { f, net, sauve } = monter();
-    const { session } = await inscrire(net, f);
-    const s = sauve()!;
-    expect(JSON.stringify(s)).not.toContain("Léa");
-    const re = monter(undefined, JSON.parse(JSON.stringify(s)) as InstantaneCompte);
-    await expect(A.etat(re.net, session)).resolves.toBeTruthy();
-    await A.supprimer(re.net, session);
-    await expect(A.etat(re.net, session)).rejects.toMatchObject({ code: "session" });
-    await expect(inscrire(re.net, re.f, "autre@exemple.fr", "léa")).resolves.toBeTruthy();
+  it("pseudo réservé à l'étape ; état de l'onglet rechargé tel quel ; suppression libère le pseudo", async () => {
+    const m = monter();
+    const { session } = await inscrire(m.net);
+    const s = m.sauve()!;
+    expect(s.v).toBe(2);
+    expect(JSON.stringify(s)).not.toMatch(/"results"|K_compte/);
+    const r = monter(undefined, JSON.parse(JSON.stringify(s)));
+    expect(await A.etat(r.net, session)).toMatchObject({ palier: "neuf", banniId: null });
+    const { etape } = await A.inscriptionDebut(r.net, PREUVE);
+    expect(await A.pseudoVerifier(r.net, { etape }, "lea")).toBe(false);
+    await A.supprimer(r.net, session);
+    expect(await A.pseudoVerifier(r.net, { etape }, "lea")).toBe(true);
   });
 });

@@ -70,11 +70,11 @@ describe("match", () => {
 // adresse inconnue) ; « ?suite=salon » seul paramètre, et aucune donnée dans l'adresse.
 describe("pages du compte", () => {
   const C = (p: string, base = "/") => match(p, "", base, false, true);
-  it("avec __COMPTES__ : /compte, inscription, connexion, oubli, profil", () => {
+  it("avec __COMPTES__ : /compte, inscription, connexion, recuperation, profil", () => {
     expect(C("/compte")).toEqual({ name: "compte" });
     expect(C("/compte/inscription")).toEqual({ name: "inscription" });
     expect(C("/compte/connexion")).toEqual({ name: "connexion" });
-    expect(C("/compte/oubli")).toEqual({ name: "oubli" });
+    expect(C("/compte/recuperation")).toEqual({ name: "recuperation" });
     expect(C("/compte/profil")).toEqual({ name: "profil" });
     expect(C("/shhdrop/compte/connexion", "/shhdrop/")).toEqual({ name: "connexion" });
     // Un « # » n'ouvre rien ici (App le retire).
@@ -85,7 +85,7 @@ describe("pages du compte", () => {
       expect(C(p), p).toEqual({ name: "notfound" });
   });
   it("sans __COMPTES__ (défaut, démo) : toutes → 404", () => {
-    for (const p of ["/compte", "/compte/inscription", "/compte/connexion", "/compte/oubli", "/compte/profil"]) {
+    for (const p of ["/compte", "/compte/inscription", "/compte/connexion", "/compte/recuperation", "/compte/profil"]) {
       expect(match(p), p).toEqual({ name: "notfound" });
       expect(match(p, "", "/", false, false), p).toEqual({ name: "notfound" });
     }
@@ -99,7 +99,7 @@ describe("pages du compte", () => {
     expect(location.pathname + location.search).toBe("/compte/connexion?suite=salon");
     navigate("/compte/inscription?suite=salon");
     expect(location.search).toBe("?suite=salon");
-    for (const p of ["/compte/connexion?suite=x", "/compte/connexion?email=a@b.fr", "/securite?suite=salon", "/compte/oubli?suite=salon", "/compte/connexion?suite=salon#k"])
+    for (const p of ["/compte/connexion?suite=x", "/compte/connexion?email=a@b.fr", "/securite?suite=salon", "/compte/recuperation?suite=salon", "/compte/connexion?suite=salon#k"])
       expect(() => navigate(p), p).toThrow();
     navigate("/");
   });

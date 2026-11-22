@@ -268,11 +268,11 @@ var salonRoutes = map[string]bool{
 }
 
 var compteRoutes = map[string]bool{
-	"/compte":             true,
-	"/compte/inscription": true,
-	"/compte/connexion":   true,
-	"/compte/oubli":       true,
-	"/compte/profil":      true,
+	"/compte":              true,
+	"/compte/inscription":  true,
+	"/compte/connexion":    true,
+	"/compte/recuperation": true,
+	"/compte/profil":       true,
 }
 
 // staticName : chemin de l'URL → nom dans le dossier ; refuse les segments cachés.

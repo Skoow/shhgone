@@ -308,49 +308,22 @@ export function langAsset(base: string, demo: boolean): Plugin {
   };
 }
 
-/** Contenu de assets/jetables-EMPREINTE.js : tableau JSON des domaines des deux listes du serveur (même lecture que src/listes/jetables.ts, vérifiée par un test). */
-export function jetablesJson(): Buffer {
-  const dir = fileURLToPath(new URL("../server/internal/compte/", import.meta.url));
-  const out: string[] = [];
-  for (const f of ["jetables.txt", "jetables-ajouts.txt"])
-    for (const l of readFileSync(join(dir, f), "utf8").split("\n")) {
-      const d = l.trim().toLowerCase();
-      if (d && !d.startsWith("#")) out.push(d);
-    }
-  return Buffer.from(JSON.stringify(out));
-}
-
 /**
- * Domaines jetables de l'inscription (U13, audit de vitesse du 20 novembre) : 148 Ko de texte
- * (52 Ko en brotli) qui alourdissaient le script de l'accueil. Production : src/listes/jetables.ts,
- * importé par la page d'inscription (routes/compte/verifs.ts), est remplacé par
- * jetables.verified.ts ; la liste est écrite sous assets/jetables-EMPREINTE.js (JSON, extension
- * .js : cache immuable et compression du serveur Go), son adresse et son empreinte SHA-384 vont
- * dans le script, jamais ses domaines. Le fichier n'est écrit que si la page d'inscription est
- * construite (__COMPTES__). Démo : sa CSP interdit fetch, la liste reste intégrée. Contrôle :
- * scripts/check-dist.mjs.
+ * Passkeys (conception du compte par passkey §11, Q8) : ./navigateur, importé par
+ * src/account/webauthn.ts, est remplacé dans la démo par navigateur.demo.ts (passkey simulée de
+ * src/demo/passkeys.ts : aucune feuille du système, aucune passkey laissée dans le gestionnaire
+ * des visiteurs). Le build de la démo ne contient donc aucun appel à navigator.credentials
+ * (contrôle : scripts/check-dist.mjs --demo).
  */
-export function jetablesAsset(base: string, demo: boolean): Plugin {
-  const VIRTUAL = "virtual:shh-jetables";
+export function navigateurPasskeys(demo: boolean): Plugin {
   const here = fileURLToPath(new URL(".", import.meta.url));
   return {
-    name: "shh-jetables",
-    apply: "build",
+    name: "shh-navigateur",
     enforce: "pre",
     resolveId(source, importer) {
-      if (source === VIRTUAL) return "\0" + VIRTUAL;
       const from = importer?.replace(/\\/g, "/") ?? "";
-      if (!demo && /\/listes\/jetables(?:\.ts)?$/.test(source) && from.includes("/src/routes/compte/")) return join(here, "src/listes/jetables.verified.ts");
+      if (demo && /^\.\/navigateur(?:\.ts)?$/.test(source) && from.endsWith("/src/account/webauthn.ts")) return join(here, "src/account/navigateur.demo.ts");
       return null;
-    },
-    load(id) {
-      if (!demo && id.replace(/\\/g, "/").endsWith("/src/listes/jetables.ts")) this.error("shh-jetables : src/listes/jetables.ts (liste dans le script) n'entre jamais dans un build de production");
-      if (id !== "\0" + VIRTUAL) return null;
-      if (demo) this.error("shh-jetables : pas de fichier de liste dans la démo");
-      const data = jetablesJson();
-      const fileName = `assets/jetables-${createHash("sha256").update(data).digest("base64url").slice(0, 8)}.js`;
-      this.emitFile({ type: "asset", fileName, source: data });
-      return `export const src = ${JSON.stringify(base + fileName)}; export const integrity = ${JSON.stringify(sha384(data))};`;
     },
   };
 }
@@ -640,10 +613,8 @@ export function salonPages(actifs: boolean): Plugin {
 export default defineConfig(({ mode, command }) => {
   const demo = mode === "demo";
   return {
-    plugins: [comptesPages(comptesActifs(demo)), salonPages(salonsActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), powWorker(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), jetonsWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), jetablesAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
+    plugins: [comptesPages(comptesActifs(demo)), salonPages(salonsActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), powWorker(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), jetonsWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), navigateurPasskeys(demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
     base: demo ? DEMO_BASE : "/",
-    // Listes d'adresses jetables du serveur (mêmes fichiers), lues par routes/compte/verifs.ts.
-    server: { fs: { allow: [".", "../server/internal/compte"] } },
     define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)), __SALONS__: JSON.stringify(salonsActifs(demo)), __BILINGUE__: JSON.stringify(!demo) },
     build: {
       outDir: demo ? "dist-demo" : "dist",

@@ -17,7 +17,7 @@ const S = await import("../../account/session.svelte");
 const { CompteError, account, REGLAGES_DEFAUT } = S;
 const { default: Profil } = await import("./Profil.svelte");
 
-const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salonsActifs: 0, totp: false, recupJusqu: null, retraitTotpLe: null, banniJusqu: null, banniMotif: null };
+const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salonsActifs: 0, banniId: null, banniJusqu: null, banniMotif: null };
 const PROFIL = { pseudo: "Lea", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null };
 
 beforeEach(() => {
@@ -55,7 +55,7 @@ describe("Profil", () => {
     expect(t).toContain("Récent : 1 salon à la fois, 4 places, 24 h. Dès le 21 novembre : 3 salons, 10 places.");
     expect(t).toContain("Gratuit");
     expect(t).toContain(
-      "Votre pseudo, votre photo et votre abonnement sont chiffrés, mais gardés de façon à pouvoir vous être rendus si vous oubliez votre mot de passe : le service peut donc les lire. Vos liens et la gestion de vos salons ne sont lisibles qu'avec votre mot de passe.",
+      "Votre pseudo, votre photo et votre abonnement sont chiffrés sur vos appareils : le service ne peut pas les lire.",
     );
     const liens = [...document.querySelectorAll("a")].map((a) => [a.textContent!.trim(), a.getAttribute("href")]);
     expect(liens).toContainEqual(["En savoir plus", "/securite"]);

@@ -22,7 +22,7 @@ const EXCLUDED_DIRS = new Set(["crypto", "transfer", "demo"]);
 
 function isScanned(rel: string): boolean {
   if (!/\.(ts|svelte)$/.test(rel)) return false;
-  if (/\.test\.ts$/.test(rel) || rel.endsWith(".d.ts")) return false;
+  if (/\.test(?:-helper)?\.ts$/.test(rel) || rel.endsWith(".d.ts")) return false;
   if (rel === "index.ts") return false;
   return !rel.split("/").slice(0, -1).some((d) => EXCLUDED_DIRS.has(d));
 }
@@ -156,6 +156,36 @@ describe("règles de sources", () => {
     expect(offenders(/shhdrop-pass/, (r) => r !== "paiement/pass.ts")).toEqual([]);
     expect(files.find((f) => f.rel === "paiement/pass.ts")?.text).toMatch(/indexedDB/);
     expect(offenders(/localStorage|sessionStorage|document\.cookie/, (r) => r.startsWith("paiement/"))).toEqual([]);
+  });
+  // Conception du compte par passkey §9, §14 (plan, lot W1) : navigator.credentials seulement dans
+  // account/navigateur.ts (la démo le remplace par une passkey simulée), utilisé par account/webauthn.ts ;
+  // ni l'un ni l'autre ne fait de requête ; et aucune requête entre le geste et l'appel
+  // au navigateur (Safari annule la cérémonie) : dans les fonctions de session appelées par un
+  // geste, rien de api.* avant creer( / obtenir( / prfApresCreation(, sauf le rechargement d'une
+  // cérémonie échue (« if (!fraiche(c)) »), qui n'arrive que si l'écran ne l'a pas chargée.
+  it("compte : navigator.credentials seulement dans account/navigateur.ts ; aucune requête entre le geste et la cérémonie", () => {
+    const sansCommentaires = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
+    expect(files.filter((f) => f.rel !== "account/navigateur.ts" && /navigator\s*\??\.\s*credentials|\bcredentials\s*\??\.\s*(?:create|get)\s*\(|PublicKeyCredential\b/.test(sansCommentaires(f.text))).map((f) => f.rel)).toEqual([]);
+    expect(files.find((f) => f.rel === "account/navigateur.ts")!.text).toMatch(/navigator\?\.credentials/);
+    for (const r of ["account/navigateur.ts", "account/navigateur.demo.ts", "account/webauthn.ts"]) expect(files.find((f) => f.rel === r)!.text, r).not.toMatch(/\bfetch\b|api\./);
+    const s = files.find((f) => f.rel === "account/session.svelte.ts")!.text;
+    const gestes: [string, RegExp][] = [
+      ["creerPasskey", /\bcreer\(/],
+      ["ajouterPasskey", /\bcreer\(/],
+      ["deuxiemeGeste", /prfApresCreation\(/],
+      ["deuxiemeGesteAjout", /prfApresCreation\(/],
+      ["seConnecter", /\bobtenir\(/],
+      ["reauthLien", /\bobtenir\(/],
+    ];
+    for (const [nom, appel] of gestes) {
+      const debut = s.search(new RegExp(`(?:export )?async function ${nom}\\(`));
+      expect(debut, nom).toBeGreaterThan(-1);
+      const corps = s.slice(debut, s.indexOf("\n}\n", debut));
+      const i = corps.search(appel);
+      expect(i, nom).toBeGreaterThan(-1);
+      const avant = corps.slice(0, i).replace(/if \(!fraiche\(c\)\) c = \{[^\n]*\n/g, "");
+      expect(avant, nom).not.toMatch(/\bapi\.|\bfetch\b|preparer[A-Z]/);
+    }
   });
   it("compte : s_profil et K_compte seulement dans account/", () => {
     expect(offenders(/s_profil|sProfil|kCompte|K_compte/, (r) => !r.startsWith("account/") && !r.startsWith("engine/"))).toEqual([]);

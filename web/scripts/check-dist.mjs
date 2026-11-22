@@ -17,8 +17,12 @@ const MARK = "__SHH_DEMO__";
 /** Phrase du dictionnaire anglais (titre de l'accueil) : absente du script principal de production. */
 // Phrase propre au dictionnaire anglais (titre de l'accueil), à garder égale à en.ts (test).
 const EN_PROBE = "One link, one password, then it's gone.";
-/** Un domaine de la liste des jetables (server/internal/compte/jetables.txt), cité nulle part ailleurs : absent de tout script de production. */
-const JETABLES_PROBE = "guerrillamail.com";
+/**
+ * Appel des passkeys du navigateur (account/navigateur.ts) : jamais dans la démo, qui simule la
+ * passkey (conception du compte par passkey §11, Q8 : aucune passkey de démo laissée dans le
+ * gestionnaire des visiteurs) ; présent avec --comptes.
+ */
+const PASSKEY_PROBE = /navigator\??\.credentials/;
 
 /**
  * Poids maximal du module WebAssembly du salon, en brotli (plan salon C-1, Global Constraints ;
@@ -254,6 +258,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   // et les pages du compte manqueraient en silence).
   if (comptes && !demo && !all.some((f) => /\.m?js$/.test(f.rel) && f.data.includes("/api/compte")))
     problems.push("module de compte absent alors que --comptes est demandé (build fait sans SHH_SITE_COMPTES=1 ?)");
+  if (comptes && !demo && !all.some((f) => /\.m?js$/.test(f.rel) && PASSKEY_PROBE.test(f.data.toString("utf8"))))
+    problems.push("appel des passkeys (navigator.credentials) absent alors que --comptes est demandé");
+  if (demo)
+    for (const f of all) if (/\.m?js$/.test(f.rel) && PASSKEY_PROBE.test(f.data.toString("utf8"))) problems.push(`${f.rel} : appel des passkeys du navigateur dans la démo (la passkey y est simulée)`);
 
   if (!demo) {
     for (const f of all)
@@ -280,17 +288,17 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     // nombres), ne cite aucun de ces fichiers sans son empreinte SHA-384, et aucun n'est orphelin.
     // Scripts du site (points d'entrée et morceaux partagés des pages séparées) : tout script
     // sous assets/ sauf les scripts lus avec leur empreinte : Worker du moteur, dictionnaire
-    // anglais, liste des domaines jetables (données lues par fetch), et tout script de Worker
+    // anglais (données lues par fetch), et tout script de Worker
     // (« worker » dans le nom : le Worker anti-robot, assets/pow-worker-*.js, audit du 20 novembre
     // W3 ; ou un Worker émis par Vite, ?worker). new Worker(url) n'ayant pas de contrôle
     // d'intégrité, chacun doit être cité avec son empreinte SHA-384 (lu par fetch avec
     // `integrity`, puis lancé depuis un Blob).
     const WORKER = /^assets\/[^/]*worker[^/]*\.js$/i;
-    const mains = all.filter((f) => /^assets\/(?!engine-|locale-|jetables-)[^/]+\.js$/.test(f.rel) && !WORKER.test(f.rel)).map((f) => ({ rel: f.rel, text: f.data.toString("utf8") }));
+    const mains = all.filter((f) => /^assets\/(?!engine-|locale-)[^/]+\.js$/.test(f.rel) && !WORKER.test(f.rel)).map((f) => ({ rel: f.rel, text: f.data.toString("utf8") }));
     for (const m of mains) {
       if (m.text.includes("AGFzbQEAAAA") || /\b0,\s*97,\s*115,\s*109,\s*1,\s*0,\s*0,\s*0\b/.test(m.text))
         problems.push(`${m.rel} : octets WebAssembly en ligne dans le script principal : le moteur doit rester dans assets/engine-*.wasm, lu avec son empreinte`);
-      const cited = new Set([...m.text.matchAll(/\/(assets\/(?:engine-[A-Za-z0-9_-]+\.js|locale-[A-Za-z0-9_-]+\.js|jetables-[A-Za-z0-9_-]+\.js|[A-Za-z0-9._-]*worker[A-Za-z0-9._-]*\.js|[A-Za-z0-9._-]+\.wasm))/gi)].map((x) => x[1]));
+      const cited = new Set([...m.text.matchAll(/\/(assets\/(?:engine-[A-Za-z0-9_-]+\.js|locale-[A-Za-z0-9_-]+\.js|[A-Za-z0-9._-]*worker[A-Za-z0-9._-]*\.js|[A-Za-z0-9._-]+\.wasm))/gi)].map((x) => x[1]));
       for (const rel of cited) {
         const data = byRel.get(rel);
         if (!data) problems.push(`${rel} : cité par le script principal, absent du site`);
@@ -300,17 +308,12 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     // Fichier du moteur (.wasm, script du Worker) qu'aucun script principal ne cite : orphelin
     // (chargé d'ailleurs, sans contrôle d'intégrité, ou inutile). Cité sans empreinte : ci-dessus.
     for (const f of all)
-      if ((/^assets\/(?:[^/]+\.wasm|engine-[^/]+\.js|locale-[^/]+\.js|jetables-[^/]+\.js)$/i.test(f.rel) || WORKER.test(f.rel)) && !mains.some((m) => m.text.includes(`/${f.rel}`)))
+      if ((/^assets\/(?:[^/]+\.wasm|engine-[^/]+\.js|locale-[^/]+\.js)$/i.test(f.rel) || WORKER.test(f.rel)) && !mains.some((m) => m.text.includes(`/${f.rel}`)))
         problems.push(`${f.rel} : orphelin, aucun script principal ne le cite avec son empreinte SHA-384`);
     // Une seule langue au démarrage (D4) : le dictionnaire anglais (assets/locale-en-*.js, cité avec
     // son empreinte ci-dessus) n'est pas aussi dans le script principal.
     if (all.some((f) => /^assets\/locale-en-[^/]+\.js$/.test(f.rel)))
       for (const m of mains) if (m.text.includes(EN_PROBE)) problems.push(`${m.rel} : dictionnaire anglais dans le script principal (il doit rester dans assets/locale-en-*.js)`);
-    // Domaines jetables de l'inscription (U13, vite.config.ts, jetablesAsset) : dans leur fichier
-    // (assets/jetables-*.js, cité avec son empreinte ci-dessus), jamais dans un script ; avec
-    // --comptes, ce fichier existe (la page d'inscription est construite).
-    for (const m of mains) if (m.text.includes(JETABLES_PROBE)) problems.push(`${m.rel} : liste des domaines jetables dans un script (elle doit rester dans assets/jetables-*.js)`);
-    if (comptes && !all.some((f) => /^assets\/jetables-[^/]+\.js$/.test(f.rel))) problems.push("assets/jetables-*.js absent alors que --comptes est demandé (page d'inscription sans sa liste)");
     // Moteur WebAssembly : précompressé comme le texte (vite.config.ts, COMPRESSIBLE ; servi par
     // static.go avec Content-Encoding), sinon 506 Ko seraient lus au lieu de 148 Ko en brotli.
     for (const f of all) {

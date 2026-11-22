@@ -28,7 +28,7 @@ describe("vignette d'aperçu gardée : dite honnêtement", () => {
   });
 });
 
-// Compte par e-mail (plan du compte, lot 16 ; conception compte §16, §21.18). Règle : les textes
+// Compte par passkey (conception du compte par passkey §8, §12). Règle : les textes
 // qui décrivent le compte n'existent qu'avec __COMPTES__ ; les phrases communes restent vraies
 // avec ou sans compte (le site public n'annonce pas une fonction absente).
 const NOMS = ["securite", "confidentialite", "conditions", "mentions", "signaler"] as const;
@@ -38,7 +38,7 @@ const texte = (name: (typeof NOMS)[number], lang: "fr" | "en", comptes: boolean)
 };
 const tout = (lang: "fr" | "en", comptes: boolean) => NOMS.map((n) => texte(n, lang, comptes)).join("\n");
 
-describe("textes publics et compte par e-mail", () => {
+describe("textes publics et compte par passkey", () => {
   test("aucune page ni aucun texte ne promet « ni e-mail » ni « 100 % » ; « Aucun cookie » reste écrit", () => {
     for (const comptes of [false, true]) {
       expect(tout("fr", comptes)).not.toMatch(/ni e-mail|100\s?%/iu);
@@ -57,18 +57,44 @@ describe("textes publics et compte par e-mail", () => {
     }
   });
 
-  test("avec __COMPTES__ : Confidentialité dit ce que garde le compte (empreinte, profil lisible, deux coffres, salons, catégories, motif, 7 jours, sauvegardes 7 jours, fournisseur, 13 mois)", () => {
+  test("avec __COMPTES__ : Confidentialité dit ce que garde le compte par passkey (clés publiques pseudonymes, clé de récupération, profil illisible, deux coffres, gestionnaires, salons, catégories, recours, sauvegardes 7 jours, 13 mois)", () => {
     const f = texte("confidentialite", "fr", true);
-    for (const re of [/Sans compte pour envoyer, recevoir ou rejoindre un salon/u, /qu'en empreinte/u, /pas en clair/u, /fournisseur d'envoi d'e-mails/u, /ne contient que le code/u, /ne quitte jamais votre appareil/u, /le service peut donc les lire/u, /second coffre, chiffré par votre mot de passe seulement/u, /quels salons votre compte a créés/u, /jamais quels partages/u, /au jour/u, /catégorie/u, /bannissement/u, /recours/u, /7 jours|7 jours/u, /30 jours/u, /13 mois/u, /exporter vos données/u])
+    for (const re of [
+      /Sans compte pour envoyer, recevoir ou rejoindre un salon/u,
+      /Pour créer un salon, un compte sans e-mail ni mot de passe, par passkey/u,
+      /clé publique/u,
+      /données pseudonymes/u,
+      /restent des données personnelles/u,
+      /Votre clé de récupération ne quitte jamais votre appareil/u,
+      /Votre pseudo, votre photo et votre abonnement sont chiffrés sur vos appareils : le service ne peut pas les lire\./u,
+      /second coffre/u,
+      /Apple, Google ou votre gestionnaire de mots de passe/u,
+      /quels salons votre compte a créés/u,
+      /jamais quels partages/u,
+      /au jour/u,
+      /catégorie/u,
+      /bannissement/u,
+      /recours/u,
+      /7 jours/u,
+      /30 jours/u,
+      /13 mois/u,
+      /exporter vos données/u,
+    ])
       expect(f).toMatch(re);
+    // Le séquestre a disparu (conception §8) : plus rien ne dit que le service peut lire le profil.
+    expect(f).not.toMatch(/peut donc les lire|peut lire votre profil|mot de passe oublié|adresse e-mail n'est gardée|fournisseur d'envoi/u);
     const e = texte("confidentialite", "en", true);
-    for (const re of [/only as a fingerprint/u, /email delivery provider/u, /can therefore read them/u, /encrypted by your password only/u, /never which shares/u, /category/u, /appeal/u, /erased after 7 days/u, /in these copies for up to 7 days/u, /13 months/u]) expect(e).toMatch(re);
+    for (const re of [/neither email nor password, using a passkey/u, /public key/u, /pseudonymous data/u, /Your recovery key never leaves your device/u, /the service cannot read them/u, /Apple, Google or your password manager/u, /never which shares/u, /category/u, /appeal/u, /erased after 7 days/u, /in these copies for up to 7 days/u, /13 months/u]) expect(e).toMatch(re);
+    expect(e).not.toMatch(/can therefore read them|can read your profile|forgotten password|email delivery/u);
     expect(texte("conditions", "fr", true)).toMatch(/au moins 15 ans/u);
+    expect(texte("conditions", "fr", true)).toMatch(/Sans passkey ni clé de récupération, le compte ne peut pas être récupéré/u);
     expect(texte("conditions", "en", true)).toMatch(/at least 15/u);
     expect(texte("securite", "fr", true)).toMatch(/Ce que le compte ne protège pas/u);
+    expect(texte("securite", "fr", true)).toMatch(/Votre clé de récupération est la clé du compte : qui la lit peut prendre le compte/u);
+    expect(texte("securite", "fr", true)).toMatch(/protégée seulement par son verrouillage/u);
     expect(texte("securite", "en", true)).toMatch(/What the account does not protect/u);
+    for (const lang of ["fr", "en"] as const) expect(tout(lang, true)).not.toMatch(/e-?mail\b[^.]*(code|empreinte|fingerprint)|double authentification|two-factor|séquestr|escrow/iu);
   });
-
   test("Signaler un abus : la catégorie part avec le signalement (feuille du lot 14, publique)", () => {
     expect(texte("signaler", "fr", false)).toMatch(/ne contient que la catégorie choisie/u);
     expect(texte("signaler", "fr", false)).not.toMatch(/ni le motif/u);
@@ -84,8 +110,8 @@ describe("textes publics et compte par e-mail", () => {
 
   test("accueil : la carte « Partage sans compte » ne parle du compte qu'avec __COMPTES__", () => {
     expect(fr["home.priv.account.p"]).not.toMatch(/salon|empreinte|en clair/u);
-    expect(fr["home.priv.account.p.comptes"]).toMatch(/Pour créer un salon, une adresse e-mail que nous ne gardons pas en clair/u);
-    expect(en["home.priv.account.p.comptes"]).toMatch(/To create a room, an email address/u);
+    expect(fr["home.priv.account.p.comptes"]).toMatch(/Pour créer un salon, un compte sans e-mail ni mot de passe, par passkey\./u);
+    expect(en["home.priv.account.p.comptes"]).toMatch(/To create a room, an account with neither email nor password, using a passkey\./u);
   });
 });
 

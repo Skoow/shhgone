@@ -26,7 +26,7 @@ describe("applySeo", () => {
     }
   });
   it("pages privées : noindex, pas de canonique", () => {
-    for (const name of ["envoyer", "open", "manage", "notfound", "signaler", "unsupported", "compte", "inscription", "connexion", "oubli", "profil"] as const) {
+    for (const name of ["envoyer", "open", "manage", "notfound", "signaler", "unsupported", "compte", "inscription", "connexion", "recuperation", "profil"] as const) {
       applySeo("home", document, ENV);
       applySeo(name, document, ENV);
       expect(robots(), name).toBe("noindex");

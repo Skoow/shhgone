@@ -2,7 +2,9 @@
   // Cadre des pages du compte (conception compte §12, §21.15) : colonne centrée de 28 rem au plus,
   // titre de l'écran (focus à l'arrivée), sous-titre, contenu. 20 novembre (propriétaire : « une
   // forme jolie ») : une carte arrondie, lueur menthe en haut, titre et sous-titre centrés.
+  // Démo : la phrase de la démo (aucune passkey créée, compte de cet onglet seulement) sous le titre.
   import { untrack, type Snippet } from "svelte";
+  import { getDemo } from "../../app/demo-hooks";
 
   type Props = { titre: string; sous?: string; children: Snippet };
   let { titre, sous, children }: Props = $props();
@@ -15,6 +17,7 @@
 <section class="cadre" aria-labelledby="compte-titre">
   <h1 id="compte-titre" class="titre" tabindex="-1" data-large-title bind:this={h1}>{titre}</h1>
   {#if sous}<p class="sous">{sous}</p>{/if}
+  {#if getDemo()}<p class="note" data-demo-note>{getDemo()!.compteNote}</p>{/if}
   {@render children()}
 </section>
 

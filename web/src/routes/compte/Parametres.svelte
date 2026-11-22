@@ -1,11 +1,10 @@
 <script lang="ts">
   // Paramètres (/compte ; conception compte §21.15.4 ; demandes du propriétaire du 14 novembre ;
   // plan, lot 13). Monté seulement avec __COMPTES__ et une session ouverte (App.svelte, pages.ts).
-  // Sections dans l'ordre : Profil (avec ancienneté et limites), Adresse e-mail, Mot de passe,
-  // Double authentification, Appareils, Confidentialité, Abonnement, Langue, Récupération, Vos
+  // Sections dans l'ordre (conception du compte par passkey §3.5) : Profil (avec ancienneté et
+  // limites), Passkeys, Clé de récupération, Appareils, Confidentialité, Abonnement, Langue, Vos
   // données ; puis « Se déconnecter » et « Supprimer le compte » (écran dédié, sans changer
-  // l'adresse de la page). L'état du compte (GET /api/compte) est relu après chaque changement de
-  // sécurité. Aucune adresse ni pseudo dans le titre de l'onglet ni dans l'adresse de la page.
+  // l'adresse de la page). Aucun pseudo dans le titre de l'onglet ni dans l'adresse de la page.
   import { untrack } from "svelte";
   import { account, ecrireProfil, etatCompte, seDeconnecter, type EtatServeur } from "../../account/session.svelte";
   import { followLink, href, navigate } from "../../app/router.svelte";
@@ -18,19 +17,16 @@
   import Segmented from "../../ui/Segmented.svelte";
   import Cadre from "./Cadre.svelte";
   import CarteCompte from "./CarteCompte.svelte";
-  import { erreur, jourLong } from "./erreurs";
+  import { erreur } from "./erreurs";
   import Abonnement from "./sections/Abonnement.svelte";
   import Appareils from "./sections/Appareils.svelte";
   import Confidentialite from "./sections/Confidentialite.svelte";
   import Donnees from "./sections/Donnees.svelte";
-  import DoubleAuth from "./sections/DoubleAuth.svelte";
-  import Email from "./sections/Email.svelte";
-  import MotDePasseSection from "./sections/MotDePasse.svelte";
+  import Passkeys from "./sections/Passkeys.svelte";
   import Recuperation from "./sections/Recuperation.svelte";
   import Section from "./sections/Section.svelte";
   import Supprimer from "./Supprimer.svelte";
 
-  const uid = $props.id();
   let etat = $state.raw<EtatServeur | null>(null);
   let bandeau = $state("");
   let vue = $state<"liste" | "supprimer">("liste");
@@ -56,14 +52,11 @@
     });
   });
 
-  const bloque = $derived(etat?.recupJusqu ? t("account.forgot.recup", { date: jourLong(etat.recupJusqu) }) : "");
-
   async function deconnecter() {
     await seDeconnecter();
     navigate("/compte/connexion");
   }
   function versSupprimer() {
-    if (bloque) return;
     vue = "supprimer";
     if (typeof window.scrollTo === "function") window.scrollTo(0, 0);
   }
@@ -85,9 +78,8 @@
         </a>
         <CarteCompte {etat} />
       </Section>
-      <Email {etat} />
-      <MotDePasseSection {etat} />
-      <DoubleAuth {etat} onchange={recharger} />
+      <Passkeys />
+      <Recuperation />
       <Appareils />
       <Confidentialite />
       <Abonnement />
@@ -101,12 +93,11 @@
           bind:value={langue}
         />
       </Section>
-      <Recuperation {etat} />
       <Donnees />
       <div class="fin">
         <Button variant="secondary" onpress={deconnecter}>{t("account.logout")}</Button>
-        <Button variant="danger" disabled={!!bloque} aria-describedby={bloque ? `${uid}-r` : undefined} onpress={versSupprimer}>{t("account.delete")}</Button>
-        {#if bloque}<p id="{uid}-r" class="raison">{bloque}</p>{/if}
+        {#if account.cleLocale}<p class="raison" data-deconnexion-cle>{t("account.logout.localKey")}</p>{/if}
+        <Button variant="danger" onpress={versSupprimer}>{t("account.delete")}</Button>
       </div>
     </div>
   </Cadre>

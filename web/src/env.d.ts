@@ -47,13 +47,6 @@ declare module "virtual:shh-lang" {
   export const integrity: string;
 }
 
-// Domaines jetables (greffon shh-jetables, vite.config.ts), production seulement : adresse et
-// empreinte SRI de assets/jetables-EMPREINTE.js.
-declare module "virtual:shh-jetables" {
-  export const src: string;
-  export const integrity: string;
-}
-
 // Module WebAssembly du salon (greffon shh-salon, vite.config.ts). Production : adresse et
 // empreinte SRI de assets/salon-EMPREINTE.wasm. Démo : le .wasm en base64 (`wasm`), dans un
 // morceau chargé à part (le pseudo du compte de la démo, 19 novembre).

@@ -247,6 +247,57 @@ export function motDePasseValide(password: string, adresse: Adresse): Promise<vo
   });
 }
 
+// --- Compte par passkey (conception 2026-11-22-compte-passkey-design.md §5 ; vecteurs
+// engine/vectors/compte-v3.json) : le moteur dérive (HKDF, codage de la clé de récupération),
+// WebCrypto chiffre (web/src/account/keys.ts). Les copies rendues sont effacées par l'appelant.
+
+/** E_prf = SHA-256(« shhdrop/v3/compte/prf/1 ») : valeur de prf.eval.first (32 octets, publique). */
+export function entreePrf(): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.entreePrf() as Uint8Array<ArrayBuffer>);
+}
+
+/** KEK_i = HKDF(P_i, « shhdrop/v3/compte/enveloppe/prf ») ; sortie PRF de 32 octets. */
+export function kekPrf(p: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.kekPrf(p) as Uint8Array<ArrayBuffer>);
+}
+
+/** AD de l'enveloppe PRF : « SHH-CENV2 » ‖ h ‖ SHA-256(cred_id) ; sinon cred_id_invalide. */
+export function adEnveloppePrf(h: Uint8Array, credId: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.adEnveloppePrf(h, credId) as Uint8Array<ArrayBuffer>);
+}
+
+/** AD de l'enveloppe de récupération : « SHH-CENV2 » ‖ h ‖ « recup ». */
+export function adEnveloppeRecup(h: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.adEnveloppeRecup(h) as Uint8Array<ArrayBuffer>);
+}
+
+/** K_profil = HKDF(K_compte, « shhdrop/v3/compte/profil »). */
+export function cleProfilCompte(kCompte: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.cleProfilCompte(kCompte) as Uint8Array<ArrayBuffer>);
+}
+
+/** Clé de récupération R (16 octets) affichée : 7 groupes « XXXX-…-XXX ». */
+export function cleRecupAffichage(r: Uint8Array): Promise<string> {
+  return run((e) => e.wasm.cleRecupAffichage(r) as string);
+}
+
+/** R lue d'une saisie (tolérante) ; sinon cle_recup_longueur, cle_recup_caractere, cle_recup_controle. */
+export function cleRecupLire(saisie: string): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => {
+    const t = utf8(saisie);
+    try {
+      return e.wasm.cleRecupLire(t) as Uint8Array<ArrayBuffer>;
+    } finally {
+      t.fill(0);
+    }
+  });
+}
+
+/** A_r (envoyé à recup seulement), v_r = SHA-256(A_r), KEK_r (jamais envoyée). */
+export function cleRecupDerivees(r: Uint8Array): Promise<{ aR: Uint8Array<ArrayBuffer>; vR: Uint8Array<ArrayBuffer>; kekR: Uint8Array<ArrayBuffer> }> {
+  return run((e) => e.wasm.cleRecupDerivees(r) as { aR: Uint8Array<ArrayBuffer>; vR: Uint8Array<ArrayBuffer>; kekR: Uint8Array<ArrayBuffer> });
+}
+
 // --- Graine, clés, enveloppe ---------------------------------------------------------------------
 
 /** Graine de contenu R : opaque (jamais en clair en JavaScript) ; `free()` l'efface. */

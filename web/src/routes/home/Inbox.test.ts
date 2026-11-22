@@ -197,7 +197,7 @@ describe("accueil connecté", () => {
 
   it("après une récupération par e-mail : bandeau d'information exact ; coffre illisible : bandeau d'erreur", async () => {
     await show({ recovered: true, vaultError: true });
-    expect(text()).toContain(`Votre compte a été récupéré. Les liens et salons enregistrés seulement dans l'ancien coffre ne sont plus disponibles${NNBSP}; ceux de cet appareil sont revenus.`);
+    expect(text()).toContain("Votre clé de récupération a servi. Si elle a pu être vue, créez-en une nouvelle dans les paramètres.");
     expect(text()).toContain("Vos données chiffrées ne s'ouvrent pas sur cet appareil. Reconnectez-vous.");
   });
 

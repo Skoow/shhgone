@@ -4,7 +4,7 @@
 // §41.8, D41-28, D41-29). Règles : jamais « 100 % », aucune allégation d'audit ni de pays
 // d'hébergement (plan B3), aucune identité d'éditeur ni d'hébergeur inventée (champs « à
 // compléter par le propriétaire »), aucune adresse e-mail. Chiffres lus dans les constantes.
-// Compte par e-mail (plan du compte, lot 16 ; conception compte §16, §21.18) : les textes qui
+// Compte par passkey (conception 2026-11-22-compte-passkey-design.md §8, §12) : les textes qui
 // DÉCRIVENT le compte ne s'ajoutent qu'avec __COMPTES__ (COMPTE_FR, COMPTE_EN) : le site public
 // n'annonce pas une fonction absente. Les phrases communes restent vraies dans les deux cas.
 import { CONTENT_MAX, MAX_ITEMS, MAX_OPENS, PW_TRIES, TTL_MAX_HOURS } from "../../limits";
@@ -642,7 +642,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
   }),
 };
 
-// --- Avec le compte (__COMPTES__ seulement ; conception compte §16, §21.18 ; à relire par le juriste) ---
+// --- Avec le compte (__COMPTES__ seulement ; conception du compte par passkey §8, §12, §13 ; à relire par le juriste) ---
 
 const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
   confidentialite: (p) => ({
@@ -653,16 +653,17 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         id: "compte",
         h: "Si vous créez un compte (pour créer des salons)",
         list: [
-          "Votre adresse e-mail n'est gardée qu'en empreinte (un calcul à sens unique, avec une clé secrète du serveur) : nous ne la gardons pas en clair. Elle passe par notre serveur le temps d'envoyer un code, et par notre fournisseur d'envoi d'e-mails (nom à compléter par le propriétaire), qui voit l'adresse, l'heure et le code. L'e-mail ne contient que le code.",
-          "Votre mot de passe ne quitte jamais votre appareil : le serveur reçoit seulement une valeur qui en est tirée, et n'en garde qu'une empreinte.",
-          "Votre pseudo, votre photo, votre langue et votre abonnement sont chiffrés, mais gardés de façon à pouvoir vous être rendus si vous oubliez votre mot de passe : le service peut donc les lire. Pour vérifier qu'il est unique, une forme simplifiée de votre pseudo est aussi gardée, en empreinte seulement.",
-          "Vos liens, les salons que vous rejoignez et la gestion de vos salons et partages sont dans un second coffre, chiffré par votre mot de passe seulement : nous ne pouvons pas les lire. Après un mot de passe oublié, ce coffre est perdu, sauf ce qui est encore sur un de vos appareils.",
-          "Nous savons quels salons votre compte a créés, le temps de leur vie, pour pouvoir bannir un compte qui nuit ; jamais quels partages.",
-          "Dates gardées au jour (création, ancienneté), dernière connexion au mois : aucune heure, aucune adresse IP, aucun nom d'appareil en clair.",
-          "Signalements : seulement leur catégorie, comptée en mémoire. Un bannissement garde l'empreinte de l'adresse, sa durée (3 ans par défaut) et sa catégorie, montrée à la personne ; un recours est possible.",
-          "Après une récupération par e-mail, l'adresse ne peut pas être changée ni le compte supprimé pendant 7 jours, par sécurité.",
-          "La base des comptes est sauvegardée chaque jour, chiffrée, chez un autre hébergeur ; chaque copie est effacée après 7 jours. Un compte supprimé peut donc rester jusqu'à 7 jours dans ces copies.",
-          "Sans connexion pendant 13 mois, le compte est effacé, au plus tard au début du 14e mois. Nous ne pouvons pas vous prévenir : nous n'avons pas votre adresse.",
+          "Pour créer un salon, un compte sans e-mail ni mot de passe, par passkey : votre téléphone, votre ordinateur ou votre gestionnaire de mots de passe vous reconnaît. Nous ne demandons ni adresse, ni numéro de téléphone, ni nom.",
+          "Pour chaque passkey, nous gardons sa clé publique, son identifiant, le mois de son ajout et si elle peut se synchroniser entre vos appareils ; jamais le modèle de votre gestionnaire. Avec l'identifiant tiré au hasard du compte, ce sont des données pseudonymes : elles ne disent pas qui vous êtes, mais restent des données personnelles.",
+          "Votre clé de récupération ne quitte jamais votre appareil : le serveur garde seulement un code à sens unique tiré d'elle, qui retrouve le compte quand vous la tapez, et jamais de quoi ouvrir vos données.",
+          "Votre pseudo, votre photo et votre abonnement sont chiffrés sur vos appareils : le service ne peut pas les lire. Pour vérifier qu'il est unique, une forme simplifiée de votre pseudo est aussi gardée, sous forme d'un code à sens unique.",
+          "Vos liens, les salons que vous rejoignez et la gestion de vos salons et partages sont dans un second coffre, chiffré de la même façon : nous ne pouvons pas les lire. Les deux coffres ne s'ouvrent qu'avec une de vos passkeys ou votre clé de récupération.",
+          "Apple, Google ou votre gestionnaire de mots de passe gardent la passkey : ils apprennent que vous avez un compte Shhgone et votre pseudo (c'est le nom de la passkey). C'est leur traitement, selon leurs propres règles.",
+          "Nous savons quels salons votre compte a créés, le temps de leur vie, pour pouvoir bannir un compte qui nuit ; jamais quels partages.",
+          "Dates gardées au jour (création, ancienneté), dernière connexion au mois : aucune heure, aucune adresse IP, aucun nom d'appareil ni de passkey en clair.",
+          "Signalements : seulement leur catégorie, comptée en mémoire. Un bannissement est lié au compte, avec sa durée (3 ans par défaut) et sa catégorie, montrée à la personne avec un identifiant pour un recours.",
+          "La base des comptes est sauvegardée chaque jour, chiffrée, chez un autre hébergeur ; chaque copie est effacée après 7 jours. Un compte supprimé peut donc rester jusqu'à 7 jours dans ces copies.",
+          "Sans connexion pendant 13 mois, le compte est effacé, au plus tard au début du 14e mois. Nous ne pouvons pas vous prévenir : nous n'avons aucun moyen de vous joindre.",
         ],
       }),
       "Vos droits",
@@ -670,7 +671,7 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         h: "Vos droits",
         p: [
           "Sans compte, nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits, utilisez le contact des mentions légales. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
-          "Avec un compte : vous pouvez exporter vos données (le fichier est fait sur votre appareil), corriger votre pseudo, votre photo et votre adresse, et supprimer votre compte à tout moment depuis ses paramètres. L'empreinte de votre adresse reste une donnée personnelle : pour une demande faite par adresse ou un recours contre un bannissement, écrivez-nous (contact des mentions légales).",
+          "Avec un compte : vous pouvez exporter vos données (le fichier est fait sur votre appareil), corriger votre pseudo et votre photo, et supprimer votre compte à tout moment depuis ses paramètres. Pour un recours contre un bannissement, écrivez-nous en donnant l'identifiant montré à la connexion (contact des mentions légales).",
         ],
       },
     ),
@@ -681,8 +682,9 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       id: "compte",
       h: "Compte",
       p: [
-        "Un compte gratuit sert seulement à créer des salons ; partager, ouvrir un lien et rejoindre un salon restent sans compte. Il faut avoir au moins 15 ans.",
-        "Un compte qui crée des salons pour nuire peut être banni : il ne peut plus créer de salon, ses salons sont fermés, et la même adresse ne peut pas en recréer un pendant la durée du bannissement (3 ans par défaut). Le motif est montré à la connexion ; un recours est possible par le contact des mentions légales.",
+        "Un compte gratuit sert seulement à créer des salons ; partager, ouvrir un lien et rejoindre un salon restent sans compte. Il faut avoir au moins 15 ans.",
+        "Le compte s'ouvre par une passkey ou par la clé de récupération montrée à sa création. Sans passkey ni clé de récupération, le compte ne peut pas être récupéré : nous n'avons aucun moyen de vous le rendre.",
+        "Un compte qui crée des salons pour nuire peut être banni : il ne peut plus créer de salon et ses salons sont fermés, pendant la durée du bannissement (3 ans par défaut). Le motif est montré à la connexion ; un recours est possible par le contact des mentions légales.",
         "Un compte sans connexion pendant 13 mois est effacé, au plus tard au début du 14e mois.",
       ],
     }),
@@ -693,12 +695,12 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       id: "compte",
       h: "Ce que le compte ne protège pas",
       list: [
-        "Votre boîte mail est la clé du compte : qui la lit peut le récupérer (avec la double authentification, il lui faut aussi votre application). Protégez-la bien.",
-        "Le service peut lire votre profil (pseudo, photo, langue, abonnement) : c'est ce qui permet de vous le rendre après un mot de passe oublié.",
-        "Qui a votre mot de passe a aussi vos liens et la gestion de vos salons et partages.",
-        "Votre fournisseur d'e-mails voit que vous recevez des codes Shhgone.",
+        "Votre clé de récupération est la clé du compte : qui la lit peut prendre le compte et retirer vos passkeys. Rangez-la hors ligne ou dans votre gestionnaire de mots de passe ; si elle a pu être vue, créez-en une nouvelle dans les paramètres.",
+        "Sur un appareil où votre passkey ne peut pas ouvrir vos données, la clé qui les ouvre est gardée sur l'appareil, protégée seulement par son verrouillage ; « Se déconnecter » l'efface.",
+        "Qui peut utiliser une de vos passkeys (votre téléphone déverrouillé, votre gestionnaire de mots de passe) a aussi vos liens et la gestion de vos salons et partages.",
+        "Sans passkey ni clé de récupération, le compte et ses données sont perdus.",
         "Notre serveur sait quels salons votre compte a créés, le temps de leur vie.",
-        "Un pseudo ne prouve pas une identité : dans un salon, n'importe qui peut choisir le même.",
+        "Un pseudo ne prouve pas une identité : dans un salon, n'importe qui peut choisir le même.",
       ],
     }),
   }),
@@ -713,16 +715,17 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         id: "compte",
         h: "If you create an account (to create rooms)",
         list: [
-          "Your email address is kept only as a fingerprint (a one-way computation with a secret server key): we do not keep it in readable form. It passes through our server while a code is sent, and through our email delivery provider (name to be completed by the owner), which sees the address, the time and the code. The email holds only the code.",
-          "Your password never leaves your device: the server only receives a value derived from it, and keeps only a fingerprint of that.",
-          "Your nickname, photo, language and subscription are encrypted, but kept so that they can be given back if you forget your password: the service can therefore read them. To check that it is unique, a simplified form of your nickname is also kept, as a fingerprint only.",
-          "Your links, the rooms you join and the management of your rooms and shares are in a second vault, encrypted by your password only: we cannot read them. After a forgotten password, this vault is lost, except what is still on one of your devices.",
+          "To create a room, an account with neither email nor password, using a passkey: your phone, your computer or your password manager recognises you. We ask for no address, no phone number and no name.",
+          "For each passkey, we keep its public key, its identifier, the month it was added and whether it can sync between your devices; never the model of your password manager. With the account's random identifier, this is pseudonymous data: it does not say who you are, but it is still personal data.",
+          "Your recovery key never leaves your device: the server keeps only a one-way code derived from it, which finds the account when you type it, and never anything that opens your data.",
+          "Your nickname, your photo and your subscription are encrypted on your devices: the service cannot read them. To check that your nickname is unique, a simplified form of it is also kept, as a one-way code.",
+          "Your links, the rooms you join and the management of your rooms and shares are in a second vault, encrypted the same way: we cannot read them. Both vaults only open with one of your passkeys or your recovery key.",
+          "Apple, Google or your password manager keep the passkey: they learn that you have a Shhgone account and your nickname (it is the passkey's name). That is their processing, under their own rules.",
           "We know which rooms your account created, for as long as they live, so that an account that does harm can be banned; never which shares.",
-          "Dates kept to the day (creation, seniority), last sign-in to the month: no time of day, no IP address, no readable device name.",
-          "Reports: only their category, counted in memory. A ban keeps the fingerprint of the address, its length (3 years by default) and its category, shown to the person; an appeal is possible.",
-          "After a recovery by email, the address cannot be changed and the account cannot be deleted for 7 days, for safety.",
+          "Dates kept to the day (creation, seniority), last sign-in to the month: no time of day, no IP address, no readable device or passkey name.",
+          "Reports: only their category, counted in memory. A ban is tied to the account, with its length (3 years by default) and its category, shown to the person with an identifier for an appeal.",
           "The accounts database is backed up every day, encrypted, with another host; each copy is erased after 7 days. A deleted account can therefore remain in these copies for up to 7 days.",
-          "With no sign-in for 13 months, the account is erased, at the latest at the start of the 14th month. We cannot warn you: we do not have your address.",
+          "With no sign-in for 13 months, the account is erased, at the latest at the start of the 14th month. We cannot warn you: we have no way to reach you.",
         ],
       }),
       "Your rights",
@@ -730,7 +733,7 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         h: "Your rights",
         p: [
           "Without an account, we keep nothing that could identify you or find your shares from your identity. To exercise your rights, use the contact in the legal notice. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
-          "With an account: you can export your data (the file is made on your device), correct your nickname, photo and address, and delete your account at any time from its settings. The fingerprint of your address is still personal data: for a request made by address or an appeal against a ban, write to us (contact in the legal notice).",
+          "With an account: you can export your data (the file is made on your device), correct your nickname and photo, and delete your account at any time from its settings. To appeal against a ban, write to us quoting the identifier shown at sign-in (contact in the legal notice).",
         ],
       },
     ),
@@ -742,7 +745,8 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       h: "Account",
       p: [
         "A free account is only used to create rooms; sharing, opening a link and joining a room need no account. You must be at least 15.",
-        "An account that creates rooms to do harm can be banned: it can no longer create rooms, its rooms are closed, and the same address cannot create another one for the length of the ban (3 years by default). The reason is shown at sign-in; an appeal is possible through the contact in the legal notice.",
+        "The account opens with a passkey or with the recovery key shown when it is created. Without a passkey or the recovery key, the account cannot be recovered: we have no way to give it back to you.",
+        "An account that creates rooms to do harm can be banned: it can no longer create rooms and its rooms are closed, for the length of the ban (3 years by default). The reason is shown at sign-in; an appeal is possible through the contact in the legal notice.",
         "An account with no sign-in for 13 months is erased, at the latest at the start of the 14th month.",
       ],
     }),
@@ -753,10 +757,10 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       id: "compte",
       h: "What the account does not protect",
       list: [
-        "Your mailbox is the key to the account: whoever reads it can recover it (with two-factor authentication, they also need your app). Protect it well.",
-        "The service can read your profile (nickname, photo, language, subscription): that is what lets it give it back after a forgotten password.",
-        "Whoever has your password also has your links and the management of your rooms and shares.",
-        "Your email provider sees that you receive Shhgone codes.",
+        "Your recovery key is the key to the account: whoever reads it can take over the account and remove your passkeys. Keep it offline or in your password manager; if it may have been seen, create a new one in the settings.",
+        "On a device where your passkey cannot open your data, the key that opens it is kept on the device, protected only by its lock; “Sign out” erases it.",
+        "Whoever can use one of your passkeys (your unlocked phone, your password manager) also has your links and the management of your rooms and shares.",
+        "Without a passkey or the recovery key, the account and its data are lost.",
         "Our server knows which rooms your account created, for as long as they live.",
         "A nickname does not prove an identity: in a room, anyone can pick the same one.",
       ],
