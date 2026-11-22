@@ -1192,8 +1192,6 @@ export const en = {
   "account.pseudo.hint": "Letters and digits without accents (A-Z, 0-9). Seen by the members of your rooms, unique among Shhgone accounts. 3\u00a0changes a year at most.",
   "account.pseudo.free": "Available",
   "account.pseudo.taken": "Already taken",
-  "account.pseudo.choose": "Choose your nickname: members of your rooms will see it. Letters and digits without accents (A-Z, 0-9).",
-  "salon.intro.pseudo.compte": "This nickname becomes your account's nickname (you can change it in your profile).",
   "salon.intro.pseudo.fige": "Your account's nickname. Change it in your profile (3\u00a0times a year at most).",
   "salon.pseudo.err.compte": "Couldn't check the nickname. Check your connection and try again.",
   "account.pseudo.later": "Availability will be checked at the next step.",

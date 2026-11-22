@@ -8,7 +8,7 @@
   // - Carte « Votre compte » (ancienneté, palier, abonnement, bannissement) et note de
   //   confidentialité : le profil est séquestré, le service peut le lire (R-D1).
   import { untrack } from "svelte";
-  import { account, changerPseudo, ecrireProfil, estPseudoProvisoire, etatCompte, pseudoInviteRetenu, pseudoLibre, verifierSaisie, type EtatServeur } from "../../account/session.svelte";
+  import { account, changerPseudo, ecrireProfil, etatCompte, pseudoLibre, verifierSaisie, type EtatServeur } from "../../account/session.svelte";
   import { followLink, href, navigate } from "../../app/router.svelte";
   import { t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
@@ -22,10 +22,7 @@
   import { codeDe, erreur, jourLong } from "./erreurs";
 
   let etat = $state.raw<EtatServeur | null>(null);
-  // Pseudo provisoire (20 novembre) : le champ est vide et une phrase demande d'en choisir un.
-  const provisoire = $derived(estPseudoProvisoire(account.profil?.pseudo));
-  // Pseudo provisoire : celui pris comme invité dans un salon de cet onglet est proposé (22 novembre).
-  let pseudo = $state(estPseudoProvisoire(account.profil?.pseudo) ? (pseudoInviteRetenu() ?? "") : (account.profil?.pseudo ?? ""));
+  let pseudo = $state(account.profil?.pseudo ?? "");
   let photo = $state.raw<Uint8Array | null>(account.profil?.photo ?? null);
   let errPseudo = $state<string | undefined>(undefined);
   let bandeau = $state("");
@@ -86,7 +83,6 @@
 
   <AvatarPicker grand bind:photo initiale={pseudo.trim()} onchange={photoChangee} />
 
-  {#if provisoire}<Banner kind="info">{t("account.pseudo.choose")}</Banner>{/if}
   <form novalidate onsubmit={(e) => e.preventDefault()}>
     <PseudoField bind:value={pseudo} {verifier} error={errPseudo} bind:el onsaisie={() => ((errPseudo = undefined), (ok = ""))} />
     {#if ok}<p class="ok" role="status">{ok}</p>{/if}

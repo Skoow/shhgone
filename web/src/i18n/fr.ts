@@ -1196,8 +1196,6 @@ export const fr = {
   "account.pseudo.hint": "Lettres et chiffres sans accent (A-Z, 0-9). Vu par les membres de vos salons, unique parmi les comptes Shhgone. 3\u202fchangements par an au plus.",
   "account.pseudo.free": "Disponible",
   "account.pseudo.taken": "Déjà pris",
-  "account.pseudo.choose": "Choisissez votre pseudo\u202f: il sera vu par les membres de vos salons. Lettres et chiffres sans accent (A-Z, 0-9).",
-  "salon.intro.pseudo.compte": "Ce pseudo devient celui de votre compte (vous pourrez le changer dans votre profil).",
   "salon.intro.pseudo.fige": "Le pseudo de votre compte. Il se change dans votre profil (3\u202ffois par an au plus).",
   "salon.pseudo.err.compte": "Vérification du pseudo impossible. Vérifiez votre réseau et réessayez.",
   "account.pseudo.later": "La disponibilité sera vérifiée à l'étape suivante.",

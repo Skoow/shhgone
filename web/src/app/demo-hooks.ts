@@ -19,6 +19,8 @@ export type DemoHooks = {
   readonly passkeys: unknown;
   /** Phrase des pages du compte (langue courante) : rien n'est envoyé, le compte vit dans cet onglet. */
   readonly compteNote: string;
+  /** Bouton de l'inscription (langue courante) : « Simuler la passkey », aucune passkey n'étant créée. */
+  readonly signupPasskey: string;
   /** Bandeau permanent, rendu dans l'emplacement `banner` de AppShell. */
   Banner: Component;
 };

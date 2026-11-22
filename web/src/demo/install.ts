@@ -34,6 +34,11 @@ const COMPTE_NOTE = {
   fr: "Dans la démo, aucune passkey n'est créée (la feuille du système est simulée)\u202f; ce compte n'existe que dans cet onglet et disparaît à sa fermeture.",
   en: "In the demo, no passkey is created (the system sheet is simulated); this account only exists in this tab and disappears when it closes.",
 } as const;
+/** Bouton de l'inscription : la démo ne crée aucune vraie passkey (22 novembre). */
+const SIGNUP_PASSKEY = {
+  fr: "Simuler la passkey",
+  en: "Simulate the passkey",
+} as const;
 const INVALID_LINK_NOTE = {
   fr: "(normal en démo : un partage n'existe que dans l'onglet qui l'a créé)",
   en: "(expected in the demo: a share only exists in the tab that created it)",
@@ -125,6 +130,9 @@ export async function installDemo(w: Window): Promise<void> {
     passkeys,
     get compteNote() {
       return COMPTE_NOTE[getLang()];
+    },
+    get signupPasskey() {
+      return SIGNUP_PASSKEY[getLang()];
     },
     get securityGaps() {
       return SECURITY_GAPS[getLang()].join("\n");
