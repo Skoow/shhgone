@@ -25,10 +25,30 @@ Source : `docs/superpowers/specs/2026-11-14-compte-email-design.md`, §20 et §2
 
 À lui soumettre, avec la conception du compte (§16, §21.18) :
 - **LCEN art. 6 et décret 2021-1362** : obligation possible de conserver 1 an les données de création de compte (adresse, pseudonyme) et de connexion (adresse IP). Elle contredirait « adresse jamais gardée » et « aucune adresse IP sur disque » (gravité élevée, R17).
+- **Recherche du 22 novembre (non juridique, à faire confirmer)**, détail en §2.1 ci-dessous.
 - **Contenus terroristes et pédocriminels** : obligations de l'hébergeur (LCEN, DSA art. 16 à 18, règlement TCO 2021/784) face à des signalements de contenus que Shhgone ne peut pas lire (R15).
 - **Motif de bannissement** gardé sous forme de catégorie : donnée relative à une infraction présumée (RGPD art. 10, R16).
 - **Photo de profil** : contenu hébergé, lisible par le séquestre (R22).
 - **Suppression retardée de 7 jours** après une récupération : compatible avec le RGPD art. 12.3 ? (§21.10).
+
+### 2.1 Conservation des IP et des données d'identification : ce que disent les textes (22 novembre 2026)
+
+Recherche faite sans avocat, sur sources secondaires (Légifrance refuse les lectures automatiques) ; seules les citations marquées « texte » ont été recoupées.
+
+- **Pas d'obligation de collecter** (texte) : décret 2021-1362, art. 8 : « Les données mentionnées aux articles 2 à 6 ne doivent être conservées que dans la mesure où elles sont collectées » ; Conseil d'État, 30 juin 2023, n° 459724 : les hébergeurs « ne sont tenus de conserver que les données qu'ils sont amenés à collecter dans le cadre de leur activité ».
+- **Mais ce qui est collecté doit être gardé** : identité civile, dont l'adresse e-mail, 5 ans ; pseudonyme et données de vérification du mot de passe, 1 an après la clôture ; paiement, 1 an ; IP de la source de connexion, 1 an.
+- **Nouveau, gravité élevée** : injonction « sécurité nationale » renouvelée par le décret n° 2026-920 du 30 septembre 2026 (en vigueur le 21 octobre 2026) ; elle vise aussi les hébergeurs (art. 6 du décret 2021-1362 : identifiant du contenu, nature de l'opération, date et heure, 1 an). Shhdrop crée l'identifiant et l'heure de chaque partage puis les détruit : non traité jusqu'ici.
+- **Nouveau, gravité élevée** : le salon est probablement un « service de communications interpersonnelles non fondé sur la numérotation » (CPCE L32, ordonnance 2021-650), donc Shhdrop serait opérateur pour le salon (L34-1). Précédent : la Cour fédérale allemande a traité Tuta comme un service de télécommunications.
+- **Sanction** (ancien art. 6 VI LCEN, numérotation après la loi SREN à vérifier) : 1 an et 75 000 € pour le dirigeant, 375 000 € pour la personne morale. Le risque concret est une réquisition à laquelle on ne peut pas répondre.
+
+Questions à poser à l'avocat :
+1. Une IP tenue en mémoire quelques minutes, pour limiter le débit, est-elle « collectée » au sens de l'art. 8 ?
+2. L'adresse e-mail reçue pour envoyer le code puis gardée en empreinte HMAC : identité civile « collectée » à garder 5 ans ? L'empreinte suffit-elle ? Effet sur la suppression du compte ?
+3. Le salon fait-il de Shhdrop un opérateur (L32, L34-1) ? Déclaration à l'ARCEP ?
+4. L'injonction 2026-920 oblige-t-elle à garder un an l'identifiant et l'heure de chaque partage et de chaque salon ?
+5. Des liens privés relèvent-ils de l'hébergement (LCEN, DSA) ?
+6. Où sont aujourd'hui l'obligation et la sanction après la loi SREN ?
+7. Que faire face à un ordre de journalisation ciblée pour l'avenir (art. 100 du code de procédure pénale) ?
 
 ## 3. Ce qui manque encore dans le produit
 
