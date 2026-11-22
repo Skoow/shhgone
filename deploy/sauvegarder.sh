@@ -17,7 +17,7 @@
 #      fournisseur que l'hébergeur), puis effacement du chiffré local.
 # Chaque base part dans son propre fichier : comptes-<date>.db.age, paiements-<date>.db.age.
 # Rien d'autre n'est sauvegardé : ni shares.db, ni partages, ni salons, ni la clé du serveur
-# (K_serveur), qui se garde à part, hors ligne (README §12). La rotation (30 copies) est la
+# (K_serveur), qui se garde à part, hors ligne (README §12). La rotation (7 jours, README §12) est la
 # règle de cycle de vie du stockage, pas ce script : le compte en écriture seule ne peut ni
 # lister ni effacer.
 #
