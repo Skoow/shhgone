@@ -18,7 +18,7 @@
   import { getLang, t } from "../i18n/i18n.svelte";
   import { createDraft, destroyShare, type CaptchaCtx, type Draft, type TtlHours } from "../index";
   import { limitesDe, type Formule } from "../limits";
-  import { formulesDisponibles, prendreJeton } from "../paiement/jetons";
+  import { formulesDisponibles, planifierReapprovisionnement, prendreJeton } from "../paiement/jetons";
   import { idbDuNavigateur } from "../paiement/pass";
   import { announce } from "../ui/announce";
   import Banner from "../ui/Banner.svelte";
@@ -74,11 +74,16 @@
       vivant = false;
     };
   });
+  // S16 : après chaque dépense, la réserve est refaite à une heure tirée au hasard (jetons.ts),
+  // pour que le partage payant suivant ne déclenche pas d'émission au même moment.
   function jetonDe(f: Formule): (() => Promise<string>) | undefined {
     if (f === "free") return undefined;
-    return () => {
+    return async () => {
       const idb = idbDuNavigateur();
-      return idb === null ? Promise.reject(new Error("aucun_jeton")) : prendreJeton(idb, f);
+      if (idb === null) throw new Error("aucun_jeton");
+      const j = await prendreJeton(idb, f);
+      planifierReapprovisionnement(idb, f);
+      return j;
     };
   }
   // Fichiers de la liste (relus pour recommencer l'envoi quand la formule change).

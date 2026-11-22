@@ -120,13 +120,22 @@ export function nouvelId(): string {
 
 const AAD_JETON = "shhdrop-pass/v1/jeton/";
 
-export type JetonGarde = { id: string; jeton: string; offre: OffrePayante; /** jour de sa clé (AAAA-MM-JJ, UTC) */ jour: string };
+export type JetonGarde = {
+  id: string;
+  jeton: string;
+  offre: OffrePayante;
+  /** jour de sa clé (AAAA-MM-JJ, UTC) */
+  jour: string;
+  /** Heure d'obtention (millisecondes, horloge de l'appareil ; 0 si inconnue) : choisir un jeton
+   *  « mûr » (S16, jetons.ts). Gardée ici seulement, jamais envoyée. */
+  obtenu: number;
+};
 
-export async function garderJeton(idb: IDBFactory, j: Omit<JetonGarde, "id">): Promise<void> {
+export async function garderJeton(idb: IDBFactory, j: Omit<JetonGarde, "id" | "obtenu"> & { obtenu?: number }): Promise<void> {
   const b = base(idb);
   const key = await b.key(await nouvelleCle());
   const id = "j:" + nouvelId();
-  const pt = utf8(JSON.stringify({ jeton: j.jeton, offre: j.offre, jour: j.jour }));
+  const pt = utf8(JSON.stringify({ jeton: j.jeton, offre: j.offre, jour: j.jour, obtenu: j.obtenu ?? 0 }));
   try {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: utf8(AAD_JETON + id) }, key, pt));
@@ -151,7 +160,9 @@ export async function lireJetons(idb: IDBFactory): Promise<JetonGarde[]> {
         const o = JSON.parse(new TextDecoder().decode(pt)) as Record<string, unknown>;
         pt.fill(0);
         if (typeof o.jeton !== "string" || !/^[A-Za-z0-9_-]{472}$/.test(o.jeton) || (o.offre !== "plus" && o.offre !== "pro") || typeof o.jour !== "string") continue;
-        out.push({ id, jeton: o.jeton, offre: o.offre, jour: o.jour });
+        // Sans heure (version précédente) : 0, compté comme mûr.
+        const obtenu = Number.isSafeInteger(o.obtenu) && (o.obtenu as number) >= 0 ? (o.obtenu as number) : 0;
+        out.push({ id, jeton: o.jeton, offre: o.offre, jour: o.jour, obtenu });
       } catch {
         // abîmé : ignoré
       }
