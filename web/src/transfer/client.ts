@@ -7,7 +7,6 @@
 import {
   BUCKETS,
   DATA_SEGMENTS,
-  KDF_CREATE,
   accessKeys,
   b64u,
   checkKdfParams,
@@ -35,7 +34,7 @@ import {
   type ParsedLink,
   type Rights,
 } from "../engine";
-import { MAX_OPENS, TTL_HOURS, type TtlHours } from "../limits";
+import { MAX_OPENS, TTL_HOURS } from "../limits";
 import * as api from "./api";
 import { type PreparedCaptcha } from "./prepare";
 import { isRiskyName, previewKindOf, safeName, type PreviewKind } from "./safety";
@@ -48,9 +47,6 @@ export type { Net } from "./api";
 export { CATEGORIES, CATEGORIE_AUTRE, type Categorie } from "./api";
 export type { PreparedCaptcha } from "./prepare";
 export type { PreviewKind } from "./safety";
-
-/** Paramètres Argon2id des nouveaux partages : ceux qu'impose deriveContentForCreate. */
-export { KDF_CREATE };
 
 /**
  * Délai minimal entre la réception du défi anti-robot et la création : le serveur refuse

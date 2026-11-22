@@ -1,10 +1,10 @@
 // Constantes uniques des chiffres affichés par les écrans (benchmark M5) : les textes (fr.ts,
 // en.ts) n'écrivent jamais ces nombres en dur, ils les reçoivent d'ici. Les mêmes valeurs
 // sont imposées par le serveur ; limits.test.ts les compare au code Go.
-import { CONTENT_MAX, MAX_ITEMS, PREVIEW_MAX, TEXT_MAX, contentMaxOf, type Palier } from "./engine/pure";
+import { CONTENT_MAX, MAX_ITEMS, TEXT_MAX, contentMaxOf, type Palier } from "./engine/pure";
 
 /** CONTENT_MAX : exactement 2 Gio de données (spec §29.3) ; TEXT_MAX en points de code. */
-export { CONTENT_MAX, MAX_ITEMS, PREVIEW_MAX, TEXT_MAX };
+export { CONTENT_MAX, MAX_ITEMS, TEXT_MAX };
 /** Durées proposées, en heures, comptées à partir de la fin de l'envoi (spec §4). */
 export const TTL_HOURS = [1, 6, 12, 24] as const;
 export type TtlHours = (typeof TTL_HOURS)[number];

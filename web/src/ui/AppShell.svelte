@@ -70,8 +70,6 @@
   // mais pas les boutons ; un élément désactivé reste trouvable, sa raison se lit).
   const off = $derived(busy ? { "aria-disabled": "true" as const, "aria-describedby": "foot-busy", title: t("foot.busy") } : {});
 
-  const here = (name: string) => (router.current.name === name ? "page" : undefined);
-
   // Téléphone (< 900 px), en-tête d'écran natif : retour en haut à gauche sur les pages
   // secondaires de l'expéditeur, et le grand titre de l'écran qui se réduit dans la barre une
   // fois défilé (titre marqué data-large-title, sinon le h1 de l'écran). Sur ordinateur, rien ne change.

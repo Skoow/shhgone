@@ -644,16 +644,10 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     return json(200, { expires_in_s: s.expiresAt - now() });
   }
 
-  /** Partage lisible (Meta) : trouvé par V_accès, prêt, non expiré, moins de 5 essais. */
-  async function readable(kAcces: Uint8Array): Promise<[string, Share]> {
-    const e = await find(kAcces, "accessV");
-    if (e === undefined) throw notFound();
-    const s = e[1];
-    if (s.state !== "ready" || s.expiresAt <= now() || s.failed >= MAX_ATTEMPTS) throw notFound();
-    return e;
-  }
-
-  /** Comme readable, et aussi un « draining » pour qui porte un octroi vivant (spec §41.4). */
+  /**
+   * Partage lisible (Meta) : trouvé par V_accès, non expiré, moins de 5 essais, prêt ; ou
+   * « draining » pour qui porte un octroi vivant (spec §41.4).
+   */
   async function reopenable(kAcces: Uint8Array, g: string | null): Promise<[string, Share]> {
     const e = await find(kAcces, "accessV");
     if (e === undefined) throw notFound();
@@ -666,7 +660,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
 
   async function meta(req: Request): Promise<Response> {
     const g = grantHeader(req);
-    const [id, s] = await reopenable(headerSecret(req, "X-Shh-Access"), g);
+    const [, s] = await reopenable(headerSecret(req, "X-Shh-Access"), g);
     return json(200, {
       expires_in_s: s.expiresAt - now(),
       salt: b64(s.salt!),

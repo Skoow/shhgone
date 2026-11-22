@@ -126,7 +126,6 @@ export const TEXT_BYTES_MAX = 4 * TEXT_MAX;
 /** Droits du destinataire (spec §34), dans le manifeste chiffré. */
 export type Rights = "voir" | "enregistrer" | "coffre";
 export type KeepTtl = 1 | 6 | 12 | 24;
-const KEEP_TTLS: readonly number[] = [1, 6, 12, 24];
 
 /** Élément à chiffrer. Un fichier (File est un Blob) n'est jamais lu en entier en mémoire. */
 export type Item = { kind: "text" | "file"; name: string; mime: string; data: Uint8Array<ArrayBuffer> | Blob; clean?: ManifestClean };

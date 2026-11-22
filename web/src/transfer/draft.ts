@@ -64,7 +64,7 @@ import {
   type CreateOpts,
 } from "./client";
 import { readCaptcha, takeCaptcha, type PreparedCaptcha } from "./prepare";
-import { SERVER_STALL_MS, abortError } from "./upload";
+import { SERVER_STALL_MS } from "./upload";
 
 /**
  * Segments pleins réservés au plus à la création (D42-6) : palier 400, plafond de création du
@@ -979,5 +979,3 @@ function canRestart(e: unknown): boolean {
 /** Plages de void envoyées au plus (limite du serveur) ; au-delà, restent indéchiffrables. */
 export const MAX_VOID = 512;
 
-/** Annulation avant tout effet : rejet AbortError. */
-export { abortError };

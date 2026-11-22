@@ -512,7 +512,6 @@ export function createDownloads(totals: readonly number[], deps: DownloadDeps) {
     },
   };
 }
-export type Downloads = ReturnType<typeof createDownloads>;
 
 /** Résumé d'un groupe de lignes (catégorie, tout) : pour les en-têtes et la barre d'actions. */
 export function summarize(rows: readonly Row[], items: readonly number[]) {

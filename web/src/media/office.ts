@@ -34,7 +34,6 @@ const TEMPLATE_REL = /\/attachedTemplate$/u;
 const PATH_PARTS = ["word/settings.xml", "xl/workbook.xml"];
 const RELS_PART = /^(?:.*\/)?_rels\/[^/]*\.rels$/u;
 // Espaces de noms : variantes « transitional » et « strict ».
-const R_NS = ["http://schemas.openxmlformats.org/officeDocument/2006/relationships", "http://purl.oclc.org/ooxml/officeDocument/relationships"];
 const W_NS = ["http://schemas.openxmlformats.org/wordprocessingml/2006/main", "http://purl.oclc.org/ooxml/wordprocessingml/main"];
 const X15AC = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/ac";
 

@@ -15,7 +15,6 @@
   import AddIcon from "./AddIcon.svelte";
   import { ChevronDown, Compass, EyeOff, Flag, Server, ShieldCheck, Upload } from "./Icon";
   import { reducedMotion } from "./motion";
-  import TabIcon from "./TabIcon.svelte";
   import { accountFlag } from "../app/account-flag.svelte";
   import { presence } from "../history/presence.svelte";
 
