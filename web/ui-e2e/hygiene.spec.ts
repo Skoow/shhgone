@@ -385,11 +385,13 @@ test.describe("intégrité des scripts et des styles (spec §28.3)", () => {
       await route.fulfill({ response: res, body: Buffer.concat([await res.body(), Buffer.from("\n;window.__piege=1")]) });
     });
     // Page de l'application (app.html, sans contenu écrit au build : l'accueil, lui, est prérendu
-    // depuis le 18 novembre et s'affiche sans script) : sans script exécuté, elle reste vide.
+    // depuis le 18 novembre et s'affiche sans script) : sans script exécuté, seul le squelette
+    // reste (U13 : coque sans contenu, jamais montée), rien de l'application.
     await page.goto(shh.origin + "/envoyer");
     await page.waitForLoadState("load");
     expect(await page.evaluate(() => (window as unknown as { __piege?: number }).__piege)).toBeUndefined();
-    await expect(page.locator("#app > *")).toHaveCount(0);
+    await expect(page.locator("#app[data-squelette]")).toHaveCount(1);
+    await expect(page.locator("#contenu > *")).toHaveCount(0);
     // WebKit signale le refus lui-même comme une exception de la page (« Cannot load script due
     // to integrity mismatch ») ; Chromium ne le signale qu'en console. C'est le refus attendu :
     // retiré de la garde, toute autre exception la fait toujours échouer.

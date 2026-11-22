@@ -9,6 +9,7 @@ import type { Lang } from "../i18n/format";
 import { setLang, t } from "../i18n/i18n.svelte";
 import HomeStatic from "./HomeStatic.svelte";
 import PagesApp from "./PagesApp.svelte";
+import ShellStatic from "./ShellStatic.svelte";
 
 /** Page d'information → fichier HTML écrit au build (l'adresse publique est sans « .html »). */
 export const PAGE_FILES: Readonly<Partial<Record<Route["name"], string>>> = {
@@ -44,4 +45,11 @@ export function renderHome(lang: Lang = "fr"): Rendered {
   const { body } = render(HomeStatic);
   // Titre de l'accueil : « landing » (celui d'index.html), « home » étant l'écran d'envoi.
   return { body, title: routeTitle("landing"), description: t("seo.home"), path: INDEXED.home };
+}
+
+/** Squelette d'app.html (U13) : la coque seule, sans contenu, en français. */
+export function renderShell(): string {
+  void setLang("fr");
+  router.current = { name: "connexion" }; // écran sans « Retour » ni onglet courant
+  return render(ShellStatic).body;
 }

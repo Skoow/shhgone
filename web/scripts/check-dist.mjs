@@ -173,7 +173,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
 
   // Accueil écrit au build (18 novembre, référencement) : index.html porte le contenu de
   // l'accueil (titre h1) avant le script, sans attribut style ni adresse de développement ;
-  // app.html (autres adresses de l'application, 404) est la même page sans ce contenu.
+  // app.html (autres adresses de l'application, 404) est la même page sans ce contenu : au plus
+  // le squelette (U13, coque sans contenu entre <!--shh-shell--> et <!--/shh-shell-->, sous
+  // #app[data-squelette]), sans titre ni contenu principal, sans attribut style ni adresse de
+  // développement.
   if (pages.length > 0) {
     const home = /<!--shh-home-->([\s\S]*?)<!--\/shh-home-->/.exec(index)?.[1];
     if (home === undefined) problems.push("index.html : accueil non écrit (repères <!--shh-home--> absents)");
@@ -186,7 +189,14 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     if (appHtml === undefined) problems.push("app.html : page de l'application sans accueil écrit absente");
     else {
       problems.push(...checkSri("app.html", appHtml, (rel) => byRel.get(rel) ?? null, demo ? DEMO_BASE : "/"));
-      if (!appHtml.includes('<div id="app"><!--shh-home--></div>')) problems.push("app.html : contient l'accueil écrit (il ne doit pas s'afficher sur les autres adresses)");
+      const shell = /<div id="app" data-squelette><!--shh-shell-->([\s\S]*?)<!--\/shh-shell--><\/div>/.exec(appHtml)?.[1];
+      if (appHtml.includes("<!--/shh-home-->") || (shell === undefined && !appHtml.includes('<div id="app"><!--shh-home--></div>')))
+        problems.push("app.html : contient l'accueil écrit (il ne doit pas s'afficher sur les autres adresses)");
+      else if (shell !== undefined) {
+        if (/<h1[^>]*>/.test(shell) || !/<main\b[^>]*>\s*(?:<!--[^>]*-->\s*)*<\/main>/.test(shell)) problems.push("app.html : squelette avec du contenu (titre ou contenu principal)");
+        if (/\sstyle="/.test(shell)) problems.push("app.html : attribut style dans le squelette (CSP)");
+        if (/\/src\//.test(shell)) problems.push("app.html : adresse de développement (/src/) dans le squelette");
+      }
     }
   }
 
@@ -215,9 +225,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   for (const f of all) {
     if (!/\.html$|\.css$/.test(f.rel)) continue;
     // Pages d'information : leur contenu écrit cite des liens sortants (<a href>, ouverts par la
-    // personne, jamais chargés par la page) ; seuls ces liens-là sont admis.
+    // personne, jamais chargés par la page) ; seuls ces liens-là sont admis. Même chose pour le
+    // pied de page du squelette d'app.html (U13), copié en 404.html dans la démo.
     let text = f.data.toString("utf8");
-    if (INFO_PAGES.includes(f.rel) || EN_PAGES.includes(f.rel) || f.rel === "index.html")
+    if (INFO_PAGES.includes(f.rel) || EN_PAGES.includes(f.rel) || f.rel === "index.html" || f.rel === "app.html" || f.rel === "404.html")
       text = text
         .replace(/<a\b[^>]*\shref="https:\/\/[^"]*"[^>]*>/g, "<a>")
         .replace(/<link rel="(?:canonical|alternate" hreflang="(?:fr|en|x-default))" href="https:\/\/shhgone\.com\/[a-z/-]*" \/>/g, "");

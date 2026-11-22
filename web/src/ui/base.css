@@ -190,6 +190,13 @@ html.vt-reduced::view-transition-new(root) {
 #app {
   overflow-x: clip;
 }
+/* Squelette d'app.html (U13, pages/ShellStatic.svelte) : avant le script, seuls l'ambiance et le
+   logo (un lien ordinaire) se voient ; menus, boutons et pied, en français et inertes sans
+   script, sont cachés à leur place (aucun décalage). Attribut retiré au montage (main.ts). */
+#app[data-squelette] > :not(.night, .aurora, .grain, header),
+#app[data-squelette] > header .bar > :not(.logo) {
+  visibility: hidden;
+}
 @media (max-width: 899px) {
   html.no-pull,
   html.no-pull body {

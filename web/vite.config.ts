@@ -429,9 +429,10 @@ export function infoPages(base: string, demo: boolean): Plugin {
         const { createServer } = await import("vite");
         const vite = await createServer({ configFile, mode, server: { middlewareMode: true, hmr: false }, appType: "custom", logLevel: "error" });
         try {
-          const { renderPage, renderHome, PAGE_FILES } = (await vite.ssrLoadModule("/src/pages/prerender.ts")) as {
+          const { renderPage, renderHome, renderShell, PAGE_FILES } = (await vite.ssrLoadModule("/src/pages/prerender.ts")) as {
             renderPage: (n: string, lang?: "fr" | "en") => { body: string; title: string; description: string; path: string | undefined };
             renderHome: (lang?: "fr" | "en") => { body: string; title: string; description: string; path: string | undefined };
+            renderShell: () => string;
             PAGE_FILES: Record<string, string>;
           };
           const clean = (raw: string, file: string) => {
@@ -474,8 +475,13 @@ export function infoPages(base: string, demo: boolean): Plugin {
             // l'application (« /envoyer », « /envois »…) et le 404 (serveur Go, static.go) :
             // l'accueil ne s'y affiche jamais avant le script.
             // « noindex » (audit du 20 novembre) : ni l'envoi, ni un partage, ni le 404 ne sont des pages à indexer.
+            // Squelette (U13) : la coque sans contenu (ambiance et logo visibles, le reste caché par
+            // base.css tant que #app porte data-squelette), au lieu d'un écran vide avant le script.
             const appHtml = readFileSync(indexFile, "utf8");
-            writeFileSync(join(outDir, "app.html"), appHtml.replace("</head>", robots(undefined) + "</head>"));
+            const vide = '<div id="app"><!--shh-home--></div>';
+            if (!appHtml.includes(vide)) throw new Error(`index.html sans ${vide}`);
+            const squelette = `<div id="app" data-squelette><!--shh-shell-->${clean(renderShell(), "app.html")}<!--/shh-shell--></div>`;
+            writeFileSync(join(outDir, "app.html"), appHtml.replace("</head>", robots(undefined) + "</head>").replace(vide, squelette));
             const r = renderHome();
             const body = clean(r.body, "index.html");
             const html = readFileSync(indexFile, "utf8");
