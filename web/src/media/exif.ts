@@ -77,15 +77,16 @@ export function emptyTiff(le = false): Uint8Array<ArrayBuffer> {
 // l'orientation : un TIFF neuf ne porte que l'orientation (IFD0, si elle sert) et l'IFD1 réduit
 // à ce qui décrit la vignette (Compression = 6, position, longueur), puis la vignette octet
 // pour octet. Aucune autre étiquette (appareil, dates, position GPS, logiciel…) n'y survit.
-// Une vignette qui porte elle-même des métadonnées (segment APP1 à APP15 ou commentaire) est
-// retirée : elle ferait revenir ce que le nettoyage enlève. Elle est coupée juste après son EOI
-// (audit du 20 novembre, W7) ; sans EOI lisible, elle est retirée (jpeg-scan.ts).
+// Les métadonnées que la vignette porte elle-même (APPn, COM, marqueurs réservés) en sont
+// retirées, la vignette restant gardée (décision du propriétaire du 22 novembre) ; elle est
+// coupée juste après son EOI (audit du 20 novembre, W7) ; mal formée (sans EOI lisible, segment
+// qui déborde), elle est retirée (jpeg-scan.ts, cleanThumbnail).
 
 export const COMPRESSION = 0x0103;
 export const THUMB_OFFSET = 0x0201;
 export const THUMB_LENGTH = 0x0202;
 
-/** Vignette JPEG de l'IFD1 (copie exacte), ou null : absente, illisible ou porteuse de métadonnées. */
+/** Vignette JPEG de l'IFD1, sans ses propres métadonnées (cleanThumbnail), ou null : absente ou mal formée. */
 export function readThumbnail(tiff: Uint8Array): Uint8Array | null {
   try {
     const le = tiff[0] === 0x49 && tiff[1] === 0x49;
@@ -110,10 +111,9 @@ export function readThumbnail(tiff: Uint8Array): Uint8Array | null {
       else len = v;
     }
     if (off <= 0 || len < 4 || off + len > tiff.length) return null;
-    // Coupée à son EOI (audit du 20 novembre, W7) : rien de ce que la longueur déclarée couvre
-    // après la fin de la vignette n'est recopié ; sans EOI, la vignette est retirée.
-    const thumb = cleanThumbnail(tiff.subarray(off, off + len));
-    return thumb ? thumb.slice() : null;
+    // Coupée à son EOI (audit du 20 novembre, W7) et sans ses propres métadonnées (22 novembre) :
+    // rien de ce que la longueur déclarée couvre après la fin n'est recopié ; mal formée, retirée.
+    return cleanThumbnail(tiff.subarray(off, off + len));
   } catch {
     return null;
   }

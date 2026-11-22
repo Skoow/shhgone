@@ -6,16 +6,11 @@
 // MPF, cartes de gain et de profondeur, vidéo des photos animées).
 import { Malformed, concat, slice, startsWith, u16be, u8 } from "./bytes";
 import { keptTiff, orientationToKeep } from "./exif";
-import { scanEnd } from "./jpeg-scan";
+import { keptTable, scanEnd } from "./jpeg-scan";
 
-export { scanEnd };
+export { keptTable, scanEnd };
 
 const EXIF_ID = "Exif\0\0";
-/** Tables et trames gardées : DQT, DHT, DAC, DRI, DNL, SOF0 à SOF15 (sauf DHT, JPG, DAC). */
-export function keptTable(m: number): boolean {
-  return m === 0xdb || m === 0xc4 || m === 0xcc || m === 0xdd || m === 0xdc || (m >= 0xc0 && m <= 0xcf && m !== 0xc8);
-}
-
 function segment(m: number, body: Uint8Array): Uint8Array {
   if (body.length + 2 > 0xffff) throw new Malformed("jpeg_segment");
   return concat([new Uint8Array([0xff, m, (body.length + 2) >> 8, (body.length + 2) & 0xff]), body]);

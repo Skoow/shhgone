@@ -7,6 +7,7 @@ import { ascii, u16be, u32be, u32le } from "./bytes";
 import { crc32 } from "./crc32";
 import { keptTiff, readOrientation, readThumbnail } from "./exif";
 import { EMPTY_XMP } from "./heif";
+import { cleanJpeg } from "./jpeg";
 import { children, topLevel } from "./isobmff";
 import { stripMetadata, type StripResult } from "./strip";
 import { found as foundAv } from "./test-markers";
@@ -325,16 +326,6 @@ describe("vignette EXIF gardée (décision du propriétaire du 11 novembre)", ()
     // Relu : identique (le nettoyage d'un fichier déjà nettoyé ne change rien).
     expect(keptTiff(bare, 1)).toEqual(bare);
   });
-  it("vignette qui porte elle-même des métadonnées (APP1, commentaire) : retirée ; place trop petite : retirée", () => {
-    const thumbWithExif = new Uint8Array([0xff, 0xd8, 0xff, 0xe1, 0, 8, ...[..."ReperX"].map((c) => c.charCodeAt(0)), 0xff, 0xd9]);
-    const t = keptTiff(fakeTiff(thumbWithExif), null);
-    expect(t).toBeNull();
-    const ok = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 3, 0, 0xff, 0xd9]);
-    expect(readThumbnail(keptTiff(fakeTiff(ok), null)!)).toEqual(ok);
-    expect(keptTiff(fakeTiff(ok), null, 40)).toBeNull();
-    expect(readOrientation(keptTiff(fakeTiff(ok), 3, 40)!)).toBe(3);
-  });
-
   // W7 (audit du 20 novembre) : la longueur déclarée dans l'IFD1 peut couvrir plus que la vignette.
   const enc = (s: string) => [...s].map((c) => c.charCodeAt(0));
   const thumbJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 3, 0, 0xff, 0xc0, 0, 3, 0, 0xff, 0xda, 0, 3, 0, 1, 2, 0xff, 0x00, 3, 0xff, 0xd0, 4, 0xff, 0xd9]);
@@ -345,15 +336,49 @@ describe("vignette EXIF gardée (décision du propriétaire du 11 novembre)", ()
     expect(found(kept)).toEqual([]);
     expect(readThumbnail(kept)).toEqual(thumbJpeg);
     expect(kept.length).toBe(8 + 2 + 4 + 2 + 3 * 12 + 4 + thumbJpeg.length);
-    // Vignette sans SOS (tables seules) : coupée à son EOI de même.
-    const ok = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 3, 0, 0xff, 0xd9]);
-    expect(readThumbnail(fakeTiff(new Uint8Array([...ok, ...enc("ReperApres")])))).toEqual(ok);
+    // Place trop petite : retirée ; l'orientation reste.
+    expect(keptTiff(fakeTiff(thumbJpeg), null, 40)).toBeNull();
+    expect(readOrientation(keptTiff(fakeTiff(thumbJpeg), 3, 40)!)).toBe(3);
   });
-  it("vignette sans EOI, segment qui déborde, ou longueur au-delà du TIFF : retirée", () => {
+
+  // Décision du propriétaire du 22 novembre : la vignette est gardée, ses propres métadonnées
+  // partent (segments retirés un à un, le reste octet pour octet).
+  const seg = (m: number, body: number[]) => [0xff, m, (body.length + 2) >> 8, (body.length + 2) & 0xff, ...body];
+  const GPS = enc("GPS 48.8566N 2.3522E");
+  const [soi, dqt, sof, scan] = [thumbJpeg.subarray(0, 2), thumbJpeg.subarray(2, 7), thumbJpeg.subarray(7, 12), thumbJpeg.subarray(12)];
+  it("segments de métadonnées dans la vignette (FF F1, APP1, COM, APP0, 0xC8, 0xDE, 0xDF, 0xFD) : retirés, vignette gardée et valide", () => {
+    for (const m of [0xf1, 0xe1, 0xfe, 0xe0, 0xc8, 0xde, 0xdf, 0xfd, 0xf0]) {
+      const dirty = new Uint8Array([...soi, ...seg(m, GPS), ...dqt, ...seg(m, GPS), ...sof, ...scan]);
+      expect(indexOf(dirty, new Uint8Array(GPS)), m.toString(16)).toBeGreaterThan(0);
+      const t = readThumbnail(fakeTiff(dirty))!;
+      expect(t, m.toString(16)).toEqual(thumbJpeg); // tables, trame, SOS et données intactes
+      expect(indexOf(t, new Uint8Array(GPS))).toBe(-1);
+      const kept = keptTiff(fakeTiff(dirty), null)!;
+      expect(indexOf(kept, new Uint8Array(GPS))).toBe(-1);
+      expect(readThumbnail(kept)).toEqual(thumbJpeg);
+    }
+    // Vignette nettoyée : JPEG bien formé (SOI … EOI), accepté tel quel par le nettoyeur de
+    // l'image principale (même structure qu'une image : tables, trame, SOS, EOI), et stable.
+    const t = readThumbnail(fakeTiff(new Uint8Array([...soi, ...seg(0xf1, GPS), ...dqt, ...sof, ...scan])))!;
+    expect([...t.subarray(0, 2)]).toEqual([0xff, 0xd8]);
+    expect([...t.subarray(-2)]).toEqual([0xff, 0xd9]);
+    expect(cleanJpeg(t)).toEqual(t);
+    expect(readThumbnail(fakeTiff(t))).toEqual(t);
+    // APP14 Adobe (transformation des couleurs) gardé, comme pour l'image principale.
+    const adobe = new Uint8Array([...soi, ...seg(0xee, [...enc("Adobe"), 0, 100, 0, 0, 0, 0, 1]), ...dqt, ...sof, ...scan]);
+    expect(readThumbnail(fakeTiff(adobe))).toEqual(adobe);
+  });
+  it("vignette sans métadonnées : rendue octet pour octet ; nettoyée deux fois : identique", () => {
+    expect(readThumbnail(fakeTiff(thumbJpeg))).toEqual(thumbJpeg);
+    const t = readThumbnail(exifOf(fx("iphone-like.jpg")))!;
+    expect(readThumbnail(fakeTiff(t))).toEqual(t);
+  });
+  it("vignette mal formée : sans EOI, segment qui déborde, marqueur seul hors norme, ou longueur au-delà du TIFF : retirée", () => {
     expect(readThumbnail(fakeTiff(thumbJpeg.subarray(0, thumbJpeg.length - 2)))).toBeNull();
     expect(readThumbnail(fakeTiff(new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 3, 0])))).toBeNull();
     expect(readThumbnail(fakeTiff(new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 40, 0, 0xff, 0xd9])))).toBeNull();
     expect(readThumbnail(fakeTiff(new Uint8Array([0xff, 0xd8, 0x00, 0xff, 0xd9])))).toBeNull();
+    expect(readThumbnail(fakeTiff(new Uint8Array([...soi, ...seg(0xf1, GPS).slice(0, 10)])))).toBeNull(); // segment de métadonnées tronqué
     const t = fakeTiff(thumbJpeg);
     new DataView(t.buffer).setUint32(36, thumbJpeg.length + 1); // longueur déclarée trop grande d'un octet
     expect(readThumbnail(t)).toBeNull();
