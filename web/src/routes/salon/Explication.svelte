@@ -124,10 +124,8 @@
       }}
     />
     <!-- Photo pour ce salon (v3 §7.2), facultative : ré-encodée sur l'appareil, envoyée chiffrée. -->
-    <div class="photo" role="group" aria-label={t("salon.avatar.photo")}>
-      <span class="note">{t("salon.avatar.photo")}</span>
-      <AvatarPicker bind:photo initiale={[...pseudo.trim()][0] ?? ""} />
-    </div>
+    <!-- Un seul libellé (restes, point 8) : celui du choix de photo, nommé pour le salon. -->
+    <AvatarPicker bind:photo initiale={[...pseudo.trim()][0] ?? ""} libelle={t("salon.avatar.photo")} />
     {#if premier}<p class="note" data-pseudo-compte>{t("salon.intro.pseudo.compte")}</p>{/if}
     {#if fige}<p class="note" data-pseudo-fige>{t("salon.intro.pseudo.fige")}</p>{/if}
     <div class="actions"><Button onpress={go}>{t("salon.intro.enter")}</Button></div>

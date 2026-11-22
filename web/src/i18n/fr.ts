@@ -1600,7 +1600,7 @@ export const fr = {
   "salon.end.detruire.sans": "Pour détruire le salon, ouvrez votre lien de gestion : il n'est pas gardé sur cet appareil.",
   "salon.end.detruire.err": "La destruction n'a pas abouti. Réessayez.",
   "salon.avatar.masquer": "Masquer sa photo pour moi",
-  "salon.avatar.photo": "Photo pour ce salon (facultative)",
+  "salon.avatar.photo": "Photo pour ce salon",
   "salon.files.title": "Fichiers",
   "salon.appel.audio": "Appel audio",
   "salon.appel.video": "Appel vidéo",

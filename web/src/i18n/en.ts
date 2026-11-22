@@ -1596,7 +1596,7 @@ export const en = {
   "salon.end.detruire.sans": "To destroy the room, open your management link: it is not kept on this device.",
   "salon.end.detruire.err": "The room could not be destroyed. Try again.",
   "salon.avatar.masquer": "Hide their photo for me",
-  "salon.avatar.photo": "Photo for this room (optional)",
+  "salon.avatar.photo": "Photo for this room",
   "salon.files.title": "Files",
   "salon.appel.audio": "Voice call",
   "salon.appel.video": "Video call",

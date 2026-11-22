@@ -136,6 +136,9 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await champ(pageB, "Mot de passe du salon").fill(mdp);
     await bouton(pageB, "Continuer").click();
     await expect(titre(pageB, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
+    // Un seul libellé pour la photo (restes, point 8).
+    await expect(pageB.getByText("Photo pour ce salon", { exact: false })).toHaveCount(1);
+    await expect(pageB.getByText("Photo de profil", { exact: false })).toHaveCount(0);
     await capture(pageB, "salon-explication");
     expect(await axe(pageB)).toEqual([]);
     await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoA);
