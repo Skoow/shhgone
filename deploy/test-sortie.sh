@@ -143,6 +143,9 @@ check "tous les profils : seuls les relais sont sur « sortie »" \
 check "tous les profils : aucun port publié" j '[.services[] | .ports // [] | length] | add == 0' "$T"
 check "tous les profils : aucune variable de secret en valeur" \
 	j '[.services[] | .environment // {} | keys[] | select(test("PASSWORD|MDP|SECRET|TOKEN|CLE|KEY|IPN|WEBHOOK_FILE") and (endswith("_FILE") | not))] == []' "$T"
+# shellcheck disable=SC2016 # filtre jq
+check "caddy : non root (65532), aucune capacité, no-new-privileges, lecture seule (D9, 22 novembre)" \
+	j '.services.caddy | .user == "65532:65532" and .cap_drop == ["ALL"] and (.cap_add // [] | length) == 0 and (.security_opt | index("no-new-privileges:true")) != null and .read_only == true' "$T"
 # jr <filtre> : filtre jq sur la configuration de tous les profils, avec $n (relais), $ip et $h.
 jr() { jq -e --arg n "$n" --arg ip "$ip" --arg h "$h" "$1" "$T" >/dev/null; }
 # shellcheck disable=SC2016 # variables de jq, pas du shell

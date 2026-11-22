@@ -46,6 +46,7 @@ sain() {
 	export SHH_ALERTE_APT='echo "Inst libc6 [2.36-9] (2.36-9+deb12u9 Debian:12.9/stable [amd64])"'
 	export SHH_ALERTE_REBOOT="$work/pas-de-redemarrage"
 	export SHH_ALERTE_RETARD='echo 0' SHH_ALERTE_NTP='echo yes' SHH_ALERTE_UNITES='true'
+	export SHH_ALERTE_BOOT_ID='echo boot-1' SHH_ALERTE_DEMARRAGE='echo "2026-11-22 03:12:00"' SHH_ALERTE_MONTE='echo oui'
 	unset SHH_SERVEUR_ECHEANCE SHH_ALERTE_A
 }
 
@@ -120,6 +121,59 @@ attendu prevoir "Bilan bilan,URGENT signalements,À prévoir certificat-bientot,
 grep -q "2 mise(s) à jour de sécurité" "$work/prevoir.out" || ko "prevoir : nombre de mises à jour"
 grep -q "plein dans environ 1 jour" "$work/prevoir.out" || ko "prevoir : rythme du disque"
 [ "$(cut -d' ' -f2 "$work/etat-prevoir/echantillon-données")" = 84 ] || ko "prevoir : échantillon non mis à jour"
+
+# 3 bis. Certificat de 6 jours : sain à 4 jours de la fin, URGENT à 20 h.
+sain
+export SHH_ALERTE_CERT_DEBUT
+SHH_ALERTE_CERT_DEBUT="$(jour -2) 12:00:00 GMT"
+SHH_ALERTE_CERT_FIN="$(jour 4) 12:00:00 GMT"
+lance court-sain
+attendu court-sain "Bilan bilan,Rappel restauration"
+SHH_ALERTE_CERT_DEBUT="$(date -u -d "@$((NOW - 5 * 86400))" '+%Y-%m-%d %H:%M:%S GMT')"
+SHH_ALERTE_CERT_FIN="$(date -u -d "@$((NOW + 20 * 3600))" '+%Y-%m-%d %H:%M:%S GMT')"
+lance court-fin
+attendu court-fin "Bilan bilan,Rappel restauration,URGENT certificat"
+grep -q "à 20 h de sa fin" "$work/court-fin.out" || ko "court-fin : heures restantes"
+unset SHH_ALERTE_CERT_DEBUT
+
+# 3 ter. Deux certificats légitimes dans la fenêtre : l'ancien (série 0a1a) a été servi au
+# passage précédent, le nouveau (0a1b) maintenant ; rien de suspect. Un troisième jamais servi : alerte.
+sain
+export SHH_ALERTE_CERT_SERIE='0a1a'
+SHH_ALERTE_CT="echo '[{\"not_before\":\"$(jour -2)T10:00:00\",\"serial_number\":\"0a1a\"}]'"
+lance renouv
+case $(sujets "$work/renouv.out" | paste -sd, -) in *certificat-inconnu*) ko "renouv : certificat servi pris pour suspect" ;; esac
+export SHH_ALERTE_CERT_SERIE='0a1b'
+SHH_ALERTE_CT="echo '[{\"not_before\":\"$(jour -2)T10:00:00\",\"serial_number\":\"0a1a\"},{\"not_before\":\"$(jour -1)T10:00:00\",\"serial_number\":\"0A:1B\"}]'"
+SHH_ALERTE_MAINTENANT=$((NOW + 900)) relance renouv
+case $(sujets "$work/renouv.out2" | paste -sd, -) in *certificat-inconnu*) ko "renouv : renouvellement pris pour suspect" ;; esac
+SHH_ALERTE_CT="echo '[{\"not_before\":\"$(jour -1)T10:00:00\",\"serial_number\":\"dead\"}]'"
+SHH_ALERTE_MAINTENANT=$((NOW + 1800)) relance renouv
+case $(sujets "$work/renouv.out2" | paste -sd, -) in *"URGENT certificat-inconnu"*) ;; *) ko "renouv : certificat jamais servi non signalé" ;; esac
+
+# 3 quater. Redémarrage : premier passage, l'identifiant est retenu sans alerte ; nouveau
+# démarrage → URGENT redemarre et volume verrouillé ; ensuite, plus d'alerte de redémarrage.
+sain
+lance boot
+attendu boot "Bilan bilan,Rappel restauration"
+export SHH_ALERTE_BOOT_ID='echo boot-2' SHH_ALERTE_MONTE='echo non'
+SHH_ALERTE_MAINTENANT=$((NOW + 900)) relance boot
+s2=$(sujets "$work/boot.out2" | paste -sd, -)
+[ "$s2" = "URGENT redemarre,URGENT volume" ] || ko "boot : attendu redemarre et volume, obtenu [$s2]"
+grep -q "démarrage : 2026-11-22 03:12:00" "$work/boot.out2" || ko "boot : heure de démarrage"
+export SHH_ALERTE_MONTE='echo oui'
+SHH_ALERTE_MAINTENANT=$((NOW + 2 * 3600)) relance boot
+[ ! -s "$work/boot.out2" ] || ko "boot : alerte répétée après le même démarrage : $(cat "$work/boot.out2")"
+# Volume verrouillé, aucun mot de passe lisible avec un destinataire : pas d'arrêt du script.
+printf 'SHH_ALERTE_A=alerte@exemple.test\nSHH_SMTP_HOST=smtp.exemple.test\nSHH_SMTP_USER=u\nSHH_MAIL_FROM=a@exemple.test\n' >>"$work/env"
+export SHH_ALERTE_MDP_FICHIER="$work/absent" SHH_ALERTE_BOOT_ID='echo boot-3' SHH_ALERTE_MONTE='echo non'
+export SHH_ALERTE_ETAT="$work/etat-boot"
+SHH_ALERTE_MAINTENANT=$((NOW + 3 * 3600)) "$here/alerte.sh" >"$work/boot3.out" 2>"$work/boot3.err" || ko "boot3 : arrêt sans mot de passe lisible ($(cat "$work/boot3.err"))"
+grep -q "aucun mot de passe SMTP lisible" "$work/boot3.err" || ko "boot3 : constat absent"
+grep -q "^ALERTE URGENT redemarre" "$work/boot3.out" || ko "boot3 : redémarrage non constaté"
+[ "$(cat "$work/etat-boot/boot-id")" = boot-1 ] || [ "$(cat "$work/etat-boot/boot-id")" = boot-2 ] || ko "boot3 : identifiant retenu sans envoi"
+sed -i '/^SHH_ALERTE_A=/d;/^SHH_SMTP_HOST=/d;/^SHH_SMTP_USER=/d;/^SHH_MAIL_FROM=/d' "$work/env"
+unset SHH_ALERTE_MDP_FICHIER
 
 # 4. Domaine illisible (RDAP muet, pas de date notée) puis date notée en secours.
 sain

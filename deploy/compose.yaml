@@ -5,7 +5,7 @@
 #   SHH_IMAGE      image du serveur, épinglée par empreinte : dépôt@sha256:…
 #   SHH_DOMAIN     nom du site (exemple : shhgone.com)
 #   SHH_DATA_ROOT  point de montage du volume chiffré (LUKS2, noatime), par exemple /srv/shhdrop.
-#                  Doit contenir « data » (compte 65532, mode 0700) et « caddy » (root, 0700).
+#                  Doit contenir « data » et « caddy » (compte 65532, mode 0700).
 # Variables facultatives :
 #   SHH_STORAGE_MAX  plafond de stockage en octets (défaut : 200 Gio, spec §24)
 #   SHH_UPLOADS_MAX, SHH_DOWNLOADS_MAX, SHH_WATCH_MAX, SHH_WS_MAX, SHH_DISK_OPS_MAX : capacité
@@ -371,11 +371,12 @@ services:
     # passer 443/udp (README §1).
     network_mode: host
     read_only: true
-    # root DANS le conteneur, mais sans aucune capacité sauf celle d'écouter sur 80 et 443.
-    # Non root impossible avec cette image sous no-new-privileges (capacité de fichier « +p »
-    # seulement, ignorée sous no-new-privileges) : README §9, audit du 13 novembre (D9).
+    # Non root (D9, décision du propriétaire du 22 novembre, voie (a)) : compte 65532, aucune
+    # capacité. Écouter sur 80 et 443 vient du réglage de la machine
+    # net.ipv4.ip_unprivileged_port_start=80 (README §1, vérifié par deploy.sh) : la capacité de
+    # fichier de l'image (« +p ») est ignorée sous no-new-privileges.
+    user: "65532:65532"
     cap_drop: [ALL]
-    cap_add: [NET_BIND_SERVICE]
     security_opt: ["no-new-privileges:true"]
     ulimits:
       core: 0
@@ -403,7 +404,7 @@ services:
         bind:
           create_host_path: false
     tmpfs:
-      - /config:size=8m,mode=0700,noexec,nosuid,nodev
+      - /config:size=8m,mode=0700,uid=65532,gid=65532,noexec,nosuid,nodev
     logging:
       driver: none
     depends_on:

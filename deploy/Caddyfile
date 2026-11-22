@@ -79,6 +79,15 @@ http://{$SHH_DOMAIN} {
 
 {$SHH_DOMAIN} {
 	tls {
+		# Certificats de 6 jours (profil « shortlived » de Let's Encrypt, 22 novembre) : une clé
+		# volée ne sert que quelques jours. Caddy renouvelle seul, bien avant la fin ; le compte
+		# ACME et la clé du certificat ne quittent jamais le volume chiffré. Panne de Let's
+		# Encrypt de plus de 2 jours : alerte URGENT (alerte.sh), retirer ces 4 lignes pour
+		# revenir aux certificats de 90 jours (README, « Hébergeur et certificat »).
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			profile shortlived
+		}
 		# TLS 1.3 seulement : l'échange de clés hybride n'existe pas en TLS 1.2.
 		protocols tls1.3
 		# Hybride post-quantique d'abord, X25519 seul en repli (spec §30, Q-PQ1).

@@ -26,11 +26,14 @@ jobs:
           code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$HOTE/")
           echo "accueil : $code"
           [ "$code" = 200 ]
-      - name: Le certificat a encore au moins 14 jours
+      - name: Le certificat n'est pas près de sa fin (36 h pour un certificat de 6 jours, 14 jours sinon)
         env:
           HOTE: ${{ vars.SHH_SONDE_HOTE }}
         run: |
-          fin=$(echo | openssl s_client -connect "$HOTE:443" -servername "$HOTE" 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
-          reste=$(( ($(date -d "$fin" +%s) - $(date +%s)) / 86400 ))
-          echo "fin du certificat : $fin ($reste jours)"
-          [ "$reste" -ge 14 ]
+          cert=$(echo | openssl s_client -connect "$HOTE:443" -servername "$HOTE" 2>/dev/null | openssl x509 -noout -startdate -enddate)
+          debut=$(date -d "$(printf '%s\n' "$cert" | sed -n 's/^notBefore=//p')" +%s)
+          fin=$(date -d "$(printf '%s\n' "$cert" | sed -n 's/^notAfter=//p')" +%s)
+          reste=$(( (fin - $(date +%s)) / 3600 ))
+          echo "fin du certificat dans $reste h (durée de vie : $(( (fin - debut) / 86400 )) jours)"
+          # Profil « shortlived » (6 jours, Caddyfile) : Caddy renouvelle vers 2 jours restants.
+          if [ $((fin - debut)) -le $((10 * 86400)) ]; then [ "$reste" -ge 36 ]; else [ "$reste" -ge $((14 * 24)) ]; fi

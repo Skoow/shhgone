@@ -189,7 +189,14 @@ preflight() {
 	[[ ",$opts," == *,noatime,* ]] ||
 		die "$SHH_DATA_ROOT n'est pas monté avec noatime (options : $opts)"
 	[ -d "$SHH_DATA_ROOT/data" ] && [ -d "$SHH_DATA_ROOT/caddy" ] ||
-		die "$SHH_DATA_ROOT doit contenir data/ (compte 65532) et caddy/ (root) : voir le README"
+		die "$SHH_DATA_ROOT doit contenir data/ et caddy/ (compte 65532) : voir le README"
+	# Caddy non root (D9, 22 novembre) : son dossier lui appartient, et la machine laisse un
+	# compte ordinaire écouter sur 80 et 443.
+	[ "$(stat -c '%u:%g %a' "$SHH_DATA_ROOT/caddy")" = "65532:65532 700" ] ||
+		die "$SHH_DATA_ROOT/caddy doit appartenir à 65532:65532, mode 0700 (Caddy non root) : chown -R 65532:65532 $SHH_DATA_ROOT/caddy && chmod 0700 $SHH_DATA_ROOT/caddy"
+	port=$(sysctl -n net.ipv4.ip_unprivileged_port_start 2>/dev/null || echo 1024)
+	[ "$port" -le 80 ] ||
+		die "net.ipv4.ip_unprivileged_port_start vaut $port : le poser à 80 (README §1, Caddy non root)"
 	[ "$(wc -l </proc/swaps)" -le 1 ] ||
 		die "mémoire d'échange active (swapon --show) : la désactiver (spec §22)"
 	# Secrets du compte (README §12) : dossier exigé même compte désactivé (monté dans le

@@ -4,12 +4,15 @@
 # au plus une fois par période (1 h pour l'urgent, 1 jour ou 7 jours pour ce qui se prévoit) :
 #
 #   urgent (« URGENT ») :
+#     redemarre      la machine a redémarré (accès possible : vérifier avant de déverrouiller)
+#     volume         le volume chiffré n'est pas déverrouillé (site arrêté)
 #     serveur        le contrôle de santé ne répond pas
 #     signalements   au moins 5 signalements dans l'heure (reports_alert de /healthz)
 #     disque         données ou système à 90 % ou plus ; inodes à 90 % ou plus
 #     memoire        moins de 10 % de mémoire disponible
 #     conteneur      un conteneur « unhealthy » ou qui redémarre en boucle
-#     certificat     certificat TLS du site à moins de 7 jours de sa fin
+#     certificat     certificat TLS du site à moins de 7 jours de sa fin (36 h pour un
+#                    certificat de 6 jours, profil « shortlived »)
 #     domaine        nom de domaine à moins de 7 jours de son échéance
 #     hebergement    serveur loué à moins de 7 jours de son échéance (SHH_SERVEUR_ECHEANCE)
 #     dns            le nom de domaine ne pointe plus vers cette machine
@@ -40,8 +43,11 @@
 #
 # Réglages, dans deploy/.env :
 #   SHH_ALERTE_A          adresse qui reçoit les alertes (par exemple contact@shhgone.com)
-#   SHH_SMTP_HOST, SHH_SMTP_USER, SHH_MAIL_FROM : ceux du compte (README §12) ; mot de passe
-#                         dans $SHH_DATA_ROOT/secrets/shh_smtp_mdp (jamais une variable)
+#   SHH_SMTP_HOST, SHH_SMTP_USER, SHH_MAIL_FROM : ceux du compte (README §12)
+#   SHH_ALERTE_SMTP_USER  (conseillé) identifiant SMTP réservé aux alertes ; son mot de passe dans
+#                         /etc/shhdrop/alerte_smtp_mdp (root 0600, disque système : lisible après un
+#                         redémarrage). Sinon : SHH_SMTP_USER et $SHH_DATA_ROOT/secrets/shh_smtp_mdp,
+#                         illisible tant que le volume est verrouillé (jamais une variable)
 #   SHH_DOMAIN            nom du site (certificat, DNS, échéance du domaine)
 #   SHH_DATA_ROOT         racine du volume chiffré (défaut /srv/shhdrop)
 #   SHH_SERVEUR_ECHEANCE  (facultatif) date AAAA-MM-JJ de fin de la location du serveur
@@ -52,9 +58,10 @@
 # Essais (deploy/test-alerte.sh) : SHH_ENV_FILE, SHH_ALERTE_ETAT, SHH_ALERTE_MAINTENANT (heure
 # Unix), et une commande ou un fichier de remplacement par contrôle : SHH_ALERTE_SANTE,
 # SHH_ALERTE_DF (sortie « pcent ipcent » d'un dossier), SHH_ALERTE_MEMINFO, SHH_ALERTE_LOADAVG,
-# SHH_ALERTE_NPROC, SHH_ALERTE_DOCKER, SHH_ALERTE_CERT_FIN, SHH_ALERTE_CERT_SERIE, SHH_ALERTE_CT, SHH_ALERTE_RDAP, SHH_ALERTE_DNS,
+# SHH_ALERTE_NPROC, SHH_ALERTE_DOCKER, SHH_ALERTE_CERT_FIN, SHH_ALERTE_CERT_DEBUT, SHH_ALERTE_CERT_SERIE, SHH_ALERTE_CT, SHH_ALERTE_RDAP, SHH_ALERTE_DNS,
 # SHH_ALERTE_IPS, SHH_ALERTE_SAUVEGARDE_OK, SHH_ALERTE_SMART, SHH_ALERTE_APT,
-# SHH_ALERTE_REBOOT, SHH_ALERTE_RETARD, SHH_ALERTE_NTP, SHH_ALERTE_UNITES.
+# SHH_ALERTE_REBOOT, SHH_ALERTE_RETARD, SHH_ALERTE_NTP, SHH_ALERTE_UNITES, SHH_ALERTE_BOOT_ID,
+# SHH_ALERTE_DEMARRAGE, SHH_ALERTE_MONTE (« oui » ou « non »), SHH_ALERTE_MDP_FICHIER.
 set -euo pipefail
 export LC_ALL=C
 here=$(cd "$(dirname "$0")" && pwd)
@@ -110,8 +117,16 @@ envoyer() { # $1 : sujet (nom du fichier d'état), $2 : période en secondes, $3
 	if [ -z "${SHH_SMTP_HOST:-}" ] || [ -z "${SHH_SMTP_USER:-}" ] || [ -z "${SHH_MAIL_FROM:-}" ]; then
 		die "SHH_ALERTE_A sans SHH_SMTP_HOST, SHH_SMTP_USER et SHH_MAIL_FROM"
 	fi
-	local mdp="$root/secrets/shh_smtp_mdp" de
-	[ -r "$mdp" ] || die "$mdp illisible"
+	# Mot de passe d'envoi des alertes : d'abord celui de /etc/shhdrop (disque système, lisible
+	# juste après un redémarrage, quand le volume chiffré est encore verrouillé), sinon celui du
+	# compte sur le volume. Aucun lisible : constat sur la sortie, nouvel essai plus tard.
+	local utilisateur=${SHH_ALERTE_SMTP_USER:-$SHH_SMTP_USER} de
+	local mdp=${SHH_ALERTE_MDP_FICHIER:-/etc/shhdrop/alerte_smtp_mdp}
+	[ -r "$mdp" ] || mdp="$root/secrets/shh_smtp_mdp"
+	if [ ! -r "$mdp" ]; then
+		printf 'alerte : aucun mot de passe SMTP lisible (/etc/shhdrop/alerte_smtp_mdp absent, volume verrouillé ?) : « %s » non envoyée\n' "$cle" >&2
+		return 0
+	fi
 	de=$(printf '%s' "$SHH_MAIL_FROM" | sed -n 's/.*<\(.*\)>.*/\1/p')
 	[ -n "$de" ] || de=$SHH_MAIL_FROM
 	# Mot de passe lu par curl depuis un fichier de configuration (jamais sur la ligne de commande).
@@ -121,12 +136,37 @@ envoyer() { # $1 : sujet (nom du fichier d'état), $2 : période en secondes, $3
 			"$SHH_MAIL_FROM" "$SHH_ALERTE_A" "$niveau" "$cle" "$texte"
 	} | curl -sS --fail --max-time 60 --ssl-reqd --url "smtps://$SHH_SMTP_HOST:465" \
 		--mail-from "$de" --mail-rcpt "$SHH_ALERTE_A" --upload-file - \
-		-K <(printf 'user = "%s:%s"\n' "$SHH_SMTP_USER" "$(cat "$mdp")") >/dev/null; then
+		-K <(printf 'user = "%s:%s"\n' "$utilisateur" "$(cat "$mdp")") >/dev/null; then
 		printf '%s\n' "$now" >"$etat/$cle"
 	else
 		printf 'alerte : envoi de « %s » impossible (SMTP), nouvel essai au prochain passage\n' "$cle" >&2
 	fi
 }
+
+# --- Redémarrage, volume ------------------------------------------------------------------------
+# Un redémarrage que personne n'a demandé peut cacher un accès à la machine (lecture du disque
+# ou de la mémoire à froid, démarrage sur un autre système) : prévenir aussitôt. L'identifiant
+# de démarrage du noyau change à chaque démarrage ; il n'est retenu qu'une fois l'alerte partie.
+boot=$(lire SHH_ALERTE_BOOT_ID cat /proc/sys/kernel/random/boot_id)
+if [ -n "$boot" ]; then
+	if [ -f "$etat/boot-id" ] && [ "$(cat "$etat/boot-id")" != "$boot" ]; then
+		depuis=$(lire SHH_ALERTE_DEMARRAGE uptime -s)
+		envoyer redemarre $HEURE "la machine a redémarré (démarrage : ${depuis:-?}). Si ce n'est ni toi ni une maintenance annoncée par l'hébergeur : quelqu'un a pu accéder à la machine. Ne pas déverrouiller le volume avant d'avoir vérifié (README, « Hébergeur et certificat »)"
+		if [ "$(cat "$etat/redemarre" 2>/dev/null)" = "$now" ]; then printf '%s\n' "$boot" >"$etat/boot-id"; fi
+	else
+		printf '%s\n' "$boot" >"$etat/boot-id"
+	fi
+fi
+if [ -n "${SHH_ALERTE_MONTE:-}" ]; then
+	monte=$(bash -c "$SHH_ALERTE_MONTE" 2>/dev/null || true)
+elif mountpoint -q "$root" 2>/dev/null; then
+	monte=oui
+else
+	monte=non
+fi
+if [ "$monte" != oui ]; then
+	envoyer volume $HEURE "le volume chiffré ($root) n'est pas déverrouillé : le site est arrêté. Le déverrouiller par SSH (README §5), après avoir vérifié la raison du redémarrage"
+fi
 
 # --- Service ------------------------------------------------------------------------------------
 sante=$(lire SHH_ALERTE_SANTE "$here/deploy.sh" health)
@@ -199,14 +239,29 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 	cert_servi=""
 	if [ -z "${SHH_ALERTE_CERT_FIN:-}" ] || [ -z "${SHH_ALERTE_CERT_SERIE:-}" ]; then
 		cert_servi=$(openssl s_client -connect "$SHH_DOMAIN:443" -servername "$SHH_DOMAIN" </dev/null 2>/dev/null |
-			openssl x509 -noout -enddate -serial 2>/dev/null || true)
+			openssl x509 -noout -startdate -enddate -serial 2>/dev/null || true)
 	fi
 	fin_cert=${SHH_ALERTE_CERT_FIN:-$(printf '%s\n' "$cert_servi" | sed -n 's/^notAfter=//p')}
+	debut_cert=${SHH_ALERTE_CERT_DEBUT:-$(printf '%s\n' "$cert_servi" | sed -n 's/^notBefore=//p')}
 	serie_servie=${SHH_ALERTE_CERT_SERIE:-$(printf '%s\n' "$cert_servi" | sed -n 's/^serial=//p')}
-	jours_cert=""
-	if [ -n "$fin_cert" ]; then jours_cert=$(jours_jusqua "$fin_cert"); fi
+	jours_cert="" heures_cert="" court=0
+	if [ -n "$fin_cert" ]; then
+		jours_cert=$(jours_jusqua "$fin_cert")
+		t_fin=$(date -u -d "$fin_cert" +%s 2>/dev/null || true)
+		[ -n "$t_fin" ] && heures_cert=$(((t_fin - now) / HEURE))
+		# Certificat court (profil « shortlived », 6 jours, Caddyfile) : Caddy le renouvelle
+		# quand il lui reste environ 2 jours ; moins de 36 h, c'est que le renouvellement échoue.
+		t_debut=""
+		# Date vide : « date -d "" » rendrait minuit du jour, jamais l'utiliser.
+		if [ -n "${debut_cert:-}" ]; then t_debut=$(date -u -d "$debut_cert" +%s 2>/dev/null || true); fi
+		if [ -n "$t_fin" ] && [ -n "$t_debut" ] && [ $((t_fin - t_debut)) -le $((10 * JOUR)) ]; then court=1; fi
+	fi
 	if [ -z "$jours_cert" ]; then
 		if [ -n "$sante" ]; then envoyer certificat-bientot $JOUR "certificat TLS illisible sur $SHH_DOMAIN:443"; fi
+	elif [ "$court" = 1 ]; then
+		if [ "$heures_cert" -lt 36 ]; then
+			envoyer certificat $HEURE "certificat TLS de 6 jours expiré ou à $heures_cert h de sa fin : Caddy ne le renouvelle pas (Let's Encrypt en panne ? DNS, port 80). En cas de panne longue : retirer le bloc « issuer acme » du Caddyfile pour revenir aux certificats de 90 jours"
+		fi
 	elif [ "$jours_cert" -lt 7 ]; then
 		envoyer certificat $HEURE "certificat TLS expiré ou à $jours_cert jour(s) de sa fin : Caddy ne le renouvelle pas (journal de Caddy, DNS, port 80)"
 	elif [ "$jours_cert" -lt 21 ]; then
@@ -250,13 +305,19 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 	fi
 	norm() { tr 'A-F' 'a-f' | tr -d ':' | sed 's/^0*//'; }
 	serie_ok=$(printf '%s' "$serie_servie" | norm)
+	# Numéros de série servis ces 10 derniers jours (vus toutes les 15 min) : avec des
+	# certificats de 6 jours, deux certificats légitimes peuvent tomber dans la fenêtre.
+	series="$etat/series-servies"
+	touch "$series"
+	if [ -n "$serie_ok" ] && ! grep -q " $serie_ok\$" "$series"; then printf '%s %s\n' "$now" "$serie_ok" >>"$series"; fi
+	awk -v lim=$((now - 10 * JOUR)) '$1 >= lim' "$series" >"$series.n" && mv "$series.n" "$series"
 	if [ -n "$ct" ] && [ -n "$serie_ok" ]; then
 		inconnus=0
 		while IFS='|' read -r debut serie; do
 			if [ -z "$debut" ] || [ -z "$serie" ]; then continue; fi
 			t=$(date -u -d "$debut" +%s 2>/dev/null) || continue
 			[ $((now - t)) -le $((3 * JOUR)) ] || continue
-			[ "$(printf '%s' "$serie" | norm)" = "$serie_ok" ] || inconnus=$((inconnus + 1))
+			grep -q " $(printf '%s' "$serie" | norm)\$" "$series" || inconnus=$((inconnus + 1))
 		done < <(printf '%s' "$ct" | tr '{' '\n' | tr '}' '\n' | grep '"serial_number"' |
 			sed -n 's/.*"not_before" *: *"\([^"]*\)".*"serial_number" *: *"\([^"]*\)".*/\1|\2/p; t; s/.*"serial_number" *: *"\([^"]*\)".*"not_before" *: *"\([^"]*\)".*/\2|\1/p' || true)
 		if [ "$inconnus" -gt 0 ]; then
