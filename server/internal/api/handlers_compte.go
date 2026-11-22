@@ -38,6 +38,16 @@ func (a compteAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/compte/connexion/debut", a.connexionDebut)
 	mux.HandleFunc("POST /api/compte/connexion/fin", a.connexionFin)
 	mux.HandleFunc("POST /api/compte/recup", a.recup)
+	// Lot S5 : passkeys du compte, réauthentification, nouvelle clé de récupération.
+	mux.HandleFunc("POST /api/compte/reauth/debut", a.reauthDebut)
+	mux.HandleFunc("POST /api/compte/reauth/fin", a.reauthFin)
+	mux.HandleFunc("GET /api/compte/passkeys", a.passkeys)
+	mux.HandleFunc("POST /api/compte/passkeys/debut", a.passkeysDebut)
+	mux.HandleFunc("POST /api/compte/passkeys/fin", a.passkeysFin)
+	mux.HandleFunc("POST /api/compte/passkeys/enveloppe", a.passkeysEnveloppe)
+	mux.HandleFunc("POST /api/compte/passkeys/nommer", a.passkeysNommer)
+	mux.HandleFunc("POST /api/compte/passkeys/retirer", a.passkeysRetirer)
+	mux.HandleFunc("POST /api/compte/recup/renouveler", a.recupRenouveler)
 	mux.HandleFunc("GET /api/compte/sessions", a.sessions)
 	mux.HandleFunc("POST /api/compte/sessions/fermer", a.fermer)
 	mux.HandleFunc("POST /api/compte/sessions/etiquette", a.etiquette)
@@ -87,6 +97,8 @@ func failCompte(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusNotFound, "not_found")
 	case errors.Is(err, compte.ErrDerniere):
 		writeErr(w, http.StatusConflict, "derniere")
+	case errors.Is(err, compte.ErrPasskeysMax):
+		writeErr(w, http.StatusConflict, "passkeys_max")
 	case errors.Is(err, compte.ErrPseudoPris):
 		writeErr(w, http.StatusConflict, "pseudo_pris")
 	case errors.Is(err, compte.ErrBusy):

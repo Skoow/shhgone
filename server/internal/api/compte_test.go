@@ -189,6 +189,9 @@ func TestRoutesCompteAbsentes(t *testing.T) {
 var routesCompte = [][2]string{
 	{"POST", "/api/compte/inscription/debut"}, {"POST", "/api/compte/inscription/fin"},
 	{"POST", "/api/compte/connexion/debut"}, {"POST", "/api/compte/connexion/fin"}, {"POST", "/api/compte/recup"},
+	{"POST", "/api/compte/reauth/debut"}, {"POST", "/api/compte/reauth/fin"}, {"GET", "/api/compte/passkeys"},
+	{"POST", "/api/compte/passkeys/debut"}, {"POST", "/api/compte/passkeys/fin"}, {"POST", "/api/compte/passkeys/enveloppe"},
+	{"POST", "/api/compte/passkeys/nommer"}, {"POST", "/api/compte/passkeys/retirer"}, {"POST", "/api/compte/recup/renouveler"},
 	{"GET", "/api/compte/sessions"}, {"POST", "/api/compte/sessions/fermer"}, {"POST", "/api/compte/deconnexion"},
 	{"POST", "/api/compte/sessions/etiquette"},
 	{"GET", "/api/compte/coffre/profil"}, {"PUT", "/api/compte/coffre/profil"}, {"GET", "/api/compte/coffre/prive"},

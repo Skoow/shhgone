@@ -151,14 +151,16 @@
 
 ## Lot S5 — Passkeys du compte, réauthentification, nouvelle clé de récupération
 
+**État : fait le 22 novembre. Écart signalé : GET passkeys ne rend pas « courante » (le serveur ne garde pas quelle passkey a ouvert une session ; l'appareil le sait : cred_id rendu par connexion/fin) ; passkeys_max (409) pour la onzième. Avec ce lot, web/e2e/compte-sees-nothing.test.ts est refait sans écran (authentificateur logiciel web/e2e/webauthn.ts, calculs de l'appareil par le moteur WebAssembly et WebCrypto) : une partie de T1 ; les parcours ui-e2e restent à T1.**
+
 *Dépend de : S4.*
 
 **Files :** Modify : `server/internal/api/handlers_compte.go`, `server/internal/api/compte_test.go`, `server/internal/compte/{service.go,sessions.go}`
 
 **Interfaces :** `POST reauth/debut`, `reauth/fin` (session récente 5 min ; la passkey doit être du compte) ; `GET passkeys` → `{ passkeys: [{ cred_id, ajoutee: "2026-11", etiquette, be, prf, courante }] }` ; `POST passkeys/debut`, `passkeys/fin` (session récente, `excludeCredentials` = passkeys du compte, 10 au plus, `passkeys/debut` 10/h/compte) ; `POST passkeys/enveloppe` `{ cred_id, env }` ; `POST passkeys/nommer` `{ cred_id, etiquette }` (64 octets) ; `POST passkeys/retirer` (session récente ; `derniere`, 409) ; `POST recup/renouveler` `{ v_r, env_r }` (session récente) ; `sessions` montre `par_recup`.
 
-- [ ] **Step 1 : tests** — onzième passkey refusée ; retrait de la dernière refusé ; enveloppe d'une passkey d'un autre compte refusée ; ancienne clé de récupération refusée après `recup/renouveler` ; session non récente refusée partout où elle est exigée.
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go`, `make test-e2e`. **Step 5 :** commit `feat(serveur): gestion des passkeys et de la clé de récupération`.
+- [x] **Step 1 : tests** — onzième passkey refusée ; retrait de la dernière refusé ; enveloppe d'une passkey d'un autre compte refusée ; ancienne clé de récupération refusée après `recup/renouveler` ; session non récente refusée partout où elle est exigée.
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go`, `make test-e2e`. **Step 5 :** commit `feat(serveur): gestion des passkeys et de la clé de récupération`.
 
 ## Lot S6 — En-têtes, fichiers des apps, « aucune sortie » SMTP
 
