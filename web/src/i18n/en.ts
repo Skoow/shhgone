@@ -517,7 +517,7 @@ export const en = {
   "account.delete.stays.messages": "Your messages in other people's rooms: they are erased when those rooms end, not before. Those who read them may have copied them.",
   "account.delete.stays.unknown": "Shares created on a device without history, or missing from your account: we can't find them. They are erased when they expire.",
   "account.delete.stays.received": "What others have already received or saved.",
-  "account.delete.stays.kept": "The fingerprint of a banned address, until the ban ends; backup copies, for up to 30 days; the logs of the service that sends the codes.",
+  "account.delete.stays.kept": "The fingerprint of a banned address, until the ban ends; backup copies, for up to 7 days; the logs of the service that sends the codes.",
   "account.delete.pass": "Your Plus subscription will be lost with the account.",
   "account.delete.device": "Also erase this device's data",
   "account.delete.device.hint": "History, received links and downloads kept here.",
