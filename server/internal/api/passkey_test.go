@@ -183,8 +183,14 @@ func TestPseudoReserveAEtape(t *testing.T) {
 	cred, _, _ := webauthntest.Nouveau(webauthntest.ES256).Creer(o2, origineCompte, "")
 	w := e.do(req{method: "POST", path: "/api/compte/inscription/fin", remote: "203.0.113.84:1", body: mustJSON(corpsFin(e2, cred, "zoe", rnd(32)))})
 	expect(t, w, 409, `{"error":"pseudo_pris"}`)
+	// L'étape d'inscription vit 15 min (temps de noter la clé) : encore réservé à 14 min.
+	e.clk.Add(14 * time.Minute)
+	e4, _ := e.debutInscription(t, "203.0.113.86:1")
+	if v(e4, "zoe") != `{"libre":false}` {
+		t.Fatal("réservation perdue avant 15 min")
+	}
 	// Étape échue : la réservation tombe avec elle.
-	e.clk.Add(6 * time.Minute)
+	e.clk.Add(2 * time.Minute)
 	e3, _ := e.debutInscription(t, "203.0.113.85:1")
 	if v(e3, "zoe") != `{"libre":true}` {
 		t.Fatal("réservation d'une étape échue")

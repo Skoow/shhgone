@@ -8,12 +8,16 @@ import (
 
 // Étapes en mémoire (conception du compte par passkey §6.2) : une cérémonie WebAuthn commencée
 // (inscription, connexion, réauthentification, ajout de passkey), désignée par un jeton de
-// 32 octets rendu au client ; la table ne garde que SHA-256 du jeton. Usage unique, 5 min
+// 32 octets rendu au client ; la table ne garde que SHA-256 du jeton. Usage unique, 5 min (15 pour l'inscription)
 // (contrainte de Safari, §3 : les options sont chargées avant le clic), 20 000 vivantes au plus
 // (au-delà : busy). Rien sur disque : un redémarrage les perd.
 const (
 	dureeEtape = 5 * time.Minute
-	etapesMax  = 20000
+	// dureeInscription : l'étape d'inscription couvre aussi le temps de noter puis de vérifier la
+	// clé de récupération, entre la feuille de passkey et inscription/fin (5 min ne suffisent pas
+	// toujours : la passkey resterait orpheline). Le pseudo reste réservé autant.
+	dureeInscription = 15 * time.Minute
+	etapesMax        = 20000
 )
 
 type sorteEtape uint8
@@ -72,7 +76,7 @@ func (t *etapes) balayerLocked(now time.Time) {
 	}
 }
 
-// nouvelleEtapeLocked : jeton tiré, étape gardée 5 min (s.mu tenu) ; 20 000 vivantes : busy.
+// nouvelleEtapeLocked : jeton tiré, étape gardée 5 min, 15 pour l'inscription (s.mu tenu) ; 20 000 vivantes : busy.
 func (s *Service) nouvelleEtapeLocked(e *etape, now time.Time) ([32]byte, error) {
 	if len(s.et.m) >= etapesMax {
 		s.et.balayerLocked(now)
@@ -82,7 +86,11 @@ func (s *Service) nouvelleEtapeLocked(e *etape, now time.Time) ([32]byte, error)
 	}
 	var jeton [32]byte
 	rand.Read(jeton[:])
-	e.expire = now.Add(dureeEtape)
+	if e.sorte == etapeInscription {
+		e.expire = now.Add(dureeInscription)
+	} else {
+		e.expire = now.Add(dureeEtape)
+	}
 	s.et.m[cleEtape(jeton)] = e
 	return jeton, nil
 }

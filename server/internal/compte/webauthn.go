@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/protocol/webauthncbor"
@@ -288,7 +287,3 @@ func (c *Ceremonies) finAssertion(sd *defi, reponse []byte, cherche chercheur, h
 	}
 	return trouve, bytes.Clone(p.RawID), nil
 }
-
-// expireDe : échéance d'un défi (5 min, horloge du service : la bibliothèque ne l'applique pas,
-// Timeouts.Enforce faux).
-func expireDe(now time.Time) time.Time { return now.Add(dureeEtape) }
