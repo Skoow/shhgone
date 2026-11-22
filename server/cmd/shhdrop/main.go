@@ -224,10 +224,11 @@ func tightenPerms(dataDir string) error {
 // salonsOf : réglages du salon donnés à l'API, valeur zéro (désactivé) sans SHH_SALONS=1,
 // même si SHH_ORIGIN est posée (la CSP reste alors celle d'avant le salon).
 func salonsOf(cfg config.Config, m *salon.Manager, cpt *comptes, turn api.Turn) api.Salons {
+	apps := api.NouvellesApps(cfg.AppleAppIDs, cfg.AndroidPaquet, cfg.AndroidEmpreintes)
 	if !cfg.Salons {
-		return api.Salons{}
+		return api.Salons{Apps: apps}
 	}
-	s := api.Salons{Origin: cfg.Origin, M: m}
+	s := api.Salons{Origin: cfg.Origin, M: m, Apps: apps}
 	s.Turn = turn
 	if cfg.Comptes && cpt != nil {
 		s.Comptes = cpt.svc // SHH_COMPTES=0 : nil, aucune route /api/compte/*

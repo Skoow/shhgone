@@ -18,7 +18,7 @@ var pdfFrameFiles = map[string]bool{
 //   - CSP propre (pdfFrameCSP) et Permissions-Policy fermée sur /pdf-frame.html seulement.
 //
 // pdfFramePermissions : le cadre PDF n'a jamais besoin du micro, de la caméra ni de la position.
-const pdfFramePermissions = "microphone=(), camera=(), " + deniedFeatures
+const pdfFramePermissions = "microphone=(), camera=(), publickey-credentials-create=(), publickey-credentials-get=(), " + deniedFeatures
 
 // pdfFrameCSP : CSP du cadre PDF, fermée. Il ne charge que pdf-frame.js et pdf-frame.css,
 // dessine des <canvas> (images blob: et data:) et ne se connecte à rien : pdf.js y tourne sur

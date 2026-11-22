@@ -354,6 +354,8 @@ type Salons struct {
 	M        *salon.Manager
 	Comptes  *compte.Service
 	Paiement *paiement.Service
+	// Apps : fichiers d'association des apps natives (apps.go) ; vides : non servis.
+	Apps Apps
 }
 
 func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
@@ -396,6 +398,7 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 
 	root := http.NewServeMux()
 	root.HandleFunc("GET /healthz", s.healthz)
+	routesApps(root, sal.Apps)
 	root.Handle("/api/", s.guard(api))
 	root.Handle("/api", s.guard(http.HandlerFunc(notFoundAPI))) // sans cela : 307 vers /api/
 	// /API/x, /Api… : jamais le repli SPA (200 + index.html), la même 404 que /api/… (limites comprises).

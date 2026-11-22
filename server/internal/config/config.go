@@ -68,6 +68,10 @@ type Config struct {
 	// exactement android:apk-key-hash:<43 caractères base64url> (conception du compte par passkey
 	// §6.2, §10.1). L'app iOS présente l'origine https://<rp.id> : rien à ajouter pour elle.
 	WebAuthnOriginesApps []string
+	// Apps natives (apps.go) : fichiers d'association servis seulement s'ils sont posés.
+	AppleAppIDs       []string // SHH_APPLE_APP_IDS
+	AndroidPaquet     string   // SHH_ANDROID_APP_PACKAGE
+	AndroidEmpreintes []string // SHH_ANDROID_APP_SHA256
 	// Paiement (SHH_PAIEMENT=1, conception du paiement §10) : vente de Plus et Pro. Désactivé
 	// par défaut (aucune route, aucun fichier, aucun appel sortant) ; exige SHH_ORIGIN, SHH_TVA
 	// et au moins un prestataire complet (Pay).
@@ -159,6 +163,9 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("SHH_SALONS=1 exige SHH_ORIGIN (origine publique du site, ex. https://shhgone.com)")
 	}
 	if err := comptesFromEnv(&c); err != nil {
+		return Config{}, err
+	}
+	if err := appsFromEnv(&c); err != nil {
 		return Config{}, err
 	}
 	if err := appelsFromEnv(&c); err != nil {

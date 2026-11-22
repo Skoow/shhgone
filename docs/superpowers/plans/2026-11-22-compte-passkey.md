@@ -164,12 +164,14 @@
 
 ## Lot S6 — En-têtes, fichiers des apps, « aucune sortie » SMTP
 
+**État : fait le 22 novembre. Fichiers d'association servis par l'API (internal/api/apps.go, avant le site statique), réglés par SHH_APPLE_APP_IDS, SHH_ANDROID_APP_PACKAGE et SHH_ANDROID_APP_SHA256 (vides par défaut) ; test dans cmd/shhdrop/static_assoc_test.go. TestNoOutgoingHTTP sans exception SMTP depuis S2.**
+
 *Dépend de : S4.*
 
 **Files :** Modify : `server/internal/api/headers.go` (+ test), `server/cmd/shhdrop/static.go` (+ `static_app_test.go`), `server/internal/config/config.go` (identifiants d'app, vides par défaut), `server/internal/stats_test.go`
 
-- [ ] **Step 1 : tests** — `Permissions-Policy` : `publickey-credentials-create=(self), publickey-credentials-get=(self)` sur les pages, `()` sur `/pdf-frame.html` ; `/.well-known/apple-app-site-association` et `/.well-known/assetlinks.json` : 404 identique à une route inconnue sans identifiants d'app, sinon `application/json`, sans redirection ; `TestNoOutgoingHTTP` : aucun `net/smtp`, `crypto/tls` client, ni `net.Dial` hors des exceptions restantes.
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go`. **Step 5 :** commit `feat(serveur): Permissions-Policy WebAuthn, fichiers d'association des apps`.
+- [x] **Step 1 : tests** — `Permissions-Policy` : `publickey-credentials-create=(self), publickey-credentials-get=(self)` sur les pages, `()` sur `/pdf-frame.html` ; `/.well-known/apple-app-site-association` et `/.well-known/assetlinks.json` : 404 identique à une route inconnue sans identifiants d'app, sinon `application/json`, sans redirection ; `TestNoOutgoingHTTP` : aucun `net/smtp`, `crypto/tls` client, ni `net.Dial` hors des exceptions restantes.
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go`. **Step 5 :** commit `feat(serveur): Permissions-Policy WebAuthn, fichiers d'association des apps`.
 
 ## Lot S7 — Tableau de bord et administration
 
