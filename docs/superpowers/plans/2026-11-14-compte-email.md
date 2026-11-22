@@ -1,5 +1,7 @@
 # Compte par e-mail et mot de passe (D42-26) — plan d'implémentation, version 2
 
+> **Remplacée le 22 novembre 2026 pour l'identité, la connexion et la récupération** par `docs/superpowers/specs/2026-11-22-compte-passkey-design.md` (passkey et clé de récupération, sans e-mail, sans mot de passe, sans double authentification ni séquestre ; codé : serveur lots S1 à S8, site lots W1 à W5 et T1 du plan `docs/superpowers/plans/2026-11-22-compte-passkey.md`). Ce plan n'est plus suivi pour ces parties ; le reste de la conception (pseudo §21.5, coffres §21.2.2, sessions §8.5, ancienneté §11, bannissement §21.11 sauf la clé, accueil §21.7, signalements §21.10, suppression §21.12, sauvegarde §21.13, tableau de bord §21.14 sauf la recherche par adresse) reste valable.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **Version 2 du 14 novembre 2026** (décisions du propriétaire du même jour, conception §21). Elle **remplace** la version 1 (code de secours, e-mails « déjà inscrit » et « adresse changée », un seul coffre) ; la version 1 reste lisible dans l'historique git (commit `e620ae6`). **À ne pas commencer avant la validation de la conception** (décisions R-D1 à R-D5 de §21.19, et D1, D4, D7, D8 de §20). Les valeurs ci-dessous sont les recommandations ; une décision contraire change les lots cités.
