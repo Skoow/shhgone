@@ -771,7 +771,7 @@ pub fn password_key_for_create(
     unchecked_return_type = "{ canon: string; exacte: string }"
 )]
 pub fn normaliser_adresse(email: &str) -> core::result::Result<Object, JsValue> {
-    let a = compte::normaliser(email).map_err(js_err)?;
+    let a = compte::v2::normaliser(email).map_err(js_err)?;
     let o = Object::new();
     set(&o, "canon", &JsValue::from_str(&a.canon));
     set(&o, "exacte", &JsValue::from_str(&a.exacte));
@@ -786,7 +786,7 @@ pub fn normaliser_adresse(email: &str) -> core::result::Result<Object, JsValue> 
 )]
 pub fn deriver_compte(pw: &Uint8Array, canon: &str) -> core::result::Result<Object, JsValue> {
     let pw = secret_text(pw, Error::MotDePasseVide).map_err(js_err)?;
-    let (a, k) = compte::deriver(&pw, canon).map_err(js_err)?;
+    let (a, k) = compte::v2::deriver(&pw, canon).map_err(js_err)?;
     let o = Object::new();
     set(&o, "aAuth", &bytes(&*a));
     set(&o, "kekMdp", &bytes(&*k));
@@ -815,7 +815,7 @@ pub fn cle_prive(k_compte: &Uint8Array) -> core::result::Result<Uint8Array, JsVa
 #[wasm_bindgen(js_name = cleProfil)]
 pub fn cle_profil(s_profil: &Uint8Array) -> core::result::Result<Uint8Array, JsValue> {
     let k = key32(s_profil).map_err(js_err)?;
-    Ok(Uint8Array::from(&compte::cle_profil(&k)[..]))
+    Ok(Uint8Array::from(&compte::v2::cle_profil(&k)[..]))
 }
 
 /// `K_etiquette` (nom d'appareil d'une session) tirée de `K_compte`.
@@ -834,11 +834,99 @@ pub fn mot_de_passe_valide(
     exacte: &str,
 ) -> core::result::Result<(), JsValue> {
     let pw = secret_text(pw, Error::MdpCourt).map_err(js_err)?;
-    let a = compte::Adresse {
+    let a = compte::v2::Adresse {
         canon: canon.to_string(),
         exacte: exacte.to_string(),
     };
-    compte::mot_de_passe_valide(&pw, &a).map_err(js_err)
+    compte::v2::mot_de_passe_valide(&pw, &a).map_err(js_err)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Compte par passkey (conception 2026-11-22-compte-passkey-design.md §5) ; vecteurs communs :
+// engine/vectors/compte-v3.json. Le site tire K_compte, R et les nonces (crypto.getRandomValues)
+// et fait les enveloppes et les coffres avec WebCrypto, à partir des clés et des AD rendues ici.
+// ---------------------------------------------------------------------------------------------
+
+/// `h` (16 octets, identifiant du compte, public) venu de JavaScript.
+fn h16(h: &[u8]) -> Result<[u8; 16]> {
+    arr::<16>(h).map_err(|_| Error::TailleInvalide)
+}
+
+/// Clé de récupération `R` (16 octets) venue de JavaScript, recopiée dans un tampon effacé.
+fn recup16(r: &Uint8Array) -> Result<compte::CleRecup> {
+    let v = secret(r);
+    let mut k = Zeroizing::new([0u8; compte::RECUP_LEN]);
+    if v.len() != compte::RECUP_LEN {
+        return Err(Error::TailleInvalide);
+    }
+    k.copy_from_slice(&v);
+    Ok(compte::CleRecup::new(k))
+}
+
+/// `E_prf` (32 octets, public) : valeur de `prf.eval.first` à la création et à la connexion.
+#[wasm_bindgen(js_name = entreePrf)]
+pub fn entree_prf() -> Uint8Array {
+    Uint8Array::from(&compte::entree_prf()[..])
+}
+
+/// `KEK_i` tirée de la sortie PRF `P_i` (32 octets) d'une passkey.
+#[wasm_bindgen(js_name = kekPrf)]
+pub fn kek_prf(sortie_prf: &Uint8Array) -> core::result::Result<Uint8Array, JsValue> {
+    let p = key32(sortie_prf).map_err(js_err)?;
+    Ok(Uint8Array::from(&compte::kek_prf(&p)[..]))
+}
+
+/// AD de l'enveloppe PRF (« SHH-CENV2 » ‖ `h` ‖ SHA-256(`cred_id`)) ; `cred_id_invalide`.
+#[wasm_bindgen(js_name = adEnveloppePrf)]
+pub fn ad_enveloppe_prf(h: &[u8], cred_id: &[u8]) -> core::result::Result<Uint8Array, JsValue> {
+    let h = h16(h).map_err(js_err)?;
+    let ad = compte::ad_enveloppe_prf(&h, cred_id).map_err(js_err)?;
+    Ok(Uint8Array::from(&ad[..]))
+}
+
+/// AD de l'enveloppe de récupération (« SHH-CENV2 » ‖ `h` ‖ « recup »).
+#[wasm_bindgen(js_name = adEnveloppeRecup)]
+pub fn ad_enveloppe_recup(h: &[u8]) -> core::result::Result<Uint8Array, JsValue> {
+    let h = h16(h).map_err(js_err)?;
+    Ok(Uint8Array::from(&compte::ad_enveloppe_recup(&h)[..]))
+}
+
+/// `K_profil` (coffre de profil) tirée de `K_compte` (remplace `cleProfil`, tirée de `s_profil`).
+#[wasm_bindgen(js_name = cleProfilCompte)]
+pub fn cle_profil_compte(k_compte: &Uint8Array) -> core::result::Result<Uint8Array, JsValue> {
+    let k = key32(k_compte).map_err(js_err)?;
+    Ok(Uint8Array::from(&compte::cle_profil(&k)[..]))
+}
+
+/// Texte affiché de la clé de récupération `R` (16 octets) : `XXXX-…-XXX`, 7 groupes.
+#[wasm_bindgen(js_name = cleRecupAffichage)]
+pub fn cle_recup_affichage(r: &Uint8Array) -> core::result::Result<JsString, JsValue> {
+    let k = recup16(r).map_err(js_err)?;
+    Ok(secret_string(k.affichage()))
+}
+
+/// `R` (16 octets) lue d'une saisie en UTF-8 (TextEncoder) ; `cle_recup_longueur`,
+/// `cle_recup_caractere`, `cle_recup_controle`.
+#[wasm_bindgen(js_name = cleRecupLire)]
+pub fn cle_recup_lire(saisie: &Uint8Array) -> core::result::Result<Uint8Array, JsValue> {
+    let t = secret_text(saisie, Error::CleRecupCaractere).map_err(js_err)?;
+    let k = compte::CleRecup::lire(&t).map_err(js_err)?;
+    Ok(Uint8Array::from(&k.octets()[..]))
+}
+
+/// `{ aR, vR, kekR }` tirées de `R` (16 octets) : `A_r` (envoyé à `recup`), `v_r` = SHA-256(`A_r`)
+/// (gardé par le serveur), `KEK_r` (enveloppe `Env_r`, jamais envoyée).
+#[wasm_bindgen(
+    js_name = cleRecupDerivees,
+    unchecked_return_type = "{ aR: Uint8Array; vR: Uint8Array; kekR: Uint8Array }"
+)]
+pub fn cle_recup_derivees(r: &Uint8Array) -> core::result::Result<Object, JsValue> {
+    let k = recup16(r).map_err(js_err)?;
+    let o = Object::new();
+    set(&o, "aR", &bytes(&*k.acces()));
+    set(&o, "vR", &bytes(&k.verificateur()));
+    set(&o, "kekR", &bytes(&*k.kek()));
+    Ok(o)
 }
 
 // ---------------------------------------------------------------------------------------------

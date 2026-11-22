@@ -89,6 +89,16 @@ pub enum Error {
     PseudoEcritures,
     /// Nom du partage de plus de `manifest::TITLE_MAX` points de code après nettoyage.
     TitreTropLong,
+    /// Clé de récupération : pas exactement 27 caractères une fois blancs et tirets retirés.
+    CleRecupLongueur,
+    /// Clé de récupération : caractère hors de l'alphabet de Crockford (ou hors des symboles de
+    /// contrôle en dernière position).
+    CleRecupCaractere,
+    /// Clé de récupération : caractère de contrôle faux ou bits de bourrage non nuls (faute de
+    /// recopie).
+    CleRecupControle,
+    /// Identifiant de passkey vide ou de plus de 1 023 octets (WebAuthn niveau 3).
+    CredIdInvalide,
 }
 
 impl Error {
@@ -134,6 +144,10 @@ impl Error {
             Error::PseudoCaracteres => "pseudo_caracteres",
             Error::PseudoEcritures => "pseudo_ecritures",
             Error::TitreTropLong => "titre_trop_long",
+            Error::CleRecupLongueur => "cle_recup_longueur",
+            Error::CleRecupCaractere => "cle_recup_caractere",
+            Error::CleRecupControle => "cle_recup_controle",
+            Error::CredIdInvalide => "cred_id_invalide",
         }
     }
 }

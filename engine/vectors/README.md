@@ -122,6 +122,8 @@ MLS n'est pas dans le fichier (aléa interne d'OpenMLS) : la même version d'Ope
 
 # Vecteurs du compte v2 (`compte.json`)
 
+**Gelé depuis le 22 novembre** : le compte par e-mail est remplacé par le compte par passkey (`compte-v3.json` ci-dessous). Ce fichier n'est plus régénéré ; il est retiré, avec `engine/core/src/compte/v2.rs`, `engine/core/tests/compte.rs` et `web/scripts/gen-compte-vectors.mjs`, quand le site et le serveur ne l'utilisent plus (lot W1 du plan `docs/superpowers/plans/2026-11-22-compte-passkey.md`).
+
 Référence du compte par e-mail (conception `docs/superpowers/specs/2026-11-14-compte-email-design.md` §5.1, §6, §21.2.2, §21.5), ajoutée le 14 novembre (lot 1 du plan). Deux auteurs, chacun pour ses sections :
 
 - **moteur Rust** (`engine/core/tests/compte.rs`, `SHH_GEN_COMPTE=1 cargo test -p shhdrop-core --test compte`) : `constants`, `normaliser`, `sel`, `deriver`, `cles`, `pseudo`, `mot_de_passe`. Les sorties attendues sont écrites à la main dans les tables du test : la génération échoue si le moteur s'en écarte ;
@@ -142,6 +144,25 @@ Mêmes conventions que `v2.json` (hex minuscule, JSON à clés triées, 2 espace
 | `mot_de_passe` | Mot de passe, adresse → `ok` ou `mdp_court`, `mdp_long`, `mdp_adresse` (en minuscules, égal à l'adresse exacte, à l'adresse canonique ou à l'une de leurs parties locales). |
 | `enveloppes` | `env_mdp` = nonce (12) ‖ AES-256-GCM(`kek_mdp`, nonce, `k_compte`, AD = « SHH-CENV1 » ‖ `h` ‖ « mdp ») : 60 octets. |
 | `coffre_prive`, `coffre_profil` | « SHH-ACCT1 » ou « SHH-PROF1 » (9) ‖ `gen` (8, gros-boutiste) ‖ nonce (12) ‖ AES-256-GCM(`cle`, nonce, clair, AD = magie ‖ `h` ‖ `gen`) ; clair = longueur du JSON (4, gros-boutiste) ‖ JSON ‖ zéros, **de la taille exacte du palier** (4, 16, 64 ou 256 Kio : le plus petit qui contient 4 + JSON) ; coffre = palier + 45 octets. `blob` en entier pour les cas de 4 Kio, sinon `blob_len` et `blob_sha256`. |
+
+# Vecteurs du compte par passkey (`compte-v3.json`)
+
+Référence du compte par passkey et clé de récupération (conception `docs/superpowers/specs/2026-11-22-compte-passkey-design.md` §5, §14), ajoutée le 22 novembre (lot P1 du plan `docs/superpowers/plans/2026-11-22-compte-passkey.md`). Nouveau fichier (le format change : plus d'adresse, de mot de passe ni de séquestre ; `K_profil` tirée de `K_compte`).
+
+**Un seul auteur** : le moteur Rust écrit tout le fichier (`engine/core/tests/compte_v3.rs`, `SHH_GEN_COMPTE_V3=1 cargo test -p shhdrop-core --test compte_v3`), enveloppes et coffres compris, avec l'AES-256-GCM natif de RustCrypto (celui des apps) à nonces fixés. Le site refait chaque chiffré avec WebCrypto et doit trouver les mêmes octets (`web/src/engine/compte-v3.test.ts`, qui rejoue aussi toutes les dérivations par le build WebAssembly et les recalcule à part avec HKDF de WebCrypto et SHA-256 de `node:crypto`) ; le serveur Go rejoue `recup.v_r` = SHA-256(`a_r`), les longueurs, la forme des coffres et les `p_canon` de `pseudo` (`server/internal/compte/vecteurs_v3_test.go`). Sans la variable, le test Rust échoue si le fichier n'est plus exactement celui que produit le moteur. Les textes de référence de la clé de récupération, `entree_prf` et `sel_prf` ont été calculés par un programme indépendant (Python : `hashlib`, entiers) et sont écrits dans le test. Régénérer n'est permis que pour ajouter des cas, après relecture du diff ; un changement voulu du format demande un nouveau fichier.
+
+Mêmes conventions que `v2.json` (hex minuscule, JSON à clés triées, 2 espaces, LF final, `{ "error": "<message exact>" }`, règle anti-détecteur de secrets vérifiée avant commit). Textes d'entrée en hex UTF-8 (`entree_hex`, `json_hex`). Entrées fixes : SHA-256(UTF-8(`shhdrop/vecteurs/compte-v3/` + étiquette)), tronqué (`prf/a`, `k_compte/a` sur 32 octets ; `recup/a`, `h/a` sur 16 ; `nonce/prf/a`, `nonce/recup/a`, `nonce/SHH-PROF1/petit` sur 12…).
+
+| Clé | Contenu |
+|---|---|
+| `constants` | `entree_prf` = SHA-256(« shhdrop/v3/compte/prf/1 ») (`prf.eval.first`) ; `sel_prf` = SHA-256(« WebAuthn PRF » ‖ 0x00 ‖ `entree_prf`) (ce que reçoit l'authentificateur en `hmac-secret` ; pour les API natives, conception §10.1) ; étiquettes HKDF ; `enveloppe_len` 60 ; `cred_id_max` 1 023 ; alphabet de la clé de récupération (base32 de Crockford, valeurs 0 à 31) et des symboles de contrôle (0 à 36 : les 32 mêmes, puis `*~$=U`), groupes affichés ; paliers des coffres ; bornes et mots réservés du pseudo. |
+| `enveloppe_prf` | Sortie PRF `p` → `kek` = HKDF(`p`, « shhdrop/v3/compte/enveloppe/prf ») ; `ad` = « SHH-CENV2 » ‖ `h` ‖ SHA-256(`cred_id`) (57 octets) ; `env` = nonce (12) ‖ AES-256-GCM(`kek`, nonce, `k_compte`, `ad`) : 60 octets. `cred_id` de 1, 16, 64 et 1 023 octets ; vide ou de 1 024 octets → `cred_id_invalide` (`cred_id_len`). |
+| `cle_recup.texte` | `r` (16 octets) → `texte` : 26 caractères de base32 de Crockford de l'entier gros-boutiste `r` décalé de 2 bits (bits de bourrage nuls), puis le symbole de contrôle de `r` mod 37 (`controle`) ; `affichage` : groupes de 4 séparés par « - » (`XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX`). Chaque symbole de contrôle propre (`*`, `~`, `$`, `=`, `U`) y figure. |
+| `cle_recup.saisie` | Saisie (`entree_hex`) → `r`, ou `cle_recup_longueur` (pas 27 caractères une fois retirés les blancs Unicode et les tirets « - », U+2010 à U+2014, U+2212 ; ou plus de 1 024 octets), `cle_recup_caractere` (hors alphabet ; `U` et `*~$=` seulement en dernière position ; minuscules, `I`/`L` → `1`, `O` → `0` acceptés), `cle_recup_controle` (bourrage non nul, contrôle faux : substitution, transposition). Dans cet ordre. |
+| `recup` | `r` → `texte`, `a_r` = HKDF(`r`, « shhdrop/v3/compte/recup/acces ») (seul envoyé, à `recup`), `v_r` = SHA-256(`a_r`) (seul gardé par le serveur), `kek_r` = HKDF(`r`, « shhdrop/v3/compte/recup/enveloppe ») ; `ad` = « SHH-CENV2 » ‖ `h` ‖ « recup » (30 octets) ; `env_r` = nonce ‖ AES-256-GCM(`kek_r`, nonce, `k_compte`, `ad`) : 60 octets. |
+| `cles` | `k_compte` → `k_prive` (« shhdrop/v2/compte/blob », inchangée), `k_profil` (« shhdrop/v3/compte/profil », **tirée de `K_compte`** : plus de séquestre), `k_etiquette` (« shhdrop/v2/compte/appareil », inchangée ; nom d'appareil et libellé de passkey). |
+| `coffre_profil`, `coffre_prive` | Même forme que dans `compte.json` ; clé de `cles` (`cles` : étiquette du cas) ; `blob` en entier pour les cas de 4 Kio, sinon `blob_len` et `blob_sha256`. |
+| `pseudo` | Identique à la section `pseudo` de `compte.json` (une seule table de cas, `engine/core/tests/support/pseudo.rs` ; le test vérifie l'égalité tant que `compte.json` existe). |
 
 ## Empreinte des fichiers (`v2-empreinte.json`)
 

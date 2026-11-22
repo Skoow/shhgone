@@ -7,6 +7,8 @@ use shhdrop_core::native::RustCrypto;
 use shhdrop_core::{Error, Result};
 use std::rc::Rc;
 
+pub mod pseudo;
+
 /// Exécute un futur du fournisseur natif, toujours prêt dès le premier appel (aucune attente
 /// réelle) : un futur en attente est un bogue du test ou du fournisseur.
 pub fn block_on<F: Future>(f: F) -> F::Output {
