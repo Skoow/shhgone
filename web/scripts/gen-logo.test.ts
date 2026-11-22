@@ -34,9 +34,9 @@ describe("gen-logo", () => {
       expect(readFileSync(join(web, rel), "utf8"), rel).toBe(gen());
   });
 
-  it("trame légère : le S en points puis 6 tranches, une soixantaine de points (« gone »), rien d'autre qu'arcs et déplacements", () => {
+  it("trame légère : 6 tranches, une soixantaine de points (« gone »), rien d'autre qu'arcs et déplacements ; le S à part", () => {
     const b = build();
-    expect(b.dots).toHaveLength(7);
+    expect(b.dots).toHaveLength(6);
     expect(b.count).toBeGreaterThan(50);
     expect(b.count).toBeLessThan(70);
     for (const d of b.dots) expect(d).toMatch(/^(M[-\d. ]+a[-\d. ]+a[-\d. ]+)+$/);
@@ -45,7 +45,8 @@ describe("gen-logo", () => {
 
   it("mot-symbole « Shhgone » : S capitale + « hh » pleins (3 lettres), « gone » en trame, nommé Shhgone", () => {
     const b = build();
-    expect(b.head.match(/M/g)).toHaveLength(5); // S : 1 tracé ; h : 2 chacun
+    expect(b.cap.match(/M/g)).toHaveLength(1); // S : 1 tracé, à part (bouts arrondis)
+    expect(b.head.match(/M/g)).toHaveLength(4); // h : 2 chacun
     const svg = (OUTPUTS as Record<string, () => string>)["public/logo.svg"]!();
     expect(svg).toContain('aria-label="Shhgone"');
     expect(svg).not.toMatch(/shhdrop/i);
@@ -72,12 +73,24 @@ describe("gen-logo", () => {
         expect(x + r).toBeLessThanOrEqual(30);
         expect(y + r).toBeLessThanOrEqual(30);
       }
-      // Bornes du trait : épine à rx, ry du centre, plus la demi-épaisseur.
+      // Bornes du trait : dans la tuile, marge de 2 u au moins.
       expect(conf.cx - conf.rx - conf.W / 2).toBeGreaterThanOrEqual(2);
-      expect(conf.cyU - conf.ry - conf.W / 2).toBeGreaterThanOrEqual(2);
-      expect(conf.cyU + 3 * conf.ry + conf.W / 2).toBeLessThanOrEqual(30);
+      expect(m.geom.top).toBeGreaterThanOrEqual(2);
+      expect(m.geom.bottom).toBeLessThanOrEqual(30);
     }
     expect(MARK_SMALL.r1).toBeGreaterThanOrEqual(1.25); // ≥ 0,6 px à 16 px
+  });
+
+  it("un seul S : l'initiale du mot et la marque ont les mêmes proportions (à l'échelle du trait près)", () => {
+    const b = build();
+    // Mêmes arcs : rayons de l'initiale = rayons de la marque × (5 / 4).
+    const arcs = (d: string) => [...d.matchAll(/A([\d.]+) ([\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    const k = 5 / MARK.W;
+    for (const [[a, b2], [c, d]] of arcs(b.cap).map((x, i) => [x, arcs(mark().stroke)[i]!] as const)) {
+      expect(a).toBeCloseTo(c! * k, 2);
+      expect(b2).toBeCloseTo(d! * k, 2);
+    }
+    expect(b.capAlpha).toEqual(mark().geom.alpha);
   });
 
   it("favicon.ico : en-tête ICO, entrées 16 et 32 en PNG", () => {

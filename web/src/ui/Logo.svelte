@@ -4,7 +4,7 @@
   // Animations (écran de destruction seulement) : opacity et transform (Web Animations API, aucun attribut style),
   // rien en mouvement réduit (UI §7.5). Chronologie de la gomme dans logoMotion.ts.
   import { tick } from "svelte";
-  import { LOGO_DOTS, LOGO_HEAD, LOGO_STROKE, LOGO_TAIL, LOGO_VIEWBOX, MARK_DOTS, MARK_STROKE, MARK_WIDTH } from "./logo-paths";
+  import { LOGO_CAP, LOGO_CAP_DOTS, LOGO_DOTS, LOGO_HEAD, LOGO_STROKE, LOGO_TAIL, LOGO_VIEWBOX, MARK_DOTS, MARK_STROKE, MARK_WIDTH } from "./logo-paths";
   import { CRUMBS, ERASE, ERASER_RUBBER, ERASER_SLEEVE, eraseTimeline, type Timeline } from "./logoMotion";
   import { reducedMotion } from "./motion";
 
@@ -88,7 +88,9 @@
 {#if variant === "mark"}
   <svg bind:this={svg} class="logo mark" viewBox="3 2 26 28" role="img" aria-label="Shhgone" focusable="false">
     <path class="stroke" d={MARK_STROKE} stroke-width={MARK_WIDTH} />
-    <path class="mark-dots" d={MARK_DOTS} />
+    <g class="mark-dots">
+      {#each MARK_DOTS as p, i (i)}<path d={p.d} fill-opacity={p.o} />{/each}
+    </g>
   </svg>
 {:else}
   <svg bind:this={svg} class={["logo", "word", gone && "gone"]} viewBox={LOGO_VIEWBOX} role="img" aria-label="Shhgone" focusable="false">
@@ -110,10 +112,15 @@
           <rect class="m2" x={ERASE.x1 - ERASE.maskW * (ERASE.soft / 2)} y={ERASE.band2.y} width={ERASE.maskW} height={ERASE.band2.h} fill="url(#{uid}-g2)" />
         </mask>
       </defs>
-      <path class="fx ghost" d={LOGO_HEAD + LOGO_TAIL} />
+      <path class="fx ghost" d={LOGO_CAP + LOGO_HEAD + LOGO_TAIL} />
     {/if}
     <g class="ink" mask={erasing ? `url(#${uid}-m)` : undefined}>
+      <!-- Initiale : le même S que la marque (bouts arrondis), ses points pâlissent vers la fin. -->
+      <path class="head cap" d={LOGO_CAP} stroke-width={LOGO_STROKE} />
       <path class="head" d={LOGO_HEAD} stroke-width={LOGO_STROKE} />
+      <g class="dots">
+        {#each LOGO_CAP_DOTS as p, i (i)}<path d={p.d} fill-opacity={p.o} />{/each}
+      </g>
       <path class="tail" d={LOGO_TAIL} stroke-width={LOGO_STROKE} />
       {#each LOGO_DOTS as d, k (k)}
         <path class="dots" {d} />
@@ -156,7 +163,8 @@
     fill: none;
     stroke: currentColor;
   }
-  .stroke {
+  .stroke,
+  .cap {
     stroke-linecap: round;
   }
   /* État statique : « shh » plein, « gone » en trame. */

@@ -27,7 +27,7 @@ describe("Logo", () => {
     expect(svg.getAttribute("role")).toBe("img");
     expect(svg.getAttribute("aria-label")).toBe("Shhgone");
     expect(svg.querySelectorAll(".dots")).toHaveLength(7);
-    expect(svg.querySelectorAll("*").length).toBeLessThanOrEqual(10);
+    expect(svg.querySelectorAll("*").length).toBeLessThanOrEqual(18); // S + ses 6 points, « hh », trame en 6 tranches
     expect(document.body.innerHTML).not.toContain("style=");
   });
 

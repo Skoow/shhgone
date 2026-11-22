@@ -22,7 +22,7 @@ test("logo : statique à l'arrivée, aucune animation en cours, nom accessible �
   const logo = page.locator("header svg[role='img']");
   await expect(logo).toHaveAttribute("aria-label", "Shhgone");
   expect(await logoAnimations(page)).toBe(0);
-  await expect(logo.locator(".head")).toHaveCount(1);
+  await expect(logo.locator(".head")).toHaveCount(2); // l'initiale S (bouts arrondis) et « hh »
   await expect(logo.locator(".dots")).toHaveCount(7);
   await expect(logo.locator("mask, .finger, .wave")).toHaveCount(0);
   expect(await logo.locator(".dots").evaluateAll((es) => es.map((e) => getComputedStyle(e).opacity))).toEqual(Array(7).fill("1"));

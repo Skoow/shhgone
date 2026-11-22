@@ -42,12 +42,13 @@ const dot = ([x, y, r]) => `M${P(x - r, y)}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a
  * ajustés pour finir au bout ; chaque point s'écarte de l'épine (côté intérieur) de drift · t².
  * Renvoie le tracé plein (arcs exacts), le reste de l'épine (fantôme de la gomme) et les points.
  */
-export function sGeom({ cx, cyU, rx, ry, W, a0 = -30, cut = -40, a1 = 160, n, r0, r1, k = 1.4, drift, ext }) {
-  const cyL = cyU + 2 * ry;
-  const pu = (d) => [cx + rx * Math.cos(rad(d)), cyU + ry * Math.sin(rad(d))];
+export function sGeom({ cx, cyU, rx, ry, rxU = rx, ryU = ry, W, a0 = -30, cut = -40, a1 = 160, n, r0, r1, k = 1.4, drift, ext, fade = 0 }) {
+  // Panse haute (rxU, ryU) un peu plus petite que la basse, comme un S dessiné : jonction en (cx, cyU + ryU).
+  const cyL = cyU + ryU + ry;
+  const pu = (d) => [cx + rxU * Math.cos(rad(d)), cyU + ryU * Math.sin(rad(d))];
   const pl = (d) => [cx + rx * Math.cos(rad(d)), cyL + ry * Math.sin(rad(d))];
-  const A = (large, sweep, p) => `A${f(rx)} ${f(ry)} 0 ${large} ${sweep} ${P(...p)}`;
-  const solid = `M${P(...pu(a0))}${A(1, 0, pu(90))}${A(cut + 90 > 180 ? 1 : 0, 1, pl(cut))}`;
+  const A = (large, sweep, p, a = rx, b = ry) => `A${f(a)} ${f(b)} 0 ${large} ${sweep} ${P(...p)}`;
+  const solid = `M${P(...pu(a0))}${A(1, 0, pu(90), rxU, ryU)}${A(cut + 90 > 180 ? 1 : 0, 1, pl(cut))}`;
   const rest = `M${P(...pl(cut))}${A(a1 - cut > 180 ? 1 : 0, 1, pl(a1))}`;
   // Reste de l'épine échantillonné (abscisse curviligne), puis prolongé à la tangente.
   const STEPS = 2400, pts = [];
@@ -65,28 +66,43 @@ export function sGeom({ cx, cyU, rx, ry, W, a0 = -30, cut = -40, a1 = 160, n, r0
   const radii = Array.from({ length: n }, (_, j) => r0 + ((r1 - r0) * j) / (n - 1));
   const weights = radii.map((_, j) => k ** j);
   const gap = (len.at(-1) - W / 2 - radii.reduce((a, r) => a + 2 * r, 0)) / weights.reduce((a, b) => a + b, 0);
-  const dots = [];
+  const dots = [], alpha = [];
   let s = W / 2;
   radii.forEach((r, j) => {
     s += weights[j] * gap + r;
     const [x, y, nx, ny] = at(s), t = j / (n - 1), off = drift * t * t;
     dots.push([x + nx * off, y + ny * off, r]);
+    // Les points pâlissent vers la fin (propriétaire, 22 novembre) : opacité de 1 à 1 − fade.
+    alpha.push(Math.round((1 - fade * t * t) * 100) / 100);
     s += r;
   });
-  return { solid, rest, dots, gap, width: 2 * rx + W };
+  return { solid, rest, dots, alpha, gap, width: 2 * rx + W, top: cyU - ryU - W / 2, bottom: cyL + ry + W / 2 };
 }
 
-/** Marque (repère 32 × 32, centrée en 16, 16) ; « small » : variante 16 px (3 points plus gros, trait plus épais). */
-export const MARK = { cx: 16, cyU: 10.7, rx: 6.7, ry: 5.3, W: 4.4, n: 6, r0: 1.9, r1: 0.8, drift: 1.4, ext: 3 };
-export const MARK_SMALL = { ...MARK, W: 4.8, cut: -35, n: 3, r0: 2.0, r1: 1.35, k: 1.5, drift: 0.8, ext: 2.2 };
+/**
+ * LE S (22 novembre : un seul dessin pour l'icône et l'initiale du mot). Toutes les mesures sont
+ * des multiples de l'épaisseur du trait W : l'icône et l'initiale ne diffèrent que par l'échelle.
+ */
+export const S_FORME = { rx: 1.76, ry: 1.4, rxU: 1.66, ryU: 1.27, n: 6, r0: 0.46, r1: 0.2, k: 1.4, drift: 0.36, ext: 0.8, fade: 0.8 };
+/** Paramètres de sGeom pour un S de trait W, centre horizontal cx, bas du trait (hors points) à `bas`. */
+export function sAt(W, cx, bas, forme = S_FORME) {
+  const m = (v) => v * W;
+  const ry = m(forme.ry), ryU = m(forme.ryU);
+  return { cx, cyU: bas - W / 2 - ry - ry - ryU, rx: m(forme.rx), ry, rxU: m(forme.rxU), ryU, W, n: forme.n, r0: m(forme.r0), r1: m(forme.r1), k: forme.k, drift: m(forme.drift), ext: m(forme.ext), fade: forme.fade };
+}
+/** Marque (repère 32 × 32) : le S, trait 4, centré en (16, 16) (hauteur du trait 2 ryU + 2 ry + W). */
+const MW = 4;
+const MH = 2 * S_FORME.ryU * MW + 2 * S_FORME.ry * MW + MW;
+export const MARK = sAt(MW, 16, 16 + MH / 2);
+/** 16 px seulement (favicon.ico) : même S (mêmes panses), trait un peu plus épais et trois points plus gros, pour rester net. */
+export const MARK_SMALL = { ...MARK, W: 4.6, n: 3, r0: 2.0, r1: 1.4, k: 1.5, drift: 0.8, ext: 2.2, fade: 0.55 };
 
 // Lettres, tracées directement à leur abscisse x0 (chemins absolus).
 const L = {
-  // S capitale : même dessin que la marque, trait du mot (5), rayons des points ceux de la trame (2,5 à 1,5).
+  // S capitale : LE S de la marque (S_FORME), au trait du mot (5), posé sur la ligne de base (+ débord).
   S(x0) {
-    const rx = 8.8, ry = 7;
-    const g = sGeom({ cx: x0 + HW + rx, cyU: OV - HW - 3 * ry, rx, ry, W, n: 6, r0: R_MAX, r1: R_MIN, drift: 1.8, ext: 4 });
-    return { d: g.solid, rest: g.rest, dots: g.dots, w: g.width };
+    const g = sGeom(sAt(W, x0 + HW + S_FORME.rx * W, OV));
+    return { d: g.solid, rest: g.rest, dots: g.dots, alpha: g.alpha, w: g.width };
   },
   h(x0) {
     const s = x0 + HW;
@@ -111,7 +127,10 @@ const L = {
 
 export function build() {
   const xs = [];
-  let x = 0;
+  // Les derniers points du S dérivent un peu à gauche du trait : le mot commence assez loin pour
+  // qu'aucun ne sorte du cadre (bord gauche du point le plus à gauche sur x = 0).
+  const pad = Math.max(0, -Math.min(...L.S(0).dots.map(([px, , r]) => px - r)));
+  let x = pad;
   const parts = [..."Shhgone"].map((ch, i) => {
     xs.push(x);
     const g = L[ch](x);
@@ -155,18 +174,25 @@ export function build() {
   const top = -ASC, bottom = DESC + R_MIN + 0.2;
   return {
     viewBox: `0 ${f(top)} ${f(width)} ${f(bottom - top)}`,
-    head: parts.slice(0, 3).map((p) => p.d).join(""),
+    // Initiale à part (bouts arrondis, comme la marque) ; « hh » au trait du mot.
+    cap: parts[0].d,
+    head: parts.slice(1, 3).map((p) => p.d).join(""),
     tail: parts[0].rest + parts.slice(3).map((p) => p.d).join(""),
-    dots: [parts[0].dots.map(dot).join(""), ...buckets],
+    dots: buckets,
     count: pts.length,
     capDots: parts[0].dots,
+    capAlpha: parts[0].alpha,
   };
 }
 
-/** Marque « S qui s'efface » : tracé plein et points (repère 32 × 32). */
+/** Points qui pâlissent : un tracé par point, avec son opacité. */
+const fading = (dots, alpha) => dots.map((p, i) => ({ d: dot(p), o: alpha[i] }));
+const fadingSvg = (l, fill) => l.map(({ d, o }) => `<path d="${d}" fill="${fill}"${o < 1 ? ` fill-opacity="${o}"` : ""}/>`).join("");
+
+/** Marque « S qui s'efface » : tracé plein et points qui pâlissent (repère 32 × 32). */
 export function mark(small = false) {
   const g = sGeom(small ? MARK_SMALL : MARK);
-  return { stroke: g.solid, width: (small ? MARK_SMALL : MARK).W, dots: g.dots.map(dot).join(""), geom: g };
+  return { stroke: g.solid, width: (small ? MARK_SMALL : MARK).W, dots: fading(g.dots, g.alpha), geom: g };
 }
 
 export const COLORS = { bg: "#0B0D12", text: "#E9ECF2", accent: "#5FE3B5" };
@@ -182,7 +208,7 @@ export function iconSvg(size, { rounded = true, scale = 1, small = false } = {})
     `<rect width="32" height="32" rx="${rx}" fill="${COLORS.bg}"/>` +
     `<g transform="translate(${f(off)} ${f(off)}) scale(${f(scale)})">` +
     `<path d="${m.stroke}" fill="none" stroke="${COLORS.text}" stroke-width="${f(m.width)}" stroke-linecap="round"/>` +
-    `<path d="${m.dots}" fill="${COLORS.accent}"/></g></svg>\n`
+    `${fadingSvg(m.dots, COLORS.accent)}</g></svg>\n`
   );
 }
 
@@ -190,7 +216,9 @@ export function logoSvg() {
   const b = build();
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${b.viewBox}" role="img" aria-label="Shhgone">` +
+    `<path d="${b.cap}" fill="none" stroke="${COLORS.text}" stroke-width="${W}" stroke-linecap="round"/>` +
     `<path d="${b.head}" fill="none" stroke="${COLORS.text}" stroke-width="${W}"/>` +
+    fadingSvg(fading(b.capDots, b.capAlpha), COLORS.accent) +
     `<path d="${b.dots.join("")}" fill="${COLORS.accent}"/></svg>\n`
   );
 }
@@ -199,15 +227,17 @@ export function pathsTs() {
   const b = build();
   return (
     "// Généré par scripts/gen-logo.mjs : ne pas modifier à la main.\n" +
-    `// Trame : points du S, puis ${b.count} points de « gone » en ${b.dots.length - 1} tranches (de gauche à droite).\n` +
+    `// Initiale S (même dessin que la marque) ; trame : ${b.count} points de « gone » en ${b.dots.length} tranches.\n` +
     `export const LOGO_VIEWBOX = ${JSON.stringify(b.viewBox)};\n` +
     `export const LOGO_STROKE = ${W};\n` +
+    `export const LOGO_CAP = ${JSON.stringify(b.cap)};\n` +
+    `export const LOGO_CAP_DOTS: readonly { d: string; o: number }[] = ${JSON.stringify(fading(b.capDots, b.capAlpha))};\n` +
     `export const LOGO_HEAD = ${JSON.stringify(b.head)};\n` +
     `export const LOGO_TAIL = ${JSON.stringify(b.tail)};\n` +
     `export const LOGO_DOTS: readonly string[] = ${JSON.stringify(b.dots)};\n` +
     `export const MARK_STROKE = ${JSON.stringify(mark().stroke)};\n` +
     `export const MARK_WIDTH = ${mark().width};\n` +
-    `export const MARK_DOTS = ${JSON.stringify(mark().dots)};\n`
+    `export const MARK_DOTS: readonly { d: string; o: number }[] = ${JSON.stringify(mark().dots)};\n`
   );
 }
 
