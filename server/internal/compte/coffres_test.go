@@ -11,7 +11,7 @@ import (
 // forme vérifiée (palier exact, en-tête de la bonne sorte, gen = if_gen + 1).
 func TestDeuxCoffresIndependants(t *testing.T) {
 	b := nouveauBanc(t)
-	_, j, d := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	_, j, d := b.inscrire(t, "lea")
 	c, err := b.s.Session(j)
 	if err != nil {
 		t.Fatal(err)
@@ -81,8 +81,8 @@ func TestDeuxCoffresIndependants(t *testing.T) {
 // Un compte ne lit ni n'écrit les coffres d'un autre : la session désigne le compte.
 func TestCoffresParCompte(t *testing.T) {
 	b := nouveauBanc(t)
-	_, ja, _ := b.inscrire(t, ipN(1), "lea@exemple.fr", "lea")
-	_, _, db := b.inscrire(t, ipN(2), "leo@exemple.fr", "leo")
+	_, ja, _ := b.inscrire(t, "lea")
+	_, _, db := b.inscrire(t, "leo")
 	ca, _ := b.s.Session(ja)
 	blob, _, err := b.s.LireCoffre(ca, Prive)
 	if err != nil || bytes.Equal(blob, db.BlobPrive) {

@@ -1,20 +1,23 @@
 package compte
 
 import (
+	"encoding/hex"
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 )
 
-// Lot 7 du plan du compte : bannissement révisé (conception §13, §21.11, §21.14.4). Durée
+// Lot 7 du plan du compte : bannissement révisé (conception §13, §21.11, §21.14.4), par compte
+// depuis le 22 novembre (conception du compte par passkey §7.4). Durée
 // choisie (30 jours, 1 an), identifiant opaque B-…, suspendre, réactiver, changer
 // l'échéance (5 ans au plus), lever, annuler ; 20 bannissements par heure au plus.
 
 // ban : bannissement réussi (échoue sinon).
-func (b *banc) ban(t *testing.T, c Cible, jours int, motif uint8) Ban {
+func (b *banc) ban(t *testing.T, h [16]byte, jours int, motif uint8) Ban {
 	t.Helper()
-	r, err := b.s.Bannir(c, jours, motif)
+	r, err := b.s.Bannir(h, jours, motif)
 	if err != nil {
 		t.Fatalf("Bannir : %v", err)
 	}
@@ -23,16 +26,35 @@ func (b *banc) ban(t *testing.T, c Cible, jours int, motif uint8) Ban {
 
 func (b *banc) aujourdhui() int64 { return jourDe(b.clk.Now()) }
 
+// lettres : pseudo de test sans « i » ni « m » (forme canonique inchangée par canonTest).
+func lettres(i int) string {
+	const a = "abcdefghjklnopqrstuvwxyz"
+	s := "p"
+	for {
+		s += string(a[i%len(a)])
+		if i /= len(a); i == 0 {
+			return s
+		}
+	}
+}
+
+// compte : le compte n° i (pseudo distinct).
+func (b *banc) compte(t *testing.T, i int) [16]byte {
+	t.Helper()
+	h, _, _ := b.inscrire(t, lettres(i))
+	return h
+}
+
 // Bannir le compte créateur d'un salon (lien ou ref : le compte h) : ligne bannis (début
 // aujourd'hui, échéance + durée, active, motif, salons fermés), sessions fermées, salons du
 // compte fermés par le crochet du salon, création refusée ; connexion encore permise.
 func TestBannirFermeLesSalonsOuverts(t *testing.T) {
 	b := nouveauBanc(t)
-	h, j, d := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, j, _ := b.inscrire(t, "lea")
 	var fermes [][16]byte
 	b.s.fermerSalons = func(x [16]byte) (int, error) { fermes = append(fermes, x); return 2, nil }
-	r := b.ban(t, Cible{H: &h}, 365, 6)
-	if !r.Compte || r.SalonsFermes != 2 || len(fermes) != 1 || fermes[0] != h {
+	r := b.ban(t, h, 365, 6)
+	if r.SalonsFermes != 2 || len(fermes) != 1 || fermes[0] != h {
 		t.Fatalf("%+v %v", r, fermes)
 	}
 	auj := b.aujourdhui()
@@ -52,64 +74,64 @@ func TestBannirFermeLesSalonsOuverts(t *testing.T) {
 	if _, err := b.s.Palier(h); !errors.As(err, &bn) || bn.Jusqu != r.Vue.Jusqu {
 		t.Fatal("création permise :", err)
 	}
-	if _, err := b.s.Connexion(ipA, "lea@exemple.fr", d.AAuth, OptionsSession{}, false); err != nil {
+	if _, err := b.connecter(h); err != nil {
 		t.Fatal("connexion refusée (export, suppression) :", err)
 	}
 	// Compte inconnu (supprimé) : rien n'est banni.
-	if _, err := b.s.Bannir(Cible{H: &[16]byte{9}}, 30, 10); !errors.Is(err, ErrEtape) {
+	if _, err := b.s.Bannir([16]byte{9}, 30, 10); !errors.Is(err, ErrEtape) {
 		t.Fatal(err)
 	}
 }
 
-// Par adresse : n'importe quelle variante de l'adresse du compte (conception §5.1) ; sans
-// compte : l'adresse ne peut plus en créer ; déjà bannie : ErrDejaBanni avec le bannissement.
-func TestBannirParAdresse(t *testing.T) {
+// Déjà banni (non échu) : ErrDejaBanni avec le bannissement en cours.
+func TestDejaBanni(t *testing.T) {
 	b := nouveauBanc(t)
-	h, _, _ := b.inscrire(t, ipA, "leadupont@gmail.com", "lea")
-	r := b.ban(t, Cible{Email: []byte(" Lea.Dupont+x@GMAIL.com ")}, 30, 8)
-	if !r.Compte || r.Vue.Jusqu != dateJour(b.aujourdhui()+30*jourS) {
-		t.Fatalf("%+v", r)
-	}
-	if _, err := b.s.Palier(h); !errors.As(err, new(ErrBanni)) {
-		t.Fatal(err)
-	}
+	h, _, _ := b.inscrire(t, "lea")
+	r := b.ban(t, h, 30, 8)
 	var deja ErrDejaBanni
-	if _, err := b.s.Bannir(Cible{Email: []byte("leadupont@gmail.com")}, 365, 1); !errors.As(err, &deja) ||
-		deja.Vue.ID != r.Vue.ID {
-		t.Fatal("deux bannissements pour une adresse :", err)
-	}
-	r2 := b.ban(t, Cible{Email: []byte("inconnue@exemple.fr")}, 365, 10)
-	if r2.Compte || r2.SalonsFermes != 0 {
-		t.Fatalf("%+v", r2)
-	}
-	_, e, code := b.debut(t, ipN(3), "inconnue@exemple.fr")
-	if _, err := b.s.InscriptionFin(e, code, donneesTest("nouveau"), OptionsSession{}); !errors.As(err, new(ErrBanni)) {
-		t.Fatal("inscription d'une adresse bannie :", err)
-	}
-	for _, mauvaise := range []string{"", "pas une adresse", "a@b", "é@exemple.fr"} {
-		if _, err := b.s.Bannir(Cible{Email: []byte(mauvaise)}, 30, 10); !errors.Is(err, ErrAdresse) {
-			t.Errorf("%q : %v", mauvaise, err)
-		}
-	}
-	if _, err := b.s.Bannir(Cible{}, 30, 10); !errors.Is(err, ErrRequete) {
-		t.Fatal("cible vide :", err)
+	if _, err := b.s.Bannir(h, 365, 1); !errors.As(err, &deja) || deja.Vue != r.Vue {
+		t.Fatal(err)
 	}
 }
 
-// Durées : 30, 365 ou 1 095 jours ; motif 1 à 10 ; rien d'autre.
+// Conception du compte par passkey §7.4 : supprimer un compte banni efface son bannissement
+// (cascade) ; la passe quotidienne n'a rien à faire de plus.
+func TestBannisParH(t *testing.T) {
+	b := nouveauBanc(t)
+	h, j, _ := b.inscrire(t, "lea")
+	h2, _, _ := b.inscrire(t, "leo")
+	b.ban(t, h2, 30, 8)
+	r := b.ban(t, h, 30, 8)
+	if r.Vue.ID == "" || len(lignes(t, b.db, `SELECT hex(id) FROM bannis`)) != 2 {
+		t.Fatal(r)
+	}
+	o, err := b.connecter(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = j
+	if _, err := b.s.Supprimer(b.session(t, o.Jeton)); err != nil {
+		t.Fatal(err)
+	}
+	if got := lignes(t, b.db, `SELECT hex(h) FROM bannis`); len(got) != 1 || got[0] != strings.ToUpper(hex.EncodeToString(h2[:])) {
+		t.Fatal("bannissement du compte supprimé gardé :", got)
+	}
+}
+
 func TestDurees(t *testing.T) {
 	b := nouveauBanc(t)
 	for i, j := range []int{30, 365, 1095} {
-		r := b.ban(t, Cible{Email: []byte("a" + string(rune('0'+i)) + "@exemple.fr")}, j, 10)
+		r := b.ban(t, b.compte(t, i), j, 10)
 		if r.Vue.Jusqu != dateJour(b.aujourdhui()+int64(j)*jourS) {
 			t.Fatal(j, r.Vue)
 		}
 	}
+	hx := b.compte(t, 99)
 	for _, c := range []struct {
 		jours int
 		motif uint8
 	}{{0, 10}, {-30, 10}, {31, 10}, {364, 10}, {366, 10}, {1094, 10}, {1096, 10}, {1825, 10}, {30, 0}, {30, 11}} {
-		if _, err := b.s.Bannir(Cible{Email: []byte("x@exemple.fr")}, c.jours, c.motif); !errors.Is(err, ErrRequete) {
+		if _, err := b.s.Bannir(hx, c.jours, c.motif); !errors.Is(err, ErrRequete) {
 			t.Errorf("%+v : %v", c, err)
 		}
 	}
@@ -120,10 +142,10 @@ func TestDurees(t *testing.T) {
 // l'état d'avant.
 func TestSuspendreReactiver(t *testing.T) {
 	b := nouveauBanc(t)
-	h, _, d := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, _, _ := b.inscrire(t, "lea")
 	n := 0
 	b.s.fermerSalons = func([16]byte) (int, error) { n++; return 1, nil }
-	r := b.ban(t, Cible{H: &h}, 365, 4)
+	r := b.ban(t, h, 365, 4)
 	avant, apres, err := b.s.ActionBan(r.Vue.ID, "suspendre", "")
 	if err != nil || !avant.Actif || apres == nil || apres.Actif || apres.Jusqu != r.Vue.Jusqu || apres.ID != r.Vue.ID {
 		t.Fatal(avant, apres, err)
@@ -131,7 +153,7 @@ func TestSuspendreReactiver(t *testing.T) {
 	if _, err := b.s.Palier(h); err != nil {
 		t.Fatal("suspendu : création refusée :", err)
 	}
-	o, err := b.s.Connexion(ipA, "lea@exemple.fr", d.AAuth, OptionsSession{}, false)
+	o, err := b.connecter(h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,12 +170,6 @@ func TestSuspendreReactiver(t *testing.T) {
 	if _, err := b.s.Palier(h); !errors.As(err, new(ErrBanni)) {
 		t.Fatal(err)
 	}
-	// Suspendu, l'adresse sans compte peut s'inscrire.
-	r2 := b.ban(t, Cible{Email: []byte("leo@exemple.fr")}, 30, 10)
-	if _, _, err := b.s.ActionBan(r2.Vue.ID, "suspendre", ""); err != nil {
-		t.Fatal(err)
-	}
-	b.inscrire(t, ipN(4), "leo@exemple.fr", "leo")
 	for _, x := range []struct{ id, action string }{{r.Vue.ID, "inconnue"}, {r.Vue.ID, ""}, {"B-0000", "lever"}, {"", "lever"}} {
 		if _, _, err := b.s.ActionBan(x.id, x.action, ""); !errors.Is(err, ErrRequete) {
 			t.Errorf("%+v : %v", x, err)
@@ -167,7 +183,7 @@ func TestSuspendreReactiver(t *testing.T) {
 // Changer l'échéance : toute date de demain à aujourd'hui + 5 ans, au jour, rien d'autre.
 func TestEcheanceBornes(t *testing.T) {
 	b := nouveauBanc(t)
-	r := b.ban(t, Cible{Email: []byte("lea@exemple.fr")}, 365, 10)
+	r := b.ban(t, b.compte(t, 0), 365, 10)
 	auj := time.Unix(b.aujourdhui(), 0).UTC()
 	f := func(x time.Time) string { return x.Format("2006-01-02") }
 	for _, ok := range []string{f(auj.AddDate(0, 0, 1)), f(auj.AddDate(5, 0, 0)), f(auj.AddDate(2, 3, 4))} {
@@ -192,10 +208,10 @@ func TestEcheanceBornes(t *testing.T) {
 // Lever : fin maintenant, ligne effacée ; l'ancienneté n'est pas rendue.
 func TestLever(t *testing.T) {
 	b := nouveauBanc(t)
-	h, _, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, _, _ := b.inscrire(t, "lea")
 	b.clk.Add(20 * 24 * time.Hour)
 	b.s.Signale(h)
-	r := b.ban(t, Cible{H: &h}, 365, 6)
+	r := b.ban(t, h, 365, 6)
 	avant, apres, err := b.s.ActionBan(r.Vue.ID, "lever", "")
 	if err != nil || apres != nil || avant.ID != r.Vue.ID || !avant.Actif {
 		t.Fatal(avant, apres, err)
@@ -217,10 +233,10 @@ func TestLever(t *testing.T) {
 // Annuler (erreur de bannissement) : comme Lever, plus compte_des = cree_jour.
 func TestAnnulerRendAnciennete(t *testing.T) {
 	b := nouveauBanc(t)
-	h, _, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, _, _ := b.inscrire(t, "lea")
 	b.clk.Add(20 * 24 * time.Hour)
 	b.s.Signale(h)
-	r := b.ban(t, Cible{H: &h}, 30, 10)
+	r := b.ban(t, h, 30, 10)
 	if _, apres, err := b.s.ActionBan(r.Vue.ID, "annuler", ""); err != nil || apres != nil {
 		t.Fatal(apres, err)
 	}
@@ -245,57 +261,37 @@ func TestAnnulerRendAnciennete(t *testing.T) {
 func TestVingtBannissementsParHeure(t *testing.T) {
 	b := nouveauBanc(t)
 	b.clk.Add(-10 * time.Minute) // 9 h 50 : la fenêtre change à 10 h
-	adr := func(i int) []byte { return []byte("p" + itoa(int64(i)) + "@exemple.fr") }
+	var hs [21][16]byte
+	for i := range hs {
+		hs[i] = b.compte(t, i)
+	}
 	for i := range 20 {
-		b.ban(t, Cible{Email: adr(i)}, 30, 10)
+		b.ban(t, hs[i], 30, 10)
 	}
 	var lim ErrLimit
-	if _, err := b.s.Bannir(Cible{Email: adr(20)}, 30, 10); !errors.As(err, &lim) || lim.Retry <= 0 {
+	if _, err := b.s.Bannir(hs[20], 30, 10); !errors.As(err, &lim) || lim.Retry <= 0 {
 		t.Fatal("21e accepté :", err)
 	}
 	if n := len(lignes(t, b.db, `SELECT hex(id) FROM bannis`)); n != 20 {
 		t.Fatal(n)
 	}
 	b.clk.Add(11 * time.Minute)
-	b.ban(t, Cible{Email: adr(20)}, 30, 10)
+	b.ban(t, hs[20], 30, 10)
 }
 
-// Le motif et l'échéance sont montrés à la personne à la connexion (GET /api/compte, R16).
+// Le motif, l'échéance et l'identifiant B-… (recours, conception du compte par passkey §7.4) sont
+// montrés à la personne à la connexion (GET /api/compte, R16).
 func TestMotifMontreALaConnexion(t *testing.T) {
 	b := nouveauBanc(t)
-	h, _, d := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
-	r := b.ban(t, Cible{H: &h}, 365, 6)
-	o, err := b.s.Connexion(ipA, "lea@exemple.fr", d.AAuth, OptionsSession{}, false)
+	h, _, _ := b.inscrire(t, "lea")
+	r := b.ban(t, h, 365, 6)
+	o, err := b.connecter(h)
 	if err != nil {
 		t.Fatal(err)
 	}
 	et, err := b.s.Etat(b.session(t, o.Jeton))
-	if err != nil || !et.Banni || et.BanniJusqu != r.Vue.Jusqu || et.BanniMotif != 6 {
+	if err != nil || !et.Banni || et.BanniJusqu != r.Vue.Jusqu || et.BanniMotif != 6 || et.BanniID != r.Vue.ID {
 		t.Fatal(et, err)
-	}
-}
-
-// Recherche par adresse (recours) : le bannissement ou rien, et « un compte existe : palier,
-// ancienneté » ; jamais l'adresse, l'empreinte, h ni le pseudo.
-func TestChercherBan(t *testing.T) {
-	b := nouveauBanc(t)
-	h, _, _ := b.inscrire(t, ipA, "leadupont@gmail.com", "lea")
-	b.clk.Add(3 * 24 * time.Hour)
-	bv, cv, err := b.s.ChercherBan([]byte("Lea.Dupont@gmail.com"))
-	if err != nil || bv != nil || cv != (CompteVue{Existe: true, Palier: "neuf", AncienneteJours: 3}) {
-		t.Fatal(bv, cv, err)
-	}
-	r := b.ban(t, Cible{H: &h}, 30, 3)
-	bv, cv, err = b.s.ChercherBan([]byte("leadupont+z@gmail.com"))
-	if err != nil || bv == nil || *bv != r.Vue || !cv.Banni {
-		t.Fatal(bv, cv, err)
-	}
-	bv, cv, err = b.s.ChercherBan([]byte("personne@exemple.fr"))
-	if err != nil || bv != nil || cv != (CompteVue{}) {
-		t.Fatal(bv, cv, err)
-	}
-	if _, _, err := b.s.ChercherBan([]byte("pas une adresse")); !errors.Is(err, ErrAdresse) {
-		t.Fatal(err)
 	}
 }
 
@@ -313,7 +309,7 @@ func TestListeBans(t *testing.T) {
 		case i == 7:
 			jusqu = auj // échu : la passe quotidienne l'effacera
 		}
-		k := alea32()
+		k := b.compte(t, i)
 		if _, err := b.db.Exec(`INSERT INTO bannis VALUES(?,?,?,?,?,10,0)`, alea8(), k[:], auj-int64(i)*jourS, jusqu, actif); err != nil {
 			t.Fatal(err)
 		}
@@ -372,10 +368,13 @@ func TestIDBan(t *testing.T) {
 func TestActionsBanDansLaLimite(t *testing.T) {
 	b := nouveauBanc(t)
 	b.clk.Add(-10 * time.Minute) // 9 h 50 : la fenêtre change à 10 h
-	adr := func(i int) []byte { return []byte("q" + itoa(int64(i)) + "@exemple.fr") }
+	var hs [12][16]byte
+	for i := range hs {
+		hs[i] = b.compte(t, i)
+	}
 	var ids []string
 	for i := range 12 {
-		ids = append(ids, b.ban(t, Cible{Email: adr(i)}, 30, 10).Vue.ID)
+		ids = append(ids, b.ban(t, hs[i], 30, 10).Vue.ID)
 	}
 	for _, id := range ids[:8] { // 12 bannissements + 8 actions = 20
 		if _, _, err := b.s.ActionBan(id, "lever", ""); err != nil {

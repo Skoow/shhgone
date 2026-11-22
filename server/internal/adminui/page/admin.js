@@ -361,7 +361,7 @@ function palier(p) { return p === 'confirme' ? 'Confirmé' : 'Récent'; }
 function sections(s) {
   salonsActifs = s.salon_actif;
   comptesActifs = !!s.comptes_actif;
-  for (const id of ['onglet-bannissements', 'onglet-comptes', 'bannissements', 'comptes', 'carte-bannir', 'carte-chercher',
+  for (const id of ['onglet-bannissements', 'onglet-comptes', 'bannissements', 'comptes', 'carte-bannir',
     'carte-bannis', 'carte-comptes']) {
     $(id).hidden = !comptesActifs;
   }
@@ -423,7 +423,6 @@ async function envoyer(methode, chemin, objet) {
 function messageErreur(r) {
   const e = r.json && r.json.error;
   if (r.statut === 429) return 'Refusé : 20 bannissements par heure au plus (garde-fou). Réessayer plus tard.';
-  if (e === 'adresse_invalide') return 'Ce n’est pas une adresse e-mail valide. Rien n’a été fait.';
   if (e === 'lien_invalide') return 'Ce n’est pas un lien d’invitation de salon. Rien n’a été fait.';
   if (e === 'deja_banni') return 'Déjà banni : ' + ligneBan(r.json.ban) + '. Agir sur ce bannissement dans la liste.';
   if (e === 'bad_request') return 'Demande refusée : valeur hors des bornes. Rien n’a été fait.';
@@ -607,7 +606,7 @@ remplirDurees($('bannir-duree'));
 remplirMotifs($('bannir-motif'), 10);
 boutonsFiltre();
 
-// Bannir par adresse ou par lien : le champ est vidé avant l'envoi ; « @ » : une adresse.
+// Bannir par lien d'invitation : le champ est vidé avant l'envoi.
 confirmer($('bannir-bouton'), 'bannir (sessions et salons fermés)', async () => {
   const champ = $('bannir-cible');
   const v = champ.value.trim();
@@ -615,13 +614,11 @@ confirmer($('bannir-bouton'), 'bannir (sessions et salons fermés)', async () =>
   const res = $('bannir-resultat');
   if (!v) { res.textContent = 'Rien à bannir : champ vide.'; return; }
   const corps = { duree_jours: Number($('bannir-duree').value), motif: Number($('bannir-motif').value) };
-  if (v.includes('@')) corps.email = v; else corps.lien = v;
+  corps.lien = v;
   const r = await envoyer('POST', '/api/bannir', corps);
   if (!r) return;
   if (r.ok && r.json && r.json.banni === 'compte') {
     res.textContent = 'Compte banni (' + ligneBan(r.json.ban) + ') ; ' + (r.json.salons_fermes || 0) + ' salon(s) fermé(s), sessions fermées.';
-  } else if (r.ok && r.json && r.json.banni === 'adresse') {
-    res.textContent = 'Adresse bannie (' + ligneBan(r.json.ban) + ') : aucun compte ; l’inscription est refusée.';
   } else if (r.ok && r.json && r.json.banni === 'aucun') {
     res.textContent = 'Salon créé sans compte : personne à bannir. Le détruire dans « Actions ».';
   } else if (r.ok && r.json && r.json.introuvable) {
@@ -631,28 +628,6 @@ confirmer($('bannir-bouton'), 'bannir (sessions et salons fermés)', async () =>
 });
 $('bannir').addEventListener('submit', (ev) => { ev.preventDefault(); $('bannir-bouton').click(); });
 
-$('chercher').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  const champ = $('chercher-adresse');
-  const v = champ.value.trim();
-  champ.value = '';
-  const out = $('chercher-resultat');
-  vider(out);
-  if (!v) return;
-  const r = await envoyer('POST', '/api/bannis/chercher', { email: v });
-  if (!r) return;
-  if (!r.ok || !r.json) { out.append(el('p', messageErreur(r), 'resultat')); return; }
-  const dl = el('dl', undefined, 'faits apres');
-  fait(dl, 'Bannissement', r.json.ban ? ligneBan(r.json.ban) : 'aucun');
-  const c = r.json.compte;
-  fait(dl, 'Un compte existe', c.existe ? 'oui' : 'non');
-  if (c.existe) {
-    fait(dl, 'Palier', palier(c.palier));
-    fait(dl, 'Ancienneté', c.anciennete_jours + ' j');
-  }
-  out.append(dl);
-});
-
 // ----- Comptes -----
 
 function afficherComptes(a) {
@@ -661,9 +636,9 @@ function afficherComptes(a) {
   chiffre(c, 'Comptes (plafond ' + nombre.format(a.comptes_max) + ')', a.comptes);
   chiffre(c, 'Récents (< 7 j)', a.neufs);
   chiffre(c, 'Confirmés', a.confirmes);
-  chiffre(c, 'Double authentification', a.avec_totp);
-  chiffre(c, 'Retrait de la double auth. en attente', a.retrait_totp_en_attente);
-  chiffre(c, 'Récupérés par e-mail (7 j)', a.recuperes_7_jours);
+  chiffre(c, 'Passkeys', a.passkeys);
+  chiffre(c, 'Dont ouvrant les données (PRF)', a.passkeys_prf);
+  chiffre(c, 'Comptes sans passkey synchronisable', a.comptes_sans_passkey_synchronisable);
   chiffre(c, 'Sessions ouvertes', a.sessions);
   chiffre(c, 'Dont « rester connecté »', a.sessions_persistantes);
   chiffre(c, 'Effacés (inactivité, dernier passage)', a.effaces_inactivite_dernier_passage);
@@ -676,12 +651,9 @@ function afficherComptes(a) {
   ['Moins de 7 j', '7 à 29 j', '1 à 6 mois', '6 à 12 mois', 'Plus de 12 mois'].forEach((t, i) => chiffre(an, t, a.anciennete[i]));
   const u = $('comptes-usage');
   vider(u);
-  chiffre(u, 'Inscriptions confirmées', a.inscriptions);
-  chiffre(u, 'Connexions réussies', a.connexions);
+  chiffre(u, 'Comptes créés', a.inscriptions);
+  chiffre(u, 'Connexions par passkey', a.connexions);
   chiffre(u, 'Échecs de connexion', a.echecs_connexion);
-  chiffre(u, 'Récupérations', a.recuperations);
+  chiffre(u, 'Récupérations par la clé', a.recuperations);
   chiffre(u, 'Suppressions de compte', a.suppressions);
-  chiffre(u, 'E-mails envoyés', a.courriel.envoyes);
-  chiffre(u, 'Échecs d’envoi', a.courriel.echecs_envoi);
-  chiffre(u, 'File d’e-mails (plus haut ' + nombre.format(a.courriel.file_max) + ')', a.courriel.file);
 }

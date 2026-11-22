@@ -12,8 +12,8 @@ import (
 // change ; 64 octets exactement ; jamais en clair (le serveur garde les octets reçus).
 func TestEtiquetteApresConnexion(t *testing.T) {
 	b := nouveauBanc(t)
-	_, j1, d := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
-	o, err := b.s.Connexion(ipN(1), "lea@exemple.fr", d.AAuth, OptionsSession{}, false)
+	h, j1, _ := b.inscrire(t, "lea")
+	o, err := b.connecter(h)
 	if err != nil {
 		t.Fatal(err)
 	}

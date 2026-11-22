@@ -51,32 +51,32 @@ type Config struct {
 	// SHH_ADMIN_TOKEN_SHA256, ou, en développement local seulement, calculée depuis
 	// SHH_ADMIN_TOKEN (adminFromEnv). Seule l'empreinte sert, à la comparaison en temps constant.
 	AdminTokenHash [32]byte
-	// Comptes (SHH_COMPTES=1, conception du compte §8.1) : compte par e-mail pour créer un
-	// salon. Désactivé par défaut (aucune route, aucun fichier) ; exige SHH_SALONS=1.
+	// Comptes (SHH_COMPTES=1, conception du compte par passkey) : compte par passkey et clé de
+	// récupération pour créer un salon. Désactivé par défaut (aucune route, aucun fichier) ; exige
+	// SHH_SALONS=1 (donc SHH_ORIGIN, dont l'hôte est le rp.id des passkeys, RPID).
 	Comptes bool
 	// ComptesCleFile (SHH_COMPTES_CLE_FILE) : fichier de K_serveur (32 octets, 0400 ou 0600),
 	// chemin absolu hors de SHH_DATA_DIR. Obligatoire avec SHH_COMPTES=1.
 	ComptesCleFile string
 	// ComptesMax (SHH_COMPTES_MAX, 1 à 1 000 000, défaut 10 000) : comptes au plus.
 	ComptesMax int
-	// SMTP : envoi des codes par e-mail (obligatoire avec SHH_COMPTES=1).
-	SMTP SMTP
+	// ComptesJour (SHH_COMPTES_JOUR, 1 à 100 000, défaut 500) : comptes créés au plus par jour
+	// UTC pour tout le serveur (coupe-circuit, conception du compte par passkey §7.2).
+	ComptesJour int
+	// WebAuthnOriginesApps (SHH_WEBAUTHN_ORIGINES_APPS, vide par défaut) : origines des apps
+	// Android acceptées par les cérémonies WebAuthn, séparées par des virgules, chacune
+	// exactement android:apk-key-hash:<43 caractères base64url> (conception du compte par passkey
+	// §6.2, §10.1). L'app iOS présente l'origine https://<rp.id> : rien à ajouter pour elle.
+	WebAuthnOriginesApps []string
+	// Apps natives (apps.go) : fichiers d'association servis seulement s'ils sont posés.
+	AppleAppIDs       []string // SHH_APPLE_APP_IDS
+	AndroidPaquet     string   // SHH_ANDROID_APP_PACKAGE
+	AndroidEmpreintes []string // SHH_ANDROID_APP_SHA256
 	// Paiement (SHH_PAIEMENT=1, conception du paiement §10) : vente de Plus et Pro. Désactivé
 	// par défaut (aucune route, aucun fichier, aucun appel sortant) ; exige SHH_ORIGIN, SHH_TVA
 	// et au moins un prestataire complet (Pay).
 	Paiement bool
 	Pay      Paiement
-}
-
-// SMTP : fournisseur d'envoi (conception §8.1). Port 465 (TLS implicite, défaut) ou 587
-// (STARTTLS) ; tout autre port (texte clair) seulement vers la boucle locale, pour les tests.
-// Le mot de passe est dans un fichier (PasswordFile), jamais dans une variable.
-type SMTP struct {
-	Host         string // SHH_SMTP_HOST
-	Port         int    // SHH_SMTP_PORT
-	User         string // SHH_SMTP_USER
-	PasswordFile string // SHH_SMTP_PASSWORD_FILE
-	From         string // SHH_MAIL_FROM, par exemple « Shhgone <ne-pas-repondre@shhgone.com> »
 }
 
 func FromEnv() (Config, error) {
@@ -85,6 +85,7 @@ func FromEnv() (Config, error) {
 		StorageMaxBytes: 214748364800, // 200 Gio (spec §24, §41.2)
 		SalonsMax:       200,          // spec §39.3.2
 		ComptesMax:      10000,        // conception du compte §8.1
+		ComptesJour:     500,          // conception du compte par passkey §7.2
 		Now:             time.Now,
 	}
 	var err error
@@ -162,6 +163,9 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("SHH_SALONS=1 exige SHH_ORIGIN (origine publique du site, ex. https://shhgone.com)")
 	}
 	if err := comptesFromEnv(&c); err != nil {
+		return Config{}, err
+	}
+	if err := appsFromEnv(&c); err != nil {
 		return Config{}, err
 	}
 	if err := appelsFromEnv(&c); err != nil {

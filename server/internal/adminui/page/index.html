@@ -89,9 +89,9 @@
   <h2 class="groupe" id="bannissements" hidden>Bannissements</h2>
   <section class="carte" aria-labelledby="t-bannir" id="carte-bannir" hidden>
     <h3 class="titre" id="t-bannir">Bannir</h3>
-    <p class="note">Une adresse e-mail (signalement reçu par la page de contact) ou le lien d'invitation d'un salon. Le champ est vidé aussitôt ; rien n'est gardé ni affiché ensuite.</p>
+    <p class="note">Le lien d'invitation d'un salon (signalement reçu par la page de contact) : son créateur est banni. Le champ est vidé aussitôt ; rien n'est gardé ni affiché ensuite. Recours : la personne donne l'identifiant B-… qu'elle voit ; agir sur lui dans « Bannissements en cours ».</p>
     <form id="bannir" autocomplete="off">
-      <label for="bannir-cible">Adresse e-mail ou lien d'invitation</label>
+      <label for="bannir-cible">Lien d'invitation</label>
       <input id="bannir-cible" type="password" autocomplete="off" spellcheck="false" required>
       <div class="rangee">
         <div>
@@ -106,17 +106,6 @@
       <button class="detruire" type="submit" id="bannir-bouton">Bannir</button>
     </form>
     <p class="resultat" id="bannir-resultat" role="status"></p>
-  </section>
-
-  <section class="carte" aria-labelledby="t-chercher" id="carte-chercher" hidden>
-    <h3 class="titre" id="t-chercher">Recours : chercher par adresse</h3>
-    <p class="note">La personne donne son adresse ; elle n'est ni gardée ni affichée, le champ est vidé aussitôt.</p>
-    <form id="chercher" autocomplete="off">
-      <label for="chercher-adresse">Adresse e-mail</label>
-      <input id="chercher-adresse" type="password" autocomplete="off" spellcheck="false" required>
-      <button class="agir" type="submit">Chercher</button>
-    </form>
-    <div id="chercher-resultat" role="status"></div>
   </section>
 
   <section class="carte large" aria-labelledby="t-bannis" id="carte-bannis" hidden>

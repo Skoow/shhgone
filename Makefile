@@ -34,8 +34,8 @@ test-repro:
 	web/scripts/repro.sh
 
 # Scripts de déploiement et de build : syntaxe, ShellCheck (0.11.0 en CI, job deploy-lint),
-# banc de l'alerte (deploy/test-alerte.sh, sans réseau), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais SMTP,
-# contrôle SMTP ; les essais de banc, sans leurs variables, sont sautés).
+# banc de l'alerte (deploy/test-alerte.sh, sans réseau), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais de sortie,
+# contrôle « joindre » ; les essais de banc, sans leurs variables, sont sautés).
 lint-deploy:
 	for f in deploy/*.sh web/scripts/*.sh; do bash -n "$$f" || exit 1; done
 	shellcheck deploy/*.sh web/scripts/*.sh
@@ -49,7 +49,7 @@ test-proxy:
 	cd web && npm run build
 	deploy/test-proxy.sh
 
-# Sorties SMTP et paiement (deploy/test-sortie.sh) : configuration résolue de compose.yaml (docker compose
+# Sorties (aucun relais SMTP ; paiement) (deploy/test-sortie.sh) : configuration résolue de compose.yaml (docker compose
 # config) ; puis, avec un démon Docker et SHH_IMAGE (image de cet arbre), le réseau réel. Code 3 :
 # partie réseau non faite (aucun démon).
 test-sortie:

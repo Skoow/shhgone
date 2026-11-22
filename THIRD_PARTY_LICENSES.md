@@ -205,6 +205,11 @@ Versions exactes dans `server/go.mod` et `server/go.sum` ; liste des modules com
 - ISC : `github.com/coder/websocket` v1.8.15 (WebSocket du salon ; Copyright (c) 2025 Coder ; aucune dépendance transitive)
 - MIT : `github.com/altcha-org/altcha-lib-go` v1.0.0 (anti-robot ; Copyright (c) 2023 Daniel Regeci), `github.com/dustin/go-humanize` v1.1.0 (Copyright (c) 2005-2008 Dustin Sallings)
 - BSD-3-Clause : `modernc.org/sqlite` v1.62.0 (SQLite traduit en Go ; SQLite lui-même est dans le domaine public), `modernc.org/libc` v1.81.0, `modernc.org/mathutil` v1.7.1, `modernc.org/memory` v1.12.1, `golang.org/x/sys` v0.50.0, `github.com/google/uuid` v1.6.0, `github.com/remyoudompheng/bigfft` v0.0.0-20230129092748-24d4a6f8daec
+- Compte par passkey (vérification WebAuthn ; revue de chaîne d'approvisionnement du 22 novembre 2026, `docs/superpowers/plans/2026-11-22-revue-go-webauthn.md`, versions exactes) :
+  - BSD-3-Clause : `github.com/go-webauthn/webauthn` v0.18.2 (Copyright (c) 2025 github.com/go-webauthn/webauthn authors), `github.com/go-webauthn/x` v0.3.1 (Copyright (c) 2021-2023 github.com/go-webauthn authors ; sous-paquets recopiés de Decred, ISC, de la bibliothèque standard de Go, BSD, et de cfssl, BSD-2-Clause), `golang.org/x/crypto` v0.57.0 (The Go Authors ; seul `ocsp` est compilé)
+  - MIT : `github.com/fxamacker/cbor/v2` v2.9.4 (Copyright (c) 2019-present Faye Amacker), `github.com/x448/float16` v0.8.4 (Copyright (c) 2019 Montgomery Edwards⁴⁴⁸ and Faye Amacker), `github.com/golang-jwt/jwt/v5` v5.3.1 (Copyright (c) 2012 Dave Grijalva, (c) 2021 golang-jwt maintainers), `github.com/go-viper/mapstructure/v2` v2.5.0 (Copyright (c) 2013 Mitchell Hashimoto), `github.com/tinylib/msgp` v1.6.4 (Copyright (c) 2014 Philip Hofer), `github.com/philhofer/fwd` v1.2.0 (Copyright (c) 2014-2015 Philip Hofer)
+  - Apache-2.0 : `github.com/google/go-tpm` v0.9.8 (Google ; texte : https://www.apache.org/licenses/LICENSE-2.0)
+  - Compilés mais inatteignables depuis une requête (attestation « none » exigée, aucun fournisseur de métadonnées) : go-tpm, golang-jwt, mapstructure, `x/crypto/ocsp`, secp256k1 de go-webauthn/x.
 - Indirectes de `go.mod` absentes du binaire Linux (compilées sur d'autres systèmes seulement) : `github.com/mattn/go-isatty` v0.0.24 (MIT), `github.com/ncruces/go-strftime` v1.1.0 (MIT)
 - `deploy/shhcheck` : bibliothèque standard seulement.
 
@@ -212,4 +217,4 @@ Versions exactes dans `server/go.mod` et `server/go.sum` ; liste des modules com
 
 - Source : https://github.com/disposable-email-domains/disposable-email-domains (fichier `disposable_email_blocklist.conf`, branche `main`), copie du 14 novembre 2026, 10 181 domaines, SHA-256 de la source `8a303e28fe2704fc20e73bd320cb9f47e8b3658adc0ebb046260d5acf59c27c2`.
 - Licence : CC0 1.0 Universal (domaine public), texte : https://creativecommons.org/publicdomain/zero/1.0/legalcode.
-- Utilisation : embarquée dans le binaire (`go:embed`), refus des adresses jetables à l'inscription et au changement d'adresse (conception du compte §5.3). Mise à jour sur le poste du développeur seulement : `node web/scripts/maj-jetables.mjs` ; le serveur ne la télécharge jamais.
+- Utilisation : depuis le 22 novembre (compte par passkey, sans e-mail), plus lue par le serveur ; seulement par le site du compte par e-mail (`web/src/listes/jetables.ts`), jusqu'à son retrait au lot W1 du plan `2026-11-22-compte-passkey.md`, avec ce fichier. Plus de mise à jour (script retiré).

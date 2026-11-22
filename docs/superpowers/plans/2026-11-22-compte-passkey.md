@@ -75,19 +75,23 @@
 
 ## Lot S1 — Revue de chaîne d'approvisionnement de go-webauthn v0.18.2 (avant tout ajout)
 
+**État : fait le 22 novembre, revue acceptée** (`docs/superpowers/plans/2026-11-22-revue-go-webauthn.md`).
+
 *Livrable seul : un document de revue et une décision ; `go.mod` ne change pas tant que la revue n'est pas acceptée. Dépend de : rien.*
 
 **Files :**
 - Create : `docs/superpowers/plans/2026-11-22-revue-go-webauthn.md` (ou une section datée de `docs/superpowers/plans/maj-dependances-2026-11-04.md`, au choix du contrôleur, une seule)
 - Modify (seulement si la revue est acceptée, au lot S3) : `server/go.mod`, `server/go.sum`, `THIRD_PARTY_LICENSES.md`
 
-- [ ] **Step 1 :** dans un module jetable hors du dépôt (scratchpad), `go mod init x && go get github.com/go-webauthn/webauthn@v0.18.2` ; `go mod graph` et `go list -m all` : liste **exacte** des modules et versions tirés (attendus d'après la conception : `github.com/go-webauthn/x`, `github.com/fxamacker/cbor/v2`, `github.com/golang-jwt/jwt/v5`, `github.com/google/go-tpm`, `github.com/google/uuid`, `github.com/mitchellh/mapstructure` ou successeur ; à relever, pas à supposer).
-- [ ] **Step 2 :** pour chaque module : version, date de publication (≥ 7 jours, règle §24), mainteneurs, licence (fichier LICENSE lu dans le cache de modules), avis connus (`govulncheck` sur un programme minimal qui appelle `BeginRegistration`, `CreateCredential`, `BeginDiscoverableLogin`, `ValidateDiscoverableLogin` ; base OSV/GitHub Advisory), présence de code `init()`, de `unsafe`, de `cgo`, d'accès réseau ou fichier (grep). Licence de go-webauthn : **à revérifier** (conception §6.1 : BSD-3-Clause annoncée).
-- [ ] **Step 3 :** vérifier que la vérification des signatures passe par `crypto/ecdsa`, `crypto/rsa`, `crypto/ed25519` de la bibliothèque standard (aucune crypto maison dans la bibliothèque) et noter les chemins d'attestation (TPM, métadonnées FIDO) compilés mais inutilisés avec `attestation: "none"`.
-- [ ] **Step 4 :** décision écrite : accepté (versions exactes à épingler) ou refusé, avec la raison. **Refus = arrêt du sous-projet 2 et retour au propriétaire, jamais de vérification WebAuthn réécrite à la main.**
-- [ ] **Step 5 :** commit `docs(revue): chaîne d'approvisionnement de go-webauthn v0.18.2`.
+- [x] **Step 1 :** dans un module jetable hors du dépôt (scratchpad), `go mod init x && go get github.com/go-webauthn/webauthn@v0.18.2` ; `go mod graph` et `go list -m all` : liste **exacte** des modules et versions tirés (attendus d'après la conception : `github.com/go-webauthn/x`, `github.com/fxamacker/cbor/v2`, `github.com/golang-jwt/jwt/v5`, `github.com/google/go-tpm`, `github.com/google/uuid`, `github.com/mitchellh/mapstructure` ou successeur ; à relever, pas à supposer).
+- [x] **Step 2 :** pour chaque module : version, date de publication (≥ 7 jours, règle §24), mainteneurs, licence (fichier LICENSE lu dans le cache de modules), avis connus (`govulncheck` sur un programme minimal qui appelle `BeginRegistration`, `CreateCredential`, `BeginDiscoverableLogin`, `ValidateDiscoverableLogin` ; base OSV/GitHub Advisory), présence de code `init()`, de `unsafe`, de `cgo`, d'accès réseau ou fichier (grep). Licence de go-webauthn : **à revérifier** (conception §6.1 : BSD-3-Clause annoncée).
+- [x] **Step 3 :** vérifier que la vérification des signatures passe par `crypto/ecdsa`, `crypto/rsa`, `crypto/ed25519` de la bibliothèque standard (aucune crypto maison dans la bibliothèque) et noter les chemins d'attestation (TPM, métadonnées FIDO) compilés mais inutilisés avec `attestation: "none"`.
+- [x] **Step 4 :** décision écrite : accepté (versions exactes à épingler) ou refusé, avec la raison. **Refus = arrêt du sous-projet 2 et retour au propriétaire, jamais de vérification WebAuthn réécrite à la main.**
+- [x] **Step 5 :** commit `docs(revue): chaîne d'approvisionnement de go-webauthn v0.18.2`.
 
 ## Lot S2 — Configuration, `comptes.db` schéma 3, retrait du compte par e-mail
+
+**État : fait le 22 novembre. Écarts : la route POST recup (S4) et les nouvelles limites de §7.2 (limits/compte.go) sont venues dès ce lot (recup ne dépend pas de WebAuthn ; elle sert aux tests de session récente) ; la partie Go du tableau de bord (S7 : plus de recherche ni de bannissement par adresse) aussi, sans quoi le serveur ne compilait plus. Gardés exprès : server/internal/compte/jetables*.txt (lus par le site, web/src/listes/jetables.ts, jusqu'à W1), web/e2e/smtp.ts et totp.ts (ui-e2e du compte par e-mail, à refaire en T1 ; web/e2e/server.ts refuse leurs options au lancement). web/e2e/compte-sees-nothing.test.ts réduit dans ce lot, refait au lot S5 avec un authentificateur logiciel.**
 
 *Livrable seul : le serveur démarre en `SHH_COMPTES=1` sans SMTP ; les anciennes routes ont disparu (404) ; aucune nouvelle route encore. Dépend de : P1.*
 
@@ -101,13 +105,15 @@
 - Schéma 3 exact (conception §6.3) : `comptes(h, p_empreinte, pseudo_jour, v_r, env_r, blob_profil, gen_profil, blob_prive, gen_prive, cree_jour, compte_des, vu_mois)`, `passkeys(cred_id, h, cle_pub, alg, be, env, etiquette, ajoutee_mois)`, `sessions(… , par_recup)`, `bannis(id, h, debut_jour, jusqu_jour, actif, motif, salons_fermes)` ; BLOB et INTEGER seulement, `WITHOUT ROWID`, `secure_delete`, `ON DELETE CASCADE`.
 - Démarrage sur une `comptes.db` de schéma 2 : **vide** → recréée ; **non vide** → refus avec message, jamais d'effacement (conception §15).
 
-- [ ] **Step 1 : tests** — `TestSchemaComptes` v3 (colonnes exactes ; aucune colonne `e_*`, `v_mdp`, `env_mdp`, `cle_profil`, `totp*`, `recup_jour`, `aaguid`, `compteur`, `bs`, `vu_jour`) ; `TestSchema2NonVideRefuse`, `TestSchema2VideRecree` ; `TestConfigSMTPRefuse` (chaque ancienne variable) ; `TestComptesJour` (bornes) ; `TestNoOutgoingHTTP` : **plus d'exception SMTP** (restent `captcha/recaptcha.go` et `paiement/http.go`, voir Signalements point 1) ; `allowedMaps` sans les maps de `courriel` et des quotas d'e-mails ; `TestBannisParH` (cascade à la suppression du compte) ; `TestPageSansIdentite` du tableau de bord sans « Recherche par adresse » ni « Bannir par adresse ».
-- [ ] **Step 2 :** `cd server && go test -race ./...` → FAIL.
-- [ ] **Step 3 :** implémenter les retraits et le schéma ; `export` sans adresse ni double authentification ; `GET /api/compte` sans `totp`, `recup_jusqu`, `retrait_totp_le` ; `supprimer` sans attente (`attente` retiré).
-- [ ] **Step 4 :** `make test-go` ; `make test-e2e` (les e2e du compte par e-mail sont retirés dans ce lot : `web/e2e/compte-sees-nothing.test.ts` réduit au démarrage et aux 404 des anciennes routes, refait en T1).
-- [ ] **Step 5 :** commit `refactor(serveur): compte sans e-mail — schéma 3, retrait de SMTP, du TOTP, du séquestre et de la récupération par e-mail`.
+- [x] **Step 1 : tests** — `TestSchemaComptes` v3 (colonnes exactes ; aucune colonne `e_*`, `v_mdp`, `env_mdp`, `cle_profil`, `totp*`, `recup_jour`, `aaguid`, `compteur`, `bs`, `vu_jour`) ; `TestSchema2NonVideRefuse`, `TestSchema2VideRecree` ; `TestConfigSMTPRefuse` (chaque ancienne variable) ; `TestComptesJour` (bornes) ; `TestNoOutgoingHTTP` : **plus d'exception SMTP** (restent `captcha/recaptcha.go` et `paiement/http.go`, voir Signalements point 1) ; `allowedMaps` sans les maps de `courriel` et des quotas d'e-mails ; `TestBannisParH` (cascade à la suppression du compte) ; `TestPageSansIdentite` du tableau de bord sans « Recherche par adresse » ni « Bannir par adresse ».
+- [x] **Step 2 :** `cd server && go test -race ./...` → FAIL.
+- [x] **Step 3 :** implémenter les retraits et le schéma ; `export` sans adresse ni double authentification ; `GET /api/compte` sans `totp`, `recup_jusqu`, `retrait_totp_le` ; `supprimer` sans attente (`attente` retiré).
+- [x] **Step 4 :** `make test-go` ; `make test-e2e` (les e2e du compte par e-mail sont retirés dans ce lot : `web/e2e/compte-sees-nothing.test.ts` réduit au démarrage et aux 404 des anciennes routes, refait en T1).
+- [x] **Step 5 :** commit `refactor(serveur): compte sans e-mail — schéma 3, retrait de SMTP, du TOTP, du séquestre et de la récupération par e-mail`.
 
 ## Lot S3 — Cérémonies WebAuthn (go-webauthn, configuration figée)
+
+**État : fait le 22 novembre (internal/compte/webauthn.go, authentificateur logiciel internal/compte/webauthntest, importable par les tests des autres paquets ; govulncheck v1.9.0 : 0 vulnérabilité atteinte). Les défis vivent dans les étapes de defis.go (lot S2). Une réponse qui contient une sortie PRF (prf.results) ou hmac-secret est refusée (bad_request) : le site doit les retirer de clientExtensionResults avant l'envoi.**
 
 *Livrable seul : bibliothèque appelée par des tests seulement. Dépend de : S1 (accepté), S2.*
 
@@ -121,10 +127,12 @@
 - Défis : 32 octets `crypto/rand`, clé = SHA-256(`etape`), usage unique, 5 min, 20 000 au plus (au-delà : `busy`, 503).
 - Stocké d'une passkey : `cred_id`, `cle_pub` (COSE ≤ 1 024), `alg`, `be`, `ajoutee_mois` ; **jamais** AAGUID, transports, attestation, compteur, `BS`. Compteur remis à 0 avant chaque vérification, avertissement de clonage ignoré.
 
-- [ ] **Step 1 : tests** — cérémonie complète pour chaque algorithme ; défi rejoué, défi échu (horloge de test), mauvaise origine, mauvais `rp.id`, `UV` absent, `BE` changé entre inscription et connexion, `userHandle` d'un autre compte, `cred_id` inconnu → même erreur `identifiants` ; attestation autre que `none` refusée ou ignorée sans rien garder ; `TestRPIDProduction` : `SHH_ORIGIN=https://shhgone.com` → `rp.id` = `shhgone.com` ; origine `http://` refusée hors boucle locale ; `localhost` accepté pour les tests (voir Signalements point 3).
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go` ; `govulncheck` (CI). **Step 5 :** commit `feat(serveur): cérémonies WebAuthn (go-webauthn épinglé, configuration figée)`.
+- [x] **Step 1 : tests** — cérémonie complète pour chaque algorithme ; défi rejoué, défi échu (horloge de test), mauvaise origine, mauvais `rp.id`, `UV` absent, `BE` changé entre inscription et connexion, `userHandle` d'un autre compte, `cred_id` inconnu → même erreur `identifiants` ; attestation autre que `none` refusée ou ignorée sans rien garder ; `TestRPIDProduction` : `SHH_ORIGIN=https://shhgone.com` → `rp.id` = `shhgone.com` ; origine `http://` refusée hors boucle locale ; `localhost` accepté pour les tests (voir Signalements point 3).
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go` ; `govulncheck` (CI). **Step 5 :** commit `feat(serveur): cérémonies WebAuthn (go-webauthn épinglé, configuration figée)`.
 
 ## Lot S4 — Routes : inscription, connexion, récupération
+
+**État : fait le 22 novembre (recup et limites venues dès S2). Écarts signalés : dans les requêtes, « aucune enveloppe » s'écrit env: "" (jamais null : JSON strict sans null, §8.6) ; la difficulté ALTCHA double par compte créé pendant l'heure qui suit (captcha.RecordCreate existant, commun aux créations), pas « dans la journée ».**
 
 *Livrable seul (`SHH_COMPTES=1` : comptes créables par un client de test). Dépend de : S3.*
 
@@ -138,10 +146,12 @@
 - `POST connexion/debut` `{}` → `{ etape, options }` ; `POST connexion/fin` → `{ session, h, cred_id, env, blob_profil, gen_profil, blob_prive, gen_prive }`, `vu_mois` mis à jour ;
 - `POST recup` `{ a_r, persistante, etiquette }` → recherche par `v_r` = SHA-256(`a_r`) (index unique, pas de comparaison en boucle) → session **récente**, `par_recup = 1` ; erreur `identifiants` (403, même corps que passkey inconnue).
 
-- [ ] **Step 1 : tests** — parcours complets avec l'authentificateur logiciel ; `TestRecupVecteurs` (les `a_r` de `compte-v3.json` retrouvent un compte créé avec les `v_r` correspondants) ; `env`, `env_r` ≠ 60 octets refusés ; `v_r` en double refusé ; `A_r` absent de toute réponse, de tout journal et de la base (`TestAucunSequestre` : aucune route ne rend `K_compte`, `KEK_*`, `R`, `A_r`) ; quotas §7.2 un par un ; `allowedMaps` à jour.
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go` et `make test-e2e`. **Step 5 :** commit `feat(serveur): inscription et connexion par passkey, récupération par clé`.
+- [x] **Step 1 : tests** — parcours complets avec l'authentificateur logiciel ; `TestRecupVecteurs` (les `a_r` de `compte-v3.json` retrouvent un compte créé avec les `v_r` correspondants) ; `env`, `env_r` ≠ 60 octets refusés ; `v_r` en double refusé ; `A_r` absent de toute réponse, de tout journal et de la base (`TestAucunSequestre` : aucune route ne rend `K_compte`, `KEK_*`, `R`, `A_r`) ; quotas §7.2 un par un ; `allowedMaps` à jour.
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go` et `make test-e2e`. **Step 5 :** commit `feat(serveur): inscription et connexion par passkey, récupération par clé`.
 
 ## Lot S5 — Passkeys du compte, réauthentification, nouvelle clé de récupération
+
+**État : fait le 22 novembre. Écart signalé : GET passkeys ne rend pas « courante » (le serveur ne garde pas quelle passkey a ouvert une session ; l'appareil le sait : cred_id rendu par connexion/fin) ; passkeys_max (409) pour la onzième. Avec ce lot, web/e2e/compte-sees-nothing.test.ts est refait sans écran (authentificateur logiciel web/e2e/webauthn.ts, calculs de l'appareil par le moteur WebAssembly et WebCrypto) : une partie de T1 ; les parcours ui-e2e restent à T1. Ajout du 22 novembre (décision du propriétaire, conception §17 « enveloppes multiples ») : table enveloppes (4 par passkey), connexion/fin et reauth/fin rendent enveloppes, passkeys/enveloppe { env } pour la seule passkey qui a signé l'assertion de la session.**
 
 *Dépend de : S4.*
 
@@ -149,28 +159,34 @@
 
 **Interfaces :** `POST reauth/debut`, `reauth/fin` (session récente 5 min ; la passkey doit être du compte) ; `GET passkeys` → `{ passkeys: [{ cred_id, ajoutee: "2026-11", etiquette, be, prf, courante }] }` ; `POST passkeys/debut`, `passkeys/fin` (session récente, `excludeCredentials` = passkeys du compte, 10 au plus, `passkeys/debut` 10/h/compte) ; `POST passkeys/enveloppe` `{ cred_id, env }` ; `POST passkeys/nommer` `{ cred_id, etiquette }` (64 octets) ; `POST passkeys/retirer` (session récente ; `derniere`, 409) ; `POST recup/renouveler` `{ v_r, env_r }` (session récente) ; `sessions` montre `par_recup`.
 
-- [ ] **Step 1 : tests** — onzième passkey refusée ; retrait de la dernière refusé ; enveloppe d'une passkey d'un autre compte refusée ; ancienne clé de récupération refusée après `recup/renouveler` ; session non récente refusée partout où elle est exigée.
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go`, `make test-e2e`. **Step 5 :** commit `feat(serveur): gestion des passkeys et de la clé de récupération`.
+- [x] **Step 1 : tests** — onzième passkey refusée ; retrait de la dernière refusé ; enveloppe d'une passkey d'un autre compte refusée ; ancienne clé de récupération refusée après `recup/renouveler` ; session non récente refusée partout où elle est exigée.
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go`, `make test-e2e`. **Step 5 :** commit `feat(serveur): gestion des passkeys et de la clé de récupération`.
 
 ## Lot S6 — En-têtes, fichiers des apps, « aucune sortie » SMTP
+
+**État : fait le 22 novembre. Fichiers d'association servis par l'API (internal/api/apps.go, avant le site statique), réglés par SHH_APPLE_APP_IDS, SHH_ANDROID_APP_PACKAGE et SHH_ANDROID_APP_SHA256 (vides par défaut) ; test dans cmd/shhdrop/static_assoc_test.go. TestNoOutgoingHTTP sans exception SMTP depuis S2.**
 
 *Dépend de : S4.*
 
 **Files :** Modify : `server/internal/api/headers.go` (+ test), `server/cmd/shhdrop/static.go` (+ `static_app_test.go`), `server/internal/config/config.go` (identifiants d'app, vides par défaut), `server/internal/stats_test.go`
 
-- [ ] **Step 1 : tests** — `Permissions-Policy` : `publickey-credentials-create=(self), publickey-credentials-get=(self)` sur les pages, `()` sur `/pdf-frame.html` ; `/.well-known/apple-app-site-association` et `/.well-known/assetlinks.json` : 404 identique à une route inconnue sans identifiants d'app, sinon `application/json`, sans redirection ; `TestNoOutgoingHTTP` : aucun `net/smtp`, `crypto/tls` client, ni `net.Dial` hors des exceptions restantes.
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go`. **Step 5 :** commit `feat(serveur): Permissions-Policy WebAuthn, fichiers d'association des apps`.
+- [x] **Step 1 : tests** — `Permissions-Policy` : `publickey-credentials-create=(self), publickey-credentials-get=(self)` sur les pages, `()` sur `/pdf-frame.html` ; `/.well-known/apple-app-site-association` et `/.well-known/assetlinks.json` : 404 identique à une route inconnue sans identifiants d'app, sinon `application/json`, sans redirection ; `TestNoOutgoingHTTP` : aucun `net/smtp`, `crypto/tls` client, ni `net.Dial` hors des exceptions restantes.
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go`. **Step 5 :** commit `feat(serveur): Permissions-Policy WebAuthn, fichiers d'association des apps`.
 
 ## Lot S7 — Tableau de bord et administration
+
+**État : fait le 22 novembre : la partie Go et la page (plus de recherche ni de bannissement par adresse ; agrégats des passkeys) sont venues au lot S2 ; ce lot ajoute banni_id à GET /api/compte (l'identifiant B-… que la personne bannie donne pour son recours, §7.4).**
 
 *Dépend de : S2.*
 
 **Files :** Modify : `server/internal/adminui/{comptes.go,comptes_test.go,page/*}`, `server/cmd/shhdrop/{admin.go,admin_comptes_test.go}`
 
-- [ ] **Step 1 : tests** — « Bannir par adresse » et « Recherche par adresse » absents ; `shhdrop admin bannis … <id>` agit par l'identifiant `B-…` ; « Bannir par lien de salon » et « par salon signalé » inchangés ; `TestPageSansIdentite` (jamais `h`, empreinte, pseudo, `cred_id`).
-- [ ] **Step 2-5 :** FAIL, implémenter, `make test-go`, commit `refactor(admin): bannissement par compte, plus de recherche par adresse`.
+- [x] **Step 1 : tests** — « Bannir par adresse » et « Recherche par adresse » absents ; `shhdrop admin bannis … <id>` agit par l'identifiant `B-…` ; « Bannir par lien de salon » et « par salon signalé » inchangés ; `TestPageSansIdentite` (jamais `h`, empreinte, pseudo, `cred_id`).
+- [x] **Step 2-5 :** FAIL, implémenter, `make test-go`, commit `refactor(admin): bannissement par compte, plus de recherche par adresse`.
 
 ## Lot S8 — Déploiement : relais SMTP et secrets d'e-mail retirés
+
+**État : fait le 22 novembre. relais-smtp et ses variables retirés de compose.yaml ; deploy.sh refuse SHH_SMTP_*, SHH_MAIL_FROM, un secret shh_smtp_mdp resté et, avec SHH_COMPTES=1, un SHH_DOMAIN autre que shhgone.com ; shhcheck smtp remplacé par shhcheck joindre (relais.go gardé) ; l'alerte de la machine a ses propres variables SHH_ALERTE_SMTP_HOST, SHH_ALERTE_SMTP_USER, SHH_ALERTE_FROM (elle lisait celles du compte : signalé) ; test-restauration : avec une autre clé du serveur, la connexion réussit (la clé ne sert plus qu'aux pseudos). Vérifié : make lint-deploy, test-sortie.sh --statique, make test-restauration (root) ; partie réseau de test-sortie non faite (pas de démon Docker utilisable ici).**
 
 *Dépend de : S2.*
 
@@ -178,8 +194,8 @@
 - Modify : `deploy/compose.yaml` (service `relais-smtp` retiré, `/etc/hosts` du serveur sans `SHH_SMTP_HOST`), `deploy/deploy.sh` (plus de fournisseur d'e-mails exigé ni de secret SMTP), `deploy/env.example`, `deploy/Dockerfile` si concerné, `deploy/test-sortie.sh` (sortie SMTP retirée, sorties de paiement gardées), `deploy/test-restauration.sh` (schéma 3), `deploy/sauvegarder.sh`, `deploy/restaurer.sh` si le schéma y est cité, `deploy/shhcheck/{compte_test.go,main.go}` (contrôle SMTP retiré), `deploy/README.md` §12 (« Compte par passkey : secrets, sauvegarde »), `Makefile` (commentaires de `lint-deploy`, `test-sortie`)
 - Keep : `deploy/shhcheck/relais.go` (**sert encore aux relais de paiement**, conception du paiement §4 : ne pas le supprimer)
 
-- [ ] **Step 1 : tests** — `make test-sortie` : la configuration résolue de compose n'a plus de relais SMTP ni de réseau de sortie pour lui ; les relais de paiement inchangés ; `deploy.sh` refuse une ancienne variable SMTP restée dans `.env` (message clair) ; `make test-restauration` sur une `comptes.db` de schéma 3.
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make lint-deploy`, `make test-sortie`, `make test-restauration` (root). **Step 5 :** commit `chore(deploy): compte sans e-mail — relais SMTP et secrets retirés`.
+- [x] **Step 1 : tests** — `make test-sortie` : la configuration résolue de compose n'a plus de relais SMTP ni de réseau de sortie pour lui ; les relais de paiement inchangés ; `deploy.sh` refuse une ancienne variable SMTP restée dans `.env` (message clair) ; `make test-restauration` sur une `comptes.db` de schéma 3.
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make lint-deploy`, `make test-sortie`, `make test-restauration` (root). **Step 5 :** commit `chore(deploy): compte sans e-mail — relais SMTP et secrets retirés`.
 
 ---
 

@@ -1,7 +1,8 @@
 package main
 
-// Tests du relais SMTP (shhcheck relais, plan du compte lot 8) et du contrôle d'accueil SMTP
-// (shhcheck smtp). Boucle locale seulement ; rien n'est écrit sur disque.
+// Tests du relais de sortie (shhcheck relais : relais des prestataires de paiement, d'abord
+// écrit pour le relais SMTP du compte par e-mail, retiré) et du contrôle shhcheck joindre.
+// Boucle locale seulement ; rien n'est écrit sur disque.
 
 import (
 	"bufio"
@@ -264,7 +265,7 @@ func TestRelaisFermeLesDeuxCotes(t *testing.T) {
 	}
 }
 
-// certificat : autorité et certificat de serveur pour nom (ECDSA P-256), pour un faux SMTP TLS.
+// certificat : autorité et certificat de serveur pour nom (ECDSA P-256), pour un faux serveur TLS.
 func certificat(t *testing.T, nom string) (*x509.CertPool, tls.Certificate) {
 	t.Helper()
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -288,7 +289,7 @@ func certificat(t *testing.T, nom string) (*x509.CertPool, tls.Certificate) {
 	return pool, tls.Certificate{Certificate: [][]byte{der}, PrivateKey: k}
 }
 
-// fauxSMTP : TLS implicite (465), envoie accueil, puis attend « QUIT ». Rend l'adresse et un
+// fauxSMTP : faux serveur TLS (ou en clair si cert est nil) : envoie accueil, puis lit une ligne. Rend l'adresse et un
 // canal qui reçoit la ligne lue après l'accueil.
 func fauxSMTP(t *testing.T, cert *tls.Certificate, accueil string) (string, chan string) {
 	t.Helper()
@@ -318,41 +319,37 @@ func fauxSMTP(t *testing.T, cert *tls.Certificate, accueil string) (string, chan
 	return ln.Addr().String(), lu
 }
 
-func TestSMTPAccueil(t *testing.T) {
-	pool, cert := certificat(t, "smtp.essai.test")
-	a, lu := fauxSMTP(t, &cert, "220 smtp.essai.test ESMTP\r\n")
-	if err := smtpAccueil(a, "smtp.essai.test", pool); err != nil {
+func TestJoignable(t *testing.T) {
+	pool, cert := certificat(t, "api.essai.test")
+	a, _ := fauxSMTP(t, &cert, "")
+	if err := joignable(a, "api.essai.test", pool); err != nil {
 		t.Fatal(err)
-	}
-	if l := <-lu; l != "QUIT\r\n" {
-		t.Fatalf("après l'accueil : %q, QUIT attendu", l)
 	}
 }
 
-func TestSMTPAccueilRefus(t *testing.T) {
-	pool, cert := certificat(t, "smtp.essai.test")
+func TestJoignableRefus(t *testing.T) {
+	pool, cert := certificat(t, "api.essai.test")
 	cas := []struct {
-		nom, accueil string
-		tls          bool
+		nom string
+		tls bool
 	}{
-		{"autre nom", "220 ok\r\n", true},              // certificat pour un autre nom
-		{"smtp.essai.test", "554 non\r\n", true},       // accueil refusé
-		{"smtp.essai.test", "220 en clair\r\n", false}, // pas de TLS
+		{"autre nom", true},       // certificat pour un autre nom
+		{"api.essai.test", false}, // pas de TLS
 	}
 	for _, c := range cas {
 		var a string
 		if c.tls {
-			a, _ = fauxSMTP(t, &cert, c.accueil)
+			a, _ = fauxSMTP(t, &cert, "")
 		} else {
-			a, _ = fauxSMTP(t, nil, c.accueil)
+			a, _ = fauxSMTP(t, nil, "HTTP/1.1 400 en clair\r\n")
 		}
-		if err := smtpAccueil(a, c.nom, pool); err == nil {
-			t.Errorf("%s / %q / TLS %v : accepté", c.nom, c.accueil, c.tls)
+		if err := joignable(a, c.nom, pool); err == nil {
+			t.Errorf("%s / TLS %v : accepté", c.nom, c.tls)
 		}
 	}
 	// Autorités du système : le certificat de test n'y est pas.
-	a, _ := fauxSMTP(t, &cert, "220 ok\r\n")
-	if err := smtpAccueil(a, "smtp.essai.test", nil); err == nil {
+	a, _ := fauxSMTP(t, &cert, "")
+	if err := joignable(a, "api.essai.test", nil); err == nil {
 		t.Error("certificat inconnu accepté")
 	}
 }

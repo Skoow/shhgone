@@ -4,22 +4,23 @@
 # en mémoire (/dev/shm), avec le vrai serveur Go.
 #
 # Ce qui est prouvé :
-#   1. un compte de test est créé par le vrai parcours (ALTCHA, code reçu par un faux SMTP sur
-#      la boucle locale, inscription/fin), serveur lancé sous le compte 65532 comme en
+#   1. un compte de test est créé par le vrai parcours (ALTCHA, inscription/debut, passkey ES256
+#      jouée par le test, inscription/fin), serveur lancé sous le compte 65532 comme en
 #      production ;
 #   2. sauvegarder.sh refuse de tourner sans clé publique, avec une autre version d'age, hors
 #      d'un point de montage, ou si le clair temporaire serait hors du volume (autre système de
 #      fichiers, lien symbolique) ; aucun refus ne laisse de fichier ;
 #   3. sauvegarde serveur EN MARCHE : un seul fichier envoyé, qui commence par
-#      « age-encryption.org/v1 » et ne contient ni « h » du compte, ni adresse (exacte,
-#      minuscule), ni pseudo, ni en-tête SQLite ; aucun clair laissé ;
+#      « age-encryption.org/v1 » et ne contient ni « h » du compte, ni pseudo, ni en-tête
+#      SQLite ; aucun clair laissé ;
 #   4. effacement de la base, puis : mauvaise identité et fichier tronqué refusés sans rien
 #      installer ; « verifier » ; « installer » (propriétaire 65532, 0600) ; réinstallation
 #      refusée sans --remplacer, et refusée base ouverte même avec --remplacer ;
-#   5. serveur relancé sur la base restaurée et la même clé : connexion du compte de test
-#      réussie, mêmes h, enveloppe, séquestre et coffre de profil ; avec une autre clé du
-#      serveur : connexion refusée (les deux copies hors ligne sont nécessaires) ;
-#   6. l'adresse n'est nulle part dans la base restaurée ni dans les sorties du serveur ;
+#   5. serveur relancé sur la base restaurée et la même clé : connexion par la passkey et
+#      récupération par la clé du compte de test réussies, mêmes h, passkey, enveloppe et coffre
+#      de profil ; avec une autre clé du serveur aussi (depuis le compte par passkey, K_serveur ne
+#      sert plus qu'à l'unicité des pseudos : sa perte ne perd pas les comptes, conception §7.4) ;
+#   6. le pseudo n'est nulle part dans la base restaurée ni dans les sorties du serveur ;
 #   7. paiements.db (créée par le vrai serveur, SHH_PAIEMENT=1 en bac à sable, un pass factice) :
 #      sauvegardée dans son propre fichier chiffré, sans l'empreinte du pass en clair ;
 #      restaurée (65532, 0600), pass gardé, clés de jetons effacées.
@@ -39,7 +40,7 @@ export LC_ALL=C
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(dirname "$here")
 base=${PORT_BASE:-18470}
-p_srv=$base p_smtp=$((base + 1))
+p_srv=$base
 
 fails=0
 ok() { printf 'ok    %s\n' "$1"; }
@@ -95,9 +96,8 @@ mount -t tmpfs -o size=1100m,mode=0755 tmpfs "$racine"
 install -d -o 65532 -g 65532 -m 0700 "$racine/data" "$racine/sauvegarde"
 install -d -o root -g 65532 -m 0750 "$racine/secrets"
 head -c 32 /dev/urandom >"$racine/secrets/shh_comptes_cle"
-printf 'mot-de-passe-smtp-factice' >"$racine/secrets/shh_smtp_mdp"
-chown 65532:65532 "$racine/secrets/shh_comptes_cle" "$racine/secrets/shh_smtp_mdp"
-chmod 0400 "$racine/secrets/shh_comptes_cle" "$racine/secrets/shh_smtp_mdp"
+chown 65532:65532 "$racine/secrets/shh_comptes_cle"
+chmod 0400 "$racine/secrets/shh_comptes_cle"
 head -c 32 /dev/urandom >"$work/autre-cle"
 chown 65532:65532 "$work/autre-cle"
 chmod 0400 "$work/autre-cle"
@@ -114,14 +114,12 @@ if [ -z "$shhdrop" ]; then
 fi
 chmod 0755 "$work/bin" "$shhdrop"
 
-# demarrer <fichier de clé> : serveur Go, compte et salon activés, SMTP en clair vers la
-# boucle locale (accepté seulement là), sous le compte 65532 ; attend SHH_LISTENING.
+# demarrer <fichier de clé> : serveur Go, compte et salon activés (origine http://localhost :
+# rp.id des passkeys de test), sous le compte 65532 ; attend SHH_LISTENING.
 demarrer() {
 	: >"$work/srv.stdout"
 	env -i PATH="$PATH" SHH_DATA_DIR="$racine/data" SHH_LISTEN="127.0.0.1:$p_srv" SHH_STORAGE_MAX=1048576 \
-		SHH_SALONS=1 SHH_ORIGIN="http://127.0.0.1:$p_srv" SHH_COMPTES=1 SHH_COMPTES_CLE_FILE="$1" \
-		SHH_SMTP_HOST=127.0.0.1 SHH_SMTP_PORT="$p_smtp" SHH_SMTP_USER=essai \
-		SHH_SMTP_PASSWORD_FILE="$racine/secrets/shh_smtp_mdp" SHH_MAIL_FROM='Shhgone <ne-pas-repondre@shhgone.test>' \
+		SHH_SALONS=1 SHH_ORIGIN="http://localhost:$p_srv" SHH_COMPTES=1 SHH_COMPTES_CLE_FILE="$1" \
 		setpriv --reuid=65532 --regid=65532 --clear-groups -- "$shhdrop" serve \
 		>>"$work/srv.stdout" 2>>"$work/srv.stderr" &
 	pid_srv=$!
@@ -138,7 +136,7 @@ demarrer() {
 # compte <étape> : go test du compte de test (deploy/shhcheck/compte_test.go).
 compte() {
 	(cd "$here/shhcheck" && SHH_COMPTE_URL="http://127.0.0.1:$p_srv" SHH_COMPTE_ETAPE="$1" \
-		SHH_COMPTE_ETAT="$work/etat.json" SHH_COMPTE_SMTP="127.0.0.1:$p_smtp" \
+		SHH_COMPTE_ETAT="$work/etat.json" SHH_COMPTE_ORIGINE="http://localhost:$p_srv" \
 		go test -count=1 -run '^TestCompteRestauration$' -v . >"$work/compte-$1.txt" 2>&1) &&
 		grep -q '^--- PASS: TestCompteRestauration' "$work/compte-$1.txt"
 }
@@ -160,7 +158,7 @@ comptes_et_restes() { find "$racine/data" -mindepth 1 -maxdepth 1 \( -name 'comp
 
 # --- 1. Compte de test ------------------------------------------------------------------------
 demarrer "$racine/secrets/shh_comptes_cle"
-check "compte de test créé (ALTCHA, code reçu par e-mail, inscription/fin)" compte inscrire
+check "compte de test créé (ALTCHA, passkey, inscription/fin)" compte inscrire
 [ -s "$work/etat.json" ] || {
 	cat "$work/compte-inscrire.txt" >&2
 	die "compte de test non créé"
@@ -210,8 +208,7 @@ check "nom daté, en UTC (comptes-AAAA-MM-JJTHHMMSSZ.db.age)" \
 	bash -c '[[ ${1##*/} =~ ^comptes-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z\.db\.age$ ]]' _ "$copie"
 check "le fichier commence par age-encryption.org/v1" test "$(head -c 22 "$copie")" = "age-encryption.org/v1"
 refuse "le fichier ne contient pas le h du compte" contient "$h_hex" "$copie"
-email='Restauration.Repere+essai@exemple-shhdrop.org'
-for r in "$email" "${email,,}" "repererestauratlon" "SQLite format 3"; do
+for r in "repererestauratlon" "SQLite format 3"; do
 	refuse "le fichier ne contient pas « $r »" grep -qaF -- "$r" "$copie"
 done
 check "aucun clair laissé dans le dossier temporaire" vides "$racine/sauvegarde"
@@ -243,9 +240,7 @@ check "la sauvegarde, elle, avait la session de l'inscription" \
 	bash -c '"$1" verifier "$2" "$3" >/dev/null && age -d -i "$3" "$2" >"$4" && test "$(sqlite3 "$4" "SELECT count(*) FROM sessions;")" = 1' \
 	_ "$here/restaurer.sh" "$copie" "$work/identite.txt" "$work/clair-controle.db"
 rm -f -- "$work/clair-controle.db"*
-for r in "$email" "${email,,}" "repererestauratlon"; do
-	refuse "base restaurée : pas de « $r »" grep -qaiF -- "$r" "$racine/data/comptes.db"
-done
+refuse "base restaurée : pas de « repererestauratlon »" grep -qaiF -- "repererestauratlon" "$racine/data/comptes.db"
 refuse "réinstallation refusée sans --remplacer" "$here/restaurer.sh" installer "$copie" "$work/identite.txt" "$racine/data"
 (
 	exec 3<"$racine/data/comptes.db"
@@ -263,10 +258,10 @@ rm -f -- "$racine/data/comptes.db.avant-restauration"
 
 # --- 5. Connexion sur la base restaurée ------------------------------------------------------------
 demarrer "$racine/secrets/shh_comptes_cle"
-check "connexion du compte de test réussie sur la base restaurée (mêmes h, enveloppe, profil)" compte connecter
+check "connexion et récupération du compte de test sur la base restaurée (mêmes h, passkey, enveloppe, profil)" compte connecter
 arreter
 demarrer "$work/autre-cle"
-check "avec une autre clé du serveur : connexion refusée" compte refuser
+check "avec une autre clé du serveur : connexion et récupération réussies (la clé ne sert qu'aux pseudos)" compte connecter
 arreter
 
 # --- 7. paiements.db ---------------------------------------------------------------------------------
@@ -313,9 +308,9 @@ check "paiements restaurée : le pass y est" test "$(sqlite3 "$pdb" "SELECT coun
 check "paiements restaurée : clés de jetons effacées (jetons d'avant refusés)" test "$(sqlite3 "$pdb" 'SELECT count(*) FROM cles_jetons;')" = 0
 check "comptes.db intacte à côté" test -f "$racine/data/comptes.db"
 
-# --- 6. Adresse absente des sorties ---------------------------------------------------------------
+# --- 6. Pseudo absent des sorties ----------------------------------------------------------------
 for f in "$work/srv.stdout" "$work/srv.stderr"; do
-	refuse "${f##*/} : pas d'adresse" grep -qaiF -- "${email,,}" "$f"
+	refuse "${f##*/} : pas de pseudo" grep -qaiF -- "repererestauratlon" "$f"
 done
 
 if [ "$fails" -ne 0 ]; then

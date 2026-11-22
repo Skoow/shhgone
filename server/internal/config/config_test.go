@@ -200,15 +200,15 @@ func TestSalonsMaxInvalide(t *testing.T) {
 	}
 }
 
-// Compte (conception §8.1, plan lot 2) : désactivé par défaut, rien d'autre n'est exigé.
+// Compte (conception du compte par passkey) : désactivé par défaut, rien d'autre n'est exigé.
 func TestComptesDefautDesactive(t *testing.T) {
 	env(t, map[string]string{"SHH_DATA_DIR": "/d"})
 	c, err := FromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Comptes || c.ComptesCleFile != "" || c.ComptesMax != 10000 || c.SMTP != (SMTP{}) {
-		t.Fatalf("défauts du compte : %+v %d %+v", c.Comptes, c.ComptesMax, c.SMTP)
+	if c.Comptes || c.ComptesCleFile != "" || c.ComptesMax != 10000 || c.ComptesJour != 500 {
+		t.Fatalf("défauts du compte : %+v %d %d", c.Comptes, c.ComptesMax, c.ComptesJour)
 	}
 	env(t, map[string]string{"SHH_DATA_DIR": "/d", "SHH_COMPTES": "0"})
 	if c, err := FromEnv(); err != nil || c.Comptes {
@@ -216,13 +216,11 @@ func TestComptesDefautDesactive(t *testing.T) {
 	}
 }
 
-// comptesOK : configuration complète et valide avec SHH_COMPTES=1.
+// comptesOK : configuration complète et valide avec SHH_COMPTES=1 (aucune variable d'e-mail).
 func comptesOK() map[string]string {
 	return map[string]string{
 		"SHH_DATA_DIR": "/d", "SHH_SALONS": "1", "SHH_ORIGIN": "https://shhgone.com",
 		"SHH_COMPTES": "1", "SHH_COMPTES_CLE_FILE": "/run/secrets/shh_comptes_cle",
-		"SHH_SMTP_HOST": "smtp.tem.scaleway.com", "SHH_SMTP_USER": "utilisateur",
-		"SHH_SMTP_PASSWORD_FILE": "/run/secrets/shh_smtp_mdp", "SHH_MAIL_FROM": "Shhgone <ne-pas-repondre@shhgone.com>",
 	}
 }
 
@@ -238,30 +236,70 @@ func TestComptesConfigValide(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := SMTP{Host: "smtp.tem.scaleway.com", Port: 465, User: "utilisateur", PasswordFile: "/run/secrets/shh_smtp_mdp",
-		From: "Shhgone <ne-pas-repondre@shhgone.com>"}
-	if !c.Comptes || c.ComptesCleFile != "/run/secrets/shh_comptes_cle" || c.ComptesMax != 10000 || c.SMTP != want {
-		t.Fatalf("%v %q %d %+v", c.Comptes, c.ComptesCleFile, c.ComptesMax, c.SMTP)
-	}
-	for k, v := range map[string]string{
-		"SHH_SMTP_PORT": "587", "SHH_COMPTES_MAX": "1", "SHH_MAIL_FROM": "ne-pas-repondre@shhgone.com",
-	} {
-		env(t, avec(comptesOK(), k, v))
-		if _, err := FromEnv(); err != nil {
-			t.Errorf("%s=%q refusé : %v", k, v, err)
-		}
+	if !c.Comptes || c.ComptesCleFile != "/run/secrets/shh_comptes_cle" || c.ComptesMax != 10000 || c.ComptesJour != 500 {
+		t.Fatalf("%v %q %d %d", c.Comptes, c.ComptesCleFile, c.ComptesMax, c.ComptesJour)
 	}
 	env(t, avec(comptesOK(), "SHH_COMPTES_MAX", "1000000"))
 	if c, err := FromEnv(); err != nil || c.ComptesMax != 1000000 {
 		t.Fatal(c.ComptesMax, err)
 	}
-	// Texte clair (autre port que 465 ou 587) : seulement vers la boucle locale (tests).
-	for _, h := range []string{"127.0.0.1", "localhost", "::1"} {
-		m := avec(comptesOK(), "SHH_SMTP_HOST", h)
-		m["SHH_SMTP_PORT"] = "2525"
-		env(t, m)
-		if c, err := FromEnv(); err != nil || c.SMTP.Port != 2525 {
-			t.Errorf("boucle locale %s : %v", h, err)
+	// Tests du compte : localhost (les navigateurs refusent une adresse IP comme rp.id).
+	env(t, avec(comptesOK(), "SHH_ORIGIN", "http://localhost:8080"))
+	if c, err := FromEnv(); err != nil || RPID(c.Origin) != "localhost" {
+		t.Fatal(err)
+	}
+}
+
+// TestComptesJour : SHH_COMPTES_JOUR de 1 à 100 000 (plafond global, conception §7.2).
+func TestComptesJour(t *testing.T) {
+	for v, n := range map[string]int{"1": 1, "500": 500, "100000": 100000} {
+		env(t, avec(comptesOK(), "SHH_COMPTES_JOUR", v))
+		if c, err := FromEnv(); err != nil || c.ComptesJour != n {
+			t.Errorf("%s : %d %v", v, c.ComptesJour, err)
+		}
+	}
+	for _, v := range []string{"0", "100001", "010", "-1", "dix", " 5"} {
+		env(t, avec(comptesOK(), "SHH_COMPTES_JOUR", v))
+		if _, err := FromEnv(); err == nil {
+			t.Errorf("SHH_COMPTES_JOUR=%q accepté", v)
+		}
+	}
+}
+
+// TestRPIDProduction : rp.id = hôte de SHH_ORIGIN (shhgone.com en production, R1) ; jamais une
+// adresse IP.
+func TestRPIDProduction(t *testing.T) {
+	for o, w := range map[string]string{"https://shhgone.com": "shhgone.com", "http://localhost:8080": "localhost",
+		"https://a.b.example:8443": "a.b.example", "http://127.0.0.1:8080": "", "": "", "shhgone.com": ""} {
+		if g := RPID(o); g != w {
+			t.Errorf("RPID(%q) = %q, attendu %q", o, g, w)
+		}
+	}
+	env(t, avec(comptesOK(), "SHH_ORIGIN", "http://127.0.0.1:8080"))
+	if _, err := FromEnv(); err == nil || !strings.Contains(err.Error(), "rp.id") {
+		t.Fatal("origine en adresse IP acceptée avec les comptes :", err)
+	}
+	// Sans compte, une origine en adresse IP reste permise (salon, tests e2e).
+	m := avec(comptesOK(), "SHH_ORIGIN", "http://127.0.0.1:8080")
+	m["SHH_COMPTES"] = "0"
+	env(t, m)
+	if _, err := FromEnv(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestConfigSMTPRefuse : le compte par e-mail est retiré ; chaque ancienne variable d'envoi
+// d'e-mails, encore posée, fait refuser le démarrage, compte activé ou non (conception §17).
+func TestConfigSMTPRefuse(t *testing.T) {
+	for _, k := range []string{"SHH_SMTP_HOST", "SHH_SMTP_PORT", "SHH_SMTP_USER", "SHH_SMTP_PASSWORD_FILE", "SHH_MAIL_FROM",
+		"SHH_SMTP_AUTRE"} {
+		for _, base := range []map[string]string{comptesOK(), {"SHH_DATA_DIR": "/d"}} {
+			env(t, base)
+			t.Setenv(k, "x")
+			_, err := FromEnv()
+			if err == nil || !strings.Contains(err.Error(), k) || !strings.Contains(err.Error(), "retiré") {
+				t.Errorf("%s accepté : %v", k, err)
+			}
 		}
 	}
 }
@@ -269,47 +307,49 @@ func TestComptesConfigValide(t *testing.T) {
 func TestComptesConfigRefusee(t *testing.T) {
 	sans := func(k string) map[string]string { m := comptesOK(); delete(m, k); return m }
 	cas := map[string]map[string]string{
-		"SHH_COMPTES=2":                 {"SHH_DATA_DIR": "/d", "SHH_COMPTES": "2"},
-		"SHH_COMPTES=true":              {"SHH_DATA_DIR": "/d", "SHH_COMPTES": "true"},
-		"sans SHH_SALONS=1":             avec(comptesOK(), "SHH_SALONS", "0"),
-		"sans clé":                      sans("SHH_COMPTES_CLE_FILE"),
-		"sans hôte SMTP":                sans("SHH_SMTP_HOST"),
-		"sans utilisateur SMTP":         sans("SHH_SMTP_USER"),
-		"sans mot de passe SMTP":        sans("SHH_SMTP_PASSWORD_FILE"),
-		"sans expéditeur":               sans("SHH_MAIL_FROM"),
-		"clé relative":                  avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "cle"),
-		"clé dans SHH_DATA_DIR":         avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "/d/cle"),
-		"clé = SHH_DATA_DIR":            avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "/d"),
-		"clé sous SHH_DATA_DIR (..)":    avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "/x/../d/sous/cle"),
-		"mot de passe dans les données": avec(comptesOK(), "SHH_SMTP_PASSWORD_FILE", "/d/mdp"),
-		"clé sous SHH_DATA_DIR (..x)":   avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "/d/..x/cle"),
-		"mot de passe relatif":          avec(comptesOK(), "SHH_SMTP_PASSWORD_FILE", "mdp"),
-		"port 25":                       avec(comptesOK(), "SHH_SMTP_PORT", "25"),
-		"port 2525 hors boucle":         avec(comptesOK(), "SHH_SMTP_PORT", "2525"),
-		"port 0":                        avec(comptesOK(), "SHH_SMTP_PORT", "0"),
-		"port 65536":                    avec(comptesOK(), "SHH_SMTP_PORT", "65536"),
-		"port 0465":                     avec(comptesOK(), "SHH_SMTP_PORT", "0465"),
-		"port texte":                    avec(comptesOK(), "SHH_SMTP_PORT", "smtps"),
-		"hôte avec port":                avec(comptesOK(), "SHH_SMTP_HOST", "smtp.exemple.fr:465"),
-		"hôte en majuscules":            avec(comptesOK(), "SHH_SMTP_HOST", "SMTP.exemple.fr"),
-		"hôte avec espace":              avec(comptesOK(), "SHH_SMTP_HOST", "smtp exemple.fr"),
-		"hôte vide d'étiquette":         avec(comptesOK(), "SHH_SMTP_HOST", "smtp..fr"),
-		"expéditeur sans @":             avec(comptesOK(), "SHH_MAIL_FROM", "Shhgone"),
-		"expéditeur avec saut de ligne": avec(comptesOK(), "SHH_MAIL_FROM", "a@b.fr\r\nBcc: x@y.fr"),
-		"expéditeur deux adresses":      avec(comptesOK(), "SHH_MAIL_FROM", "a@b.fr, c@d.fr"),
-		"utilisateur avec saut":         avec(comptesOK(), "SHH_SMTP_USER", "u\nv"),
-		"max 0":                         avec(comptesOK(), "SHH_COMPTES_MAX", "0"),
-		"max 1000001":                   avec(comptesOK(), "SHH_COMPTES_MAX", "1000001"),
-		"max 010":                       avec(comptesOK(), "SHH_COMPTES_MAX", "010"),
-		"max texte":                     avec(comptesOK(), "SHH_COMPTES_MAX", "dix"),
+		"SHH_COMPTES=2":               {"SHH_DATA_DIR": "/d", "SHH_COMPTES": "2"},
+		"SHH_COMPTES=true":            {"SHH_DATA_DIR": "/d", "SHH_COMPTES": "true"},
+		"sans SHH_SALONS=1":           avec(comptesOK(), "SHH_SALONS", "0"),
+		"sans clé":                    sans("SHH_COMPTES_CLE_FILE"),
+		"clé relative":                avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "cle"),
+		"clé dans SHH_DATA_DIR":       avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "/d/cle"),
+		"clé = SHH_DATA_DIR":          avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "/d"),
+		"clé sous SHH_DATA_DIR (..)":  avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "/x/../d/sous/cle"),
+		"clé sous SHH_DATA_DIR (..x)": avec(comptesOK(), "SHH_COMPTES_CLE_FILE", "/d/..x/cle"),
+		"max 0":                       avec(comptesOK(), "SHH_COMPTES_MAX", "0"),
+		"max 1000001":                 avec(comptesOK(), "SHH_COMPTES_MAX", "1000001"),
+		"max 010":                     avec(comptesOK(), "SHH_COMPTES_MAX", "010"),
+		"max texte":                   avec(comptesOK(), "SHH_COMPTES_MAX", "dix"),
 		// Valeur fausse refusée même compte désactivé (comme SHH_SALONS_MAX, SHH_ORIGIN).
 		"max faux, compte coupé":  {"SHH_DATA_DIR": "/d", "SHH_COMPTES_MAX": "0"},
-		"port faux, compte coupé": {"SHH_DATA_DIR": "/d", "SHH_SMTP_PORT": "25"},
+		"jour faux, compte coupé": {"SHH_DATA_DIR": "/d", "SHH_COMPTES_JOUR": "0"},
 	}
 	for nom, kv := range cas {
 		env(t, kv)
 		if _, err := FromEnv(); err == nil {
 			t.Errorf("%s accepté", nom)
+		}
+	}
+}
+
+// SHH_WEBAUTHN_ORIGINES_APPS : vide par défaut ; chaque origine exactement
+// android:apk-key-hash:<43 caractères base64url> (conception du compte par passkey §6.2).
+func TestOriginesApps(t *testing.T) {
+	env(t, comptesOK())
+	if c, err := FromEnv(); err != nil || c.WebAuthnOriginesApps != nil {
+		t.Fatal(c.WebAuthnOriginesApps, err)
+	}
+	a := "android:apk-key-hash:" + strings.Repeat("A", 42) + "E"
+	b := "android:apk-key-hash:" + strings.Repeat("_", 42) + "w"
+	env(t, avec(comptesOK(), "SHH_WEBAUTHN_ORIGINES_APPS", a+","+b))
+	if c, err := FromEnv(); err != nil || len(c.WebAuthnOriginesApps) != 2 || c.WebAuthnOriginesApps[1] != b {
+		t.Fatal(c.WebAuthnOriginesApps, err)
+	}
+	for _, v := range []string{"android:apk-key-hash:", a + "A", a[:len(a)-1], a + ", " + b, a + ",", "https://shhgone.com",
+		"android:apk-key-hash:" + strings.Repeat("A", 42) + "B", "ios:" + strings.Repeat("A", 43)} {
+		env(t, avec(comptesOK(), "SHH_WEBAUTHN_ORIGINES_APPS", v))
+		if _, err := FromEnv(); err == nil {
+			t.Errorf("%q accepté", v)
 		}
 	}
 }

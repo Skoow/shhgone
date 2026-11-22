@@ -37,8 +37,11 @@ var securityHeaders = [][2]string{
 	// Le reste est refusé explicitement (audit F3) : fonctions puissantes inutilisées, qui
 	// valent sinon « self » et serviraient à un script injecté (capture d'écran, lecture du
 	// presse-papiers, périphériques, capteurs). clipboard-write, web-share, screen-wake-lock,
-	// fullscreen et publickey-credentials-* restent à leur défaut (self) : utilisés ou prévus (§37.9).
-	{"Permissions-Policy", "microphone=(self), camera=(self), " + deniedFeatures},
+	// fullscreen restent à leur défaut (self) : utilisés ou prévus (§37.9). Passkeys du compte
+	// (conception du compte par passkey §6.5) : publickey-credentials-create et -get posés
+	// explicitement à self (le défaut aujourd'hui, mais un changement de défaut ne doit rien
+	// ouvrir ni fermer en silence), refusés au cadre PDF.
+	{"Permissions-Policy", "microphone=(self), camera=(self), publickey-credentials-create=(self), publickey-credentials-get=(self), " + deniedFeatures},
 	{"Cross-Origin-Opener-Policy", "same-origin"},
 	{"Cross-Origin-Resource-Policy", "same-origin"},
 	{"Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload"},

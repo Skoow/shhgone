@@ -13,7 +13,7 @@ import (
 // adresse bannie (bannissement actif non échu) : ErrBanni ; compte inconnu : ErrSession.
 func TestPalierDuCompte(t *testing.T) {
 	b := nouveauBanc(t)
-	h, _, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, _, _ := b.inscrire(t, "lea")
 	if l, err := b.s.Palier(h); err != nil || l != limitesNeuf {
 		t.Fatal("neuf :", l, err)
 	}
@@ -24,12 +24,8 @@ func TestPalierDuCompte(t *testing.T) {
 	if _, err := b.s.Palier([16]byte{1}); !errors.Is(err, ErrSession) {
 		t.Fatal("compte inconnu :", err)
 	}
-	var canon []byte
-	if err := b.db.QueryRow(`SELECT e_canon FROM comptes WHERE h=?`, h[:]).Scan(&canon); err != nil {
-		t.Fatal(err)
-	}
 	j := jourDe(b.clk.Now())
-	if _, err := b.db.Exec(`INSERT INTO bannis VALUES(?,?,?,?,1,8,0)`, alea8(), canon, j, j+30*jourS); err != nil {
+	if _, err := b.db.Exec(`INSERT INTO bannis VALUES(?,?,?,?,1,8,0)`, alea8(), h[:], j, j+30*jourS); err != nil {
 		t.Fatal(err)
 	}
 	var bn ErrBanni
@@ -48,7 +44,7 @@ func TestPalierDuCompte(t *testing.T) {
 // Un signalement d'un salon du compte remet son ancienneté au jour même (conception §11).
 func TestSignalementRemetAZero(t *testing.T) {
 	b := nouveauBanc(t)
-	h, _, d := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, _, _ := b.inscrire(t, "lea")
 	b.clk.Add(10 * 24 * time.Hour)
 	if l, _ := b.s.Palier(h); l != limitesConfirme {
 		t.Fatal("confirmé attendu")
@@ -59,7 +55,7 @@ func TestSignalementRemetAZero(t *testing.T) {
 	if l, _ := b.s.Palier(h); l != limitesNeuf {
 		t.Fatal("neuf attendu après le signalement")
 	}
-	o, err := b.s.Connexion(ipA, "lea@exemple.fr", d.AAuth, OptionsSession{}, false)
+	o, err := b.connecter(h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +96,7 @@ func (f *fauxSalons) brancher(s *Service) {
 // 10 min (deux appareils du compte s'accordent), jamais l'identifiant du salon.
 func TestSalonsListe(t *testing.T) {
 	b := nouveauBanc(t)
-	h, j, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, j, _ := b.inscrire(t, "lea")
 	f := &fauxSalons{vivants: map[[16]byte][]SalonVivant{h: {{ID: "salon-a", ExpireVers: 1800, Places: 4, Sieges: 2},
 		{ID: "salon-b", ExpireVers: 2700, Places: 3, Sieges: 0}}}}
 	f.brancher(b.s)
@@ -133,7 +129,7 @@ func TestSalonsListe(t *testing.T) {
 // inconnue, échue ou d'un autre compte : la même réponse (ErrEtape, 404).
 func TestRefExpire10Min(t *testing.T) {
 	b := nouveauBanc(t)
-	h, j, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, j, _ := b.inscrire(t, "lea")
 	f := &fauxSalons{vivants: map[[16]byte][]SalonVivant{h: {{ID: "salon-a", Places: 4}, {ID: "salon-b", Places: 4}}}}
 	f.brancher(b.s)
 	c := b.session(t, j)
@@ -156,8 +152,8 @@ func TestRefExpire10Min(t *testing.T) {
 
 func TestRefDUnAutreCompteRefusee(t *testing.T) {
 	b := nouveauBanc(t)
-	h, j, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
-	_, j2, _ := b.inscrire(t, ipN(1), "leo@exemple.fr", "leo")
+	h, j, _ := b.inscrire(t, "lea")
+	_, j2, _ := b.inscrire(t, "leo")
 	f := &fauxSalons{vivants: map[[16]byte][]SalonVivant{h: {{ID: "salon-a", Places: 4}}}}
 	f.brancher(b.s)
 	l, _ := b.s.SalonsListe(b.session(t, j))
@@ -172,7 +168,7 @@ func TestRefDUnAutreCompteRefusee(t *testing.T) {
 // Salon déjà fini quand la ref sert : ErrEtape (404), comme une ref inconnue.
 func TestRefSalonFini(t *testing.T) {
 	b := nouveauBanc(t)
-	h, j, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, j, _ := b.inscrire(t, "lea")
 	f := &fauxSalons{vivants: map[[16]byte][]SalonVivant{h: {{ID: "salon-a", Places: 4}}}}
 	f.brancher(b.s)
 	c := b.session(t, j)
@@ -188,7 +184,7 @@ func TestRefSalonFini(t *testing.T) {
 // rendu les compte tous.
 func TestSuppressionDeuxPasses(t *testing.T) {
 	b := nouveauBanc(t)
-	h, j, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	h, j, _ := b.inscrire(t, "lea")
 	var passes []bool
 	b.s.fermerSalons = func(x [16]byte) (int, error) {
 		if x != h {

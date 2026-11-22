@@ -6,12 +6,12 @@ Caddy (TLS) devant le serveur Go, dans Docker. Références : spécification §8
 |---|---|
 | `Caddyfile` | TLS 1.3, échange de clés hybride, remplacement de `X-Shh-Client-IP`, aucun journal |
 | `Dockerfile` | image du serveur : binaire Go statique + site, sur `scratch`, compte 65532 |
-| `compose.yaml` | les deux conteneurs (trois avec le compte : relais SMTP), en lecture seule, sans capacité, sans journal |
+| `compose.yaml` | les deux conteneurs (plus les relais du paiement et des appels, §13 et §14), en lecture seule, sans capacité, sans journal |
 | `deploy.sh` | installe une version par empreinte, contrôle, revient en arrière ; commandes d'administration |
-| `shhcheck/` | petit programme Go : santé du conteneur, test TLS hybride, relais SMTP et contrôle SMTP du compte (§12) ; `salonws_test.go` et `compte_test.go` : essais de banc (tests seulement, hors du binaire) |
+| `shhcheck/` | petit programme Go : santé du conteneur, test TLS hybride, relais de sortie du paiement (§13), contrôle d'un hôte joignable en TLS (`joindre`), relais TURN (§14) ; `salonws_test.go` et `compte_test.go` : essais de banc (tests seulement, hors du binaire) |
 | `test-proxy.sh` | test du proxy : le Caddyfile devant le vrai serveur (salon activé), sur la boucle locale |
 | `journaux.sh`, `test-journaux.sh` | contrôles des journaux de la machine (aucune adresse IP sur le disque, une heure au plus en mémoire), bloquants dans `deploy.sh` ; leur banc d'essai, sur une machine factice (§1) |
-| `test-sortie.sh` | test de la sortie SMTP : configuration résolue de `compose.yaml`, puis réseau réel avec Docker (§12.1) |
+| `test-sortie.sh` | test des sorties : configuration résolue de `compose.yaml` (aucun relais SMTP, relais du paiement), puis réseau réel avec Docker (§12.1, §13.1) |
 | `compose.yaml` : `relais-stripe`, `relais-paypal`, `relais-nowpayments` | seules sorties du paiement, une par prestataire, paiement activé (§13) |
 | `systemd/shhdrop-journal.*`, `systemd/00-shhdrop-connexions.conf` | purge du journal de plus d'une heure, tous les quarts d'heure ; registres des connexions (`wtmp`, `btmp`, `lastlog`) vers `/dev/null` (§1) |
 | `sauvegarder.sh`, `systemd/` | sauvegarde quotidienne chiffrée (age) de `comptes.db` et de `paiements.db`, et son minuteur (§12.4) |
@@ -34,7 +34,7 @@ Chez l'hébergeur et le registraire :
 
 Ce que l'hébergeur (ou qui prend la machine) peut faire, et ce qui l'en empêche ou le fait voir :
 
-- **Le contenu reste hors de portée** : fichiers, messages, noms de fichiers, clés et mots de passe des utilisateurs sont chiffrés dans le navigateur ; le serveur ne les a jamais en clair, même en mémoire. Lire la mémoire ne donne que des métadonnées passagères (adresses des connexions en cours, tailles, heures, l'adresse e-mail le temps d'envoyer un code).
+- **Le contenu reste hors de portée** : fichiers, messages, noms de fichiers, clés et mots de passe des utilisateurs sont chiffrés dans le navigateur ; le serveur ne les a jamais en clair, même en mémoire. Lire la mémoire ne donne que des métadonnées passagères (adresses des connexions en cours, tailles, heures).
 - **Le volume chiffré se déverrouille par SSH seulement** (§5), jamais par la console KVM/IPMI de l'hébergeur, qui peut voir ce qu'on y tape. La phrase n'est écrite nulle part. Couper l'accès IPMI dans l'espace client quand il ne sert pas.
 - **Dédié plutôt que VPS** : sur un VPS, l'hébergeur lit la mémoire de la machine (donc la clé du volume ouvert et la clé TLS) d'une simple commande ; sur un dédié, il lui faut une intervention physique. Chiffrement de la mémoire par le processeur (AMD SME/TSME, Intel TME) : à activer dans le BIOS si le modèle l'a (pas le Xeon-D 2141I du SYS-2, trop ancien).
 - **Certificats de 6 jours** (profil « shortlived » de Let's Encrypt, `Caddyfile`) : une clé volée ne sert que quelques jours. Caddy renouvelle seul vers 2 jours restants ; chaque renouvellement crée une **nouvelle clé**, sur la machine, qui ne voyage jamais (seule une preuve de contrôle du domaine passe par le réseau) : aucun risque de plus par renouvellement. Alerte URGENT sous 36 h restantes ; panne de Let's Encrypt de plusieurs jours : retirer le bloc `issuer acme` du `Caddyfile` et redéployer, retour aux certificats de 90 jours. Sonde externe adaptée (36 h pour un certificat de 6 jours, 14 jours sinon).
@@ -86,7 +86,7 @@ Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plu
     Le préfixe 00 l'emporte sur les lignes de `/usr/lib/tmpfiles.d/var.conf` qui recréent ces fichiers (essayé avec systemd 255, celui d'Ubuntu 24.04) ; sans les règles de logrotate, rien ne remet de fichier à la place des liens. `sshd` n'en souffre pas (il écrit dans `/dev/null`, ou saute le registre qui n'est pas un fichier) ; `last`, `lastb` et l'accueil « Last login » n'affichent plus rien. **Ubuntu 26.04** (si `wtmpdb` et `lastlog2` remplacent ces fichiers : bases `/var/lib/wtmpdb/wtmp.db` et `/var/lib/lastlog/lastlog2.db`, écrites par les modules PAM `pam_wtmpdb` et `pam_lastlog2`) : `pam-auth-update --disable wtmpdb lastlog2` (retire ces modules de `common-session`), `systemctl mask wtmpdb-update-boot.service`, puis `rm -f /var/lib/wtmpdb/wtmp.db /var/lib/lastlog/lastlog2.db`. Les deux versions : aucune ligne active `pam_lastlog.so`, `pam_lastlog2.so` ni `pam_wtmpdb.so` dans `/etc/pam.d/sshd`, `common-session` ni `common-session-noninteractive` (retirer ou commenter la ligne). Ces modules ne font qu'écrire le registre : la connexion n'en dépend pas, mais **vérifier depuis une deuxième session SSH** que l'on se connecte encore avant de fermer la première. `deploy.sh` refuse si l'un des trois fichiers de `/var/log` existe sans être un lien vers `/dev/null` (même vide : `sshd` y écrirait), si une des deux bases est un fichier non vide, si un de ces modules est actif, ou si une règle logrotate `wtmp` ou `btmp` reste ;
 - **heure** synchronisée (NTP : `timedatectl set-ntp true`) ;
 - **mises à jour de sécurité automatiques**, sans redémarrage automatique de la machine (`unattended-upgrades`, `Automatic-Reboot "false"`, §22) ;
-- compte par e-mail seulement (§12) : paquets `sqlite3` et `age` (version exacte, notée dans `deploy/.env`), `curl` ;
+- compte (§12) : paquets `sqlite3` et `age` (version exacte, notée dans `deploy/.env`), `curl` ;
 - **SSH par clé seulement** (`PasswordAuthentication no`), **pare-feu** : 22, 80 et 443 en TCP, **443 en UDP** (HTTP/3, QUIC, décision du 13 novembre), et les ports du relais des appels (3478 en UDP et TCP, 49160 à 49999 en UDP : `deploy.sh` les ouvre lui-même avec ufw, §14), rien d'autre. Avec ufw : `ufw allow 22/tcp`, `ufw allow 80/tcp`, `ufw allow 443/tcp`, `ufw allow 443/udp`. Sans l'ouverture UDP, les navigateurs restent en HTTP/2 (rien ne casse). Tampons UDP conseillés par la bibliothèque QUIC de Caddy, dans `/etc/sysctl.d/` : `net.core.rmem_max=7500000` et `net.core.wmem_max=7500000` (sinon HTTP/3 marche, plus lentement).
 
 ## 2. Première installation
@@ -164,9 +164,9 @@ Le lien signalé ne se donne **jamais** en argument (il irait dans l'historique 
 - **Alerte de la machine** (`deploy/alerte.sh`, minuteur `systemd/shhdrop-alerte.timer`, toutes les 15 min ; banc d'essai `deploy/test-alerte.sh`, en CI) : e-mail à `SHH_ALERTE_A` (dans `deploy/.env`, par exemple `contact@shhgone.com`) pour prévenir **avant** que le problème n'arrive. Chaque sujet revient au plus une fois par période : 1 h pour l'urgent, 1 jour ou 7 jours pour ce qui se prévoit.
   - **URGENT** : machine redémarrée (accès possible : vérifier avant de déverrouiller) ; volume chiffré verrouillé ; certificat inconnu dans les journaux publics ; serveur muet ; 5 signalements dans l'heure ; conteneur malade ; disque (données ou système) ou inodes à 90 % ; mémoire disponible sous 10 % ; certificat TLS à moins de 7 jours ; domaine ou location du serveur à moins de 7 jours de l'échéance ; nom de domaine qui ne pointe plus vers la machine (détournement, expiration) ; aucune sauvegarde réussie depuis 26 h ; disque qui annonce une panne (`smartctl`, paquet `smartmontools`).
   - **À prévoir** : disque à 75 %, ou plein dans moins de 14 jours au rythme du jour ; certificat à moins de 21 jours (Caddy renouvelle à 30 : le renouvellement échoue) ; domaine ou location à moins de 45 jours ; échéance du domaine illisible ; mises à jour de sécurité du système en attente ; redémarrage demandé ; commits de retard sur GitHub (correctif à déployer) ; horloge non synchronisée ; unité systemd en échec ; charge trop haute.
-  - **Rappel** tous les 30 jours : essayer une restauration (§12). **Bilan** chaque semaine, même sans problème (disque, jours restants du certificat, du domaine et de la location, mises à jour, retard) : s'il n'arrive pas, c'est l'alerte qui ne marche plus (SMTP, minuteur).
+  - **Rappel** tous les 30 jours : essayer une restauration (§12). **Bilan** chaque semaine, même sans problème (disque, jours restants du certificat, du domaine et de la location, mises à jour, retard) : s'il n'arrive pas, c'est l'alerte qui ne marche plus (fournisseur d'envoi, minuteur).
   - Réglages : `SHH_SERVEUR_ECHEANCE` (fin de la location, à remettre à jour après chaque renouvellement), `SHH_DOMAINE_ECHEANCE` seulement si RDAP ne répond pas. L'échéance du domaine se lit par RDAP (`rdap.org`, qui renvoie au registre : seul le nom du domaine, public, est envoyé). Le retard sur GitHub suppose que la copie du dépôt est un clone `git` lisible par root (`git config --global --add safe.directory /opt/shhdrop`).
-  - Envoi par le fournisseur SMTP du compte ; un envoi raté est retenté au passage suivant. **Après un redémarrage, le volume chiffré est verrouillé** et `secrets/shh_smtp_mdp` illisible : créer chez le fournisseur un **identifiant SMTP réservé aux alertes** (par exemple `alertes@shhgone.com`, envoi seulement), le mettre dans `SHH_ALERTE_SMTP_USER` et son mot de passe dans `/etc/shhdrop/alerte_smtp_mdp` (`install -d -m 0700 /etc/shhdrop`, fichier root 0600). Il est sur le disque système, en clair : quelqu'un qui lirait ce disque pourrait envoyer des e-mails avec, rien d'autre, d'où un identifiant à part, que l'on change s'il fuit. Aucune donnée d'utilisateur ni adresse IP dans les e-mails ni dans l'état (`/var/lib/shhdrop-alerte` : des dates et un pourcentage par jour). Santé lisible à la main : `deploy/deploy.sh health`.
+  - Envoi depuis la machine (pas depuis le conteneur, qui n'a pas de sortie) par un fournisseur SMTP : `SHH_ALERTE_SMTP_HOST` (TLS implicite sur 465), avec un **identifiant réservé aux alertes** (par exemple `alertes@shhgone.com`, envoi seulement) dans `SHH_ALERTE_SMTP_USER`, et `SHH_ALERTE_FROM`. Le mot de passe va dans `/etc/shhdrop/alerte_smtp_mdp` (`install -d -m 0700 /etc/shhdrop`, fichier root 0600), hors du volume chiffré pour que l'alerte parte même volume verrouillé après un redémarrage. Un envoi raté est retenté au passage suivant. Avant le 22 novembre, ces réglages s'appelaient `SHH_SMTP_HOST` et `SHH_MAIL_FROM` et servaient aussi au compte. Ces noms sont maintenant refusés : les renommer. Ce mot de passe est sur le disque système, en clair : quelqu'un qui lirait ce disque pourrait envoyer des e-mails avec, rien d'autre, d'où un identifiant à part, que l'on change s'il fuit. Aucune donnée d'utilisateur ni adresse IP dans les e-mails ni dans l'état (`/var/lib/shhdrop-alerte` : des dates et un pourcentage par jour). Santé lisible à la main : `deploy/deploy.sh health`.
 - Les **demandes des autorités** (Pharos, injonctions) arrivent à `contact@shhgone.com` : notification activée sur le téléphone. Chaque demande traitée va au registre des retraits (`docs/juridique/registre-retraits-modele.md`, tenu hors du serveur).
 
 ### Détruire un lien depuis un téléphone (signalement, demande d'une autorité)
@@ -233,7 +233,7 @@ En cas de doute sur la sécurité du serveur ou du code :
 
 1. `deploy/deploy.sh admin freeze`, puis `deploy/deploy.sh admin wipe --yes` si nécessaire.
 2. Changer les accès : clés SSH, GitHub, registraire, registre d'images.
-3. Réinstaller le serveur depuis zéro (nouvelle machine, nouveau volume chiffré, §1 et §2). Ne pas reprendre `/srv/shhdrop/caddy` : nouvelles clés TLS, et révoquer les anciens certificats. Compte activé : la **clé du serveur** (§12.2) est à tenir pour connue de l'attaquant, avec `comptes.db` (profils séquestrés lisibles, adresses testables une à une) ; elle ne peut pas être changée sans perdre tous les comptes (conception §5.2) : décision du propriétaire, à prendre avant de reprendre la base ; changer aussi le mot de passe SMTP et l'accès au stockage des sauvegardes.
+3. Réinstaller le serveur depuis zéro (nouvelle machine, nouveau volume chiffré, §1 et §2). Ne pas reprendre `/srv/shhdrop/caddy` : nouvelles clés TLS, et révoquer les anciens certificats. Compte activé : la **clé du serveur** (§12.2) est à tenir pour connue de l'attaquant, avec `comptes.db`. Il peut alors tester des pseudos un à un. Il ne peut ni ouvrir les coffres, ni se faire passer pour une passkey, ni utiliser une clé de récupération : `v_r` est l'empreinte d'un secret de 128 bits. Elle ne peut pas être changée sans perdre l'unicité des pseudos existants (conception §5.2) : la décision revient au propriétaire, avant de reprendre la base. Changer aussi l'identifiant SMTP des alertes et l'accès au stockage des sauvegardes.
 4. Publier un avis sur le site.
 
 ## 7. Vérifications après chaque mise en ligne
@@ -292,8 +292,8 @@ docker run --rm --network host --log-driver none -v /etc/ssl/certs/ca-certificat
 
 ```sh
 CADDY=/chemin/vers/caddy deploy/test-proxy.sh     # Caddy 2.10 ou plus, curl 7.83 ou plus, Go, web/dist construit (≈ 2 min 30 : WebSocket gardé 75 s)
-make lint-deploy                                  # bash -n, ShellCheck, go vet et tests unitaires de shhcheck (relais SMTP)
-SHH_IMAGE=shhdrop:ci make test-sortie             # sortie SMTP : configuration, puis réseau réel (démon Docker ; code 3 sans démon)
+make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte et des journaux, go vet et tests de shhcheck
+SHH_IMAGE=shhdrop:ci make test-sortie             # sorties : configuration, puis réseau réel (démon Docker ; code 3 sans démon)
 sudo make test-restauration                       # sauvegarde et restauration d'un compte de test, en mémoire (≈ 45 s)
 ```
 
@@ -375,64 +375,68 @@ Aucune limite de capacité n'est fixée en dur (décision du propriétaire du 13
 
 **Part équitable** (audit du 13 novembre, D2) : en plus de ses propres limites, une connexion ou un bloc /48 (une adresse en IPv4) prend au plus **1/8** de chaque plafond global, et le **dernier quart** des places (envois, lectures, surveillances, WebSocket, salons) ne va qu'à un bloc qui n'en tient aucune. Le **dernier huitième du stockage** ne va qu'à une adresse qui n'a rien créé ni envoyé aujourd'hui (UTC) ; un agrandissement et une pièce du salon n'y entrent jamais ; une adresse ne réserve pas plus de `SHH_STORAGE_MAX / 8` octets par jour. Un salon où personne n'est entré est effacé 15 min après sa création. Adresses IPv4 nécessaires pour tout prendre, avec `compose.yaml` : envois 23 (8 avant), lectures 107 (16 avant), salons (200) 80 qui y entrent (40 avant, sans y entrer), stockage environ 43 (34 avant). Ces seuils restent atteignables par un attaquant qui dispose de beaucoup d'adresses : ce sont des limites assumées, à reporter dans la spécification (§18).
 
-## 12. Compte par e-mail (désactivé) : sortie SMTP, secrets, sauvegarde
+## 12. Compte par passkey : clé du serveur, sauvegarde
 
-Le compte (conception `docs/superpowers/specs/2026-11-14-compte-email-design.md`) est **activé** (décision D8 du propriétaire, 19 novembre) : `compose.yaml` pose `SHH_COMPTES: "1"` et le site de l'image est construit avec le compte (`deploy/Dockerfile`, `SHH_SITE_COMPTES=1`, `check-dist.mjs --comptes`). **Risque assumé par le propriétaire** : l'avis du juriste sur la conservation des données de création de compte (LCEN et décret 2021-1362 ; conception §16, §21.18) n'a pas été demandé. `deploy.sh` refuse d'installer tant que les secrets (§12.2) et la configuration SMTP (§12.3) manquent : **ce qui reste à faire avant la mise en ligne est la liste du §12.3** (fournisseur, DNS, secrets, sauvegarde le même jour). Avec `SHH_COMPTES: "0"` : aucune route `/api/compte/*`, aucun fichier lu dans `secrets/`, aucun relais SMTP, aucune connexion sortante.
+Le compte est **activé** (décision D8 du propriétaire, 19 novembre). Depuis le 22 novembre, il fonctionne **sans e-mail** : une passkey et une clé de récupération (conception `docs/superpowers/specs/2026-11-22-compte-passkey-design.md`, qui remplace la partie e-mail de `2026-11-14-compte-email-design.md`). `compose.yaml` pose `SHH_COMPTES: "1"`, et le site de l'image est construit avec le compte (`deploy/Dockerfile`, `SHH_SITE_COMPTES=1`, `check-dist.mjs --comptes`).
 
-### 12.1 Sortie SMTP : le seul relais
+**Risque assumé par le propriétaire** : l'avis du juriste sur la conservation des données de création de compte (LCEN et décret 2021-1362 ; conception §12) n'a pas été demandé.
 
-Le serveur Go reste sur le réseau Docker `interne` (`internal: true`), **sans aucune route vers Internet, même compte activé**. Compte activé, `deploy.sh` démarre un troisième conteneur, `relais-smtp` (profil Compose `comptes`, même image que le serveur, programme `/shhcheck relais`, `shhcheck/relais.go`) :
+Avec `SHH_COMPTES: "0"` : aucune route `/api/compte/*` et aucun fichier lu dans `secrets/` pour le compte.
 
-- il est sur `interne` (172.30.53.3) et sur un réseau `sortie` à lui seul (172.30.53.8/29), sans port publié ;
-- dans le conteneur du serveur, `extra_hosts` fait pointer le nom `SHH_SMTP_HOST` vers 172.30.53.3 : le serveur se connecte « au fournisseur », arrive sur le relais, qui recopie les octets vers **`SHH_SMTP_HOST:465` et rien d'autre** (cible fixée à son démarrage ; le serveur ne peut rien choisir : ni hôte, ni port) ;
-- TLS est de bout en bout entre le serveur et le fournisseur : le serveur vérifie le certificat pour `SHH_SMTP_HOST` (certificats racine de l'image) ; le relais ne voit que des octets chiffrés, leur taille et l'heure. Il n'écrit rien (journal `none`) ; 4 connexions à la fois, 60 s chacune au plus ; compte 65532, lecture seule, sans capacité ;
-- il résout `SHH_SMTP_HOST` à chaque connexion (résolveur de Docker, donc celui de la machine) : un changement d'adresse du fournisseur ne demande rien.
+### 12.1 Plus de sortie SMTP
 
-**Écart au plan, voulu** : le plan prévoyait le serveur sur un réseau non interne et une règle de pare-feu de la machine (TCP 465 vers les adresses de `SHH_SMTP_HOST`). Refusé parce qu'il échoue **ouvert** : sans la règle (pare-feu vidé, `iptables -F`, Docker en mode nftables où `DOCKER-USER` n'existe pas, adresses du fournisseur changées puis élargies à la main), le serveur aurait eu une sortie complète vers Internet. Avec le relais, c'est Docker (`internal: true`) qui garantit l'absence de route, comme avant le compte. **Limite** : le conteneur du relais, lui, a une sortie ordinaire (réseau `sortie`) ; c'est son code, fixe et testé (`go test` de `shhcheck`), qui la borne à une seule cible. Défense de plus, facultative, à poser par l'exploitant selon son pare-feu : n'autoriser depuis 172.30.53.8/29 que TCP 465 et la résolution DNS par la machine.
+Le serveur Go reste sur le réseau Docker `interne` (`internal: true`), **sans aucune route vers Internet**. Il n'envoie plus aucun e-mail : le relais `relais-smtp`, son profil Compose `comptes` et ses variables ont disparu. Les seules sorties du serveur qui restent sont celles du paiement (§13).
 
-Contrôles : `deploy.sh` vérifie, après chaque installation compte activé, que le fournisseur répond à travers le relais en TLS vérifié (`shhcheck smtp` : accueil SMTP puis `QUIT`, ni authentification ni e-mail) ; un échec n'est qu'un **avertissement** (une panne du fournisseur ne fait pas revenir à l'image d'avant), mais il veut dire qu'**aucun code n'arrive** et rien d'autre ne le dit (aucun journal). Tests : `make test-sortie` (configuration résolue ; réseau réel avec un démon Docker), `make lint-deploy` (tests du relais).
+Garde-fous :
+- le serveur refuse de démarrer si une ancienne variable `SHH_SMTP_*` ou `SHH_MAIL_FROM` est encore posée ;
+- `deploy.sh` refuse ces variables dans `deploy/.env` ;
+- `deploy.sh` refuse aussi un fichier `secrets/shh_smtp_mdp` resté en place : l'effacer avec `shred -u`, puis révoquer le mot de passe chez l'ancien fournisseur.
 
-**Fournisseur d'envoi** (décision D1, encore ouverte : la conception recommande un fournisseur dans l'UE, SMTP standard) : SMTP authentifié en **TLS implicite sur 465** ; suivi des ouvertures et des clics **désactivé** ; contrat de sous-traitance (RGPD art. 28) ; durée de conservation de ses journaux la plus courte possible (ils gardent adresse, heure et code, conception §21.3). Il apprend l'adresse IP de la machine.
+Le relais générique (`/shhcheck relais`, `shhcheck/relais.go`) sert toujours au paiement.
 
-**DNS du domaine d'envoi** (celui de `SHH_MAIL_FROM`), sans quoi les codes finissent en indésirables (conception §18) : les enregistrements que donne le fournisseur, exactement :
+Tests :
+- `make test-sortie` : configuration résolue (aucun relais SMTP, serveur sur `interne` seul ; relais du paiement, §13) ;
+- `make lint-deploy` : tests du relais.
 
-- **SPF** : un seul enregistrement `TXT` à la racine, `v=spf1 include:<valeur du fournisseur> -all` (fusionner avec un SPF existant, jamais deux) ;
-- **DKIM** : l'enregistrement `TXT` (ou `CNAME`) `<sélecteur>._domainkey` du fournisseur ;
-- **DMARC** : `_dmarc TXT "v=DMARC1; p=quarantine; adkim=s; aspf=r"` pour commencer, puis `p=reject` une fois les envois vérifiés. Aucune adresse `rua`/`ruf` n'est nécessaire (les rapports contiendraient les adresses IP des serveurs d'envoi, pas celles des personnes ; à décider) ;
-- vérifier depuis un autre poste : `dig +short TXT <domaine>`, `dig +short TXT <sélecteur>._domainkey.<domaine>`, `dig +short TXT _dmarc.<domaine>`, puis un envoi réel vers une boîte de test (en-têtes `spf=pass`, `dkim=pass`, `dmarc=pass`).
+**Nom du site.** Le `rp.id` des passkeys découle de `SHH_ORIGIN`. Une passkey créée pour un nom ne marche jamais pour un autre, et changer de domaine perdrait toutes les passkeys. Avec `SHH_COMPTES=1`, `deploy.sh` refuse donc tout autre nom que `shhgone.com`. Pour les apps futures, le serveur lit `SHH_APPLE_APP_IDS`, `SHH_ANDROID_APP_PACKAGE` et `SHH_ANDROID_APP_SHA256` : les fichiers d'association ne sont servis que si ces variables sont posées. Elles ne sont pas encore dans `compose.yaml` ; les y ajouter quand une app existera (conception §6.5).
 
-### 12.2 Secrets : clé du serveur et mot de passe SMTP
+### 12.2 Secret : clé du serveur
 
-Deux fichiers dans `/srv/shhdrop/secrets/` (volume chiffré, **hors** de `data/`, donc hors de la sauvegarde), montés en lecture seule dans `/run/secrets` du serveur. Le dépôt, `deploy/.env`, la configuration du conteneur (`docker inspect`) et l'environnement du processus n'en contiennent que les **chemins**. `deploy.sh` refuse d'installer, compte activé, si un fichier manque ou n'a pas exactement ces droits ; le serveur refuse aussi de démarrer (clé de 32 octets, 0400 ou 0600).
+Un fichier dans `/srv/shhdrop/secrets/`. Ce dossier est sur le volume chiffré, **hors** de `data/`, donc hors de la sauvegarde ; il est monté en lecture seule dans `/run/secrets` du serveur.
+
+Le dépôt, `deploy/.env`, la configuration du conteneur (`docker inspect`) et l'environnement du processus n'en contiennent que le **chemin**.
+
+Compte activé, `deploy.sh` refuse d'installer si le fichier manque ou n'a pas exactement ces droits. Le serveur refuse aussi de démarrer (clé de 32 octets, droits 0400 ou 0600).
 
 ```sh
 install -d -o root -g 65532 -m 0750 /srv/shhdrop/secrets   # déjà fait au §2
 cd /srv/shhdrop/secrets
 # Clé du serveur K_serveur : 32 octets tirés au hasard, une fois pour toutes.
 (umask 077 && head -c 32 /dev/urandom > shh_comptes_cle)
-# Mot de passe SMTP du fournisseur : tapé sans écho, jamais en argument ni dans l'historique.
-(umask 077 && IFS= read -rs MDP && printf '%s' "$MDP" > shh_smtp_mdp; unset MDP)
-chown 65532:65532 shh_comptes_cle shh_smtp_mdp && chmod 0400 shh_comptes_cle shh_smtp_mdp
+chown 65532:65532 shh_comptes_cle && chmod 0400 shh_comptes_cle
 ```
 
-**La clé du serveur ne se perd pas** : sans elle, **tous les comptes sont perdus**, sans recours (plus aucune adresse ne retrouve son compte, plus aucun mot de passe ne se vérifie, les profils séquestrés ne s'ouvrent plus) ; elle ne se change pas non plus (conception §5.2). Une sauvegarde de `comptes.db` sans elle ne sert à rien. Donc, dès sa création :
+**Elle ne sert plus qu'aux pseudos.** Le serveur en tire `K_pseudo`, qui sert à calculer l'empreinte `p_empreinte`, garante de l'unicité d'un pseudo sans le garder en clair. Elle n'ouvre aucun coffre, ne vérifie aucune passkey et ne retrouve aucun compte.
 
-- **copie hors ligne obligatoire**, par exemple sur papier : `base64 < shh_comptes_cle` (44 caractères, à recopier puis à relire ; effacer ensuite l'écran : `clear`), ou sur une clé USB chiffrée ; restauration : `base64 -d > shh_comptes_cle`, puis les droits ci-dessus ;
-- cette copie est rangée **à part** de la clé privée age des sauvegardes (§12.4) : qui a les deux et une sauvegarde lit les profils séquestrés et peut essayer des adresses une à une (conception R19) ;
-- elle ne va jamais dans le dépôt, dans `deploy/.env`, dans un gestionnaire de mots de passe synchronisé avec la machine, ni dans la sauvegarde.
+Si elle est perdue :
+- les comptes restent utilisables (passkeys, clé de récupération, coffres) ;
+- l'unicité des pseudos est perdue : un pseudo déjà pris ne se reconnaît plus, et deux personnes pourraient avoir le même.
 
-Le mot de passe SMTP, lui, se remplace (nouveau mot de passe chez le fournisseur, nouveau fichier, `deploy.sh`) : pas de copie hors ligne nécessaire.
+Elle ne se change pas non plus (conception §5.2). Donc, dès sa création :
+
+- **faire une copie hors ligne**, par exemple sur papier : `base64 < shh_comptes_cle` donne 44 caractères à recopier puis à relire ; effacer ensuite l'écran avec `clear`. Une clé USB chiffrée convient aussi. Pour la restaurer : `base64 -d > shh_comptes_cle`, puis les droits ci-dessus ;
+- ranger cette copie **à part** de la clé privée age des sauvegardes (§12.4) : qui a les deux et une sauvegarde peut tester des pseudos un à un pour savoir s'ils ont un compte ;
+- ne jamais la mettre dans le dépôt, dans `deploy/.env`, dans un gestionnaire de mots de passe synchronisé avec la machine, ni dans la sauvegarde.
 
 ### 12.3 Activer le compte (décision D8 prise)
 
-1. Fournisseur choisi (D1), DNS du §12.1 posés et vérifiés.
-2. Secrets du §12.2 créés ; copie hors ligne de la clé faite.
-3. `deploy/.env` : `SHH_SMTP_HOST`, `SHH_SMTP_USER`, `SHH_MAIL_FROM` (entre apostrophes), modèle dans `env.example`.
-4. `compose.yaml` : `SHH_SALONS: "1"` et `SHH_COMPTES: "1"` (fichier relu et commité, comme le salon).
-5. `deploy/deploy.sh sha256:<empreinte>` : relais démarré, secrets contrôlés, fournisseur contrôlé.
-6. Sauvegarde du §12.4 installée **le même jour**, puis une restauration essayée (§12.5).
+1. Créer le secret du §12.2 et en faire la copie hors ligne.
+2. Dans `deploy/.env`, mettre `SHH_DOMAIN=shhgone.com` et ne laisser aucune variable `SHH_SMTP_*` ni `SHH_MAIL_FROM` (modèle dans `env.example`). On peut y régler aussi `SHH_COMPTES_JOUR`, le plafond d'inscriptions par jour pour tout le site (500 par défaut).
+3. Dans `compose.yaml`, poser `SHH_SALONS: "1"` et `SHH_COMPTES: "1"` (fichier relu et commité, comme pour le salon).
+4. Lancer `deploy/deploy.sh sha256:<empreinte>` : le secret est contrôlé.
+5. Installer la sauvegarde du §12.4 **le même jour**, puis essayer une restauration (§12.5).
 
-Désactiver : `SHH_COMPTES: "0"`, `deploy.sh` (le relais est arrêté). `comptes.db` reste sur le volume, intacte.
+Désactiver : poser `SHH_COMPTES: "0"`, puis lancer `deploy.sh`. `comptes.db` reste intacte sur le volume.
 
 ### 12.4 Sauvegarde quotidienne chiffrée de `comptes.db` et de `paiements.db`
 
@@ -472,11 +476,11 @@ Mise en place, une fois :
 **Essai mensuel** (décision du propriétaire du 14 novembre), sur le poste de l'exploitant (Linux : `age`, `sqlite3`, `/dev/shm`) : télécharger la copie la plus récente avec l'accès en lecture, puis
 
 ```sh
-deploy/restaurer.sh verifier comptes-<date>.db.age sauvegarde.cle   # « intégrité : ok ; schéma 2 ; N comptes »
+deploy/restaurer.sh verifier comptes-<date>.db.age sauvegarde.cle   # « intégrité : ok ; schéma 3 ; N comptes »
 deploy/restaurer.sh verifier paiements-<date>.db.age sauvegarde.cle # « intégrité : ok ; base des paiements ; schéma 2 ; N pass »
 ```
 
-(déchiffrée en mémoire, `/dev/shm`, puis effacée ; rien n'est installé). À chaque changement du schéma de `comptes.db`, et à chaque changement des scripts : `sudo make test-restauration` (compte de test créé par le vrai serveur, sauvegarde serveur en marche, effacement, restauration, reconnexion réussie ; avec une autre clé du serveur, connexion refusée ; puis `paiements.db` créée par le serveur avec le paiement en bac à sable, un pass factice sauvegardé sans son empreinte en clair ni clé de jetons, restauré).
+(déchiffrée en mémoire, `/dev/shm`, puis effacée ; rien n'est installé). À chaque changement du schéma de `comptes.db`, et à chaque changement des scripts : `sudo make test-restauration` (compte de test créé par le vrai serveur avec une passkey logicielle, sauvegarde serveur en marche, effacement, restauration, reconnexion par la passkey réussie ; avec une autre clé du serveur, la connexion réussit aussi : la clé ne sert plus qu'aux pseudos ; puis `paiements.db` créée par le serveur avec le paiement en bac à sable, un pass factice sauvegardé sans son empreinte en clair ni clé de jetons, restauré).
 
 **Restauration réelle** (base perdue ou abîmée, nouvelle machine) :
 
@@ -491,13 +495,21 @@ deploy/restaurer.sh verifier paiements-<date>.db.age sauvegarde.cle # « intégr
    ```
 
    La même commande restaure `paiements-<date>.db.age` (la base est reconnue à ses tables et installée sous `paiements.db`). Le clair est déchiffré dans le dossier de données lui-même (volume chiffré), vérifié (`integrity_check`, tables), installé (compte 65532, 0600). `--remplacer` garde l'ancienne base à côté (`comptes.db.avant-restauration`, avec son `-wal`) : l'effacer une fois un compte de contrôle reconnecté.
-4. Se connecter avec un compte de contrôle.
+4. Se connecter avec un compte de contrôle (sa passkey).
 
 Règles et effets :
 
 - **toujours la plus récente** : les suppressions de comptes antérieures y sont appliquées ; une copie plus ancienne ferait revenir des comptes supprimés (interdit par la procédure, conception §21.13) ;
 - **toutes les sessions sont effacées** à la restauration : chacun se reconnecte (une session fermée depuis la sauvegarde, après un vol par exemple, ne revient pas) ;
-- **ce qui a changé depuis la sauvegarde est perdu** (24 h au plus) : un mot de passe changé **revient à l'ancien**, une adresse changée aussi, un compte créé disparaît, **un compte supprimé depuis revient**, un bannissement posé depuis disparaît ; aucun e-mail ne peut prévenir les personnes (le serveur ne garde pas les adresses). À noter dans le registre de l'incident ; un bannissement se repose depuis le tableau de bord ;
+- **ce qui a changé depuis la sauvegarde est perdu** (24 h au plus) :
+  - **une passkey retirée depuis revient**, par exemple celle d'un appareil volé ;
+  - **une clé de récupération renouvelée revient à l'ancienne** ;
+  - une passkey ajoutée disparaît ;
+  - un compte créé disparaît ;
+  - **un compte supprimé depuis revient** ;
+  - un bannissement posé depuis disparaît.
+
+  Aucun moyen de prévenir les personnes : le serveur n'a aucune adresse. L'avis sur le site (§6) leur demande de vérifier leurs passkeys et, au besoin, de retirer de nouveau une passkey et de renouveler leur clé de récupération. À noter dans le registre de l'incident ; un bannissement se repose depuis le tableau de bord ;
 - partages et salons d'avant la perte sont perdus (éphémères, jamais sauvegardés), le lien compte ↔ salon aussi ;
 - **paiements** : la copie n'a **aucune clé de jetons** (retirées à la sauvegarde, et encore à la restauration ; de nouvelles sont tirées à la première demande) : tout jeton émis avant ne passe plus (un jeton dépensé depuis la sauvegarde ne peut donc pas resservir) ; chacun en reprend sans rien faire, dans la limite du jour. **Un pass payé depuis la sauvegarde est inconnu de la copie** (24 h au plus) : sa commande aussi, et un webhook rejoué ensuite ne le recrée pas. La personne le signale au contact avec la date, le montant et le moyen de paiement ; l'exploitant retrouve le paiement dans le tableau de bord du prestataire (qui, lui, connaît l'acheteur) et le rembourse : rien chez nous ne relie un pass à une personne. Une révocation posée à la main depuis la sauvegarde (`shhdrop admin paiement revoquer`) disparaît : la reposer.
 
@@ -507,7 +519,7 @@ Conception : `docs/superpowers/specs/2026-11-19-paiement-design.md`. **Désactiv
 
 ### 13.1 Sorties : un relais par prestataire
 
-Même modèle que le relais SMTP (§12.1), pour la même raison (échec fermé) : le serveur reste sur `interne` (`internal: true`), **sans route vers Internet, même paiement activé**. Pour chaque prestataire configuré, `deploy.sh` démarre son relais (même image, `/shhcheck relais`, 16 connexions à la fois, 60 s chacune au plus, compte 65532, lecture seule, sans capacité, aucun journal) :
+Un relais par sortie, pour échouer fermé (c'était aussi le modèle du relais SMTP du compte par e-mail, retiré le 22 novembre) : le serveur reste sur `interne` (`internal: true`), **sans route vers Internet, même paiement activé**. Pour chaque prestataire configuré, `deploy.sh` démarre son relais (même image, `/shhcheck relais`, 16 connexions à la fois, 60 s chacune au plus, compte 65532, lecture seule, sans capacité, aucun journal) :
 
 | Relais (profil) | Adresse interne | Seule cible (production ; bac à sable avec `SHH_PAIEMENT_ESSAI: "1"`) |
 | --- | --- | --- |
@@ -515,7 +527,7 @@ Même modèle que le relais SMTP (§12.1), pour la même raison (échec fermé) 
 | `relais-paypal` (`paiement-paypal`) | 172.30.53.5:443 | `api-m.paypal.com:443` (`api-m.sandbox.paypal.com:443`) |
 | `relais-nowpayments` (`paiement-nowpayments`) | 172.30.53.6:443 | `api.nowpayments.io:443` (`api-sandbox.nowpayments.io:443`) |
 
-Dans le conteneur du serveur, `extra_hosts` fait pointer chacun de ces noms vers son relais ; le serveur vérifie le certificat TLS pour ce nom (TLS de bout en bout : le relais ne voit que des octets chiffrés, leur taille et l'heure). Le client HTTP du paiement ouvre une connexion par appel (aucune connexion gardée que le relais couperait au milieu d'un paiement) et ne lit aucune variable de proxy. Les hôtes sont fixés par `deploy.sh` d'après `SHH_PAIEMENT_ESSAI` (dans `compose.yaml`), jamais par `deploy/.env`. Les webhooks des prestataires **entrent** par Caddy, comme le reste du site : rien à ouvrir pour eux. Défense de plus, facultative (comme §12.1) : n'autoriser depuis 172.30.53.8/29 que TCP 465 et 443 et la résolution DNS par la machine. **Limite** : un relais joint toute adresse que le DNS donne pour son hôte ; il ne choisit pas l'hôte.
+Dans le conteneur du serveur, `extra_hosts` fait pointer chacun de ces noms vers son relais ; le serveur vérifie le certificat TLS pour ce nom (TLS de bout en bout : le relais ne voit que des octets chiffrés, leur taille et l'heure). Le client HTTP du paiement ouvre une connexion par appel (aucune connexion gardée que le relais couperait au milieu d'un paiement) et ne lit aucune variable de proxy. Les hôtes sont fixés par `deploy.sh` d'après `SHH_PAIEMENT_ESSAI` (dans `compose.yaml`), jamais par `deploy/.env`. Les webhooks des prestataires **entrent** par Caddy, comme le reste du site : rien à ouvrir pour eux. Défense de plus, facultative (comme §12.1) : n'autoriser depuis 172.30.53.8/29 que TCP 443 et la résolution DNS par la machine. **Limite** : un relais joint toute adresse que le DNS donne pour son hôte ; il ne choisit pas l'hôte.
 
 Tests : `make test-sortie` (configuration résolue : relais, adresses, cibles, profils, aucun port publié, serveur sur `interne` seul ; avec un démon Docker : chaque API jointe à travers son relais en TLS vérifié, injoignable relais arrêté), `make lint-deploy` (tests du relais, dont son plafond de connexions).
 

@@ -52,13 +52,21 @@ export type StartOpts = {
    */
   salons?: boolean;
   /**
-   * Compte activé (SHH_COMPTES=1, salon compris) : K_serveur et le mot de passe SMTP sont
-   * écrits dans un dossier à part (hors du dossier de données, 0400), supprimé par dispose() ;
-   * envoi en texte clair vers le faux SMTP de la boucle locale (`smtpPort`, e2e/smtp.ts).
+   * Compte activé (SHH_COMPTES=1, salon compris ; compte par passkey, sans e-mail) : K_serveur
+   * est écrite dans un dossier à part (hors du dossier de données, 0400), supprimé par
+   * dispose(). L'origine est alors http://localhost:<port> : c'est le rp.id des passkeys, et
+   * les navigateurs refusent une adresse IP comme rp.id (conception du compte par passkey §17).
    * `admin` : jeton du tableau de bord (SHH_ADMIN_TOKEN, développement local), écouteur sur un
    * second port libre.
    */
-  comptes?: { cle: Uint8Array; smtpPort: number; smtpMdp: string; from: string; admin?: string };
+  comptes?: {
+    cle: Uint8Array;
+    admin?: string;
+    /** Compte par e-mail, retiré le 22 novembre : refusé au lancement (ui-e2e du compte à refaire, lot T1). */
+    smtpPort?: number;
+    smtpMdp?: string;
+    from?: string;
+  };
   /**
    * Paiement activé (SHH_PAIEMENT=1, bacs à sable, conception du paiement §10) avec Stripe et
    * NOWPayments : clés d'essai et secrets de webhook écrits dans un dossier à part (0400),
@@ -85,28 +93,21 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
   let adminOrigin: string | undefined;
   if (opts.salons || opts.comptes || opts.paiement) {
     const port = await portLibre();
-    salons = { SHH_LISTEN: `127.0.0.1:${port}`, SHH_ORIGIN: `http://127.0.0.1:${port}` };
+    const hote = opts.comptes ? "localhost" : "127.0.0.1";
+    salons = { SHH_LISTEN: `127.0.0.1:${port}`, SHH_ORIGIN: `http://${hote}:${port}` };
     // Paiement seul : SHH_ORIGIN (adresses de retour) sans le salon.
     if (opts.salons || opts.comptes) salons.SHH_SALONS = "1";
   }
   if (opts.comptes) {
     const c = opts.comptes;
+    if (c.smtpPort !== undefined || c.smtpMdp !== undefined || c.from !== undefined) {
+      throw new Error("compte par e-mail retiré le 22 novembre : parcours à refaire avec une passkey (lot T1)");
+    }
     secrets = mkdtempSync(join(tmpdir(), "shh-e2e-secrets-"));
     const cle = join(secrets, "cle");
-    const mdp = join(secrets, "smtp");
     writeFileSync(cle, c.cle);
-    writeFileSync(mdp, c.smtpMdp);
     chmodSync(cle, 0o400);
-    chmodSync(mdp, 0o400);
-    Object.assign(salons, {
-      SHH_COMPTES: "1",
-      SHH_COMPTES_CLE_FILE: cle,
-      SHH_SMTP_HOST: "127.0.0.1",
-      SHH_SMTP_PORT: String(c.smtpPort),
-      SHH_SMTP_USER: "shhgone-test",
-      SHH_SMTP_PASSWORD_FILE: mdp,
-      SHH_MAIL_FROM: c.from,
-    });
+    Object.assign(salons, { SHH_COMPTES: "1", SHH_COMPTES_CLE_FILE: cle });
     if (c.admin !== undefined) {
       const p = await portLibre();
       adminOrigin = `http://127.0.0.1:${p}`;

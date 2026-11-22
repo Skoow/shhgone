@@ -43,11 +43,14 @@
 #
 # Réglages, dans deploy/.env :
 #   SHH_ALERTE_A          adresse qui reçoit les alertes (par exemple contact@shhgone.com)
-#   SHH_SMTP_HOST, SHH_SMTP_USER, SHH_MAIL_FROM : ceux du compte (README §12)
-#   SHH_ALERTE_SMTP_USER  (conseillé) identifiant SMTP réservé aux alertes ; son mot de passe dans
+#   SHH_ALERTE_SMTP_HOST  fournisseur d'envoi des alertes (SMTP authentifié, TLS implicite sur 465)
+#   SHH_ALERTE_SMTP_USER  identifiant SMTP réservé aux alertes ; son mot de passe dans
 #                         /etc/shhdrop/alerte_smtp_mdp (root 0600, disque système : lisible après un
-#                         redémarrage). Sinon : SHH_SMTP_USER et $SHH_DATA_ROOT/secrets/shh_smtp_mdp,
-#                         illisible tant que le volume est verrouillé (jamais une variable)
+#                         redémarrage ; jamais une variable)
+#   SHH_ALERTE_FROM       expéditeur (« Shhgone <alertes@shhgone.com> » ou une adresse)
+#   Ces réglages ne servent qu'aux alertes de l'exploitant, envoyées depuis la machine : le
+#   serveur Go et le compte (par passkey depuis le 22 novembre) n'envoient aucun e-mail, et
+#   SHH_SMTP_* / SHH_MAIL_FROM (anciens réglages du compte) font refuser deploy.sh.
 #   SHH_DOMAIN            nom du site (certificat, DNS, échéance du domaine)
 #   SHH_DATA_ROOT         racine du volume chiffré (défaut /srv/shhdrop)
 #   SHH_SERVEUR_ECHEANCE  (facultatif) date AAAA-MM-JJ de fin de la location du serveur
@@ -114,27 +117,26 @@ envoyer() { # $1 : sujet (nom du fichier d'état), $2 : période en secondes, $3
 		printf '%s\n' "$now" >"$etat/$cle"
 		return 0
 	fi
-	if [ -z "${SHH_SMTP_HOST:-}" ] || [ -z "${SHH_SMTP_USER:-}" ] || [ -z "${SHH_MAIL_FROM:-}" ]; then
-		die "SHH_ALERTE_A sans SHH_SMTP_HOST, SHH_SMTP_USER et SHH_MAIL_FROM"
+	if [ -z "${SHH_ALERTE_SMTP_HOST:-}" ] || [ -z "${SHH_ALERTE_SMTP_USER:-}" ] || [ -z "${SHH_ALERTE_FROM:-}" ]; then
+		die "SHH_ALERTE_A sans SHH_ALERTE_SMTP_HOST, SHH_ALERTE_SMTP_USER et SHH_ALERTE_FROM"
 	fi
-	# Mot de passe d'envoi des alertes : d'abord celui de /etc/shhdrop (disque système, lisible
-	# juste après un redémarrage, quand le volume chiffré est encore verrouillé), sinon celui du
-	# compte sur le volume. Aucun lisible : constat sur la sortie, nouvel essai plus tard.
-	local utilisateur=${SHH_ALERTE_SMTP_USER:-$SHH_SMTP_USER} de
+	# Mot de passe d'envoi des alertes : celui de /etc/shhdrop (disque système, lisible juste
+	# après un redémarrage, quand le volume chiffré est encore verrouillé). Illisible : constat
+	# sur la sortie, nouvel essai plus tard.
+	local utilisateur=$SHH_ALERTE_SMTP_USER de
 	local mdp=${SHH_ALERTE_MDP_FICHIER:-/etc/shhdrop/alerte_smtp_mdp}
-	[ -r "$mdp" ] || mdp="$root/secrets/shh_smtp_mdp"
 	if [ ! -r "$mdp" ]; then
-		printf 'alerte : aucun mot de passe SMTP lisible (/etc/shhdrop/alerte_smtp_mdp absent, volume verrouillé ?) : « %s » non envoyée\n' "$cle" >&2
+		printf 'alerte : aucun mot de passe SMTP lisible (/etc/shhdrop/alerte_smtp_mdp absent) : « %s » non envoyée\n' "$cle" >&2
 		return 0
 	fi
-	de=$(printf '%s' "$SHH_MAIL_FROM" | sed -n 's/.*<\(.*\)>.*/\1/p')
-	[ -n "$de" ] || de=$SHH_MAIL_FROM
+	de=$(printf '%s' "$SHH_ALERTE_FROM" | sed -n 's/.*<\(.*\)>.*/\1/p')
+	[ -n "$de" ] || de=$SHH_ALERTE_FROM
 	# Mot de passe lu par curl depuis un fichier de configuration (jamais sur la ligne de commande).
 	# Envoi raté : la date n'est pas écrite, l'essai reprend au passage suivant.
 	if {
 		printf 'From: %s\r\nTo: %s\r\nSubject: Shhgone %s : %s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n' \
-			"$SHH_MAIL_FROM" "$SHH_ALERTE_A" "$niveau" "$cle" "$texte"
-	} | curl -sS --fail --max-time 60 --ssl-reqd --url "smtps://$SHH_SMTP_HOST:465" \
+			"$SHH_ALERTE_FROM" "$SHH_ALERTE_A" "$niveau" "$cle" "$texte"
+	} | curl -sS --fail --max-time 60 --ssl-reqd --url "smtps://$SHH_ALERTE_SMTP_HOST:465" \
 		--mail-from "$de" --mail-rcpt "$SHH_ALERTE_A" --upload-file - \
 		-K <(printf 'user = "%s:%s"\n' "$utilisateur" "$(cat "$mdp")") >/dev/null; then
 		printf '%s\n' "$now" >"$etat/$cle"

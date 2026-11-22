@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -10,11 +11,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +22,6 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/config"
-	"github.com/skoow/shhdrop/server/internal/courriel"
 	"github.com/skoow/shhdrop/server/internal/limits"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
@@ -31,26 +29,8 @@ import (
 )
 
 // Lot 7 du plan du compte : tableau de bord finalisé et ligne de commande du bannissement,
-// branchés sur les vrais services (compte, salon), avec un faux envoi d'e-mails.
-
-// postierTest : la file d'e-mails, gardée en mémoire (le code est lu par le test).
-type postierTest struct {
-	mu   sync.Mutex
-	msgs []courriel.Message
-}
-
-func (p *postierTest) Mettre(m courriel.Message) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.msgs = append(p.msgs, m)
-	return nil
-}
-func (p *postierTest) Plein() bool { return false }
-func (p *postierTest) code() string {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.msgs[len(p.msgs)-1].Code
-}
+// branchés sur les vrais services (compte, salon). Bannissement par compte seulement depuis le
+// 22 novembre (conception du compte par passkey §7.4).
 
 func coffreTest(magic string) []byte {
 	b := make([]byte, 4096+45)
@@ -60,19 +40,32 @@ func coffreTest(magic string) []byte {
 	return b
 }
 
-// inscrireTest : un compte complet (pseudo p) ; rend h.
-func inscrireTest(t *testing.T, s *compte.Service, p *postierTest, ip, email, pseudo string) [16]byte {
+// inscrireTest : un compte complet (pseudo p) écrit directement dans comptes.db (ligne du compte
+// et d'une passkey, comme inscription/fin ; la cérémonie WebAuthn est testée par internal/api et
+// internal/compte) ; rend h.
+func inscrireTest(t *testing.T, db *sql.DB, cles compte.Cles, pseudo string) [16]byte {
 	t.Helper()
-	h, e, err := s.InscriptionDebut(netip.MustParseAddr(ip), email, "fr")
+	var h [16]byte
+	rand.Read(h[:])
+	pe, err := cles.EmpreintePseudo([]byte(strings.NewReplacer("i", "l", "1", "l", "0", "o", "m", "rn").Replace(strings.ToLower(pseudo))))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var d compte.Donnees
-	rand.Read(d.AAuth[:])
-	rand.Read(d.EnvMdp[:])
-	rand.Read(d.SProfil[:])
-	d.PCanon, d.BlobProfil, d.BlobPrive = []byte(strings.NewReplacer("i", "l", "1", "l", "0", "o", "m", "rn").Replace(strings.ToLower(pseudo))), coffreTest("SHH-PROF1"), coffreTest("SHH-ACCT1")
-	if _, err := s.InscriptionFin(e, p.code(), d, compte.OptionsSession{}); err != nil {
+	now := time.Now().UTC()
+	jour := now.Unix() / 86400 * 86400
+	mois := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).Unix()
+	if _, err := db.Exec(`INSERT INTO comptes(h, p_empreinte, pseudo_jour, v_r, env_r, blob_profil, gen_profil, blob_prive,
+		gen_prive, cree_jour, compte_des, vu_mois) VALUES(?,?,0,randomblob(32),randomblob(60),?,1,?,1,?,?,?)`,
+		h[:], pe[:], coffreTest("SHH-PROF1"), coffreTest("SHH-ACCT1"), jour, jour, mois); err != nil {
+		t.Fatal(err)
+	}
+	cred := make([]byte, 32)
+	rand.Read(cred)
+	if _, err := db.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, etiquette, ajoutee_mois)
+		VALUES(?,?,randomblob(77),-7,1,NULL,?)`, cred, h[:], mois); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO enveloppes(cred_id, n, env) VALUES(?,0,randomblob(60))`, cred); err != nil {
 		t.Fatal(err)
 	}
 	return h
@@ -81,11 +74,10 @@ func inscrireTest(t *testing.T, s *compte.Service, p *postierTest, ip, email, ps
 // fixtureComptes : serveur sans écoute : shares.db, comptes.db, gestionnaire du salon et
 // service du compte reliés comme par serve (setupComptes, setupSalons, BrancherSalonsDuCompte).
 type fixtureComptes struct {
-	cfg  config.Config
-	d    adminDeps
-	cpt  *comptes
-	post *postierTest
-	h    http.Handler
+	cfg config.Config
+	d   adminDeps
+	cpt *comptes
+	h   http.Handler
 }
 
 func cleCompteTest(t *testing.T) string {
@@ -125,13 +117,12 @@ func nouvelleFixture(t *testing.T) *fixtureComptes {
 	if err != nil {
 		t.Fatal(err)
 	}
-	post := &postierTest{}
-	cc := compte.Config{DB: cpt.db, Cles: cpt.cles, Courriel: post, Limites: lim, Now: time.Now, Max: 10}
+	cc := compte.Config{DB: cpt.db, Cles: cpt.cles, Limites: lim, Now: time.Now, Max: 10}
 	api.BrancherSalonsDuCompte(&cc, sm)
 	if cpt.svc, err = compte.NewService(cc); err != nil {
 		t.Fatal(err)
 	}
-	f := &fixtureComptes{cfg: cfg, cpt: cpt, post: post,
+	f := &fixtureComptes{cfg: cfg, cpt: cpt,
 		d: adminDeps{svc: svc, sm: sm, db: db, gate: gate, lim: lim, probes: sondesVides(), start: time.Now(), cpt: cpt.svc}}
 	f.h = adminui.New(adminConfig(cfg, f.d))
 	return f
@@ -187,14 +178,14 @@ func (f *fixtureComptes) req(t *testing.T, method, path, corps string) (int, str
 
 // Bout en bout, vrais services : un salon signalé apparaît par sa ref avec son créateur
 // (palier, ancienneté, autres salons) ; « Bannir le créateur » ferme tous ses salons et
-// bannit l'adresse ; bannir par lien collé ou par adresse ; les agrégats ; et aucune réponse
-// ne contient une adresse (brute, normalisée, empreinte), un h, une empreinte de pseudo, un
-// pseudo, un lien ni un identifiant de salon.
+// bannit le compte ; bannir par lien collé ; plus de bannissement ni de recherche par adresse ;
+// les agrégats ; et aucune réponse ne contient un h, une empreinte de pseudo, un pseudo, un
+// identifiant ou une clé de passkey, un lien ni un identifiant de salon.
 func TestTableauDeBordComptes(t *testing.T) {
 	f := nouvelleFixture(t)
-	const email, pseudo = "Lea.Dupont+salon@Exemple.FR", "zorglubien"
-	h := inscrireTest(t, f.cpt.svc, f.post, "2001:db8:1::1", email, pseudo)
-	h2 := inscrireTest(t, f.cpt.svc, f.post, "2001:db8:2::1", "autre@exemple.fr", "bidulon")
+	const pseudo = "zorglubien"
+	h := inscrireTest(t, f.cpt.db, f.cpt.cles, pseudo)
+	h2 := inscrireTest(t, f.cpt.db, f.cpt.cles, "bidulon")
 	ka, kp, lien := f.salonDe(t, &h)
 	f.signaler(t, ka, kp, 2)
 	ss := f.d.sm.Signalements()
@@ -231,7 +222,10 @@ func TestTableauDeBordComptes(t *testing.T) {
 		t.Fatalf("%+v %+v", s, s.Createur)
 	}
 	note(f.req(t, "GET", "/api/comptes", ""))
-	note(f.req(t, "POST", "/api/bannis/chercher", `{"email":"`+email+`"}`))
+	ref, _ := f.req(t, "GET", "/api/inconnue", "")
+	if code, _ := f.req(t, "POST", "/api/bannis/chercher", `{"email":"a@b.fr"}`); code != ref {
+		t.Fatal("recherche par adresse encore servie :", code)
+	}
 	// Rendre l'ancienneté, puis bannir le créateur depuis la liste.
 	if c := note(f.req(t, "POST", "/api/salons/action", `{"ref":"`+s.Ref+`","action":"anciennete"}`)); c != `{"anciennete":"rendue"}` {
 		t.Fatal(c)
@@ -248,7 +242,7 @@ func TestTableauDeBordComptes(t *testing.T) {
 		t.Fatal(err)
 	}
 	note(f.req(t, "GET", "/api/signalements", ""))
-	// Par lien collé (salon d'un autre compte), puis lien d'un salon disparu, puis par adresse.
+	// Par lien collé (salon d'un autre compte), puis lien d'un salon disparu ; jamais par adresse.
 	if c := note(f.req(t, "POST", "/api/bannir", `{"lien":"`+lien2+`","duree_jours":30,"motif":10}`)); !strings.HasPrefix(c, `{"banni":"compte"`) {
 		t.Fatal(c)
 	}
@@ -259,25 +253,22 @@ func TestTableauDeBordComptes(t *testing.T) {
 		c != `{"error":"lien_invalide"}` {
 		t.Fatal(code, c)
 	}
-	if c := note(f.req(t, "POST", "/api/bannir", `{"email":"inconnue@exemple.fr","duree_jours":365,"motif":8}`)); !strings.HasPrefix(c, `{"banni":"adresse"`) {
-		t.Fatal(c)
-	}
-	if code, c := f.req(t, "POST", "/api/bannir", `{"email":"LEA.DUPONT@exemple.fr","duree_jours":365,"motif":8}`); code != 409 {
-		t.Fatal("déjà banni :", code, c)
+	if code, c := f.req(t, "POST", "/api/bannir", `{"email":"inconnue@exemple.fr","duree_jours":365,"motif":8}`); code != 400 {
+		t.Fatal("bannissement par adresse :", code, c)
 	}
 	l := note(f.req(t, "POST", "/api/bannis", `{"filtre":"actifs","page":0}`))
 	var liste struct {
 		Bannis []compte.BanVue `json:"bannis"`
 		Total  int             `json:"total"`
 	}
-	if json.Unmarshal([]byte(l), &liste) != nil || liste.Total != 3 {
+	if json.Unmarshal([]byte(l), &liste) != nil || liste.Total != 2 {
 		t.Fatal(l)
 	}
 	note(f.req(t, "POST", "/api/bannis/action", `{"id":"`+liste.Bannis[0].ID+`","action":"suspendre"}`))
 	ag := note(f.req(t, "GET", "/api/comptes", ""))
 	var a adminui.Agregats
-	if json.Unmarshal([]byte(ag), &a) != nil || a.Comptes != 2 || a.BannisActifs != 2 || a.BannisSuspendus != 1 ||
-		a.Inscriptions != 2 || a.SalonsDeComptes != 0 {
+	if json.Unmarshal([]byte(ag), &a) != nil || a.Comptes != 2 || a.BannisActifs != 1 || a.BannisSuspendus != 1 ||
+		a.Passkeys != 2 || a.SalonsDeComptes != 0 {
 		t.Fatal(ag)
 	}
 	if e := note(f.req(t, "GET", "/api/etat", "")); !strings.Contains(e, `"comptes_actif":true`) {
@@ -285,11 +276,12 @@ func TestTableauDeBordComptes(t *testing.T) {
 	}
 	// Fouille : rien qui désigne une personne, un salon ou un contenu.
 	tout := strings.ToLower(toutes.String())
-	var canon, pe []byte
-	f.cpt.db.QueryRow(`SELECT e_canon, p_empreinte FROM comptes WHERE h=?`, h[:]).Scan(&canon, &pe)
-	interdits := []string{"dupont", "exemple.fr", pseudo, "bidulon", salonID, lien[strings.IndexByte(lien, '#')+2:],
+	var vr, pe, cred, pub []byte
+	f.cpt.db.QueryRow(`SELECT v_r, p_empreinte FROM comptes WHERE h=?`, h[:]).Scan(&vr, &pe)
+	f.cpt.db.QueryRow(`SELECT cred_id, cle_pub FROM passkeys WHERE h=?`, h[:]).Scan(&cred, &pub)
+	interdits := []string{pseudo, "bidulon", salonID, lien[strings.IndexByte(lien, '#')+2:],
 		lien2[strings.IndexByte(lien2, '#')+2:]}
-	for _, b := range [][]byte{h[:], h2[:], canon, pe, ka} {
+	for _, b := range [][]byte{h[:], h2[:], vr, pe, cred, pub, ka} {
 		if len(b) == 0 {
 			t.Fatal("valeur de fouille vide")
 		}
@@ -323,10 +315,10 @@ func TestTableauDeBordSansComptes(t *testing.T) {
 	}
 }
 
-// Ligne de commande : « shhdrop admin bannir - » lit un lien de salon ou une adresse sur
-// l'entrée standard (jamais en argument), ferme les salons du compte, et n'affiche ni le lien,
-// ni l'adresse : seulement l'identifiant B-… ; « bannis liste|suspendre|… » agissent par cet
-// identifiant.
+// Ligne de commande : « shhdrop admin bannir - » lit un lien de salon sur l'entrée standard
+// (jamais en argument ; plus d'adresse), ferme les salons du compte, et n'affiche pas le lien :
+// seulement l'identifiant B-… ; « bannis liste|suspendre|… <B-…> » agissent par cet identifiant
+// (recours de la personne bannie, conception du compte par passkey §7.4).
 func TestAdminBannirStdin(t *testing.T) {
 	cfg, svc := adminSetup(t)
 	cfg.Comptes, cfg.ComptesCleFile, cfg.ComptesMax = true, cleCompteTest(t), 10
@@ -338,12 +330,7 @@ func TestAdminBannirStdin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	post := &postierTest{}
-	cs, err := compte.NewService(compte.Config{DB: cdb, Cles: cles, Courriel: post, Limites: limits.New(time.Now), Now: time.Now, Max: 10})
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := inscrireTest(t, cs, post, "2001:db8:1::1", "lea@exemple.fr", "zorglubien")
+	h := inscrireTest(t, cdb, cles, "zorglubien")
 	cdb.Close()
 	s := nouveauSalonTest(t)
 	insererSalon(t, cfg.DataDir, s)
@@ -360,17 +347,17 @@ func TestAdminBannirStdin(t *testing.T) {
 	if salonLignes(t, svc.DB, s.id) != 0 {
 		t.Fatal("salon du banni gardé")
 	}
-	// Déjà banni (adresse) : refus, l'identifiant du bannissement en place est donné.
+	// Une adresse n'est plus une cible : erreur d'usage, rien n'est fait.
 	code, out2, errOut := runIn(cfg, " Lea@Exemple.fr \n", "bannir", "-")
-	if code != 1 || !strings.Contains(errOut, "déjà banni") || strings.Contains(strings.ToLower(out2+errOut), "lea@") {
+	if code != 2 || strings.Contains(strings.ToLower(out2+errOut), "lea@") {
 		t.Fatal(code, out2, errOut)
 	}
-	code, out, errOut = runIn(cfg, "personne@exemple.fr\n", "bannir", "-", "--motif", "10")
-	if code != 0 || !strings.Contains(out, "adresse bannie") || strings.Contains(out, "personne") {
-		t.Fatal(code, out, errOut)
+	// Le salon a été fermé : son lien ne désigne plus rien.
+	if code, _, errOut := runIn(cfg, s.lien+"\n", "bannir", "-"); code != 1 || !strings.Contains(errOut, "introuvable") {
+		t.Fatal(code, errOut)
 	}
 	code, out, _ = runIn(cfg, "", "bannis", "liste")
-	if code != 0 || strings.Count("\n"+out, "\nB-") != 2 || strings.Contains(out, "exemple") {
+	if code != 0 || strings.Count("\n"+out, "\nB-") != 1 {
 		t.Fatal(code, out)
 	}
 	id := out[:17]

@@ -25,11 +25,11 @@ type AgregatsComptes struct {
 	// Anciennete : depuis compte_des, < 7 j, 7 à 29 j, 30 à 182 j (« 1 à 6 mois »), 183 à 364 j
 	// (« 6 à 12 mois »), 365 j et plus.
 	Anciennete [5]int `json:"anciennete"`
-	// AvecTOTP : double authentification active ; RetraitTOTP : retrait demandé, en attente ;
-	// RecuperesSemaine : récupération par e-mail ces 7 derniers jours (recup_jour).
-	AvecTOTP         int `json:"avec_totp"`
-	RetraitTOTP      int `json:"retrait_totp_en_attente"`
-	RecuperesSemaine int `json:"recuperes_7_jours"`
+	// Passkeys enregistrées, dont avec enveloppe PRF ; comptes sans aucune passkey
+	// synchronisable (be = 0 partout : R3, perte plus probable).
+	Passkeys           int `json:"passkeys"`
+	PasskeysPRF        int `json:"passkeys_prf"`
+	ComptesSansSynchro int `json:"comptes_sans_passkey_synchronisable"`
 	// Sessions non échues, dont « rester connecté ».
 	Sessions             int `json:"sessions"`
 	SessionsPersistantes int `json:"sessions_persistantes"`
@@ -39,9 +39,8 @@ type AgregatsComptes struct {
 	BannisActifs    int `json:"bannis_actifs"`
 	BannisSuspendus int `json:"bannis_suspendus"`
 	BannisBientot   int `json:"bannis_echeant_30_jours"`
-	// Depuis le démarrage : inscriptions confirmées, connexions réussies (mot de passe, puis
-	// code de l'application s'il le faut), échecs (mot de passe ou code de l'application faux),
-	// récupérations par e-mail menées au bout, suppressions de compte.
+	// Depuis le démarrage : inscriptions menées au bout, connexions par passkey réussies, échecs
+	// (passkey ou clé de récupération refusée), récupérations par la clé, suppressions de compte.
 	Inscriptions    int64 `json:"inscriptions"`
 	Connexions      int64 `json:"connexions"`
 	EchecsConnexion int64 `json:"echecs_connexion"`
@@ -49,7 +48,7 @@ type AgregatsComptes struct {
 	Suppressions    int64 `json:"suppressions"`
 }
 
-// Agregats : lus à l'instant (trois requêtes d'agrégat ; une seule connexion à la base).
+// Agregats : lus à l'instant (quatre requêtes d'agrégat ; une seule connexion à la base).
 func (s *Service) Agregats() (AgregatsComptes, error) {
 	now := s.now()
 	auj := jourDe(now)
@@ -62,14 +61,17 @@ func (s *Service) Agregats() (AgregatsComptes, error) {
 		coalesce(sum((?1-compte_des)/86400 BETWEEN 30 AND 182), 0),
 		coalesce(sum((?1-compte_des)/86400 BETWEEN 183 AND 364), 0),
 		coalesce(sum((?1-compte_des)/86400 >= 365), 0),
-		coalesce(sum(totp IS NOT NULL), 0), coalesce(sum(totp_retrait_jour IS NOT NULL), 0),
-		coalesce(sum(recup_jour > ?1-7*86400), 0) FROM comptes`, auj)
+		coalesce(sum(NOT EXISTS (SELECT 1 FROM passkeys p WHERE p.h = comptes.h AND p.be = 1)), 0) FROM comptes`, auj)
 	if err := q.Scan(&a.Comptes, &a.Anciennete[0], &a.Anciennete[1], &a.Anciennete[2], &a.Anciennete[3], &a.Anciennete[4],
-		&a.AvecTOTP, &a.RetraitTOTP, &a.RecuperesSemaine); err != nil {
+		&a.ComptesSansSynchro); err != nil {
 		return AgregatsComptes{}, err
 	}
 	a.Neufs = a.Anciennete[0]
 	a.Confirmes = a.Comptes - a.Neufs
+	if err := s.db.QueryRow(`SELECT count(*), (SELECT count(DISTINCT cred_id) FROM enveloppes) FROM passkeys`).Scan(
+		&a.Passkeys, &a.PasskeysPRF); err != nil {
+		return AgregatsComptes{}, err
+	}
 	if err := s.db.QueryRow(`SELECT count(*), coalesce(sum(persistante), 0) FROM sessions WHERE expire_jour>?`,
 		now.Unix()).Scan(&a.Sessions, &a.SessionsPersistantes); err != nil {
 		return AgregatsComptes{}, err
