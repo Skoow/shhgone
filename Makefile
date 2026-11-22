@@ -34,11 +34,12 @@ test-repro:
 	web/scripts/repro.sh
 
 # Scripts de déploiement et de build : syntaxe, ShellCheck (0.11.0 en CI, job deploy-lint),
-# go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais SMTP,
+# banc de l'alerte (deploy/test-alerte.sh, sans réseau), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais SMTP,
 # contrôle SMTP ; les essais de banc, sans leurs variables, sont sautés).
 lint-deploy:
 	for f in deploy/*.sh web/scripts/*.sh; do bash -n "$$f" || exit 1; done
 	shellcheck deploy/*.sh web/scripts/*.sh
+	deploy/test-alerte.sh
 	cd deploy/shhcheck && go vet ./... && go test -race -count=1 ./...
 
 # Test du proxy (deploy/test-proxy.sh) : Caddy 2.10 ou plus dans le PATH (ou CADDY=…), site

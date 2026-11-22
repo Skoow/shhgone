@@ -164,3 +164,7 @@ sauver() {
 
 sauver comptes comptes sessions bannis
 sauver paiements passes commandes refs
+# Réussite datée (heure Unix seulement), lue par alerte.sh : rien depuis 26 h → alerte.
+ok=${SHH_SAUVEGARDE_OK:-/var/lib/shhdrop-sauvegarde/ok}
+mkdir -p "$(dirname "$ok")"
+date +%s >"$ok"

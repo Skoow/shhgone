@@ -1,4 +1,5 @@
-# Alerte de l'exploitant (deploy/alerte.sh ; README §4) : signalements, disque, serveur.
+# Alerte de l'exploitant (deploy/alerte.sh ; README §4) : santé, disques, certificat, domaine,
+# hébergement, DNS, sauvegarde, mises à jour, horloge ; bilan chaque semaine.
 # Installation : copier ce fichier et shhdrop-alerte.timer dans /etc/systemd/system/, en
 # remplaçant /opt/shhdrop par le chemin de la copie du dépôt, puis :
 #   systemctl daemon-reload && systemctl enable --now shhdrop-alerte.timer
@@ -11,8 +12,9 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/opt/shhdrop/deploy/alerte.sh
 UMask=0077
-RuntimeDirectory=shhdrop-alerte
-RuntimeDirectoryPreserve=yes
+# État : dates d'envoi et un échantillon d'occupation du disque par jour (aucune donnée
+# d'utilisateur, aucune adresse) ; gardé au redémarrage pour le rythme du disque et le bilan.
+StateDirectory=shhdrop-alerte
 ProtectHome=read-only
 PrivateTmp=yes
 NoNewPrivileges=yes

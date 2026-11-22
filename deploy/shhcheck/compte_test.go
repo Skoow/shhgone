@@ -36,7 +36,7 @@ import (
 // la base restaurée (adresse : jamais, ni en clair ni normalisée ; seules ses empreintes).
 const (
 	compteEmail  = "Restauration.Repere+essai@exemple-shhdrop.org"
-	comptePseudo = "repererestauration"
+	comptePseudo = "repererestauratlon" // forme canonique : « i » devient « l »
 )
 
 type etatCompte struct {

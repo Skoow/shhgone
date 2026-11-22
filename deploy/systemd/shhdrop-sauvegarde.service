@@ -13,6 +13,8 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/opt/shhdrop/deploy/sauvegarder.sh
 UMask=0077
+# Date de la dernière réussite (/var/lib/shhdrop-sauvegarde/ok), lue par alerte.sh.
+StateDirectory=shhdrop-sauvegarde
 # root : lit comptes.db (compte 65532) et le fichier d'accès au stockage (root 0600) ; SQLite
 # tourne sous le compte 65532 (setpriv). Le reste du système est en lecture seule ou caché.
 ProtectSystem=full

@@ -148,7 +148,7 @@ env_sauvegarde() {
 	printf 'SHH_DATA_ROOT=%s\nSHH_SAUVEGARDE_DESTINATAIRE=%s\nSHH_SAUVEGARDE_URL=file://%s/\nSHH_AGE_VERSION=%s\n' \
 		"$2" "$3" "$depot" "$4" >"$1"
 }
-sauvegarder() { SHH_ENV_FILE=$1 "$here/sauvegarder.sh"; }
+sauvegarder() { SHH_ENV_FILE=$1 SHH_SAUVEGARDE_OK="$work/sauvegarde-ok" "$here/sauvegarder.sh"; }
 vides() { # vides <dossier…> : aucun fichier
 	local d
 	for d in "$@"; do [ -z "$(find "$d" -mindepth 1 -print -quit)" ] || return 1; done
@@ -211,7 +211,7 @@ check "nom daté, en UTC (comptes-AAAA-MM-JJTHHMMSSZ.db.age)" \
 check "le fichier commence par age-encryption.org/v1" test "$(head -c 22 "$copie")" = "age-encryption.org/v1"
 refuse "le fichier ne contient pas le h du compte" contient "$h_hex" "$copie"
 email='Restauration.Repere+essai@exemple-shhdrop.org'
-for r in "$email" "${email,,}" "repererestauration" "SQLite format 3"; do
+for r in "$email" "${email,,}" "repererestauratlon" "SQLite format 3"; do
 	refuse "le fichier ne contient pas « $r »" grep -qaF -- "$r" "$copie"
 done
 check "aucun clair laissé dans le dossier temporaire" vides "$racine/sauvegarde"
@@ -243,7 +243,7 @@ check "la sauvegarde, elle, avait la session de l'inscription" \
 	bash -c '"$1" verifier "$2" "$3" >/dev/null && age -d -i "$3" "$2" >"$4" && test "$(sqlite3 "$4" "SELECT count(*) FROM sessions;")" = 1' \
 	_ "$here/restaurer.sh" "$copie" "$work/identite.txt" "$work/clair-controle.db"
 rm -f -- "$work/clair-controle.db"*
-for r in "$email" "${email,,}" "repererestauration"; do
+for r in "$email" "${email,,}" "repererestauratlon"; do
 	refuse "base restaurée : pas de « $r »" grep -qaiF -- "$r" "$racine/data/comptes.db"
 done
 refuse "réinstallation refusée sans --remplacer" "$here/restaurer.sh" installer "$copie" "$work/identite.txt" "$racine/data"
