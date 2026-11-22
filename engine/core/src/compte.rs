@@ -11,13 +11,9 @@
 //! avec RustCrypto (`native`, `platform::Key`), à partir des clés et des données authentifiées
 //! rendues ici ; leur format est prouvé par `engine/vectors/compte-v3.json`. Rien ici ne dépend
 //! du navigateur : l'aléa (`K_compte`, `R`, nonces) vient de la plateforme.
-//!
-//! `v2` : compte par e-mail, gelé, retiré au lot W1 du plan (voir son en-tête).
 use crate::error::{Error, Result};
 use crate::kdf::{hkdf, sha256};
 use zeroize::Zeroizing;
-
-pub mod v2;
 
 pub use crate::texte::{PSEUDO_MAX, PSEUDO_MIN, pseudo_canon, pseudo_valide};
 
@@ -123,7 +119,7 @@ pub fn ad_enveloppe_recup(h: &[u8; 16]) -> Vec<u8> {
 }
 
 /// `K_profil` = HKDF(`K_compte`, « shhdrop/v3/compte/profil ») : clé du coffre de profil
-/// « SHH-PROF1 » (format inchangé). Remplace la clé tirée de `s_profil` (`v2::cle_profil`,
+/// « SHH-PROF1 » (format inchangé). Remplace la clé tirée de `s_profil` (compte par e-mail retiré,
 /// séquestre retiré, conception §8, Q3) : le serveur ne peut plus lire le profil.
 pub fn cle_profil(k_compte: &[u8; 32]) -> Cle {
     hkdf::<32>(k_compte, "shhdrop/v3/compte/profil")

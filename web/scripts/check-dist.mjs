@@ -47,6 +47,9 @@ const SALON_BROTLI_MAX = 435_000;
  * avec la règle du pseudo (tables Unicode : unicode-segmentation, -script, -security), 148 300 o
  * une fois le pseudo exposé par le module du salon à la place (dérivations du compte gardées).
  * Le plafond laisse ~5 % de marge : une table Unicode ou une bibliothèque entrée par erreur se voit.
+ * 22 novembre 2026 : 154 958 o avec le compte par passkey ajouté au compte par e-mail, 147 481 o
+ * une fois le compte par e-mail retiré (adresse, mot de passe, Argon2id du compte). Plafond gardé
+ * (le baisser est une décision).
  */
 const ENGINE_BROTLI_MAX = 156_000;
 

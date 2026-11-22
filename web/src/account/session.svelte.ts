@@ -410,11 +410,6 @@ export function cleAffichee(): string {
   return creee.texte;
 }
 
-/** La passkey créée ouvre-t-elle les données (sortie PRF obtenue) ? */
-export function creationAvecPrf(): boolean {
-  return creee?.prf !== null && creee !== null;
-}
-
 /**
  * « Terminer » (§3.1, écran 4) : enveloppes, coffres et libellés faits ici, puis inscription/fin.
  * Le compte n'existe qu'à partir d'ici. Erreur du serveur (pseudo_pris, étape échue…) :

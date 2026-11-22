@@ -13,7 +13,7 @@
 //   Les codes propres au moteur, inconnus de l'interface (aleatoire_indisponible,
 //   chiffrement_echec, entree_invalide), deviennent paquet_corrompu à l'ouverture ; à l'envoi, ils
 //   restent des erreurs inattendues (écran « erreur d'envoi » générique, flows/send.svelte.ts).
-import { compteKeys, passwordKey as kdfOpen, passwordKeyForCreate as kdfCreate } from "./argon2";
+import { passwordKey as kdfOpen, passwordKeyForCreate as kdfCreate } from "./argon2";
 import { loadEngine, resetEngine, type Engine } from "./load";
 import type { JsAccessKeys, JsContentKeys, JsElementSealer, JsReader, JsSeed } from "./pkg/shhdrop_wasm.js";
 import { type KAcces, type KdfParams, type KeepTtl, type KLien, type KMdp, type KPreuve, type Manifest, type ManifestClean, type Palier, type Piece, PREVIEW_MAX, type Rights, type SGestion, utf8 } from "./pure";
@@ -191,39 +191,11 @@ export function passwordKeyForCreate(password: string, salt: Uint8Array<ArrayBuf
   return run(async (e) => (await kdfCreate(e, password, salt)) as KMdp);
 }
 
-// --- Compte v2 (conception compte v2 §5.1, §6, §21.2.2, §21.5) -------------------------------------
-
-/** Adresse normalisée : `canon` (sel, connexion), `exacte` (envoi des codes). */
-export type Adresse = { canon: string; exacte: string };
-
-/** Normalise une adresse ; sinon adresse_invalide ou adresse_non_ascii. */
-export function normaliserAdresse(email: string): Promise<Adresse> {
-  return run((e) => e.wasm.normaliserAdresse(email) as Adresse);
-}
-
-/**
- * A_auth (envoyé au serveur) et KEK_mdp (enveloppe de K_compte), dans un Worker neuf
- * (Argon2id de 64 Mio) ; l'appelant efface les deux après usage. Refus : mot_de_passe_vide.
- */
-export function deriverCompte(password: string, canon: string): Promise<{ aAuth: Uint8Array<ArrayBuffer>; kekMdp: Uint8Array<ArrayBuffer> }> {
-  return run(async (e) => {
-    const k = await compteKeys(e, password, canon);
-    try {
-      return { aAuth: k.slice(0, 32), kekMdp: k.slice(32, 64) };
-    } finally {
-      k.fill(0);
-    }
-  });
-}
+// --- Compte : clés des coffres tirées de K_compte (conception du compte par passkey §5.1) -----------
 
 /** K_prive = HKDF(K_compte, « shhdrop/v2/compte/blob ») ; l'appelant l'efface. */
 export function clePrive(kCompte: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
   return run((e) => e.wasm.clePrive(kCompte) as Uint8Array<ArrayBuffer>);
-}
-
-/** K_profil = HKDF(s_profil, « shhdrop/v2/compte/profil ») ; l'appelant l'efface. */
-export function cleProfil(sProfil: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
-  return run((e) => e.wasm.cleProfil(sProfil) as Uint8Array<ArrayBuffer>);
 }
 
 /** K_etiquette = HKDF(K_compte, « shhdrop/v2/compte/appareil ») ; l'appelant l'efface. */
@@ -234,18 +206,6 @@ export function cleAppareil(kCompte: Uint8Array): Promise<Uint8Array<ArrayBuffer
 // Pseudo du compte : moteur du salon (src/salon/engine.ts : pseudoValide, cleUnicite = p_canon,
 // pseudoReserve), qui a déjà les tables Unicode de sa règle ; ici, elles pèseraient 50 Ko de plus
 // en brotli sur toutes les pages de partage.
-
-/** Mot de passe d'un nouveau compte ; sinon mdp_court, mdp_long, mdp_adresse. */
-export function motDePasseValide(password: string, adresse: Adresse): Promise<void> {
-  return run((e) => {
-    const pw = utf8(password);
-    try {
-      e.wasm.motDePasseValide(pw, adresse.canon, adresse.exacte);
-    } finally {
-      pw.fill(0);
-    }
-  });
-}
 
 // --- Compte par passkey (conception 2026-11-22-compte-passkey-design.md §5 ; vecteurs
 // engine/vectors/compte-v3.json) : le moteur dérive (HKDF, codage de la clé de récupération),

@@ -1,6 +1,6 @@
-// Preuve anti-robot des pages du compte (conception compte §8.8, §10.1 : « calculée pendant la
-// saisie, comme pour un partage ») : défi lu à l'avance (preparerPreuve, au premier champ
-// rempli), preuve de travail dans son Worker, puis les champs { altcha, hp, shown_at } au plus
+// Preuve anti-robot de l'inscription (conception compte §8.8 ; conception du compte par passkey
+// §3.1 : calculée dès l'ouverture de la page, avant inscription/debut) : défi lu, preuve de
+// travail dans son Worker, puis les champs { altcha, hp, shown_at } au plus
 // tôt 3,1 s après la réception (proofForm). Un défi sert une fois ; échu (2 min) ou bientôt
 // échu : un nouveau est lu. Aucune clé n'existe encore à ce moment (le repli reCAPTCHA, §26,
 // resterait possible ici : la clé du compte n'est tirée qu'après, par account/session.svelte.ts).
@@ -18,12 +18,6 @@ function lancer() {
   const proof = cap.then((c) => solvePow(c.challenge, { fallbackOrigin: c.fallbackOrigin, mode: "pow" }));
   proof.catch(() => undefined);
   prete = { cap, proof };
-}
-
-/** Lit un défi et lance la preuve, s'il n'y en a pas déjà une en cours. */
-export function preparerPreuve(): void {
-  if (getDemo() !== null) return; // démo : preuve factice, rien à calculer
-  if (prete === null) lancer();
 }
 
 /** Champs anti-robot pour UNE requête ; erreurs : celles de prepareCaptcha (réseau, limite). */

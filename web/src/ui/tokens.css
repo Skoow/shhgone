@@ -61,7 +61,6 @@
   --vessel: rgb(17 20 27 / 0.62);
   --edge-hi: inset 0 1px 0 rgb(255 255 255 / 0.06);
   --seal-light: #C9FBE8;
-  --seal-halo: rgb(95 227 181 / 0.28);
   --paper: #EEF1F5;
   --ink: #0B0D12;
 
@@ -75,11 +74,7 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* §4.2 échelle : taille, interligne, poids, largeur (font-stretch) */
-  --fs-display: clamp(2.625rem, 1.1rem + 4.6vw, 5.5rem);
-  --lh-display: 0.98;
-  --fw-display: 600;
   --wd-display: 116%;
-  --ls-display: -0.035em;
   --fs-h1: 1.75rem;
   --lh-h1: 1.15;
   --fw-h1: 650;
@@ -98,16 +93,9 @@
   --wd-body: 100%;
   --fs-small: 0.875rem;
   --lh-small: 1.45;
-  --fw-small: 450;
-  --wd-small: 100%;
   --fs-micro: 0.75rem;
   --lh-micro: 1.4;
-  --fw-micro: 520;
-  --wd-micro: 100%;
   --fs-mono: 1.0625rem;
-  --lh-mono: 1.5;
-  --fw-mono: 480;
-  --fs-mono-block: 1.25rem;
   --fs-figure: clamp(3.5rem, 2rem + 6vw, 5.5rem);
   --lh-figure: 1;
   --fw-figure: 560;
@@ -128,7 +116,6 @@
   --sp-6: 32px;
   --sp-7: 48px;
   --sp-8: 64px;
-  --sp-9: 96px;
 
   /* §5.2 rayons */
   --r-sm: 6px;
@@ -139,7 +126,6 @@
   --r-pill: 999px;
 
   /* §5.3 élévation */
-  --e-1: 0 1px 2px rgb(0 0 0 / 0.40);
   --e-2: 0 8px 24px -8px rgb(0 0 0 / 0.60), 0 2px 6px rgb(0 0 0 / 0.35);
   --e-3: 0 24px 64px -16px rgb(0 0 0 / 0.70);
   --edge: inset 0 1px 0 rgb(255 255 255 / 0.05);
@@ -150,28 +136,21 @@
   --dur-fast: 180ms;
   --dur-base: 240ms;
   --dur-slow: 400ms;
-  --dur-moment: 640ms;
-  --dur-dissolve: 1100ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* §20.3 mouvement v2 */
   --dur-press: 90ms;
-  --dur-stagger: 45ms;
   --dur-view: 420ms;
-  --dur-reveal: 560ms;
   --dur-orbit: 7.2s;
   --dur-ambient: 46s;
   --dur-ambient-2: 58s;
   --dur-ambient-3: 64s;
   --ease-view: cubic-bezier(0.22, 1, 0.36, 1);
-  --rise: 14px;
-  --blur-in: 6px;
 
   /* Accueil v3 (UI §9.1, §20.4) : titres de section ; courbe « qui se pose » (ressort très
      amorti, sans dépassement ni rebond : la règle v1 tient), échantillonnée en linear(). */
-  --fs-section: clamp(2.25rem, 1.3rem + 3.2vw, 4rem);
   --ease-settle: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.281 6.7%, 0.723 15.4%, 0.856 19.4%, 0.938 23.6%, 0.977 28%, 0.994 33.4%, 1);
 }
 
@@ -191,7 +170,6 @@
     --paper: Canvas;
     --ink: CanvasText;
     --seal-light: Highlight;
-    --e-1: none;
     --e-2: none;
     --e-3: none;
     --e-vessel: none;

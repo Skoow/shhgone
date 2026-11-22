@@ -26,7 +26,7 @@ const C = vi.hoisted(() => ({
   groupeAVerifier: vi.fn(),
 }));
 vi.mock("../../account/session.svelte", async (orig) => ({ ...(await orig<object>()), ...C }));
-vi.mock("./preuve", () => ({ obtenirPreuve: async () => PREUVE, preparerPreuve: () => undefined }));
+vi.mock("./preuve", () => ({ obtenirPreuve: async () => PREUVE }));
 const { CompteError, account } = await import("../../account/session.svelte");
 const { default: Inscription } = await import("./Inscription.svelte");
 

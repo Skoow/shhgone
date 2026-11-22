@@ -743,16 +743,6 @@ fn vecteurs_pseudo() {
             assert_eq!(got.get(k), c.get(k), "{} : {k}", c["label"]);
         }
     }
-    // Même section que compte.json (une seule table de cas) tant que ce fichier existe.
-    let v2: Value = serde_json::from_str(
-        &std::fs::read_to_string(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../vectors/compte.json"
-        ))
-        .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(v2["pseudo"], v["pseudo"]);
 }
 
 // ------------------------------------------------------------------------- propriétés
@@ -845,7 +835,5 @@ fn entrees_prf_et_cles_distinctes() {
     let r: [u8; 16] = derive("recup/a");
     let c = recup(r);
     assert_ne!(*c.acces(), *c.kek());
-    // L'ancienne clé du profil (tirée de s_profil, v2) n'est pas la nouvelle.
-    assert_ne!(*shhdrop_core::compte::v2::cle_profil(&k), *cle_profil(&k));
     assert_ne!(entree_prf(), sel_prf());
 }

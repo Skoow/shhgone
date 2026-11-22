@@ -19,7 +19,6 @@ export async function attendre(n = 30): Promise<void> {
   }
   flushSync();
 }
-export const texte = () => document.body.textContent!.replace(/[ \n\t]+/g, " ");
 export function champ(label: string): HTMLInputElement {
   const l = [...document.querySelectorAll("label")].find((x) => x.textContent!.trim() === label);
   if (!l) throw new Error(`champ « ${label} » absent`);

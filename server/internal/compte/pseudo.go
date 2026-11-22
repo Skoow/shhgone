@@ -21,7 +21,7 @@ var (
 )
 
 // reserves.txt : formes canoniques (pseudo_canon du moteur Rust, squelette UTS #39 compris)
-// des pseudos réservés, exactement constants.reserves de engine/vectors/compte.json. Le
+// des pseudos réservés, exactement constants.reserves de engine/vectors/compte-v3.json. Le
 // serveur ne calcule jamais le canon : il reçoit p_canon du client et compare des octets ;
 // aucune bibliothèque Unicode côté Go (versions Unicode : celles du moteur, notées dans
 // constants.unicode).

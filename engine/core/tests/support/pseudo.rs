@@ -1,6 +1,5 @@
-//! Cas du pseudo (règle de `shhdrop_core::texte`), communs aux vecteurs du compte v2
-//! (`compte.json`) et du compte par passkey (`compte-v3.json`) : une seule table, deux fichiers
-//! identiques sur cette section. Les sorties attendues sont écrites à la main (relues).
+//! Cas du pseudo (règle de `shhdrop_core::texte`) des vecteurs du compte par passkey
+//! (`compte-v3.json`). Les sorties attendues sont écrites à la main (relues).
 use super::hex;
 use serde_json::{Value, json};
 use shhdrop_core::compte::{PSEUDOS_RESERVES, pseudo_canon, pseudo_reserve, pseudo_valide};
