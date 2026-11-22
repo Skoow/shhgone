@@ -75,17 +75,19 @@
 
 ## Lot S1 — Revue de chaîne d'approvisionnement de go-webauthn v0.18.2 (avant tout ajout)
 
+**État : fait le 22 novembre, revue acceptée** (`docs/superpowers/plans/2026-11-22-revue-go-webauthn.md`).
+
 *Livrable seul : un document de revue et une décision ; `go.mod` ne change pas tant que la revue n'est pas acceptée. Dépend de : rien.*
 
 **Files :**
 - Create : `docs/superpowers/plans/2026-11-22-revue-go-webauthn.md` (ou une section datée de `docs/superpowers/plans/maj-dependances-2026-11-04.md`, au choix du contrôleur, une seule)
 - Modify (seulement si la revue est acceptée, au lot S3) : `server/go.mod`, `server/go.sum`, `THIRD_PARTY_LICENSES.md`
 
-- [ ] **Step 1 :** dans un module jetable hors du dépôt (scratchpad), `go mod init x && go get github.com/go-webauthn/webauthn@v0.18.2` ; `go mod graph` et `go list -m all` : liste **exacte** des modules et versions tirés (attendus d'après la conception : `github.com/go-webauthn/x`, `github.com/fxamacker/cbor/v2`, `github.com/golang-jwt/jwt/v5`, `github.com/google/go-tpm`, `github.com/google/uuid`, `github.com/mitchellh/mapstructure` ou successeur ; à relever, pas à supposer).
-- [ ] **Step 2 :** pour chaque module : version, date de publication (≥ 7 jours, règle §24), mainteneurs, licence (fichier LICENSE lu dans le cache de modules), avis connus (`govulncheck` sur un programme minimal qui appelle `BeginRegistration`, `CreateCredential`, `BeginDiscoverableLogin`, `ValidateDiscoverableLogin` ; base OSV/GitHub Advisory), présence de code `init()`, de `unsafe`, de `cgo`, d'accès réseau ou fichier (grep). Licence de go-webauthn : **à revérifier** (conception §6.1 : BSD-3-Clause annoncée).
-- [ ] **Step 3 :** vérifier que la vérification des signatures passe par `crypto/ecdsa`, `crypto/rsa`, `crypto/ed25519` de la bibliothèque standard (aucune crypto maison dans la bibliothèque) et noter les chemins d'attestation (TPM, métadonnées FIDO) compilés mais inutilisés avec `attestation: "none"`.
-- [ ] **Step 4 :** décision écrite : accepté (versions exactes à épingler) ou refusé, avec la raison. **Refus = arrêt du sous-projet 2 et retour au propriétaire, jamais de vérification WebAuthn réécrite à la main.**
-- [ ] **Step 5 :** commit `docs(revue): chaîne d'approvisionnement de go-webauthn v0.18.2`.
+- [x] **Step 1 :** dans un module jetable hors du dépôt (scratchpad), `go mod init x && go get github.com/go-webauthn/webauthn@v0.18.2` ; `go mod graph` et `go list -m all` : liste **exacte** des modules et versions tirés (attendus d'après la conception : `github.com/go-webauthn/x`, `github.com/fxamacker/cbor/v2`, `github.com/golang-jwt/jwt/v5`, `github.com/google/go-tpm`, `github.com/google/uuid`, `github.com/mitchellh/mapstructure` ou successeur ; à relever, pas à supposer).
+- [x] **Step 2 :** pour chaque module : version, date de publication (≥ 7 jours, règle §24), mainteneurs, licence (fichier LICENSE lu dans le cache de modules), avis connus (`govulncheck` sur un programme minimal qui appelle `BeginRegistration`, `CreateCredential`, `BeginDiscoverableLogin`, `ValidateDiscoverableLogin` ; base OSV/GitHub Advisory), présence de code `init()`, de `unsafe`, de `cgo`, d'accès réseau ou fichier (grep). Licence de go-webauthn : **à revérifier** (conception §6.1 : BSD-3-Clause annoncée).
+- [x] **Step 3 :** vérifier que la vérification des signatures passe par `crypto/ecdsa`, `crypto/rsa`, `crypto/ed25519` de la bibliothèque standard (aucune crypto maison dans la bibliothèque) et noter les chemins d'attestation (TPM, métadonnées FIDO) compilés mais inutilisés avec `attestation: "none"`.
+- [x] **Step 4 :** décision écrite : accepté (versions exactes à épingler) ou refusé, avec la raison. **Refus = arrêt du sous-projet 2 et retour au propriétaire, jamais de vérification WebAuthn réécrite à la main.**
+- [x] **Step 5 :** commit `docs(revue): chaîne d'approvisionnement de go-webauthn v0.18.2`.
 
 ## Lot S2 — Configuration, `comptes.db` schéma 3, retrait du compte par e-mail
 
