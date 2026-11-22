@@ -17,7 +17,7 @@ import { previewable } from "../media/dimensions";
 import { stripMetadata } from "../media/strip";
 import { clickDownload, REVOKE_AFTER_MS } from "../viewers/save";
 import { preparer, oublier as oublierPreparation, type Duree } from "./creation";
-import { lienSalon } from "./liens";
+import { lienGestionDans, lienSalon } from "./liens";
 import { captcha as captchaDuServeur, ctx as transferCtx } from "../transfer/api";
 import { CAPTCHA_MIN_MS } from "../transfer/client";
 import { solvePow } from "../captcha/pow";
@@ -74,6 +74,12 @@ export const vue = $state({
   reprise: false,
   /** Le serveur offre les appels audio et vidéo (relais TURN configuré). */
   appels: false,
+  /**
+   * Lien de gestion collé dans la conversation (exigence C-3 32), jamais envoyé : « proposee »
+   * (membre : retrouver les droits ?), « deja » (déjà créateur), « autre » (pas ce salon),
+   * « horsligne », « fait », ou null. Le secret lui-même n'est jamais dans cet état.
+   */
+  gestionCollee: null as "proposee" | "deja" | "autre" | "horsligne" | "erreur" | "fait" | null,
 });
 
 /**
@@ -142,8 +148,9 @@ export function oublier(): void {
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, reprise: false, appels: false });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, reprise: false, appels: false, gestionCollee: null });
   lienReprise = null;
+  oublierGestionCollee();
 }
 
 // --- Invité : lien, mot de passe -----------------------------------------------------------------
@@ -519,7 +526,7 @@ function surEvenement(x: Session, ev: EvClient): void {
       fichiersOuverts.clear();
       break;
     case "nouvelleEntree":
-      conv.moi = ev.siege;
+      conv.changerDeSiege(ev.siege);
       // Nouveau siège : l'appel en cours est quitté (les paires sont nommées par siège).
       x.appel?.fermer();
       x.appel = nouvelAppel(x, c);
@@ -682,9 +689,76 @@ export function nettoyer(x: string): string {
   return s.eng.nettoyerTexte(x);
 }
 
+// --- Lien de gestion collé dans la conversation (exigence C-3 32) -----------------------------------
+
+/** Secret du lien de gestion collé, en attente du choix de la personne (mémoire seulement). */
+let gestionEnAttente: Uint8Array<ArrayBuffer> | undefined;
+function oublierGestionCollee(): void {
+  gestionEnAttente?.fill(0);
+  gestionEnAttente = undefined;
+}
+
+/**
+ * Texte tapé ou collé dans la saisie : s'il contient un lien de gestion, rien ne part (ni message,
+ * ni « écrit ») ; le secret reste en mémoire le temps que la personne choisisse, la saisie est
+ * vidée par l'écran. Rend vrai si le texte a été intercepté. Jamais gardé ailleurs : ni historique,
+ * ni stockage ; la preuve de membre ne le reçoit que si les droits sont rendus (exigence 31).
+ */
+export function intercepterLienGestion(texte: string): boolean {
+  const cle = lienGestionDans(texte);
+  if (!cle) return false;
+  oublierGestionCollee();
+  if (vue.createur || !s?.client) {
+    cle.fill(0);
+    vue.gestionCollee = "deja";
+  } else {
+    gestionEnAttente = cle;
+    vue.gestionCollee = "proposee";
+  }
+  return true;
+}
+
+/** « Annuler » (ou fermeture) : le secret collé est mis à zéro. */
+export function annulerGestionCollee(): void {
+  oublierGestionCollee();
+  vue.gestionCollee = null;
+}
+
+/**
+ * « Retrouver mes droits de créateur » : siège 0 avec J_gestion (seul envoyé au serveur), ancienne
+ * place rendue, rôle rendu dès le Commit qui l'ajoute (client.reprendreLeRole). Un lien d'un autre
+ * salon (400) ne change rien.
+ */
+export async function reprendreDroits(): Promise<void> {
+  const x = s;
+  const cle = gestionEnAttente;
+  gestionEnAttente = undefined;
+  if (!x?.client || !cle) {
+    cle?.fill(0);
+    vue.gestionCollee = null;
+    return;
+  }
+  try {
+    await x.client.reprendreLeRole(cle);
+    if (s !== x) return;
+    x.sGestion?.fill(0);
+    x.sGestion = cle.slice();
+    x.gestionColle = true;
+    vue.createur = true;
+    vue.gestionCollee = "fait";
+    ecrirePreuve(x);
+  } catch (e) {
+    vue.gestionCollee = e instanceof api.SalonError && e.code === "bad_request" ? "autre" : (e as Error).message === "hors_ligne" ? "horsligne" : "erreur";
+  } finally {
+    cle.fill(0);
+  }
+}
+
 export function envoyerTexte(texte: string, cite: string | null): void {
   const x = s;
   if (!x?.client || !x.conv) return;
+  // Exigence C-3 32 : un lien de gestion ne part jamais dans un message.
+  if (lienGestionDans(texte)) throw new Error("lien_gestion");
   const t = x.eng.nettoyerTexte(texte);
   const regle = regleCourante();
   const message = cite ? { k: "reponse" as const, cible: hexOctets(cite), x: t } : { k: "texte" as const, x: t };
@@ -694,6 +768,7 @@ export function envoyerTexte(texte: string, cite: string | null): void {
 export function modifier(b: Bulle, texte: string): void {
   const x = s;
   if (!x?.client || !x.conv || !b.id || !b.moi) return;
+  if (lienGestionDans(texte)) throw new Error("lien_gestion");
   const t = x.eng.nettoyerTexte(texte);
   x.client.envoyer({ k: "modif", cible: hexOctets(b.id), x: t }, b.regle);
   x.conv.modifierLocal(b.id, t);

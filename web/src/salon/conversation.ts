@@ -211,6 +211,22 @@ export class Conversation {
     this.ecrit.delete(siege);
     this.#change();
   }
+  /**
+   * Notre siège change (nouvelle entrée ; créateur qui retrouve ses droits, exigence C-3 32) :
+   * l'ancien est rendu sans ligne (le départ annoncé ensuite n'en ajoute pas), son profil oublié
+   * (notre pseudonyme n'y est plus « pris ») ; les messages de l'ancien occupant du nouveau siège
+   * gardent son nom et sa couleur (figés). Notre profil est renvoyé par l'appelant.
+   */
+  changerDeSiege(siege: number): void {
+    if (siege === this.moi) return;
+    const ancien = this.moi;
+    this.presents.delete(ancien);
+    this.#liberer(ancien);
+    this.#liberer(siege);
+    this.moi = siege;
+    this.presents.add(siege);
+    this.#change();
+  }
   presenceDe(siege: number, p: Presence): void {
     this.presence.set(siege, p);
     this.#change();

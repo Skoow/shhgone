@@ -83,6 +83,22 @@ describe("conversation", () => {
     c.message(24, 0, 3, env(33, { k: "piece_ouverte", ids: [id(2)] }));
     expect(bulles(c)[1]!.ouverts).toEqual([]);
   });
+  it("changerDeSiege (exigence C-3 32) : notre pseudonyme suit au siège 0 sans être « pris » par notre ancien siège ; l'ancien occupant garde son nom", () => {
+    const c = conv(2);
+    c.message(5, 0, 3, env(1, { k: "profil", pseudo: "Lea", couleur: 0, avatar: null }));
+    c.message(6, 0, 3, env(2, { k: "texte", x: "de l'ancienne page" }));
+    c.monProfil("Leax", 2, 7);
+    c.changerDeSiege(0);
+    expect(c.moi).toBe(0);
+    expect(c.presents.has(2)).toBe(false);
+    c.monProfil("Leax", 2);
+    expect(c.pseudoRefuse).toBe(false);
+    expect(c.nom(0).pseudo).toBe("Leax");
+    expect(c.nomDe(bulles(c)[0]!).pseudo).toBe("Lea");
+    // Aucune ligne « a changé de pseudonyme » ni « a quitté » ; le départ annoncé ensuite n'en ajoute pas.
+    c.depart(2);
+    expect(c.elements.filter((e) => e.k === "sys")).toEqual([]);
+  });
   it("réponse : citation par identifiant ; efface (0x0E) retire la bulle", () => {
     const c = conv();
     c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));

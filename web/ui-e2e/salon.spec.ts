@@ -35,10 +35,10 @@ const test = base.extend<{ smtp: FauxSMTP }, { site: string }>({
     use({ comptes: { cle: new Uint8Array(randomBytes(32)), smtpPort: smtp.port, smtpMdp: SMTP_MDP, from: FROM }, env: { SHH_STATIC_DIR: site } }),
 });
 
-test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
+test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", actionTimeout: 30_000 });
 // WebKit : comme compte.spec.ts (Chromium seulement pour l'instant).
 test.skip(({ browserName }) => browserName !== "chromium", "salon.spec.ts : Chromium (comme compte.spec.ts)");
-test.setTimeout(420_000); // parcours long : rechargement, exclusion, troisième navigateur
+test.setTimeout(600_000); // parcours long : rechargement, exclusion, troisième et quatrième navigateurs
 
 const champ = (page: Page, label: string) => page.getByLabel(label, { exact: true }).and(page.locator("input"));
 const bouton = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
@@ -125,6 +125,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   pageB.on("pageerror", (e) => erreursB.push(e.message));
   pageB.on("console", (m) => /Refused to|Content Security Policy/.test(m.text()) && erreursB.push(m.text()));
   let ctxC: BrowserContext | undefined;
+  let ctxE: BrowserContext | undefined;
   try {
     await pageB.goto(lien);
     await expect(titre(pageB, "Salon de discussion")).toBeVisible();
@@ -335,6 +336,46 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await envoyer(page, t5);
     await expect(fil(pageC).locator("p.texte").getByText(t5, { exact: true })).toBeVisible({ timeout: 30_000 });
 
+    // --- Exigence C-3 32 : la créatrice revient sans son lien de gestion (autre navigateur : ni
+    // historique ni preuve), entre comme simple membre, colle son lien de gestion DANS la
+    // conversation : rien n'est envoyé, elle retrouve ses droits ; l'ancienne page est délogée.
+    ctxE = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
+    const pageE = await ctxE.newPage();
+    const pseudoE = `Lea${r.slice(4, 8)}x`;
+    await pageE.goto(lien2);
+    await champ(pageE, "Mot de passe du salon").fill(mdp2);
+    await bouton(pageE, "Continuer").click();
+    await expect(titre(pageE, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
+    await champ(pageE, "Pseudonyme pour ce salon").fill(pseudoE);
+    await bouton(pageE, "Entrer dans le salon").click();
+    await expect(fil(pageE)).toBeVisible();
+    await expect(fil(page).getByText(`${pseudoE} a rejoint le salon`)).toBeVisible({ timeout: 60_000 });
+    if (!(await pageE.getByRole("complementary", { name: "Participants" }).isVisible())) await bouton(pageE, "Participants").click();
+    await pageE.getByText("Vous avez créé ce salon\u202f?").click();
+    await expect(pageE.getByText("Vous êtes revenu sans votre lien de gestion\u202f: vous ne pouvez plus exclure ni changer l'invitation. Collez votre lien de gestion pour retrouver ces droits.")).toBeVisible();
+    await expect(pageE.getByRole("button", { name: `Exclure ${pseudoC}`, exact: true })).toHaveCount(0);
+    if (await pageE.getByRole("dialog", { name: "Participants" }).isVisible()) await pageE.keyboard.press("Escape");
+    // Collé dans la saisie : vidée aussitôt, rien envoyé, choix proposé.
+    await saisie(pageE).fill(`mon lien ${gestion}`);
+    await expect(saisie(pageE)).toHaveValue("");
+    await expect(pageE.getByText("Vous avez collé un lien de gestion. Il n'a pas été envoyé", { exact: false })).toBeVisible();
+    await capture(pageE, "salon-lien-gestion-colle");
+    expect(await axe(pageE)).toEqual([]);
+    await bouton(pageE, "Retrouver mes droits de créateur").click();
+    await expect(pageE.getByText("Vous avez retrouvé vos droits de créateur.")).toBeVisible({ timeout: 30_000 });
+    // L'ancienne page de la créatrice est délogée ; la nouvelle a les droits (exclure C).
+    await expect(titre(page, "Fin du salon")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Votre place de créateur a été reprise", { exact: false })).toBeVisible();
+    if (!(await pageE.getByRole("complementary", { name: "Participants" }).isVisible())) await bouton(pageE, "Participants").click();
+    await expect(pageE.getByRole("button", { name: `Exclure ${pseudoC}`, exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(pageE.getByText("Vous avez créé ce salon\u202f?")).toHaveCount(0);
+    if (await pageE.getByRole("dialog", { name: "Participants" }).isVisible()) await pageE.keyboard.press("Escape");
+    const t6 = `Créatrice de retour ${r}`;
+    await envoyer(pageE, t6);
+    await expect(fil(pageC).locator("p.texte").getByText(t6, { exact: true })).toBeVisible({ timeout: 30_000 });
+    // Le lien collé n'est arrivé chez personne.
+    await expect(fil(pageC).getByText(cle(gestion), { exact: false })).toHaveCount(0);
+
     // --- Le serveur ne voit rien (test bloquant, étendu au salon par l'interface) -------------------
     const reperes = [
       needle("texte 1", t1),
@@ -354,6 +395,8 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
       needle("nouvelle clé du lien (octets)", new Uint8Array(Buffer.from(cle(lien2), "base64url"))),
       needle("texte après rechargement", t4),
       needle("texte après exclusion", t5),
+      needle("pseudo E", pseudoE),
+      needle("texte de la créatrice revenue", t6),
       needle("texte long envoyé en .txt", long.slice(0, 60)),
       needle("clé du lien (base64url)", cle(lien)),
       needle("lien de gestion (base64url)", cle(gestion)),
@@ -363,7 +406,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     const dir = shh.server.dataDir;
     expect(scanDir(dir, reperes)).toEqual([]);
     // Destruction par le lien de gestion ouvert SEUL (exigence C-3 32), dans un autre navigateur :
-    // il ne fait entrer personne, dit l'état du salon, détruit. Fin chez A et C, plus rien sur le disque.
+    // il ne fait entrer personne, dit l'état du salon, détruit. Fin chez A, C et E, plus rien sur le disque.
     const ctxD: BrowserContext = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
     try {
       const pageD = await ctxD.newPage();
@@ -383,6 +426,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(pageC.getByText("Ce salon a été détruit.", { exact: false })).toBeVisible();
     await capture(pageC, "salon-fin");
     await expect(titre(page, "Fin du salon")).toBeVisible({ timeout: 30_000 });
+    await expect(titre(pageE, "Fin du salon")).toBeVisible({ timeout: 30_000 });
     expect(scanDir(dir, reperes)).toEqual([]);
     await shh.server.stop();
     expect(scanDir(dir, reperes)).toEqual([]);
@@ -391,6 +435,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     expect(findIn(shh.server.stderr(), reperes)).toEqual([]);
   } finally {
     await ctxC?.close();
+    await ctxE?.close();
     await ctxB.close();
   }
 });

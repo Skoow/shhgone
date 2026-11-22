@@ -134,6 +134,7 @@
     tropLong = null;
     erreur = "";
     texte = "";
+    if (S.intercepterLienGestion(x)) return; // exigence C-3 32 : jamais envoyé, même en .txt
     void S.envoyerFichiers([new File([x], "message.txt", { type: "text/plain" })]);
   }
   /** Silencieux (v3 §14.4) : choix ouvert (toujours, 1 h, 8 h). */
@@ -147,6 +148,7 @@
     tropLong = null;
     const brut = texte;
     if (brut.trim() === "") return;
+    if (intercepte()) return;
     try {
       if (edition) S.modifier(edition, brut);
       else S.envoyerTexte(brut, reponse?.id ?? null);
@@ -175,7 +177,26 @@
     }
   }
   function frappe(): void {
+    if (intercepte()) return;
     if (texte !== "") S.ecrit();
+  }
+  /**
+   * Exigence C-3 32 : un lien de gestion tapé ou collé dans la saisie n'est jamais envoyé (ni
+   * message, ni « écrit ») ; la saisie est vidée et le choix est proposé (salon.svelte.ts).
+   */
+  function intercepte(): boolean {
+    if (!S.intercepterLienGestion(texte)) return false;
+    texte = "";
+    tropLong = null;
+    erreur = "";
+    void tick().then(() => document.getElementById("salon-colle")?.focus());
+    return true;
+  }
+  // Le résultat est dit par le paragraphe role="status" du panneau (pas d'annonce en double).
+  const reprendreDroits = (): Promise<void> => S.reprendreDroits();
+  function fermerColle(): void {
+    S.annulerGestionCollee();
+    saisie?.focus();
   }
   function annulerEdition(): void {
     edition = null;
@@ -471,6 +492,21 @@
               <Button variant="secondary" dense onpress={() => S.confirmerTelQuel(true)}>{t("salon.piece.telquel")}</Button>
               <Button variant="ghost" dense onpress={() => S.confirmerTelQuel(false)}>{t("salon.piece.annuler")}</Button>
             </div>
+          </div>
+        {/if}
+        {#if vue.gestionCollee}
+          <div class="confirmer" id="salon-colle" tabindex="-1" role="group" aria-label={t("salon.colle.titre")}>
+            {#if vue.gestionCollee === "proposee"}
+              <p class="note">{t("salon.colle.proposee")}</p>
+              <p class="note">{t("salon.colle.deloge")}</p>
+              <div class="ligne">
+                <Button variant="secondary" dense onpress={reprendreDroits}>{t("salon.colle.reprendre")}</Button>
+                <Button variant="ghost" dense onpress={fermerColle}>{t("salon.colle.annuler")}</Button>
+              </div>
+            {:else}
+              <p class={vue.gestionCollee === "fait" || vue.gestionCollee === "deja" ? "note" : "err"} role="status">{t(`salon.colle.${vue.gestionCollee}`)}</p>
+              <div class="ligne"><Button variant="ghost" dense onpress={fermerColle}>{t("salon.colle.fermer")}</Button></div>
+            {/if}
           </div>
         {/if}
         {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}

@@ -115,7 +115,10 @@ export class ClientSalon {
   get siege(): number {
     return this.#siege;
   }
-  readonly createur: boolean;
+  /** Créateur : ce client détient S_gestion (dès l'entrée, ou repris par `reprendreLeRole`). */
+  get createur(): boolean {
+    return this.#sGestion !== undefined;
+  }
   #deps: Required<Deps>;
   #cles: ClesSalon;
   #kLien: Uint8Array<ArrayBuffer>;
@@ -168,7 +171,6 @@ export class ClientSalon {
     this.#jeton = e.jeton;
     this.#siege = e.siege;
     this.#nonce = e.nonce;
-    this.createur = sGestion !== undefined;
     this.#commitMs = this.#deps.horloge.maintenant();
     // Rien de rang ≤ celui de notre entrée ne nous concerne (renouvellements d'avant compris).
     this.#depart = e.seq;
@@ -1036,6 +1038,53 @@ export class ClientSalon {
       if (this.#enVol !== f) return;
       this.#envoyerWS(f.octets);
     });
+  }
+
+  /**
+   * Exigence C-3 32 : créateur revenu sans `S_gestion`, qui colle son lien de gestion dans la
+   * conversation. `rejoindre` avec J_gestion (siège 0, sans compter dans les arrivées ; un
+   * S_gestion d'un autre salon : 400, rien ne change ici) ; puis l'ancienne place est rendue
+   * (`0x03` sur l'ancienne connexion) et le client repart au siège 0, état MLS neuf sous la clé de
+   * rôle : le rôle est rendu dès le Commit qui l'ajoute (ou il refonde un groupe orphelin). Seul
+   * J_gestion part au serveur ; S_gestion reste en mémoire du client comme à l'entrée.
+   * Exige une connexion ouverte (sinon l'ancienne place ne pourrait pas être rendue).
+   */
+  async reprendreLeRole(sGestion: Uint8Array): Promise<void> {
+    if (this.#fini || this.#sGestion !== undefined || !this.#lienValide) throw new Error("etat_invalide");
+    if (sGestion.length !== 32) throw new Error("argument_invalide");
+    if (this.#ws?.readyState !== 1) throw new Error("hors_ligne");
+    const e = await ClientSalon.#rejoindre(this.#deps, this.#kLien, this.#cles, sGestion);
+    if (this.#fini) return;
+    if (e.siege !== 0) throw new Error("reponse_invalide");
+    // Ancienne place rendue : départ annoncé, ancienne connexion fermée (son onclose est ignoré).
+    this.#envoyerWS(quitter());
+    const ws = this.#ws;
+    this.#ws = undefined;
+    try {
+      ws?.close(1000);
+    } catch {
+      // déjà fermé
+    }
+    this.#reconnexion?.();
+    this.#reconnexion = undefined;
+    this.#orphelin?.();
+    this.#orphelin = undefined;
+    this.#arreterVol();
+    this.#sGestion = sGestion.slice() as Uint8Array<ArrayBuffer>;
+    this.#jeton = e.jeton;
+    this.#nonce = e.nonce;
+    this.#siege = e.siege;
+    this.#salon?.free();
+    this.#annonces.clear();
+    this.#kps.clear();
+    this.#regles.clear();
+    this.#dernierSeq = 0;
+    this.#depart = e.seq;
+    this.#reprendreLaFile();
+    this.#salon = this.#deps.eng.Salon.creer(e.siege, e.nonce, this.#cles, false, this.#sGestion);
+    this.#emettre({ k: "nouvelleEntree", siege: e.siege });
+    this.#emettre({ k: "groupe", dansLeGroupe: false });
+    this.#connecter(BigInt(e.seq));
   }
 
   // --- Départ, fin ----------------------------------------------------------------------------
