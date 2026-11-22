@@ -23,7 +23,7 @@ env_file=${SHH_ENV_FILE:-$here/.env}
 . "$env_file"
 root=${SHH_DATA_ROOT:-/srv/shhdrop}
 etat=${SHH_ALERTE_ETAT:-/run/shhdrop-alerte}
-mkdir -p -m 0700 "$etat"
+mkdir -p "$etat" && chmod 0700 "$etat"
 
 envoyer() { # $1 : sujet court (nom de fichier d'état), $2 : texte
 	local cle=$1 texte=$2 now last=0

@@ -1081,7 +1081,16 @@ fn pseudo_canon_identique_pour_variantes() {
 // 0-9) ont la même clé, quelle que soit la casse : I, i, l et 1 ; O et 0 ; « rn » et « m ».
 #[test]
 fn pseudo_canon_homoglyphes() {
-    for (a, b) in [("Alice", "AIice"), ("Alice", "A1ice"), ("Alice", "ALICE"), ("Bob", "B0b"), ("Leo", "LE0"), ("Marin", "rnarin"), ("Paul", "PAUI"), ("admin", "ADMIN")] {
+    for (a, b) in [
+        ("Alice", "AIice"),
+        ("Alice", "A1ice"),
+        ("Alice", "ALICE"),
+        ("Bob", "B0b"),
+        ("Leo", "LE0"),
+        ("Marin", "rnarin"),
+        ("Paul", "PAUI"),
+        ("admin", "ADMIN"),
+    ] {
         assert_eq!(pseudo_canon(a), pseudo_canon(b), "{a} / {b}");
     }
     // Des pseudos vraiment différents restent différents.
