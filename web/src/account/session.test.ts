@@ -171,9 +171,9 @@ describe("inscription par passkey", () => {
     expect(C.inscriptionPrete()).toBe(true);
   });
 
-  it("pseudo invalide, réservé ou de forme provisoire : refus avant le navigateur", async () => {
+  it("pseudo invalide ou réservé : refus avant le navigateur", async () => {
     await C.preparerInscription(PREUVE);
-    for (const [p, e] of [["a", "pseudo_longueur"], ["Admin", "pseudo_reserve"], ["membre123456", "pseudo_reserve"]] as const) await expect(C.creerPasskey(p, "fr"), p).rejects.toThrow(e);
+    for (const [p, e] of [["a", "pseudo_longueur"], ["Admin", "pseudo_reserve"]] as const) await expect(C.creerPasskey(p, "fr"), p).rejects.toThrow(e);
     expect(auth.creations).toEqual([]);
   });
 

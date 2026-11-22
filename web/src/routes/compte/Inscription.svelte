@@ -13,6 +13,7 @@
   import { tick, untrack } from "svelte";
   import { abandonnerInscription, account, cleAffichee, creerPasskey, deuxiemeGeste, inscriptionPrete, passkeysDisponibles, preparerInscription, pseudoInviteRetenu, pseudoLibre, terminerInscription, verifierSaisie } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
+  import { getDemo } from "../../app/demo-hooks";
   import { getLang, t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
   import Banner from "../../ui/Banner.svelte";
@@ -181,7 +182,7 @@
     <form novalidate onsubmit={(e) => e.preventDefault()}>
       <TextField label={t("account.pseudo")} hint={t("account.pseudo.hint")} autocomplete="username" autocapitalize="off" spellcheck="false" maxlength={64} error={errPseudo || undefined} bind:value={pseudo} bind:el={elPseudo} oninput={tape} />
       {#if libre !== null && !errPseudo}<p class="dispo" class:pris={!libre} role="status" data-dispo>{libre ? t("account.pseudo.free") : t("account.pseudo.taken")}</p>{/if}
-      <Button type="submit" busy={!pret} disabled={!pret} onpress={creer}>{pret ? t("account.signup.passkey") : t("account.preparing")}</Button>
+      <Button type="submit" busy={!pret} disabled={!pret} onpress={creer}>{pret ? (getDemo()?.signupPasskey ?? t("account.signup.passkey")) : t("account.preparing")}</Button>
       <p class="legal" data-legal>
         {t("account.signup.legal.a")}<a class="lien-t" href={href("/conditions")} target="_blank" rel="noopener noreferrer">{t("account.signup.legal.link")}</a>{t("account.signup.legal.b")}
       </p>

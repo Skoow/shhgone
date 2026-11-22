@@ -319,7 +319,6 @@ async function ePrf(): Promise<Uint8Array> {
 
 /** Pseudo affiché et p_canon ; réservé : Error("pseudo_reserve") ; règle du salon (§39.4). */
 function pseudoCanonDe(s: PseudoMoteur, p: string): { affiche: string; pCanon: string } {
-  if (formeProvisoire(p)) throw new Error("pseudo_reserve");
   const affiche = s.pseudoValide(p);
   const pCanon = s.cleUnicite(affiche);
   if (s.pseudoReserve(pCanon)) throw new Error("pseudo_reserve");
@@ -330,19 +329,6 @@ async function pseudoCanon(p: string): Promise<{ affiche: string; pCanon: string
 }
 
 // --- Saisie (écrans) ----------------------------------------------------------------------------
-
-/**
- * Pseudo provisoire (« Membre » ou « Member » et 6 chiffres, comptes créés avant le 22 novembre,
- * jamais ouverts au public) : personne ne peut le choisir (verifierSaisie le dit réservé).
- */
-export const estPseudoProvisoire = (p: string | undefined | null): boolean => !!p && /^(Membre|Member)\d{6}$/u.test(p);
-/** Forme des pseudos provisoires, quelle que soit la casse : refusée à la saisie (audit du 20 novembre). */
-const formeProvisoire = (p: string) => /^(membre|member)\d{6}$/iu.test(p.trim());
-
-/** Vrai si le compte ouvert a encore un pseudo provisoire (réglage « Proposer mon pseudo » actif). */
-export function pseudoAChoisir(): boolean {
-  return !!ouverte && account.profil?.reglages.proposerProfil === true && estPseudoProvisoire(account.profil.pseudo);
-}
 
 /**
  * Vérifie sur l'appareil, sans requête, le pseudo saisi : pseudo_longueur, pseudo_caracteres,
@@ -779,7 +765,7 @@ export async function pseudoLibreSalon(p: string): Promise<boolean> {
     throw e;
   }
   const mien = ouverte ? account.profil?.pseudo : undefined;
-  if (mien && !estPseudoProvisoire(mien)) {
+  if (mien) {
     const k = await pseudoCanon(mien).then((x) => x.pCanon, () => null);
     if (k === canon) return true;
   }
@@ -828,7 +814,7 @@ export async function creerSalon(entetes: { acces: string; gestion: string }, co
 export function profilPourSalon(): { pseudo: string; photo: Uint8Array | null } | null {
   const p = account.profil;
   if (!ouverte || !p || !p.reglages.proposerProfil) return null;
-  return { pseudo: estPseudoProvisoire(p.pseudo) ? "" : p.pseudo, photo: p.photo };
+  return { pseudo: p.pseudo, photo: p.photo };
 }
 
 // --- Coffres ---------------------------------------------------------------------------------

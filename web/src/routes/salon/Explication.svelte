@@ -8,7 +8,7 @@
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatDuration } from "../../i18n/format";
   import { vue, entrer, pseudoPropose, photoProposee, choisirAvatar, verifierPseudo, conversation } from "../../salon/salon.svelte";
-  import { changerPseudo, pseudoAChoisir, pseudoLibre, pseudoLibreSalon, pseudoInviteRetenu, retenirPseudoInvite, verifierSaisie } from "../../account/session.svelte";
+  import { pseudoLibreSalon, retenirPseudoInvite } from "../../account/session.svelte";
   import { codeDe } from "../compte/erreurs";
   import AvatarPicker from "../../ui/AvatarPicker.svelte";
   import Cadre from "../compte/Cadre.svelte";
@@ -18,8 +18,7 @@
   import { ChevronDown } from "../../ui/Icon";
 
   const refuse = untrack(() => conversation()?.pseudoRefuse === true);
-  // Compte sans vrai pseudo : celui pris comme invité plus tôt dans cet onglet est proposé (il le garde s'il est libre).
-  let pseudo = $state(untrack(() => vue.monPseudo ?? (__COMPTES__ && pseudoAChoisir() ? pseudoInviteRetenu() : null) ?? pseudoPropose()));
+  let pseudo = $state(untrack(() => vue.monPseudo ?? pseudoPropose()));
   let essaye = $state(false);
   let photo = $state<Uint8Array | null>(untrack(() => photoProposee()));
   let champ: HTMLInputElement | undefined = $state();
@@ -28,35 +27,17 @@
   const verdict = $derived((void vue.rev, verifierPseudo(pseudo)));
   let errCompte = $state("");
   const erreur = $derived(errCompte || (essaye || pseudo.length > 0 ? ("code" in verdict ? t(`salon.pseudo.err.${verdict.code}`) : "") : ""));
-  // Compte sans vrai pseudo (pseudo provisoire de l'inscription, 20 novembre) : celui choisi ici
-  // devient le pseudo du compte, unique parmi les comptes (vérifié avant d'entrer).
-  const premier = __COMPTES__ && untrack(() => pseudoAChoisir());
   // Avec un compte et son vrai pseudo (20 novembre, propriétaire : un seul pseudo) : le salon
   // prend le pseudo du compte, non modifiable ici ; il se change dans le profil (3 fois par an).
   // Pseudo du compte déjà pris dans ce salon (course rare, `refuse`) : le champ se libère.
-  const fige = __COMPTES__ && !premier && !refuse && untrack(() => pseudoPropose()) !== "";
+  const fige = __COMPTES__ && !refuse && untrack(() => pseudoPropose()) !== "";
   let envoi = false;
 
   async function go(): Promise<void> {
     essaye = true;
     errCompte = "";
     if (envoi) return;
-    if (premier && !("code" in verdict)) {
-      envoi = true;
-      try {
-        const r = await verifierSaisie({ pseudo });
-        if (r.pseudo) errCompte = t(r.pseudo === "pseudo_reserve" ? "account.err.pseudoReserve" : `salon.pseudo.err.${r.pseudo === "pseudo_longueur" ? "longueur" : r.pseudo === "pseudo_ecritures" ? "ecritures" : "caracteres"}`);
-        else if (!(await pseudoLibre(pseudo))) errCompte = t("account.pseudo.taken");
-        // Enregistré AVANT d'entrer (audit du 20 novembre) : si le serveur refuse (pris entre-temps,
-        // trop d'essais), on le dit ici plutôt que d'entrer avec un pseudo que le compte n'a pas.
-        else await changerPseudo(pseudo);
-      } catch (e) {
-        errCompte = t(codeDe(e) === "pseudo_pris" ? "account.pseudo.taken" : "salon.pseudo.err.compte");
-      } finally {
-        envoi = false;
-      }
-      if (errCompte) return champ?.focus();
-    } else if (__COMPTES__ && !fige && !("code" in verdict)) {
+    if (__COMPTES__ && !fige && !("code" in verdict)) {
       // Invité (ou compte qui garde le salon à part) : unique dans la conversation, et jamais le
       // pseudo d'un autre compte (décision du propriétaire, 22 novembre). Le serveur ne sait pas
       // de quel salon il s'agit ; rien n'est gardé.
@@ -69,7 +50,7 @@
         envoi = false;
       }
       if (errCompte) return champ?.focus();
-      if (!pseudoAChoisir()) retenirPseudoInvite(pseudo);
+      retenirPseudoInvite(pseudo);
     }
     if (!entrer(pseudo)) return champ?.focus();
     if (photo) void choisirAvatar(photo);
@@ -126,7 +107,6 @@
     <!-- Photo pour ce salon (v3 §7.2), facultative : ré-encodée sur l'appareil, envoyée chiffrée. -->
     <!-- Un seul libellé (restes, point 8) : celui du choix de photo, nommé pour le salon. -->
     <AvatarPicker bind:photo initiale={[...pseudo.trim()][0] ?? ""} libelle={t("salon.avatar.photo")} />
-    {#if premier}<p class="note" data-pseudo-compte>{t("salon.intro.pseudo.compte")}</p>{/if}
     {#if fige}<p class="note" data-pseudo-fige>{t("salon.intro.pseudo.fige")}</p>{/if}
     <div class="actions"><Button onpress={go}>{t("salon.intro.enter")}</Button></div>
     {#if !vue.dansLeGroupe && !vue.createur}<p class="note" role="status">{t("salon.intro.wait")}</p>{/if}

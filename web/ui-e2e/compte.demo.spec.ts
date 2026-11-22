@@ -29,7 +29,9 @@ async function inscrire(page: Page, url: string): Promise<string> {
   await expect(page.locator("[data-demo-note]")).toContainText("Dans la démo, aucune passkey n'est créée");
   await page.getByLabel("Pseudo", { exact: true }).fill(PSEUDO);
   await expect(page.locator("[data-dispo]")).toHaveText("Disponible", { timeout: 30_000 });
-  await page.getByRole("button", { name: "Créer avec une passkey", exact: true }).click();
+  // Démo : le bouton dit qu'il simule la passkey (aucune n'est créée), jamais le libellé du site.
+  await expect(page.getByRole("button", { name: "Créer avec une passkey", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Simuler la passkey", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Votre clé de récupération" })).toBeVisible({ timeout: 30_000 });
   const cle = (await page.locator("[data-cle] .g").allTextContents()).join("-");
   await page.getByRole("button", { name: "Je l'ai notée", exact: true }).click();

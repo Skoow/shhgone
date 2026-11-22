@@ -37,10 +37,12 @@ describe("installDemo", async () => {
     expect(await d.solveCaptcha({}, { fallbackOrigin: null, mode: "pow" })).toEqual({ kind: "pow", payload: "demo" });
     setLang("fr");
     expect(d.invalidLinkNote).toBe("(normal en démo : un partage n'existe que dans l'onglet qui l'a créé)");
+    expect(d.signupPasskey).toBe("Simuler la passkey");
     expect(d.securityGaps).toContain("frame-ancestors");
     expect(d.securityGaps).toContain("GitHub reçoit votre adresse IP");
     setLang("en");
     expect(d.invalidLinkNote).toBe("(expected in the demo: a share only exists in the tab that created it)");
+    expect(d.signupPasskey).toBe("Simulate the passkey");
     expect(d.securityGaps).toContain("HSTS");
     expect(d.securityGaps).toContain("GitHub receives your IP address");
   });
