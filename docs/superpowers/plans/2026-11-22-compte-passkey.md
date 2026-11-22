@@ -151,7 +151,7 @@
 
 ## Lot S5 — Passkeys du compte, réauthentification, nouvelle clé de récupération
 
-**État : fait le 22 novembre. Écart signalé : GET passkeys ne rend pas « courante » (le serveur ne garde pas quelle passkey a ouvert une session ; l'appareil le sait : cred_id rendu par connexion/fin) ; passkeys_max (409) pour la onzième. Avec ce lot, web/e2e/compte-sees-nothing.test.ts est refait sans écran (authentificateur logiciel web/e2e/webauthn.ts, calculs de l'appareil par le moteur WebAssembly et WebCrypto) : une partie de T1 ; les parcours ui-e2e restent à T1.**
+**État : fait le 22 novembre. Écart signalé : GET passkeys ne rend pas « courante » (le serveur ne garde pas quelle passkey a ouvert une session ; l'appareil le sait : cred_id rendu par connexion/fin) ; passkeys_max (409) pour la onzième. Avec ce lot, web/e2e/compte-sees-nothing.test.ts est refait sans écran (authentificateur logiciel web/e2e/webauthn.ts, calculs de l'appareil par le moteur WebAssembly et WebCrypto) : une partie de T1 ; les parcours ui-e2e restent à T1. Ajout du 22 novembre (décision du propriétaire, conception §17 « enveloppes multiples ») : table enveloppes (4 par passkey), connexion/fin et reauth/fin rendent enveloppes, passkeys/enveloppe { env } pour la seule passkey qui a signé l'assertion de la session.**
 
 *Dépend de : S4.*
 
@@ -186,14 +186,16 @@
 
 ## Lot S8 — Déploiement : relais SMTP et secrets d'e-mail retirés
 
+**État : fait le 22 novembre. relais-smtp et ses variables retirés de compose.yaml ; deploy.sh refuse SHH_SMTP_*, SHH_MAIL_FROM, un secret shh_smtp_mdp resté et, avec SHH_COMPTES=1, un SHH_DOMAIN autre que shhgone.com ; shhcheck smtp remplacé par shhcheck joindre (relais.go gardé) ; l'alerte de la machine a ses propres variables SHH_ALERTE_SMTP_HOST, SHH_ALERTE_SMTP_USER, SHH_ALERTE_FROM (elle lisait celles du compte : signalé) ; test-restauration : avec une autre clé du serveur, la connexion réussit (la clé ne sert plus qu'aux pseudos). Vérifié : make lint-deploy, test-sortie.sh --statique, make test-restauration (root) ; partie réseau de test-sortie non faite (pas de démon Docker utilisable ici).**
+
 *Dépend de : S2.*
 
 **Files :**
 - Modify : `deploy/compose.yaml` (service `relais-smtp` retiré, `/etc/hosts` du serveur sans `SHH_SMTP_HOST`), `deploy/deploy.sh` (plus de fournisseur d'e-mails exigé ni de secret SMTP), `deploy/env.example`, `deploy/Dockerfile` si concerné, `deploy/test-sortie.sh` (sortie SMTP retirée, sorties de paiement gardées), `deploy/test-restauration.sh` (schéma 3), `deploy/sauvegarder.sh`, `deploy/restaurer.sh` si le schéma y est cité, `deploy/shhcheck/{compte_test.go,main.go}` (contrôle SMTP retiré), `deploy/README.md` §12 (« Compte par passkey : secrets, sauvegarde »), `Makefile` (commentaires de `lint-deploy`, `test-sortie`)
 - Keep : `deploy/shhcheck/relais.go` (**sert encore aux relais de paiement**, conception du paiement §4 : ne pas le supprimer)
 
-- [ ] **Step 1 : tests** — `make test-sortie` : la configuration résolue de compose n'a plus de relais SMTP ni de réseau de sortie pour lui ; les relais de paiement inchangés ; `deploy.sh` refuse une ancienne variable SMTP restée dans `.env` (message clair) ; `make test-restauration` sur une `comptes.db` de schéma 3.
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make lint-deploy`, `make test-sortie`, `make test-restauration` (root). **Step 5 :** commit `chore(deploy): compte sans e-mail — relais SMTP et secrets retirés`.
+- [x] **Step 1 : tests** — `make test-sortie` : la configuration résolue de compose n'a plus de relais SMTP ni de réseau de sortie pour lui ; les relais de paiement inchangés ; `deploy.sh` refuse une ancienne variable SMTP restée dans `.env` (message clair) ; `make test-restauration` sur une `comptes.db` de schéma 3.
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make lint-deploy`, `make test-sortie`, `make test-restauration` (root). **Step 5 :** commit `chore(deploy): compte sans e-mail — relais SMTP et secrets retirés`.
 
 ---
 

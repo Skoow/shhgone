@@ -12,23 +12,22 @@
 #                    (défaut : calculée d'après GOMEMLIMIT et nofile, README §11)
 #   SHH_SALONS_MAX   salons vivants au plus (défaut : 200 ; 50 proposé pour un usage personnel),
 #                    sans effet tant que le salon est désactivé (SHH_SALONS, ci-dessous)
-#   SHH_SMTP_HOST, SHH_SMTP_USER, SHH_MAIL_FROM, SHH_COMPTES_MAX : compte par e-mail
-#                    (README §12), sans effet tant que le compte est désactivé (SHH_COMPTES)
+#   SHH_COMPTES_MAX, SHH_COMPTES_JOUR : compte par passkey (README §12), sans effet tant que le
+#                    compte est désactivé (SHH_COMPTES)
 #
 # Réseau : Caddy utilise le réseau de la machine (il voit donc toujours la vraie adresse
 # du client, en IPv4 comme en IPv6, sans dépendre de la traduction d'adresses de Docker).
 # Le serveur Go est sur un réseau Docker interne, sans route vers Internet et sans port
-# publié : seul Caddy, depuis la machine, peut le joindre. Compte activé seulement : le relais
-# SMTP (même image, « shhcheck relais ») est sur ce réseau interne ET sur le réseau « sortie » ;
-# il recopie chaque connexion du serveur vers le seul SHH_SMTP_HOST:465, sans le laisser
-# choisir. Le serveur n'a donc AUCUNE route vers Internet, même compte activé (README §12).
-# Paiement activé seulement (SHH_PAIEMENT: "1", ci-dessous) : un relais par prestataire
-# configuré (172.30.53.4 Stripe, .5 PayPal, .6 NOWPayments, profils « paiement-… »), même modèle
-# que le relais SMTP, vers le seul hôte de l'API du prestataire, port 443 (README §13 ;
-# conception du paiement §4, S1). Rien d'autre n'est joignable, même paiement activé.
+# publié : seul Caddy, depuis la machine, peut le joindre. Le compte par passkey n'a aucune
+# sortie (plus d'e-mail ni de relais SMTP depuis le 22 novembre). Paiement activé seulement
+# (SHH_PAIEMENT: "1", ci-dessous) : un relais par prestataire configuré (même image,
+# « shhcheck relais », 172.30.53.4 Stripe, .5 PayPal, .6 NOWPayments, profils « paiement-… »),
+# sur ce réseau interne ET sur le réseau « sortie », vers le seul hôte de l'API du prestataire,
+# port 443 (README §13 ; conception du paiement §4, S1). Le serveur n'a donc AUCUNE route vers
+# Internet ; rien d'autre n'est joignable, même paiement activé.
 #
-# Secrets du compte : fichiers de <SHH_DATA_ROOT>/secrets, montés en lecture seule dans
-# /run/secrets, hors de /data (jamais sauvegardés avec la base, jamais en variable
+# Secrets (clé du compte, prestataires) : fichiers de <SHH_DATA_ROOT>/secrets, montés en lecture
+# seule dans /run/secrets, hors de /data (jamais sauvegardés avec la base, jamais en variable
 # d'environnement : docker inspect ne montre que leurs chemins).
 
 name: shhdrop
@@ -105,22 +104,16 @@ services:
       SHH_SEGMENTS_PER_MIN: ${SHH_SEGMENTS_PER_MIN:-}
       # Trames non volatiles rangées au plus par salon (100 000 ≈ 417 Mo de disque).
       SHH_SALON_FRAMES_MAX: ${SHH_SALON_FRAMES_MAX:-}
-      # Compte par e-mail (conception du compte, plan lot 8) : ACTIVÉ (décision D8 du
-      # propriétaire, 19 novembre, sans l'avis du juriste : risque LCEN écrit dans
-      # docs/ouverture-comptes.md). Exige SHH_SALONS: "1" ; deploy.sh démarre le relais SMTP
-      # (profil « comptes ») et refuse d'installer sans les secrets du README §12.2.
-      # Le couper : "0" ici (fichier relu, commité).
+      # Compte par passkey (conception docs/superpowers/specs/2026-11-22-compte-passkey-design.md,
+      # README §12) : ACTIVÉ (décision D8 du propriétaire, 19 novembre, sans l'avis du juriste :
+      # risque LCEN écrit dans docs/ouverture-comptes.md ; ne pas ouvrir au public avant le
+      # passage manuel sur appareils, conception §14). Exige SHH_SALONS: "1" et, pour deploy.sh,
+      # SHH_DOMAIN=shhgone.com : l'hôte de SHH_ORIGIN est le rp.id des passkeys, définitif (R1).
+      # Aucun e-mail, aucun relais, aucune sortie. Le couper : "0" ici (fichier relu, commité).
       SHH_COMPTES: "1"
       SHH_COMPTES_MAX: ${SHH_COMPTES_MAX:-}
+      SHH_COMPTES_JOUR: ${SHH_COMPTES_JOUR:-}
       SHH_COMPTES_CLE_FILE: /run/secrets/shh_comptes_cle
-      # Nom du fournisseur : le serveur le résout par son /etc/hosts (extra_hosts, plus bas)
-      # vers le relais, et vérifie le certificat TLS pour ce nom (TLS de bout en bout).
-      SHH_SMTP_HOST: ${SHH_SMTP_HOST:-}
-      # 465 (TLS implicite) seulement : c'est aussi le port du relais et de sa cible.
-      SHH_SMTP_PORT: "465"
-      SHH_SMTP_USER: ${SHH_SMTP_USER:-}
-      SHH_SMTP_PASSWORD_FILE: /run/secrets/shh_smtp_mdp
-      SHH_MAIL_FROM: ${SHH_MAIL_FROM:-}
       # Paiement des offres Plus et Pro (conception du paiement, docs/superpowers/specs/
       # 2026-11-19-paiement-design.md) : DÉSACTIVÉ tant que le propriétaire n'a pas fourni ce
       # que liste son §13 (comptes des prestataires, régime de TVA, mentions des notes de
@@ -145,12 +138,10 @@ services:
     networks:
       interne:
         ipv4_address: 172.30.53.2
-    # Le nom du fournisseur d'envoi désigne le relais, seule adresse joignable. Sans
-    # SHH_SMTP_HOST : une ligne inoffensive (nom réservé .invalid).
+    # API des prestataires de paiement : chacune désigne son relais (hôte de production ou de bac
+    # à sable, choisi par deploy.sh d'après SHH_PAIEMENT_ESSAI), seule adresse joignable. Relais
+    # arrêté : rien.
     extra_hosts:
-      - "${SHH_SMTP_HOST:-smtp.invalid}:172.30.53.3"
-      # API des prestataires de paiement : chacune désigne son relais (hôte de production ou de
-      # bac à sable, choisi par deploy.sh d'après SHH_PAIEMENT_ESSAI). Relais arrêté : rien.
       - "${SHH_HOTE_STRIPE:-api.stripe.com}:172.30.53.4"
       - "${SHH_HOTE_PAYPAL:-api-m.paypal.com}:172.30.53.5"
       - "${SHH_HOTE_NOWPAYMENTS:-api.nowpayments.io}:172.30.53.6"
@@ -163,8 +154,8 @@ services:
         target: /data
         bind:
           create_host_path: false
-      # Secrets du compte (clé du serveur, mot de passe SMTP) : dossier du volume chiffré,
-      # root:65532 0750, fichiers 65532 0400 (README §12), lecture seule, hors de /data.
+      # Secrets (clé du serveur du compte, prestataires de paiement) : dossier du volume chiffré,
+      # root:65532 0750, fichiers 65532 0400 (README §12, §13), lecture seule, hors de /data.
       # Exigé même compte désactivé (dossier vide) : jamais créé par Docker sur le disque
       # système.
       - type: bind
@@ -190,42 +181,6 @@ services:
       retries: 3
       start_period: 30s
       start_interval: 2s
-
-  # Relais SMTP : seule sortie vers Internet, et seulement compte activé (profil « comptes »,
-  # posé par deploy.sh quand SHH_COMPTES vaut "1" ci-dessus). Même image que le serveur
-  # (binaire /shhcheck, deploy/shhcheck/relais.go) : aucune image de plus à épingler. Il recopie
-  # chaque connexion reçue sur 172.30.53.3:465 vers SHH_SMTP_HOST:465, résolu à chaque
-  # connexion, sans rien laisser choisir au client ; TLS reste de bout en bout entre le serveur
-  # et le fournisseur (le relais ne voit que des octets chiffrés). 4 connexions à la fois, 60 s
-  # chacune au plus ; rien n'est écrit.
-  relais-smtp:
-    image: ${SHH_IMAGE:?SHH_IMAGE manquant (dépôt@sha256:…)}
-    profiles: ["comptes"]
-    restart: unless-stopped
-    entrypoint: ["/shhcheck"]
-    command: ["relais", "172.30.53.3:465", "${SHH_SMTP_HOST:-}:465"]
-    user: "65532:65532"
-    read_only: true
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    # Écouter sur 465 sans capacité : réglage par défaut de Docker, rendu explicite.
-    sysctls:
-      net.ipv4.ip_unprivileged_port_start: "0"
-    ulimits:
-      core: 0
-      nofile: 1024
-    pids_limit: 64
-    mem_limit: 64m
-    memswap_limit: 64m
-    cpus: 0.25
-    environment:
-      GOMEMLIMIT: 48MiB
-    networks:
-      interne:
-        ipv4_address: 172.30.53.3
-      sortie: {}
-    logging:
-      driver: none
 
   # Relais TURN des appels audio et vidéo du salon (profil « appels », posé par deploy.sh sauf
   # SHH_APPELS=0 dans deploy/.env ; conception des appels, README §14). Même image (binaire
@@ -272,9 +227,12 @@ services:
 
   # Relais des prestataires de paiement (profils « paiement-stripe », « paiement-paypal »,
   # « paiement-nowpayments », posés par deploy.sh pour chaque prestataire configuré, paiement
-  # activé). Même binaire et mêmes règles que le relais SMTP : une seule cible, l'hôte de l'API
-  # sur 443, TLS de bout en bout (certificat vérifié par le serveur pour ce nom) ; 16 connexions
-  # à la fois, 60 s chacune au plus (le serveur ouvre une connexion par appel, délai 20 s).
+  # activé). Même image que le serveur (binaire /shhcheck, deploy/shhcheck/relais.go) : aucune
+  # image de plus à épingler. Chacun recopie chaque connexion reçue vers une seule cible, l'hôte
+  # de l'API sur 443, résolu à chaque connexion, sans rien laisser choisir au client ; TLS de bout
+  # en bout (certificat vérifié par le serveur pour ce nom, le relais ne voit que des octets
+  # chiffrés) ; 16 connexions à la fois, 60 s chacune au plus (le serveur ouvre une connexion par
+  # appel, délai 20 s) ; rien n'est écrit.
   relais-stripe:
     image: ${SHH_IMAGE:?SHH_IMAGE manquant (dépôt@sha256:…)}
     profiles: ["paiement-stripe"]
@@ -412,16 +370,17 @@ services:
 
 networks:
   interne:
-    # Aucune sortie vers Internet depuis le serveur Go, même compte ou paiement activé : il ne
-    # joint que les relais (172.30.53.3 SMTP, .4 à .6 prestataires de paiement), sur ce réseau.
-    # /29 : .1 passerelle (Caddy, sur la machine), .2 serveur, .3 à .6 relais ; plus de place.
+    # Aucune sortie vers Internet depuis le serveur Go, même paiement activé : il ne joint que les
+    # relais des prestataires de paiement (.4 à .6), sur ce réseau. /29 : .1 passerelle (Caddy, sur
+    # la machine), .2 serveur, .3 libre (ancien relais SMTP, retiré le 22 novembre), .4 à .6
+    # relais.
     internal: true
     ipam:
       config:
         - subnet: 172.30.53.0/29
           gateway: 172.30.53.1
-  # Sortie des seuls relais (réseau créé seulement avec le profil « comptes » ou un profil
-  # « paiement-… »). Ni le serveur ni Caddy n'y sont ; aucun port publié.
+  # Sortie des seuls relais de paiement (réseau créé seulement avec un profil « paiement-… »).
+  # Ni le serveur ni Caddy n'y sont ; aucun port publié.
   sortie:
     ipam:
       config:

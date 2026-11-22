@@ -165,14 +165,14 @@ export SHH_ALERTE_MONTE='echo oui'
 SHH_ALERTE_MAINTENANT=$((NOW + 2 * 3600)) relance boot
 [ ! -s "$work/boot.out2" ] || ko "boot : alerte répétée après le même démarrage : $(cat "$work/boot.out2")"
 # Volume verrouillé, aucun mot de passe lisible avec un destinataire : pas d'arrêt du script.
-printf 'SHH_ALERTE_A=alerte@exemple.test\nSHH_SMTP_HOST=smtp.exemple.test\nSHH_SMTP_USER=u\nSHH_MAIL_FROM=a@exemple.test\n' >>"$work/env"
+printf 'SHH_ALERTE_A=alerte@exemple.test\nSHH_ALERTE_SMTP_HOST=smtp.exemple.test\nSHH_ALERTE_SMTP_USER=u\nSHH_ALERTE_FROM=a@exemple.test\n' >>"$work/env"
 export SHH_ALERTE_MDP_FICHIER="$work/absent" SHH_ALERTE_BOOT_ID='echo boot-3' SHH_ALERTE_MONTE='echo non'
 export SHH_ALERTE_ETAT="$work/etat-boot"
 SHH_ALERTE_MAINTENANT=$((NOW + 3 * 3600)) "$here/alerte.sh" >"$work/boot3.out" 2>"$work/boot3.err" || ko "boot3 : arrêt sans mot de passe lisible ($(cat "$work/boot3.err"))"
 grep -q "aucun mot de passe SMTP lisible" "$work/boot3.err" || ko "boot3 : constat absent"
 grep -q "^ALERTE URGENT redemarre" "$work/boot3.out" || ko "boot3 : redémarrage non constaté"
 [ "$(cat "$work/etat-boot/boot-id")" = boot-1 ] || [ "$(cat "$work/etat-boot/boot-id")" = boot-2 ] || ko "boot3 : identifiant retenu sans envoi"
-sed -i '/^SHH_ALERTE_A=/d;/^SHH_SMTP_HOST=/d;/^SHH_SMTP_USER=/d;/^SHH_MAIL_FROM=/d' "$work/env"
+sed -i '/^SHH_ALERTE_A=/d;/^SHH_ALERTE_SMTP_HOST=/d;/^SHH_ALERTE_SMTP_USER=/d;/^SHH_ALERTE_FROM=/d' "$work/env"
 unset SHH_ALERTE_MDP_FICHIER
 
 # 4. Domaine illisible (RDAP muet, pas de date notée) puis date notée en secours.
@@ -196,8 +196,8 @@ attendu sans-sauvegarde "Bilan bilan"
 sain
 printf 'SHH_ALERTE_A=alerte@exemple.test\n' >>"$work/env"
 export SHH_ALERTE_ETAT="$work/etat-smtp"
-if "$here/alerte.sh" >/dev/null 2>"$work/smtp.err"; then ko "smtp : accepté sans SHH_SMTP_HOST"; fi
-grep -q "SHH_SMTP_HOST" "$work/smtp.err" || ko "smtp : message $(cat "$work/smtp.err")"
+if "$here/alerte.sh" >/dev/null 2>"$work/smtp.err"; then ko "smtp : accepté sans SHH_ALERTE_SMTP_HOST"; fi
+grep -q "SHH_ALERTE_SMTP_HOST" "$work/smtp.err" || ko "smtp : message $(cat "$work/smtp.err")"
 
 [ "$echec" = 0 ] && printf 'test-alerte : ok\n'
 exit "$echec"

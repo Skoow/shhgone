@@ -13,15 +13,14 @@
 //	    Autorités : celles du système, ou le fichier désigné par SSL_CERT_FILE.
 //
 //	shhcheck relais <écoute IP:port> <cible hôte:port> [connexions]
-//	    Relais de sortie, seules sorties du serveur Go vers Internet (SMTP du compte, API des
-//	    prestataires de paiement) : recopie chaque connexion reçue vers la seule cible fixée ici
-//	    (relais.go), au plus [connexions] à la fois (1 à 64, 4 par défaut). Ne rend la main
-//	    qu'en cas d'erreur.
+//	    Relais de sortie, seules sorties du serveur Go vers Internet (API des prestataires de
+//	    paiement) : recopie chaque connexion reçue vers la seule cible fixée ici (relais.go), au
+//	    plus [connexions] à la fois (1 à 64, 4 par défaut). Ne rend la main qu'en cas d'erreur.
 //
-//	shhcheck smtp <hôte:port>
-//	    Contrôle d'exploitation : TLS implicite vers hôte:port, certificat valide pour hôte,
-//	    accueil SMTP « 220 », puis QUIT ; aucune authentification, aucun e-mail. Lancé dans le
-//	    conteneur du serveur, il passe par le relais (deploy.sh, compte activé).
+//	shhcheck joindre <hôte:port>
+//	    Contrôle d'exploitation : poignée de main TLS vers hôte:port, certificat valide pour hôte,
+//	    rien d'autre n'est envoyé. Lancé dans le conteneur du serveur (deploy/test-sortie.sh), il
+//	    prouve qu'une API n'est joignable qu'à travers son relais.
 //
 //	shhcheck turn
 //	    Relais TURN des appels audio et vidéo du salon (turn.go) ; réglages par l'environnement.
@@ -62,12 +61,12 @@ func main() {
 			exit(turnMain())
 		case os.Args[1] == "stun" && len(os.Args) == 3:
 			exit(stunMain(os.Args[2]))
-		case os.Args[1] == "smtp" && len(os.Args) == 3:
-			exit(smtpMain(os.Args[2]))
+		case os.Args[1] == "joindre" && len(os.Args) == 3:
+			exit(joindreMain(os.Args[2]))
 		}
 	}
 	fmt.Fprintln(os.Stderr, "usage: shhcheck health [hôte:port] | shhcheck tls <hôte:port> <nom du site>\n"+
-		"       shhcheck relais <écoute IP:port> <cible hôte:port> [connexions] | shhcheck smtp <hôte:port>\n"+
+		"       shhcheck relais <écoute IP:port> <cible hôte:port> [connexions] | shhcheck joindre <hôte:port>\n"+
 		"       shhcheck turn")
 	os.Exit(2)
 }

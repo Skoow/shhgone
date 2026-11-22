@@ -13,12 +13,14 @@
 #
 # Réglages : deploy/.env (modèle : deploy/env.example). Aucun secret qui ouvre quoi que ce soit :
 # le tableau de bord n'y a que l'EMPREINTE de son jeton (SHH_ADMIN_TOKEN_SHA256, README §4), le
-# jeton reste chez l'exploitant ; la clé du serveur et le mot de passe SMTP du compte sont des
-# fichiers de <SHH_DATA_ROOT>/secrets (README §12), jamais des variables. Tout deploy/.env est
-# exporté aux commandes de ce script (set -a). Compte activé (SHH_COMPTES: "1" dans
-# compose.yaml) : relais SMTP démarré, secrets vérifiés avant l'installation, fournisseur
-# d'envoi contrôlé après (avertissement seulement). Paiement activé (SHH_PAIEMENT: "1") : un
-# relais par prestataire dont les secrets sont dans <SHH_DATA_ROOT>/secrets (README §13).
+# jeton reste chez l'exploitant ; la clé du serveur du compte est un fichier de
+# <SHH_DATA_ROOT>/secrets (README §12), jamais une variable. Tout deploy/.env est exporté aux
+# commandes de ce script (set -a). Compte par passkey activé (SHH_COMPTES: "1" dans
+# compose.yaml) : clé vérifiée avant l'installation, SHH_DOMAIN exigé à shhgone.com (rp.id des
+# passkeys, définitif) ; aucun e-mail, aucun relais (une ancienne variable SHH_SMTP_* ou
+# SHH_MAIL_FROM, ou un ancien secret shh_smtp_mdp, fait refuser l'installation). Paiement
+# activé (SHH_PAIEMENT: "1") : un relais par prestataire dont les secrets sont dans
+# <SHH_DATA_ROOT>/secrets (README §13).
 # État : deploy/.release (empreinte en service) et deploy/.release.prev (la précédente).
 #
 # Limites, dites aussi dans le README :
@@ -63,15 +65,25 @@ cur=$(cat .release 2>/dev/null || true)
 prev=$(cat .release.prev 2>/dev/null || true)
 valid() { [[ $1 =~ ^sha256:[0-9a-f]{64}$ ]]; }
 
-# Compte par e-mail (README §12) : activé seulement par compose.yaml (SHH_COMPTES: "1", fichier
-# relu et commité), jamais par deploy/.env. Activé, le relais SMTP (profil « comptes ») est
-# démarré ; désactivé, il est arrêté s'il tournait encore.
+# Compte par passkey (README §12) : activé seulement par compose.yaml (SHH_COMPTES: "1", fichier
+# relu et commité), jamais par deploy/.env. Aucun relais : le compte n'a aucune sortie.
 [ "$(grep -cE '^ +SHH_COMPTES:' compose.yaml)" = 1 ] ||
 	die "compose.yaml : une seule ligne SHH_COMPTES attendue"
 comptes=$(sed -nE 's/^ +SHH_COMPTES: "([01])"$/\1/p' compose.yaml)
 [ "$comptes" = 0 ] || [ "$comptes" = 1 ] || die "compose.yaml : SHH_COMPTES doit valoir \"0\" ou \"1\""
+# Compte par e-mail, retiré le 22 novembre : une variable d'envoi d'e-mails restée dans
+# deploy/.env désigne un secret qui traîne ou une installation ancienne ; jamais ignorée.
+for v in $(compgen -v); do
+	case $v in
+	SHH_SMTP_* | SHH_MAIL_FROM) die "deploy/.env : $v ne sert plus (compte par e-mail retiré le 22 novembre, compte par passkey) : l'ôter (README §12)" ;;
+	esac
+done
+# rp.id des passkeys = hôte de SHH_ORIGIN (https://SHH_DOMAIN) : définitif, le changer rend
+# toutes les passkeys inutilisables (conception du compte par passkey R1, Q7 : shhgone.com).
+if [ "$comptes" = 1 ] && [ "$SHH_DOMAIN" != shhgone.com ]; then
+	die "compte activé : SHH_DOMAIN doit valoir shhgone.com (identifiant des passkeys, définitif ; README §12)"
+fi
 profils=
-if [ "$comptes" = 1 ]; then profils=comptes; fi
 secrets=$SHH_DATA_ROOT/secrets
 
 # Paiement (README §13 ; conception du paiement §10, S1) : interrupteurs dans compose.yaml
@@ -207,15 +219,15 @@ preflight() {
 		die "$secrets absent ou mal réglé : install -d -o root -g 65532 -m 0750 $secrets (README §12)"
 	if [ "$comptes" = 1 ]; then
 		grep -qE '^ +SHH_SALONS: "1"$' compose.yaml || die "SHH_COMPTES=1 exige SHH_SALONS: \"1\" dans compose.yaml"
-		[ -n "${SHH_SMTP_HOST:-}" ] && [ -n "${SHH_SMTP_USER:-}" ] && [ -n "${SHH_MAIL_FROM:-}" ] ||
-			die "compte activé : SHH_SMTP_HOST, SHH_SMTP_USER et SHH_MAIL_FROM manquent dans deploy/.env (README §12)"
-		local f
-		for f in shh_comptes_cle shh_smtp_mdp; do
-			[ -f "$secrets/$f" ] && [ ! -L "$secrets/$f" ] && [ "$(stat -c '%u %a' "$secrets/$f")" = "65532 400" ] ||
-				die "$secrets/$f absent ou mal réglé : fichier du compte 65532, droits 0400 (README §12)"
-		done
+		[ -f "$secrets/shh_comptes_cle" ] && [ ! -L "$secrets/shh_comptes_cle" ] &&
+			[ "$(stat -c '%u %a' "$secrets/shh_comptes_cle")" = "65532 400" ] ||
+			die "$secrets/shh_comptes_cle absent ou mal réglé : fichier du compte 65532, droits 0400 (README §12)"
 		[ "$(stat -c %s "$secrets/shh_comptes_cle")" = 32 ] ||
 			die "$secrets/shh_comptes_cle : 32 octets attendus (README §12)"
+	fi
+	# Ancien mot de passe SMTP (compte par e-mail, retiré) : un secret qui ne sert plus ne reste pas.
+	if [ -e "$secrets/shh_smtp_mdp" ] || [ -L "$secrets/shh_smtp_mdp" ]; then
+		die "$secrets/shh_smtp_mdp ne sert plus (compte par e-mail retiré le 22 novembre) : l'effacer (shred -u), puis révoquer ce mot de passe chez le fournisseur (README §12)"
 	fi
 	if [ "$paiement" = 1 ]; then
 		[ -n "${SHH_TVA:-}" ] || die "paiement activé : SHH_TVA manque dans deploy/.env (franchise, france ou oss, README §13)"
@@ -294,14 +306,6 @@ check() {
 			--log-driver none --entrypoint /shhcheck "$SHH_IMAGE_REPO@$1" stun 127.0.0.1:3478 ||
 			echo "AVERTISSEMENT : le relais des appels ne répond pas sur 127.0.0.1:3478 (README §14) : les appels ne marcheront pas." >&2
 	fi
-	# 6. Compte activé : le fournisseur d'envoi répond, à travers le relais, en TLS vérifié pour
-	#    SHH_SMTP_HOST (accueil SMTP puis QUIT ; ni connexion au compte, ni e-mail). Simple
-	#    avertissement : une panne du fournisseur ne doit pas faire revenir à l'image d'avant,
-	#    mais sans lui, aucun code n'arrive et rien d'autre ne le dit (aucun journal).
-	if [ "$comptes" = 1 ]; then
-		dc "$1" exec -T shhdrop /shhcheck smtp "$SHH_SMTP_HOST:465" ||
-			echo "AVERTISSEMENT : $SHH_SMTP_HOST:465 injoignable depuis le serveur (relais SMTP, README §12) : aucun e-mail ne partira." >&2
-	fi
 }
 
 install_version() {
@@ -319,10 +323,9 @@ install_version() {
 
 	echo "installation de $new"
 	dc "$new" up -d --remove-orphans || true # l'échec éventuel est constaté par check
-	# Compte désactivé : le relais SMTP d'une activation précédente ne doit pas rester (un
-	# service hors profil n'est pas un « orphelin » pour --remove-orphans).
-	if [ "$comptes" = 0 ]; then dc "$new" rm -sf relais-smtp >/dev/null 2>&1 || true; fi
-	# Même chose pour les relais des prestataires absents ou paiement désactivé.
+	# Relais des prestataires absents ou paiement désactivé : ceux d'une activation précédente ne
+	# doivent pas rester (un service hors profil n'est pas un « orphelin » pour --remove-orphans ;
+	# l'ancien relais SMTP, retiré de compose.yaml, l'est).
 	if [ "$avec_stripe" = 0 ]; then dc "$new" rm -sf relais-stripe >/dev/null 2>&1 || true; fi
 	if [ "$avec_paypal" = 0 ]; then dc "$new" rm -sf relais-paypal >/dev/null 2>&1 || true; fi
 	if [ "$avec_nowpayments" = 0 ]; then dc "$new" rm -sf relais-nowpayments >/dev/null 2>&1 || true; fi

@@ -83,7 +83,7 @@ COPY --from=engine /out/paiement/pkg ./src/paiement/pkg
 # check-dist.mjs : le build de production est conforme (variantes .br et .gz exactes,
 # aucun code de démo, aucune adresse http(s):// externe dans index.html, le CSS et
 # pdf-frame.html). Un écart arrête le build de l'image.
-# Compte par e-mail construit (décision D8 du propriétaire, 19 novembre) : --comptes exige
+# Compte construit (décision D8 du propriétaire, 19 novembre ; par passkey depuis le 22 novembre) : --comptes exige
 # alors le module de compte. Même valeur que web/scripts/repro.sh (images comparées en CI).
 RUN SHH_SITE_COMPTES=1 SHH_ENGINE_PREBUILT=1 npm run build && node scripts/check-dist.mjs --comptes
 
@@ -120,11 +120,10 @@ RUN mkdir -m 0700 /out/data
 
 # --- Image finale : rien d'autre que deux binaires, le site et les certificats racine -----
 # scratch : ni shell, ni bibliothèque, ni gestionnaire de paquets. Connexions sortantes du
-# serveur : SMTP en TLS vérifié vers SHH_SMTP_HOST, avec SHH_COMPTES=1 seulement, et l'API de
-# chaque prestataire de paiement configuré, avec SHH_PAIEMENT=1 seulement (compose.yaml)
-# (internal/courriel/smtp.go, conception du compte §3.2) ; elles exigent les certificats racine,
+# serveur : l'API de chaque prestataire de paiement configuré, avec SHH_PAIEMENT=1 seulement
+# (compose.yaml ; plus de SMTP depuis le compte par passkey, 22 novembre) ; elles exigent les certificats racine,
 # copiés de l'étape server (paquet ca-certificates de l'image golang épinglée ci-dessus), au
-# chemin que lit crypto/x509 sous Linux. Avec SHH_COMPTES=0, ils ne servent à rien.
+# chemin que lit crypto/x509 sous Linux.
 FROM scratch
 COPY --from=server /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=server /out/shhdrop /out/shhcheck /

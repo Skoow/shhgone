@@ -1,13 +1,13 @@
 package main
 
-// Relais de sortie (plan du compte, lot 8 ; conception du compte §3.2 ; conception du paiement
-// §4, S1) : les seules sorties du serveur Go vers Internet, une par cible (SMTP du compte, API
-// des trois prestataires de paiement). Le serveur reste sur le réseau Docker interne (aucune route vers Internet) ;
-// son /etc/hosts fait pointer SHH_SMTP_HOST vers ce relais, qui recopie les octets, dans les
-// deux sens, vers une seule cible fixée au démarrage (hôte:port du fournisseur d'envoi). Le
-// client ne choisit rien : quoi qu'il envoie, la connexion part vers cette cible. TLS est de
-// bout en bout entre le serveur Go et le fournisseur (certificat vérifié pour SHH_SMTP_HOST par
-// le serveur) : le relais ne voit que des octets chiffrés. Il n'écrit rien (ni journal, ni
+// Relais de sortie (conception du paiement §4, S1 ; d'abord écrit pour le relais SMTP du compte
+// par e-mail, retiré le 22 novembre) : les seules sorties du serveur Go vers Internet, une par
+// cible (API des trois prestataires de paiement). Le serveur reste sur le réseau Docker interne
+// (aucune route vers Internet) ; son /etc/hosts fait pointer le nom de l'API vers ce relais, qui
+// recopie les octets, dans les deux sens, vers une seule cible fixée au démarrage (hôte:port).
+// Le client ne choisit rien : quoi qu'il envoie, la connexion part vers cette cible. TLS est de
+// bout en bout entre le serveur Go et le prestataire (certificat vérifié pour ce nom par le
+// serveur) : le relais ne voit que des octets chiffrés. Il n'écrit rien (ni journal, ni
 // adresse), sauf un refus de démarrer.
 
 import (
@@ -32,11 +32,11 @@ type relais struct {
 }
 
 // nouveauRelais : cible « hôte:port », hôte en minuscules ([a-z0-9-], étiquettes non vides,
-// sans tiret en bord : la règle de SHH_SMTP_HOST) ou adresse IP sans zone, port 1 à 65535.
+// sans tiret en bord) ou adresse IP sans zone, port 1 à 65535.
 func nouveauRelais(cible string) (*relais, error) {
 	h, p, err := net.SplitHostPort(cible)
 	if err != nil || h == "" {
-		return nil, fmt.Errorf("cible du relais invalide (hôte:port ; SHH_SMTP_HOST manquant ?) : %q", cible)
+		return nil, fmt.Errorf("cible du relais invalide (hôte:port) : %q", cible)
 	}
 	if n, err := strconv.Atoi(p); err != nil || n < 1 || n > 65535 || strconv.Itoa(n) != p {
 		return nil, fmt.Errorf("port de la cible invalide : %q", cible)
@@ -159,37 +159,26 @@ func relaisMain(ecoute, cible, max string) error {
 	return r.servir(ln)
 }
 
-// smtpAccueil : contrôle d'exploitation (deploy.sh, avec le compte activé) : TLS implicite vers
-// addr, certificat valide pour nom (autorités : roots, ou celles du système si nil), puis un
-// accueil SMTP « 220 », puis QUIT. Aucune authentification, aucun e-mail.
-func smtpAccueil(addr, nom string, roots *x509.CertPool) error {
+// joignable : contrôle d'exploitation (test-sortie.sh) : TLS vers addr, certificat valide pour
+// nom (autorités : roots, ou celles du système si nil) ; poignée de main seulement, rien
+// d'autre n'est envoyé. Sert à prouver qu'une API n'est joignable qu'à travers son relais.
+func joignable(addr, nom string, roots *x509.CertPool) error {
 	d := &net.Dialer{Timeout: 5 * time.Second}
 	c, err := tls.DialWithDialer(d, "tcp", addr, &tls.Config{ServerName: nom, MinVersion: tls.VersionTLS12, RootCAs: roots})
 	if err != nil {
 		return err
 	}
-	defer c.Close()
-	c.SetDeadline(time.Now().Add(10 * time.Second))
-	var b [512]byte
-	n, err := c.Read(b[:])
-	if err != nil {
-		return err
-	}
-	if l := string(b[:n]); !strings.HasPrefix(l, "220") {
-		return fmt.Errorf("accueil SMTP inattendu (%d octets, pas « 220 »)", n)
-	}
-	_, err = c.Write([]byte("QUIT\r\n"))
-	return err
+	return c.Close()
 }
 
-func smtpMain(addr string) error {
+func joindreMain(addr string) error {
 	h, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return err
 	}
-	if err := smtpAccueil(addr, h, nil); err != nil {
+	if err := joignable(addr, h, nil); err != nil {
 		return err
 	}
-	fmt.Printf("SMTP joignable en TLS vérifié : %s\n", addr)
+	fmt.Printf("joignable en TLS vérifié : %s\n", addr)
 	return nil
 }
