@@ -2,8 +2,14 @@
 // Photo de profil (conception compte §21.15.3, salon v3 §7.2) : ré-encodage sur l'appareil en
 // 256 × 256, carré pris au centre, 64 Ko au plus, sans métadonnées (le canevas ne recopie que les
 // pixels) ; qualité baissée jusqu'à tenir ; image illisible : message, rien de gardé.
-import { describe, expect, it, vi } from "vitest";
+// Choix de la photo (AvatarPicker) : un seul libellé, celui de l'écran qui l'emploie (restes du
+// salon, point 8 : la page d'explication affichait « Photo pour ce salon (facultative) » puis
+// « Photo de profil · Facultative »).
+import { flushSync, mount, unmount } from "svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { setLang } from "../i18n/i18n.svelte";
 import { AVATAR_MAX, AVATAR_PX, carreCentre, reencoder } from "./avatar";
+import AvatarPicker from "./AvatarPicker.svelte";
 
 describe("avatar", () => {
   it("carré au centre : paysage, portrait, carré", () => {
@@ -30,5 +36,35 @@ describe("avatar", () => {
     const toile = () => ({ dessiner: () => undefined, encoder: async () => new Uint8Array(AVATAR_MAX + 1) });
     await expect(reencoder(new Blob(["x"]), { decoder: async () => ({ width: 10, height: 10, close: () => undefined }), toile })).rejects.toThrow("photo_illisible");
     await expect(reencoder(new Blob(["x"]), { decoder: async () => Promise.reject(new Error("x")), toile })).rejects.toThrow("photo_illisible");
+  });
+});
+
+let app: Record<string, unknown> | null = null;
+afterEach(() => {
+  if (app) unmount(app);
+  app = null;
+  document.body.innerHTML = "";
+});
+
+describe("AvatarPicker", () => {
+  it("libellé par défaut : « Photo de profil · Facultative », nom du groupe", () => {
+    setLang("fr");
+    app = mount(AvatarPicker, { target: document.body, props: {} });
+    flushSync();
+    const g = document.querySelector('[role="group"]')!;
+    const l = document.getElementById(g.getAttribute("aria-labelledby")!)!;
+    expect(l.textContent!.replace(/\s+/g, " ").trim()).toBe("Photo de profil · Facultative");
+  });
+
+  it("libellé donné (salon) : seul affiché, une seule fois", () => {
+    setLang("fr");
+    app = mount(AvatarPicker, { target: document.body, props: { libelle: "Photo pour ce salon" } });
+    flushSync();
+    const texte = document.body.textContent!;
+    expect(texte).not.toContain("Photo de profil");
+    expect(texte.split("Photo pour ce salon").length - 1).toBe(1);
+    const g = document.querySelector('[role="group"]')!;
+    expect(document.getElementById(g.getAttribute("aria-labelledby")!)!.textContent).toContain("Photo pour ce salon");
+    expect(texte).toContain("Facultative");
   });
 });

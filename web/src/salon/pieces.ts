@@ -68,6 +68,40 @@ export async function envoyerPiece(n: api.Net, jeton: string, blob: Blob, o: { n
   }
 }
 
+/** Taille d'un lot de morceaux déchiffrés gardés par la page avant de passer au Blob. */
+const LOT = 8 * 1048576;
+
+/**
+ * Assemble un fichier déchiffré par lots (restes du salon, point 6) : la page ne garde que le lot
+ * en cours (8 Mio au plus) ; chaque lot plein devient un Blob, que le navigateur peut garder hors
+ * de la mémoire de la page (Chromium écrit les gros Blobs sur le disque). Avant : tous les
+ * morceaux, puis leur copie dans le Blob final, soit deux fois la taille du fichier au pic.
+ * Chaque morceau reçu est copié puis effacé (comme avant).
+ */
+export class Lots {
+  #faits: Blob[] = [];
+  #lot: Uint8Array<ArrayBuffer>[] = [];
+  enAttente = 0;
+  constructor(private readonly taille = LOT) {}
+  ajouter(c: Uint8Array): void {
+    this.#lot.push(c.slice() as Uint8Array<ArrayBuffer>);
+    this.enAttente += c.length;
+    c.fill(0);
+    if (this.enAttente >= this.taille) this.#vider();
+  }
+  #vider(): void {
+    if (this.#lot.length === 0) return;
+    this.#faits.push(new Blob(this.#lot));
+    for (const m of this.#lot) m.fill(0);
+    this.#lot = [];
+    this.enAttente = 0;
+  }
+  blob(type: string): Blob {
+    this.#vider();
+    return new Blob(this.#faits, { type });
+  }
+}
+
 /**
  * Lit une pièce reçue (`ref` du message `piece` ou de l'avatar d'un profil) : octets du fichier.
  * Le segment 0 n'est lu qu'une fois (budget de lecture du serveur, plan C-2 Task 13).
@@ -96,7 +130,7 @@ export async function lirePiece(n: api.Net, jeton: string, ref: RefPiece, max: n
         // ne lie personne (audit du 20 novembre). Au-delà de `max`, rien d'autre n'est demandé.
         const e = rd.manifest.items[0];
         if (!e || e.size > max) throw new Error("trop_gros");
-        const parts: BlobPart[] = [];
+        const lots = new Lots();
         let recu = 0;
         await rd.streamItem(0, (c) => {
           recu += c.length;
@@ -104,10 +138,9 @@ export async function lirePiece(n: api.Net, jeton: string, ref: RefPiece, max: n
             c.fill(0);
             throw new Error("trop_gros");
           }
-          parts.push(c.slice());
-          c.fill(0);
+          lots.ajouter(c);
         });
-        return new Blob(parts, { type: e?.kind === "file" ? "application/octet-stream" : "text/plain" });
+        return lots.blob(e?.kind === "file" ? "application/octet-stream" : "text/plain");
       } finally {
         rd.wipe();
         rd.free();

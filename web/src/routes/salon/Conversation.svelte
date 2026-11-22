@@ -6,7 +6,7 @@
   // https? seulement, sans aperçu.
   import { onMount, tick, untrack } from "svelte";
   import { t, getLang } from "../../i18n/i18n.svelte";
-  import { formatClock, formatDuration } from "../../i18n/format";
+  import { formatClock, formatDayTime, formatDuration } from "../../i18n/format";
   import { announce } from "../../ui/announce";
   import { routeTitle } from "../../app/title";
   import { morceaux, type Bulle, type Element } from "../../salon/conversation";
@@ -23,6 +23,7 @@
   import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
   import { Folder, Mic, Paperclip, Phone, Users, Video, Volume, VolumeX } from "../../ui/Icon";
   import { doitSonner, jouer, SILENCE_TOUJOURS } from "../../salon/son";
+  import { SvelteSet } from "svelte/reactivity";
 
   const vue = S.vue;
   const conv = S.conversation()!;
@@ -134,6 +135,7 @@
     tropLong = null;
     erreur = "";
     texte = "";
+    if (S.intercepterLienGestion(x)) return; // exigence C-3 32 : jamais envoyé, même en .txt
     void S.envoyerFichiers([new File([x], "message.txt", { type: "text/plain" })]);
   }
   /** Silencieux (v3 §14.4) : choix ouvert (toujours, 1 h, 8 h). */
@@ -147,6 +149,7 @@
     tropLong = null;
     const brut = texte;
     if (brut.trim() === "") return;
+    if (intercepte()) return;
     try {
       if (edition) S.modifier(edition, brut);
       else S.envoyerTexte(brut, reponse?.id ?? null);
@@ -175,7 +178,26 @@
     }
   }
   function frappe(): void {
+    if (intercepte()) return;
     if (texte !== "") S.ecrit();
+  }
+  /**
+   * Exigence C-3 32 : un lien de gestion tapé ou collé dans la saisie n'est jamais envoyé (ni
+   * message, ni « écrit ») ; la saisie est vidée et le choix est proposé (salon.svelte.ts).
+   */
+  function intercepte(): boolean {
+    if (!S.intercepterLienGestion(texte)) return false;
+    texte = "";
+    tropLong = null;
+    erreur = "";
+    void tick().then(() => document.getElementById("salon-colle")?.focus());
+    return true;
+  }
+  // Le résultat est dit par le paragraphe role="status" du panneau (pas d'annonce en double).
+  const reprendreDroits = (): Promise<void> => S.reprendreDroits();
+  function fermerColle(): void {
+    S.annulerGestionCollee();
+    saisie?.focus();
   }
   function annulerEdition(): void {
     edition = null;
@@ -205,6 +227,136 @@
     } catch {
       // Copie refusée par le navigateur : rien d'autre à faire.
     }
+  }
+  // --- Mode sélection (v3 §14.3) : appui long sur une pièce, ou « Sélectionner » dans son menu
+  // (clavier) ; « Télécharger (N) » en une archive .zip faite sur l'appareil, comme « Fichiers ».
+  let selection = $state(false);
+  const choix = new SvelteSet<string>();
+  let selEnCours = $state(false);
+  let selMessage = $state("");
+  const selectionnable = (b: Bulle): boolean => b.piece !== null && b.piece.ref !== null && !b.retire;
+  const selectionnables = $derived(elements.filter((e): e is Bulle => e.k === "bulle" && selectionnable(e)));
+  function nomPiece(b: Bulle): string {
+    try {
+      return S.moteur()?.nettoyerNom(b.piece!.nom) || t("salon.piece.sans.nom");
+    } catch {
+      return t("salon.piece.sans.nom");
+    }
+  }
+  function selectionner(b: Bulle): void {
+    menu = null;
+    selection = true;
+    selMessage = "";
+    choix.add(b.cle);
+    void tick().then(() => document.getElementById(`sel-${b.cle}`)?.focus());
+  }
+  function basculer(cle: string): void {
+    if (choix.has(cle)) choix.delete(cle);
+    else choix.add(cle);
+  }
+  function finSelection(): void {
+    selection = false;
+    choix.clear();
+    selMessage = "";
+  }
+  async function telechargerSelection(): Promise<void> {
+    selEnCours = true;
+    selMessage = "";
+    const e = await S.telechargerArchive(selectionnables.filter((b) => choix.has(b.cle)));
+    selEnCours = false;
+    if (e === null) finSelection();
+    else selMessage = t(e === "trop_gros" ? "salon.files.zip.gros" : e === "indisponible" ? "salon.piece.err.indisponible" : "salon.piece.err.lecture");
+  }
+  // Sélection : les pièces retirées ou effacées entre-temps quittent le choix.
+  $effect(() => {
+    const ok = new Set(selectionnables.map((b) => b.cle));
+    untrack(() => {
+      for (const c of choix) if (!ok.has(c)) choix.delete(c);
+    });
+  });
+  /**
+   * Appui long (500 ms sans bouger) sur une pièce : mode sélection, cette pièce choisie. En mode
+   * sélection, un toucher (ou clic) sur une pièce la coche ou la décoche.
+   */
+  function appuiLong(el: HTMLElement, b: Bulle) {
+    let minuteur: ReturnType<typeof setTimeout> | undefined;
+    let x0 = 0;
+    let y0 = 0;
+    let fait = false;
+    const stop = () => {
+      clearTimeout(minuteur);
+      minuteur = undefined;
+    };
+    const bas = (ev: PointerEvent) => {
+      if (ev.button !== 0 || !selectionnable(b) || selection) return;
+      fait = false;
+      x0 = ev.clientX;
+      y0 = ev.clientY;
+      stop();
+      minuteur = setTimeout(() => {
+        minuteur = undefined;
+        fait = true;
+        selectionner(b);
+      }, 500);
+    };
+    const bouge = (ev: PointerEvent) => {
+      if (minuteur && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) stop();
+    };
+    const menuContexte = (ev: Event) => {
+      if (fait || minuteur) ev.preventDefault();
+    };
+    const clic = (ev: MouseEvent) => {
+      if (fait) {
+        fait = false;
+        ev.preventDefault();
+        ev.stopPropagation();
+        return;
+      }
+      if (!selection || !selectionnable(b) || (ev.target as HTMLElement).closest("input.sel")) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      basculer(b.cle);
+    };
+    el.addEventListener("pointerdown", bas);
+    el.addEventListener("pointermove", bouge);
+    el.addEventListener("pointerup", stop);
+    el.addEventListener("pointercancel", stop);
+    el.addEventListener("pointerleave", stop);
+    el.addEventListener("contextmenu", menuContexte);
+    el.addEventListener("click", clic, true);
+    return {
+      update(nb: Bulle) {
+        b = nb;
+      },
+      destroy() {
+        stop();
+        el.removeEventListener("pointerdown", bas);
+        el.removeEventListener("pointermove", bouge);
+        el.removeEventListener("pointerup", stop);
+        el.removeEventListener("pointercancel", stop);
+        el.removeEventListener("pointerleave", stop);
+        el.removeEventListener("contextmenu", menuContexte);
+        el.removeEventListener("click", clic, true);
+      },
+    };
+  }
+
+  // Fiche « Infos » (v3 §14.2) : nos messages seulement, données déjà sur l'appareil.
+  let infosDe = $state<string | null>(null);
+  let infosOuverte = $state(false);
+  const infos = $derived.by(() => {
+    void vue.rev;
+    const b = infosDe ? conv.bulle(infosDe) : undefined;
+    return b ? { b, f: conv.infos(b) } : null;
+  });
+  function ouvrirInfos(b: Bulle): void {
+    menu = null;
+    infosDe = b.id;
+    infosOuverte = true;
+  }
+  function heure(ms: number | null): string {
+    if (ms === null) return t("salon.infos.pas");
+    return new Date(ms).toDateString() === new Date().toDateString() ? formatClock(ms, lang) : formatDayTime(ms, lang);
   }
   function reagir(b: Bulle, e: string): void {
     menu = null;
@@ -345,6 +497,7 @@
       emojis = false;
       saisie?.focus();
     } else if (menu !== null) menu = null;
+    else if (selection) finSelection();
   }
 </script>
 
@@ -392,6 +545,18 @@
         </div>
       {/if}
       {#each fantomes as f (f.siege)}<p class="bandeau alerte" role="alert">{t("salon.room.fantome", { nom: f.pseudo ?? t("salon.room.participant", { n: f.numero }) })}</p>{/each}
+      {#if selection}
+        <div class="barre-sel" role="group" aria-label={t("salon.sel.titre")}>
+          <span class="nb" role="status">{t("salon.sel.n", { n: choix.size })}</span>
+          <Button variant="ghost" dense onpress={() => {
+              if (choix.size === selectionnables.length) choix.clear();
+              else for (const b of selectionnables) choix.add(b.cle);
+            }}>{choix.size === selectionnables.length ? t("salon.files.aucun") : t("salon.files.tout")}</Button>
+          <Button variant="secondary" dense disabled={choix.size === 0 || selEnCours} onpress={telechargerSelection}>{t("salon.files.zip", { n: choix.size })}</Button>
+          <Button variant="ghost" dense onpress={finSelection}>{t("salon.sel.fin")}</Button>
+          {#if selMessage}<p class="err" role="alert">{selMessage}</p>{/if}
+        </div>
+      {/if}
       <div role="log" aria-live="off" bind:this={fil}>
       <ol class="fil">
         {#each elements as e (e.cle)}
@@ -400,7 +565,10 @@
             <li class="sys">{ligne(e)}</li>
           {:else}
             {@const al = albums.get(e.cle)}
-            <li class={["msg", { moi: e.moi, album: al !== undefined }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e}>
+            <li class={["msg", { moi: e.moi, album: al !== undefined, choisi: selection && choix.has(e.cle) }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e} use:appuiLong={e}>
+              {#if selection && selectionnable(e)}
+                <input type="checkbox" class="sel" id="sel-{e.cle}" checked={choix.has(e.cle)} aria-label={t("salon.files.choisir", { nom: nomPiece(e) })} onchange={() => basculer(e.cle)} />
+              {/if}
               <div class="bulle">
                 {#if !e.moi && al !== "suite"}<span class="auteur">{nomDe(e)}</span>{/if}
                 {#if e.retire}
@@ -440,8 +608,10 @@
                       {#each QUICK as q (q)}<button type="button" aria-label="{t('salon.room.react')} {q}" onclick={() => reagir(e, q)}>{q}</button>{/each}
                     </div>
                     <Button variant="ghost" dense onpress={() => repondre(e)}>{t("salon.room.reply")}</Button>
+                    {#if selectionnable(e)}<Button variant="ghost" dense onpress={() => selectionner(e)}>{t("salon.sel.choisir")}</Button>{/if}
                     <Button variant="ghost" dense onpress={() => copier(e)}>{t("salon.room.copy")}</Button>
                     {#if e.moi && e.seq !== null}
+                      <Button variant="ghost" dense onpress={() => ouvrirInfos(e)}>{t("salon.infos")}</Button>
                       <Button variant="ghost" dense onpress={() => editer(e)}>{t("salon.room.edit")}</Button>
                       <InlineConfirm label={t("salon.room.retract")} message={t("salon.room.retract.confirm")} confirmLabel={t("salon.room.retract")} kind="danger" triggerVariant="ghost" onconfirm={() => ((menu = null), S.retirer(e))} />
                     {/if}
@@ -471,6 +641,21 @@
               <Button variant="secondary" dense onpress={() => S.confirmerTelQuel(true)}>{t("salon.piece.telquel")}</Button>
               <Button variant="ghost" dense onpress={() => S.confirmerTelQuel(false)}>{t("salon.piece.annuler")}</Button>
             </div>
+          </div>
+        {/if}
+        {#if vue.gestionCollee}
+          <div class="confirmer" id="salon-colle" tabindex="-1" role="group" aria-label={t("salon.colle.titre")}>
+            {#if vue.gestionCollee === "proposee"}
+              <p class="note">{t("salon.colle.proposee")}</p>
+              <p class="note">{t("salon.colle.deloge")}</p>
+              <div class="ligne">
+                <Button variant="secondary" dense onpress={reprendreDroits}>{t("salon.colle.reprendre")}</Button>
+                <Button variant="ghost" dense onpress={fermerColle}>{t("salon.colle.annuler")}</Button>
+              </div>
+            {:else}
+              <p class={vue.gestionCollee === "fait" || vue.gestionCollee === "deja" ? "note" : "err"} role="status">{t(`salon.colle.${vue.gestionCollee}`)}</p>
+              <div class="ligne"><Button variant="ghost" dense onpress={fermerColle}>{t("salon.colle.fermer")}</Button></div>
+            {/if}
           </div>
         {/if}
         {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}
@@ -525,6 +710,32 @@
 {#if !large}
   <Sheet bind:open={membres} title={t("salon.room.members")}><Membres /></Sheet>
 {/if}
+<Sheet bind:open={infosOuverte} title={t("salon.infos.titre")} onclose={() => (infosDe = null)}>
+  {#if infos?.f}
+    {@const f = infos.f}
+    <p class="note">{t("salon.infos.envoye", { heure: heure(f.envoyeMs) })}</p>
+    {#if f.lecteurs.length === 0}
+      <p class="note">{t("salon.infos.personne")}</p>
+    {:else}
+      <ul class="infos">
+        {#each f.lecteurs as l (l.siege)}
+          <li>
+            <p class="qui"><bdi>{nom(l.siege)}</bdi></p>
+            <dl>
+              <dt>{t("salon.infos.recu")}</dt><dd>{heure(l.recu)}</dd>
+              <dt>{t("salon.infos.vu")}</dt><dd>{heure(l.vu)}</dd>
+              {#if infos.b.piece}
+                <dt>{t("salon.infos.ouvert")}</dt><dd>{heure(l.ouvert)}</dd>
+                <dt>{t("salon.infos.telecharge")}</dt><dd>{heure(l.telecharge)}</dd>
+              {/if}
+            </dl>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <p class="note">{t("salon.infos.note")}</p>
+  {/if}
+</Sheet>
 <Sheet bind:open={fichiers} title={t("salon.files.title")}><Fichiers onvoir={voir} /></Sheet>
 <VoiceRecorder bind:open={vocal} ondone={(v) => S.envoyerVocal(v)} />
 
@@ -562,6 +773,26 @@
     padding: var(--sp-2) var(--sp-3);
     border: 1px solid var(--warn);
     border-radius: 12px;
+  }
+  .infos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-3);
+  }
+  .infos .qui {
+    margin: 0;
+    font-weight: 600;
+  }
+  .infos dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--sp-1) var(--sp-3);
+    margin: var(--sp-1) 0 0;
+  }
+  .infos dd {
+    margin: 0;
   }
   .confirmer ul {
     margin: 0;
@@ -781,6 +1012,37 @@
     background: var(--surface-1);
     border-inline-start: 3px solid var(--pc, var(--line));
     overflow-wrap: anywhere;
+  }
+  .barre-sel {
+    position: sticky;
+    top: var(--sp-2);
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    background: var(--surface-2);
+  }
+  .barre-sel .nb {
+    font-weight: 600;
+  }
+  .barre-sel .err {
+    flex-basis: 100%;
+    margin: 0;
+  }
+  input.sel {
+    align-self: center;
+    inline-size: 24px;
+    block-size: 24px;
+    margin: 10px;
+    accent-color: var(--accent);
+  }
+  .choisi .bulle {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .moi .bulle {
     background: var(--surface-2);

@@ -76,6 +76,14 @@
   {/each}
 </ul>
 {#if exclusion}<p class="note" role="status">{exclusion}</p>{/if}
+{#if !vue.createur}
+  <!-- Exigence C-3 32 : créateur revenu sans son lien de gestion (la page ne peut pas le savoir). -->
+  <details class="code colle">
+    <summary>{t("salon.colle.question")}</summary>
+    <p class="note">{t("salon.colle.sans")}</p>
+    <p class="note">{t("salon.colle.ou")}</p>
+  </details>
+{/if}
 <section class="codes" aria-label={t("salon.code.titre")}>
   <p class="note">{t("salon.code.inciter")}</p>
   <p class="note">{t("salon.code.createur")}</p>

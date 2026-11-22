@@ -7,7 +7,7 @@
   import { formatDuration } from "../../i18n/format";
   import { navigate } from "../../app/router.svelte";
   import { lireFragment } from "../../salon/liens";
-  import { vue, ouvrirInvitation, ouvrirGestion, detruireParGestion, oublierGestion, deverrouiller, oublier, reveiller, reprendreLaMain } from "../../salon/salon.svelte";
+  import { vue, ouvrirInvitation, ouvrirGestion, detruireParGestion, oublierGestion, deverrouiller, oublier, reveiller, reprendreLaMain, detruireApresDelogement } from "../../salon/salon.svelte";
   import InlineConfirm from "../../ui/InlineConfirm.svelte";
   import Cadre from "../compte/Cadre.svelte";
   import TextField from "../../ui/TextField.svelte";
@@ -73,6 +73,12 @@
     return t(`salon.join.err.${e.code}`);
   });
 
+  /** Créateur délogé : destruction depuis l'écran de fin (lien de gestion encore sur l'appareil). */
+  let echecFin = $state(false);
+  async function detruireFin(): Promise<void> {
+    echecFin = !(await detruireApresDelogement()) && vue.detruireFin === "possible";
+  }
+
   function fin(): string {
     const r = vue.fin ?? "introuvable";
     if (r === "remplace" && vue.createur) return t("salon.end.remplace.createur");
@@ -117,6 +123,14 @@
   <Cadre titre={t("salon.end.title")}>
     <p class="note" role="status">{fin()}</p>
     {#if vue.reprise}<div class="actions"><Button onpress={() => reprendreLaMain()}>{t("salon.end.reprendre")}</Button></div>{/if}
+    {#if vue.reprise && vue.detruireFin === "possible"}
+      <div class="actions">
+        <InlineConfirm label={t("salon.gestion.detruire")} message={t("salon.gestion.detruire.confirm")} confirmLabel={t("salon.gestion.detruire")} kind="danger" triggerVariant="danger" onconfirm={detruireFin} />
+      </div>
+      {#if echecFin}<p class="note" role="alert">{t("salon.end.detruire.err")}</p>{/if}
+    {:else if vue.reprise && vue.detruireFin === "lien"}
+      <p class="note">{t("salon.end.detruire.sans")}</p>
+    {/if}
     <div class="actions"><Button variant="secondary" onpress={() => navigate("/")}>{t("salon.end.home")}</Button></div>
   </Cadre>
 {:else if vue.etape === "gestion" && vue.gestionSeule}

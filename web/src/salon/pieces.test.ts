@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { envoyerPiece, lirePiece } from "./pieces";
+import { Lots, envoyerPiece, lirePiece } from "./pieces";
 import type { Net } from "./api";
 
 /** Faux serveur des pièces : segments gardés tels quels, tailles exactes vérifiées. */
@@ -62,6 +62,23 @@ describe("pièces du salon", () => {
     // Sous le plafond : lue.
     expect((await lirePiece(f.n, "J".repeat(43), ref, data.length)).size).toBe(data.length);
   }, 60_000);
+  // Restes, point 6 : une grosse pièce (vidéo jusqu'à 500 Mo) n'est plus gardée deux fois (morceaux
+  // en mémoire de la page, puis copie dans le Blob) : les morceaux passent au Blob par lots.
+  it("Lots : au plus un lot en mémoire de la page, octets rendus dans l'ordre, morceaux effacés", async () => {
+    const l = new Lots(8);
+    const a = Uint8Array.of(1, 2, 3, 4, 5);
+    const b = Uint8Array.of(6, 7, 8, 9, 10);
+    l.ajouter(a);
+    expect(l.enAttente).toBe(5);
+    expect([...a]).toEqual([0, 0, 0, 0, 0]); // l'original est effacé : la copie seule est gardée
+    l.ajouter(b);
+    expect(l.enAttente).toBe(0); // lot plein : passé au Blob
+    l.ajouter(Uint8Array.of(11));
+    expect(l.enAttente).toBe(1);
+    const bl = l.blob("application/octet-stream");
+    expect(bl.type).toBe("application/octet-stream");
+    expect([...new Uint8Array(await bl.arrayBuffer())]).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
   it("autre graine : refusé (paquet_corrompu)", async () => {
     const f = fauxServeur();
     const ref = await envoyerPiece(f.n, "J".repeat(43), new Blob([new Uint8Array(10)]), { nom: "a", mime: "text/plain", vocal: false });

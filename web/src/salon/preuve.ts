@@ -13,7 +13,8 @@
 //   chaque rotation), S_gestion pour le créateur, et le réglage « silencieux » (v3 §14.4). Jamais un message, une clé MLS ni le mot de
 //   passe. `purge_apres` en clair : fin du salon arrondie à l'heure, pour effacer sans mot de
 //   passe les entrées de salons finis.
-// - Effacée à « Quitter », à l'exclusion, à la fin du salon et quand le serveur refuse le jeton.
+// - Effacée à « Quitter », à l'exclusion, à la fin du salon et quand le serveur refuse le jeton ;
+//   toute la base (réglage « silencieux » compris) part avec « Effacer l'historique » (effacerTout).
 // Risque résiduel (spec §39.13.3) : une copie du stockage permet d'essayer des mots de passe hors
 // ligne ; il faut aussi le lien (K_lien entre dans K_m) et le mot de passe est généré.
 import { b64u, unb64u, utf8 } from "../engine/pure";
@@ -135,4 +136,22 @@ export async function ouvrir(index: Uint8Array, cle: CryptoKey): Promise<Contenu
 
 export async function effacer(index: Uint8Array): Promise<void> {
   await tx("readwrite", (s) => s.delete(b64u(index as Uint8Array<ArrayBuffer>)));
+}
+
+/** « Effacer l'historique » (history/live.svelte.ts) : supprime toute la base, toutes les preuves
+ *  et le réglage « silencieux » qu'elles portent. Une base tenue par un autre onglet (onblocked)
+ *  est supprimée dès qu'il la relâche ; aucune erreur ne remonte. */
+export function effacerTout(): Promise<void> {
+  const f = idb();
+  if (!f) return Promise.resolve();
+  return new Promise((ok) => {
+    try {
+      const r = f.deleteDatabase(BASE);
+      r.onsuccess = () => ok();
+      r.onerror = () => ok();
+      r.onblocked = () => ok();
+    } catch {
+      ok();
+    }
+  });
 }

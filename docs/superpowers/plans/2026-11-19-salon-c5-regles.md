@@ -20,19 +20,19 @@
 ## Tasks
 
 ### Task 1 : renouvellement du salon côté client (exigence 22)
-- [ ] test de bout en bout : renouvellement par le créateur ; chaque membre purge, le groupe est recréé, les messages repartent.
+- [x] test de bout en bout : renouvellement par le créateur ; chaque membre purge, le groupe est recréé, les messages repartent.
 
 ### Task 2 : règle d'effacement et compte à rebours
 - [ ] tests du fil : message `regle` (« Léa a réglé l'effacement… »), règle courante, état d'effacement (`etatEffacement`), « En attente de lecture ».
 
 ### Task 3 : codes de vérification
-- [ ] test du fil : vérification annulée au changement de code.
+- [x] test du fil : vérification annulée au changement de code.
 
 ### Task 4 : gestion, fin, signalement, retour du créateur
 - [ ] Playwright : places, destruction par le créateur (écran de fin chez l'invité), « Quitter et signaler ».
 
 ### Task 5 : exclusion et nouvelle invitation (si fait)
-- [ ] test de bout en bout : exclusion, retrait, rotation, refondation ; l'exclu ne lit plus rien ; l'ancienne invitation n'ouvre plus rien ; la nouvelle fait entrer.
+- [x] test de bout en bout : exclusion, retrait, rotation, refondation ; l'exclu ne lit plus rien ; l'ancienne invitation n'ouvre plus rien ; la nouvelle fait entrer.
 
 ## État (19 novembre)
 
@@ -44,7 +44,8 @@ Version finale (19 novembre), faits et testés :
 - **Exigence 27** : alerte « X est encore dans le groupe chiffré » après 8 s d'écart (*par défaut*).
 - **Lien de gestion ouvert seul** (`#s`) : état du salon, « Détruire le salon », S_gestion gardé en mémoire pour l'invitation ouverte ensuite dans l'onglet (repli en simple membre si le serveur le refuse). Playwright : destruction depuis un autre navigateur.
 
-Restes, avec leur raison :
-- **Coller le lien de gestion dans la conversation** (exigence 32, créateur revenu sans `S_gestion`) : pas d'écran ; il faut quitter puis ouvrir le lien de gestion puis l'invitation dans le même onglet.
-- **Créateur délogé** : « Détruire le salon » depuis l'écran de fin n'est pas proposé (le jeton de gestion est déjà effacé) ; le lien de gestion seul le permet.
-- **« Effacer l'historique »** n'efface pas encore les preuves de membre (base à part, effacées à la fin du salon, à « Quitter » et à l'exclusion).
+Restes (22 novembre) : tous faits.
+- **Coller le lien de gestion dans la conversation** (exigence 32) : fait. Le texte est intercepté avant tout envoi (ni message, ni « écrit », ni `.txt`), « Retrouver mes droits de créateur » fait `rejoindre` avec `J_gestion` (siège 0), rend l'ancienne place et repart sous la clé de rôle ; texte de l'exigence 32 dans « Participants ». Défaut trouvé et corrigé : au changement de siège, notre pseudonyme était refusé par notre ancien siège (`Conversation.changerDeSiege`).
+- **Créateur délogé** : fait. « Détruire le salon » est proposé sur l'écran de fin quand le lien de gestion est encore sur l'appareil (historique local, ou lien de gestion ouvert dans l'onglet), relu à la demande ; sinon l'écran dit qu'il faut ouvrir le lien de gestion. Texte corrigé : il promettait un « renouvellement du lien de gestion » qui n'existe pas.
+- **« Effacer l'historique »** : fait. La base des preuves de membre (réglage « silencieux » compris) est supprimée avec l'historique, au plus 2 s.
+- Cases non cochées ci-dessus : « En attente de lecture » sans test, places et « Quitter et signaler » sans test Playwright.

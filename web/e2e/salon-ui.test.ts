@@ -330,3 +330,89 @@ describe("salon : exclusion et nouvelle invitation (exigences 24, 25)", () => {
 });
 
 const secret: { sGestion: Uint8Array } = { sGestion: new Uint8Array(32) };
+
+describe("salon : lien de gestion collé dans la conversation (exigence C-3 32)", () => {
+  let srv: TestServer;
+  let eng: SalonEngine;
+  const fermer: ClientSalon[] = [];
+  beforeAll(async () => {
+    srv = await startServer({ salons: true });
+    eng = await loadSalonEngine();
+  });
+  afterAll(async () => {
+    for (const c of fermer) c.fermer();
+    await srv?.dispose();
+  });
+
+  it("créateur revenu sans S_gestion : simple membre ; un lien d'un autre salon est refusé ; le sien rend le rôle au siège 0 et libère l'ancienne place", async () => {
+    const net = { origin: srv.origin, fetch: (...x: Parameters<typeof fetch>) => fetch(...x) };
+    const mdp = generatePassword();
+    const p = await preparer(eng, mdp, { ttlHours: 1, maxMembers: 5, membersCanDestroy: false });
+    const cap = await (await fetch(srv.origin + "/api/captcha")).json();
+    const recu = Date.now();
+    const { shown_at, fallback: _f, ...defi } = cap;
+    const pv = await solveAltcha(defi);
+    await dormir(Math.max(0, recu + 3100 - Date.now()));
+    const rc = await fetch(srv.origin + "/api/salons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shh-Access": p.entetes.acces, "X-Shh-Manage": p.entetes.gestion },
+      body: JSON.stringify({ ...p.corps, altcha: (pv as { payload: string }).payload, hp: "", shown_at }),
+    });
+    expect(rc.status).toBe(201);
+    const cles = async () => {
+      const acces = eng.cleAcces(p.kLien);
+      const meta = await api.meta(net, acces.k);
+      const kMdp = await passwordKey(mdp, meta.salt, { ops: meta.kdfOps, mem: meta.kdfMem });
+      return eng.clesSalon(p.kLien, kMdp);
+    };
+    const mk = async (o: { cles: ReturnType<SalonEngine["clesSalon"]>; sGestion?: Uint8Array; creerGroupe?: boolean }) => {
+      const evs: EvClient[] = [];
+      const garde: { ws?: WsLike } = {};
+      const { client } = await ClientSalon.entrer(deps(srv, eng, garde), { kLien: p.kLien, ...o });
+      client.ecouter((e) => evs.push(e));
+      fermer.push(client);
+      return { c: client, evs, ws: () => garde.ws };
+    };
+    const membres = async (m: Membre, s: number[]) => {
+      const fin = Date.now() + 30_000;
+      while (JSON.stringify(m.c.membres()) !== JSON.stringify(s)) {
+        if (Date.now() > fin) throw new Error(`siège ${m.c.siege} : membres ${JSON.stringify(m.c.membres())}`);
+        await dormir(20);
+      }
+    };
+    const sGestion = p.sGestion.slice();
+    const a = await mk({ cles: p.cles, sGestion: p.sGestion, creerGroupe: true });
+    const b = await mk({ cles: await cles() });
+    await membres(b, [0, 1]);
+    // Le créateur ferme la page ; il revient sans son lien de gestion : simple membre, siège 2.
+    a.c.fermer();
+    const a2 = await mk({ cles: await cles() });
+    expect(a2.c.createur).toBe(false);
+    expect(a2.c.siege).toBe(2);
+    await attendre(a2, (e) => e.k === "groupe" && e.dansLeGroupe, 30_000);
+    await attendre(a2, (e) => e.k === "connexion" && e.etat === "ouvert");
+    // Lien de gestion d'un AUTRE salon (secret au hasard) : 400, rien ne change.
+    await expect(a2.c.reprendreLeRole(crypto.getRandomValues(new Uint8Array(32)))).rejects.toMatchObject({ code: "bad_request" });
+    expect(a2.c.createur).toBe(false);
+    expect(a2.c.siege).toBe(2);
+    // Le bon : siège 0, rôle rendu (createurRevenu chez B), l'ancienne place (2) est rendue.
+    await a2.c.reprendreLeRole(sGestion);
+    expect(a2.c.createur).toBe(true);
+    expect(a2.c.siege).toBe(0);
+    await attendre(a2, (e) => e.k === "nouvelleEntree" && e.siege === 0);
+    await attendre(b, (e) => e.k === "depart" && e.siege === 2, 30_000);
+    await attendre(b, (e) => e.k === "membres" && e.createurRevenu, 30_000);
+    await membres(b, [0, 1]);
+    const fin = Date.now() + 30_000;
+    while (!a2.c.dansLeGroupe()) {
+      if (Date.now() > fin) throw new Error("créateur pas rentré dans le groupe");
+      await dormir(20);
+    }
+    a2.c.envoyer({ k: "texte", x: "créateur de retour" }, 2);
+    await attendre(b, texteRecu("créateur de retour"), 30_000);
+    // Droits rendus : le créateur peut de nouveau exclure (retrait d'un membre présent, rotation).
+    const inv = await exclure(net, eng, a2.c, 1);
+    expect(inv.kLien.length).toBe(32);
+    await attendre(b, (e) => e.k === "fin" && e.raison === "exclu", 30_000);
+  });
+});

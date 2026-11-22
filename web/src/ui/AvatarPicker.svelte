@@ -16,8 +16,10 @@
     grand?: boolean;
     /** Après chaque changement (ajout, retrait) ; l'écran range les octets dans le coffre de profil. */
     onchange?: (p: Uint8Array | null) => void | Promise<void>;
+    /** Libellé de l'écran qui l'emploie (salon : « Photo pour ce salon ») ; « Photo de profil » sinon. */
+    libelle?: string;
   };
-  let { photo = $bindable(null), initiale = "", grand = false, onchange }: Props = $props();
+  let { photo = $bindable(null), initiale = "", grand = false, onchange, libelle }: Props = $props();
   const px = $derived(grand ? 96 : 64);
   const uid = $props.id();
   let input: HTMLInputElement | undefined = $state();
@@ -55,7 +57,7 @@
 </script>
 
 <div class={["av", { grand }]} style:--px="{px}px" role="group" aria-labelledby="{uid}-l" aria-describedby="{uid}-h{erreur ? ` ${uid}-e` : ''}">
-  <p id="{uid}-l" class="l">{t("account.photo")} <span class="opt">· {t("account.photo.optional")}</span></p>
+  <p id="{uid}-l" class="l">{libelle ?? t("account.photo")} <span class="opt">· {t("account.photo.optional")}</span></p>
   <div class="ligne">
     <span class="rond" aria-hidden={url ? undefined : "true"}>
       {#if url}<img src={url} alt={t("account.photo.preview")} width={px} height={px} />{:else}<span class="ini">{initiale.slice(0, 1).toUpperCase()}</span>{/if}
