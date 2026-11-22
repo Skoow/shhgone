@@ -625,5 +625,3 @@ export function createComposer(deps: ComposeDeps = {}) {
     toApiItems,
   };
 }
-
-export type Composer = ReturnType<typeof createComposer>;

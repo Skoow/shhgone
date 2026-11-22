@@ -237,11 +237,6 @@ export async function lireSegment(n: Net, jeton: string, piece: Uint8Array, seg:
   }
 }
 
-/** POST /api/salons/pieces/retirer : l'auteur retire sa pièce (avant tout lien à une trame). */
-export async function retirerPiece(n: Net, jeton: string, piece: Uint8Array): Promise<void> {
-  await appel(n, "POST", "/pieces/retirer", { "X-Shh-Membre": jeton, "X-Shh-Piece": b64u(piece as Bytes) }, {});
-}
-
 /** Corps de la création (POST /api/salons) ; les en-têtes sont posés par account/api.ts. */
 export type CorpsCreation = {
   ttl_hours: 1 | 6 | 12 | 24;
