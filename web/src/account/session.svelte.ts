@@ -2,7 +2,7 @@
 // conception du compte §9, §10, §21.2 pour ce qu'elle ne remplace pas ; plan, lot W1). Seul
 // détenteur du jeton de session et de K_compte (règle de §37.3, source-rules.test.ts) ; les
 // écrans n'importent que ce module, derrière __COMPTES__.
-// - Passkey : navigator.credentials seulement dans webauthn.ts, avec des options chargées AVANT
+// - Passkey : navigator.credentials seulement dans navigateur.ts (via webauthn.ts), avec des options chargées AVANT
 //   le clic (preparerInscription, preparerConnexion, preparerReauth, preparerAjout : Safari annule
 //   une cérémonie précédée d'une requête). Ni la sortie PRF, ni la clé de récupération R, ni
 //   K_compte ne partent : seulement les enveloppes (60 octets), A_r (route recup), v_r.

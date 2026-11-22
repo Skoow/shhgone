@@ -29,6 +29,7 @@ Chaque signalement donne la gravité, l'endroit, le problème et une correction 
   Aucune exception : le séquestre du profil a été retiré le 22 novembre (conception `docs/superpowers/specs/2026-11-22-compte-passkey-design.md` §8). Le serveur ne reçoit jamais la sortie PRF d'une passkey, la clé de récupération ni la clé du compte ; il ne garde que les clés publiques des passkeys, les enveloppes chiffrées (4 au plus par passkey) et l'empreinte `v_r` (test bloquant « le serveur ne voit rien » du compte).
 - Aucune ressource tierce sur le site : pas de CDN, de police externe, d'analytics ni de traceur. Seule exception, validée par le propriétaire : le repli Google reCAPTCHA, chargé après un clic et seulement dans un cadre isolé sur un autre site, jamais sur une page qui détient des clés (spécification §26).
 - Aucune adresse IP enregistrée sur disque.
+- Passkeys du compte : `navigator.credentials` n'est appelé que dans `web/src/account/navigateur.ts` (la démo le remplace par une passkey simulée, jamais de vraie passkey) ; aucune requête entre le geste et la cérémonie ; la sortie PRF ne quitte jamais l'appareil (liste blanche de `clientExtensionResults`). Sur l'appareil, seule la base `shhdrop-compte` garde le compte (session si « Rester connecté », clé locale si la passkey n'ouvre pas les données), chiffrée par une clé non extractible et effacée par « Se déconnecter ».
 - Toute modification passe par des tests. On n'annonce rien comme « fait » sans preuve (tests passés, captures).
 - Ne jamais écrire « 100 % sécurisé ».
 
