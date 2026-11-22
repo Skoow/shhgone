@@ -13,28 +13,39 @@ import {
   DELAI_MIN_MS,
   JETONS_PAR_LOT,
   MUR_MS,
+  clesVerifiees,
   delaiAleatoire,
   formulesDisponibles,
   jetonValable,
   planifierReapprovisionnement,
   prendreJeton,
   reapprovisionner,
+  refusCles,
 } from "./jetons";
-import { garder, garderJeton, lireJetons, nouvelId, tirerPass } from "./pass";
+import { garder, garderJeton, lireClesVues, lireJetons, lirePasses, nouvelId, tirerPass } from "./pass";
 
 const PP = JSON.parse(readFileSync(new URL("../../../engine/vectors/privacypass.json", import.meta.url), "utf8"));
 const sk = createPrivateKey({ key: Buffer.from(PP.sk_pkcs8_hex, "hex"), format: "der", type: "pkcs8" });
 const MAINTENANT = new Date("2026-11-20T10:00:00Z");
 const rep = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { "Content-Type": "application/json" } });
 
-function serveur(etat: "payee" | "revoquee" = "payee", reserve = 30) {
+const SPKI = b64u(Buffer.from(PP.spki_hex, "hex") as unknown as Uint8Array<ArrayBuffer>);
+/** Une autre clé (342 octets) : le vecteur, un octet du module changé. */
+const AUTRE = (() => {
+  const b = Buffer.from(PP.spki_hex, "hex");
+  b[200]! ^= 1;
+  return b64u(b as unknown as Uint8Array<ArrayBuffer>);
+})();
+type Cle = { jour: string; offre: "plus" | "pro"; spki: string };
+const CLES: Cle[] = [{ jour: "2026-11-20", offre: "plus", spki: SPKI }];
+
+function serveur(etat: "payee" | "revoquee" = "payee", reserve = 30, cles: Cle[] = CLES) {
   const appels: string[] = [];
   const fetch = (async (url: string, init: RequestInit) => {
     const path = new URL(url).pathname;
     appels.push(`${init.method} ${path}`);
     if (path === "/api/paiement/etat") return rep({ v: 1, etat, offre: "plus", fin: "2026-12-20", renouvelle: true, droits: [] });
-    if (path === "/api/paiement/jetons/cles")
-      return rep({ v: 1, emetteur: PP.issuer_name, cles: [{ jour: "2026-11-20", offre: "plus", spki: b64u(Buffer.from(PP.spki_hex, "hex") as unknown as Uint8Array<ArrayBuffer>) }] });
+    if (path === "/api/paiement/jetons/cles") return rep({ v: 1, emetteur: PP.issuer_name, cles });
     if (path === "/api/paiement/jetons") {
       const { requetes } = JSON.parse(init.body as string) as { requetes: string[] };
       if (reserve < requetes.length) return rep({ error: "aucun_jeton" }, 409);
@@ -198,5 +209,72 @@ describe("S16 : émission en avance, à une heure aléatoire", () => {
     annuler2();
     expect(minuteries[1]!.annulee).toBe(true);
     annuler(); // sans effet sur une minuterie déjà partie
+  });
+});
+
+// S17 (conception du paiement §7, §15) : clés publiées 7 jours à l'avance ; l'appareil garde
+// celles qu'il a vues et refuse une clé différente pour un (jour, formule) déjà vu.
+describe("S17 : même clé pour tous, vérifiée par l'appareil", () => {
+  const emissions = (appels: string[]) => appels.filter((a) => a.endsWith("/api/paiement/jetons")).length;
+
+  it("clés vues gardées (chiffrées, avec le pass) ; la même clé ensuite : acceptée", async () => {
+    const idb = fakeIndexedDB();
+    await avecPass(idb);
+    const cles = [...CLES, { jour: "2026-11-27", offre: "pro" as const, spki: AUTRE }];
+    const v = await clesVerifiees(idb, serveur("payee", 30, cles).n, MAINTENANT);
+    expect(v?.refusees).toEqual([]);
+    expect(v?.cles.map((c) => `${c.jour}/${c.offre}`)).toEqual(["2026-11-20/plus", "2026-11-27/pro"]);
+    expect((await lireClesVues(idb)).map((c) => `${c.jour}/${c.offre}/${c.differente}`).sort()).toEqual(["2026-11-20/plus/false", "2026-11-27/pro/false"]);
+    // Sur « disque » : chiffré (ni la clé ni le jour en clair).
+    const disque = JSON.stringify([...idb.raw().values()].flatMap((s) => [...s.values()].flatMap((m) => [...m.entries()])), (_k, x) => (x instanceof Uint8Array ? Buffer.from(x).toString("latin1") : x));
+    expect(disque).not.toContain("2026-11-27");
+    expect(disque).not.toContain(SPKI.slice(0, 40));
+    expect((await clesVerifiees(idb, serveur("payee", 30, cles).n, MAINTENANT))?.refusees).toEqual([]);
+    expect(await lirePasses(idb)).toHaveLength(1); // les enregistrements de clés ne sont pas des pass
+  });
+
+  it("clé différente pour un (jour, formule) déjà vu : refusée, ni émission ni dépense sous elle, même si le serveur revient ensuite à l'ancienne", async () => {
+    const idb = fakeIndexedDB();
+    await avecPass(idb);
+    await clesVerifiees(idb, serveur().n, MAINTENANT);
+    await garderJeton(idb, { jeton: "A".repeat(472), offre: "plus", jour: "2026-11-20", obtenu: 1 });
+    const { n, appels } = serveur("payee", 30, [{ jour: "2026-11-20", offre: "plus", spki: AUTRE }]);
+    const v = await clesVerifiees(idb, n, MAINTENANT);
+    expect(v?.refusees).toEqual([{ jour: "2026-11-20", offre: "plus" }]);
+    expect(v?.cles).toEqual([]);
+    // Écran : avertissement et formule Plus retirée aujourd'hui (lu sur l'appareil, aucune requête).
+    const avant = appels.length;
+    expect(await refusCles(idb, MAINTENANT)).toEqual({ avertir: true, formules: ["plus"] });
+    expect(await refusCles(idb, new Date("2026-11-21T10:00:00Z"))).toEqual({ avertir: true, formules: [] });
+    expect(await refusCles(fakeIndexedDB(), MAINTENANT)).toEqual({ avertir: false, formules: [] });
+    expect(appels.length).toBe(avant);
+    await expect(prendreJeton(idb, "plus", n, MAINTENANT)).rejects.toThrow("cle_differente");
+    expect(await reapprovisionner(idb, "plus", n, MAINTENANT)).toBe(0);
+    expect(emissions(appels)).toBe(0);
+    expect(await lireJetons(idb)).toHaveLength(1); // gardé, jamais dépensé
+    // Retour à l'ancienne clé : toujours refusée (le serveur s'est contredit pour ce jour).
+    const s2 = serveur();
+    expect((await clesVerifiees(idb, s2.n, MAINTENANT))?.refusees).toEqual([{ jour: "2026-11-20", offre: "plus" }]);
+    await expect(prendreJeton(idb, "plus", s2.n, MAINTENANT)).rejects.toThrow("cle_differente");
+    expect(emissions(s2.appels)).toBe(0);
+  });
+
+  it("clé jamais vue alors qu'un autre jour a été vu : rien à comparer, acceptée ; clés d'avant la veille oubliées", async () => {
+    const idb = fakeIndexedDB();
+    await avecPass(idb);
+    await clesVerifiees(idb, serveur().n, MAINTENANT);
+    const demain = new Date("2026-11-21T10:00:00Z");
+    const v = await clesVerifiees(idb, serveur("payee", 30, [{ jour: "2026-11-21", offre: "plus", spki: AUTRE }]).n, demain);
+    expect(v?.refusees).toEqual([]);
+    expect((await lireClesVues(idb)).map((c) => c.jour).sort()).toEqual(["2026-11-20", "2026-11-21"]);
+    await clesVerifiees(idb, serveur("payee", 30, []).n, new Date("2026-11-22T10:00:00Z"));
+    expect((await lireClesVues(idb)).map((c) => c.jour)).toEqual(["2026-11-21"]);
+  });
+
+  it("sans pass : rien n'est gardé ni créé", async () => {
+    const idb = fakeIndexedDB();
+    expect((await clesVerifiees(idb, serveur().n, MAINTENANT))?.refusees).toEqual([]);
+    expect(await lireClesVues(idb)).toEqual([]);
+    expect(idb.raw().size).toBe(0);
   });
 });

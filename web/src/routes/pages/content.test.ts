@@ -114,7 +114,10 @@ describe("Confidentialité : section paiement", () => {
         /jour de sa clé\. Un partage payant ne se cache donc que parmi les pass de la même offre qui ont pris des jetons ce jour-là ou la veille/u, // S19
         /au moment même du partage/u, // S16, résiduel
         /à une heure tirée au hasard/u, // S16, corrigé
-        /une clé par personne et reconnaître ainsi ses jetons\. Ce point n'est pas résolu/u, // S17
+        // S17 : clés annoncées 7 jours à l'avance, clé différente refusée, limite du premier contact.
+        /annonce ses clés sept jours à l'avance/u,
+        /refuse, avec un avertissement, une clé différente pour un jour déjà annoncé/u,
+        /dès le premier contact ne serait pas détecté par cet appareil seul/u,
       ])
         expect(t).toMatch(re);
     }
@@ -136,7 +139,9 @@ describe("Confidentialité : section paiement", () => {
         /day of its key\. A paid share therefore only hides among the passes of the same plan that took tokens that day or the day before/u,
         /at the very moment of the share/u,
         /at a randomly drawn time/u,
-        /one key per person and so recognise their tokens\. This is not solved/u,
+        /announces its keys seven days ahead/u,
+        /refuses, with a warning, a different key for a day already announced/u,
+        /from the very first contact would not be detected by that device alone/u,
       ])
         expect(t).toMatch(re);
     }

@@ -28,7 +28,15 @@ import (
 // rien ; les jetons qu'il a déjà reçus meurent au plus tard le surlendemain. Les émissions sont
 // bornées par jour et par pass (EmisParJour) : après une révocation, au plus ce nombre de
 // partages payants peut encore être créé. La même clé du jour sert à tous : aucune clé ne
-// désigne une personne (limite : rien ne prouve au client que tous reçoivent la même, §7).
+// désigne une personne. S17 : les clés sont tirées JoursAvance jours à l'avance et servies
+// d'aujourd'hui à J+JoursAvance ; l'appareil garde celles qu'il a vues et refuse une clé
+// différente pour un (jour, formule) déjà vu (web/src/paiement/jetons.ts). Limite : un serveur
+// qui donne à un appareil ses propres clés dès le premier contact n'est pas détecté par cet
+// appareil seul (§7, §15).
+
+// JoursAvance : jours de clés tirées et publiées à l'avance (S17) ; GET /api/paiement/jetons/cles
+// sert les clés d'aujourd'hui à aujourd'hui + JoursAvance, des deux formules.
+const JoursAvance = 7
 
 const (
 	// TypeJeton et NK : RFC 9578 §6 (type 0x0002, authentificateur de 256 octets).
@@ -103,7 +111,7 @@ type Jetons struct {
 	now      func() time.Time
 	emetteur string
 	mu       sync.Mutex
-	cache    []cleJour // jour, veille, lendemain (au plus 6 entrées)
+	cache    []cleJour // de la veille à J+JoursAvance (au plus 2 × (JoursAvance + 2) entrées)
 }
 
 // NouveauxJetons : emetteur = nom public du service (hôte de SHH_ORIGIN).
@@ -114,7 +122,7 @@ func NouveauxJetons(db *sql.DB, now func() time.Time, emetteur string) *Jetons {
 // Emetteur : issuer_name du défi.
 func (j *Jetons) Emetteur() string { return j.emetteur }
 
-// cle : clé (jour, offre), lue ou tirée (seulement pour aujourd'hui et demain).
+// cle : clé (jour, offre), lue ou tirée (creer : seulement par Cles, d'aujourd'hui à J+JoursAvance).
 func (j *Jetons) cle(jour int64, o Offre, creer bool) (cleJour, bool, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -154,7 +162,7 @@ func (j *Jetons) cle(jour int64, o Offre, creer bool) (cleJour, bool, error) {
 		return cleJour{}, false, err
 	}
 	c := cleJour{jour: jour, offre: o, sk: sk, spki: spki, kid: sha256.Sum256(spki)}
-	// Cache : seulement la veille, le jour et le lendemain.
+	// Cache : de la veille à J+JoursAvance (rien n'est demandé au-delà).
 	auj := jourDe(j.now())
 	garde := j.cache[:0]
 	for _, x := range j.cache {
@@ -166,18 +174,20 @@ func (j *Jetons) cle(jour int64, o Offre, creer bool) (cleJour, bool, error) {
 	return c, true, nil
 }
 
-// CleDuJour : clé publique d'aujourd'hui ou de demain (decalage 0 ou 1) pour une formule.
+// CleDuJour : clé publique d'un jour (aujourd'hui à J+JoursAvance) pour une formule.
 type CleDuJour struct {
 	Jour  int64
 	Offre Offre
 	SPKI  []byte
 }
 
-// Cles : clés publiques d'aujourd'hui et de demain, des deux formules (tirées au besoin).
+// Cles : clés publiques d'aujourd'hui à J+JoursAvance, des deux formules (tirées au besoin), par
+// jour croissant puis Plus, Pro. Une clé tirée ne change plus jusqu'à son effacement (Purger).
 func (j *Jetons) Cles() ([]CleDuJour, error) {
 	auj := jourDe(j.now())
-	var out []CleDuJour
-	for _, jour := range []int64{auj, auj + jourS} {
+	out := make([]CleDuJour, 0, 2*(JoursAvance+1))
+	for d := int64(0); d <= JoursAvance; d++ {
+		jour := auj + d*jourS
 		for _, o := range []Offre{Plus, Pro} {
 			c, _, err := j.cle(jour, o, true)
 			if err != nil {

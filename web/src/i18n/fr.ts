@@ -1036,6 +1036,7 @@ export const fr = {
   "offers.ret.none": "Aucune commande sur cet appareil",
   "offers.ret.none.body": "Cette page affiche le résultat d'un paiement commencé sur cet appareil.",
   "offers.ret.back": "Revenir aux offres",
+  "offers.keys.mismatch": "Attention : notre serveur a donné à cet appareil une clé de jetons différente de celle qu'il lui avait annoncée pour le même jour. Cela peut servir à reconnaître vos partages payants : cet appareil n'en crée plus sous cette clé. Vos partages gratuits ne sont pas touchés. Si cela dure, signalez-le (contact des mentions légales).",
   "offers.ret.forget": "Oublier cette commande",
   "offers.free": "Gratuit",
   "offers.card.size": "Taille par partage",

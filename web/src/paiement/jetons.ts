@@ -21,8 +21,8 @@
 // d'obtention est locale (jamais envoyée) ; la minuterie devient celle de l'app (au premier plan).
 import { b64u } from "../engine/pure";
 import { jetonFinaliser, jetonPreparer } from "./moteur";
-import { emettre, lireCles, lireEtat, netParDefaut, type Net, type OffrePayante } from "./api";
-import { garderJeton, lireJetons, lirePasses, retirerJeton } from "./pass";
+import { emettre, lireCles, lireEtat, netParDefaut, type CleJetons, type Net, type OffrePayante } from "./api";
+import { garderCleVue, garderJeton, lireClesVues, lireJetons, lirePasses, nouvelId, retirerCleVue, retirerJeton, type CleVue } from "./pass";
 
 /** Jetons demandés par requête (au plus 5 côté serveur). */
 export const JETONS_PAR_LOT = 3;
@@ -59,11 +59,76 @@ export async function formulesDisponibles(idb: IDBFactory, n: Net = netParDefaut
   return (["plus", "pro"] as const).filter((x) => out.has(x));
 }
 
-/** Un lot de jetons de la formule `offre`, obtenu en aveugle avec un pass payé ; null sinon. */
+export type ClesVerifiees = { emetteur: string; cles: CleJetons[]; refusees: { jour: string; offre: OffrePayante }[] };
+
+/**
+ * S17 : clés servies par GET /api/paiement/jetons/cles (aujourd'hui à J+7), comparées à celles
+ * que cet appareil a déjà vues. Une clé différente pour un (jour, formule) déjà vu est refusée,
+ * et ce (jour, formule) le reste (même si le serveur revient ensuite à l'ancienne) : ni émission
+ * ni dépense sous lui. Une clé jamais vue est gardée (rien à comparer). Avec un pass gardé
+ * seulement (sinon rien n'est écrit : la base n'est pas créée). Null : clés indisponibles.
+ * Limite écrite (§7, §15) : un serveur qui donne à cet appareil ses propres clés dès le premier
+ * contact n'est pas détecté ici ; seul un second chemin (une autre personne, les apps) le peut.
+ */
+export async function clesVerifiees(idb: IDBFactory, n: Net = netParDefaut(), maintenant: Date = new Date()): Promise<ClesVerifiees | null> {
+  const servies = await lireCles(n);
+  if (servies === null) return null;
+  if ((await lirePasses(idb)).length === 0) return { emetteur: servies.emetteur, cles: servies.cles, refusees: [] };
+  const veille = jour(new Date(maintenant.getTime() - 86_400_000));
+  const vues = new Map<string, CleVue>();
+  for (const v of await lireClesVues(idb)) {
+    if (v.jour < veille) await retirerCleVue(idb, v.id).catch(() => undefined);
+    else vues.set(`${v.jour}/${v.offre}`, v);
+  }
+  const cles: CleJetons[] = [];
+  const refusees: ClesVerifiees["refusees"] = [];
+  for (const c of servies.cles) {
+    const spki = b64u(c.spki);
+    const v = vues.get(`${c.jour}/${c.offre}`);
+    if (v === undefined) {
+      const nv: CleVue = { id: "c:" + nouvelId(), jour: c.jour, offre: c.offre, spki, differente: false };
+      await garderCleVue(idb, nv);
+      vues.set(`${c.jour}/${c.offre}`, nv); // la même réponse ne peut pas en donner deux
+      cles.push(c);
+    } else if (!v.differente && v.spki === spki) cles.push(c);
+    else {
+      if (!v.differente) {
+        v.differente = true;
+        await garderCleVue(idb, v);
+      }
+      // Déjà acceptée plus haut dans cette même réponse : retirée aussi.
+      const i = cles.findIndex((x) => x.jour === c.jour && x.offre === c.offre);
+      if (i >= 0) cles.splice(i, 1);
+      if (!refusees.some((r) => r.jour === c.jour && r.offre === c.offre)) refusees.push({ jour: c.jour, offre: c.offre });
+    }
+  }
+  return { emetteur: servies.emetteur, cles, refusees };
+}
+
+/** (jour, formule) refusés par S17, d'après les clés vues sur cet appareil (aucune requête). */
+async function refuseesLocales(idb: IDBFactory): Promise<Set<string>> {
+  return new Set((await lireClesVues(idb)).filter((v) => v.differente).map((v) => `${v.jour}/${v.offre}`));
+}
+
+/**
+ * S17, pour l'écran : formules dont la clé d'aujourd'hui est refusée sur cet appareil, et s'il
+ * reste un refus (avertissement). Lu sur l'appareil seulement, aucune requête.
+ */
+export async function refusCles(idb: IDBFactory, maintenant: Date = new Date()): Promise<{ avertir: boolean; formules: OffrePayante[] }> {
+  const veille = jour(new Date(maintenant.getTime() - 86_400_000));
+  const r = (await lireClesVues(idb)).filter((v) => v.differente && v.jour >= veille);
+  return { avertir: r.length > 0, formules: (["plus", "pro"] as const).filter((o) => r.some((v) => v.offre === o && v.jour === jour(maintenant))) };
+}
+
+/**
+ * Un lot de jetons de la formule `offre`, obtenu en aveugle avec un pass payé ; null sinon.
+ * Erreur « cle_differente » si la clé du jour est refusée (S17).
+ */
 async function obtenirLot(idb: IDBFactory, offre: OffrePayante, n: Net, maintenant: Date): Promise<{ jetons: string[]; jour: string } | null> {
   const passes = (await lirePasses(idb)).filter((g) => g.offre === offre && !g.enAttente);
   if (passes.length === 0) return null; // aucune requête sans pass
-  const cles = await lireCles(n);
+  const cles = await clesVerifiees(idb, n, maintenant);
+  if (cles?.refusees.some((r) => r.offre === offre && r.jour === jour(maintenant))) throw new Error("cle_differente");
   const cle = cles?.cles.find((c) => c.offre === offre && c.jour === jour(maintenant));
   if (!cles || !cle) return null;
   for (const g of passes) {
@@ -103,7 +168,8 @@ export function reapprovisionner(idb: IDBFactory, offre: OffrePayante, n: Net = 
   const m = parOffre;
   const p = (async () => {
     try {
-      const reserve = (await lireJetons(idb)).filter((j) => j.offre === offre && jetonValable(j.jour, maintenant));
+      const refusees = await refuseesLocales(idb);
+      const reserve = (await lireJetons(idb)).filter((j) => j.offre === offre && jetonValable(j.jour, maintenant) && !refusees.has(`${j.jour}/${j.offre}`));
       if (reserve.length >= RESERVE_MIN) return 0;
       const lot = await obtenirLot(idb, offre, n, maintenant);
       if (lot === null) return 0;
@@ -163,13 +229,14 @@ export function planifierReapprovisionnement(
 export async function prendreJeton(idb: IDBFactory, offre: OffrePayante, n: Net = netParDefaut(), maintenant: Date = new Date()): Promise<string> {
   await enCours.get(idb)?.get(offre);
   const t = maintenant.getTime();
+  const refusees = await refuseesLocales(idb); // S17 : jamais dépensé sous une clé refusée
   const candidats = [];
   for (const j of await lireJetons(idb)) {
     if (!jetonValable(j.jour, maintenant)) {
       await retirerJeton(idb, j.id).catch(() => undefined);
       continue;
     }
-    if (j.offre === offre) candidats.push(j);
+    if (j.offre === offre && !refusees.has(`${j.jour}/${j.offre}`)) candidats.push(j);
   }
   const mur = (j: { obtenu: number }) => (t - j.obtenu >= MUR_MS ? 0 : 1);
   candidats.sort((a, b) => mur(a) - mur(b) || (a.jour < b.jour ? -1 : a.jour > b.jour ? 1 : 0) || a.obtenu - b.obtenu);

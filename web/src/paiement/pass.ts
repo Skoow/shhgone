@@ -75,7 +75,7 @@ export async function lirePasses(idb: IDBFactory): Promise<PassGarde[]> {
     const key = await b.key(await nouvelleCle());
     const out: PassGarde[] = [];
     for (const [id, rec] of await b.all()) {
-      if (id.startsWith("j:")) continue; // jeton (lireJetons)
+      if (id.startsWith("j:") || id.startsWith("c:")) continue; // jeton (lireJetons), clé vue (lireClesVues)
       try {
         if (!(rec?.iv instanceof Uint8Array) || !(rec.ct instanceof Uint8Array)) continue;
         const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: rec.iv, additionalData: utf8(AAD + id) }, key, rec.ct));
@@ -174,5 +174,59 @@ export async function lireJetons(idb: IDBFactory): Promise<JetonGarde[]> {
 }
 
 export async function retirerJeton(idb: IDBFactory, id: string): Promise<void> {
+  await base(idb).del(id);
+}
+
+// --- Clés d'émission vues (S17, conception du paiement §7) -------------------------------------
+// Même base, enregistrements « c: » (identifiant aléatoire), même chiffrement : la clé publique
+// entière (SPKI, base64url) servie pour un (jour, formule), et `differente` si le serveur en a
+// servi une autre pour ce même (jour, formule). Gardées jusqu'au surlendemain de leur jour.
+
+const AAD_CLE = "shhdrop-pass/v1/cle/";
+
+export type CleVue = { id: string; jour: string; offre: OffrePayante; spki: string; differente: boolean };
+
+/** Range une clé vue ; `id` donné : remplace cet enregistrement. */
+export async function garderCleVue(idb: IDBFactory, c: Omit<CleVue, "id"> & { id?: string }): Promise<void> {
+  const b = base(idb);
+  const key = await b.key(await nouvelleCle());
+  const id = c.id ?? "c:" + nouvelId();
+  const pt = utf8(JSON.stringify({ jour: c.jour, offre: c.offre, spki: c.spki, differente: c.differente }));
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: utf8(AAD_CLE + id) }, key, pt));
+    await b.put(id, { iv, ct });
+  } finally {
+    pt.fill(0);
+  }
+}
+
+/** Clés vues (illisibles ignorées) ; [] sans base. */
+export async function lireClesVues(idb: IDBFactory): Promise<CleVue[]> {
+  const b = base(idb);
+  try {
+    if (!(await b.exists())) return [];
+    const key = await b.key(await nouvelleCle());
+    const out: CleVue[] = [];
+    for (const [id, rec] of await b.all()) {
+      if (!id.startsWith("c:")) continue;
+      try {
+        if (!(rec?.iv instanceof Uint8Array) || !(rec.ct instanceof Uint8Array)) continue;
+        const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: rec.iv, additionalData: utf8(AAD_CLE + id) }, key, rec.ct));
+        const o = JSON.parse(new TextDecoder().decode(pt)) as Record<string, unknown>;
+        pt.fill(0);
+        if (typeof o.jour !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(o.jour) || (o.offre !== "plus" && o.offre !== "pro") || typeof o.spki !== "string" || typeof o.differente !== "boolean") continue;
+        out.push({ id, jour: o.jour, offre: o.offre, spki: o.spki, differente: o.differente });
+      } catch {
+        // abîmé : ignoré
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export async function retirerCleVue(idb: IDBFactory, id: string): Promise<void> {
   await base(idb).del(id);
 }

@@ -37,7 +37,7 @@ func (e envPaiement) jetonsPour(t *testing.T, pass, offre string, n int) []strin
 		Emetteur string `json:"emetteur"`
 		Cles     []struct{ Jour, Offre, SPKI string }
 	}
-	if json.Unmarshal(w.Body.Bytes(), &cl); w.Code != 200 || cl.Emetteur != "shhgone.test" || len(cl.Cles) != 4 {
+	if json.Unmarshal(w.Body.Bytes(), &cl); w.Code != 200 || cl.Emetteur != "shhgone.test" || len(cl.Cles) != 2*(paiement.JoursAvance+1) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	spki, _ := enc.DecodeString(cl.Cles[map[string]int{"plus": 0, "pro": 1}[offre]].SPKI)

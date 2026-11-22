@@ -182,7 +182,7 @@ export async function resilier(pass: Uint8Array<ArrayBuffer>, n: Net = netParDef
 
 export type CleJetons = { jour: string; offre: OffrePayante; spki: Uint8Array<ArrayBuffer> };
 
-/** Clés publiques d'aujourd'hui et de demain (les mêmes pour tous) ; null si indisponibles. */
+/** Clés publiques d'aujourd'hui à J+7 (S17 : comparées par jetons.ts à celles déjà vues) ; null si indisponibles. */
 export async function lireCles(n: Net = netParDefaut()): Promise<{ emetteur: string; cles: CleJetons[] } | null> {
   const r = await appel(n, "/jetons/cles", { method: "GET" });
   if (r === null || r.status !== 200) return null;
