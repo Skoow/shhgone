@@ -46,7 +46,6 @@ export const GLYPHS = {
   "lock-open": [LOCK_BODY, { d: "M8.5 10.5v-3a3.5 3.5 0 0 1 6.7-1.4M12 14.5v2" }],
   "shield-check": [{ d: SHIELD }, { d: "M9 12l2.2 2.2 3.8-4" }],
   "shield-alert": [{ d: SHIELD }, { d: "M12 8.5v4M12 15.8h.01" }],
-  "shield-x": [{ d: SHIELD }, { d: "M9.8 9.8l4.4 4.4M14.2 9.8l-4.4 4.4" }],
   "triangle-alert": [{ d: "M10.3 4.6a2 2 0 0 1 3.4 0l7 12.2a2 2 0 0 1-1.7 3H5a2 2 0 0 1-1.7-3zM12 9.5v4M12 16.8h.01" }],
   "copy": [{ r: [8.5, 8.5, 11, 11, 2.25] }, { d: "M15.5 8.5V6.3a1.8 1.8 0 0 0-1.8-1.8H6.3a1.8 1.8 0 0 0-1.8 1.8v7.4a1.8 1.8 0 0 0 1.8 1.8h2.2" }],
   "check": [{ d: "M5 12.5l4.5 4.5L19 7.5" }],
@@ -84,8 +83,6 @@ export const GLYPHS = {
   "server": [{ r: [4, 4, 16, 7, 2] }, { r: [4, 13, 16, 7, 2] }, { d: "M8 7.5h.01M8 16.5h.01" }],
   "server-crash": [{ r: [4, 4, 16, 7, 2] }, { d: "M9 20H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3M15 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3M12.8 12l-2.3 4h3l-2.3 4M8 7.5h.01" }],
   "user-x": [{ c: [9.5, 8, 3.75] }, { d: "M3.5 20a6 6 0 0 1 12 0M16.5 8.5l4 4M20.5 8.5l-4 4" }],
-  "hard-drive": [{ d: "M3.5 13.5h17M3.5 13.5l2.6-7a1.5 1.5 0 0 1 1.4-1h9a1.5 1.5 0 0 1 1.4 1l2.6 7v4.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2zM7.5 17h.01M11 17h.01" }],
-  "code-xml": [{ d: "M8 7.5L3.5 12 8 16.5M16 7.5l4.5 4.5-4.5 4.5M13.5 5l-3 14" }],
   "ellipsis": [{ c: [6, 12, 1.4], dot: true }, { c: [12, 12, 1.4], dot: true }, { c: [18, 12, 1.4], dot: true }],
   "sliders-horizontal": [{ d: "M4 7h9M17 7h3M4 17h3M11 17h9" }, { c: [15, 7, 2] }, { c: [9, 17, 2] }],
   "compass": [RING, { d: "M15.5 8.5l-2 5-5 2 2-5z" }],
@@ -99,8 +96,6 @@ export const GLYPHS = {
   "tag": [{ d: "M3.5 12.2V5.5a2 2 0 0 1 2-2h6.7l8.3 8.3a2 2 0 0 1 0 2.8l-5.9 5.9a2 2 0 0 1-2.8 0z" }, { c: [8.5, 8.5, 1.4], dot: true }],
   "messages-square": [{ d: "M14.5 9.5a2 2 0 0 1-2 2h-6L3.5 14.5v-9a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z" }, { d: "M17.5 8.5h1a2 2 0 0 1 2 2v10l-3-3h-6a2 2 0 0 1-2-2v-1" }],
   "chevron-right": [{ d: "M9.5 6l6 6-6 6" }],
-  // Menu du téléphone (retours du 15 novembre) : trois traits.
-  "menu": [{ d: "M4.5 7h15M4.5 12h15M4.5 17h15" }],
   "send": [{ d: "M20.5 3.5l-10 10M20.5 3.5l-6 17-4-7-7-4z" }],
   // En-tête du salon sur téléphone (revue du 20 novembre, U8) : son coupé, fichiers, participants.
   "volume-x": [{ d: "M4.5 9.5h3l4.5-4v13l-4.5-4h-3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z" }, { d: "M16 9.5l5 5M21 9.5l-5 5" }],

@@ -458,13 +458,11 @@ describe("Icon.ts (UI §6, jeu maison UI8)", () => {
     "check", "share-2", "qr-code", "refresh-cw", "switch-camera", "screen-share", "eye", "eye-off", "clock", "timer", "pause", "play",
     "download", "file", "file-text", "image", "music", "film", "trash-2", "flag", "chevron-left",
     "wifi-off", "clipboard-x", "circle-help", "minus", "plus", "info", "link-2", "key-round",
-    "server", "user-x", "hard-drive", "code-xml", "chevron-down", "arrow-right", "shield-x",
+    "server", "user-x", "chevron-down", "arrow-right",
     "ellipsis", "sliders-horizontal", "file-archive", "upload", "compass", "server-crash",
     "hourglass", "wrench", "monitor-x", "send", "broom", "volume",
     // Conception compte §21.15 (plan, lot 12) : accueil connecté, revue du jeu fermé.
     "search", "user", "messages-square", "chevron-right",
-    // Menu du téléphone (retours du 15 novembre).
-    "menu",
     // Menu du téléphone, compte et offres (18 novembre).
     "log-out", "tag",
     // Appels du salon (20 novembre).
