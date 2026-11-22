@@ -184,7 +184,11 @@ pub fn pseudo_canon(pseudo: &str) -> String {
     let bas: String = pseudo.nfkc().collect::<String>().to_lowercase();
     // Squelette UTS #39, puis minuscules de nouveau (le squelette peut redonner des majuscules).
     let sq: String = skeleton(&bas).collect::<String>().to_lowercase();
+    // P2 (audit du 21 novembre) : « I » majuscule et « l » minuscule se confondent à l'écran, et
+    // la clé ignore la casse (I = i) : i, l et 1 sont donc une seule lettre (le squelette donne
+    // déjà « l » pour « 1 », et « o » pour « 0 »). « AIice » = « Alice » ; prix : « Lia » = « Lla ».
     sq.nfkc()
+        .map(|c| if c == 'i' { 'l' } else { c })
         .filter(|&c| c.is_alphanumeric() || (!c.is_whitespace() && !c.is_ascii() && se_lie(c)))
         .collect()
 }

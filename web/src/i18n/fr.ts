@@ -1487,6 +1487,7 @@ export const fr = {
   "salon.room.sys.code": "Le code de vérification de {nom} a changé",
   "salon.room.sys.createur": "Le créateur a repris la main (rechargement ou autre appareil).",
   "salon.room.sys.pseudo": "{avant} s'appelle maintenant {apres}",
+  "salon.room.sys.double": "Deux participants ont annoncé le même pseudonyme : aucun ne le garde, pour que personne ne se fasse passer pour l'autre.",
   "salon.room.down": "Aller aux derniers messages",
   "salon.room.unread": "{n} non lus",
   "salon.room.unread.one": "{n} non lu",

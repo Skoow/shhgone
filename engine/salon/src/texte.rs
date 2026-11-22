@@ -373,7 +373,7 @@ mod tests {
     #[test]
     fn pseudo_cle_unicite() {
         assert_eq!(cle_unicite("lea"), cle_unicite("LEA"));
-        assert_eq!(cle_unicite("Jean-Luc O'Neil_x.y"), "jeanluconeilxy");
+        assert_eq!(cle_unicite("Jean-Luc O'Neil_x.y"), "jeanluconellxy"); // i = l (P2, 21 novembre)
         assert_eq!(cle_unicite("ＬＥＡ"), "lea");
         // sosies (squelette UTS #39) : la clé reste calculée sur toute entrée, même refusée.
         let latin = cle_unicite("Alice");

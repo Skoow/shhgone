@@ -1483,6 +1483,7 @@ export const en = {
   "salon.room.sys.code": "{nom}'s verification code has changed",
   "salon.room.sys.createur": "The creator took back control (reload or another device).",
   "salon.room.sys.pseudo": "{avant} is now called {apres}",
+  "salon.room.sys.double": "Two participants announced the same name: neither keeps it, so that no one can pass for the other.",
   "salon.room.down": "Go to the latest messages",
   "salon.room.unread": "{n} unread",
   "salon.room.unread.one": "{n} unread",

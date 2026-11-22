@@ -129,11 +129,11 @@
       },
       {
         "mot": "admin",
-        "p_canon_hex": "6164726e696e"
+        "p_canon_hex": "6164726e6c6e"
       },
       {
         "mot": "administrateur",
-        "p_canon_hex": "6164726e696e697374726174657572"
+        "p_canon_hex": "6164726e6c6e6c7374726174657572"
       },
       {
         "mot": "moderateur",
@@ -141,7 +141,7 @@
       },
       {
         "mot": "moderation",
-        "p_canon_hex": "726e6f6465726174696f6e"
+        "p_canon_hex": "726e6f64657261746c6f6e"
       },
       {
         "mot": "support",
@@ -149,15 +149,15 @@
       },
       {
         "mot": "aide",
-        "p_canon_hex": "61696465"
+        "p_canon_hex": "616c6465"
       },
       {
         "mot": "equipe",
-        "p_canon_hex": "657175697065"
+        "p_canon_hex": "6571756c7065"
       },
       {
         "mot": "officiel",
-        "p_canon_hex": "6f6666696369656c"
+        "p_canon_hex": "6f66666c636c656c"
       },
       {
         "mot": "systeme",
@@ -165,7 +165,7 @@
       },
       {
         "mot": "securite",
-        "p_canon_hex": "7365637572697465"
+        "p_canon_hex": "73656375726c7465"
       },
       {
         "mot": "contact",
@@ -177,11 +177,11 @@
       },
       {
         "mot": "modération",
-        "p_canon_hex": "726e6f64c3a9726174696f6e"
+        "p_canon_hex": "726e6f64c3a97261746c6f6e"
       },
       {
         "mot": "équipe",
-        "p_canon_hex": "c3a97175697065"
+        "p_canon_hex": "c3a971756c7065"
       },
       {
         "mot": "système",
@@ -189,7 +189,7 @@
       },
       {
         "mot": "sécurité",
-        "p_canon_hex": "73c3a96375726974c3a9"
+        "p_canon_hex": "73c3a96375726c74c3a9"
       }
     ],
     "unicode": {
@@ -960,21 +960,21 @@
       "affiche_hex": "41646d696e",
       "entree_hex": "41646d696e",
       "label": "reserve_admin",
-      "p_canon_hex": "6164726e696e",
+      "p_canon_hex": "6164726e6c6e",
       "reserve": true
     },
     {
       "affiche_hex": "41444d494e",
       "entree_hex": "41444d494e",
       "label": "reserve_admin_majuscules",
-      "p_canon_hex": "6164726e696e",
+      "p_canon_hex": "6164726e6c6e",
       "reserve": true
     },
     {
       "affiche_hex": "6164726e696e",
       "entree_hex": "6164726e696e",
       "label": "reserve_admin_sosie_rn",
-      "p_canon_hex": "6164726e696e",
+      "p_canon_hex": "6164726e6c6e",
       "reserve": true
     },
     {
@@ -1013,7 +1013,7 @@
       "affiche_hex": "41646d696e32",
       "entree_hex": "41646d696e32",
       "label": "non_reserve_suffixe",
-      "p_canon_hex": "6164726e696e32",
+      "p_canon_hex": "6164726e6c6e32",
       "reserve": false
     },
     {
@@ -1034,14 +1034,14 @@
       "affiche_hex": "61646d696e",
       "entree_hex": "61646d696e",
       "label": "liste_02",
-      "p_canon_hex": "6164726e696e",
+      "p_canon_hex": "6164726e6c6e",
       "reserve": true
     },
     {
       "affiche_hex": "61646d696e697374726174657572",
       "entree_hex": "61646d696e697374726174657572",
       "label": "liste_03",
-      "p_canon_hex": "6164726e696e697374726174657572",
+      "p_canon_hex": "6164726e6c6e6c7374726174657572",
       "reserve": true
     },
     {
@@ -1055,7 +1055,7 @@
       "affiche_hex": "6d6f6465726174696f6e",
       "entree_hex": "6d6f6465726174696f6e",
       "label": "liste_05",
-      "p_canon_hex": "726e6f6465726174696f6e",
+      "p_canon_hex": "726e6f64657261746c6f6e",
       "reserve": true
     },
     {
@@ -1069,21 +1069,21 @@
       "affiche_hex": "61696465",
       "entree_hex": "61696465",
       "label": "liste_07",
-      "p_canon_hex": "61696465",
+      "p_canon_hex": "616c6465",
       "reserve": true
     },
     {
       "affiche_hex": "657175697065",
       "entree_hex": "657175697065",
       "label": "liste_08",
-      "p_canon_hex": "657175697065",
+      "p_canon_hex": "6571756c7065",
       "reserve": true
     },
     {
       "affiche_hex": "6f6666696369656c",
       "entree_hex": "6f6666696369656c",
       "label": "liste_09",
-      "p_canon_hex": "6f6666696369656c",
+      "p_canon_hex": "6f66666c636c656c",
       "reserve": true
     },
     {
@@ -1097,7 +1097,7 @@
       "affiche_hex": "7365637572697465",
       "entree_hex": "7365637572697465",
       "label": "liste_11",
-      "p_canon_hex": "7365637572697465",
+      "p_canon_hex": "73656375726c7465",
       "reserve": true
     },
     {

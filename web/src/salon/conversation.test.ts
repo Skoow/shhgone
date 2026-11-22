@@ -106,6 +106,33 @@ describe("conversation", () => {
     expect(c.elements.at(-1)).toMatchObject({ k: "sys", quoi: "pseudo", siege: 1, avant: "Leo", apres: "Léa" });
     expect(c.couleurLibre()).toBe(0);
   });
+  it("P1 : deux membres déjà là à notre arrivée se disputent un pseudonyme → aucun ne le garde, une seule ligne", () => {
+    const c = conv(0); // arrivée : 1 et 2 déjà là
+    c.message(5, 2, 3, env(1, { k: "profil", pseudo: "Hugo", couleur: 2, avatar: null })); // tricheur, plus rapide
+    expect(c.nom(2).pseudo).toBe("Hugo");
+    c.message(6, 1, 3, env(2, { k: "profil", pseudo: "hugo", couleur: 1, avatar: null })); // vrai titulaire
+    expect([c.nom(1).pseudo, c.nom(2).pseudo]).toEqual([null, null]);
+    expect(c.elements.filter((e) => e.k === "sys" && e.quoi === "double")).toHaveLength(1);
+    // Redit plus tard : toujours refusé, sans nouvelle ligne.
+    c.message(7, 2, 3, env(3, { k: "profil", pseudo: "HUGO", couleur: 2, avatar: null }));
+    expect(c.nom(2).pseudo).toBeNull();
+    expect(c.elements.filter((e) => e.k === "sys" && e.quoi === "double")).toHaveLength(1);
+    expect(c.pseudoPris("Hugo")).toBe(true); // ni pour nous non plus
+    // Un autre pseudonyme reste libre pour chacun.
+    c.message(8, 1, 3, env(4, { k: "profil", pseudo: "Inès", couleur: 1, avatar: null }));
+    expect(c.nom(1).pseudo).toBe("Inès");
+  });
+  it("P1 : un membre arrivé après nous garde la règle du premier (nous avons vu l'ordre)", () => {
+    const t = { v: 0 };
+    const c = new Conversation(0, cle, () => t.v);
+    c.liste([0], 0); // seul à l'arrivée
+    c.arrivee(1);
+    c.arrivee(2);
+    c.groupe({ ajoutes: [1, 2], retires: [], createurRevenu: false, membres: [0, 1, 2] });
+    c.message(5, 1, 3, env(1, { k: "profil", pseudo: "Hugo", couleur: 1, avatar: null }));
+    c.message(6, 2, 3, env(2, { k: "profil", pseudo: "hugo", couleur: 2, avatar: null }));
+    expect([c.nom(1).pseudo, c.nom(2).pseudo]).toEqual(["Hugo", null]);
+  });
   it("notre profil : appliqué chez nous, puis au rang de notre trame ; perdu contre un rang antérieur", () => {
     const c = conv(0);
     c.monProfil("Ana", 3);

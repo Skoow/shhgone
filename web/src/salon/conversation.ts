@@ -8,6 +8,9 @@
 //   groupe à la réception, expéditeur exclu) ;
 // - pseudonymes : unicité par `cleUnicite` ; en double, le premier en ordre `seq` le garde,
 //   l'autre siège est affiché « Participant N » ; si c'est soi, `pseudoRefuse` le dit à l'écran ;
+//   sauf entre deux membres déjà là à notre arrivée (audit du 21 novembre, P1) : leurs profils
+//   nous sont redits dans un ordre que nous n'avons pas vu naître, un tricheur pourrait parler
+//   avant le vrai titulaire ; aucun des deux ne garde alors le pseudonyme (ligne « en double ») ;
 // - un siège à la fois ajouté et retiré par le même Commit (reprise, ou clé substituée) : « le
 //   code de vérification de X a changé », sauf pour le créateur revenu (même clé de rôle) ;
 // - réponse : la citation est lue du message local, sinon « indisponible » (Ruling 7).
@@ -68,7 +71,7 @@ export type PieceInfo = {
 };
 
 export type Systeme = { fige?: Fige } & (
-  | { k: "sys"; cle: string; quoi: "arrivee" | "depart" | "retour" | "exclusion" | "code" | "createur"; siege: number }
+  | { k: "sys"; cle: string; quoi: "arrivee" | "depart" | "retour" | "exclusion" | "code" | "createur" | "double"; siege: number }
   | { k: "sys"; cle: string; quoi: "pseudo"; siege: number; avant: string; apres: string }
   | { k: "sys"; cle: string; quoi: "regle"; siege: number; regle: Regle }
   | { k: "sys"; cle: string; quoi: "renouvellement" | "invitation"; siege: number }
@@ -178,6 +181,7 @@ export class Conversation {
     } catch {
       return false;
     }
+    if (this.#contestes.has(k)) return true; // disputé entre deux anciens (P1) : personne ne le prend
     for (const [s, pr] of this.profils) if (s !== this.moi && this.presents.has(s) && pr.pseudo !== null && this.cleUnicite(pr.pseudo) === k) return true;
     return false;
   }
@@ -189,6 +193,8 @@ export class Conversation {
   // --- Annonces du serveur, groupe ---------------------------------------------------------------
 
   liste(sieges: number[], createur: number): void {
+    // Membres déjà là à notre arrivée (première liste seulement ; une reprise n'y touche pas).
+    this.#anciens ??= new Set(sieges.filter((s) => s !== this.moi));
     this.presents = new Set(sieges);
     this.createurSiege = createur;
     this.#suivreEcart();
@@ -461,6 +467,10 @@ export class Conversation {
     this.#change();
   }
 
+  /** Membres présents à notre arrivée, et pseudonymes qu'ils se sont disputés (P1) : clés d'unicité. */
+  #anciens: Set<number> | null = null;
+  readonly #contestes = new Set<string>();
+
   /** Codes de vérification comparés ici (siège → code vérifié), annulés quand le code change (exigences 9, 29). */
   readonly verifies = new Map<number, string>();
 
@@ -588,7 +598,24 @@ export class Conversation {
     }
     // Unicité (exigence 11) : déjà pris par un autre siège présent, annoncé avant → refusé.
     let pris = false;
-    for (const [s, p] of this.profils) if (s !== siege && this.presents.has(s) && p.pseudo !== null && p.seq < seq && this.cleUnicite(p.pseudo) === k) pris = true;
+    let titulaire = -1;
+    for (const [s, p] of this.profils)
+      if (s !== siege && this.presents.has(s) && p.pseudo !== null && p.seq < seq && this.cleUnicite(p.pseudo) === k) {
+        pris = true;
+        titulaire = s;
+      }
+    // P1 : deux membres déjà là à notre arrivée se disputent un pseudonyme → aucun ne le garde.
+    const ancien = (x: number) => this.#anciens?.has(x) === true;
+    if (ancien(siege) && ((pris && ancien(titulaire)) || this.#contestes.has(k))) {
+      const nouveau = !this.#contestes.has(k);
+      this.#contestes.add(k);
+      const t = pris ? this.profils.get(titulaire) : undefined;
+      if (t) this.profils.set(titulaire, { ...t, pseudo: null });
+      this.profils.set(siege, { pseudo: null, couleur: Number.isInteger(couleur) && couleur >= 0 && couleur < COULEURS ? couleur : siege % COULEURS, seq });
+      if (nouveau) this.#sys({ k: "sys", quoi: "double", siege });
+      this.#change();
+      return;
+    }
     const accepte = pris ? null : pseudo;
     if (siege === this.moi) this.pseudoRefuse = pris;
     this.profils.set(siege, { pseudo: accepte, couleur: Number.isInteger(couleur) && couleur >= 0 && couleur < COULEURS ? couleur : siege % COULEURS, seq });

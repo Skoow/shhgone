@@ -533,17 +533,17 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "reserve_admin",
             "Admin".into(),
-            P::Ok("Admin", "adrnin", true),
+            P::Ok("Admin", "adrnln", true),
         ),
         (
             "reserve_admin_majuscules",
             "ADMIN".into(),
-            P::Ok("ADMIN", "adrnin", true),
+            P::Ok("ADMIN", "adrnln", true),
         ),
         (
             "reserve_admin_sosie_rn",
             "adrnin".into(),
-            P::Ok("adrnin", "adrnin", true),
+            P::Ok("adrnin", "adrnln", true),
         ),
         (
             "reserve_shhgone",
@@ -578,7 +578,7 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "non_reserve_suffixe",
             "Admin2".into(),
-            P::Ok("Admin2", "adrnin2", false),
+            P::Ok("Admin2", "adrnln2", false),
         ),
     ];
     // Chaque mot de la liste, tel quel.
@@ -1075,6 +1075,19 @@ fn pseudo_canon_identique_pour_variantes() {
         assert!(pseudo_valide(v).is_err(), "{v}");
     }
     assert_ne!(pseudo_canon("Léa"), c);
+}
+
+// P2 (audit du 21 novembre) : les lettres qui se ressemblent dans l'alphabet permis (A-Z, a-z,
+// 0-9) ont la même clé, quelle que soit la casse : I, i, l et 1 ; O et 0 ; « rn » et « m ».
+#[test]
+fn pseudo_canon_homoglyphes() {
+    for (a, b) in [("Alice", "AIice"), ("Alice", "A1ice"), ("Alice", "ALICE"), ("Bob", "B0b"), ("Leo", "LE0"), ("Marin", "rnarin"), ("Paul", "PAUI"), ("admin", "ADMIN")] {
+        assert_eq!(pseudo_canon(a), pseudo_canon(b), "{a} / {b}");
+    }
+    // Des pseudos vraiment différents restent différents.
+    for (a, b) in [("Alice", "Alicia"), ("Leo", "Lea"), ("Max", "Mix")] {
+        assert_ne!(pseudo_canon(a), pseudo_canon(b), "{a} / {b}");
+    }
 }
 
 #[test]

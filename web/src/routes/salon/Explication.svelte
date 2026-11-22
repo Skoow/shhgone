@@ -51,7 +51,6 @@
         else await changerPseudo(pseudo);
       } catch (e) {
         errCompte = t(codeDe(e) === "pseudo_pris" ? "account.pseudo.taken" : "salon.pseudo.err.compte");
-        errCompte = t("salon.pseudo.err.compte");
       } finally {
         envoi = false;
       }
