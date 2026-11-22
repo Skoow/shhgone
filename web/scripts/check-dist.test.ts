@@ -80,6 +80,15 @@ describe("check-dist.mjs, production", () => {
     const { "app.html": _a, ...noApp } = ok;
     expect(checkDist(site(noApp), false, false, ["securite.html"])).toContain("app.html : page de l'application sans accueil écrit absente");
     expect(checkDist(site({ ...ok, "app.html": HOME("<h1>U</h1>") }), false, false, ["securite.html"])).toContain("app.html : contient l'accueil écrit (il ne doit pas s'afficher sur les autres adresses)");
+    // Squelette (U13) : la coque sans contenu ; ses liens sortants (pied de page) sont admis.
+    const SHELL = (inner: string) => PROD_INDEX.replace("<body></body>", `<body><div id="app" data-squelette><!--shh-shell-->${inner}<!--/shh-shell--></div></body>`);
+    const coque = '<header><a class="logo" href="/">S</a></header> <main id="contenu"><!----><!----></main> <footer><a href="https://github.com/x">code</a></footer>';
+    expect(checkDist(site({ ...ok, "app.html": SHELL(coque) }), false, false, ["securite.html"])).toEqual([]);
+    expect(checkDist(site({ ...ok, "app.html": SHELL(coque.replace("<!----><!---->", "<h1>Se connecter</h1>")) }), false, false, ["securite.html"])).toContain("app.html : squelette avec du contenu (titre ou contenu principal)");
+    expect(checkDist(site({ ...ok, "app.html": SHELL(coque.replace("<!----><!---->", "<p>x</p>")) }), false, false, ["securite.html"])).toContain("app.html : squelette avec du contenu (titre ou contenu principal)");
+    expect(checkDist(site({ ...ok, "app.html": SHELL(coque.replace("<header>", '<header style="x">')) }), false, false, ["securite.html"])).toContain("app.html : attribut style dans le squelette (CSP)");
+    expect(checkDist(site({ ...ok, "app.html": SHELL(coque + '<img src="https://pistage.example/p.png">') }), false, false, ["securite.html"]).join("\n")).toMatch(/app\.html : adresse externe/);
+    expect(checkDist(site({ ...ok, "app.html": PROD_INDEX.replace("<body></body>", '<body><div id="app"><p>x</p></div></body>') }), false, false, ["securite.html"])).toContain("app.html : contient l'accueil écrit (il ne doit pas s'afficher sur les autres adresses)");
     const { "securite.html": _p, ...noPage } = ok;
     expect(checkDist(site(noPage), false, false, ["securite.html"])).toContain("securite.html : page d'information absente");
     expect(checkDist(site({ ...ok, "securite.html": PAGE("") }), false, false, ["securite.html"]).join("\n")).toMatch(/contenu non écrit/);

@@ -21,7 +21,10 @@ await langReady;
 
 const target = document.getElementById("app");
 if (!target) throw new Error("#app introuvable");
-// Accueil écrit au build (référencement, 18 novembre) : remplacé par l'application vivante.
-if (!moved) viderSaufAmbiance(target); // lumière d'ambiance gardée (ui/ambiance.ts)
+// Accueil ou squelette (app.html, U13) écrits au build : remplacés par l'application vivante.
+if (!moved) {
+  viderSaufAmbiance(target); // lumière d'ambiance gardée (ui/ambiance.ts)
+  target.removeAttribute("data-squelette");
+}
 
 export default moved ? undefined : mount(App, { target });

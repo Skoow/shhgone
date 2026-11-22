@@ -70,5 +70,3 @@ export function createLeaveGuard(w: HistoryWindow) {
     },
   };
 }
-
-export type LeaveGuardHandle = ReturnType<typeof createLeaveGuard>;
