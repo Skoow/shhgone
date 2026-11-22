@@ -431,14 +431,37 @@ func captureDe(ls []ppLien) string {
 	return ""
 }
 
-// Lire : signature vérifiée par PayPal, puis événement traduit.
+// Lire : signature vérifiée par PayPal, puis événement traduit (une commande approuvée est
+// capturée).
 func (p *PayPalP) Lire(ctx context.Context, h http.Header, corps []byte) ([]Evenement, error) {
 	if err := p.verifier(ctx, h, corps); err != nil {
 		return nil, err
 	}
+	evs, ordre, err := traduirePayPal(corps)
+	if err != nil || ordre == "" {
+		return evs, err
+	}
+	return p.capturer(ctx, ordre, evs[0].Commande)
+}
+
+// Cibles : ce que vise le webhook (commande, abonnement, références), lu SANS vérification
+// (audit du 20 novembre, S3) ; sert seulement à écarter, avant tout appel sortant, un webhook
+// qui ne vise rien de connu (Service.Webhook). Même lecture que Lire : un webhook que Lire
+// ignorerait ne vise rien.
+func (*PayPalP) Cibles(corps []byte) []Evenement {
+	evs, _, err := traduirePayPal(corps)
+	if err != nil {
+		return nil
+	}
+	return evs
+}
+
+// traduirePayPal : événements d'un webhook PayPal, sans appel sortant. Commande approuvée :
+// ordre = identifiant de l'ordre à capturer, evs = un seul événement (sa commande, sans sorte).
+func traduirePayPal(corps []byte) (evs []Evenement, ordre string, err error) {
 	var e ppEvenement
 	if json.Unmarshal(corps, &e) != nil {
-		return nil, ErrSignature
+		return nil, "", ErrSignature
 	}
 	switch e.EventType {
 	case "CHECKOUT.ORDER.APPROVED":
@@ -449,42 +472,42 @@ func (p *PayPalP) Lire(ctx context.Context, h http.Header, corps []byte) ([]Even
 			} `json:"purchase_units"`
 		}
 		if json.Unmarshal(e.Resource, &o) != nil || !idPayPal(o.ID) {
-			return nil, ErrSignature
+			return nil, "", ErrSignature
 		}
 		if len(o.PurchaseUnits) != 1 {
-			return nil, nil
+			return nil, "", nil
 		}
 		c, ok := CommandeDe(o.PurchaseUnits[0].CustomID)
 		if !ok {
-			return nil, nil // pas une commande à nous
+			return nil, "", nil // pas une commande à nous
 		}
-		return p.capturer(ctx, o.ID, c)
+		return []Evenement{{Commande: c, AvecCommande: true}}, o.ID, nil
 	case "PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.DENIED", "PAYMENT.CAPTURE.REVERSED":
 		var o ppCapture
 		if json.Unmarshal(e.Resource, &o) != nil {
-			return nil, ErrSignature
+			return nil, "", ErrSignature
 		}
 		ev := Evenement{Ref: o.ID}
 		avecCommande(&ev, o.CustomID)
 		switch e.EventType {
 		case "PAYMENT.CAPTURE.COMPLETED":
 			if !ev.AvecCommande || o.Status != "COMPLETED" || o.ID == "" {
-				return nil, nil
+				return nil, "", nil
 			}
 			ev.Sorte, ev.Montant, ev.Devise = Confirme, centimes(o.Amount.Value), strings.ToLower(o.Amount.CurrencyCode)
 		case "PAYMENT.CAPTURE.DENIED":
 			if !ev.AvecCommande {
-				return nil, nil
+				return nil, "", nil
 			}
 			ev.Sorte = NonAbouti
 		default:
 			ev.Sorte = Revoque
 		}
-		return []Evenement{ev}, nil
+		return []Evenement{ev}, "", nil
 	case "PAYMENT.CAPTURE.REFUNDED":
 		var o ppCapture
 		if json.Unmarshal(e.Resource, &o) != nil {
-			return nil, ErrSignature
+			return nil, "", ErrSignature
 		}
 		ev := Evenement{Sorte: Revoque, Ref: captureDe(o.Links), Montant: centimes(o.Amount.Value)}
 		if ev.Montant < 0 {
@@ -492,42 +515,42 @@ func (p *PayPalP) Lire(ctx context.Context, h http.Header, corps []byte) ([]Even
 		}
 		avecCommande(&ev, o.CustomID)
 		if !ev.AvecCommande && ev.Ref == "" {
-			return nil, nil
+			return nil, "", nil
 		}
-		return []Evenement{ev}, nil
+		return []Evenement{ev}, "", nil
 	case "BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED":
 		var o struct {
 			ID       string `json:"id"`
 			CustomID string `json:"custom_id"`
 		}
 		if json.Unmarshal(e.Resource, &o) != nil || !idPayPal(o.ID) {
-			return nil, ErrSignature
+			return nil, "", ErrSignature
 		}
 		ev := Evenement{Sorte: FinRenouvellement, Abonnement: o.ID}
 		avecCommande(&ev, o.CustomID)
 		if e.EventType == "BILLING.SUBSCRIPTION.ACTIVATED" {
 			if !ev.AvecCommande {
-				return nil, nil
+				return nil, "", nil
 			}
 			ev.Sorte = PoseAbonnement
 		}
-		return []Evenement{ev}, nil
+		return []Evenement{ev}, "", nil
 	case "PAYMENT.SALE.COMPLETED":
 		var o ppVente
 		if json.Unmarshal(e.Resource, &o) != nil || o.ID == "" {
-			return nil, ErrSignature
+			return nil, "", ErrSignature
 		}
 		if o.BillingAgreementID == "" || o.State != "completed" {
-			return nil, nil // vente hors abonnement : pas à nous
+			return nil, "", nil // vente hors abonnement : pas à nous
 		}
 		ev := Evenement{Sorte: Confirme, Ref: o.ID, Abonnement: o.BillingAgreementID, Montant: centimes(o.Amount.Total),
 			Devise: strings.ToLower(o.Amount.Currency)}
 		avecCommande(&ev, o.Custom)
-		return []Evenement{ev}, nil
+		return []Evenement{ev}, "", nil
 	case "PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED":
 		var o ppVente
 		if json.Unmarshal(e.Resource, &o) != nil {
-			return nil, ErrSignature
+			return nil, "", ErrSignature
 		}
 		ev := Evenement{Sorte: Revoque, Ref: o.SaleID, Montant: max(0, centimes(o.Amount.Total))}
 		if ev.Ref == "" {
@@ -538,9 +561,9 @@ func (p *PayPalP) Lire(ctx context.Context, h http.Header, corps []byte) ([]Even
 		}
 		avecCommande(&ev, o.Custom)
 		if !ev.AvecCommande && ev.Ref == "" {
-			return nil, nil
+			return nil, "", nil
 		}
-		return []Evenement{ev}, nil
+		return []Evenement{ev}, "", nil
 	case "CUSTOMER.DISPUTE.CREATED":
 		var o struct {
 			DisputedTransactions []struct {
@@ -549,7 +572,7 @@ func (p *PayPalP) Lire(ctx context.Context, h http.Header, corps []byte) ([]Even
 			} `json:"disputed_transactions"`
 		}
 		if json.Unmarshal(e.Resource, &o) != nil {
-			return nil, ErrSignature
+			return nil, "", ErrSignature
 		}
 		var evs []Evenement
 		for _, d := range o.DisputedTransactions {
@@ -559,9 +582,9 @@ func (p *PayPalP) Lire(ctx context.Context, h http.Header, corps []byte) ([]Even
 				evs = append(evs, ev)
 			}
 		}
-		return evs, nil
+		return evs, "", nil
 	}
-	return nil, nil
+	return nil, "", nil
 }
 
 // capturer : capture d'une commande approuvée (DP-5) ; une capture COMPLETED confirme le

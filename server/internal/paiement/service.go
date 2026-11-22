@@ -400,6 +400,15 @@ func (s *Service) Resilier(ctx context.Context, p Pass) error {
 // Webhook : vérifie et applique un webhook du prestataire pr. Chaque événement est appliqué
 // dans sa propre transaction ; un événement déjà appliqué ne change rien (idempotence).
 func (s *Service) Webhook(ctx context.Context, pr Prestataire, h http.Header, corps []byte) error {
+	if c, ok := pr.(cibleur); ok {
+		connu, err := s.vise(pr.Nom(), c.Cibles(corps))
+		if err != nil {
+			return err
+		}
+		if !connu {
+			return ErrSignature // même réponse qu'une signature fausse (400), aucun appel sortant
+		}
+	}
 	evs, err := pr.Lire(ctx, h, corps)
 	if err != nil {
 		return err
@@ -410,6 +419,47 @@ func (s *Service) Webhook(ctx context.Context, pr Prestataire, h http.Header, co
 		}
 	}
 	return nil
+}
+
+// cibleur : prestataire dont la vérification d'un webhook coûte un appel sortant authentifié
+// (PayPal). Audit du 20 novembre, S3 : avant de vérifier, Service.Webhook lit (Cibles, sans
+// vérification) ce que vise le webhook ; s'il ne vise aucune commande connue chez nous, quel que
+// soit son état, il est refusé comme une signature fausse, sans appel sortant. Ces valeurs non
+// vérifiées ne servent qu'à cette recherche ; Lire relit le corps après vérification.
+type cibleur interface {
+	Cibles(corps []byte) []Evenement
+}
+
+// vise : au moins une commande de paiements.db (tout état) est visée par evs : par son
+// identifiant, son abonnement ou l'empreinte d'une de ses références. Lecture seule.
+func (s *Service) vise(pr string, evs []Evenement) (bool, error) {
+	existe := func(q string, arg []byte) (bool, error) {
+		var un int
+		err := s.db.QueryRow(q, arg).Scan(&un)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return err == nil, err
+	}
+	for _, ev := range evs {
+		var vu bool
+		var err error
+		if ev.AvecCommande {
+			vu, err = existe(`SELECT 1 FROM commandes WHERE id=?`, ev.Commande[:])
+		}
+		if !vu && err == nil && ev.Abonnement != "" {
+			vu, err = existe(`SELECT 1 FROM commandes WHERE abonnement=?`, []byte(ev.Abonnement))
+		}
+		for _, r := range []string{ev.Ref, ev.RefLiee} {
+			if !vu && err == nil && r != "" {
+				vu, err = existe(`SELECT 1 FROM refs WHERE r=?`, empreinteRef(pr, r))
+			}
+		}
+		if vu || err != nil {
+			return vu, err
+		}
+	}
+	return false, nil
 }
 
 // empreinteRef : SHA-256(« shhdrop/v2/paiement/ref » ‖ 0x00 ‖ prestataire ‖ 0x00 ‖ référence).
