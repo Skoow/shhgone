@@ -36,8 +36,6 @@ const test = base.extend<{ smtp: FauxSMTP }, { site: string }>({
 });
 
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", actionTimeout: 30_000 });
-// WebKit : comme compte.spec.ts (Chromium seulement pour l'instant).
-test.skip(({ browserName }) => browserName !== "chromium", "salon.spec.ts : Chromium (comme compte.spec.ts)");
 test.setTimeout(600_000); // parcours long : rechargement, exclusion, troisième et quatrième navigateurs
 
 const champ = (page: Page, label: string) => page.getByLabel(label, { exact: true }).and(page.locator("input"));
@@ -74,7 +72,7 @@ async function envoyer(page: Page, texte: string): Promise<void> {
 /** Bulle d'un message par son texte (élément de liste du fil). */
 const bulle = (page: Page, texte: string) => fil(page).locator("li").filter({ has: page.locator("p.texte", { hasText: texte }) });
 
-test("deux navigateurs : création avec un compte, invitation, messages chiffrés, et le serveur ne voit rien", async ({ page, shh, smtp, browser }, info) => {
+test("deux navigateurs : création avec un compte, invitation, messages chiffrés, et le serveur ne voit rien", async ({ page, shh, smtp, browser, browserName }, info) => {
   const r = randomBytes(4).toString("hex");
   const email = `Salon.${r}@exemple.org`;
   const mdpCompte = `MdpCompteSalon-${r}-9`;
@@ -123,7 +121,24 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   const pageB = await ctxB.newPage();
   const erreursB: string[] = [];
   pageB.on("pageerror", (e) => erreursB.push(e.message));
-  pageB.on("console", (m) => /Refused to|Content Security Policy/.test(m.text()) && erreursB.push(m.text()));
+  // WebKit : pendant une capture, Playwright injecte puis retire un <style> en ligne que la CSP
+  // refuse (fixtures.ts, swallowHarnessStyle) ; ce refus-là, pendant une capture de B, est ignoré.
+  let enCaptureB = false;
+  pageB.on("console", (m) => {
+    const x = m.text();
+    if (!/Refused to|Content Security Policy/.test(x)) return;
+    if (enCaptureB && browserName === "webkit" && x.startsWith("Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive")) return;
+    erreursB.push(x);
+  });
+  const captureB = async (nom: string) => {
+    enCaptureB = true;
+    try {
+      await capture(pageB, nom);
+      await pageB.evaluate(() => 0); // aller-retour : les messages de la capture sont arrivés
+    } finally {
+      enCaptureB = false;
+    }
+  };
   let ctxC: BrowserContext | undefined;
   let ctxE: BrowserContext | undefined;
   try {
@@ -139,7 +154,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     // Un seul libellé pour la photo (restes, point 8).
     await expect(pageB.getByText("Photo pour ce salon", { exact: false })).toHaveCount(1);
     await expect(pageB.getByText("Photo de profil", { exact: false })).toHaveCount(0);
-    await capture(pageB, "salon-explication");
+    await captureB("salon-explication");
     expect(await axe(pageB)).toEqual([]);
     await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoA);
     // Unicité : le pseudonyme de la créatrice est déjà pris (dès que son profil est arrivé).
@@ -251,7 +266,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     // Écran « Fichiers » : les pièces, du plus récent au plus ancien.
     await bouton(pageB, "Fichiers").click();
     await expect(pageB.getByRole("dialog").getByText(nomDoc, { exact: true })).toBeVisible();
-    await capture(pageB, "salon-fichiers");
+    await captureB("salon-fichiers");
     // Sélection multiple (v3 §14.3) : une archive .zip faite sur l'appareil, sans compression.
     const dlg = pageB.getByRole("dialog");
     await dlg.getByRole("button", { name: "Tout sélectionner", exact: true }).click();
@@ -272,7 +287,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(fil(pageB).locator("li.msg.album img.img")).toHaveCount(2, { timeout: 60_000 });
     await expect(fil(pageB).locator("li.msg.album .auteur")).toHaveCount(1);
     await fil(pageB).locator("li.msg.album").last().scrollIntoViewIfNeeded();
-    await capture(pageB, "salon-album");
+    await captureB("salon-album");
     // Mode sélection dans la conversation (v3 §14.3) : appui long sur une photo de l'album, toucher
     // sur la seconde, « Télécharger (2) » en une archive .zip ; puis au clavier (menu « Sélectionner »).
     const photo1 = fil(pageB).locator("li.msg.album").first().locator(".bulle");
@@ -285,7 +300,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(barre.getByText("Pièces choisies : 1")).toBeVisible();
     await fil(pageB).locator("li.msg.album").nth(1).locator(".bulle").click();
     await expect(barre.getByText("Pièces choisies : 2")).toBeVisible();
-    await capture(pageB, "salon-selection");
+    await captureB("salon-selection");
     expect(await axe(pageB)).toEqual([]);
     const zipAlbum = pageB.waitForEvent("download");
     await barre.getByRole("button", { name: "Télécharger (2)", exact: true }).click();
@@ -308,7 +323,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
 
     // Captures (preuve) et audit d'accessibilité (WCAG 2.1 A et AA) des écrans du salon.
     await capture(page, "salon-conversation");
-    await capture(pageB, "salon-conversation-invite");
+    await captureB("salon-conversation-invite");
     expect(await axe(page)).toEqual([]);
     // Participants : en ligne, pseudonymes, « vous ».
     if (!(await page.getByRole("complementary", { name: "Participants" }).isVisible())) await bouton(page, "Participants").click();
@@ -326,7 +341,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(pageB.locator(".chiffres").first()).toHaveText(codeChezA);
     await bouton(pageB, "J'ai comparé ce code").click();
     await expect(pageB.getByText(`Voir le code de ${pseudoA} · Code vérifié`)).toBeVisible();
-    await capture(pageB, "salon-participants");
+    await captureB("salon-participants");
     expect(await axe(pageB)).toEqual([]);
     expect(erreursB).toEqual([]);
 
