@@ -151,9 +151,25 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Le lien et un jeton d'ouverture restent dans le stockage de l'onglet le temps de l'ouverture, pour qu'un rechargement ne coûte pas une ouverture.",
           "La langue affichée suit celle de votre navigateur : rien n'est gardé pour cela.",
           "Salon : pour retrouver votre place après un rechargement, votre jeton de membre, le nom que vous y portez et la clé du salon sont gardés chiffrés sur cet appareil, lisibles seulement avec le mot de passe du salon ; ils s'effacent à la fin du salon.",
-          "Offres payantes : le pass et les jetons anonymes qu'il donne sont gardés chiffrés sur cet appareil.",
+          "Offres payantes : le pass et les jetons anonymes qu'il donne (avec l'heure où chacun a été obtenu) sont gardés chiffrés sur cet appareil.",
           "Si vous cochez « Garder ce partage », le lien reçu (avec sa clé), sa taille et son échéance sont gardés chiffrés sur cet appareil, jamais le mot de passe. Ils s'effacent 7 jours après l'échéance, ou quand vous les retirez.",
           "L'historique des téléchargements est désactivé par défaut : rien n'est gardé tant que vous ne l'activez pas vous-même. Activé, il garde chiffrés sur cet appareil le nom, la taille et la sorte de chaque fichier enregistré, sa provenance et l'heure ; il n'est jamais envoyé, et ne contient jamais le lien ni le mot de passe. Chaque entrée s'efface après 30 jours ; le désactiver efface tout.",
+        ],
+      },
+      {
+        // Conception du paiement §3, §7, S16 à S19. Relu sur le code : server/internal/paiement
+        // (base.go, stripe.go, jetons.go), web/src/paiement (jetons.ts, pass.ts).
+        id: "paiement",
+        h: "Offres payantes : le paiement",
+        list: [
+          "Le paiement, quand il est proposé, se fait sur la page du prestataire choisi, vers laquelle nous vous envoyons : Stripe pour la carte, PayPal, ou NOWPayments pour les cryptomonnaies. Aucun de leurs scripts n'est chargé sur nos pages.",
+          "Le prestataire voit ce que vous lui donnez (selon le moyen : nom, adresse e-mail, carte, compte PayPal ou portefeuille), votre adresse IP, le montant et un numéro de commande tiré au hasard ; il le garde selon ses propres règles. Le pays que vous déclarez passe par notre serveur pour la TVA, sans y être gardé (pour la carte, nous le transmettons aussi à Stripe).",
+          "Votre appareil tire au hasard un pass, qui ne dit rien de vous. Nous gardons un code à sens unique tiré du pass, l'offre, le moyen choisi (carte, PayPal ou crypto), les dates au jour, le nombre de partages payants restants, le numéro de commande, la référence de l'abonnement chez le prestataire (pour arrêter le renouvellement) et un code à sens unique de ses références de paiement (pour un remboursement ou une contestation). Jamais votre nom, votre adresse e-mail, votre pays, le montant ni votre adresse IP (l'offre et sa durée suffisent pourtant à retrouver le prix).",
+          "Qui réunirait les données du prestataire et notre base pourrait relier votre identité à votre pass et à son offre, jamais à vos partages.",
+          "Chaque partage payant dépense un jeton anonyme, signé « en aveugle » (Privacy Pass) : quand votre appareil demande des jetons, notre serveur voit le pass et combien de jetons il prend ; quand un partage en dépense un, il voit un jeton valable pour Plus ou Pro, sans pouvoir savoir de quel pass il vient. Le jeton ne relie pas non plus deux partages entre eux.",
+          "Limite : chaque jeton porte le jour de sa clé. Un partage payant ne se cache donc que parmi les pass de la même offre qui ont pris des jetons ce jour-là ou la veille.",
+          "Limite : l'heure. Après chaque partage payant, tant que le site reste ouvert, votre appareil refait sa petite réserve de jetons à une heure tirée au hasard. Mais sans jeton en réserve (premier partage payant, ou après un ou deux jours sans), les jetons sont demandés au moment même du partage ; et l'appareil demande l'état du pass à l'ouverture de l'accueil ou de la page d'envoi. Avec peu d'acheteurs, notre serveur pourrait alors rapprocher ce partage de votre pass par l'heure.",
+          "Limite : rien ne prouve encore à votre appareil que notre serveur donne la même clé du jour à tout le monde. Un serveur malveillant pourrait donner une clé par personne et reconnaître ainsi ses jetons. Ce point n'est pas résolu.",
         ],
       },
       {
@@ -441,9 +457,23 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "The link and an open token stay in the tab's storage while the share is open, so a reload doesn't cost an open.",
           "The display language follows your browser's: nothing is stored for it.",
           "Room: to get your seat back after a reload, your member token, the name you use there and the room key are kept encrypted on this device, readable only with the room password; they are erased when the room ends.",
-          "Paid plans: the pass and the anonymous tokens it gives are kept encrypted on this device.",
+          "Paid plans: the pass and the anonymous tokens it gives (with the time each one was obtained) are kept encrypted on this device.",
           "If you tick “Keep this share”, the received link (with its key), its size and its expiry are kept encrypted on this device, never the password. They are erased 7 days after expiry, or when you remove them.",
           "The downloads history is off by default: nothing is kept until you turn it on yourself. When on, it keeps the name, size and kind of each saved file, where it came from and the time, encrypted on this device; it is never sent, and never holds the link or the password. Each entry is erased after 30 days; turning it off erases it all.",
+        ],
+      },
+      {
+        id: "paiement",
+        h: "Paid plans: payment",
+        list: [
+          "Payment, when it is offered, takes place on the page of the provider you choose, to which we send you: Stripe for cards, PayPal, or NOWPayments for cryptocurrencies. None of their scripts is loaded on our pages.",
+          "The provider sees what you give it (depending on the method: name, email address, card, PayPal account or wallet), your IP address, the amount and a randomly drawn order number; it keeps them under its own rules. The country you declare passes through our server for VAT, without being kept there (for cards, we also pass it on to Stripe).",
+          "Your device draws a random pass, which says nothing about you. We keep a one-way code derived from the pass, the plan, the chosen method (card, PayPal or crypto), the dates to the day, the number of paid shares left, the order number, the provider's subscription reference (to stop the renewal) and a one-way code of its payment references (for a refund or a dispute). Never your name, your email address, your country, the amount or your IP address (the plan and its length are enough, though, to work out the price).",
+          "Someone who combined the provider's data with our database could link your identity to your pass and its plan, never to your shares.",
+          "Each paid share spends an anonymous token, signed “blind” (Privacy Pass): when your device asks for tokens, our server sees the pass and how many tokens it takes; when a share spends one, it sees a token valid for Plus or Pro, without being able to tell which pass it came from. The token does not link two shares together either.",
+          "Limit: each token carries the day of its key. A paid share therefore only hides among the passes of the same plan that took tokens that day or the day before.",
+          "Limit: timing. After each paid share, while the site stays open, your device refills its small reserve of tokens at a randomly drawn time. But with no token in reserve (first paid share, or after one or two days without one), tokens are requested at the very moment of the share; and the device asks for the pass's status when the home page or the send page opens. With few buyers, our server could then link that share to your pass by its timing.",
+          "Limit: nothing yet proves to your device that our server gives the same key of the day to everyone. A malicious server could give one key per person and so recognise their tokens. This is not solved.",
         ],
       },
       {

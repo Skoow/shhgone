@@ -88,3 +88,57 @@ describe("textes publics et compte par e-mail", () => {
     expect(en["home.priv.account.p.comptes"]).toMatch(/To create a room, an email address/u);
   });
 });
+
+// Paiement (conception du paiement §3, §7, §13, S16 à S19). La page Offres est publique, avec ou
+// sans compte, et le paiement s'ouvre côté serveur (aucun drapeau de construction) : la section
+// est toujours là, écrite au conditionnel « quand il est proposé ».
+describe("Confidentialité : section paiement", () => {
+  const section = (lang: "fr" | "en", comptes: boolean) => {
+    const b = infoPage("confidentialite", lang, comptes).blocks.find((x) => x.id === "paiement");
+    return b ? [b.h, ...(b.p ?? []), ...(b.list ?? [])].join("\n") : "";
+  };
+  test("en français, avec et sans compte", () => {
+    for (const comptes of [false, true]) {
+      const t = section("fr", comptes);
+      for (const re of [
+        /quand il est proposé/u,
+        /page du prestataire/u,
+        /Stripe[^.]*PayPal[^.]*NOWPayments/u,
+        /aucun de leurs scripts/iu,
+        /voit ce que vous lui donnez[^.]*votre adresse IP/u,
+        /code à sens unique tiré du pass/u,
+        /Jamais votre nom, votre adresse e-mail, votre pays, le montant ni votre adresse IP/u,
+        /jamais à vos partages/u,
+        /jeton anonyme/u,
+        /sans pouvoir savoir de quel pass il vient/u,
+        /jour de sa clé\. Un partage payant ne se cache donc que parmi les pass de la même offre qui ont pris des jetons ce jour-là ou la veille/u, // S19
+        /au moment même du partage/u, // S16, résiduel
+        /à une heure tirée au hasard/u, // S16, corrigé
+        /une clé par personne et reconnaître ainsi ses jetons\. Ce point n'est pas résolu/u, // S17
+      ])
+        expect(t).toMatch(re);
+    }
+  });
+  test("en anglais, avec et sans compte", () => {
+    for (const comptes of [false, true]) {
+      const t = section("en", comptes);
+      for (const re of [
+        /when it is offered/u,
+        /page of the provider you choose/u,
+        /Stripe[^.]*PayPal[^.]*NOWPayments/u,
+        /none of their scripts/iu,
+        /sees what you give it[^.]*your IP address/u,
+        /one-way code derived from the pass/u,
+        /Never your name, your email address, your country, the amount or your IP address/u,
+        /never to your shares/u,
+        /anonymous token/u,
+        /without being able to tell which pass it came from/u,
+        /day of its key\. A paid share therefore only hides among the passes of the same plan that took tokens that day or the day before/u,
+        /at the very moment of the share/u,
+        /at a randomly drawn time/u,
+        /one key per person and so recognise their tokens\. This is not solved/u,
+      ])
+        expect(t).toMatch(re);
+    }
+  });
+});
