@@ -11,8 +11,11 @@
 //   source (partage reçu, salon) et l'heure locale de l'enregistrement. JAMAIS le lien, une
 //   clé, le mot de passe ni le contenu : tout champ inconnu est ignoré (`clean`). Même format
 //   pour les apps (D42-20).
-// - Entrées retirées 30 jours après l'enregistrement ; réglage coupé : historique effacé et
-//   plus rien n'est écrit.
+// - DÉSACTIVÉ PAR DÉFAUT (décision du propriétaire du 22 novembre 2026, remplace l'« activé »
+//   de R12) : rien n'est écrit tant que la personne ne l'a pas activé elle-même (drapeau « on »).
+//   Désactivé, ou réglage coupé : l'historique existant est effacé (y compris des entrées
+//   d'avant ce changement) et plus rien n'est écrit.
+// - Entrées retirées 30 jours après l'enregistrement.
 // Aucune requête réseau ici.
 import type { ItemSink } from "../flows/downloads.svelte";
 import { idbBackend, type Backend, type Rec } from "../history/store";
@@ -72,18 +75,14 @@ function clean(x: unknown): DownloadEntry | null {
 export type Downloads = {
   /** Plus récentes d'abord ; les entrées de 30 jours et plus sont retirées. */
   list(): Promise<DownloadEntry[]>;
-  /** null : historique coupé (rien n'est écrit). */
+  /** null : historique désactivé (rien n'est écrit). */
   add(e: NewDownload): Promise<DownloadEntry | null>;
   remove(id: string): Promise<void>;
   clear(): Promise<void>;
+  /** Faux tant que la personne ne l'a pas activé (désactivé par défaut, 22 novembre). */
   enabled(): Promise<boolean>;
   /** Coupé : l'historique existant est effacé. */
   setEnabled(v: boolean): Promise<void>;
-  /**
-   * Vrai une seule fois sur cet appareil (audit du 20 novembre, W4) : la ligne « Gardé dans
-   * Téléchargements… » est à montrer au premier fichier noté ; le drapeau est posé aussitôt.
-   */
-  takeNotice(): Promise<boolean>;
 };
 
 function randomId(): string {
@@ -117,10 +116,18 @@ export async function openDownloads(deps: { backend: Backend | null; now?: () =>
       return null;
     }
   }
-  const enabled = async () => (await b.flag("off")) !== true;
+  // Activé seulement par un geste de la personne (setEnabled(true)) : drapeau « on ». L'ancien
+  // drapeau « off » (activé par défaut, avant le 22 novembre) ne vaut plus rien.
+  const enabled = async () => (await b.flag("on")) === true;
 
   return {
     async list() {
+      // Désactivé : rien à montrer, et rien ne reste (entrées écrites avant le 22 novembre,
+      // quand l'historique était activé par défaut).
+      if (!(await enabled())) {
+        await b.clear();
+        return [];
+      }
       const t = now();
       const out: DownloadEntry[] = [];
       for (const [id, r] of await b.all()) {
@@ -147,13 +154,10 @@ export async function openDownloads(deps: { backend: Backend | null; now?: () =>
     clear: () => b.clear(),
     enabled,
     async setEnabled(v) {
+      // Coupé d'abord, effacé ensuite : un effacement en échec laisse un historique désactivé,
+      // que la lecture suivante (list) efface.
+      await b.setFlag("on", v ? true : undefined);
       if (!v) await b.clear();
-      await b.setFlag("off", v ? undefined : true);
-    },
-    async takeNotice() {
-      if ((await b.flag("notice")) === true) return false;
-      await b.setFlag("notice", true);
-      return true;
     },
   };
 }

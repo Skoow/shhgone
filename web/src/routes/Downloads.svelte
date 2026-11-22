@@ -1,8 +1,9 @@
 <script lang="ts">
   // « Téléchargements » (/telechargements, conception compte §21.15.5), avec ou sans compte :
   // historique des fichiers enregistrés, sur cet appareil seulement (downloads/store.ts, chiffré,
-  // 30 jours). Aucune requête réseau. Le site ne peut pas rouvrir un fichier enregistré : il est
-  // dans le dossier Téléchargements de l'appareil (dit dans le sous-titre).
+  // 30 jours ; désactivé par défaut, décision du propriétaire du 22 novembre 2026). Aucune
+  // requête réseau. Le site ne peut pas rouvrir un fichier enregistré : il est dans le dossier
+  // Téléchargements de l'appareil (dit dans le sous-titre).
   import { untrack } from "svelte";
   import { clearDownloads, downloads, loadDownloads, removeDownload, setDownloadsEnabled } from "../downloads/live.svelte";
   import { byDay } from "../downloads/store";
@@ -59,7 +60,7 @@
     <p class="sub" data-downloads-unavailable>{t("downloads.unavailable")}</p>
   {:else if downloads.status === "ready"}
     <div class="tools">
-      <div class="sw"><Switch label={t("downloads.keep")} checked={downloads.enabled} onchange={(v) => void toggle(v)} /></div>
+      <div class="sw"><Switch label={t("downloads.keep")} hint={t("downloads.keep.hint")} checked={downloads.enabled} onchange={(v) => void toggle(v)} /></div>
       {#if downloads.entries.length > 0}
         <InlineConfirm label={t("downloads.clear")} message={t("downloads.clear.confirm")} confirmLabel={t("downloads.clear.yes")} kind="danger" triggerVariant="ghost" onconfirm={clear}>
           {#snippet icon()}<Trash2 size={18} strokeWidth={1.75} />{/snippet}

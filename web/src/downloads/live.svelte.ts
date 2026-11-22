@@ -1,8 +1,9 @@
 // État partagé de l'historique des téléchargements pour les écrans (contenu reçu, page
 // /telechargements). Ouvre le stockage une fois : IndexedDB en production, mémoire dans la
 // démo (origine partagée de GitHub Pages : rien n'y est écrit) ; indisponible → `status:
-// "unavailable"`. Une simple visite de la page n'écrit rien tant que rien n'a été enregistré.
-// Aucune requête réseau.
+// "unavailable"`. Désactivé par défaut (décision du propriétaire du 22 novembre 2026) : tant que
+// la personne ne l'a pas activé, rien n'est créé ni écrit (ni base, ni clé, ni entrée) ; une
+// simple visite ou un fichier enregistré n'écrivent rien. Aucune requête réseau.
 import { getDemo } from "../app/demo-hooks";
 import { memoryBackend, type Backend } from "../history/store";
 import { downloadsIdb, openDownloads, type DownloadEntry, type Downloads, type NewDownload } from "./store";
@@ -10,13 +11,8 @@ import { downloadsIdb, openDownloads, type DownloadEntry, type Downloads, type N
 export const downloads = $state({
   status: "idle" as "idle" | "loading" | "ready" | "unavailable",
   entries: [] as DownloadEntry[],
-  /** « Garder l'historique » (activé par défaut, R12). */
-  enabled: true,
-  /**
-   * Audit du 20 novembre (W4) : vrai après le premier fichier noté sur cet appareil, une seule
-   * fois ; l'écran du contenu dit alors que le nom est gardé (30 jours), avec « Ne pas garder ».
-   */
-  notice: false,
+  /** « Garder l'historique » : désactivé par défaut (22 novembre 2026, remplace l'« activé » de R12). */
+  enabled: false,
 });
 
 function backend(): Backend | null {
@@ -32,7 +28,7 @@ function backend(): Backend | null {
 let chosen: Backend | null | undefined;
 const theBackend = () => (chosen === undefined ? (chosen = backend()) : chosen);
 let opening: Promise<Downloads | null> | undefined;
-/** Ouvre en créant au besoin (clé, base) : seulement pour écrire. */
+/** Ouvre en créant au besoin (clé, base) : seulement pour activer, ou écrire une fois activé. */
 function store(): Promise<Downloads | null> {
   return (opening ??= openDownloads({ backend: theBackend() }).catch(() => null));
 }
@@ -49,7 +45,7 @@ export async function loadDownloads(): Promise<void> {
   try {
     if (!opening && !(await b.exists())) {
       downloads.entries = [];
-      downloads.enabled = true;
+      downloads.enabled = false; // aucune base : jamais activé sur cet appareil
       downloads.status = "ready";
       return;
     }
@@ -64,26 +60,30 @@ export async function loadDownloads(): Promise<void> {
   }
 }
 
-/** Après un enregistrement réussi (afterSave) : rien si l'historique est coupé ou indisponible. */
+/** La base existe (ouverte ici, ou déjà sur l'appareil), sans la créer. */
+async function hasBase(): Promise<boolean> {
+  const b = theBackend();
+  return !!b && (opening !== undefined || (await b.exists().catch(() => false)));
+}
+
+/**
+ * Après un enregistrement réussi (afterSave) : rien si l'historique est désactivé ou
+ * indisponible. Sans base (jamais activé), rien n'est ouvert : ni base ni clé créées.
+ */
 export async function recordDownload(e: NewDownload): Promise<void> {
+  if (!(await hasBase())) return;
   const d = await store();
   if (!d) return;
   try {
     if (!(await d.add(e))) return;
-    if (await d.takeNotice()) downloads.notice = true;
     if (downloads.status === "ready") await reload(d);
   } catch {
     // historique illisible : le fichier est enregistré quand même
   }
 }
 
-/** « Ne pas garder » (W4) : coupe l'historique, comme la page Téléchargements, et l'efface. */
-export async function declineDownloads(): Promise<void> {
-  downloads.notice = false;
-  await setDownloadsEnabled(false);
-}
-
 export async function removeDownload(id: string): Promise<void> {
+  if (!(await hasBase())) return;
   const d = await store();
   if (!d) return;
   await d.remove(id).catch(() => undefined);
@@ -91,13 +91,20 @@ export async function removeDownload(id: string): Promise<void> {
 }
 
 export async function clearDownloads(): Promise<void> {
+  if (!(await hasBase())) return void (downloads.entries = []);
   const d = await store();
   if (!d) return;
   await d.clear().catch(() => undefined);
   await reload(d).catch(() => undefined);
 }
 
+/** Activer crée la base ; désactiver l'efface (rien n'est créé s'il n'y avait rien). */
 export async function setDownloadsEnabled(v: boolean): Promise<void> {
+  if (!v && !(await hasBase())) {
+    downloads.enabled = false;
+    downloads.entries = [];
+    return;
+  }
   const d = await store();
   if (!d) return;
   await d.setEnabled(v).catch(() => undefined);
