@@ -218,7 +218,7 @@ func brut(m json.RawMessage) ([]byte, bool) {
 	return s, true
 }
 
-func dureeOK(j int) bool { return j == 30 || j == 365 }
+func dureeOK(j int) bool { return j == 30 || j == 365 || j == 1095 }
 
 func motifOK(m uint8) bool { return m >= 1 && m <= 10 }
 

@@ -323,7 +323,7 @@ $('detruire').addEventListener('submit', async (ev) => {
 const CATEGORIES = ['Terrorisme', 'Abus sexuels sur mineurs', 'Contenu sexuel non consenti', 'Violence ou menaces',
   'Haine ou discrimination', 'Harcèlement', 'Piratage ou logiciel malveillant', 'Arnaque',
   'Données personnelles exposées', 'Autre'];
-const DUREES = [[365, '1 an'], [30, '30 jours']];
+const DUREES = [[1095, '3 ans'], [365, '1 an'], [30, '30 jours']];
 const FILTRES = [['', 'Tous'], ['actifs', 'Actifs'], ['suspendus', 'Suspendus'], ['bientot', 'Échéant sous 30 jours']];
 
 let comptesActifs = false;
@@ -341,7 +341,7 @@ function option(select, valeur, texte, choisie) {
 
 function remplirDurees(select) {
   vider(select);
-  for (const [j, t] of DUREES) option(select, j, t, j === 365);
+  for (const [j, t] of DUREES) option(select, j, t, j === 1095);
 }
 
 function remplirMotifs(select, choisi) {

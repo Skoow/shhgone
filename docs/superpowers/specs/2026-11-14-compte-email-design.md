@@ -743,7 +743,7 @@ L'accueil connecté est une **liste unique**, triée par activité, de quatre so
 
 ### 21.11 Bannissement révisé (décision 4 ; complète §13)
 
-- ~~**Durée par défaut : 3 ans** ; choix au moment de bannir : 30 jours, 1 an, 3 ans (défaut).~~ **22 novembre (propriétaire : garder le moins longtemps)** : durée par défaut **1 an**, choix 30 jours ou 1 an ; 3 ans retiré.
+- ~~**Durée par défaut : 3 ans** ; choix au moment de bannir : 30 jours, 1 an, 3 ans (défaut).~~ **22 novembre** : réduit à 1 an, puis **rétabli à 3 ans le même jour par le propriétaire** (le bannissement porte sur l'empreinte de l'adresse e-mail, jamais sur une adresse IP).
 - **Actions** sur un bannissement (tableau de bord et ligne de commande) :
   - **Suspendre / Réactiver** : `actif` 0 ou 1 ; suspendu, l'adresse peut recréer un compte et le compte créer des salons ; l'échéance ne bouge pas ;
   - **Changer l'échéance** : allonger ou raccourcir, toute date entre demain et aujourd'hui + 5 ans (au-delà : décision du juriste, la durée de conservation doit rester proportionnée) ;

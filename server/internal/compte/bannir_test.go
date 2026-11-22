@@ -96,10 +96,10 @@ func TestBannirParAdresse(t *testing.T) {
 	}
 }
 
-// Durées : 30 ou 365 jours (3 ans retiré le 22 novembre) ; motif 1 à 10 ; rien d'autre.
+// Durées : 30, 365 ou 1 095 jours ; motif 1 à 10 ; rien d'autre.
 func TestDurees(t *testing.T) {
 	b := nouveauBanc(t)
-	for i, j := range []int{30, 365} {
+	for i, j := range []int{30, 365, 1095} {
 		r := b.ban(t, Cible{Email: []byte("a" + string(rune('0'+i)) + "@exemple.fr")}, j, 10)
 		if r.Vue.Jusqu != dateJour(b.aujourdhui()+int64(j)*jourS) {
 			t.Fatal(j, r.Vue)
@@ -108,7 +108,7 @@ func TestDurees(t *testing.T) {
 	for _, c := range []struct {
 		jours int
 		motif uint8
-	}{{0, 10}, {-30, 10}, {31, 10}, {364, 10}, {366, 10}, {1095, 10}, {1825, 10}, {30, 0}, {30, 11}} {
+	}{{0, 10}, {-30, 10}, {31, 10}, {364, 10}, {366, 10}, {1094, 10}, {1096, 10}, {1825, 10}, {30, 0}, {30, 11}} {
 		if _, err := b.s.Bannir(Cible{Email: []byte("x@exemple.fr")}, c.jours, c.motif); !errors.Is(err, ErrRequete) {
 			t.Errorf("%+v : %v", c, err)
 		}
