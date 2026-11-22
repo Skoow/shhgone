@@ -88,10 +88,13 @@ func (e envPaiement) preuve(t *testing.T, corps, remote string) []byte {
 	return []byte(strings.TrimSuffix(corps, "}") + `,"altcha":"` + alt + `","hp":"","shown_at":"` + shown + `"}`)
 }
 
+// Paiement fermé : l'offre répond 200 sans moyen (P6, 22 novembre : plus de 404 dans la console
+// du navigateur) ; toutes les autres routes restent la 404 uniforme.
 func TestPaiementDesactive(t *testing.T) {
 	e := newEnv(t, false, nil)
-	for _, r := range []req{{method: "GET", path: "/api/paiement"}, {method: "POST", path: "/api/paiement/commande", body: []byte(corpsCommande)},
-		{method: "POST", path: "/api/paiement/webhook/stripe", body: []byte(`{}`)}} {
+	expect(t, e.do(req{method: "GET", path: "/api/paiement"}), 200, `{"v":1,"moyens":[],"pays":[],"bientot":[]}`)
+	for _, r := range []req{{method: "POST", path: "/api/paiement/commande", body: []byte(corpsCommande)},
+		{method: "POST", path: "/api/paiement/webhook/stripe", body: []byte(`{}`)}, {method: "GET", path: "/api/paiement/jetons/cles"}} {
 		expect(t, e.do(r), 404, `{"error":"not_found"}`)
 	}
 }

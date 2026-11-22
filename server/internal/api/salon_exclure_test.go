@@ -208,8 +208,10 @@ func TestPieceExclu(t *testing.T) {
 	expect(t, e.putPiece(tok, 0, rnd(share.SegmentSize(1, 0))), 403, exclu)
 	expect(t, e.finaliserPiece(tok, 0, 0), 403, exclu)
 	expect(t, e.getPiece(ms[1].jeton, lisible, 0), 403, exclu)
-	expect(t, e.do(req{method: "POST", path: "/api/salons/pieces/retirer", hdr: pieceHdr(ms[1].jeton, id),
-		body: []byte(`{}`)}), 403, exclu)
+	// Route « retirer une pièce » retirée le 22 novembre (aucun écran ne l'appelait, audit P4).
+	if c := e.do(req{method: "POST", path: "/api/salons/pieces/retirer", hdr: pieceHdr(ms[1].jeton, id), body: []byte(`{}`)}).Code; c != 404 && c != 405 {
+		t.Fatal("route retirée encore servie :", c)
+	}
 	// Le créateur lit toujours.
 	expect(t, e.getPiece(ms[0].jeton, lisible, 0), 200, "")
 }

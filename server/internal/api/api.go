@@ -387,6 +387,10 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 	if sal.Paiement != nil {
 		s.jetons = sal.Paiement.Jetons()
 		paiementAPI{server: s, p: sal.Paiement}.routes(api)
+	} else {
+		// Paiement fermé (audit du 20 novembre, P6) : l'offre répond 200 « aucun moyen » plutôt
+		// qu'une 404 que le navigateur affichait en erreur dans la console. Rien d'autre.
+		api.HandleFunc("GET /api/paiement", paiementFerme)
 	}
 	api.HandleFunc("/api/", notFoundAPI)
 
@@ -823,4 +827,15 @@ func withIP(r *http.Request, ip netip.Addr) *http.Request {
 func ipOf(r *http.Request) netip.Addr {
 	ip, _ := r.Context().Value(ctxIP{}).(netip.Addr)
 	return ip
+}
+
+// paiementFerme : GET /api/paiement quand le paiement n'est pas ouvert (P6) : même forme que
+// l'offre, sans moyen ni pays ; le site la lit comme « paiement fermé ».
+func paiementFerme(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, struct {
+		V       int      `json:"v"`
+		Moyens  []string `json:"moyens"`
+		Pays    []string `json:"pays"`
+		Bientot []string `json:"bientot"`
+	}{1, []string{}, []string{}, []string{}})
 }

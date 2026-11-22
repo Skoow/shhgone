@@ -116,7 +116,7 @@
     {/if}
     <g class="ink" mask={erasing ? `url(#${uid}-m)` : undefined}>
       <!-- Initiale : le même S que la marque (bouts arrondis), ses points pâlissent vers la fin. -->
-      <path class="head cap" d={LOGO_CAP} stroke-width={LOGO_STROKE} />
+      <path class="head s-trait" d={LOGO_CAP} stroke-width={LOGO_STROKE} />
       <path class="head" d={LOGO_HEAD} stroke-width={LOGO_STROKE} />
       <g class="dots">
         {#each LOGO_CAP_DOTS as p, i (i)}<path d={p.d} fill-opacity={p.o} />{/each}
@@ -164,7 +164,7 @@
     stroke: currentColor;
   }
   .stroke,
-  .cap {
+  .s-trait {
     stroke-linecap: round;
   }
   /* État statique : « shh » plein, « gone » en trame. */

@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/skoow/shhdrop/server/internal/limits"
+	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
@@ -36,6 +38,23 @@ func salonMembres(t *testing.T, e *env, n int) []string {
 }
 
 func membreHdr(jeton string) map[string]string { return map[string]string{"X-Shh-Membre": jeton} }
+
+// retirerPiece : effacement d'une pièce par son auteur, par le gestionnaire (la route HTTP
+// « retirer » est retirée le 22 novembre, audit P4 : aucun écran ne l'appelait).
+func retirerPiece(t *testing.T, m *salon.Manager, jeton, id string) {
+	t.Helper()
+	jet, err := base64.RawURLEncoding.DecodeString(jeton)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mb, err := m.Membre(jet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.RetirerPiece(mb, id); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func pieceHdr(jeton, id string) map[string]string {
 	return map[string]string{"X-Shh-Membre": jeton, "X-Shh-Piece": id}
@@ -174,21 +193,6 @@ func TestLectureBudget(t *testing.T) {
 	expect(t, e.getPiece(j[0], id, 0), 200, "")
 }
 
-func TestPieceRetirerAuteurSeul(t *testing.T) {
-	e, _ := salonEnv(t)
-	j := salonMembres(t, e, 2)
-	id, _ := e.envoyerPiece(t, j[1], 1)
-	retirer := func(jeton, id, body string) *httptest.ResponseRecorder {
-		return e.do(req{method: "POST", path: "/api/salons/pieces/retirer", hdr: pieceHdr(jeton, id), body: []byte(body)})
-	}
-	expect(t, retirer(j[0], id, `{}`), 403, `{"error":"forbidden"}`)
-	expect(t, e.getPiece(j[0], id, 0), 200, "")
-	expect(t, retirer(j[1], id, `{"x":1}`), 400, badRequest)
-	expect(t, retirer(j[1], id, `{}`), 200, `{}`)
-	expect(t, e.getPiece(j[0], id, 0), 404, notFound)
-	expect(t, retirer(j[1], id, `{}`), 404, notFound)
-}
-
 // slowGETPiece envoie un GET de segment de pièce et ne lit jamais la réponse.
 func slowGETPiece(t *testing.T, srv *httptest.Server, jeton, id string, n int) net.Conn {
 	t.Helper()
@@ -218,8 +222,7 @@ func TestCoupureLectureEnCours(t *testing.T) {
 		t.Fatal(resp, err)
 	}
 	waitFor(t, "flux inscrit", func() bool { return m.Flux().Len() == 2 })
-	expect(t, e.do(req{method: "POST", path: "/api/salons/pieces/retirer", hdr: pieceHdr(j[0], id), body: []byte(`{}`)}),
-		200, `{}`)
+	retirerPiece(t, m, j[0], id)
 	cn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	n, _ := io.Copy(io.Discard, resp.Body)
 	if n >= int64(share.SegmentSize(80, 0)) {
@@ -231,7 +234,7 @@ func TestCoupureLectureEnCours(t *testing.T) {
 // Fichier de la pièce sans date (mtime et atime à l'epoch), après envoi, finalisation et
 // lecture.
 func TestPieceSansDate(t *testing.T) {
-	e, _ := salonEnv(t)
+	e, m := salonEnv(t)
 	j := salonMembres(t, e, 2)
 	id, _ := e.envoyerPiece(t, j[0], 16)
 	expect(t, e.getPiece(j[1], id, 0), 200, "")
@@ -254,7 +257,7 @@ func TestPieceSansDate(t *testing.T) {
 	// partage, ni la dernière suppression.
 	c := e.create(t, "203.0.113.7:1", newKeys(), 1, 1)
 	e.upload(t, c, 1)
-	expect(t, e.do(req{method: "POST", path: "/api/salons/pieces/retirer", hdr: pieceHdr(j[0], id), body: []byte(`{}`)}), 200, "")
+	retirerPiece(t, m, j[0], id)
 	for _, d := range []string{"salon-pieces", "salons", "blobs"} {
 		fi, err := os.Stat(filepath.Join(e.dir, d))
 		if err != nil {

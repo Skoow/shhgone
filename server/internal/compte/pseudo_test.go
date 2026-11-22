@@ -102,25 +102,25 @@ func TestEmpreintePseudoRefus(t *testing.T) {
 }
 
 // Demande du propriétaire (14 novembre) : rôles, marques, autorités et insultes refusés, sur la
-// forme canonique du moteur (formes tirées de pseudo_canon : « m » → « rn », « 1 » → « l ») ;
+// forme canonique du moteur (formes tirées de pseudo_canon : « m » → « rn », « 1 » et « i » → « l ») ;
 // rôles et autorités en mot entier, marques et insultes aussi en sous-chaîne. Les mots courts
 // ou ambigus (« nazi » dans « Nazim », « rapist » dans « therapist ») restent en mot entier.
 func TestPseudoInterdits(t *testing.T) {
 	c := clesTest(1)
 	for _, p := range []string{
-		"staff", "tearn", "root", "fondateur", "official", "noreply", "postrnaster", "abuse", "security",
-		"police", "gendarrnerie", "pharos", "gouvfr", "gouv",
-		"shhgone", "leshhgoneofficiel", "shhdropsupport",
-		"connard", "grosconnard", "salope", "enculé", "niquetarnère", "fuck", "motherfucker", "bitchx",
-		"nazi", "rapist", "pute", "kkk", "l488",
+		"staff", "tearn", "root", "fondateur", "offlclal", "noreply", "postrnaster", "abuse", "securlty",
+		"pollce", "gendarrnerle", "pharos", "gouvfr", "gouv",
+		"shhgone", "leshhgoneofflclel", "shhdropsupport",
+		"connard", "grosconnard", "salope", "enculé", "nlquetarnère", "fuck", "motherfucker", "bltchx",
+		"nazl", "raplst", "pute", "kkk", "l488",
 	} {
 		if _, err := c.EmpreintePseudo([]byte(p)); !errors.Is(err, ErrPseudoReserve) {
 			t.Errorf("%q accepté (%v)", p, err)
 		}
 	}
 	for _, p := range []string{
-		"lea", "constance", "dispute", "badrninton", "technique", "nazirn", "scunthorpe", "therapist",
-		"cornputer", "grape", "rooted", "staffan", "polices", "connaitre", "retardataire", "shhg", "drop",
+		"lea", "constance", "dlspute", "badrnlnton", "technlque", "nazlrn", "scunthorpe", "theraplst",
+		"cornputer", "grape", "rooted", "staffan", "pollces", "connaltre", "retardatalre", "shhg", "drop",
 	} {
 		if _, err := c.EmpreintePseudo([]byte(p)); err != nil {
 			t.Errorf("%q refusé (%v)", p, err)
@@ -129,7 +129,7 @@ func TestPseudoInterdits(t *testing.T) {
 }
 
 // interdits.txt : chaque ligne est « exact <forme> » ou « contient <forme> », forme canonique
-// (minuscules, sans espace ni ponctuation ASCII) ; aucune forme en double ; aucune forme
+// (minuscules, sans espace ni ponctuation ASCII, « i » déjà replié en « l ») ; aucune forme en double ; aucune forme
 // « exact » n'est déjà dans reserves.txt (liste commune au moteur, à ne pas dédoubler ; une
 // marque de reserves.txt peut être reprise en « contient »).
 func TestListeInterdits(t *testing.T) {
@@ -138,7 +138,7 @@ func TestListeInterdits(t *testing.T) {
 	}
 	vu := map[string]bool{}
 	for i, f := range append(slices.Clone(interditsExacts), interditsContient...) {
-		if vu[f] || (i < len(interditsExacts) && slices.Contains(reserves, f)) || f == "" || strings.ToLower(f) != f || strings.ContainsAny(f, " .-_'") {
+		if vu[f] || (i < len(interditsExacts) && slices.Contains(reserves, f)) || f == "" || strings.ToLower(f) != f || strings.ContainsAny(f, " .-_'i") {
 			t.Errorf("forme %q", f)
 		}
 		vu[f] = true

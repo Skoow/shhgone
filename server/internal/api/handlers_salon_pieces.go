@@ -29,7 +29,6 @@ func (a salonAPI) routesPieces(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/salons/pieces/finalize", a.finaliserPiece)
 	mux.HandleFunc("GET /api/salons/pieces/segments/{n}", a.lireSegmentPiece)
 	mux.HandleFunc("/api/salons/pieces/segments/{n}", methodNotAllowed)
-	mux.HandleFunc("POST /api/salons/pieces/retirer", a.retirerPiece)
 }
 
 // validPieceSegment : validSegmentToken pour /api/salons/pieces/segments/{n} (n non vide,
@@ -285,29 +284,4 @@ func (a salonAPI) lireSegmentPiece(w http.ResponseWriter, r *http.Request) {
 	if err != nil || k != l.Size() {
 		panic(http.ErrAbortHandler) // réponse tronquée : connexion coupée
 	}
-}
-
-// retirerPiece : POST /api/salons/pieces/retirer (X-Shh-Membre, X-Shh-Piece, corps {}) :
-// auteur seulement (403 forbidden).
-func (a salonAPI) retirerPiece(w http.ResponseWriter, r *http.Request) {
-	var b struct{}
-	if err := readJSON(w, r, &b); err != nil {
-		failSalon(w, err)
-		return
-	}
-	mb, _, err := a.membre(r)
-	if err != nil {
-		failSalon(w, err)
-		return
-	}
-	id, err := pieceID(r)
-	if err != nil {
-		failSalon(w, err)
-		return
-	}
-	if err := a.m.RetirerPiece(mb, id); err != nil {
-		failSalon(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, struct{}{})
 }

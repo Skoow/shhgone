@@ -79,12 +79,14 @@ async function json(r: Response): Promise<Obj | null> {
   }
 }
 
-/** Offre du serveur ; null : paiement non ouvert sur ce serveur (404), injoignable ou démo. */
+/** Offre du serveur ; null : paiement non ouvert sur ce serveur (aucun moyen), injoignable ou démo. */
 export async function lireOffre(n: Net = netParDefaut()): Promise<OffreServeur | null> {
   const r = await appel(n, "", { method: "GET" });
   if (r === null || r.status !== 200) return null;
   const o = await json(r);
   if (o === null || o.v !== 1 || !chaines(o.moyens) || !chaines(o.pays) || !chaines(o.bientot)) return null;
+  // Paiement fermé sur ce serveur (P6 : 200 sans moyen, plus de 404) : comme une offre absente.
+  if (o.moyens.length === 0) return null;
   return {
     moyens: o.moyens.filter((m): m is Moyen => (MOYENS as readonly string[]).includes(m)),
     pays: o.pays.filter((p) => /^[A-Z]{2}$/.test(p)),

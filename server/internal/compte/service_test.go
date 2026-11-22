@@ -946,7 +946,7 @@ func TestPseudoReserveRefuse(t *testing.T) {
 	b := nouveauBanc(t)
 	b.inscrire(t, ipN(1), "lea@exemple.fr", "lea")
 	_, e, code := b.debut(t, ipN(2), "leo@exemple.fr")
-	for _, p := range []string{"adrnin", "shhgone", "leshhgoneofficiel", "police", "connard", "xxconnardxx", "fuck"} {
+	for _, p := range []string{"adrnln", "shhgone", "leshhgoneofflclel", "pollce", "connard", "xxconnardxx", "fuck"} {
 		if _, err := b.s.InscriptionFin(e, code, donneesTest(p), OptionsSession{}); !errors.Is(err, ErrPseudoPris) {
 			t.Fatalf("%s : %v", p, err)
 		}

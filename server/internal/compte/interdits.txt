@@ -1,7 +1,7 @@
 # Pseudos interdits côté serveur (demande du propriétaire, 14 novembre), en plus de reserves.txt
 # (liste commune au moteur, inchangée : vecteurs communs). Formes canoniques produites par
 # pseudo_canon du moteur (cleUnicite du module wasm du salon) : NFKC, minuscules, squelette
-# UTS #39 (« m » → « rn », « 1 » → « l », « 0 » → « o »), sans espaces ni ponctuation ; le mot
+# UTS #39 (« m » → « rn », « 1 » et « i » → « l », « 0 » → « o », depuis le 22 novembre pour « i »), sans espaces ni ponctuation ; le mot
 # d'origine en commentaire de fin de ligne n'est pas lu (tout ce qui suit la forme).
 #
 #   exact <forme>     refusé si p_canon est exactement la forme ;
@@ -21,32 +21,32 @@ exact root
 exact owner
 exact fondateur
 exact founder
-exact official
+exact offlclal
 exact help
-exact info
+exact lnfo
 exact noreply  no-reply, no reply
 exact postrnaster  postmaster
 exact abuse
-exact security
+exact securlty
 exact systern  system
-exact adrninistrator  administrator
+exact adrnlnlstrator  administrator
 exact rnoderator  moderator
 exact webrnaster  webmaster
 exact hostrnaster  hostmaster
-exact sysadrnin  sysadmin
+exact sysadrnln  sysadmin
 exact superuser
 
 # Autorités usurpables.
-exact police
-exact gendarrnerie  gendarmerie
-exact justice
+exact pollce
+exact gendarrnerle  gendarmerie
+exact justlce
 exact pharos
 exact gouvernernent  gouvernement
 exact gouv
 exact gouvfr  gouv.fr
-exact interpol
+exact lnterpol
 exact europol
-exact cnil
+exact cnll
 exact arcorn  arcom
 
 # Marques, en sous-chaîne (« shhgone_officiel », « Shh Drop support »).
@@ -62,19 +62,19 @@ contient encule
 contient batard
 contient bâtard
 contient salaud
-contient pédophile
-contient pedophile
-contient niquetarnère  nique ta mère
-contient niquetarnere  nique ta mere
-contient putain
+contient pédophlle
+contient pedophlle
+contient nlquetarnère  nique ta mère
+contient nlquetarnere  nique ta mere
+contient putaln
 contient pétasse
 contient petasse
-contient gouine
+contient goulne
 contient bougnoule
-contient youpin
+contient youpln
 contient salearabe  sale arabe
-contient salenoir  sale noir
-contient salejuif  sale juif
+contient salenolr  sale noir
+contient salejulf  sale juif
 exact ntrn  ntm
 exact fdp
 exact pute
@@ -83,34 +83,34 @@ exact pede
 exact tapette
 exact nègre
 exact negre
-exact nazi
+exact nazl
 
 # Insultes et termes haineux courants, anglais.
 contient fuck
-contient bitch
+contient bltch
 contient asshole
-contient nigger
-contient nigga
+contient nlgger
+contient nlgga
 contient faggot
 contient whore
-contient dickhead
+contient dlckhead
 contient tranny
 contient wetback
-contient whitepower  white power
-contient hitler
-contient siegheil  sieg heil
+contient whltepower  white power
+contient hltler
+contient sleghell  sieg heil
 exact cunt
 exact fag
 exact retard
 exact slut
-exact shit
+exact shlt
 exact rape
-exact rapist
+exact raplst
 exact pedo
 exact paedo
-exact kike
-exact chink
-exact spic
+exact klke
+exact chlnk
+exact splc
 exact kys
 exact kkk
 exact l488  1488
