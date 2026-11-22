@@ -48,6 +48,7 @@ func (a compteAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/compte/coffre/prive", a.ecrireCoffre(compte.Prive))
 	mux.HandleFunc("POST /api/compte/pseudo/verifier", a.pseudoVerifier)
 	mux.HandleFunc("POST /api/compte/pseudo", a.pseudo)
+	mux.HandleFunc("POST /api/compte/pseudo/libre", a.pseudoInvite)
 	// Lot 5 : double authentification, récupération, paramètres, suppression.
 	mux.HandleFunc("POST /api/compte/connexion/totp", a.connexionTOTP)
 	mux.HandleFunc("POST /api/compte/oubli/debut", a.oubliDebut)
@@ -599,6 +600,25 @@ func (a compteAPI) pseudoVerifier(w http.ResponseWriter, r *http.Request) {
 	default:
 		err = compte.ErrSession
 	}
+	if err != nil {
+		failCompte(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Libre bool `json:"libre"`
+	}{libre})
+}
+
+// pseudoInvite : { p_canon } → { libre }, pour l'invité d'un salon (sans compte ni salon).
+func (a compteAPI) pseudoInvite(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		PCanon string `json:"p_canon"`
+	}
+	if err := lire(w, r, &b, maxJSON); err != nil {
+		failCompte(w, err)
+		return
+	}
+	libre, err := a.c.PseudoVerifierInvite(ipOf(r), []byte(b.PCanon))
 	if err != nil {
 		failCompte(w, err)
 		return

@@ -1099,6 +1099,161 @@ fn pseudo_canon_homoglyphes() {
     }
 }
 
+// Tests croisés de la casse (demande du propriétaire, 22 novembre) : le pseudo garde ses
+// majuscules à l'affichage, mais toutes les casses d'un même pseudo ont une seule clé.
+fn casses(m: &str) -> Vec<String> {
+    let c: Vec<char> = m.chars().collect();
+    (0u32..1 << c.len())
+        .map(|bits| {
+            c.iter()
+                .enumerate()
+                .map(|(i, x)| {
+                    if bits >> i & 1 == 1 {
+                        x.to_ascii_uppercase()
+                    } else {
+                        x.to_ascii_lowercase()
+                    }
+                })
+                .collect()
+        })
+        .collect()
+}
+
+#[test]
+fn pseudo_toutes_les_casses() {
+    for m in [
+        "lea", "Alice", "maxime", "Zorglub", "jean2", "x9y8z7", "MM", "rnrn", "ilo10",
+    ] {
+        let k = pseudo_canon(m);
+        for v in casses(m) {
+            assert_eq!(pseudo_canon(&v), k, "{v} / {m}");
+            // L'affichage garde la casse telle quelle.
+            assert_eq!(pseudo_valide(&v).unwrap(), v);
+        }
+    }
+}
+
+#[test]
+fn pseudo_classes_ascii() {
+    // Lettre par lettre (exploration exhaustive des 62 caractères permis et des 3 844 paires) :
+    // les seules fusions sont I/i/L/l/1, O/o/0, M/m = « rn », et chaque lettre avec sa majuscule.
+    let al: Vec<char> = ('A'..='Z').chain('a'..='z').chain('0'..='9').collect();
+    let attendu = |c: char| -> String {
+        match c.to_ascii_lowercase() {
+            'i' | 'l' | '1' => "l".into(),
+            'o' | '0' => "o".into(),
+            'm' => "rn".into(),
+            x => x.to_string(),
+        }
+    };
+    for &a in &al {
+        assert_eq!(pseudo_canon(&a.to_string()), attendu(a), "{a}");
+        for &b in &al {
+            let s = format!("{a}{b}");
+            assert_eq!(pseudo_canon(&s), attendu(a) + &attendu(b), "{s}");
+        }
+    }
+    // Limites connues, non fusionnées (signalées) : vv / w, cl / d, 5 / S, 8 / B, 2 / Z.
+    for (a, b) in [
+        ("vvalter", "walter"),
+        ("clara", "dara"),
+        ("5am", "Sam"),
+        ("8ob", "Bob"),
+        ("2oe", "Zoe"),
+    ] {
+        assert_ne!(pseudo_canon(a), pseudo_canon(b), "{a} / {b}");
+    }
+}
+
+/// Forme que le serveur exige (compte/pseudo.go, FormeCanonique) : 2 à 48 octets a-z sans i ni m, 2-9.
+fn forme_serveur(k: &str) -> bool {
+    (2..=48).contains(&k.len())
+        && k.bytes().all(|b| {
+            (b.is_ascii_lowercase() && b != b'i' && b != b'm') || (b'2'..=b'9').contains(&b)
+        })
+}
+
+#[test]
+fn pseudo_cle_toujours_acceptee_par_le_serveur() {
+    // Pseudos valables tirés de façon reproductible (2 à 24 caractères), plus les bornes.
+    let al: Vec<char> = ('A'..='Z').chain('a'..='z').chain('0'..='9').collect();
+    let mut x: u64 = 0x5eed;
+    let mut suivant = || {
+        x = x
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (x >> 33) as usize
+    };
+    let mut essais: Vec<String> = vec![
+        "ab".into(),
+        "MMMMMMMMMMMMMMMMMMMMMMMM".into(),
+        "IIIIIIIIIIIIIIIIIIIIIIII".into(),
+        "00".into(),
+        "1l".into(),
+    ];
+    for _ in 0..5000 {
+        let n = 2 + suivant() % 23;
+        essais.push((0..n).map(|_| al[suivant() % al.len()]).collect());
+    }
+    for p in essais {
+        let net = pseudo_valide(&p).unwrap_or_else(|e| panic!("{p} : {e:?}"));
+        let k = pseudo_canon(&net);
+        assert!(forme_serveur(&k), "{p} → {k}");
+    }
+}
+
+#[test]
+fn pseudo_bornes_et_refus() {
+    assert!(pseudo_valide("A").is_err());
+    assert!(pseudo_valide("Ab").is_ok());
+    assert!(pseudo_valide(&"Ab".repeat(12)).is_ok());
+    assert!(pseudo_valide(&format!("{}c", "Ab".repeat(12))).is_err());
+    // Espaces autour : retirées ; au milieu, accents, autres écritures, pleine chasse, i turc,
+    // ß, signes : refusés (A-Z, a-z, 0-9 seulement).
+    assert_eq!(pseudo_valide("  Lea  ").unwrap(), "Lea");
+    // Caractère invisible (espace sans chasse) : retiré, jamais gardé dans le pseudo.
+    assert_eq!(pseudo_valide("Lea\u{200b}x").unwrap(), "Leax");
+    for p in [
+        "Le a",
+        "Léa",
+        "Lea!",
+        "Le-a",
+        "Le_a",
+        "Ｌｅａ",
+        "\u{130}lyas",
+        "\u{131}lyas",
+        "Stra\u{df}e",
+        "Лea",
+        "Le\u{301}a",
+    ] {
+        assert!(pseudo_valide(p).is_err(), "{p} accepté");
+    }
+}
+
+#[test]
+fn pseudo_reserve_toutes_les_casses_et_sosies() {
+    for w in PSEUDOS_RESERVES.iter().filter(|w| w.is_ascii()) {
+        for v in casses(w) {
+            assert!(pseudo_reserve(&pseudo_canon(&v)), "{v}");
+            let sosie: String = v
+                .chars()
+                .map(|c| match c {
+                    'i' => '1',
+                    'I' => 'l',
+                    'o' => '0',
+                    'O' => '0',
+                    'm' => 'M',
+                    x => x,
+                })
+                .collect();
+            assert!(pseudo_reserve(&pseudo_canon(&sosie)), "{sosie}");
+        }
+    }
+    let rn: String = "admin".replace('m', "rn");
+    assert!(pseudo_reserve(&pseudo_canon(&rn)));
+    assert!(!pseudo_reserve(&pseudo_canon("adminx")));
+}
+
 #[test]
 fn cles_de_coffre_distinctes() {
     let k = derive("k_compte/a");

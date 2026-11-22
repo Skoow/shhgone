@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -123,11 +124,21 @@ func coffreTest(magic string, gen uint64, palier int) []byte {
 
 func alea32() (k [32]byte) { rand.Read(k[:]); return }
 
+// canonTest : pseudo_canon du moteur pour un pseudo ASCII (minuscules ; i et 1 → l ; 0 → o ;
+// m → rn), complété à 2 caractères pour les pseudos d'une lettre des anciens tests.
+func canonTest(p string) string {
+	r := strings.NewReplacer("i", "l", "1", "l", "0", "o", "m", "rn").Replace(strings.ToLower(p))
+	if len(r) == 1 {
+		r += "x"
+	}
+	return r
+}
+
 func donneesTest(pseudo string) Donnees {
 	var d Donnees
 	d.AAuth, d.SProfil = alea32(), alea32()
 	rand.Read(d.EnvMdp[:])
-	d.PCanon = []byte(pseudo)
+	d.PCanon = []byte(canonTest(pseudo))
 	d.BlobProfil = coffreTest("SHH-PROF1", 1, 4096)
 	d.BlobPrive = coffreTest("SHH-ACCT1", 1, 4096)
 	return d
@@ -559,7 +570,7 @@ func TestConnexionInconnueEtFausseIdentiques(t *testing.T) {
 
 func mustPseudo(t *testing.T, c Cles, p string) []byte {
 	t.Helper()
-	e, err := c.EmpreintePseudo([]byte(p))
+	e, err := c.EmpreintePseudo([]byte(canonTest(p)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1019,7 +1030,7 @@ func TestPseudoTroisParAn(t *testing.T) {
 func TestPseudoJamaisEnClair(t *testing.T) {
 	b := nouveauBanc(t)
 	b.inscrire(t, ipN(1), "lea@exemple.fr", "ReperePseudoLea")
-	if bytes.Contains(b.fichiers(t), []byte("ReperePseudoLea")) {
+	if f := b.fichiers(t); bytes.Contains(f, []byte("ReperePseudoLea")) || bytes.Contains(f, []byte(canonTest("ReperePseudoLea"))) {
 		t.Fatal("pseudo en clair")
 	}
 	var pe []byte
@@ -1077,7 +1088,7 @@ func TestChangerPseudoLimiteLesEssais(t *testing.T) {
 	c, _ := b.s.Session(j)
 	var lim ErrLimit
 	for i := 0; ; i++ {
-		err := b.s.ChangerPseudo(c, []byte("pris"))
+		err := b.s.ChangerPseudo(c, []byte(canonTest("pris")))
 		if errors.As(err, &lim) {
 			if i == 0 || i > 40 {
 				t.Fatal("limite après", i, "essais")

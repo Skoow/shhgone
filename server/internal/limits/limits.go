@@ -68,6 +68,11 @@ const (
 	// Entrées (POST /api/salons/rejoindre) par heure (fenêtre fixe UTC).
 	JoinsPer64 = 20
 	JoinsPer48 = 60
+	// Vérifications du pseudo d'un invité du salon (POST /api/compte/pseudo/libre, sans compte ni
+	// salon : décision du propriétaire, 22 novembre) par heure (fenêtre fixe UTC) : par
+	// connexion et par /48. Borne l'énumération des pseudos des comptes.
+	PseudoInvitePer64 = 30
+	PseudoInvitePer48 = 90
 	// Commandes de paiement par heure (conception du paiement §8) : par connexion et par /48.
 	CommandesPer64 = 10
 	CommandesPer48 = 30
@@ -132,6 +137,8 @@ type Limiter struct {
 	hour    int64 // heure courante (heures depuis 1970)
 	join64  map[string]int
 	join48  map[string]int
+	inv64   map[string]int
+	inv48   map[string]int
 	// Paiement (conception du paiement §8) : commandes de l'heure.
 	paie64 map[string]int
 	paie48 map[string]int
@@ -309,6 +316,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.salon48 = map[string]int{}
 		l.join64 = map[string]int{}
 		l.join48 = map[string]int{}
+		l.inv64, l.inv48 = map[string]int{}, map[string]int{}
 		l.frame64 = map[string]int{}
 		l.frame48 = map[string]int{}
 		l.insc64, l.insc48 = map[string]int{}, map[string]int{}
@@ -341,6 +349,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.hour = h
 		l.join64 = map[string]int{}
 		l.join48 = map[string]int{}
+		l.inv64, l.inv48 = map[string]int{}, map[string]int{}
 		l.paie64, l.paie48 = map[string]int{}, map[string]int{}
 		l.echec64, l.echec48, l.echecCpt = map[string]int{}, map[string]int{}, map[string]int{}
 		l.totpCpt, l.coffreCpt, l.pseudoCpt = map[string]int{}, map[string]int{}, map[string]int{}
@@ -769,6 +778,16 @@ func (l *Limiter) AllowJoin(ip netip.Addr) bool {
 	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
 	return l.allowPairLocked(ip, l.join64, l.join48, JoinsPer64, JoinsPer48)
+}
+
+// AllowPseudoInvite : vérification du pseudo d'un invité du salon, PseudoInvitePer64 par heure
+// (fenêtre fixe UTC) par connexion et PseudoInvitePer48 par /48, comptée à l'appel. Refus :
+// JoinRetry donne le délai jusqu'à l'heure suivante.
+func (l *Limiter) AllowPseudoInvite(ip netip.Addr) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.rotateLocked(l.now())
+	return l.allowPairLocked(ip, l.inv64, l.inv48, PseudoInvitePer64, PseudoInvitePer48)
 }
 
 // AllowCommande : création d'une commande de paiement, CommandesPer64 par heure (fenêtre

@@ -373,6 +373,8 @@ export function createFauxCompte(opts: FauxCompteOpts = {}): FauxCompte {
         const o = ouverture(cle(e.email), booleen(b.persistante), etiquette(b.etiquette));
         return { session: o.session, h: o.h, s_profil: o.s_profil, blob_profil: o.blob_profil, gen_profil: o.gen_profil, gen_prive: o.gen_prive };
       }
+      case "POST pseudo/libre":
+        return { libre: !pseudos.has(chaine(b.p_canon)) };
     }
 
     // --- routes avec session ---

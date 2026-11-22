@@ -1425,6 +1425,8 @@ export const en = {
   "salon.pseudo.err.caracteres": "Letters and digits without accents only (A-Z, 0-9).",
   "salon.pseudo.err.ecritures": "One script at a time.",
   "salon.pseudo.err.pris": "Already taken in this room.",
+  "salon.pseudo.err.compte_pris": "This username is already taken on Shhgone. Choose another one.",
+  "salon.pseudo.err.essais": "Too many username attempts. Try again in an hour.",
   "salon.pseudo.err.invalide": "Invalid nickname.",
   "salon.pseudo.err.refuse": "This nickname was just taken by someone else. Choose another one.",
   "salon.room.label": "Conversation",

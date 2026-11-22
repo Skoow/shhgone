@@ -140,6 +140,16 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoA);
     // Unicité : le pseudonyme de la créatrice est déjà pris (dès que son profil est arrivé).
     await expect(pageB.getByText("Déjà pris dans ce salon.")).toBeVisible({ timeout: 30_000 });
+    // Tests croisés de la casse et des sosies (22 novembre) : même refus.
+    for (const v of [pseudoA.toUpperCase(), pseudoA.toLowerCase(), pseudoA.replace("L", "I")]) {
+      await champ(pageB, "Pseudonyme pour ce salon").fill(v);
+      await expect(pageB.getByText("Déjà pris dans ce salon.")).toBeVisible();
+    }
+    // Invité : ni un mot réservé (ADMlN = admin), ni le pseudo d'un compte (vérifié par le
+    // serveur, sans salon) ; même message, qui ne dit pas lequel.
+    await champ(pageB, "Pseudonyme pour ce salon").fill("ADMlN");
+    await bouton(pageB, "Entrer dans le salon").click();
+    await expect(pageB.getByText("Ce pseudo est déjà pris sur Shhgone. Choisissez-en un autre.")).toBeVisible();
     await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoB);
     await bouton(pageB, "Entrer dans le salon").click();
     await expect(fil(pageB)).toBeVisible();

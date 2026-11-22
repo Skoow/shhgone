@@ -93,17 +93,45 @@ func interdit(p string) bool {
 	return false
 }
 
+// Pseudo : 2 à 24 caractères A-Z, a-z, 0-9 (décision du propriétaire, 20 novembre) ; sa clé
+// (pseudo_canon du moteur) n'a donc que des minuscules et des chiffres, sans « i » ni « 1 »
+// (devenus « l »), sans « 0 » (« o ») ni « m » (« rn ») : de 2 à 48 octets.
+const (
+	pseudoCanonMin      = 2
+	pseudoCanonMaxForme = 48
+)
+
+// FormeCanonique : p_canon a la forme que pseudo_canon donne à un pseudo valable (22 novembre,
+// tests croisés : sans ce contrôle, « Lea » ou « adm1n » envoyés par un client modifié ou ancien
+// auraient une autre empreinte que « lea » ou « adrnln » et passeraient l'unicité).
+func FormeCanonique(p []byte) bool {
+	if len(p) < pseudoCanonMin || len(p) > pseudoCanonMaxForme {
+		return false
+	}
+	for _, b := range p {
+		ok := (b >= 'a' && b <= 'z' && b != 'i' && b != 'm') || (b >= '2' && b <= '9')
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // EmpreintePseudo : p_empreinte = HMAC-SHA-256(K_pseudo, « pseudo » ‖ 0x00 ‖ p_canon)
 // (conception §21.2.2). Refus : p_canon vide, de plus de PseudoCanonMax octets ou en UTF-8
-// invalide (ErrPseudoCanon) ; pseudo réservé ou interdit (ErrPseudoReserve). Limite assumée (§21.5) : un
+// invalide, ou hors de la forme canonique (FormeCanonique) (ErrPseudoCanon) ; pseudo réservé ou interdit (ErrPseudoReserve). Limite assumée (§21.5) : un
 // client modifié peut envoyer autre chose que le vrai canon ; l'unicité ne vaut que pour les
 // clients honnêtes.
 func (c Cles) EmpreintePseudo(pCanon []byte) ([32]byte, error) {
 	if len(pCanon) == 0 || len(pCanon) > PseudoCanonMax || !utf8.Valid(pCanon) {
 		return [32]byte{}, ErrPseudoCanon
 	}
+	// Réservé ou interdit d'abord (même réponse qu'un pseudo pris), puis la forme.
 	if interdit(string(pCanon)) {
 		return [32]byte{}, ErrPseudoReserve
+	}
+	if !FormeCanonique(pCanon) {
+		return [32]byte{}, ErrPseudoCanon
 	}
 	return empreinte(c.Pseudo[:], "pseudo", pCanon), nil
 }

@@ -133,7 +133,7 @@ var routesCompte = [][2]string{
 	{"GET", "/api/compte/sessions"}, {"POST", "/api/compte/sessions/fermer"}, {"POST", "/api/compte/deconnexion"},
 	{"POST", "/api/compte/sessions/etiquette"},
 	{"GET", "/api/compte/coffre/profil"}, {"PUT", "/api/compte/coffre/profil"}, {"GET", "/api/compte/coffre/prive"},
-	{"PUT", "/api/compte/coffre/prive"}, {"POST", "/api/compte/pseudo/verifier"}, {"POST", "/api/compte/pseudo"},
+	{"PUT", "/api/compte/coffre/prive"}, {"POST", "/api/compte/pseudo/verifier"}, {"POST", "/api/compte/pseudo"}, {"POST", "/api/compte/pseudo/libre"},
 	// Lot 5.
 	{"POST", "/api/compte/connexion/totp"}, {"POST", "/api/compte/oubli/debut"}, {"POST", "/api/compte/oubli/renvoyer"},
 	{"POST", "/api/compte/oubli/verifier"}, {"POST", "/api/compte/oubli/fin"}, {"GET", "/api/compte"},
@@ -228,6 +228,16 @@ func TestParcoursCompteHTTP(t *testing.T) {
 		body: []byte(`{"p_canon":"connard"}`)}), 200, `{"libre":false}`)
 	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/verifier", hdr: sess(s2),
 		body: []byte(`{"p_canon":"leo"}`)}), 200, `{"libre":true}`)
+	// Invité d'un salon (22 novembre) : sans session ; pseudo d'un compte, réservé ou interdit
+	// refusés de la même façon ; 30 par heure et par connexion.
+	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/libre", body: []byte(`{"p_canon":"lea"}`)}), 200, `{"libre":false}`)
+	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/libre", body: []byte(`{"p_canon":"adrnln"}`)}), 200, `{"libre":false}`)
+	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/libre", body: []byte(`{"p_canon":"leo"}`)}), 200, `{"libre":true}`)
+	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/libre", body: []byte(`{"p_canon":""}`)}), 400, "")
+	for i := 3; i < 30; i++ { // la requête vide n'est pas comptée
+		expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/libre", body: []byte(`{"p_canon":"leo"}`)}), 200, `{"libre":true}`)
+	}
+	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/libre", body: []byte(`{"p_canon":"leo"}`)}), 429, "")
 	// Premier changement permis le jour de l'inscription (faute de frappe), le suivant attend demain.
 	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo", hdr: sess(s2),
 		body: []byte(`{"p_canon":"leo"}`)}), 200, `{}`)

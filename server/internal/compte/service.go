@@ -579,6 +579,20 @@ func (s *Service) PseudoVerifier(c Courante, pCanon []byte) (bool, error) {
 	return s.pseudoLibre(pCanon)
 }
 
+// PseudoVerifierInvite : pseudo d'un invité du salon (décision du propriétaire, 22 novembre :
+// unique dans sa conversation, et jamais le pseudo d'un compte, ni réservé, ni interdit). Sans
+// compte ni salon : la requête ne dit pas de quel salon il s'agit et rien n'est gardé ; bornée
+// par connexion (limits.AllowPseudoInvite) contre l'énumération des pseudos des comptes.
+func (s *Service) PseudoVerifierInvite(ip netip.Addr, pCanon []byte) (bool, error) {
+	if len(pCanon) == 0 {
+		return false, ErrRequete
+	}
+	if !s.lim.AllowPseudoInvite(ip) {
+		return false, ErrLimit{heureSuivante(s.now())}
+	}
+	return s.pseudoLibre(pCanon)
+}
+
 // PseudoEcart : temps minimal entre deux changements de pseudo (décision du propriétaire,
 // 20 novembre : « 3 fois par an au plus ») ; 123 jours : 3 × 123 = 369 > 366, jamais plus de
 // 3 changements sur 12 mois glissants, même une année bissextile (audit, B4), sans nouvelle

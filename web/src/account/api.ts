@@ -293,6 +293,13 @@ export async function pseudoVerifier(n: Net, par: { jeton: string } | { etape: s
   return o.libre;
 }
 
+/** Invité d'un salon (22 novembre) : pseudo ni pris par un compte, ni réservé, ni interdit ? Sans session ni salon. */
+export async function pseudoLibreInvite(n: Net, pCanon: string): Promise<boolean> {
+  const o = await appel(n, "POST", "pseudo/libre", { body: { p_canon: pCanon } });
+  if (typeof o.libre !== "boolean") throw invalide();
+  return o.libre;
+}
+
 export async function changerPseudo(n: Net, session: string, pCanon: string): Promise<void> {
   await appel(n, "POST", "pseudo", { session, body: { p_canon: pCanon } });
 }

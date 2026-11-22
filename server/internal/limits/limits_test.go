@@ -1299,3 +1299,38 @@ func TestAllowRequestPar48(t *testing.T) {
 		t.Fatal("minute suivante : toujours refusé")
 	}
 }
+
+// Pseudo d'un invité (22 novembre) : 30 par heure et par connexion, 90 par /48, remis à zéro
+// à l'heure ; compteurs propres (les entrées de salon n'y comptent pas).
+func TestAllowPseudoInvite(t *testing.T) {
+	if PseudoInvitePer64 != 30 || PseudoInvitePer48 != 90 {
+		t.Fatal(PseudoInvitePer64, PseudoInvitePer48)
+	}
+	now := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)
+	l := newLim(&now)
+	for i := 0; i < JoinsPer64; i++ {
+		l.AllowJoin(ip("2001:db8:7:1::1"))
+	}
+	for i := 0; i < 30; i++ {
+		if !l.AllowPseudoInvite(ip(fmt.Sprintf("2001:db8:7:1::%x", i+1))) {
+			t.Fatalf("vérification %d refusée", i+1)
+		}
+	}
+	if l.AllowPseudoInvite(ip("2001:db8:7:1::ff")) {
+		t.Fatal("31e vérification de l'heure acceptée")
+	}
+	for p := 2; p <= 3; p++ {
+		for i := 0; i < 30; i++ {
+			if !l.AllowPseudoInvite(ip(fmt.Sprintf("2001:db8:7:%x::1", p))) {
+				t.Fatalf("/64 n° %d, vérification %d refusée", p, i+1)
+			}
+		}
+	}
+	if l.AllowPseudoInvite(ip("2001:db8:7:ff::1")) {
+		t.Fatal("/48 plein mais vérification acceptée")
+	}
+	now = time.Date(2026, 11, 4, 11, 0, 0, 0, time.UTC)
+	if !l.AllowPseudoInvite(ip("2001:db8:7:1::1")) {
+		t.Fatal("pas remis à zéro à l'heure")
+	}
+}

@@ -8,7 +8,7 @@
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatDuration } from "../../i18n/format";
   import { vue, entrer, pseudoPropose, photoProposee, choisirAvatar, verifierPseudo, conversation } from "../../salon/salon.svelte";
-  import { changerPseudo, pseudoAChoisir, pseudoLibre, verifierSaisie } from "../../account/session.svelte";
+  import { changerPseudo, pseudoAChoisir, pseudoLibre, pseudoLibreSalon, pseudoInviteRetenu, retenirPseudoInvite, verifierSaisie } from "../../account/session.svelte";
   import { codeDe } from "../compte/erreurs";
   import AvatarPicker from "../../ui/AvatarPicker.svelte";
   import Cadre from "../compte/Cadre.svelte";
@@ -18,7 +18,8 @@
   import { ChevronDown } from "../../ui/Icon";
 
   const refuse = untrack(() => conversation()?.pseudoRefuse === true);
-  let pseudo = $state(untrack(() => vue.monPseudo ?? pseudoPropose()));
+  // Compte sans vrai pseudo : celui pris comme invité plus tôt dans cet onglet est proposé (il le garde s'il est libre).
+  let pseudo = $state(untrack(() => vue.monPseudo ?? (__COMPTES__ && pseudoAChoisir() ? pseudoInviteRetenu() : null) ?? pseudoPropose()));
   let essaye = $state(false);
   let photo = $state<Uint8Array | null>(untrack(() => photoProposee()));
   let champ: HTMLInputElement | undefined = $state();
@@ -55,6 +56,20 @@
         envoi = false;
       }
       if (errCompte) return champ?.focus();
+    } else if (__COMPTES__ && !fige && !("code" in verdict)) {
+      // Invité (ou compte qui garde le salon à part) : unique dans la conversation, et jamais le
+      // pseudo d'un autre compte (décision du propriétaire, 22 novembre). Le serveur ne sait pas
+      // de quel salon il s'agit ; rien n'est gardé.
+      envoi = true;
+      try {
+        if (!(await pseudoLibreSalon(pseudo))) errCompte = t("salon.pseudo.err.compte_pris");
+      } catch (e) {
+        errCompte = t((e as { status?: unknown }).status === 429 || codeDe(e) === "limit" ? "salon.pseudo.err.essais" : "salon.pseudo.err.compte");
+      } finally {
+        envoi = false;
+      }
+      if (errCompte) return champ?.focus();
+      if (!pseudoAChoisir()) retenirPseudoInvite(pseudo);
     }
     if (!entrer(pseudo)) return champ?.focus();
     if (photo) void choisirAvatar(photo);

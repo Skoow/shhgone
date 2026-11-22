@@ -41,6 +41,8 @@ var allowedMaps = map[string]string{
 	"limits/limits.go:salon48":          "§9.5 salons créés du jour (§39.3.6)",
 	"limits/limits.go:join64":           "§9.5 entrées de l'heure (§39.3.6)",
 	"limits/limits.go:join48":           "§9.5 entrées de l'heure (§39.3.6)",
+	"limits/limits.go:inv64":            "§9.5 vérifications du pseudo d'un invité de l'heure",
+	"limits/limits.go:inv48":            "§9.5 vérifications du pseudo d'un invité de l'heure",
 	"limits/limits.go:frame64":          "§9.5 trames de la minute (§39.3.6)",
 	"limits/limits.go:frame48":          "§9.5 trames de la minute (§39.3.6)",
 	"limits/limits.go:paid64":           "§9.5 octets utiles du jour des partages payants par connexion (spec §38.6, conception du paiement §11)",

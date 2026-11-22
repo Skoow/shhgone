@@ -71,7 +71,7 @@ func inscrireTest(t *testing.T, s *compte.Service, p *postierTest, ip, email, ps
 	rand.Read(d.AAuth[:])
 	rand.Read(d.EnvMdp[:])
 	rand.Read(d.SProfil[:])
-	d.PCanon, d.BlobProfil, d.BlobPrive = []byte(pseudo), coffreTest("SHH-PROF1"), coffreTest("SHH-ACCT1")
+	d.PCanon, d.BlobProfil, d.BlobPrive = []byte(strings.NewReplacer("i", "l", "1", "l", "0", "o", "m", "rn").Replace(strings.ToLower(pseudo))), coffreTest("SHH-PROF1"), coffreTest("SHH-ACCT1")
 	if _, err := s.InscriptionFin(e, p.code(), d, compte.OptionsSession{}); err != nil {
 		t.Fatal(err)
 	}

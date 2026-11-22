@@ -533,6 +533,45 @@ export async function pseudoLibre(p: string): Promise<boolean> {
   throw new Error("aucune_session");
 }
 
+/**
+ * Pseudo pris pour un salon hors du compte (invité, ou compte sans « Proposer mon pseudo ») :
+ * libre si aucun AUTRE compte ne l'a et qu'il n'est ni réservé ni interdit (décision du
+ * propriétaire, 22 novembre). Le sien est toujours permis. Requête sans session ni salon.
+ */
+export async function pseudoLibreSalon(p: string): Promise<boolean> {
+  let canon: string;
+  try {
+    canon = (await pseudoCanon(p)).pCanon;
+  } catch (e) {
+    if (e instanceof Error && e.message === "pseudo_reserve") return false;
+    throw e;
+  }
+  const mien = ouverte ? account.profil?.pseudo : undefined;
+  if (mien && !estPseudoProvisoire(mien)) {
+    const k = await pseudoCanon(mien).then((x) => x.pCanon, () => null);
+    if (k === canon) return true;
+  }
+  try {
+    return await api.pseudoLibreInvite(deps.net, canon);
+  } catch (e) {
+    // Serveur sans comptes ouverts (route absente) : aucun pseudo de compte à protéger.
+    if (e instanceof api.CompteError && e.status === 404) return true;
+    throw e;
+  }
+}
+
+/**
+ * Dernier pseudo pris comme invité dans un salon de cet onglet (mémoire seulement, jamais écrit) :
+ * proposé comme pseudo du compte s'il en crée un (« il garde son pseudo s'il est libre »).
+ */
+let pseudoInvite: string | null = null;
+export function retenirPseudoInvite(p: string): void {
+  pseudoInvite = p;
+}
+export function pseudoInviteRetenu(): string | null {
+  return pseudoInvite;
+}
+
 /** Change le pseudo (une fois par 24 h, serveur), puis l'écrit dans le coffre de profil. */
 export async function changerPseudo(p: string): Promise<void> {
   const o = ouverteOuErreur();

@@ -1429,6 +1429,8 @@ export const fr = {
   "salon.pseudo.err.caracteres": "Lettres et chiffres sans accent seulement (A-Z, 0-9).",
   "salon.pseudo.err.ecritures": "Une seule écriture à la fois.",
   "salon.pseudo.err.pris": "Déjà pris dans ce salon.",
+  "salon.pseudo.err.compte_pris": "Ce pseudo est déjà pris sur Shhgone. Choisissez-en un autre.",
+  "salon.pseudo.err.essais": "Trop d'essais de pseudo. Réessayez dans une heure.",
   "salon.pseudo.err.invalide": "Pseudonyme invalide.",
   "salon.pseudo.err.refuse": "Ce pseudonyme vient d'être pris par quelqu'un d'autre. Choisissez-en un autre.",
   "salon.room.label": "Conversation",

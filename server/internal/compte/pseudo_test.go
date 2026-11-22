@@ -93,8 +93,16 @@ func TestEmpreintePseudoRefus(t *testing.T) {
 			t.Errorf("%s : %v", nom, err)
 		}
 	}
-	if _, err := c.EmpreintePseudo([]byte(strings.Repeat("a", PseudoCanonMax))); err != nil {
-		t.Errorf("%d octets refusés : %v", PseudoCanonMax, err)
+	// Forme canonique (22 novembre) : 2 à 48 octets, a-z sans i ni m, 2-9.
+	for _, ok := range []string{"ab", strings.Repeat("rn", 24), "lea", "adrnlnx", "z29"} {
+		if _, err := c.EmpreintePseudo([]byte(ok)); err != nil {
+			t.Errorf("%q refusé : %v", ok, err)
+		}
+	}
+	for _, ko := range []string{"a", strings.Repeat("a", 49), "Lea", "LEA", "lia", "1ea", "0scar", "emma", "le a", "lé", "le-a", "le_a", "ｌｅａ", strings.Repeat("a", PseudoCanonMax)} {
+		if _, err := c.EmpreintePseudo([]byte(ko)); !errors.Is(err, ErrPseudoCanon) {
+			t.Errorf("%q : %v", ko, err)
+		}
 	}
 	if PseudoCanonMax != 512 {
 		t.Fatal("borne", PseudoCanonMax)

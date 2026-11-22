@@ -113,6 +113,8 @@ function fauxServeur() {
       case "POST pseudo/verifier":
         if (!qui && !(body.etape && etapes.has(body.etape as string))) return err(401, "session");
         return ok({ libre: !pseudos.has(body.p_canon as string) });
+      case "POST pseudo/libre":
+        return ok({ libre: !pseudos.has(body.p_canon as string) });
       case "POST pseudo": {
         if (!qui) return err(401, "session");
         if (pseudos.has(body.p_canon as string)) return err(409, "pseudo_pris");
@@ -357,6 +359,49 @@ describe("inscription", () => {
     const last = srv.requetes.at(-1)!;
     expect(last.headers["X-Shh-Session"]).toBeTruthy();
     expect(last.body).toEqual({ p_canon: "lea" });
+  });
+});
+
+describe("pseudo d'un invité du salon (22 novembre)", () => {
+  it("sans session ni salon : pris par un compte → non ; réservé → non sans requête ; libre → oui ; le sien → oui", async () => {
+    await inscription();
+    const mien = C.account.profil!.pseudo;
+    await C.seDeconnecter();
+    // Sans session : la requête ne porte ni session ni rien du salon, seulement p_canon.
+    expect(await C.pseudoLibreSalon("LEA")).toBe(false);
+    const r = srv.requetes.at(-1)!;
+    expect(r.path).toBe("/api/compte/pseudo/libre");
+    expect(r.headers["X-Shh-Session"]).toBeUndefined();
+    expect(r.body).toEqual({ p_canon: "lea" });
+    // Sosies (I/l/1, O/0, rn/m, casse) : même clé, donc même réponse.
+    for (const p of ["Lea", "lEA", "LeA", "1ea", "Iea"]) expect(await C.pseudoLibreSalon(p), p).toBe(false);
+    const n = srv.requetes.length;
+    expect(await C.pseudoLibreSalon("Admin")).toBe(false);
+    expect(await C.pseudoLibreSalon("ADMlN")).toBe(false);
+    expect(srv.requetes.length).toBe(n);
+    expect(await C.pseudoLibreSalon("Leo")).toBe(true);
+    // Avec la session : son propre pseudo est permis, sans requête.
+    await C.seConnecter("Lea.Dupont@exemple.fr", MDP, false);
+    const m = srv.requetes.length;
+    expect(await C.pseudoLibreSalon(mien.toUpperCase())).toBe(true);
+    expect(srv.requetes.length).toBe(m);
+  });
+
+  it("serveur sans comptes (404) : libre ; limite (429) et réseau : erreur", async () => {
+    configurerFetch(async () => new Response(JSON.stringify({ error: "not_found" }), { status: 404 }));
+    expect(await C.pseudoLibreSalon("Leo")).toBe(true);
+    configurerFetch(async () => new Response(JSON.stringify({ error: "limit" }), { status: 429 }));
+    await expect(C.pseudoLibreSalon("Leo")).rejects.toMatchObject({ status: 429 });
+    configurerFetch(async () => {
+      throw new TypeError("hors ligne");
+    });
+    await expect(C.pseudoLibreSalon("Leo")).rejects.toThrow("reseau");
+  });
+
+  it("pseudo pris comme invité : retenu en mémoire seulement (rien dans le stockage)", () => {
+    C.retenirPseudoInvite("Lucas");
+    expect(C.pseudoInviteRetenu()).toBe("Lucas");
+    expect(JSON.stringify({ ...localStorage })).not.toContain("Lucas");
   });
 });
 
