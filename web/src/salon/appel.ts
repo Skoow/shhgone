@@ -47,6 +47,8 @@ export type DepsAppel = {
   /** Micro et/ou caméra (au moins l'un des deux) ; `face` : caméra de face (« user ») ou de dos (« environment »). */
   media(o: { audio: boolean; video: boolean; face: Face }): Promise<MediaStream>;
   pair(config: RTCConfiguration): RTCPeerConnection;
+  /** Partage d'écran (getDisplayMedia) ; absent : le navigateur ne le permet pas (Safari sur iPhone). */
+  ecran?: () => Promise<MediaStream>;
   flux(): MediaStream;
   alea(): Uint8Array;
   maintenant(): number;
@@ -132,6 +134,10 @@ export class Appel {
   camera = false;
   /** Caméra de face ou de dos (téléphone) ; l'image de face est montrée en miroir. */
   face: Face = "user";
+  /** Partage d'écran en cours : l'écran remplace la caméra pour les autres, puis la caméra revient. */
+  ecran = false;
+  #ecranPiste: MediaStreamTrack | null = null;
+  #fluxEcran: MediaStream | null = null;
   erreur: ErreurAppel | null = null;
 
   constructor(d: DepsAppel) {
@@ -248,7 +254,7 @@ export class Appel {
         local.removeTrack(t);
       }
       this.camera = false;
-      for (const p of this.#paires.values()) void p.video?.replaceTrack(null).catch(() => {});
+      if (!this.ecran) for (const p of this.#paires.values()) void p.video?.replaceTrack(null).catch(() => {});
     } else {
       let piste: MediaStreamTrack | undefined;
       try {
@@ -268,7 +274,7 @@ export class Appel {
       local.addTrack(piste);
       this.#surveiller(piste);
       this.camera = true;
-      for (const p of this.#paires.values()) void p.video?.replaceTrack(piste).catch(() => {});
+      if (!this.ecran) for (const p of this.#paires.values()) void p.video?.replaceTrack(piste).catch(() => {});
     }
     this.#annoncer(true);
     this.#d.change();
@@ -301,7 +307,60 @@ export class Appel {
     local.addTrack(piste);
     this.#surveiller(piste);
     this.face = face;
+    if (!this.ecran) for (const p of this.#paires.values()) void p.video?.replaceTrack(piste).catch(() => {});
+    this.#d.change();
+  }
+
+  /** Le navigateur permet-il de partager l'écran ? */
+  get ecranPossible(): boolean {
+    return this.#d.ecran !== undefined;
+  }
+  /** Flux de l'écran partagé (aperçu local), ou null. */
+  get fluxEcran(): MediaStream | null {
+    return this.#fluxEcran;
+  }
+
+  /**
+   * Partage d'écran : l'écran remplace la caméra pour les autres (même connexion chiffrée, même
+   * relais), le temps du partage. Refusé ou annulé dans le sélecteur du navigateur : rien ne
+   * change. Fin par « Arrêter », par le navigateur (bouton « Arrêter le partage »), ou en raccrochant.
+   */
+  async partagerEcran(): Promise<void> {
+    const ecran = this.#d.ecran;
+    if (!ecran || !this.#dans || this.ecran) return;
+    let piste: MediaStreamTrack | undefined;
+    try {
+      piste = (await ecran()).getVideoTracks()[0];
+    } catch {
+      piste = undefined;
+    }
+    if (!piste) return;
+    if (!this.#dans || this.ecran) {
+      piste.stop();
+      return;
+    }
+    this.#ecranPiste = piste;
+    this.#fluxEcran = this.#d.flux();
+    this.#fluxEcran.addTrack(piste);
+    this.ecran = true;
+    piste.onended = () => this.arreterEcran();
     for (const p of this.#paires.values()) void p.video?.replaceTrack(piste).catch(() => {});
+    this.#annoncer(true);
+    this.#d.change();
+  }
+
+  /** Fin du partage d'écran : la caméra revient si elle était allumée, sinon plus d'image. */
+  arreterEcran(): void {
+    const piste = this.#ecranPiste;
+    if (!piste) return;
+    piste.onended = null;
+    piste.stop();
+    this.#ecranPiste = null;
+    this.#fluxEcran = null;
+    this.ecran = false;
+    const cam = this.#local?.getVideoTracks()[0] ?? null;
+    for (const p of this.#paires.values()) void p.video?.replaceTrack(cam).catch(() => {});
+    this.#annoncer(true);
     this.#d.change();
   }
 
@@ -321,7 +380,7 @@ export class Appel {
       }
       local.removeTrack(t);
       this.camera = local.getVideoTracks().length > 0;
-      if (!this.camera) for (const p of this.#paires.values()) void p.video?.replaceTrack(null).catch(() => {});
+      if (!this.camera && !this.ecran) for (const p of this.#paires.values()) void p.video?.replaceTrack(null).catch(() => {});
       this.#annoncer(true);
       this.#d.change();
     };
@@ -465,7 +524,7 @@ export class Appel {
     if (!p) return;
     try {
       const a = this.#local?.getAudioTracks()[0] ?? "audio";
-      const v = this.#local?.getVideoTracks()[0] ?? "video";
+      const v = this.#ecranPiste ?? this.#local?.getVideoTracks()[0] ?? "video";
       p.audio = p.pc.addTransceiver(a, { direction: "sendrecv" }).sender;
       p.video = p.pc.addTransceiver(v, { direction: "sendrecv" }).sender;
       await p.pc.setLocalDescription(await p.pc.createOffer());
@@ -495,7 +554,7 @@ export class Appel {
           await t.sender.replaceTrack(this.#local?.getAudioTracks()[0] ?? null);
         } else if (sorte === "video" && !p.video) {
           p.video = t.sender;
-          await t.sender.replaceTrack(this.#local?.getVideoTracks()[0] ?? null);
+          await t.sender.replaceTrack(this.#ecranPiste ?? this.#local?.getVideoTracks()[0] ?? null);
         }
       }
       await p.pc.setLocalDescription(await p.pc.createAnswer());
@@ -593,6 +652,13 @@ export class Appel {
     this.micro = true;
     this.camera = false;
     this.face = "user";
+    if (this.#ecranPiste) {
+      this.#ecranPiste.onended = null;
+      this.#ecranPiste.stop();
+    }
+    this.#ecranPiste = null;
+    this.#fluxEcran = null;
+    this.ecran = false;
   }
 
   #finSiVide(): void {
@@ -614,7 +680,7 @@ export class Appel {
     // Une présence en file suffit : la plus récente remplace l'ancienne, en tête de file (elle
     // dit que nous sommes là : jamais retardée derrière la signalisation, revue du 21 novembre).
     this.#file = this.#file.filter((f) => f.m.k !== "appel_present");
-    this.#file.unshift({ m: { k: "appel_present", appel: deHex(this.#id), video: this.camera }, depuis: t });
+    this.#file.unshift({ m: { k: "appel_present", appel: deHex(this.#id), video: this.camera || this.ecran }, depuis: t });
     this.#pousser();
   }
 

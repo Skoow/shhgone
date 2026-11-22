@@ -410,6 +410,10 @@ function nouvelAppel(x: Session, c: ClientSalon): Appel {
         video: o.video ? { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 }, facingMode: o.face } : false,
       }),
     pair: (cfg) => new RTCPeerConnection(cfg),
+    // Partage d'écran (21 novembre) : seulement où le navigateur le permet (pas Safari sur iPhone).
+    ...(typeof navigator.mediaDevices?.getDisplayMedia === "function"
+      ? { ecran: () => navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { max: 15 }, width: { max: 1280 }, height: { max: 720 } }, audio: false }) }
+      : {}),
     flux: () => new MediaStream(),
     alea: () => crypto.getRandomValues(new Uint8Array(16)),
     maintenant: () => Date.now(),

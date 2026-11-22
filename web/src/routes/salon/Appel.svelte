@@ -11,7 +11,7 @@
   import { ecouterParole } from "../../salon/parole";
   import Button from "../../ui/Button.svelte";
   import IconButton from "../../ui/IconButton.svelte";
-  import { Mic, MicOff, Video, VideoOff, PhoneOff, SwitchCamera } from "../../ui/Icon";
+  import { Mic, MicOff, Video, VideoOff, PhoneOff, SwitchCamera, ScreenShare } from "../../ui/Icon";
 
   const vue = S.vue;
   const conv = S.conversation()!;
@@ -22,6 +22,9 @@
   const camera = $derived((void vue.rev, S.appel()?.camera ?? false));
   const local = $derived((void vue.rev, S.appel()?.local ?? null));
   const face = $derived((void vue.rev, S.appel()?.face ?? "user"));
+  const ecran = $derived((void vue.rev, S.appel()?.ecran ?? false));
+  const fluxEcran = $derived((void vue.rev, S.appel()?.fluxEcran ?? null));
+  const ecranPossible = $derived((void vue.rev, S.appel()?.ecranPossible ?? false));
 
   /** Plusieurs caméras (téléphone) : bouton pour passer de l'une à l'autre. Lu une fois la caméra autorisée. */
   let deuxCameras = $state(false);
@@ -108,7 +111,9 @@
   <section class="appel" aria-label={t("salon.appel.titre")} data-appel="dans">
     <ul class="tuiles" data-n={participants.length + 1}>
       <li class="tuile moi" use:parole={micro ? local : null}>
-        {#if camera && local}
+        {#if ecran && fluxEcran}
+          <video use:flux={fluxEcran} muted playsinline autoplay aria-hidden="true"></video>
+        {:else if camera && local}
           <video use:flux={local} muted playsinline autoplay class:miroir={face === "user"} aria-hidden="true"></video>
         {:else}
           <span class="pastille" aria-hidden="true">{initiale(vue.monPseudo ?? "")}</span>
@@ -139,6 +144,11 @@
       {#if camera && deuxCameras}
         <IconButton label={t("salon.appel.camera.retourner")} variant="secondary" onpress={() => void S.appel()?.retournerCamera()}>
           <SwitchCamera size={20} />
+        </IconButton>
+      {/if}
+      {#if ecranPossible}
+        <IconButton label={t(ecran ? "salon.appel.ecran.arreter" : "salon.appel.ecran.partager")} variant="secondary" aria-pressed={ecran} onpress={() => (ecran ? S.appel()?.arreterEcran() : void S.appel()?.partagerEcran())}>
+          <ScreenShare size={20} />
         </IconButton>
       {/if}
       <IconButton label={t("salon.appel.raccrocher")} variant="danger" onpress={() => S.appel()?.quitter()}>

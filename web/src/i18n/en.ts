@@ -1577,6 +1577,8 @@ export const en = {
   "salon.appel.camera.allumer": "Turn camera on",
   "salon.appel.camera.eteindre": "Turn camera off",
   "salon.appel.camera.retourner": "Switch camera (front or back)",
+  "salon.appel.ecran.partager": "Share screen",
+  "salon.appel.ecran.arreter": "Stop sharing screen",
   "salon.appel.raccrocher": "Hang up",
   "salon.appel.connexion": "connecting…",
   "salon.appel.coupe": "connection lost",

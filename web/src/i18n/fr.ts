@@ -1581,6 +1581,8 @@ export const fr = {
   "salon.appel.camera.allumer": "Allumer la caméra",
   "salon.appel.camera.eteindre": "Éteindre la caméra",
   "salon.appel.camera.retourner": "Changer de caméra (face ou dos)",
+  "salon.appel.ecran.partager": "Partager l'écran",
+  "salon.appel.ecran.arreter": "Arrêter le partage d'écran",
   "salon.appel.raccrocher": "Raccrocher",
   "salon.appel.connexion": "connexion…",
   "salon.appel.coupe": "connexion perdue",
