@@ -32,6 +32,8 @@ set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cd "$here"
+# shellcheck source=deploy/journaux.sh
+. ./journaux.sh
 
 die() {
 	printf 'erreur: %s\n' "$1" >&2
@@ -232,12 +234,16 @@ preflight() {
 				die "$secrets/$f absent ou mal réglé : fichier du compte 65532, droits 0400 (README §13)"
 		done
 	fi
-	# Suivi des connexions du pare-feu (README §1, 22 novembre) : adresses des deux bouts gardées
-	# en mémoire jusqu'à 5 jours par défaut. Avertissement seulement (module absent : rien à dire).
-	ct=/proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established
-	if [ -r "$ct" ] && [ "$(cat "$ct")" -gt 1800 ]; then
-		printf 'AVERTISSEMENT : nf_conntrack_tcp_timeout_established = %s s (adresses gardées en mémoire) : le ramener à 1800 (README §1).\n' "$(cat "$ct")" >&2
+	# Journaux de la machine (README §1 ; inventaire des adresses IP du 22 novembre, journaux.sh) :
+	# aucun syslog ni ancien journal sur le disque, journald en mémoire une heure au plus, sshd
+	# silencieux, ufw sans journal, suivi des connexions ramené à 30 min. Bloquant.
+	local sshd_t=absent pbs
+	if command -v sshd >/dev/null 2>&1 || [ -x /usr/sbin/sshd ]; then
+		sshd_t=$(PATH=$PATH:/usr/sbin sshd -T 2>/dev/null) || sshd_t=
 	fi
+	pbs=$(controle_journaux "" "$sshd_t") ||
+		die "journaux de la machine (adresses IP), à corriger avant d'installer (README §1) :
+$pbs"
 	# Simple avertissement : la détection ne connaît que dm-crypt (LUKS), pas d'autre montage.
 	src=$(findmnt -no SOURCE -T "$SHH_DATA_ROOT")
 	if ! lsblk -s -n -o TYPE "$src" 2>/dev/null | grep -qx crypt; then

@@ -319,3 +319,84 @@ func TestCreateTimesRoundedToMinute(t *testing.T) {
 		t.Fatalf("après l'heure : %d", ch.MaxNumber)
 	}
 }
+
+// Inventaire des adresses IP du 22 novembre : la clé de liaison à la connexion (HMAC tronqué
+// du /64) est tirée au hasard et remplacée à minuit UTC, comme les clés du limiteur ; celle de
+// la veille ne sert plus qu'une heure (défis en vol, difficulté de la dernière heure), puis elle
+// est effacée. Sans cela, une lecture de la mémoire reliait toute liaison à son adresse IPv4 en
+// essayant toutes les adresses, pendant toute la vie du processus.
+func TestBindKeyRotatesAtMidnight(t *testing.T) {
+	soir := time.Date(2026, 11, 4, 23, 59, 0, 0, time.UTC)
+	now := soir
+	c := newCap(&now)
+	bindOf := func(ch altcha.Challenge) string { return saltRe.FindStringSubmatch(ch.Salt)[1] }
+	ch1, err := c.Challenge(ipA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.RecordCreate(ipA)
+	c.RecordCreate(ipA)
+
+	// 00:00:30 : nouvelle clé, nouvelle liaison pour la même connexion.
+	now = soir.Add(90 * time.Second)
+	ch2, err := c.Challenge(ipA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bindOf(ch2) == bindOf(ch1) {
+		t.Fatal("liaison inchangée après minuit UTC")
+	}
+	// La difficulté de la dernière heure est gardée (deux créations : niveau 2).
+	if ch2.MaxNumber != 200000 {
+		t.Fatalf("difficulté perdue à minuit : %d", ch2.MaxNumber)
+	}
+	c.RecordCreate(ipA) // sous la nouvelle clé
+	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 400000 {
+		t.Fatalf("créations de part et d'autre de minuit : %d", ch.MaxNumber)
+	}
+
+	// Après 01:00 UTC : la clé de la veille est effacée.
+	now = time.Date(2026, 11, 5, 1, 0, 1, 0, time.UTC)
+	if _, err := c.Challenge(ipA); err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	prev := c.bindPrev
+	c.mu.Unlock()
+	if prev != nil {
+		t.Fatal("clé de la veille encore en mémoire après 01:00 UTC")
+	}
+	// Les clés de liaison ne viennent pas de la clé du processus : deux instances sur la même
+	// clé ne lient pas la connexion de la même façon.
+	other := newCap(&now)
+	a, _ := c.Challenge(ipB)
+	b, _ := other.Challenge(ipB)
+	if bindOf(a) == bindOf(b) {
+		t.Fatal("liaison déduite de la clé du processus")
+	}
+}
+
+// Un défi émis juste avant minuit et résolu juste après est accepté (clé de la veille) ; un
+// défi trop facile de la veille reste refusé.
+func TestBindKeyPreviousDayAccepted(t *testing.T) {
+	soir := time.Date(2026, 11, 4, 23, 59, 30, 0, time.UTC)
+	now := soir
+	c := newCap(&now)
+	_, p := solved(t, c, ipA)
+	_, facile := solved(t, c, ipA)
+	now = soir.Add(time.Minute) // 00:00:30
+	if err := c.Verify(p, ipA, "", soir.Add(-5*time.Second)); err != nil {
+		t.Fatalf("défi de 23:59 refusé après minuit : %v", err)
+	}
+	if err := c.Verify(p, ipA, "", soir.Add(-5*time.Second)); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("défi rejoué : %v", err)
+	}
+	// Une autre connexion ne s'en sert pas.
+	if err := c.Verify(facile, ipB, "", soir.Add(-5*time.Second)); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("autre connexion : %v", err)
+	}
+	c.RecordCreate(ipA)
+	if err := c.Verify(facile, ipA, "", soir.Add(-5*time.Second)); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("défi trop facile de la veille accepté : %v", err)
+	}
+}
