@@ -16,6 +16,7 @@
   import Unsupported from "../routes/Unsupported.svelte";
   import { watchOpenGrant } from "../session/open-grant";
   import { loadHistory } from "../history/live.svelte";
+  import { loadDownloads } from "../downloads/live.svelte";
   import AppShell from "../ui/AppShell.svelte";
 
   const supported = isSupported(globalThis);
@@ -24,6 +25,8 @@
   reloadIfRestored(window);
   // « Mes partages » dans l'en-tête seulement s'il y a des partages (lecture seule).
   if (supported) void loadHistory().catch(() => undefined);
+  // « Téléchargements » sans compte seulement si l'historique est activé (22 novembre) : lecture seule.
+  if (supported) void loadDownloads().catch(() => undefined);
   // Page d'un partage : la clé est déjà retirée de l'adresse, une actualisation par le geste
   // « tirer vers le bas » perdrait l'écran verrouillé (base.css : no-pull, 17 novembre).
   if (typeof document !== "undefined") document.documentElement.classList.add("no-pull");

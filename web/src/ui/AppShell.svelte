@@ -14,6 +14,7 @@
   import TopNav from "./TopNav.svelte";
   import MobileMenu from "./MobileMenu.svelte";
   import { accountFlag } from "../app/account-flag.svelte";
+  import { presence } from "../history/presence.svelte";
 
   type Props = {
     children: Snippet;
@@ -83,8 +84,9 @@
   const footCols = $derived<{ id: string; title: string; links: FootLink[] }[]>([
     // Plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » (retours du 16 novembre) ;
     // plus d'« Offres » (17 novembre : l'en-tête et le menu y mènent). Colonne « Produit »
-    // seulement avec un compte (Téléchargements, retours du 15 novembre, comme le menu ☰).
-    ...(accountFlag.connected ? [{ id: "product", title: t("foot.product"), links: [{ label: t("foot.downloads"), path: "/telechargements" }] }] : []),
+    // seulement avec un compte (Téléchargements, retours du 15 novembre, comme le menu ☰), ou sans
+    // compte si l'historique des téléchargements est activé sur cet appareil (22 novembre).
+    ...(accountFlag.connected || presence.downloads ? [{ id: "product", title: t("foot.product"), links: [{ label: t("foot.downloads"), path: "/telechargements" }] }] : []),
     {
       id: "trust",
       title: t("foot.trust"),

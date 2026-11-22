@@ -5,6 +5,7 @@
 // la personne ne l'a pas activé, rien n'est créé ni écrit (ni base, ni clé, ni entrée) ; une
 // simple visite ou un fichier enregistré n'écrivent rien. Aucune requête réseau.
 import { getDemo } from "../app/demo-hooks";
+import { presence } from "../history/presence.svelte";
 import { memoryBackend, type Backend } from "../history/store";
 import { downloadsIdb, openDownloads, type DownloadEntry, type Downloads, type NewDownload } from "./store";
 
@@ -45,7 +46,7 @@ export async function loadDownloads(): Promise<void> {
   try {
     if (!opening && !(await b.exists())) {
       downloads.entries = [];
-      downloads.enabled = false; // aucune base : jamais activé sur cet appareil
+      downloads.enabled = presence.downloads = false; // aucune base : jamais activé sur cet appareil
       downloads.status = "ready";
       return;
     }
@@ -53,7 +54,8 @@ export async function loadDownloads(): Promise<void> {
     if (!d) return void (downloads.status = "unavailable");
     const [list, enabled] = await Promise.all([d.list(), d.enabled()]);
     downloads.entries = list;
-    downloads.enabled = enabled;
+    // « Téléchargements » dans le menu et le pied de page sans compte : seulement activé (22 novembre).
+    downloads.enabled = presence.downloads = enabled;
     downloads.status = "ready";
   } catch {
     downloads.status = "unavailable";
@@ -101,13 +103,13 @@ export async function clearDownloads(): Promise<void> {
 /** Activer crée la base ; désactiver l'efface (rien n'est créé s'il n'y avait rien). */
 export async function setDownloadsEnabled(v: boolean): Promise<void> {
   if (!v && !(await hasBase())) {
-    downloads.enabled = false;
+    downloads.enabled = presence.downloads = false;
     downloads.entries = [];
     return;
   }
   const d = await store();
   if (!d) return;
   await d.setEnabled(v).catch(() => undefined);
-  downloads.enabled = await d.enabled().catch(() => v);
+  downloads.enabled = presence.downloads = await d.enabled().catch(() => v);
   await reload(d).catch(() => undefined);
 }

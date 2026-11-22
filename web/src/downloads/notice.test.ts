@@ -9,6 +9,8 @@ import { flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createGone } from "../flows/gone.svelte";
 import { fakeIndexedDB } from "../history/fake-idb.test-helper";
+import { presence } from "../history/presence.svelte";
+import { probeDownloads } from "./probe";
 import { setLang } from "../i18n/i18n.svelte";
 import type { Opened } from "../index";
 import { DOWNLOADS_DB, downloadsIdb, openDownloads } from "./store";
@@ -49,6 +51,9 @@ const show = async () => {
   app = mount(Content as never, { target: document.body, props: { opened: opened(), expired: false, onend: () => undefined, gone: createGone({ finish: () => undefined, revokeAll: () => undefined }) } }) as Record<string, unknown>;
   await settle();
 };
+/** La fausse fabrique avec indexedDB.databases() (liste des bases existantes). */
+const withDatabases = () =>
+  ({ databases: async () => [...idb.raw().keys()].map((name) => ({ name, version: 1 })), open: (n: string) => idb.open(n) }) as unknown as Pick<IDBFactory, "databases" | "open">;
 const line = () => document.querySelector("[data-downloads-notice]");
 const say = () => line()!.textContent!.replace(/[ \n\t]+/g, " ").trim();
 const press = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent!.trim() === label)!.click();
@@ -64,6 +69,7 @@ describe("historique des téléchargements : désactivé par défaut (22 novembr
   it("jamais activé : fichiers enregistrés, lecture, désactivation, effacement : aucune base n'est créée sur l'appareil", async () => {
     await live.loadDownloads();
     expect(live.downloads.enabled).toBe(false);
+    expect(presence.downloads).toBe(false); // pas de « Téléchargements » dans le menu sans compte
     await show();
     await live.recordDownload(entry("secret.txt"));
     await live.recordDownload(entry("autre.txt"));
@@ -84,6 +90,11 @@ describe("historique des téléchargements : désactivé par défaut (22 novembr
     press("Les garder 30 jours");
     await settle();
     expect(live.downloads.enabled).toBe(true);
+    expect(presence.downloads).toBe(true); // « Téléchargements » dans le menu et le pied de page sans compte
+    // Pages d'information : le même drapeau, lu sans clé ni création.
+    presence.downloads = false;
+    await probeDownloads(withDatabases());
+    expect(presence.downloads).toBe(true);
     expect(say()).toBe(`Fichiers enregistrés notés dans Téléchargements, sur cet appareil (30${NNBSP}jours). Ne pas garder`);
     await live.recordDownload(entry("premier.txt"));
     await live.recordDownload(entry("second.txt"));
@@ -97,6 +108,9 @@ describe("historique des téléchargements : désactivé par défaut (22 novembr
     press("Ne pas garder");
     await settle();
     expect(live.downloads.enabled).toBe(false);
+    expect(presence.downloads).toBe(false); // lien retiré
+    await probeDownloads(withDatabases());
+    expect(presence.downloads).toBe(false);
     expect(live.downloads.entries).toEqual([]);
     expect(say()).toBe(`Historique des téléchargements désactivé et effacé. Les garder 30${NNBSP}jours`);
     await live.recordDownload(entry("troisieme.txt"));

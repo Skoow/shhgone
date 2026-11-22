@@ -28,7 +28,8 @@
   const links = $derived<Link[]>([
     // « Mes partages » seulement s'il y a des partages sur cet appareil (17 novembre).
     ...(accountFlag.connected ? [{ label: t("nav.home"), path: "/", icon: Share2 }] : presence.any ? [{ label: t("nav.shares"), path: "/envois", icon: Share2 }] : []),
-    ...(accountFlag.connected ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
+    // « Téléchargements » sans compte seulement si l'historique est activé ici (22 novembre).
+    ...(accountFlag.connected || presence.downloads ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
     // Salon (plan C-3) : la création ; « bientôt » seulement sans __SALONS__ (démo, site sans compte).
     __SALONS__ ? { label: t("nav.room"), path: "/salon/nouveau", icon: MessagesSquare } : { label: t("nav.room"), path: "", icon: MessagesSquare, soon: t("tabs.soon.chat") },
     { label: t("nav.security"), path: "/securite", icon: ShieldCheck },

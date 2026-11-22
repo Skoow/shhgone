@@ -12,6 +12,7 @@
   import { watchKeyboard } from "./app/viewport";
   import { watchOpenGrant } from "./session/open-grant";
   import { loadHistory } from "./history/live.svelte";
+  import { loadDownloads } from "./downloads/live.svelte";
   import Downloads from "./routes/Downloads.svelte";
   import History from "./routes/History.svelte";
   import NotFound from "./routes/NotFound.svelte";
@@ -57,6 +58,9 @@
   // « Mes partages » dans l'en-tête et le menu seulement s'il y a des partages (17 novembre) :
   // lecture de l'historique de l'appareil, sans rien créer (live.svelte.ts, presence).
   if (supported) void loadHistory().catch(() => undefined);
+  // « Téléchargements » sans compte seulement si l'historique est activé (22 novembre) : lecture
+  // seule, rien n'est créé s'il n'a jamais été activé ici.
+  if (supported) void loadDownloads().catch(() => undefined);
 
   // UI §12.2 : une page restaurée du cache « page précédente » est rechargée.
   reloadIfRestored(window);
