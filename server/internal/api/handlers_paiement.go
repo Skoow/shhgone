@@ -38,7 +38,7 @@ func (a paiementAPI) routes(mux *http.ServeMux) {
 	}
 }
 
-// cles : clés publiques des jetons d'aujourd'hui et de demain (conception du paiement §7) ; les
+// cles : clés publiques des jetons d'aujourd'hui à J+7 (conception du paiement §7, S17) ; les
 // mêmes pour tous, sans aucun en-tête lu.
 func (a paiementAPI) cles(w http.ResponseWriter, _ *http.Request) {
 	cl, err := a.p.Jetons().Cles()

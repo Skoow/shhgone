@@ -18,7 +18,7 @@
   import { getLang, t } from "../i18n/i18n.svelte";
   import { createDraft, destroyShare, type CaptchaCtx, type Draft, type TtlHours } from "../index";
   import { limitesDe, type Formule } from "../limits";
-  import { formulesDisponibles, planifierReapprovisionnement, prendreJeton } from "../paiement/jetons";
+  import { formulesDisponibles, planifierReapprovisionnement, prendreJeton, refusCles } from "../paiement/jetons";
   import { idbDuNavigateur } from "../paiement/pass";
   import { announce } from "../ui/announce";
   import Banner from "../ui/Banner.svelte";
@@ -61,13 +61,18 @@
   // alors un jeton anonyme. Démo : jamais (aucun serveur).
   let formules = $state<Formule[]>([]);
   let formule: Formule = "free";
+  // S17 : clé de jetons différente de celle déjà annoncée pour ce jour (jetons.ts) : la formule
+  // touchée n'est plus proposée aujourd'hui et un avertissement le dit.
+  let cleDifferente = $state(false);
   $effect(() => {
     const idb = demo ? null : idbDuNavigateur();
     if (idb === null) return;
     let vivant = true;
-    void formulesDisponibles(idb)
-      .then((l) => {
-        if (vivant) formules = l;
+    void Promise.all([formulesDisponibles(idb), refusCles(idb)])
+      .then(([l, r]) => {
+        if (!vivant) return;
+        formules = l.filter((f) => !r.formules.includes(f));
+        cleDifferente = r.avertir && l.length > 0;
       })
       .catch(() => undefined);
     return () => {
@@ -81,9 +86,17 @@
     return async () => {
       const idb = idbDuNavigateur();
       if (idb === null) throw new Error("aucun_jeton");
-      const j = await prendreJeton(idb, f);
-      planifierReapprovisionnement(idb, f);
-      return j;
+      try {
+        const j = await prendreJeton(idb, f);
+        planifierReapprovisionnement(idb, f);
+        return j;
+      } catch (e) {
+        if (e instanceof Error && e.message === "cle_differente") {
+          cleDifferente = true;
+          formules = formules.filter((x) => x !== f);
+        }
+        throw e;
+      }
     };
   }
   // Fichiers de la liste (relus pour recommencer l'envoi quand la formule change).
@@ -341,6 +354,9 @@
     <div class="note"><Banner kind="info" action={{ label: t("common.close"), onpress: () => {
           note = "";
         } }}>{note}</Banner></div>
+  {/if}
+  {#if cleDifferente && view === "compose"}
+    <div class="note" data-cle-differente><Banner kind="danger">{t("offers.keys.mismatch")}</Banner></div>
   {/if}
   {#key composeKey}
     <Compose

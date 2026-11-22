@@ -106,7 +106,7 @@ func bancJetons(t *testing.T) (*banc, *Jetons) {
 
 func clePour(t *testing.T, j *Jetons, o Offre, decalage int64) []byte {
 	cles, err := j.Cles()
-	if err != nil || len(cles) != 4 {
+	if err != nil || len(cles) != 2*(JoursAvance+1) {
 		t.Fatal(err, len(cles))
 	}
 	auj := jourDe(j.now())
@@ -117,6 +117,63 @@ func clePour(t *testing.T, j *Jetons, o Offre, decalage int64) []byte {
 	}
 	t.Fatal("clé absente")
 	return nil
+}
+
+// TestJetonsClesAvance (S17) : clés d'aujourd'hui à J+JoursAvance, une par formule et par jour,
+// toutes différentes, servies dans l'ordre (jour, Plus, Pro) ; la clé d'un jour ne change pas
+// d'un appel à l'autre, ni le lendemain (J+1 d'hier = J d'aujourd'hui), ni après redémarrage
+// (base, cache vide) ; l'acceptation reste le jour de la clé et le lendemain.
+func TestJetonsClesAvance(t *testing.T) {
+	b, j := bancJetons(t)
+	cles, err := j.Cles()
+	if err != nil || len(cles) != 2*(JoursAvance+1) {
+		t.Fatal(err, len(cles))
+	}
+	auj := jourDe(b.now)
+	vues := map[string]bool{}
+	parJour := map[[2]int64][]byte{}
+	for i, c := range cles {
+		if c.Jour != auj+int64(i/2)*jourS || c.Offre != []Offre{Plus, Pro}[i%2] {
+			t.Fatal("ordre", i, c.Jour, c.Offre)
+		}
+		if vues[string(c.SPKI)] {
+			t.Fatal("clé en double", i)
+		}
+		vues[string(c.SPKI)] = true
+		parJour[[2]int64{c.Jour, int64(c.Offre)}] = c.SPKI
+	}
+	memes := func(l []CleDuJour) {
+		t.Helper()
+		for _, c := range l {
+			if old, ok := parJour[[2]int64{c.Jour, int64(c.Offre)}]; ok && !bytes.Equal(old, c.SPKI) {
+				t.Fatal("clé changée", c.Jour, c.Offre)
+			}
+		}
+	}
+	again, _ := j.Cles()
+	memes(again)
+	// Redémarrage : même base, nouvel objet (cache vide).
+	j2 := NouveauxJetons(b.db, func() time.Time { return b.now }, "shhgone.test")
+	l2, err := j2.Cles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	memes(l2)
+	// Lendemain : J..J+6 d'hier inchangées, une nouvelle clé J+7 par formule ; purge sans effet sur elles.
+	b.now = b.now.Add(24 * time.Hour)
+	if err := j.Purger(); err != nil {
+		t.Fatal(err)
+	}
+	l3, err := j.Cles()
+	if err != nil || len(l3) != 2*(JoursAvance+1) || l3[0].Jour != auj+jourS {
+		t.Fatal(err, len(l3))
+	}
+	memes(l3)
+	for _, c := range l3[len(l3)-2:] {
+		if vues[string(c.SPKI)] {
+			t.Fatal("J+7 nouvelle attendue")
+		}
+	}
 }
 
 func TestJetonsEmissionDepense(t *testing.T) {

@@ -1033,6 +1033,7 @@ export const en = {
   "offers.ret.none": "No order on this device",
   "offers.ret.none.body": "This page shows the result of a payment started on this device.",
   "offers.ret.back": "Back to plans",
+  "offers.keys.mismatch": "Warning: our server gave this device a token key different from the one it had announced to it for the same day. This could be used to recognise your paid shares: this device no longer creates any under that key. Your free shares are not affected. If this goes on, report it (contact in the legal notice).",
   "offers.ret.forget": "Forget this order",
   "offers.free": "Free",
   "offers.card.size": "Size per share",

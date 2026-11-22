@@ -65,6 +65,8 @@ export async function garder(idb: IDBFactory, g: PassGarde): Promise<void> {
   } finally {
     pt.fill(0);
   }
+  // Pass rangé de nouveau (retour de paiement, compte) : son état gardé est à relire.
+  await oublierEtat(idb, g.id);
 }
 
 /** Pass gardés, le plus récent d'abord ; [] si aucune base (rien n'est créé). Un enregistrement illisible est ignoré. */
@@ -75,7 +77,7 @@ export async function lirePasses(idb: IDBFactory): Promise<PassGarde[]> {
     const key = await b.key(await nouvelleCle());
     const out: PassGarde[] = [];
     for (const [id, rec] of await b.all()) {
-      if (id.startsWith("j:")) continue; // jeton (lireJetons)
+      if (id.startsWith("j:") || id.startsWith("c:") || id.startsWith("e:")) continue; // jeton, clé vue, état gardé
       try {
         if (!(rec?.iv instanceof Uint8Array) || !(rec.ct instanceof Uint8Array)) continue;
         const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: rec.iv, additionalData: utf8(AAD + id) }, key, rec.ct));
@@ -107,6 +109,64 @@ export async function lirePasses(idb: IDBFactory): Promise<PassGarde[]> {
 
 export async function oublier(idb: IDBFactory, id: string): Promise<void> {
   await base(idb).del(id);
+  await oublierEtat(idb, id);
+}
+
+// --- État du pass gardé (signalement du 22 novembre) ------------------------------------------
+// POST /api/paiement/etat envoie P : redemandé à chaque chargement, il datait le pass à chaque
+// visite. L'état lu est gardé chiffré (enregistrement « e:<id du pass> »), avec le jour UTC de sa
+// lecture, et resservi ce jour-là seulement ; oublié quand le pass est rangé de nouveau ou oublié,
+// et sur un événement qui le change (jetons.ts : émission refusée ; OffersReturn : résiliation).
+
+const AAD_ETAT = "shhdrop-pass/v1/etat/";
+
+export type EtatGarde = { etat: string; offre: OffrePayante | null; fin: string | null; renouvelle: boolean; droits: string[]; /** jour UTC de la lecture */ jour: string };
+
+export async function garderEtat(idb: IDBFactory, id: string, e: EtatGarde): Promise<void> {
+  const b = base(idb);
+  const key = await b.key(await nouvelleCle());
+  const rid = "e:" + id;
+  const pt = utf8(JSON.stringify(e));
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: utf8(AAD_ETAT + rid) }, key, pt));
+    await b.put(rid, { iv, ct });
+  } finally {
+    pt.fill(0);
+  }
+}
+
+/** État gardé du pass `id`, ou null (absent, illisible). */
+export async function lireEtatGarde(idb: IDBFactory, id: string): Promise<EtatGarde | null> {
+  const b = base(idb);
+  try {
+    if (!(await b.exists())) return null;
+    const rid = "e:" + id;
+    const rec = (await b.all()).find(([k]) => k === rid)?.[1];
+    if (!(rec?.iv instanceof Uint8Array) || !(rec.ct instanceof Uint8Array)) return null;
+    const key = await b.key(await nouvelleCle());
+    const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: rec.iv, additionalData: utf8(AAD_ETAT + rid) }, key, rec.ct));
+    const o = JSON.parse(new TextDecoder().decode(pt)) as Record<string, unknown>;
+    pt.fill(0);
+    if (
+      typeof o.etat !== "string" ||
+      !(o.offre === null || o.offre === "plus" || o.offre === "pro") ||
+      !(o.fin === null || typeof o.fin === "string") ||
+      typeof o.renouvelle !== "boolean" ||
+      !Array.isArray(o.droits) ||
+      !o.droits.every((d) => typeof d === "string") ||
+      typeof o.jour !== "string"
+    )
+      return null;
+    return { etat: o.etat, offre: o.offre, fin: o.fin, renouvelle: o.renouvelle, droits: o.droits as string[], jour: o.jour };
+  } catch {
+    return null;
+  }
+}
+
+export async function oublierEtat(idb: IDBFactory, id: string): Promise<void> {
+  const b = base(idb);
+  if (await b.exists().catch(() => false)) await b.del("e:" + id).catch(() => undefined);
 }
 
 /** Identifiant d'enregistrement : 16 caractères base64url aléatoires (aucun lien avec le pass). */
@@ -174,5 +234,59 @@ export async function lireJetons(idb: IDBFactory): Promise<JetonGarde[]> {
 }
 
 export async function retirerJeton(idb: IDBFactory, id: string): Promise<void> {
+  await base(idb).del(id);
+}
+
+// --- Clés d'émission vues (S17, conception du paiement §7) -------------------------------------
+// Même base, enregistrements « c: » (identifiant aléatoire), même chiffrement : la clé publique
+// entière (SPKI, base64url) servie pour un (jour, formule), et `differente` si le serveur en a
+// servi une autre pour ce même (jour, formule). Gardées jusqu'au surlendemain de leur jour.
+
+const AAD_CLE = "shhdrop-pass/v1/cle/";
+
+export type CleVue = { id: string; jour: string; offre: OffrePayante; spki: string; differente: boolean };
+
+/** Range une clé vue ; `id` donné : remplace cet enregistrement. */
+export async function garderCleVue(idb: IDBFactory, c: Omit<CleVue, "id"> & { id?: string }): Promise<void> {
+  const b = base(idb);
+  const key = await b.key(await nouvelleCle());
+  const id = c.id ?? "c:" + nouvelId();
+  const pt = utf8(JSON.stringify({ jour: c.jour, offre: c.offre, spki: c.spki, differente: c.differente }));
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: utf8(AAD_CLE + id) }, key, pt));
+    await b.put(id, { iv, ct });
+  } finally {
+    pt.fill(0);
+  }
+}
+
+/** Clés vues (illisibles ignorées) ; [] sans base. */
+export async function lireClesVues(idb: IDBFactory): Promise<CleVue[]> {
+  const b = base(idb);
+  try {
+    if (!(await b.exists())) return [];
+    const key = await b.key(await nouvelleCle());
+    const out: CleVue[] = [];
+    for (const [id, rec] of await b.all()) {
+      if (!id.startsWith("c:")) continue;
+      try {
+        if (!(rec?.iv instanceof Uint8Array) || !(rec.ct instanceof Uint8Array)) continue;
+        const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: rec.iv, additionalData: utf8(AAD_CLE + id) }, key, rec.ct));
+        const o = JSON.parse(new TextDecoder().decode(pt)) as Record<string, unknown>;
+        pt.fill(0);
+        if (typeof o.jour !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(o.jour) || (o.offre !== "plus" && o.offre !== "pro") || typeof o.spki !== "string" || typeof o.differente !== "boolean") continue;
+        out.push({ id, jour: o.jour, offre: o.offre, spki: o.spki, differente: o.differente });
+      } catch {
+        // abîmé : ignoré
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export async function retirerCleVue(idb: IDBFactory, id: string): Promise<void> {
   await base(idb).del(id);
 }
