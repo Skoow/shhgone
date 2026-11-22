@@ -98,6 +98,43 @@ describe("revue D42-22 : « Effacer l'historique » efface aussi les retours gar
   });
 });
 
+// Restes du salon (spec salon v3 §16, confidentialité, moyenne) : les preuves de membre (base à part
+// de salon/preuve.ts, avec le réglage « silencieux » qu'elles contiennent) partent aussi.
+describe("« Effacer l'historique » efface aussi les preuves de membre du salon", () => {
+  it("la base des preuves disparaît avec l'historique ; plus aucune preuve lisible", async () => {
+    await seed();
+    const preuve = await import("../salon/preuve");
+    const index = new Uint8Array(16).fill(7);
+    const cle = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+    await preuve.ecrire(index, cle, new Uint8Array(16).fill(1), { jeton: "J".repeat(43), siege: 2, pseudo: "Renard", couleur: 1, kMaitre: new Uint8Array(32), silence: -1 }, Date.now() + 3600_000);
+    expect(await preuve.ouvrir(index, cle)).not.toBeNull();
+    const avant = [...idb.raw().keys()];
+    await live.clearHistory();
+    const disparues = avant.filter((n) => !idb.raw().has(n));
+    expect(disparues.length).toBeGreaterThan(0);
+    expect(await preuve.lireSel(index)).toBeNull();
+    expect(await preuve.ouvrir(index, cle)).toBeNull();
+  });
+
+  it("une base des preuves bloquée ne bloque pas l'effacement (au plus 2 s)", async () => {
+    await seed();
+    vi.resetModules();
+    vi.doMock("../salon/preuve", () => ({ effacerTout: () => new Promise<void>(() => undefined) }));
+    live = await import("./live.svelte");
+    vi.useFakeTimers();
+    try {
+      let done = false;
+      const p = live.clearHistory().then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(2100);
+      await p;
+      expect(done).toBe(true);
+    } finally {
+      vi.useRealTimers();
+      vi.doUnmock("../salon/preuve");
+    }
+  });
+});
+
 describe("relecture (A) : « Effacer l'historique » ne se bloque jamais sur les retours", () => {
   it("historique effacé d'abord ; retours bloqués (base tenue ailleurs) : fini au plus tard 2 s après", async () => {
     await seed();

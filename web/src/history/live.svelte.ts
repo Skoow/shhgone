@@ -11,6 +11,7 @@ import { cleanTitle, destroyShare, fetchMeta, shareStatus } from "../index";
 import { destroyedPatch, missingPatch, pollHistory, statusPatch, type PollError, type Poller, type RefreshResult, type Status } from "./poll";
 import { presence } from "./presence.svelte";
 import { pageReturns } from "./returns";
+import { effacerTout as effacerPreuves } from "../salon/preuve";
 import { effectiveState, idbBackend, linkKey, memoryBackend, openHistory, type Backend, type History, type HistoryEntry, type NewEntry } from "./store";
 
 export type ShareInfo = {
@@ -268,7 +269,9 @@ export async function clearHistory(): Promise<void> {
   // Revue D42-22 : les retours gardés (octrois chiffrés, history/returns.ts) partent aussi, en
   // parallèle et au plus 2 s : une base tenue par un autre onglet ne bloque jamais
   // l'effacement de l'historique (relecture du 12 novembre, A).
-  const returns = Promise.race([pageReturns().clear(), new Promise<void>((ok) => setTimeout(ok, 2000))]);
+  // Les preuves de membre du salon (salon/preuve.ts, réglage « silencieux » compris) partent aussi,
+  // au plus 2 s de même (restes du salon, spec salon v3 §16).
+  const returns = Promise.race([Promise.all([pageReturns().clear(), effacerPreuves()]).then(() => undefined), new Promise<void>((ok) => setTimeout(ok, 2000))]);
   const h = await store();
   if (h) {
     await h.clear();
