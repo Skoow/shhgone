@@ -37,7 +37,8 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   }
   // Sans compte, plus de colonne « Produit » (17 novembre : « Offres » retiré du pied).
   await expect(foot.getByText("Produit", { exact: true })).toHaveCount(0);
-  // Sans compte, pas de « Téléchargements » (retours du 15 novembre).
+  // Sans compte, pas de « Téléchargements » tant que l'historique n'est pas activé sur cet appareil
+  // (désactivé par défaut ; décision du propriétaire du 22 novembre, qui change celle du 15 novembre).
   await expect(foot.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
   // Plus d'« Envoyer », de « Mes partages » ni de « Salon » (16 novembre) : le logo et le menu y mènent.
   for (const l of ["Envoyer", "Mes partages"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}$`) })).toHaveCount(0);
@@ -64,6 +65,42 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(600); // fin des apparitions au défilement
   expect(await axe(page)).toEqual([]);
+});
+
+test("Téléchargements sans compte : dans le menu et le pied de page seulement une fois l'historique activé ici, retiré à la désactivation (22 novembre)", async ({ page, shh, isMobile }) => {
+  const foot = page.locator("footer[data-foot]");
+  const link = () => foot.getByRole("link", { name: /^Téléchargements/ });
+  const menuHas = async (n: number) => {
+    if (!isMobile) return;
+    await page.getByRole("banner").getByRole("button", { name: "Ouvrir le menu" }).click();
+    await expect(page.locator("[data-menu]").getByRole("link", { name: /^Téléchargements/ })).toHaveCount(n);
+    await page.keyboard.press("Escape");
+  };
+  await page.goto(shh.origin + "/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(link()).toHaveCount(0);
+  await menuHas(0);
+  // Activé par la personne (page joignable par son adresse) : le lien apparaît.
+  await page.goto(shh.origin + "/telechargements");
+  await page.getByRole("button", { name: "L'activer" }).click();
+  await expect(page.getByRole("switch", { name: /^Garder l'historique/ })).toHaveAttribute("aria-checked", "true");
+  await expect(link()).toHaveCount(1);
+  // Relu depuis l'appareil : application et page d'information.
+  await page.goto(shh.origin + "/");
+  await expect(link()).toHaveCount(1);
+  await menuHas(1);
+  await page.goto(shh.origin + "/securite");
+  await expect(link()).toHaveCount(1);
+  await menuHas(1);
+  // Désactivé (et effacé) : le lien disparaît, partout.
+  await page.goto(shh.origin + "/telechargements");
+  await page.getByRole("switch", { name: /^Garder l'historique/ }).click();
+  await expect(page.getByRole("switch", { name: /^Garder l'historique/ })).toHaveAttribute("aria-checked", "false");
+  await expect(link()).toHaveCount(0);
+  await page.goto(shh.origin + "/securite");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(link()).toHaveCount(0);
+  await menuHas(0);
 });
 });
 

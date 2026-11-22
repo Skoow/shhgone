@@ -9,6 +9,13 @@ import { fakeIndexedDB } from "../history/fake-idb.test-helper";
 import { memoryBackend } from "../history/store";
 import { DOWNLOADS_DB, DOWNLOADS_KEEP_MS, afterSave, byDay, downloadsIdb, openDownloads, type NewDownload } from "./store";
 
+/** Ouvert puis activé (désactivé par défaut) : pour les essais qui écrivent. */
+async function enabledStore(deps: Parameters<typeof openDownloads>[0]) {
+  const d = await openDownloads(deps);
+  await d?.setEnabled(true);
+  return d;
+}
+
 const T0 = new Date(2026, 10, 14, 15, 30).getTime();
 const NAME = "Facture-confidentielle-Dupont.pdf";
 const fresh = (over: Partial<NewDownload> = {}): NewDownload => ({
@@ -33,27 +40,39 @@ function dump(v: unknown): string {
   return seen.join("\n");
 }
 
-describe("historique des téléchargements : ligne du premier fichier (W4)", () => {
-  it("takeNotice : vrai une seule fois sur cet appareil, même après réouverture ; le drapeau est chiffré à part des entrées, sans nom", async () => {
+describe("historique des téléchargements : désactivé par défaut (22 novembre 2026)", () => {
+  it("base neuve : désactivé, rien n'est écrit ; activé seulement par setEnabled(true)", async () => {
     const idb = fakeIndexedDB();
     const d = (await openDownloads({ backend: downloadsIdb(idb), now: () => T0 }))!;
-    await d.add(fresh());
-    expect(await d.takeNotice()).toBe(true);
-    expect(await d.takeNotice()).toBe(false);
-    const again = (await openDownloads({ backend: downloadsIdb(idb), now: () => T0 }))!;
-    expect(await again.takeNotice()).toBe(false);
-    // Coupé puis remis : la ligne ne revient pas (elle a déjà été montrée).
-    await again.setEnabled(false);
-    await again.setEnabled(true);
-    expect(await again.takeNotice()).toBe(false);
+    expect(await d.enabled()).toBe(false);
+    expect(await d.add(fresh())).toBeNull();
+    expect(await d.list()).toEqual([]);
     expect(dump(idb.raw())).not.toContain("Facture");
+    expect(idb.raw().get(DOWNLOADS_DB)!.get("entries")!.size).toBe(0);
+    await d.setEnabled(true);
+    expect(await d.enabled()).toBe(true);
+    expect(await d.add(fresh())).not.toBeNull();
+    const again = (await openDownloads({ backend: downloadsIdb(idb), now: () => T0 }))!;
+    expect(await again.enabled()).toBe(true); // le choix de la personne est gardé
+    expect(await again.list()).toHaveLength(1);
+  });
+
+  it("entrées d'avant le changement (activé par défaut, sans drapeau « on ») : effacées à la lecture, jamais montrées", async () => {
+    const b = memoryBackend();
+    const d = (await openDownloads({ backend: b, now: () => T0 }))!;
+    await d.setEnabled(true);
+    await d.add(fresh());
+    await b.setFlag("on", undefined); // état d'une base écrite avant le 22 novembre
+    expect(b.raw().size).toBe(1);
+    expect(await d.list()).toEqual([]);
+    expect(b.raw().size).toBe(0);
   });
 });
 
 describe("historique des téléchargements : stockage", () => {
   it("base « shhdrop-telechargements », chiffrée : aucun nom, taille, date ni champ en clair ; relue à l'identique", async () => {
     const idb = fakeIndexedDB();
-    const d = (await openDownloads({ backend: downloadsIdb(idb), now: () => T0 }))!;
+    const d = (await enabledStore({ backend: downloadsIdb(idb), now: () => T0 }))!;
     const e = await d.add(fresh());
     expect(e).not.toBeNull();
     expect([...idb.raw().keys()]).toEqual([DOWNLOADS_DB]);
@@ -66,7 +85,7 @@ describe("historique des téléchargements : stockage", () => {
 
   it("champs exacts : nom, taille, format, source, date ; tout autre champ (lien, clé, mot de passe) est ignoré", async () => {
     const b = memoryBackend();
-    const d = (await openDownloads({ backend: b, now: () => T0 }))!;
+    const d = (await enabledStore({ backend: b, now: () => T0 }))!;
     const extra = { ...fresh(), link: "https://x.test/#" + "K".repeat(43), key: "K".repeat(43), password: "motdepasse" };
     const e = (await d.add(extra as NewDownload))!;
     expect(Object.keys(e).sort()).toEqual(["format", "id", "name", "savedAt", "sizeBytes", "source"]);
@@ -76,7 +95,7 @@ describe("historique des téléchargements : stockage", () => {
   });
 
   it("entrée invalide refusée (source, format, taille, nom vide)", async () => {
-    const d = (await openDownloads({ backend: memoryBackend(), now: () => T0 }))!;
+    const d = (await enabledStore({ backend: memoryBackend(), now: () => T0 }))!;
     for (const bad of [{ source: "compte" }, { format: { family: "zzz", label: "PDF" } }, { format: { family: "pdf", label: "<b>" } }, { sizeBytes: -1 }, { name: "" }])
       await expect(d.add(fresh(bad as Partial<NewDownload>))).rejects.toThrow();
     expect(await d.list()).toEqual([]);
@@ -86,7 +105,7 @@ describe("historique des téléchargements : stockage", () => {
     expect(DOWNLOADS_KEEP_MS).toBe(30 * 86_400_000);
     let now = T0;
     const b = memoryBackend();
-    const d = (await openDownloads({ backend: b, now: () => now }))!;
+    const d = (await enabledStore({ backend: b, now: () => now }))!;
     await d.add(fresh({ savedAt: T0 - 2 * 86_400_000, name: "vieux.txt" }));
     await d.add(fresh({ savedAt: T0, name: "neuf.txt" }));
     expect((await d.list()).map((e) => e.name)).toEqual(["neuf.txt", "vieux.txt"]);
@@ -100,7 +119,8 @@ describe("historique des téléchargements : stockage", () => {
   it("réglage coupé : rien d'écrit, l'historique existant est effacé ; rallumé : écrit de nouveau", async () => {
     const b = memoryBackend();
     const d = (await openDownloads({ backend: b, now: () => T0 }))!;
-    expect(await d.enabled()).toBe(true); // activé par défaut (R12)
+    expect(await d.enabled()).toBe(false); // désactivé par défaut (22 novembre)
+    await d.setEnabled(true);
     await d.add(fresh());
     await d.setEnabled(false);
     expect(await d.enabled()).toBe(false);
@@ -113,7 +133,7 @@ describe("historique des téléchargements : stockage", () => {
   });
 
   it("« Effacer tout » et « Retirer »", async () => {
-    const d = (await openDownloads({ backend: memoryBackend(), now: () => T0 }))!;
+    const d = (await enabledStore({ backend: memoryBackend(), now: () => T0 }))!;
     const a = (await d.add(fresh({ name: "a.txt" })))!;
     await d.add(fresh({ name: "b.txt" }));
     await d.remove(a.id);
@@ -165,7 +185,7 @@ describe("une entrée seulement après un enregistrement réussi", () => {
   });
 
   it("avec la file de téléchargements : réussi → 1 entrée ; lecture échouée, arrêt, sélecteur fermé → rien", async () => {
-    const d = (await openDownloads({ backend: memoryBackend(), now: () => T0 }))!;
+    const d = (await enabledStore({ backend: memoryBackend(), now: () => T0 }))!;
     const record = (i: number) => void d.add(fresh({ name: `f${i}.bin`, sizeBytes: 4 }));
     let fail = false;
     const dl = createDownloads([4, 4, 4], {

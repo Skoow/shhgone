@@ -208,7 +208,7 @@ describe("Paramètres", () => {
     expect(C.ecrireProfil).toHaveBeenLastCalledWith({ reglages: { proposerProfil: false, garderRecus: false, garderSalons: false } });
     sw("Historique des téléchargements sur cet appareil").click();
     await attendre();
-    expect(D.setDownloadsEnabled).toHaveBeenCalledWith(false);
+    expect(D.setDownloadsEnabled).toHaveBeenCalledWith(true); // désactivé par défaut (22 novembre) : le geste l'active
     // « Rester connecté » : seulement coupé d'ici (le serveur fixe la durée de la session à la connexion).
     expect(sw("Rester connecté sur cet appareil").getAttribute("aria-disabled")).toBe("true");
   });

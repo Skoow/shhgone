@@ -6,7 +6,13 @@
 //  - Pages d'information : seule l'existence de la base de l'historique est vérifiée
 //    (indexedDB.databases(), sans l'ouvrir ni la créer) ; une base vide compte comme « quelque
 //    chose » (rare : la liste dit alors qu'elle est vide).
-export const presence = $state({ any: false });
+//  - « Téléchargements » (menu ☰, pied de page) sans compte : seulement si l'historique des
+//    téléchargements est activé sur cet appareil (`downloads` ; décision du propriétaire du
+//    22 novembre, qui change celle du 15 novembre, UI §26). L'application le pose d'après
+//    downloads/live.svelte.ts ; les pages d'information lisent le seul drapeau « on » de la base
+//    des téléchargements, sans clé ni création (downloads/probe.ts, seul module avec store.ts à
+//    nommer cette base).
+export const presence = $state({ any: false, downloads: false });
 
 const HISTORY_DB = "shhdrop-history";
 

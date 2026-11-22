@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { probeDownloads } from "../downloads/probe";
 import { presence, probeHistory } from "./presence.svelte";
 
 /** Fausse fabrique IndexedDB : `count` entrées dans « entries » ; `created` : la base n'existait plus. */
@@ -60,5 +61,22 @@ describe("« Mes partages » seulement s'il y a des partages (17 novembre)", () 
     await probeHistory({ databases: async () => Promise.reject(new Error("refusé")), open: () => { throw new Error("x"); } } as unknown as Pick<IDBFactory, "databases" | "open">);
     await probeHistory(undefined);
     expect(presence.any).toBe(false);
+  });
+});
+
+describe("« Téléchargements » sans compte seulement si l'historique est activé (22 novembre)", () => {
+  it("pages d'information : base absente, ou stockage refusé : rien à montrer, rien de créé", async () => {
+    presence.downloads = false;
+    const f = fake(["shhdrop-history"], 3);
+    await probeDownloads(f.factory);
+    expect(presence.downloads).toBe(false);
+    await probeDownloads(undefined);
+    await probeDownloads({ databases: async () => { throw new Error("refus"); }, open: () => { throw new Error("refus"); } } as never);
+    expect(presence.downloads).toBe(false);
+    // Base supprimée entre-temps : sa création est annulée.
+    const gone = fake(["shhdrop-telechargements"], 0, { created: true });
+    await probeDownloads(gone.factory);
+    expect(gone.log.aborted).toBe(1);
+    expect(presence.downloads).toBe(false);
   });
 });

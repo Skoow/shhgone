@@ -153,7 +153,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Salon : pour retrouver votre place après un rechargement, votre jeton de membre, le nom que vous y portez et la clé du salon sont gardés chiffrés sur cet appareil, lisibles seulement avec le mot de passe du salon ; ils s'effacent à la fin du salon.",
           "Offres payantes : le pass et les jetons anonymes qu'il donne sont gardés chiffrés sur cet appareil.",
           "Si vous cochez « Garder ce partage », le lien reçu (avec sa clé), sa taille et son échéance sont gardés chiffrés sur cet appareil, jamais le mot de passe. Ils s'effacent 7 jours après l'échéance, ou quand vous les retirez.",
-          "L'historique des téléchargements (nom, taille et sorte de chaque fichier enregistré, sa provenance et l'heure) reste chiffré sur cet appareil et n'est jamais envoyé ; jamais le lien ni le mot de passe. Chaque entrée s'efface après 30 jours ; la page Téléchargements permet de le couper ou de tout effacer.",
+          "L'historique des téléchargements est désactivé par défaut : rien n'est gardé tant que vous ne l'activez pas vous-même. Activé, il garde chiffrés sur cet appareil le nom, la taille et la sorte de chaque fichier enregistré, sa provenance et l'heure ; il n'est jamais envoyé, et ne contient jamais le lien ni le mot de passe. Chaque entrée s'efface après 30 jours ; le désactiver efface tout.",
         ],
       },
       {
@@ -443,7 +443,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Room: to get your seat back after a reload, your member token, the name you use there and the room key are kept encrypted on this device, readable only with the room password; they are erased when the room ends.",
           "Paid plans: the pass and the anonymous tokens it gives are kept encrypted on this device.",
           "If you tick “Keep this share”, the received link (with its key), its size and its expiry are kept encrypted on this device, never the password. They are erased 7 days after expiry, or when you remove them.",
-          "The downloads history (name, size and kind of each saved file, where it came from and the time) stays encrypted on this device and is never sent; never the link or the password. Each entry is erased after 30 days; the Downloads page lets you turn it off or erase it all.",
+          "The downloads history is off by default: nothing is kept until you turn it on yourself. When on, it keeps the name, size and kind of each saved file, where it came from and the time, encrypted on this device; it is never sent, and never holds the link or the password. Each entry is erased after 30 days; turning it off erases it all.",
         ],
       },
       {

@@ -83,7 +83,7 @@ describe("règles de sources", () => {
   });
   it("aucun stockage navigateur (hors historique local et retours, ci-dessous)", () =>
     expect(
-      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
+      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "downloads/probe.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
     ).toEqual([]));
   // Spec §33, §33.1 : exception écrite, l'historique local chiffré des envois. Seul
   // history/live.svelte.ts lit `indexedDB` (pour le passer à history/store.ts, qui chiffre) ;
@@ -117,6 +117,12 @@ describe("règles de sources", () => {
     expect(live.text).toMatch(/indexedDB/);
     expect(live.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
     expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("downloads/"))).toEqual([]);
+    // downloads/probe.ts (pages d'information, 22 novembre) : lecture seule du drapeau « on »,
+    // jamais d'écriture ni d'entrée lue.
+    const probe = files.find((f) => f.rel === "downloads/probe.ts")!.text;
+    expect(probe).toMatch(/"readonly"/);
+    expect(probe).not.toMatch(/"readwrite"|\.put\(|\.add\(|\.delete\(|\.clear\(|"entries"|localStorage|sessionStorage|document\.cookie/);
+    expect([...probe.matchAll(/\.get\("([^"]+)"\)/g)].map((m) => m[1])).toEqual(["flag:on"]);
     const store = files.find((f) => f.rel === "downloads/store.ts")!;
     const type = store.text.match(/export type DownloadEntry = \{([\s\S]*?)\n\};/)![1]!;
     expect([...type.matchAll(/^\s+(\w+):/gm)].map((m) => m[1])).toEqual(["id", "name", "sizeBytes", "format", "source", "savedAt"]);

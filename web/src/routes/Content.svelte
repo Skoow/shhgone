@@ -6,7 +6,7 @@
   // titre, l'adresse ni un stockage. « Voir seulement » : aucune action de téléchargement ni de
   // copie dans le DOM (ni barre, ni ligne, ni visionneuse).
   import { lowMemory } from "../app/env";
-  import { declineDownloads, downloads, recordDownload } from "../downloads/live.svelte";
+  import { downloads, loadDownloads, recordDownload, setDownloadsEnabled } from "../downloads/live.svelte";
   import { afterSave } from "../downloads/store";
   import { guardUnload } from "../app/lifecycle";
   import { createDownloads, readSkipping, summarize, type Target } from "../flows/downloads.svelte";
@@ -408,16 +408,19 @@
     };
   });
 
-  // ---------- Historique des téléchargements : ligne du premier fichier noté (W4) ----------
-  // Audit du 20 novembre : l'historique reste activé par défaut (R12), mais le premier fichier
-  // noté sur cet appareil le dit, une seule fois (drapeau dans la base), avec « Ne pas garder ».
-  let declined = $state(false);
-  async function decline() {
-    await declineDownloads();
-    declined = true;
-    announce(t("downloads.off.done"));
+  // ---------- Historique des téléchargements : réglage sur place ----------
+  // Désactivé par défaut (décision du propriétaire du 22 novembre 2026, remplace l'« activé » de
+  // R12) : une ligne le dit près des téléchargements, avec « Les garder 30 jours » ; activé, elle
+  // dit qu'ils sont gardés, avec « Ne pas garder » (désactive et efface). Ici parce que c'est le
+  // seul écran où l'on enregistre des fichiers, avec ou sans compte (audit, P3). Lecture seule à
+  // l'ouverture : rien n'est créé tant que la personne n'active pas.
+  void loadDownloads().catch(() => undefined);
+  let erased = $state(false);
+  async function setKept(v: boolean) {
+    await setDownloadsEnabled(v);
+    erased = !v;
+    announce(t(v ? "downloads.on.done" : "downloads.off.done"));
   }
-  $effect(() => () => void (downloads.notice = false));
 
   // ---------- Visionneuse ----------
   let viewAt = $state<number | null>(null);
@@ -480,12 +483,11 @@
       onresumezip={() => dl.resumeZip()}
       onstopzip={() => dl.stopZip()}
     />
-    {#if declined}
-      <p class="kept" data-downloads-notice>{t("downloads.off.done")}</p>
-    {:else if downloads.notice}
+    {#if downloads.status === "ready"}
       <p class="kept" data-downloads-notice>
-        <span>{t("downloads.notice")}</span>
-        <button type="button" class="kept-no" onclick={() => void decline()}>{t("downloads.notice.no")}</button>
+        <!-- Après « Ne pas garder » : la phrase dit que la liste est effacée. -->
+        <span>{downloads.enabled ? t("downloads.notice") : t(erased ? "downloads.off.done" : "downloads.notice.off")}</span>
+        <button type="button" class="kept-no" onclick={() => void setKept(!downloads.enabled)}>{t(downloads.enabled ? "downloads.notice.no" : "downloads.notice.on")}</button>
       </p>
     {/if}
   {/if}
@@ -724,7 +726,7 @@
   .hint:empty {
     display: none;
   }
-  /* Historique des téléchargements (W4) : une ligne discrète, « Ne pas garder » en lien. */
+  /* Historique des téléchargements (désactivé par défaut) : une ligne discrète, le réglage en lien. */
   .kept {
     margin: 0;
     display: flex;

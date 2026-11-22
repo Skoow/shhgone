@@ -35,7 +35,7 @@
     <Switch label={t("account.privacy.propose")} hint={t("account.privacy.propose.hint")} checked={r.proposerProfil} disabled={!account.profil} onchange={(v) => regler("proposerProfil", v)} />
     <Switch label={t("account.privacy.links")} checked={r.garderRecus} disabled={!account.profil} onchange={(v) => regler("garderRecus", v)} />
     <Switch label={t("account.privacy.rooms")} checked={r.garderSalons} disabled={!account.profil} onchange={(v) => regler("garderSalons", v)} />
-    <Switch label={t("account.privacy.downloads")} checked={downloads.enabled} onchange={(v) => void setDownloadsEnabled(v)} />
+    <Switch label={t("account.privacy.downloads")} hint={t("downloads.keep.hint")} checked={downloads.enabled} onchange={(v) => void setDownloadsEnabled(v)} />
     <Switch label={t("account.privacy.stay")} checked={account.persistante} disabled={!account.persistante} reason="{uid}-stay" onchange={(v) => void (v ? undefined : arreterResterConnecte())} />
     {#if !account.persistante}<p id="{uid}-stay" class="note">{t("account.privacy.stay.off")}</p>{/if}
   </div>

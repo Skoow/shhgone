@@ -1218,8 +1218,11 @@ export const fr = {
   "downloads.unavailable": "Historique indisponible dans ce navigateur (navigation privée stricte ou stockage refusé).",
   "downloads.todo.one": "À télécharger · {n}\u202félément · {size}",
   "downloads.todo.other": "À télécharger · {n}\u202féléments · {size}",
-  "downloads.notice": "Gardé dans Téléchargements sur cet appareil (30\u202fjours).",
+  "downloads.notice": "Fichiers enregistrés notés dans Téléchargements, sur cet appareil (30\u202fjours).",
   "downloads.notice.no": "Ne pas garder",
+  "downloads.notice.off": "Les noms des fichiers enregistrés ne sont pas gardés sur cet appareil.",
+  "downloads.notice.on": "Les garder 30\u202fjours",
+  "downloads.keep.hint": "Désactivé par défaut. Activé, il garde 30\u202fjours le nom, la taille et l'heure des fichiers enregistrés, sur cet appareil seulement. Le désactiver efface tout.",
   "downloads.until": "Disponible jusqu'au {date}, puis effacé du serveur",
   // Compte (plan du compte, lot 10 ; conception compte §12, §21.3, §21.15) : pages présentes
   // seulement si __COMPTES__. Textes d'erreur exacts de §12.1, §12.2, §21.2.4, §21.3, §21.15.

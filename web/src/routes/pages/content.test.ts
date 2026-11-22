@@ -75,9 +75,11 @@ describe("textes publics et compte par e-mail", () => {
     expect(texte("signaler", "en", false)).toMatch(/only the category you chose/u);
   });
 
-  test("Confidentialité : l'historique des téléchargements (lot 15, public) est dit", () => {
-    expect(texte("confidentialite", "fr", false)).toMatch(/historique des téléchargements[^.]*chiffré sur cet appareil/u);
-    expect(texte("confidentialite", "en", false)).toMatch(/downloads history[^.]*encrypted on this device/u);
+  test("Confidentialité : l'historique des téléchargements (lot 15, public) est dit, désactivé par défaut (22 novembre)", () => {
+    expect(texte("confidentialite", "fr", false)).toMatch(/historique des téléchargements est désactivé par défaut[^.]*vous-même\. Activé, il garde chiffrés sur cet appareil/u);
+    expect(texte("confidentialite", "fr", false)).toMatch(/le désactiver efface tout/u);
+    expect(texte("confidentialite", "en", false)).toMatch(/downloads history is off by default[^.]*yourself\. When on[^.]*encrypted on this device/u);
+    expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
   });
 
   test("accueil : la carte « Partage sans compte » ne parle du compte qu'avec __COMPTES__", () => {
