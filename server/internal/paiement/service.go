@@ -98,6 +98,9 @@ type Evenement struct {
 	Ref string
 	// RefLiee : seconde référence du paiement de Ref (LieRef seulement).
 	RefLiee string
+	// Tardif (LieRef seulement) : événement de plus de 24 h ; Ref encore inconnue → ignoré
+	// (200) au lieu d'un nouvel essai.
+	Tardif bool
 	// Montant TTC en centimes et devise en minuscules (Confirme).
 	Montant int64
 	Devise  string
@@ -595,7 +598,7 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 // lierRef : range l'empreinte de ev.RefLiee avec la commande de ev.Ref (déjà créditée). Déjà
 // rangée (paiement unique dont le PaymentIntent est la référence du crédit, ou événement
 // rejoué) : rien. Commande pas encore créditée : le prestataire réessaie (les événements
-// Stripe n'arrivent pas dans l'ordre). Seule une empreinte est gardée, comme pour Ref (§5.1).
+// Stripe n'arrivent pas dans l'ordre), sauf après 24 h (Tardif) : rien. Seule une empreinte est gardée, comme pour Ref (§5.1).
 func lierRef(tx *sql.Tx, pr string, ev Evenement, l ligneCommande, ok bool, auj int64) error {
 	if ev.Ref == "" || ev.RefLiee == "" {
 		return nil
@@ -609,6 +612,9 @@ func lierRef(tx *sql.Tx, pr string, ev Evenement, l ligneCommande, ok bool, auj 
 		return nil
 	}
 	if !ok {
+		if ev.Tardif {
+			return nil // facture jamais créditée (motif hors création et cycle, commande purgée)
+		}
 		return ErrPasEncore
 	}
 	if _, err := tx.Exec(`INSERT INTO refs(r, commande, jour) VALUES(?,?,?)`, r, l.id, auj); err != nil {

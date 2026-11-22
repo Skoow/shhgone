@@ -387,3 +387,34 @@ func un(evs []Evenement) Evenement {
 	}
 	return evs[0]
 }
+
+// S6-4 : invoice_payment.paid d'une facture jamais créditée (motif hors subscription_create et
+// subscription_cycle, ou commande purgée) : 500 (Stripe réessaie) tant que l'événement signé a
+// moins de 24 h, pour l'ordre d'arrivée ; ensuite 200 sans rien faire, au lieu de 500 sans fin.
+func TestStripeLienFactureInconnueTardif(t *testing.T) {
+	b := nouveauBanc(t)
+	s, _, now := nouveauStripeTest(t, true)
+	lien := `{"invoice":"in_inconnue","payment":{"type":"payment_intent","payment_intent":"pi_inconnu"},"status":"paid"}`
+	webhook := func(cree int64) error {
+		t.Helper()
+		corps := strings.Replace(evenementStripe("invoice_payment.paid", false, lien), `"created":1795000000`, fmt.Sprintf(`"created":%d`, cree), 1)
+		return b.s.Webhook(context.Background(), s, entete("Stripe-Signature", signeStripe(whsec, now.Unix(), corps)), []byte(corps))
+	}
+	for _, age := range []time.Duration{0, time.Hour, 24 * time.Hour} {
+		if err := webhook(now.Add(-age).Unix()); err != ErrPasEncore {
+			t.Fatal(age, err)
+		}
+	}
+	if err := webhook(now.Add(-24*time.Hour - time.Second).Unix()); err != nil {
+		t.Fatal("après 24 h", err)
+	}
+	var n int
+	b.db.QueryRow(`SELECT count(*) FROM refs`).Scan(&n)
+	if n != 0 {
+		t.Fatal("référence rangée sans commande", n)
+	}
+	// Champ created absent ou nul : jamais « tardif » (comportement d'avant, Stripe réessaie).
+	if err := webhook(0); err != ErrPasEncore {
+		t.Fatal(err)
+	}
+}

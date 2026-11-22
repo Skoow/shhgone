@@ -220,6 +220,7 @@ type stripeEvenement struct {
 	Object   string `json:"object"`
 	Type     string `json:"type"`
 	Livemode bool   `json:"livemode"`
+	Created  int64  `json:"created"` // secondes Unix de l'événement (signé avec le corps)
 	Data     struct {
 		Object json.RawMessage `json:"object"`
 	} `json:"data"`
@@ -256,6 +257,10 @@ type stripeCharge struct {
 	Refunded      bool      `json:"refunded"`
 	Metadata      meta      `json:"metadata"`
 }
+
+// delaiLienFacture : au-delà, invoice_payment.paid d'une facture inconnue répond 200 sans rien
+// faire (avant : 500, pour attendre invoice.paid, les événements n'arrivant pas dans l'ordre).
+const delaiLienFacture = 24 * time.Hour
 
 // stripePaiementFacture : objet invoice_payment (versions « basil » et suivantes) : relie une
 // facture au PaymentIntent qui l'a payée.
@@ -355,7 +360,10 @@ func (s *Stripe) Lire(_ context.Context, h http.Header, corps []byte) ([]Eveneme
 		if o.Status != "paid" || o.Payment.Type != "payment_intent" || o.Invoice == "" || o.Payment.PaymentIntent == "" {
 			return nil, nil
 		}
-		return []Evenement{{Sorte: LieRef, Ref: string(o.Invoice), RefLiee: string(o.Payment.PaymentIntent)}}, nil
+		// Plus de 24 h après l'événement (heure signée), une facture encore inconnue ne sera plus
+		// créditée (motif hors création et cycle, commande purgée) : ignoré au lieu de réessayé.
+		tardif := e.Created > 0 && s.now().Sub(time.Unix(e.Created, 0)) > delaiLienFacture
+		return []Evenement{{Sorte: LieRef, Ref: string(o.Invoice), RefLiee: string(o.Payment.PaymentIntent), Tardif: tardif}}, nil
 	case "customer.subscription.deleted":
 		var o stripeAbonnement
 		if json.Unmarshal(e.Data.Object, &o) != nil || o.ID == "" {
