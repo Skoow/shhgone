@@ -179,9 +179,6 @@ export function conversation(): Conversation | null {
 export function appel(): Appel | null {
   return s?.appel ?? null;
 }
-export function client(): ClientSalon | null {
-  return s?.client ?? null;
-}
 export function moteur(): SalonEngine | null {
   return s?.eng ?? null;
 }
@@ -741,12 +738,6 @@ export function effacement(b: Bulle, maintenantMs: number): { etat: "visible" } 
   } catch {
     return { etat: "visible" };
   }
-}
-
-/** Texte nettoyé par le moteur (exigence 4) ; erreur du moteur sinon (`texte_invalide`, `texte_trop_long`). */
-export function nettoyer(x: string): string {
-  if (!s) throw new Error("texte_invalide");
-  return s.eng.nettoyerTexte(x);
 }
 
 // --- Lien de gestion collé dans la conversation (exigence C-3 32) -----------------------------------

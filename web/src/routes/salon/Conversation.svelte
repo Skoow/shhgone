@@ -81,7 +81,6 @@
   let emojis = $state(false);
   let membres = $state(false);
   let erreur = $state("");
-  let fil: HTMLElement | undefined = $state();
   let enBas = $state(true);
   let nonLus = $state(0);
 
@@ -557,7 +556,7 @@
           {#if selMessage}<p class="err" role="alert">{selMessage}</p>{/if}
         </div>
       {/if}
-      <div role="log" aria-live="off" bind:this={fil}>
+      <div role="log" aria-live="off">
       <ol class="fil">
         {#each elements as e (e.cle)}
           {#if e.cle === separateur}<li class="sys nouveaux">{t("salon.room.nouveaux")}</li>{/if}

@@ -68,7 +68,7 @@ import init, * as wasm from "./pkg/shhdrop_salon_wasm.js";
 import type { Annonce, EnTete, Enveloppe, EnveloppeEnvoi, Evenement, Message, Regle } from "./pkg/shhdrop_salon_wasm.js";
 import { salonWasmBytes } from "./source";
 
-export type { Annonce, EnTete, Enveloppe, EnveloppeEnvoi, Evenement, Message, Regle, Rejoue, SortePiece } from "./pkg/shhdrop_salon_wasm.js";
+export type { Annonce, EnTete, Enveloppe, EnveloppeEnvoi, Evenement, Message, Regle } from "./pkg/shhdrop_salon_wasm.js";
 
 /** Instant en millisecondes : entier sûr positif (Date.now()) ou bigint de 0 à 2^64 − 1. */
 export type Instant = number | bigint;
