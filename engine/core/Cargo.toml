@@ -30,8 +30,9 @@ unicode-security = "=0.1.3"
 zeroize = { version = "1.9", default-features = false, features = ["alloc"] }
 # Jetons anonymes (Privacy Pass, RSA aveugle ; conception du paiement §7, §12) : exception écrite dans
 # CLAUDE.md (décision du propriétaire du 19 novembre), version exacte après revue de chaîne
-# d'approvisionnement ; seulement avec la fonction « jetons » (moteur des partages du site, apps),
-# jamais dans le module du salon. rand_core : trait du générateur de la bibliothèque (même version).
+# d'approvisionnement ; seulement avec la fonction « jetons » (module des jetons du site,
+# shhdrop-jetons-wasm, et apps), jamais dans le moteur des partages (shhdrop-wasm) ni
+# dans le module du salon. rand_core : trait du générateur de la bibliothèque (même version).
 blind-rsa-signatures = { version = "=0.19.0", default-features = false, optional = true }
 rand_core = { version = "0.10", default-features = false, optional = true }
 
@@ -43,7 +44,7 @@ aes-gcm = { version = "0.11", default-features = false, features = ["aes", "zero
 # Empreinte SHA-256 par morceaux d'un fichier (16 novembre) : activée par le moteur des partages
 # (shhdrop-wasm) et les apps ; pas par le module du salon, qui reste sous son plafond de poids.
 empreinte = []
-# Jetons anonymes des offres payantes (jetons.rs) : moteur des partages (shhdrop-wasm) et apps.
+# Jetons anonymes des offres payantes (jetons.rs) : module des jetons (shhdrop-jetons-wasm) et apps.
 jetons = ["dep:blind-rsa-signatures", "dep:rand_core"]
 
 [[bench]]
