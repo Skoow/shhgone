@@ -38,6 +38,7 @@ Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plu
 - **pas de mémoire d'échange** : `swapoff -a`, ligne retirée de `/etc/fstab` (`deploy.sh` refuse d'installer sinon) ;
 - **vidages mémoire coupés** : `kernel.core_pattern=|/bin/false` dans `/etc/sysctl.d/`, en plus de la limite posée sur les conteneurs ;
 - **journald en mémoire** : `Storage=volatile` dans `/etc/systemd/journald.conf` (sinon `sshd` et le pare-feu écrivent des adresses sur disque) ; pas de journal des paquets refusés par le pare-feu (`ufw logging off`) ;
+- **suivi des connexions du pare-feu raccourci** (22 novembre) : le noyau garde en mémoire, pour chaque connexion vue par le pare-feu, les adresses IP des deux bouts, jusqu'à **5 jours** par défaut pour une connexion TCP établie, même inactive. Dans `/etc/sysctl.d/` : `net.netfilter.nf_conntrack_tcp_timeout_established=1800` (30 min ; nos connexions longues envoient un signe de vie toutes les 25 à 45 s, WebSocket et relais, elles ne sont pas coupées). Vérifier : `sysctl net.netfilter.nf_conntrack_tcp_timeout_established` ;
 - **heure** synchronisée (NTP : `timedatectl set-ntp true`) ;
 - **mises à jour de sécurité automatiques**, sans redémarrage automatique de la machine (`unattended-upgrades`, `Automatic-Reboot "false"`, §22) ;
 - compte par e-mail seulement (§12) : paquets `sqlite3` et `age` (version exacte, notée dans `deploy/.env`), `curl` ;

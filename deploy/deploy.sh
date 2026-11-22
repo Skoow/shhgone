@@ -225,6 +225,12 @@ preflight() {
 				die "$secrets/$f absent ou mal réglé : fichier du compte 65532, droits 0400 (README §13)"
 		done
 	fi
+	# Suivi des connexions du pare-feu (README §1, 22 novembre) : adresses des deux bouts gardées
+	# en mémoire jusqu'à 5 jours par défaut. Avertissement seulement (module absent : rien à dire).
+	ct=/proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established
+	if [ -r "$ct" ] && [ "$(cat "$ct")" -gt 1800 ]; then
+		printf 'AVERTISSEMENT : nf_conntrack_tcp_timeout_established = %s s (adresses gardées en mémoire) : le ramener à 1800 (README §1).\n' "$(cat "$ct")" >&2
+	fi
 	# Simple avertissement : la détection ne connaît que dm-crypt (LUKS), pas d'autre montage.
 	src=$(findmnt -no SOURCE -T "$SHH_DATA_ROOT")
 	if ! lsblk -s -n -o TYPE "$src" 2>/dev/null | grep -qx crypt; then
