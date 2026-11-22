@@ -139,7 +139,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Ce que nous ne gardons pas",
         list: [
-          "Votre adresse IP n'est pas enregistrée. Le serveur la voit le temps de traiter chaque demande, comme tout site web, mais ne l'écrit nulle part et ne la garde pas : les limites anti-abus n'en gardent qu'une valeur chiffrée, sous une clé tirée au hasard, gardée en mémoire seulement et jamais écrite.",
+          "Votre adresse IP n'est pas enregistrée. Le serveur la voit le temps de traiter chaque demande, comme tout site web, mais ne l'écrit nulle part et ne la garde pas : les limites anti-abus n'en gardent qu'un code à sens unique, en mémoire seulement, sous une clé tirée au hasard, remplacée chaque jour puis effacée : une fois la clé effacée, plus rien ne relie ce code à votre adresse.",
           "Aucun cookie de notre part, et aucune mesure d'audience.",
           "Aucun journal des partages, aucune mesure d'audience. Le serveur tient seulement, en mémoire, des compteurs globaux pour son exploitation (par exemple le nombre de partages créés depuis son dernier démarrage) : rien par personne, par adresse ni par partage, rien sur disque.",
         ],
@@ -429,7 +429,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "What we don't keep",
         list: [
-          "Your IP address is not recorded. The server sees it while handling each request, like any website, but never writes it down or keeps it: the anti-abuse limits keep only an encrypted value derived from it, under a random key kept in memory only and never written down.",
+          "Your IP address is not recorded. The server sees it while handling each request, like any website, but never writes it down or keeps it: the anti-abuse limits keep only a one-way code derived from it, in memory only, under a random key replaced every day and then erased: once the key is gone, nothing links that code to your address.",
           "No cookies of ours, and no analytics.",
           "No log of shares, no audience measurement. The server only keeps, in memory, global counters for its own operation (for example the number of shares created since it last started): nothing per person, per address or per share, nothing on disk.",
         ],
