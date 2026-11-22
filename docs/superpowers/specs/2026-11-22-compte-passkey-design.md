@@ -1,6 +1,6 @@
 # Compte par passkey et clé de récupération, sans e-mail — conception
 
-> **À valider par le propriétaire.** Rien n'est codé. Date : 22 novembre 2026. Décision de départ du propriétaire (22 novembre) : « OK pour passkey », avec la question « est-ce facile de se créer un compte ? ». Cette conception **remplace**, pour l'identité, la connexion et la récupération, la conception `2026-11-14-compte-email-design.md` (e-mail, mot de passe, TOTP, séquestre). Ce qui n'est pas dit ici **reste valable** (pseudo unique §21.5, coffres et leurs formats, sessions §8.5, ancienneté §11, bannissement §21.11 sauf la clé de recherche, accueil connecté §21.7, signalements §21.10, suppression totale §21.12, sauvegarde §21.13, tableau de bord §21.14 sauf la recherche par adresse). Les décisions qui reviennent au propriétaire sont en §16, chacune avec une recommandation.
+> **Validée par le propriétaire le 22 novembre 2026** : toutes les recommandations du §16 acceptées ; domaine définitif `shhgone.com` (RP ID) ; bannis : accepter et observer (Q5). Rien n'est encore codé. Date : 22 novembre 2026. Décision de départ du propriétaire (22 novembre) : « OK pour passkey », avec la question « est-ce facile de se créer un compte ? ». Cette conception **remplace**, pour l'identité, la connexion et la récupération, la conception `2026-11-14-compte-email-design.md` (e-mail, mot de passe, TOTP, séquestre). Ce qui n'est pas dit ici **reste valable** (pseudo unique §21.5, coffres et leurs formats, sessions §8.5, ancienneté §11, bannissement §21.11 sauf la clé de recherche, accueil connecté §21.7, signalements §21.10, suppression totale §21.12, sauvegarde §21.13, tableau de bord §21.14 sauf la recherche par adresse). Les décisions qui reviennent au propriétaire sont en §16, chacune avec une recommandation.
 
 Références lues : `CLAUDE.md` ; `2026-11-14-compte-email-design.md` (entier) ; spécification principale `2026-11-03-shhdrop-design.md` §37 (v2.7 et compléments v2.8 §37.11 : passkey, PRF, clé de secours) ; `docs/ouverture-comptes.md` (§2.1) ; `2026-11-19-paiement-design.md` (§6.2, DP-8) ; code : `engine/core/src/compte.rs`, `engine/vectors/README.md` et `compte.json`, `server/internal/compte/*` (notamment `base.go`, `sequestre.go`, `totp.go`, `cles.go`), `server/internal/api/handlers_compte.go`, `server/internal/api/headers.go`, `server/internal/courriel/`, `server/go.mod`, `web/src/account/*`, `web/src/routes/compte/*`, `web/e2e/compte-sees-nothing.test.ts`, `web/ui-e2e/compte*.ts`.
 
@@ -436,7 +436,7 @@ Aujourd'hui essayable avec un faux serveur (§22 de la conception du compte). Un
 
 Ordre : P1 → S1 → S2 → W1 → W2 → T1 → D1, chaque lot avec ses tests au vert avant le push sur `main`.
 
-## 16. Questions à trancher par le propriétaire (recommandation)
+## 16. Questions tranchées par le propriétaire le 22 novembre (recommandations toutes retenues ; Q7 : `shhgone.com`)
 
 1. **Q1 — Clé de récupération obligatoire à la création**, vérifiée par un groupe tiré au hasard. Facultative, la création tomberait à 4 actions, mais toute passkey perdue (ou un gestionnaire sans PRF sur un nouvel appareil) ferait perdre le compte. **Recommandé : obligatoire.**
 2. **Q2 — Format de la clé** : 27 caractères (128 bits, base32 de Crockford avec contrôle) ou 12 mots. **Recommandé : 27 caractères** (aucune liste de mots ni dépendance, identique dans toutes les langues).
