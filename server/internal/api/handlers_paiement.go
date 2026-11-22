@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"github.com/skoow/shhdrop/server/internal/limits"
 	"io"
 	"net/http"
 	"strings"
@@ -340,7 +339,7 @@ func (a paiementAPI) webhook(w http.ResponseWriter, r *http.Request) {
 		writeLimit(w, a.lim.MinuteRetry())
 		return
 	}
-	k64, k48 := limits.Prefixes(ip)
+	k64, k48 := a.lim.Key(ip) // clé HMAC du jour, jamais le préfixe en clair (22 novembre)
 	rendre, errPlace := corpsWebhook.Acquire(k64, k48)
 	if errPlace != nil {
 		w.Header().Set("Connection", "close")

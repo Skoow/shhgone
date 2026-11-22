@@ -142,14 +142,25 @@ func failCompte(w http.ResponseWriter, err error) {
 // borne, quelques centaines de connexions tenaient chacune 1 Mio pendant l'échéance de lecture
 // et faisaient tuer le serveur par le noyau. Trois garde-fous avant la première lecture :
 // longueur annoncée exigée et sous le plafond (pas d'envoi par blocs), et une place de
-// grosCorps (16 en tout, 2 par connexion, 4 par bloc /48), sinon 503 busy et connexion fermée.
+// grosCorps (16 en tout, 2 par connexion, 4 par bloc /48), sinon 503 busy et connexion fermée :
+// lireGros seulement, lire refuse un tel plafond (erreur de programmation).
 func lire(w http.ResponseWriter, r *http.Request, v any, max int64) error {
+	if max > maxJSON {
+		panic("api : gros corps lu sans place (lireGros)")
+	}
+	return lireCorps(w, r, v, max)
+}
+
+// lireGros : lire, avec les garde-fous des gros corps. Places tenues sous la clé HMAC du jour du
+// limiteur (inventaire des adresses IP du 22 novembre) : jamais le préfixe /64 ou /48 en clair
+// comme clé de table.
+func (s *server) lireGros(w http.ResponseWriter, r *http.Request, v any, max int64) error {
 	if max > maxJSON {
 		if r.ContentLength < 0 || r.ContentLength > max {
 			w.Header().Set("Connection", "close")
 			return errBadRequest
 		}
-		k64, k48 := limits.Prefixes(ipOf(r))
+		k64, k48 := s.lim.Key(ipOf(r))
 		rendre, err := grosCorps.Acquire(k64, k48)
 		if err != nil {
 			w.Header().Set("Connection", "close")
@@ -157,6 +168,10 @@ func lire(w http.ResponseWriter, r *http.Request, v any, max int64) error {
 		}
 		defer rendre()
 	}
+	return lireCorps(w, r, v, max)
+}
+
+func lireCorps(w http.ResponseWriter, r *http.Request, v any, max int64) error {
 	rc := http.NewResponseController(w)
 	if err := rc.SetReadDeadline(time.Now().Add(jsonReadTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		return errBadRequest
@@ -291,7 +306,7 @@ func (a compteAPI) inscriptionFin(w http.ResponseWriter, r *http.Request) {
 		Persistante *bool   `json:"persistante"`
 		Etiquette   *string `json:"etiquette"`
 	}
-	if err := lire(w, r, &b, maxInscriptionJSON); err != nil {
+	if err := a.lireGros(w, r, &b, maxInscriptionJSON); err != nil {
 		failCompte(w, err)
 		return
 	}
@@ -550,7 +565,7 @@ func (a compteAPI) ecrireCoffre(sorte compte.Coffre) http.HandlerFunc {
 			IfGen *uint64 `json:"if_gen"`
 			Blob  string  `json:"blob"`
 		}
-		if err := lire(w, r, &b, maxCoffreJSON); err != nil || b.IfGen == nil {
+		if err := a.lireGros(w, r, &b, maxCoffreJSON); err != nil || b.IfGen == nil {
 			failCompte(w, errBadRequest)
 			return
 		}
@@ -777,7 +792,7 @@ func (a compteAPI) oubliFin(w http.ResponseWriter, r *http.Request) {
 		Persistante *bool   `json:"persistante"`
 		Etiquette   *string `json:"etiquette"`
 	}
-	if err := lire(w, r, &b, maxCoffreJSON); err != nil {
+	if err := a.lireGros(w, r, &b, maxCoffreJSON); err != nil {
 		failCompte(w, err)
 		return
 	}

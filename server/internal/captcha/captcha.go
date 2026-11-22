@@ -9,7 +9,10 @@
 // hachée étant la même). Le niveau est la difficulté au moment de l'émission : un défi
 // dont le niveau est inférieur au niveau actuel de la connexion est refusé, pour que la
 // difficulté ne puisse pas être contournée en stockant des défis faciles à l'avance.
-// Tout est en mémoire ; rien n'est lié à une adresse IP en clair.
+// Tout est en mémoire ; rien n'est lié à une adresse IP en clair. La clé de liaison est tirée
+// au hasard et remplacée à minuit UTC, comme les clés du limiteur (inventaire des adresses IP
+// du 22 novembre) ; celle de la veille sert encore une heure (défis en vol, difficulté de la
+// dernière heure), puis elle est effacée.
 package captcha
 
 import (
@@ -49,10 +52,16 @@ var ErrInvalid = errors.New("anti-robot invalide")
 var saltRe = regexp.MustCompile(`^[0-9a-f]{24}\.([0-9a-f]{16})\.([0-5])\?expires=([0-9]{10})&$`)
 
 type Captcha struct {
-	sigKey, bindKey []byte
-	now             func() time.Time
+	sigKey []byte
+	now    func() time.Time
 
-	mu        sync.Mutex
+	mu sync.Mutex
+	// bindKey : clé de liaison du jour UTC bindDay (crypto/rand, jamais écrite) ; bindPrev :
+	// celle de la veille jusqu'à prevUntil (minuit + window), nil ensuite.
+	bindKey, bindPrev []byte
+	bindDay           int64
+	prevUntil         time.Time
+
 	used      map[string]int64       // sel consommé → expiration (unix)
 	creates   map[string][]time.Time // lien de connexion → créations de la dernière heure
 	lastSweep time.Time
@@ -65,11 +74,53 @@ func New(hmacKey []byte, now func() time.Time) *Captcha {
 	}
 	return &Captcha{
 		sigKey:  derive(hmacKey, "shhdrop altcha signature"),
-		bindKey: derive(hmacKey, "shhdrop altcha connexion"),
 		now:     now,
+		bindKey: randomKey(),
+		bindDay: utcDay(now()),
 		used:    map[string]int64{},
 		creates: map[string][]time.Time{},
 	}
+}
+
+func randomKey() []byte {
+	k := make([]byte, 32)
+	if _, err := rand.Read(k); err != nil {
+		panic(err) // crypto/rand ne renvoie pas d'erreur sous Linux
+	}
+	return k
+}
+
+// utcDay : jours UTC depuis 1970 (arrondi vers le bas, dates d'avant 1970 comprises).
+func utcDay(t time.Time) int64 {
+	u := t.Unix()
+	d := u / 86400
+	if u%86400 < 0 {
+		d--
+	}
+	return d
+}
+
+// rotateLocked remplace la clé de liaison à minuit UTC et efface celle de la veille une heure
+// plus tard (même règle que le limiteur : nouvelle clé aléatoire, l'ancienne effacée).
+func (c *Captcha) rotateLocked(now time.Time) {
+	if c.bindPrev != nil && !now.Before(c.prevUntil) {
+		clear(c.bindPrev)
+		c.bindPrev = nil
+	}
+	d := utcDay(now)
+	if d == c.bindDay {
+		return
+	}
+	clear(c.bindPrev)
+	c.bindPrev = nil
+	if d == c.bindDay+1 {
+		c.bindPrev = c.bindKey
+		c.prevUntil = time.Unix(d*86400, 0).Add(window)
+	} else {
+		clear(c.bindKey)
+	}
+	c.bindKey = randomKey()
+	c.bindDay = d
 }
 
 func derive(key []byte, label string) []byte {
@@ -78,12 +129,31 @@ func derive(key []byte, label string) []byte {
 	return h.Sum(nil)
 }
 
-// bind rend 16 hex liés à la connexion (/64 ou IPv4), sans révéler l'adresse.
-func (c *Captcha) bind(ip netip.Addr) string {
+// bindsLocked rend 16 hex liés à la connexion (/64 ou IPv4), sans révéler l'adresse, sous la
+// clé du jour (cur) et sous celle de la veille tant qu'elle est gardée (prev, sinon "").
+func (c *Captcha) bindsLocked(ip netip.Addr, now time.Time) (cur, prev string) {
+	c.rotateLocked(now)
 	p64, _ := limits.Prefixes(ip)
-	h := hmac.New(sha256.New, c.bindKey)
+	cur = bindWith(c.bindKey, p64)
+	if c.bindPrev != nil {
+		prev = bindWith(c.bindPrev, p64)
+	}
+	return cur, prev
+}
+
+func bindWith(key []byte, p64 string) string {
+	h := hmac.New(sha256.New, key)
 	h.Write([]byte(p64))
 	return hex.EncodeToString(h.Sum(nil)[:8])
+}
+
+// levelLocked : niveau de la connexion, créations de la dernière heure sous les deux clés.
+func (c *Captcha) levelLocked(cur, prev string, now time.Time) int {
+	l := c.recentLocked(cur, now)
+	if prev != "" {
+		l = min(l+c.recentLocked(prev, now), maxLevel)
+	}
+	return l
 }
 
 // sweepLocked oublie les sels expirés et les créations de plus d'une heure (au plus une fois par minute).
@@ -121,10 +191,10 @@ func (c *Captcha) recentLocked(b string, now time.Time) int {
 // Challenge émet un défi lié à la connexion, valable 2 minutes.
 func (c *Captcha) Challenge(ip netip.Addr) (altcha.Challenge, error) {
 	now := c.now()
-	b := c.bind(ip)
 	c.mu.Lock()
+	b, bp := c.bindsLocked(ip, now)
 	c.sweepLocked(now)
-	level := c.recentLocked(b, now)
+	level := c.levelLocked(b, bp, now)
 	c.mu.Unlock()
 
 	rnd := make([]byte, 12)
@@ -144,9 +214,9 @@ func (c *Captcha) Challenge(ip netip.Addr) (altcha.Challenge, error) {
 // RecordCreate compte une création réussie : la difficulté double pour l'heure qui suit.
 func (c *Captcha) RecordCreate(ip netip.Addr) {
 	now := c.now()
-	b := c.bind(ip)
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	b, _ := c.bindsLocked(ip, now)
 	c.sweepLocked(now)
 	// Heure arrondie à la minute supérieure (spec §36 S15) : rien de plus précis n'est gardé,
 	// et une création compte toujours au moins une heure.
@@ -181,8 +251,13 @@ func (c *Captcha) Verify(payload string, ip netip.Addr, honeypot string, shownAt
 	if now.Unix() >= exp || exp > now.Add(ttl).Unix() {
 		return ErrInvalid
 	}
-	b := c.bind(ip)
-	if !hmac.Equal([]byte(m[1]), []byte(b)) {
+	c.mu.Lock()
+	b, bp := c.bindsLocked(ip, now)
+	c.mu.Unlock()
+	// Clé du jour, ou de la veille pour un défi émis avant minuit (2 minutes au plus).
+	okCur := hmac.Equal([]byte(m[1]), []byte(b))
+	okPrev := bp != "" && hmac.Equal([]byte(m[1]), []byte(bp))
+	if !okCur && !okPrev {
 		return ErrInvalid
 	}
 	want, err := altcha.CreateChallenge(altcha.ChallengeOptions{
@@ -198,8 +273,9 @@ func (c *Captcha) Verify(payload string, ip netip.Addr, honeypot string, shownAt
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	b, bp = c.bindsLocked(ip, now)
 	c.sweepLocked(now)
-	if level < c.recentLocked(b, now) {
+	if level < c.levelLocked(b, bp, now) {
 		return ErrInvalid
 	}
 	if _, dup := c.used[p.Salt]; dup {
