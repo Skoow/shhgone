@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// installDemo : fetch détourné pour /api seulement, titre « Démo · », crochets des écrans.
+// installDemo : fetch détourné pour /api seulement, titre inchangé, crochets des écrans.
 import { describe, expect, it, vi } from "vitest";
 import { getDemo } from "../app/demo-hooks";
 import { setLang } from "../i18n/i18n.svelte";
@@ -26,22 +26,10 @@ describe("installDemo", async () => {
     expect(sent).toEqual([`${location.origin}/assets/a.js`, "https://ailleurs.test/api/captcha"]);
   });
 
-  it("titre préfixé, y compris après un changement", async () => {
-    expect(document.title).toBe("Démo · Shhgone");
+  it("titre de l'onglet laissé tel quel, sans « Démo · » (22 novembre)", async () => {
     document.title = "Ouvrir";
     await new Promise((r) => setTimeout(r, 0));
-    expect(document.title).toBe("Démo · Ouvrir");
-  });
-
-  it("préfixe traduit : « Demo · » en anglais, jamais doublé (scan UX B9)", async () => {
-    setLang("en");
-    document.title = "Send · Shhgone";
-    await new Promise((r) => setTimeout(r, 0));
-    expect(document.title).toBe("Demo · Send · Shhgone");
-    setLang("fr");
-    document.title = "Envoyer · Shhgone";
-    await new Promise((r) => setTimeout(r, 0));
-    expect(document.title).toBe("Démo · Envoyer · Shhgone");
+    expect(document.title).toBe("Ouvrir");
   });
 
   it("crochets : preuve factice, phrase de « Lien invalide » et écarts dans la langue courante", async () => {

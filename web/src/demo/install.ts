@@ -5,7 +5,6 @@
 // serveur de cet onglet (demo/persist.ts, exception démo), pour survivre à un rechargement.
 import { setDemo } from "../app/demo-hooks";
 import { leaveGuard } from "../app/router.svelte";
-import { demoPrefixed } from "../app/title";
 import { getLang } from "../i18n/i18n.svelte";
 import { SHARE_FRAGMENT, type CaptchaProof } from "../index";
 import DemoBanner from "./DemoBanner.svelte";
@@ -97,15 +96,9 @@ export async function installDemo(w: Window): Promise<void> {
   const g = w as Window & { XMLHttpRequest: typeof XMLHttpRequest };
   g.XMLHttpRequest = fakeXHRClass(g.XMLHttpRequest, isApi, (r) => fake.handle(r), rate);
 
-  // Titre des onglets : toujours « Démo · … » (« Demo · … » en anglais), même si un écran le change.
-  const d = w.document;
-  d.documentElement.setAttribute("data-shh-demo", MARK);
-  const prefix = () => {
-    const want = demoPrefixed(d.title, d.documentElement.lang);
-    if (d.title !== want) d.title = want;
-  };
-  prefix();
-  new MutationObserver(prefix).observe(d.head, { subtree: true, childList: true, characterData: true });
+  // Titre des onglets : le même que le site (22 novembre, propriétaire : plus de « Démo · ») ;
+  // le bandeau permanent de la page dit que c'est une démo.
+  w.document.documentElement.setAttribute("data-shh-demo", MARK);
 
   setDemo({
     solveCaptcha: async (): Promise<CaptchaProof> => ({ kind: "pow", payload: "demo" }),

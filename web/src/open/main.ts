@@ -9,7 +9,7 @@ import { langReady } from "../i18n/i18n.svelte";
 import OpenApp from "./OpenApp.svelte";
 
 setEntry("s");
-// Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau, titres « Démo · »).
+// Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau ; titres du site, sans « Démo · » depuis le 22 novembre).
 if (import.meta.env.MODE === "demo") await (await import("../demo/install")).installDemo(window);
 
 // Retours gardés (D42-22) : entrées échues retirées au démarrage, sans rien créer.

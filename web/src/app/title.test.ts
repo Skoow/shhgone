@@ -2,7 +2,7 @@
 // Titre de l'onglet (scan UX B9) : « écran · Shhgone », traduit, jamais de secret ; préfixe de la démo.
 import { afterEach, describe, expect, it } from "vitest";
 import { setLang } from "../i18n/i18n.svelte";
-import { demoPrefixed, progressTitle, routeTitle, setProgressTitle, setScreenTitle } from "./title";
+import { progressTitle, routeTitle, setProgressTitle, setScreenTitle } from "./title";
 
 afterEach(() => setLang("fr"));
 
@@ -48,12 +48,5 @@ describe("titre de l'onglet", () => {
   it("setScreenTitle écrit document.title", () => {
     setScreenTitle("sealing");
     expect(document.title).toBe("Envoi en cours · Shhgone");
-  });
-  it("préfixe de la démo dans la langue de la page, jamais doublé", () => {
-    expect(demoPrefixed("Envoyer · Shhgone", "fr")).toBe("Démo · Envoyer · Shhgone");
-    expect(demoPrefixed("Send · Shhgone", "en")).toBe("Demo · Send · Shhgone");
-    expect(demoPrefixed("Démo · Send · Shhgone", "en")).toBe("Demo · Send · Shhgone");
-    expect(demoPrefixed("Demo · Envoyer · Shhgone", "fr")).toBe("Démo · Envoyer · Shhgone");
-    expect(demoPrefixed("Démo · x", "fr")).toBe("Démo · x");
   });
 });

@@ -33,6 +33,7 @@ func TestCacheControlEndToEnd(t *testing.T) {
 		"sitemap.xml":                                 "<urlset/>",
 		"manifest.webmanifest":                        "{}",
 		"favicon.svg":                                 "<svg/>",
+		"favicon-32.png":                              "png",
 	} {
 		p := filepath.Join(static, n)
 		os.MkdirAll(filepath.Dir(p), 0o700)
@@ -81,6 +82,7 @@ func TestCacheControlEndToEnd(t *testing.T) {
 		{"/sitemap.xml", 200, none},
 		{"/manifest.webmanifest", 200, day},
 		{"/favicon.svg", 200, day},
+		{"/favicon-32.png", 200, day},
 		{"/api/captcha", 200, none},
 		{"/fonts/absente.woff2", 404, none}, // un 404 jamais en cache
 		{"/api/assets/index-yRSR4HNN.js", 404, none},

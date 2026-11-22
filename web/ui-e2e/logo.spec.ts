@@ -56,11 +56,12 @@ test("icônes : liens présents dans <head>, fichiers servis (200, bon type)", a
   const links = await page.$$eval("link[rel~='icon'], link[rel='apple-touch-icon']", (ls) =>
     ls.map((l) => (l as HTMLLinkElement).getAttribute("href")!),
   );
-  expect(links.sort()).toEqual(["/apple-touch-icon.png", "/favicon.ico", "/favicon.svg"]);
+  expect(links.sort()).toEqual(["/apple-touch-icon.png", "/favicon-32.png", "/favicon.ico", "/favicon.svg", "/icon-192.png"]);
   const types: Record<string, RegExp> = {
     "/favicon.svg": /^image\/svg\+xml/,
     "/favicon.ico": /^image\/(x-icon|vnd\.microsoft\.icon)/,
     "/apple-touch-icon.png": /^image\/png/,
+    "/favicon-32.png": /^image\/png/,
     "/icon-192.png": /^image\/png/,
     "/icon-512.png": /^image\/png/,
     "/logo.svg": /^image\/svg\+xml/,

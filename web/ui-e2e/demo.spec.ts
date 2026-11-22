@@ -21,7 +21,7 @@ const storage = (page: Page) => page.evaluate(() => localStorage.length + Object
 test.describe("fr-FR", () => {
   test.use({ locale: "fr-FR" });
 
-  test("/shhgone/ : accueil, bandeau permanent, titre « Démo · », CSP meta en tête ; axe ; captures", async ({ page, demo }) => {
+  test("/shhgone/ : accueil, bandeau permanent, titre du site (sans « Démo · »), CSP meta en tête ; axe ; captures", async ({ page, demo }) => {
     const res = await page.goto(demo.url);
     expect(res?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
@@ -33,7 +33,7 @@ test.describe("fr-FR", () => {
     // Tout en haut de la page, avant l'en-tête, sans bouton de fermeture.
     expect((await banner.boundingBox())!.y).toBe(0);
     await expect(banner.getByRole("button")).toHaveCount(0);
-    await expect(page).toHaveTitle("Démo · Shhgone · Partagez en secret, puis ça s'efface");
+    await expect(page).toHaveTitle("Shhgone · Partagez en secret, puis ça s'efface");
     // La démo est servie par GitHub Pages, hors d'Europe : rien ne prétend le contraire (plus de
     // sur-titre depuis le 15 novembre).
     await expect(page.locator("[data-eyebrow]")).toHaveCount(0);
@@ -302,9 +302,9 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await sendButton(page).click();
     // Les étapes peuvent défiler très vite (démo locale) : n'importe quel écran du parcours d'envoi.
     await expect(page.getByRole("heading", { name: /^(Préparation des clés|Vérification anti-robot|Chiffrement et envoi|Finalisation|Lien prêt)$/ }).first()).toBeVisible();
-    await expect(page).toHaveTitle(/^Démo · /);
+    await expect(page).not.toHaveTitle(/Démo/);
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
-    await expect(page).toHaveTitle("Démo · Lien prêt · Shhgone");
+    await expect(page).toHaveTitle("Lien prêt · Shhgone");
     const link = (await page.getByRole("group", { name: "Lien", exact: true }).locator(".sr-only").first().textContent()) ?? "";
     expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhgone/s#[A-Za-z0-9_-]{43}$`));
     // Le bandeau n'est plus qu'une ligne : l'avertissement est redit sous le lien (16 novembre).
@@ -392,7 +392,7 @@ test.describe("en-US", () => {
   test("bandeau en anglais ; capture", async ({ page, demo }) => {
     await page.goto(demo.url);
     await expect(page.getByRole("note")).toHaveText(BANNER_EN);
-    await expect(page).toHaveTitle("Demo · Shhgone · Share in secret, then it's gone");
+    await expect(page).toHaveTitle("Shhgone · Share in secret, then it's gone");
     await page.waitForTimeout(700);
     await capture(page, "demo-home-en");
   });

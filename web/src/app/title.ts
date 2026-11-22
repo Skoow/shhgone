@@ -54,11 +54,3 @@ export function claimScreenTitle(screen: TitleScreen): () => void {
     if (screenNow !== null) document.title = routeTitle(screenNow);
   };
 }
-
-const DEMO_PREFIXES = ["Démo · ", "Demo · "];
-
-/** Titre de la démo : préfixe « Démo · » ou « Demo · » selon la langue, jamais doublé. */
-export function demoPrefixed(title: string, lang: string): string {
-  const bare = DEMO_PREFIXES.reduce((s, p) => (s.startsWith(p) ? s.slice(p.length) : s), title);
-  return (lang === "fr" ? DEMO_PREFIXES[0] : DEMO_PREFIXES[1]) + bare;
-}

@@ -12,7 +12,7 @@ import PagesApp from "./PagesApp.svelte";
 setEntry("pages");
 // « Mes partages » dans l'en-tête seulement si l'historique existe sur cet appareil (17 novembre).
 void probeHistory();
-// Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau, titres « Démo · »).
+// Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau ; titres du site, sans « Démo · » depuis le 22 novembre).
 if (import.meta.env.MODE === "demo") await (await import("../demo/install")).installDemo(window);
 await langReady;
 

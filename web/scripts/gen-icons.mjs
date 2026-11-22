@@ -53,6 +53,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   await browser.close();
   for (const name of ["apple-touch-icon.png", "icon-192.png", "icon-512.png"]) writeFileSync(join(web, "public", name), out[name]);
+  // PNG 32 px à part (22 novembre) : des navigateurs mobiles (Firefox sur iPhone) ne lisent ni
+  // l'ICO ni le SVG d'un lien « icon » et montraient une lettre à la place de l'icône.
+  writeFileSync(join(web, "public", "favicon-32.png"), out["favicon-32"]);
   writeFileSync(join(web, "public", "favicon.ico"), ico([{ size: 16, data: out["favicon-16"] }, { size: 32, data: out["favicon-32"] }]));
-  console.log("gen-icons : apple-touch-icon.png, icon-192.png, icon-512.png, favicon.ico");
+  console.log("gen-icons : apple-touch-icon.png, icon-192.png, icon-512.png, favicon-32.png, favicon.ico");
 }
