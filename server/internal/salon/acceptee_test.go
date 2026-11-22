@@ -2,7 +2,6 @@ package salon
 
 import (
 	"bytes"
-	"net/netip"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -40,7 +39,7 @@ func echo(l *fauxLien, seq uint64) bool {
 
 // enRattrapage : 500 trames rangées par g, puis connexion lente (1 ms par écriture) du jeton de
 // ea depuis son rang d'émission : elle est en rattrapage pour environ 500 ms simulées.
-func (b *banc) enRattrapage(t *testing.T, g Membre, ea Entree, autoriser func(netip.Addr) bool) *fauxLien {
+func (b *banc) enRattrapage(t *testing.T, g Membre, ea Entree, autoriser func() bool) *fauxLien {
 	t.Helper()
 	for i := 0; i < 500; i++ {
 		b.recevoir(t, g, trameD(0, i))
@@ -191,7 +190,7 @@ func TestRefusAtteintExpediteurEnRattrapage(t *testing.T) {
 		_, g := b.entrerMembre(t, c, true)
 		ea := b.entrer(t, c, false)
 		refus := false
-		autoriser := func(netip.Addr) bool { return !refus }
+		autoriser := func() bool { return !refus }
 		la := b.enRattrapage(t, g, ea, autoriser)
 		refus = true
 		la.envoyer(demTrame(trameD(0, 1)))

@@ -41,17 +41,23 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   await page.goto(shh.origin + "/signaler");
   await expect(page.getByRole("heading", { level: 1, name: "Signaler un abus" })).toBeVisible();
   await expect(page.locator("main")).toContainText("Signaler");
-  // Mentions légales : l'identité de l'éditeur et de l'hébergeur reste à compléter par le
-  // propriétaire (jamais inventée), d'où le bandeau ; Conditions : complètes (20 novembre).
+  // Signalement complet par écrit (DSA art. 16) : lien, explication, nom et e-mail, bonne foi.
+  await expect(page.locator("main")).toContainText("de bonne foi");
+  // Mentions légales (22 novembre) : éditeur particulier anonyme (LCEN art. 1-1, II), point de
+  // contact unique du DSA (art. 11 et 12), hébergeur OVH ; bandeau gardé jusqu'à l'avis du juriste.
   await page.goto(shh.origin + "/mentions-legales");
   await expect(page.getByRole("heading", { level: 1, name: "Mentions légales" })).toBeVisible();
   await expect(page.locator("[data-draft]")).toHaveText("En cours de rédaction");
-  await expect(page.locator("main")).toContainText("compléter par le propriétaire");
-  for (const path of ["/conditions", "/mentions-legales"]) {
-    await page.goto(shh.origin + path);
-    expect(await page.locator("main").innerText()).not.toMatch(/@|SAS|SARL|OVH|Hetzner|Scaleway/);
-    expect(await axe(page)).toEqual([]);
-  }
+  await expect(page.locator("main")).not.toContainText("compléter par le propriétaire");
+  await expect(page.locator("main")).toContainText("contact@shhgone.com");
+  await expect(page.locator("main")).toContainText("OVH SAS");
+  await expect(page.locator("main")).toContainText("article 1-1, II");
+  expect(await axe(page)).toEqual([]);
+  // Conditions : modération décrite (DSA art. 14), aucune coordonnée ni hébergeur.
+  await page.goto(shh.origin + "/conditions");
+  await expect(page.locator("main")).toContainText("aucun outil automatique de modération");
+  expect(await page.locator("main").innerText()).not.toMatch(/@|SAS|SARL|OVH|Hetzner|Scaleway/);
+  expect(await axe(page)).toEqual([]);
   await page.goto(shh.origin + "/conditions");
   await expect(page.getByRole("heading", { level: 1, name: "Conditions d'utilisation" })).toBeVisible();
   await expect(page.locator("main")).toContainText("la moitié de ses ouvertures permises");

@@ -212,15 +212,15 @@ func (f *fauxLien) brut(i int) []byte {
 
 const ipTest = "2001:db8::1"
 
-func toujours(netip.Addr) bool { return true }
+func toujours() bool { return true }
 
 func accueilWS(jeton [32]byte, depuis uint64) []byte {
 	b := []byte(base64.RawURLEncoding.EncodeToString(jeton[:]))
 	return binary.BigEndian.AppendUint64(b, depuis)
 }
 
-func (b *banc) servir(l *fauxLien, autoriser func(netip.Addr) bool) {
-	go func() { l.fini <- b.m.Servir(context.Background(), l, netip.MustParseAddr(ipTest), autoriser) }()
+func (b *banc) servir(l *fauxLien, autoriser func() bool) {
+	go func() { l.fini <- b.m.Servir(context.Background(), l, autoriser) }()
 }
 
 // connecter : connexion du jeton avec depuis, accueil envoyé.
@@ -984,7 +984,7 @@ func TestTrameFrequenceIP(t *testing.T) {
 		ea, a := b.entrerMembre(t, c, false)
 		lim := limits.New(b.h.Now)
 		la := nouveauLien()
-		b.servir(la, lim.AllowFrame)
+		b.servir(la, lim.FrameGuard(netip.MustParseAddr(ipTest)))
 		la.envoyer(accueilWS(ea.Jeton, ea.Seq))
 		synctest.Wait()
 		for i := 0; i < 481; i++ {
@@ -1360,7 +1360,7 @@ func TestContexteAnnule(t *testing.T) {
 		ea := b.entrer(t, c, false)
 		ctx, cancel := context.WithCancel(context.Background())
 		la := nouveauLien()
-		go func() { la.fini <- b.m.Servir(ctx, la, netip.MustParseAddr(ipTest), toujours) }()
+		go func() { la.fini <- b.m.Servir(ctx, la, toujours) }()
 		la.envoyer(accueilWS(ea.Jeton, ea.Seq))
 		synctest.Wait()
 		cancel()

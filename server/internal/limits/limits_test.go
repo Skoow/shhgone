@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -983,6 +984,36 @@ func TestAllowFrameMinute(t *testing.T) {
 	if !l.AllowFrame(ip("2001:db8:b:1::1")) {
 		t.Fatal("pas de remise à zéro à la minute")
 	}
+}
+
+// FrameGuard (22 novembre) : une connexion de salon ne garde que des empreintes. Mêmes
+// plafonds qu'AllowFrame et mêmes compteurs (deux connexions du même /64 se partagent la
+// minute) ; remise à zéro à la minute et au jour ; l'empreinte ne contient pas l'adresse.
+func TestFrameGuard(t *testing.T) {
+	now := time.Date(2026, 11, 4, 23, 59, 0, 0, time.UTC)
+	l := newLim(&now)
+	a, b := l.FrameGuard(ip("2001:db8:b:1::1")), l.FrameGuard(ip("2001:db8:b:1::2"))
+	for i := 0; i < 240; i++ {
+		if !a() || !b() {
+			t.Fatalf("trame %d refusée", 2*i+1)
+		}
+	}
+	if a() || b() || l.AllowFrame(ip("2001:db8:b:1::3")) {
+		t.Fatal("481e trame de la minute acceptée")
+	}
+	now = now.Add(time.Minute) // minuit passé : nouvelle minute, nouveau jour
+	if !a() {
+		t.Fatal("pas de remise à zéro après minuit")
+	}
+	// Les clés sont des empreintes (« t » + 64 chiffres hexadécimaux), jamais l'adresse ni son
+	// préfixe en clair.
+	l.mu.Lock()
+	for k := range l.frame64 {
+		if len(k) != 65 || k[0] != 't' || strings.ContainsAny(k[1:], ":.") {
+			t.Fatal("clé qui n'est pas une empreinte", k)
+		}
+	}
+	l.mu.Unlock()
 }
 
 // IPv4 (revue finale C-2, I4) : l'adresse est à la fois la connexion et le bloc ; 480 trames

@@ -786,12 +786,36 @@ func (l *Limiter) MinuteRetry() time.Duration {
 }
 
 // AllowFrame : trame montante du salon, FramesPer64 par minute (fenêtre fixe) par connexion
-// et FramesPer48 par /48 (spec §39.3.6).
+// et FramesPer48 par /48 (spec §39.3.6). Une connexion de salon passe par FrameGuard.
 func (l *Limiter) AllowFrame(ip netip.Addr) bool {
+	return l.FrameGuard(ip)()
+}
+
+// FrameGuard rend l'autorisation des trames d'une connexion de salon (AllowFrame, mêmes
+// plafonds). L'adresse n'est lue qu'ici, à l'ouverture : la connexion ne garde que deux
+// empreintes, HMAC-SHA-256 de sa connexion et de son bloc sous le secret du jour (jamais
+// écrit, remplacé à minuit). Plus aucune adresse ne vit en mémoire pendant les heures d'un
+// WebSocket (22 novembre : l'adresse n'est jamais gardée au-delà du traitement d'une
+// requête), et une fois le secret remplacé, même une lecture de la mémoire ne permet plus de
+// retrouver l'adresse en essayant toutes les adresses IPv4. Une connexion qui passe minuit
+// garde ses empreintes de la veille : ses trames restent comptées à part, sous la même minute.
+func (l *Limiter) FrameGuard(ip netip.Addr) func() bool {
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
-	return l.allowPairLocked(ip, l.frame64, l.frame48, FramesPer64, FramesPer48)
+	k64, k48 := keys(l.secret, ip)
+	l.mu.Unlock()
+	k64, k48 = "t"+k64, "t"+k48 // à part des clés d'AllowFrame (mêmes compteurs, autre espace)
+	return func() bool {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		l.rotateLocked(l.now())
+		if l.frame64[k64] >= FramesPer64 || l.frame48[k48] >= FramesPer48 {
+			return false
+		}
+		l.frame64[k64]++
+		l.frame48[k48]++
+		return true
+	}
 }
 
 // JoinRetry : délai jusqu'à l'heure UTC suivante (refus d'AllowJoin).

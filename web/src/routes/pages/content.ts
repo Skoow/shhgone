@@ -139,7 +139,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Ce que nous ne gardons pas",
         list: [
-          "Votre adresse IP n'est pas enregistrée. Le serveur la voit le temps de la connexion, comme tout site web, mais ne l'écrit nulle part.",
+          "Votre adresse IP n'est pas enregistrée. Le serveur la voit le temps de traiter chaque demande, comme tout site web, mais ne l'écrit nulle part et ne la garde pas : les limites anti-abus n'en gardent qu'une valeur chiffrée, sous une clé tirée au hasard, gardée en mémoire seulement et jamais écrite.",
           "Aucun cookie de notre part, et aucune mesure d'audience.",
           "Aucun journal des partages, aucune mesure d'audience. Le serveur tient seulement, en mémoire, des compteurs globaux pour son exploitation (par exemple le nombre de partages créés depuis son dernier démarrage) : rien par personne, par adresse ni par partage, rien sur disque.",
         ],
@@ -214,6 +214,13 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         ],
       },
       {
+        h: "Modération",
+        p: [
+          "Nous ne lisons pas les partages ni les salons (ils sont chiffrés sur votre appareil) et n'utilisons aucun outil automatique de modération. Les seules mesures possibles sont la suppression d'un partage ou d'un salon : par les signalements des personnes qui l'ont ouvert (règle ci-dessus), ou par l'éditeur, en personne, après un signalement écrit qui joint le lien, ou sur demande d'une autorité.",
+          "Toute décision peut être contestée en écrivant au contact des mentions légales : elle est réexaminée par une personne.",
+        ],
+      },
+      {
         h: "Disponibilité",
         p: [
           "Le service est fourni tel quel, sans garantie de disponibilité. Il peut être interrompu pour maintenance ou après un incident ; un envoi en cours peut alors être perdu et devra être refait.",
@@ -255,27 +262,24 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Éditeur",
         list: [
-          "Nom ou raison sociale : à compléter par le propriétaire.",
-          "Statut et numéro d'immatriculation (si société) : à compléter par le propriétaire.",
-          "Adresse : à compléter par le propriétaire.",
-          "Contact : à compléter par le propriétaire.",
-          "Directeur de la publication : à compléter par le propriétaire.",
+          "Shhgone est édité par une personne physique non professionnelle qui, comme la loi le permet (loi n° 2004-575 du 21 juin 2004, article 1-1, II), ne publie pas son identité : celle-ci est connue de l'hébergeur ci-dessous.",
+          "Contact : contact@shhgone.com (en français ou en anglais).",
         ],
       },
       {
         h: "Hébergeur",
-        list: ["Nom ou raison sociale : à compléter par le propriétaire.", "Adresse : à compléter par le propriétaire.", "Téléphone : à compléter par le propriétaire."],
+        list: ["OVH SAS", "2 rue Kellermann, 59100 Roubaix, France", "Téléphone : +33 9 72 10 10 07"],
       },
       {
         h: "Contact et contenus illicites",
         p: [
-          "Pour signaler un contenu illicite : depuis le partage (« Signaler ce partage »), ou au contact de l'éditeur en joignant le lien ; vous pouvez aussi le signaler aux autorités (en France : PHAROS, internet-signalement.gouv.fr).",
-          "Point de contact unique pour les autorités et les utilisateurs (règlement européen sur les services numériques, articles 11 et 12) : le contact de l'éditeur, en français ou en anglais.",
+          "Point de contact unique pour les autorités et pour les utilisateurs (règlement européen sur les services numériques, articles 11 et 12), y compris pour les demandes de retrait des autorités : contact@shhgone.com, en français ou en anglais. Chaque message est lu par une personne, jamais par un robot seul.",
+          "Pour signaler un contenu illicite : depuis le partage (« Signaler ce partage »), ou par écrit à contact@shhgone.com (voir « Signaler un abus » pour ce qu'il faut joindre) ; vous pouvez aussi le signaler aux autorités (en France : PHAROS, internet-signalement.gouv.fr).",
         ],
       },
       {
         h: "Données personnelles",
-        p: ["Voir la page Confidentialité. Pour exercer vos droits, utilisez le contact de l'éditeur ; vous pouvez aussi saisir la CNIL (cnil.fr)."],
+        p: ["Voir la page Confidentialité. Pour exercer vos droits, écrivez à contact@shhgone.com ; vous pouvez aussi saisir la CNIL (cnil.fr)."],
       },
       {
         h: "Propriété intellectuelle et code source",
@@ -300,6 +304,14 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         p: [
           "Le signalement ne contient que la catégorie choisie (par exemple « Arnaque ») et la preuve que vous avez ouvert le partage : ni le contenu, ni qui vous êtes. Nous ne pouvons pas lire le partage. Nous comptons, en mémoire seulement, les signalements par catégorie depuis le dernier démarrage du serveur et leur nombre dans l'heure, pour repérer un abus massif ; rien n'est écrit sur disque.",
           `Sans le lien et le mot de passe, rien ne peut être fait sur le partage : il s'effacera seul à son échéance (${v.h} h au plus en gratuit). Pour un contenu illégal, vous pouvez aussi écrire au contact des mentions légales en joignant le lien.`,
+        ],
+      },
+      {
+        h: "Par écrit",
+        list: [
+          "Écrivez au contact des mentions légales en joignant : le lien complet du partage (avec ce qui suit le « # ») et son mot de passe si vous l'avez, sans lequel personne ne peut voir le contenu ; ce qui vous paraît illégal, et pourquoi ; votre nom et votre adresse e-mail (facultatifs pour un contenu d'abus sexuel sur mineur) ; une phrase qui confirme que vous signalez de bonne foi et que ces informations sont exactes.",
+          "Nous accusons réception, une personne examine le partage (jamais un robot seul), puis nous vous répondons avec notre décision et les recours possibles.",
+          "Un contenu manifestement illégal est détruit tout de suite : plus aucune ouverture, téléchargements en cours coupés. Si la vie ou la sécurité de quelqu'un est menacée, nous prévenons les autorités.",
         ],
       },
     ],
@@ -405,7 +417,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "What we don't keep",
         list: [
-          "Your IP address is not recorded. The server sees it while you are connected, like any website, but never writes it down.",
+          "Your IP address is not recorded. The server sees it while handling each request, like any website, but never writes it down or keeps it: the anti-abuse limits keep only an encrypted value derived from it, under a random key kept in memory only and never written down.",
           "No cookies of ours, and no analytics.",
           "No log of shares, no audience measurement. The server only keeps, in memory, global counters for its own operation (for example the number of shares created since it last started): nothing per person, per address or per share, nothing on disk.",
         ],
@@ -480,6 +492,13 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         ],
       },
       {
+        h: "Moderation",
+        p: [
+          "We do not read shares or rooms (they are encrypted on your device) and use no automated moderation tool. The only possible measures are deleting a share or a room: through reports from the people who opened it (rule above), or by the publisher, in person, after a written report that includes the link, or at the request of an authority.",
+          "Any decision can be challenged by writing to the contact in the legal notice: a person reviews it again.",
+        ],
+      },
+      {
         h: "Availability",
         p: [
           "The service is provided as is, with no guarantee of availability. It may be interrupted for maintenance or after an incident; an upload in progress may then be lost and will have to be done again.",
@@ -519,24 +538,21 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Publisher",
         list: [
-          "Name or company: to be completed by the owner.",
-          "Status and registration number (if a company): to be completed by the owner.",
-          "Address: to be completed by the owner.",
-          "Contact: to be completed by the owner.",
-          "Publication director: to be completed by the owner.",
+          "Shhgone is published by a private individual acting in a non-professional capacity who, as French law allows (Law no. 2004-575 of 21 June 2004, article 1-1, II), does not publish their identity: it is known to the host below.",
+          "Contact: contact@shhgone.com (in French or English).",
         ],
       },
-      { h: "Host", list: ["Name or company: to be completed by the owner.", "Address: to be completed by the owner.", "Phone: to be completed by the owner."] },
+      { h: "Host", list: ["OVH SAS", "2 rue Kellermann, 59100 Roubaix, France", "Phone: +33 9 72 10 10 07"] },
       {
         h: "Contact and illegal content",
         p: [
-          "To report illegal content: from the share (“Report this share”), or to the publisher's contact with the link; you can also report it to the authorities (in France: PHAROS, internet-signalement.gouv.fr).",
-          "Single point of contact for authorities and users (EU Digital Services Act, articles 11 and 12): the publisher's contact, in French or English.",
+          "Single point of contact for authorities and users (EU Digital Services Act, articles 11 and 12), including removal requests from authorities: contact@shhgone.com, in French or English. Every message is read by a person, never by a bot alone.",
+          "To report illegal content: from the share (“Report this share”), or in writing to contact@shhgone.com (see “Report abuse” for what to include); you can also report it to the authorities (in France: PHAROS, internet-signalement.gouv.fr).",
         ],
       },
       {
         h: "Personal data",
-        p: ["See the Privacy page. To exercise your rights, use the publisher's contact; you can also complain to the CNIL (cnil.fr)."],
+        p: ["See the Privacy page. To exercise your rights, write to contact@shhgone.com; you can also complain to the CNIL (cnil.fr)."],
       },
       { h: "Intellectual property and source code", p: ["The Shhgone name and logo belong to the publisher. Shhgone's code is public, under the AGPL-3.0 license."] },
     ],
@@ -558,6 +574,14 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         p: [
           "A report holds only the category you chose (for example “Scam”) and the proof that you opened the share: neither the content nor who you are. We cannot read the share. We count, in memory only, reports per category since the server last started and their number per hour, to spot mass abuse; nothing is written to disk.",
           `Without the link and the password, nothing can be done to the share: it erases itself when it expires (${v.h} h at most on the free plan). For illegal content, you can also write to the contact in the legal notice with the link.`,
+        ],
+      },
+      {
+        h: "In writing",
+        list: [
+          "Write to the contact in the legal notice with: the full link of the share (including what follows the “#”) and its password if you have it, without which no one can see the content; what seems illegal to you, and why; your name and email address (optional for child sexual abuse material); a sentence confirming that you report in good faith and that this information is accurate.",
+          "We acknowledge receipt, a person reviews the share (never a bot alone), then we reply with our decision and the possible remedies.",
+          "Manifestly illegal content is destroyed at once: no open remains possible, downloads in progress are cut. If someone's life or safety is threatened, we alert the authorities.",
         ],
       },
     ],

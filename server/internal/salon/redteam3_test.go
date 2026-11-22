@@ -2,7 +2,6 @@ package salon
 
 import (
 	"context"
-	"net/netip"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -293,7 +292,7 @@ func TestRT3_D_MemoireDesLotsDeRattrapage(t *testing.T) {
 	for _, x := range tous {
 		l := &lienGele{accueil: accueilWS(x.jeton, x.depuis), ferme: make(chan struct{}), gele: make(chan struct{})}
 		liens = append(liens, l)
-		fini.Go(func() { _ = b.m.Servir(context.Background(), l, netip.MustParseAddr(ipTest), toujours) })
+		fini.Go(func() { _ = b.m.Servir(context.Background(), l, toujours) })
 	}
 	for i, l := range liens {
 		select {

@@ -73,7 +73,7 @@ func (a salonAPI) salonWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.SetReadLimit(salon.LimiteLecture)
-	_ = a.m.Servir(r.Context(), wsLien{c}, ipOf(r), a.lim.AllowFrame)
+	_ = a.m.Servir(r.Context(), wsLien{c}, a.lim.FrameGuard(ipOf(r)))
 }
 
 // poigneeWS : poignée de main WebSocket (RFC 6455 §4.2.1) au moins aussi stricte que celle

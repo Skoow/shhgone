@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
-	"net/netip"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -31,8 +30,8 @@ import (
 // 0x05 raison 6 puis 4006 ; aucun pong ni message depuis silenceMax → 1001 ; panique dans une
 // goroutine de la connexion → 1011 (jamais d'arrêt du processus, aucune sortie).
 //
-// Aucune adresse n'est gardée dans l'état du salon : ip ne vit que dans la goroutine de
-// lecture, pour autoriser (limits.AllowFrame dans le serveur).
+// Aucune adresse n'est gardée, ni dans l'état du salon ni dans la connexion : autoriser
+// (limits.FrameGuard dans le serveur) ne garde que des empreintes calculées à l'ouverture.
 
 const (
 	delaiAccueil = 5 * time.Second
@@ -156,11 +155,11 @@ func (f *fermeur) fermer(code int) {
 // Servir sert le WebSocket l d'un membre jusqu'à sa fermeture : accueil dans les 5 s (sinon
 // 4001), jeton révoqué 4002, inconnu 4004 ; une seule connexion par siège (l'ancienne reçoit
 // 0x05 raison 4 et 4005) ; séquence d'accueil du « Protocole » ; reprise (DepuisReprise) :
-// nouveau nonce_arrivée annoncé par 0x0A, 20 par heure et par siège. autoriser(ip) est
-// consultée avant chaque trame (limits.AllowFrame dans le serveur) : refus → 0x0B jusqu'à la
+// nouveau nonce_arrivée annoncé par 0x0A, 20 par heure et par siège. autoriser() est
+// consultée avant chaque trame (limits.FrameGuard dans le serveur) : refus → 0x0B jusqu'à la
 // minute suivante, trame non rangée. ctx annulé : 1001. Rend nil, ou une erreur fixe si une
 // panique a été récupérée (rien n'est écrit dans un journal).
-func (m *Manager) Servir(ctx context.Context, l Lien, ip netip.Addr, autoriser func(netip.Addr) bool) (err error) {
+func (m *Manager) Servir(ctx context.Context, l Lien, autoriser func() bool) (err error) {
 	m.servis.Add(1)
 	defer m.servis.Add(-1) // en dernier : après desinscrire (AttendreConnexions)
 	f := &fermeur{l: l}
@@ -217,7 +216,7 @@ func (m *Manager) Servir(ctx context.Context, l Lien, ip netip.Addr, autoriser f
 	}()
 	wg.Add(3)
 	go func() { defer wg.Done(); c.ecrivain() }()
-	go func() { defer wg.Done(); c.lecteur(ip, autoriser) }()
+	go func() { defer wg.Done(); c.lecteur(autoriser) }()
 	go func() { defer wg.Done(); c.pingeur() }()
 	c.veiller(ctx)
 	return nil
@@ -556,7 +555,7 @@ func (c *connexion) pingeur() {
 }
 
 // lecteur : demandes du client jusqu'à la fermeture.
-func (c *connexion) lecteur(ip netip.Addr, autoriser func(netip.Addr) bool) {
+func (c *connexion) lecteur(autoriser func() bool) {
 	defer c.recuperer()
 	var fenetre time.Time
 	controles := 0
@@ -585,20 +584,20 @@ func (c *connexion) lecteur(ip netip.Addr, autoriser func(netip.Addr) bool) {
 				return
 			}
 		}
-		if !c.traiter(d, ip, autoriser) {
+		if !c.traiter(d, autoriser) {
 			return
 		}
 	}
 }
 
 // traiter : une demande ; false si la connexion doit se fermer (code déjà décidé).
-func (c *connexion) traiter(d Demande, ip netip.Addr, autoriser func(netip.Addr) bool) bool {
+func (c *connexion) traiter(d Demande, autoriser func() bool) bool {
 	switch d.Type {
 	case DemTrame:
-		// autoriser (limits.AllowFrame) compte toute trame reçue, même refusée ensuite par le
+		// autoriser (limits.FrameGuard) compte toute trame reçue, même refusée ensuite par le
 		// salon (seaux du siège, disque plein) : voulu, anti-abus (un client qui insiste
 		// malgré 0x0B ou 0x0C épuise aussi le compte de sa connexion et de son /48).
-		if !autoriser(ip) {
+		if !autoriser() {
 			// Fenêtre fixe d'une minute (limits.AllowFrame), même horloge que le limiteur.
 			t := c.m.cfg.Now().Unix()
 			attente := uint32(60 - (t%60+60)%60)

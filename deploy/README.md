@@ -112,6 +112,18 @@ deploy/deploy.sh admin wipe --yes    # urgence : gèle, puis efface tous les par
 
 Le lien signalé ne se donne **jamais** en argument (il irait dans l'historique du shell) : toujours sur l'entrée standard.
 
+### Détruire un lien depuis un téléphone (signalement, demande d'une autorité)
+
+La destruction est **immédiate** : plus aucune ouverture, téléchargements en cours coupés, aucun délai de grâce (partage ou salon `#c…`). Délais légaux à tenir : **24 h** pour une demande de retrait de la police (LCEN art. 6-1 : contenus pédocriminels ou terroristes), **1 h** pour une injonction de retrait de contenu terroriste (règlement (UE) 2021/784, art. 3, si le service y est soumis). Les demandes arrivent à `contact@shhgone.com` : notification activée sur le téléphone.
+
+1. Une application SSH sur le téléphone (par exemple Termius ou Blink), avec **la même clé SSH** que le poste (jamais de mot de passe, §1).
+2. Se connecter à la machine, puis :
+   ```sh
+   cd /chemin/vers/shhgone && deploy/deploy.sh admin destroy -
+   ```
+3. Coller le lien entier (avec ce qui suit le `#`), Entrée, puis Ctrl-D. Réponse attendue : `partage` ou `salon` ; « introuvable » si le lien est déjà effacé.
+4. Répondre à l'expéditeur du signalement (accusé de réception, décision, recours ; DSA art. 16) ; pour une injonction, prévenir l'autorité de l'heure du retrait (règlement 2021/784, art. 3.6, modèle de son annexe II).
+
 ### Tableau de bord d'administration (désactivé par défaut)
 
 Une page qui réunit l'état du serveur (santé, stockage, mémoire, places, partages et salons vivants : des nombres seulement, jamais un identifiant, une adresse ni un contenu) et trois commandes : geler, dégeler, détruire un lien signalé. `wipe` n'y est pas, volontairement : il reste en ligne de commande. Conception : `docs/superpowers/specs/2026-11-13-tableau-de-bord-admin-design.md`.
