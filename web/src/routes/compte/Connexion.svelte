@@ -9,7 +9,7 @@
   // Compte banni : la connexion reste permise (exporter, supprimer), avec la date, le motif et
   // l'identifiant B-… à donner pour un recours (§7.4).
   import { tick, untrack } from "svelte";
-  import { account, annulerCle, etatCompte, ouvrirAvecCle, passkeysDisponibles, preparerConnexion, seConnecter, seDeconnecter } from "../../account/session.svelte";
+  import { account, annulerCle, cleRequise, etatCompte, ouvrirAvecCle, passkeysDisponibles, preparerConnexion, seConnecter, seDeconnecter } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
   import { t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
@@ -42,7 +42,12 @@
     untrack(() => {
       preparer();
       const m = setInterval(preparer, 240_000);
-      return () => clearInterval(m);
+      return () => {
+        clearInterval(m);
+        // Page quittée pendant que la clé de récupération est demandée : la session ouverte par la
+        // passkey (qui n'ouvre pas les données ici) est fermée au serveur.
+        if (cleRequise()) void annulerCle();
+      };
     }),
   );
 

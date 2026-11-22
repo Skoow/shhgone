@@ -38,6 +38,9 @@
         (n) => (partages = n),
         () => (partages = 0),
       );
+      // Cérémonie rechargée avant son échéance (5 min au serveur) : le geste n'attend jamais de requête.
+      const m = setInterval(() => preparerReauth().catch(() => undefined), 240_000);
+      return () => clearInterval(m);
     }),
   );
 

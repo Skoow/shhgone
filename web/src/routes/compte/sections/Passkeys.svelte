@@ -40,6 +40,9 @@
     untrack(() => {
       void charger();
       preparerReauth().catch(() => undefined);
+      // Cérémonie rechargée avant son échéance (5 min au serveur) : le geste n'attend jamais de requête.
+      const m = setInterval(() => preparerReauth().catch(() => undefined), 240_000);
+      return () => clearInterval(m);
     }),
   );
 

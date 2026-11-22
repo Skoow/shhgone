@@ -164,6 +164,12 @@ test("nouvel appareil par la clé de récupération : passkey créée ici, ancie
   await authentificateur(page, true);
   const pseudo = `Leo${randomBytes(3).toString("hex")}`;
   const cle = await inscrire(page, shh.origin, pseudo);
+  // Passkey de ce premier appareil renommée (libellé chiffré sur l'appareil) : on la retrouve ensuite.
+  await parametres(page, shh.origin);
+  await page.getByRole("button", { name: /^Renommer / }).click();
+  await champ(page, "Nom de la passkey").fill("Premier appareil");
+  await page.getByRole("region", { name: "Passkeys" }).getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Passkeys" }).getByText("Premier appareil")).toBeVisible();
 
   // Autre appareil (autre navigateur, autre authentificateur, sans la passkey).
   const ctx = await browser.newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
@@ -186,8 +192,9 @@ test("nouvel appareil par la clé de récupération : passkey créée ici, ancie
     await parametres(p2, shh.origin);
     const pks = p2.getByRole("region", { name: "Passkeys" }).locator("li");
     await expect(pks).toHaveCount(2);
-    // Retrait de la première passkey (celle de l'autre appareil) ; session récente (clé de récupération).
-    await p2.getByRole("button", { name: /^Retirer / }).first().click();
+    // Retrait de la passkey du premier appareil ; session récente (clé de récupération).
+    await expect(p2.getByRole("region", { name: "Passkeys" }).getByText("Premier appareil")).toBeVisible();
+    await bouton(p2, "Retirer Premier appareil").click();
     await expect(p2.getByText("Retirer cette passkey ? Elle ne pourra plus ouvrir ce compte.")).toBeVisible();
     await p2.getByRole("region", { name: "Passkeys" }).getByRole("button", { name: "Retirer", exact: true }).last().click();
     await expect(p2.getByRole("region", { name: "Passkeys" }).locator("p.ok")).toContainText("Passkey retirée", { timeout: 30_000 });

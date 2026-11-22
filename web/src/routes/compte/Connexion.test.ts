@@ -13,6 +13,7 @@ const C = vi.hoisted(() => ({
   seConnecter: vi.fn(),
   ouvrirAvecCle: vi.fn(),
   annulerCle: vi.fn(),
+  cleRequise: vi.fn(),
   etatCompte: vi.fn(),
   seDeconnecter: vi.fn(),
   passkeysDisponibles: vi.fn(),
@@ -90,6 +91,19 @@ describe("connexion par passkey", () => {
     await presser("Ouvrir");
     expect(C.ouvrirAvecCle).toHaveBeenLastCalledWith("abcd");
     expect(texte()).toContain("Vous êtes connecté sur cet appareil.");
+  });
+
+  it("page quittée pendant que la clé est demandée : la session de la passkey est fermée ; sinon rien", async () => {
+    await monter(Connexion);
+    C.cleRequise.mockReturnValue(false);
+    demonter();
+    expect(C.annulerCle).not.toHaveBeenCalled();
+    C.seConnecter.mockResolvedValue("cle_requise");
+    await monter(Connexion);
+    await presser("Se connecter avec une passkey");
+    C.cleRequise.mockReturnValue(true);
+    demonter();
+    expect(C.annulerCle).toHaveBeenCalledTimes(1);
   });
 
   it("annuler la clé : la session de la passkey est fermée, retour au bouton", async () => {
