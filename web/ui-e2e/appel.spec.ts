@@ -14,12 +14,9 @@ import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
-import { codeDuCourriel, demarrerSMTP, type FauxSMTP } from "../e2e/smtp";
 import { siteComptes } from "./comptes-site";
 import { axe, capture, expect, test as base } from "./fixtures";
 
-const FROM = "Shhgone <ne-pas-repondre@shhgone.test>";
-const SMTP_MDP = "SmtpUiSecretVq4nRw";
 const SHHCHECK = fileURLToPath(new URL("../../deploy/shhcheck", import.meta.url));
 
 /** Adresse IPv4 de la machine hors boucle locale : Chromium ne propose pas de candidat sur 127.0.0.1. */
@@ -40,7 +37,7 @@ function portLibre(): Promise<number> {
 
 type Relais = { url: string; secretFile: string };
 
-const test = base.extend<{ smtp: FauxSMTP; relais: Relais }, { site: string; shhcheck: string }>({
+const test = base.extend<{ relais: Relais }, { site: string; shhcheck: string }>({
   site: [async ({}, use) => use(await siteComptes()), { scope: "worker", timeout: 360_000 }],
   // Binaire du relais, construit une fois par processus de test depuis deploy/shhcheck.
   shhcheck: [
@@ -56,14 +53,6 @@ const test = base.extend<{ smtp: FauxSMTP; relais: Relais }, { site: string; shh
     },
     { scope: "worker", timeout: 300_000 },
   ],
-  smtp: async ({}, use) => {
-    const smtp = await demarrerSMTP();
-    try {
-      await use(smtp);
-    } finally {
-      await smtp.fermer();
-    }
-  },
   relais: async ({ shhcheck }, use) => {
     const ip = adresse()!;
     const port = await portLibre();
@@ -92,9 +81,9 @@ const test = base.extend<{ smtp: FauxSMTP; relais: Relais }, { site: string; shh
       rmSync(dir, { recursive: true, force: true });
     }
   },
-  shhServer: async ({ smtp, site, relais }, use) =>
+  shhServer: async ({ site, relais }, use) =>
     use({
-      comptes: { cle: new Uint8Array(randomBytes(32)), smtpPort: smtp.port, smtpMdp: SMTP_MDP, from: FROM },
+      comptes: { cle: new Uint8Array(randomBytes(32)) },
       env: { SHH_STATIC_DIR: site, SHH_TURN_URLS: relais.url, SHH_TURN_SECRET_FILE: relais.secretFile },
     }),
 });
@@ -157,15 +146,23 @@ async function etatDesConnexions(page: Page) {
   });
 }
 
-async function inscrire(page: Page, origin: string, smtp: FauxSMTP, email: string, mdp: string): Promise<void> {
+/** Compte par passkey (authentificateur virtuel de Chromium) : pseudo, passkey, clé notée, un groupe retapé. */
+async function inscrire(page: Page, origin: string, pseudo: string): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable", { enableUI: false });
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true },
+  });
   await page.goto(origin + "/compte/inscription?suite=salon");
-  await champ(page, "Adresse e-mail").fill(email);
-  await champ(page, "Mot de passe").fill(mdp);
-  await champ(page, "Confirmer le mot de passe").fill(mdp);
-  await bouton(page, "Créer").click();
-  const code = codeDuCourriel(await smtp.attendre(1)).code;
-  await champ(page, "Code reçu par e-mail").fill(code);
-  await bouton(page, "Valider").click();
+  await champ(page, "Pseudo").fill(pseudo);
+  await expect(page.locator("[data-dispo]")).toHaveText("Disponible", { timeout: 30_000 });
+  await bouton(page, "Créer avec une passkey").click();
+  await expect(titre(page, "Votre clé de récupération")).toBeVisible({ timeout: 30_000 });
+  const cle = (await page.locator("[data-cle] .g").allTextContents()).join("-");
+  await bouton(page, "Je l'ai notée").click();
+  const label = (await page.locator("label").filter({ hasText: "Tapez le groupe" }).textContent())!;
+  await page.getByLabel(label.trim(), { exact: true }).fill(cle.split("-")[Number(/n°\s*(\d)/u.exec(label)![1]) - 1]!);
+  await bouton(page, "Terminer").click();
   await expect(titre(page, "Compte créé.")).toBeVisible({ timeout: 30_000 });
 }
 
@@ -186,19 +183,19 @@ async function inviter(browser: Browser, use: object, lien: string, mdp: string,
   return { ctx, page, erreurs };
 }
 
-test("appel vidéo à trois : tout passe par le relais, qui parle, micro, caméra, raccrocher, onglet fermé", async ({ page, context, shh, smtp, browser }, info) => {
+test("appel vidéo à trois : tout passe par le relais, qui parle, micro, caméra, raccrocher, onglet fermé", async ({ page, context, shh, browser }, info) => {
   const r = randomBytes(4).toString("hex");
   await espionner(context);
 
   // --- A crée le salon et y entre ----------------------------------------------------------------------
-  await inscrire(page, shh.origin, smtp, `Appel.${r}@exemple.org`, `MdpCompteAppel-${r}-9`);
+  await inscrire(page, shh.origin, `Lea${r.slice(0, 4)}`);
   await bouton(page, "Continuer").click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
   const lien = (await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
   const mdp = (await page.locator(".cf").filter({ hasText: "Mot de passe" }).locator(".val").textContent())!.trim();
   await bouton(page, "Entrer dans le salon").click();
-  await champ(page, "Pseudonyme pour ce salon").fill(`Lea${r.slice(0, 4)}`);
+  await expect(champ(page, "Pseudonyme pour ce salon")).toHaveValue(`Lea${r.slice(0, 4)}`); // pseudo du compte
   await bouton(page, "Entrer dans le salon").click();
   await expect(fil(page)).toBeVisible();
 

@@ -59,14 +59,7 @@ export type StartOpts = {
    * `admin` : jeton du tableau de bord (SHH_ADMIN_TOKEN, développement local), écouteur sur un
    * second port libre.
    */
-  comptes?: {
-    cle: Uint8Array;
-    admin?: string;
-    /** Compte par e-mail, retiré le 22 novembre : refusé au lancement (ui-e2e du compte à refaire, lot T1). */
-    smtpPort?: number;
-    smtpMdp?: string;
-    from?: string;
-  };
+  comptes?: { cle: Uint8Array; admin?: string };
   /**
    * Paiement activé (SHH_PAIEMENT=1, bacs à sable, conception du paiement §10) avec Stripe et
    * NOWPayments : clés d'essai et secrets de webhook écrits dans un dossier à part (0400),
@@ -100,9 +93,6 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
   }
   if (opts.comptes) {
     const c = opts.comptes;
-    if (c.smtpPort !== undefined || c.smtpMdp !== undefined || c.from !== undefined) {
-      throw new Error("compte par e-mail retiré le 22 novembre : parcours à refaire avec une passkey (lot T1)");
-    }
     secrets = mkdtempSync(join(tmpdir(), "shh-e2e-secrets-"));
     const cle = join(secrets, "cle");
     writeFileSync(cle, c.cle);

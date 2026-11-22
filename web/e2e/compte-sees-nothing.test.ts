@@ -21,6 +21,7 @@ import { b64u, unb64u, utf8 } from "../src/engine/pure";
 import { loadEngine, type Wasm } from "../src/engine/load";
 import { loadSalonEngine } from "../src/salon/engine";
 import { scellerEtiquette } from "../src/account/device";
+import { sansSortiePrf } from "../src/account/webauthn";
 import { priveEnJson, priveVide, profilEnJson, REGLAGES_DEFAUT, sceller } from "../src/account/vaults";
 import { solveAltcha } from "./altcha";
 import { ClientSalon } from "./salon-client";
@@ -124,8 +125,11 @@ describe("le serveur ne voit rien : compte par passkey", () => {
     expect((await json("POST", "/api/compte/pseudo/verifier", { etape, p_canon: pCanon })).corps).toEqual({ libre: true });
     const auth = new Authentificateur(-7, true);
     options.user.name = pseudo; // le site met le pseudo dans la feuille du système (Q6) ; jamais envoyé
-    const { credential, passkey, sortie } = auth.creer(options, web);
+    const { credential: brut, passkey, sortie } = auth.creer(options, web);
     expect(sortie).not.toBeNull();
+    // Comme un navigateur, l'authentificateur rend la sortie PRF au script ; le site la retire.
+    expect(JSON.stringify(brut)).toContain(`"results"`);
+    const credential = sansSortiePrf(brut);
     const h = unb64u(options.user.id) as Bytes;
     const kCompte = alea(32);
     const r = alea(16);
@@ -172,7 +176,7 @@ describe("le serveur ne voit rien : compte par passkey", () => {
     const g = A.auth.obtenir(cd.corps.options, web, A.pk);
     A.sorties.push(g.sortie!);
     const kekEtiq = await cleAes(W.cleAppareil(A.kCompte));
-    const cf = await json("POST", "/api/compte/connexion/fin", { etape: cd.corps.etape, credential: g.credential, persistante: true, etiquette: b64u(await scellerEtiquette(kekEtiq, A.h, ETIQ_APPAREIL)) });
+    const cf = await json("POST", "/api/compte/connexion/fin", { etape: cd.corps.etape, credential: sansSortiePrf(g.credential), persistante: true, etiquette: b64u(await scellerEtiquette(kekEtiq, A.h, ETIQ_APPAREIL)) });
     expect(cf.status).toBe(200);
     jetons.push(cf.corps.session);
     const kekC = W.kekPrf(g.sortie!) as Bytes;
@@ -202,7 +206,7 @@ describe("le serveur ne voit rien : compte par passkey", () => {
     const c2 = authA2.creer(pd.corps.options, web);
     pkA2 = c2.passkey;
     expect(c2.sortie).toBeNull();
-    expect((await json("POST", "/api/compte/passkeys/fin", { etape: pd.corps.etape, credential: c2.credential, env: "", etiquette: b64u(await scellerEtiquette(kekEtiq, A.h, ETIQ_PK_A2)) }, S)).corps).toEqual({});
+    expect((await json("POST", "/api/compte/passkeys/fin", { etape: pd.corps.etape, credential: sansSortiePrf(c2.credential), env: "", etiquette: b64u(await scellerEtiquette(kekEtiq, A.h, ETIQ_PK_A2)) }, S)).corps).toEqual({});
     etat.passkeys = (await json("GET", "/api/compte/passkeys", undefined, S)).corps;
 
     // ---- Nouvel appareil : la clé de récupération, tapée en minuscules -------------------------

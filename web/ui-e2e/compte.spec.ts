@@ -1,411 +1,285 @@
-// Compte par e-mail de bout en bout, PAR L'INTERFACE (conception du compte §10, §12, §21.15 ;
-// avant l'ouverture publique, décision D8). Vrai binaire Go avec SHH_COMPTES=1 (et SHH_SALONS=1),
-// clé K_serveur tirée au hasard dans un fichier 0400 hors du dossier de données, faux SMTP en
-// mémoire sur la boucle locale (e2e/smtp.ts : aucune adresse réelle ne reçoit rien) ; site
-// construit avec SHH_SITE_COMPTES=1 (web/dist-comptes, comptes-site.ts, vérifié par
-// check-dist.mjs --comptes). Chaque test a son serveur et sa boîte neufs.
-// Couvert : inscription complète (adresse, code reçu par e-mail, mot de passe, pseudo),
-// déconnexion, connexion, mauvais mot de passe, session gardée au rechargement (« Rester
-// connecté ») ou non, deux onglets, mot de passe oublié, changement de mot de passe, double
-// authentification (codes calculés ici, RFC 6238, e2e/totp.ts), suppression du compte, et « le
-// serveur ne voit rien » du compte vu du navigateur (dossier de données, -wal et -shm compris).
-// Navigateurs : Chromium (ordinateur et téléphone). WebKit écarté pour l'instant : voir la fin du fichier.
+// Compte par passkey de bout en bout, PAR L'INTERFACE (conception 2026-11-22-compte-passkey-design.md
+// §3, §5, §14 ; plan, lot T1). Vrai binaire Go avec SHH_COMPTES=1 (et SHH_SALONS=1), origine
+// http://localhost:<port> (rp.id des passkeys), clé K_serveur tirée au hasard ; site construit avec
+// SHH_SITE_COMPTES=1 (web/dist-comptes, comptes-site.ts). Passkeys : authentificateur virtuel de
+// Chromium (CDP WebAuthn.addVirtualAuthenticator, avec ou sans PRF). Chaque test a son serveur neuf.
+// Couvert : inscription (pseudo, passkey, clé de récupération notée, un groupe retapé), connexion en
+// un clic, rechargement sans « Rester connecté », nouvel appareil par la clé de récupération (puis
+// passkey créée sur cet appareil, retrait de l'ancienne, nouvelle clé), passkey sans PRF (clé locale
+// effacée par « Se déconnecter »), réparation des enveloppes (même passkey, autre sortie PRF : clé
+// demandée une fois, enveloppe ajoutée, connexion suivante sans la clé), suppression du compte par
+// un geste, et « le serveur ne voit rien » vu du navigateur : sorties PRF (lues dans la page par un
+// crochet de test), clé de récupération sous toutes ses formes, pseudo affiché, ni dans le dossier de
+// données (-wal et -shm compris), ni dans les sorties du serveur, ni dans une requête.
+// WebKit : aucun authentificateur virtuel (CDP) ; ces tests y sont écartés (R14 : passage manuel sur
+// iPhone et Mac avant l'ouverture).
 import { randomBytes } from "node:crypto";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import type { Page } from "@playwright/test";
-import { findIn, listFiles, needle, scanDir, type Needle } from "../e2e/scan";
-import { codeDuCourriel, demarrerSMTP, type FauxSMTP } from "../e2e/smtp";
-import { codeTotp, horlogeTotp } from "../e2e/totp";
+import type { BrowserContext, CDPSession, Page, Request } from "@playwright/test";
+import { findIn, needle, scanDir, type Needle } from "../e2e/scan";
 import { siteComptes } from "./comptes-site";
 import { expect, test as base } from "./fixtures";
 
-const FROM = "Shhgone <ne-pas-repondre@shhgone.test>";
-const SMTP_MDP = "SmtpUiSecretVq4nRw";
-const INCORRECT = "Adresse ou mot de passe incorrect.";
-
-type Compte = { email: string; mdp: string; pseudo: string };
-/** Un compte repère par test : adresse, mot de passe et pseudo distincts (rien de réel). */
-function compte(tag: string): Compte {
-  const r = randomBytes(4).toString("hex");
-  return { email: `Ui.${tag}${r}@exemple.org`, mdp: `MdpRepereUi-${tag}-${r}-9`, pseudo: `Zoe${tag}${r.slice(0, 4)}` };
-}
-
-/** Boîte de réception du faux SMTP : chaque code attendu est le message suivant, pour la bonne adresse. */
-type Boite = { code(a: string): Promise<string>; smtp: FauxSMTP };
-
-const test = base.extend<{ boite: Boite }, { site: string }>({
+const test = base.extend<{ requetes: { url: string; body: string }[] }, { site: string }>({
   site: [async ({}, use) => use(await siteComptes()), { scope: "worker", timeout: 360_000 }],
-  boite: async ({}, use) => {
-    const smtp = await demarrerSMTP();
-    let n = 0;
-    try {
-      await use({
-        smtp,
-        async code(a) {
-          const m = codeDuCourriel(await smtp.attendre(++n));
-          // Adresse « exacte » du serveur : celle tapée, en minuscules (conception du compte §5.1).
-          expect(m.a, "destinataire du code").toEqual([a.toLowerCase()]);
-          return m.code;
-        },
-      });
-    } finally {
-      await smtp.fermer();
-    }
+  shhServer: async ({ site }, use) => use({ comptes: { cle: new Uint8Array(randomBytes(32)) }, env: { SHH_STATIC_DIR: site } }),
+  // Corps de toutes les requêtes /api/compte du contexte (fouillés par « le serveur ne voit rien »).
+  requetes: async ({ context }, use) => {
+    const l: { url: string; body: string }[] = [];
+    const f = (r: Request) => {
+      if (new URL(r.url()).pathname.startsWith("/api/")) l.push({ url: r.url(), body: r.postData() ?? "" });
+    };
+    context.on("request", f);
+    await use(l);
   },
-  shhServer: async ({ boite, site }, use) =>
-    use({ comptes: { cle: new Uint8Array(randomBytes(32)), smtpPort: boite.smtp.port, smtpMdp: SMTP_MDP, from: FROM }, env: { SHH_STATIC_DIR: site } }),
 });
 
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
-// WebKit : voir la fin du fichier.
-test.skip(({ browserName }) => browserName !== "chromium", "compte.spec.ts : Chromium seulement (voir la fin du fichier)");
+test.skip(({ browserName }) => browserName !== "chromium", "compte.spec.ts : Chromium seulement — WebKit n'a pas d'authentificateur virtuel WebAuthn (CDP) ; passage manuel sur iPhone et Mac avant l'ouverture (conception du compte par passkey, R14)");
+test.setTimeout(180_000);
 
-// --- Parcours de l'interface -------------------------------------------------------------------
-
-/** Champ de saisie par son étiquette (une section des paramètres porte parfois le même nom). */
 const champ = (page: Page, label: string) => page.getByLabel(label, { exact: true }).and(page.locator("input"));
 const bouton = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 const titre = (page: Page, name: string) => page.getByRole("heading", { level: 1, name, exact: true });
-/** Message d'état d'une section des paramètres (et non sa copie dans la région annoncée du site). */
-const statut = (page: Page, section: string) => page.getByRole("region", { name: section, exact: true }).getByRole("status");
-
-/**
- * Inscription complète par la page : adresse, mot de passe et confirmation, code reçu ; le pseudo
- * provisoire attribué (20 novembre) est lu et gardé dans c.pseudo.
- */
-async function inscrire(page: Page, origin: string, boite: Boite, c: Compte): Promise<void> {
-  await page.goto(origin + "/compte/inscription");
-  await expect(titre(page, "Créer un compte")).toBeVisible();
-  await champ(page, "Adresse e-mail").fill(c.email);
-  await champ(page, "Mot de passe").fill(c.mdp);
-  await champ(page, "Confirmer le mot de passe").fill(c.mdp);
-  await bouton(page, "Créer").click(); // preuve anti-robot calculée dans la page
-  const code = await boite.code(c.email);
-  await champ(page, "Code reçu par e-mail").fill(code);
-  await bouton(page, "Valider").click(); // Argon2id et coffres sur l'appareil
-  await expect(titre(page, "Compte créé.")).toBeVisible({ timeout: 30_000 });
-  c.pseudo = /«\s*(\S+)\s*»/u.exec((await page.locator("[data-pseudo-temp]").textContent()) ?? "")![1]!;
-}
-
-/** Connexion depuis la page de connexion ouverte ; rend la vue atteinte. */
-async function remplirConnexion(page: Page, email: string, mdp: string, rester = false): Promise<void> {
-  await expect(titre(page, "Se connecter")).toBeVisible();
-  await champ(page, "Adresse e-mail").fill(email);
-  await champ(page, "Mot de passe").fill(mdp);
-  if (rester) await page.getByLabel("Rester connecté sur cet appareil").check();
-  await bouton(page, "Se connecter").click();
-}
 const connecte = (page: Page) => page.locator("[data-connecte]");
 
-async function connecter(page: Page, email: string, mdp: string, rester = false): Promise<void> {
-  await remplirConnexion(page, email, mdp, rester);
-  await expect(connecte(page)).toHaveText("Vous êtes connecté sur cet appareil.", { timeout: 30_000 });
+/**
+ * Crochet de test (avant le site) : relève les sorties PRF rendues à la page ; `masque` : la même
+ * passkey rend une AUTRE sortie PRF (XOR), comme le trousseau iCloud en QR ou sous une autre
+ * version d'iOS (conception §4, R6). Rien n'est changé d'autre.
+ */
+async function crochetPrf(ctx: BrowserContext): Promise<void> {
+  await ctx.addInitScript(() => {
+    const w = window as unknown as { __prf: string[]; __masque: boolean };
+    // Gardées pour l'onglet (sessionStorage) : chaque page rechargée repart de là.
+    w.__prf = JSON.parse(sessionStorage.getItem("test-prf") ?? "[]") as string[];
+    w.__masque = sessionStorage.getItem("test-masque") === "1";
+    const c = navigator.credentials;
+    if (!c) return;
+    const enrober = (f: typeof c.get) =>
+      async function (this: CredentialsContainer, o?: CredentialRequestOptions) {
+        const cred = (await f.call(c, o)) as PublicKeyCredential | null;
+        if (!cred) return cred;
+        const g = cred.getClientExtensionResults.bind(cred);
+        const r = g() as { prf?: { results?: { first?: ArrayBuffer } } };
+        const first = r.prf?.results?.first;
+        if (first) {
+          const b = new Uint8Array(first.slice(0));
+          if (w.__masque) for (let i = 0; i < b.length; i++) b[i] = b[i]! ^ 0x5a;
+          w.__prf.push(btoa(String.fromCharCode(...b)));
+          sessionStorage.setItem("test-prf", JSON.stringify(w.__prf));
+          r.prf!.results!.first = b.buffer;
+        }
+        cred.getClientExtensionResults = () => r as AuthenticationExtensionsClientOutputs;
+        return cred;
+      };
+    c.get = enrober(c.get) as typeof c.get;
+    c.create = enrober(c.create as unknown as typeof c.get) as unknown as typeof c.create;
+  });
 }
 
-/** Paramètres par la navigation du site (menu du téléphone, ou « Mon compte » puis « Paramètres »). */
-async function parametres(page: Page): Promise<void> {
-  const menu = page.getByRole("button", { name: "Ouvrir le menu" });
-  if (await menu.isVisible()) {
-    await menu.click();
-    await page.locator("[data-menu]").getByRole("link", { name: "Paramètres", exact: true }).click();
-  } else {
-    await page.getByRole("link", { name: "Mon compte", exact: true }).filter({ visible: true }).first().click();
-    await bouton(page, "Paramètres").click();
-  }
+/** Authentificateur virtuel de cet onglet (plateforme, vérification de l'utilisateur, PRF ou non). */
+async function authentificateur(page: Page, prf: boolean): Promise<{ cdp: CDPSession; id: string }> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable", { enableUI: false });
+  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: prf },
+  });
+  return { cdp, id: authenticatorId };
+}
+
+/** Inscription par la page ; rend la clé de récupération affichée (« XXXX-…-XXX »). */
+async function inscrire(page: Page, origin: string, pseudo: string, rester = false): Promise<string> {
+  await page.goto(origin + "/compte/inscription");
+  await expect(titre(page, "Créer un compte")).toBeVisible();
+  await champ(page, "Pseudo").fill(pseudo);
+  await expect(page.locator("[data-dispo]")).toHaveText("Disponible", { timeout: 30_000 }); // preuve anti-robot et cérémonie chargées
+  await bouton(page, "Créer avec une passkey").click();
+  await expect(titre(page, "Votre clé de récupération")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("[data-pas-encore]")).toHaveText("Le compte n'existe qu'après « Terminer ».");
+  const cle = (await page.locator("[data-cle] .g").allTextContents()).join("-");
+  expect(cle).toMatch(/^([0-9A-Z*~$=]{4}-){6}[0-9A-Z*~$=U]{3}$/);
+  await bouton(page, "Je l'ai notée").click();
+  const label = (await page.locator("label").filter({ hasText: "Tapez le groupe" }).textContent())!;
+  const k = Number(/n°\s*(\d)/u.exec(label)![1]);
+  await page.getByLabel(label.trim(), { exact: true }).fill(cle.split("-")[k - 1]!.toLowerCase());
+  if (rester) await page.getByLabel("Rester connecté sur cet appareil").check();
+  await bouton(page, "Terminer").click();
+  await expect(titre(page, "Compte créé.")).toBeVisible({ timeout: 30_000 });
+  return cle;
+}
+
+/** Connexion par la passkey depuis la page de connexion ; rend la vue atteinte. */
+async function connecter(page: Page, origin: string): Promise<"ouvert" | "cle"> {
+  await page.goto(origin + "/compte/connexion");
+  await expect(titre(page, "Se connecter")).toBeVisible();
+  await bouton(page, "Se connecter avec une passkey").click();
+  const cle = page.locator("[data-repli]");
+  await expect(connecte(page).or(cle)).toBeVisible({ timeout: 30_000 });
+  return (await cle.isVisible()) ? "cle" : "ouvert";
+}
+
+async function parametres(page: Page, origin: string): Promise<void> {
+  await page.evaluate(() => {
+    history.pushState(null, "", "/compte");
+    dispatchEvent(new PopStateEvent("popstate"));
+  });
   await expect(titre(page, "Paramètres")).toBeVisible();
+  void origin;
 }
 
-/** « Se déconnecter » des paramètres : retour à la connexion. */
-async function deconnecterDepuisParametres(page: Page): Promise<void> {
+async function deconnecter(page: Page, origin: string): Promise<void> {
+  await parametres(page, origin);
   await bouton(page, "Se déconnecter").click();
   await expect(titre(page, "Se connecter")).toBeVisible();
-  await expect(champ(page, "Adresse e-mail")).toBeVisible();
 }
 
-/** Après « Compte créé. » ou une connexion : « Continuer » mène à l'accueil connecté. */
-async function continuer(page: Page): Promise<void> {
-  await bouton(page, "Continuer").click();
-  await expect(page).toHaveURL(/\/$/);
-}
+/** Toutes les formes de la clé de récupération (affichée, collée, minuscules). */
+const formesCle = (c: string): Needle[] => [needle("clé (groupée)", c), needle("clé (texte)", c.replaceAll("-", "")), needle("clé (minuscules)", c.toLowerCase()), needle("clé (minuscules, texte)", c.replaceAll("-", "").toLowerCase())];
+const sortiesPrf = async (page: Page): Promise<Needle[]> => ((await page.evaluate(() => (window as unknown as { __prf: string[] }).__prf)) ?? []).map((b, i) => needle(`sortie PRF ${i}`, new Uint8Array(Buffer.from(b, "base64"))));
 
-/** Changement du mot de passe dans les paramètres ouverts. */
-async function changerMdp(page: Page, actuel: string, nouveau: string, totp?: string): Promise<void> {
-  await page.getByRole("button", { name: "Changer le mot de passe" }).click();
-  await champ(page, "Mot de passe actuel").fill(actuel);
-  if (totp !== undefined) await champ(page, "Code de votre application d'authentification").fill(totp);
-  await champ(page, "Nouveau mot de passe").fill(nouveau);
-  await bouton(page, "Enregistrer le mot de passe").click();
-  await expect(statut(page, "Mot de passe")).toHaveText("Mot de passe changé. Vos autres appareils ont été déconnectés.", { timeout: 30_000 });
-}
-
-/** Activation de la double authentification dans les paramètres ouverts ; rend la clé lue à l'écran. */
-async function activerTotp(page: Page, mdp: string, prochain: (s: string) => Promise<string>): Promise<string> {
-  await page.getByRole("switch", { name: "Double authentification" }).click();
-  // Session plus « récente » : le mot de passe est redemandé avant l'activation.
-  const actuel = champ(page, "Mot de passe actuel");
-  const cle = page.locator(".totp .v");
-  await expect(actuel.or(cle)).toBeVisible();
-  if (await actuel.isVisible()) {
-    await actuel.fill(mdp);
-    await bouton(page, "Continuer").click();
+test("inscription, déconnexion, connexion en un clic ; session oubliée au rechargement sans « Rester connecté »", async ({ page, shh, requetes }) => {
+  await crochetPrf(page.context());
+  await authentificateur(page, true);
+  const pseudo = `Zoe${randomBytes(3).toString("hex")}`;
+  const cle = await inscrire(page, shh.origin, pseudo);
+  await expect(page.locator("[data-cle-locale]")).toHaveCount(0); // la passkey ouvre les données
+  await deconnecter(page, shh.origin);
+  expect(await connecter(page, shh.origin)).toBe("ouvert");
+  await page.reload();
+  await page.goto(shh.origin + "/compte");
+  await expect(titre(page, "Se connecter")).toBeVisible(); // rien de gardé sans « Rester connecté »
+  expect(await connecter(page, shh.origin)).toBe("ouvert");
+  // Aucune requête vers /api/compte entre le clic et la cérémonie : la feuille est partie sans attendre
+  // (couvert par source-rules.test.ts) ; ici, aucune requête ne porte une sortie PRF ni la clé.
+  const prf = await sortiesPrf(page);
+  expect(prf.length).toBeGreaterThanOrEqual(3);
+  for (const r of requetes) {
+    expect(r.body, r.url).not.toMatch(/"results"|hmacGetSecret/);
+    expect(findIn(Buffer.from(r.body), [...prf, ...formesCle(cle), needle("pseudo affiché", pseudo)]), r.url).toEqual([]);
   }
-  await expect(cle).toBeVisible({ timeout: 30_000 });
-  const secret = (await cle.innerText()).replace(/\s+/g, "");
-  expect(secret).toMatch(/^[A-Z2-7]{16,}$/);
-  await champ(page, "Premier code de l'application").fill(await prochain(secret));
-  await bouton(page, "Activer").click();
-  await expect(statut(page, "Double authentification")).toHaveText("Double authentification activée.");
-  await expect(page.getByRole("switch", { name: "Double authentification" })).toHaveAttribute("aria-checked", "true");
-  return secret;
-}
-
-// --- Tests ------------------------------------------------------------------------------------
-
-test("TOTP du test : vecteur de RFC 6238 (annexe B, SHA-1, T = 59 s)", () => {
-  // Clé ASCII « 12345678901234567890 » ; 94287082 sur 8 chiffres, donc 287082 sur 6.
-  expect(codeTotp("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", Math.floor(59 / 30))).toBe("287082");
 });
 
-test("inscription complète, déconnexion, mauvais mot de passe, connexion ; session oubliée au rechargement sans « Rester connecté »", async ({ page, shh, boite }) => {
-  test.setTimeout(180_000);
-  const c = compte("Ins");
-  await inscrire(page, shh.origin, boite, c);
-  await continuer(page);
-  // Accueil connecté : le pseudo est celui choisi (profil déchiffré sur l'appareil).
-  await parametres(page);
-  await expect(page.getByText(c.pseudo, { exact: true })).toBeVisible();
-  await deconnecterDepuisParametres(page);
+test("nouvel appareil par la clé de récupération : passkey créée ici, ancienne retirée, nouvelle clé ; l'ancienne clé ne sert plus", async ({ page, shh, browser }, info) => {
+  await crochetPrf(page.context());
+  await authentificateur(page, true);
+  const pseudo = `Leo${randomBytes(3).toString("hex")}`;
+  const cle = await inscrire(page, shh.origin, pseudo);
 
-  await remplirConnexion(page, c.email, c.mdp + "x");
-  await expect(page.getByText(INCORRECT, { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(connecte(page)).toHaveCount(0);
-
-  await connecter(page, c.email, c.mdp);
-  await page.reload();
-  await expect(titre(page, "Se connecter")).toBeVisible();
-  await expect(champ(page, "Adresse e-mail")).toBeVisible();
-  await expect(connecte(page)).toHaveCount(0);
-});
-
-test("« Rester connecté » : session rouverte au rechargement ; deux onglets, déconnexion dans l'un, l'autre oublie le compte", async ({ page, shh, boite, context }) => {
-  test.setTimeout(180_000);
-  const c = compte("Onglets");
-  await inscrire(page, shh.origin, boite, c);
-  await continuer(page);
-  await parametres(page);
-  await deconnecterDepuisParametres(page);
-  await connecter(page, c.email, c.mdp, true);
-
-  await page.reload();
-  await expect(connecte(page)).toBeVisible({ timeout: 30_000 });
-
-  const autre = await context.newPage();
+  // Autre appareil (autre navigateur, autre authentificateur, sans la passkey).
+  const ctx = await browser.newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
   try {
-    await autre.goto(shh.origin + "/compte");
-    await expect(titre(autre, "Paramètres")).toBeVisible({ timeout: 30_000 });
-    await expect(autre.getByText(c.pseudo, { exact: true })).toBeVisible();
-
-    await bouton(page, "Se déconnecter").click();
-    await expect(page.getByText("Vous êtes déconnecté.", { exact: true })).toBeVisible();
-    // L'autre onglet oublie le compte sans recharger (signal du BroadcastChannel) ...
-    await expect(titre(autre, "Se connecter")).toBeVisible();
-    await expect(autre.getByText(c.pseudo, { exact: true })).toHaveCount(0);
-    // ... et ne le rouvre pas au rechargement (session gardée effacée de l'appareil).
-    await autre.reload();
-    await expect(titre(autre, "Se connecter")).toBeVisible();
-    await expect(champ(autre, "Adresse e-mail")).toBeVisible();
+    const p2 = await ctx.newPage();
+    await crochetPrf(ctx);
+    await authentificateur(p2, true);
+    await p2.goto(shh.origin + "/compte/connexion");
+    await p2.getByRole("link", { name: "J'ai ma clé de récupération" }).click();
+    await expect(titre(p2, "Clé de récupération")).toBeVisible();
+    await champ(p2, "Clé de récupération").fill("ABCD-EFGH");
+    await bouton(p2, "Ouvrir").click();
+    await expect(p2.getByText("Clé mal recopiée : vérifiez chaque groupe.")).toBeVisible();
+    await champ(p2, "Clé de récupération").fill(cle.toLowerCase().replaceAll("-", " "));
+    await bouton(p2, "Ouvrir").click();
+    await expect(titre(p2, "Créez une passkey sur cet appareil")).toBeVisible({ timeout: 30_000 });
+    await bouton(p2, "Créer la passkey").click();
+    await expect(p2.getByText("Passkey ajoutée.").first()).toBeVisible({ timeout: 30_000 });
+    await expect(p2.locator("[data-recupere]")).toContainText("Votre clé de récupération a servi.");
+    await parametres(p2, shh.origin);
+    const pks = p2.getByRole("region", { name: "Passkeys" }).locator("li");
+    await expect(pks).toHaveCount(2);
+    // Retrait de la première passkey (celle de l'autre appareil) ; session récente (clé de récupération).
+    await p2.getByRole("button", { name: /^Retirer / }).first().click();
+    await expect(p2.getByText("Retirer cette passkey ? Elle ne pourra plus ouvrir ce compte.")).toBeVisible();
+    await p2.getByRole("region", { name: "Passkeys" }).getByRole("button", { name: "Retirer", exact: true }).last().click();
+    await expect(p2.getByRole("region", { name: "Passkeys" }).locator("p.ok")).toContainText("Passkey retirée", { timeout: 30_000 });
+    await expect(pks).toHaveCount(1);
+    await expect(p2.getByText("Ajoutez d'abord une autre passkey : la dernière ne se retire pas.")).toBeVisible();
+    // Nouvelle clé de récupération (proposée après usage, Q10).
+    await bouton(p2, "Créer une nouvelle clé").click();
+    const nouvelle = (await p2.locator("[data-cle] .g").allTextContents()).join("-");
+    await bouton(p2, "Je l'ai notée").click();
+    const label = (await p2.locator("label").filter({ hasText: "Tapez le groupe" }).textContent())!;
+    await p2.getByLabel(label.trim(), { exact: true }).fill(nouvelle.split("-")[Number(/n°\s*(\d)/u.exec(label)![1]) - 1]!);
+    await bouton(p2, "Enregistrer la nouvelle clé").click();
+    await expect(p2.getByText("Nouvelle clé enregistrée. L'ancienne ne sert plus.").first()).toBeVisible({ timeout: 30_000 });
+    // L'ancienne clé ne sert plus ; la passkey retirée ne connecte plus le premier appareil.
+    await deconnecter(p2, shh.origin);
+    await p2.getByRole("link", { name: "J'ai ma clé de récupération" }).click();
+    await champ(p2, "Clé de récupération").fill(cle);
+    await bouton(p2, "Ouvrir").click();
+    await expect(p2.getByText("Cette clé de récupération n'ouvre aucun compte.")).toBeVisible({ timeout: 30_000 });
   } finally {
-    await autre.close();
+    await ctx.close();
   }
-  await page.reload();
-  await expect(champ(page, "Adresse e-mail")).toBeVisible();
-  await expect(connecte(page)).toHaveCount(0);
-});
-
-test("mot de passe oublié : code par e-mail, nouveau mot de passe, l'ancien refusé, connexion avec le nouveau", async ({ page, shh, boite }) => {
-  test.setTimeout(180_000);
-  const c = compte("Oubli");
-  const nouveau = c.mdp + "-Neuf";
-  await inscrire(page, shh.origin, boite, c);
-  await continuer(page);
-  await parametres(page);
-  await deconnecterDepuisParametres(page);
-
-  await page.getByRole("link", { name: "Mot de passe oublié ?" }).click();
-  await expect(titre(page, "Mot de passe oublié")).toBeVisible();
-  await champ(page, "Adresse e-mail exacte").fill(c.email);
-  await bouton(page, "Recevoir un code").click();
-  await champ(page, "Code reçu par e-mail").fill(await boite.code(c.email));
-  await bouton(page, "Continuer").click();
-  await champ(page, "Nouveau mot de passe").fill(nouveau);
-  await bouton(page, "Changer le mot de passe").click();
-  await expect(page.locator("[data-fini]")).toHaveText("Mot de passe changé. Vos autres appareils ont été déconnectés.", { timeout: 30_000 });
-
-  await continuer(page);
-  await parametres(page);
-  await expect(page.getByText(c.pseudo, { exact: true })).toBeVisible(); // profil rendu par le séquestre
-  await deconnecterDepuisParametres(page);
-  await remplirConnexion(page, c.email, c.mdp);
-  await expect(page.getByText(INCORRECT, { exact: true })).toBeVisible({ timeout: 30_000 });
-  await champ(page, "Mot de passe").fill(nouveau);
-  await bouton(page, "Se connecter").click();
-  await expect(connecte(page)).toBeVisible({ timeout: 30_000 });
-});
-
-test("changement du mot de passe dans les paramètres : l'ancien refusé, le nouveau accepté", async ({ page, shh, boite }) => {
-  test.setTimeout(180_000);
-  const c = compte("Mdp");
-  const nouveau = c.mdp + "-Change";
-  await inscrire(page, shh.origin, boite, c);
-  await continuer(page);
-  await parametres(page);
-  await changerMdp(page, c.mdp, nouveau);
-  await deconnecterDepuisParametres(page);
-  await remplirConnexion(page, c.email, c.mdp);
-  await expect(page.getByText(INCORRECT, { exact: true })).toBeVisible({ timeout: 30_000 });
-  await champ(page, "Mot de passe").fill(nouveau);
-  await bouton(page, "Se connecter").click();
-  await expect(connecte(page)).toBeVisible({ timeout: 30_000 });
-});
-
-test("double authentification : activation avec un code calculé, puis connexion qui la demande (code faux refusé)", async ({ page, shh, boite }) => {
-  test.setTimeout(180_000);
-  const c = compte("Totp");
-  const prochain = horlogeTotp();
-  await inscrire(page, shh.origin, boite, c);
-  await continuer(page);
-  await parametres(page);
-  const secret = await activerTotp(page, c.mdp, prochain);
-  await deconnecterDepuisParametres(page);
-
-  await remplirConnexion(page, c.email, c.mdp);
-  const code = champ(page, "Code de votre application d'authentification");
-  await expect(code).toBeVisible({ timeout: 30_000 });
-  await expect(connecte(page)).toHaveCount(0);
-  // Un code faux : différent de tous ceux que le serveur accepterait (pas courant ± 1).
-  const pas = Math.floor(Date.now() / 30_000);
-  const valides = new Set([-1, 0, 1, 2].map((d) => codeTotp(secret, pas + d)));
-  let faux = "000000";
-  while (valides.has(faux)) faux = String(Number(faux) + 1).padStart(6, "0");
-  await code.fill(faux);
-  await bouton(page, "Valider").click();
-  await expect(page.getByText("Code incorrect.", { exact: true })).toBeVisible();
-  await expect(connecte(page)).toHaveCount(0);
-  await code.fill(await prochain(secret));
-  await bouton(page, "Valider").click();
-  await expect(connecte(page)).toBeVisible({ timeout: 30_000 });
-});
-
-test("suppression du compte : confirmée par le mot de passe, puis connexion impossible et aucune ligne de compte sur le serveur", async ({ page, shh, boite }) => {
-  test.setTimeout(180_000);
-  const c = compte("Suppr");
-  await inscrire(page, shh.origin, boite, c);
-  await continuer(page);
-  await parametres(page);
-  await bouton(page, "Supprimer le compte").click();
-  await expect(titre(page, "Supprimer le compte")).toBeVisible();
-  await champ(page, "Mot de passe actuel").fill(c.mdp);
-  await bouton(page, "Supprimer définitivement").click();
-  await bouton(page, "Supprimer").click(); // confirmation sur place (ordinateur) ou feuille (téléphone)
-  await expect(titre(page, "Compte supprimé.")).toBeVisible({ timeout: 30_000 });
-  expect(await comptesEnBase(shh.server.dataDir)).toBe(0);
-
   await page.goto(shh.origin + "/compte/connexion");
-  await remplirConnexion(page, c.email, c.mdp);
-  await expect(page.getByText(INCORRECT, { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(connecte(page)).toHaveCount(0);
+  await bouton(page, "Se connecter avec une passkey").click();
+  await expect(page.getByText("Cette passkey n'est liée à aucun compte.")).toBeVisible({ timeout: 30_000 });
 });
 
-/** Nombre de lignes de la table des comptes (lecture seule, base ouverte par le serveur en WAL). */
-async function comptesEnBase(dataDir: string): Promise<number> {
-  const { DatabaseSync } = await import("node:sqlite");
-  const db = new DatabaseSync(join(dataDir, "comptes.db"), { readOnly: true });
-  try {
-    return (db.prepare("SELECT count(*) AS n FROM comptes").get() as { n: number }).n;
-  } finally {
-    db.close();
-  }
-}
-
-// --- Le serveur ne voit rien (compte, vu du navigateur) — BLOQUE TOUTE MISE EN LIGNE -----------
-
-/** Fenêtres de 8 caractères d'un repère : une partie reconnaissable suffit à le trahir. */
-const fenetres = (label: string, s: string) => Array.from({ length: s.length - 7 }, (_, i) => needle(`${label}[${i}]`, s.slice(i, i + 8)));
-
-test("le serveur ne voit rien : ni adresse, ni mot de passe, ni pseudo en clair dans son dossier de données ni dans ses journaux", async ({ page, shh, boite }) => {
-  test.setTimeout(240_000);
-  // Repères sans sous-chaîne commune avec un texte ordinaire (aucun faux positif sur 8 caractères).
-  const email = "Ui.ReperMailWq7z+Tag@Exemple.org";
-  const mdp = "MdpRepereUi-Kx4vTq";
-  const nouveau = "MdpRepereNeuf-Hm3sPj";
-  const pseudo = "ZoeRepereUiBn5";
-  const prochain = horlogeTotp();
-  const c: Compte = { email, mdp, pseudo };
-
-  await inscrire(page, shh.origin, boite, c);
-  await continuer(page);
-  await parametres(page);
-  await deconnecterDepuisParametres(page);
-  await connecter(page, email, mdp, true);
-  await continuer(page);
-  await parametres(page);
-  // Rechargé avec « Rester connecté » : l'adresse n'est pas gardée sur l'appareil, l'écran la redemande.
-  await page.reload();
-  await expect(titre(page, "Paramètres")).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Changer le mot de passe" }).click();
-  await champ(page, "Adresse e-mail").fill(email);
-  await champ(page, "Mot de passe actuel").fill(mdp);
-  await champ(page, "Nouveau mot de passe").fill(nouveau);
-  await bouton(page, "Enregistrer le mot de passe").click();
-  await expect(statut(page, "Mot de passe")).toHaveText("Mot de passe changé. Vos autres appareils ont été déconnectés.", { timeout: 30_000 });
-  const secret = await activerTotp(page, nouveau, prochain);
-  await deconnecterDepuisParametres(page);
-  await remplirConnexion(page, email, nouveau);
-  await champ(page, "Code de votre application d'authentification").fill(await prochain(secret));
-  await bouton(page, "Valider").click();
+test("réparation des enveloppes : même passkey, autre sortie PRF → clé demandée une fois, enveloppe ajoutée → connexion suivante sans la clé", async ({ page, shh, requetes }) => {
+  await crochetPrf(page.context());
+  await authentificateur(page, true);
+  const cle = await inscrire(page, shh.origin, `Ana${randomBytes(3).toString("hex")}`);
+  await deconnecter(page, shh.origin);
+  // La passkey rend désormais une autre sortie PRF (crochet : masque).
+  await page.evaluate(() => sessionStorage.setItem("test-masque", "1"));
+  expect(await connecter(page, shh.origin)).toBe("cle");
+  await expect(page.locator("[data-repli]")).toHaveText("Cet appareil ne permet pas d'ouvrir vos données avec cette passkey. Entrez votre clé de récupération une fois : cet appareil s'en souviendra.");
+  await champ(page, "Clé de récupération").fill(cle);
+  await bouton(page, "Ouvrir").click();
   await expect(connecte(page)).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("[data-cle-locale]")).toHaveCount(0); // réparée : aucune clé gardée ici
+  const poses = requetes.filter((r) => r.url.endsWith("/api/compte/passkeys/enveloppe"));
+  expect(poses).toHaveLength(1);
+  // Connexion suivante (rien de gardé : déconnexion) : l'enveloppe ajoutée ouvre les données.
+  await deconnecter(page, shh.origin);
+  expect(await connecter(page, shh.origin)).toBe("ouvert");
+  expect(requetes.filter((r) => r.url.endsWith("/api/compte/passkeys/enveloppe"))).toHaveLength(1);
+  expect(requetes.filter((r) => r.url.endsWith("/api/compte/recup"))).toHaveLength(1);
+});
 
-  const reperes: Needle[] = [
-    needle("adresse", email),
-    needle("adresse (minuscules)", email.toLowerCase()),
-    needle("adresse sans « +Tag »", "ui.repermailwq7z@exemple.org"),
-    ...fenetres("adresse", email.toLowerCase()),
-    needle("mot de passe", mdp),
-    ...fenetres("mot de passe", mdp),
-    needle("nouveau mot de passe", nouveau),
-    ...fenetres("nouveau mot de passe", nouveau),
-    needle("pseudo", pseudo),
-    needle("pseudo (minuscules)", pseudo.toLowerCase()),
-    ...fenetres("pseudo", pseudo),
-    needle("pseudo NFD", pseudo.normalize("NFD")),
-    needle("secret TOTP (base32)", secret),
-  ];
+test("passkey sans PRF : clé locale gardée (dit à l'écran), connexion sans clé ; « Se déconnecter » l'efface, la clé est redemandée", async ({ page, shh }) => {
+  await crochetPrf(page.context());
+  await authentificateur(page, false);
+  const cle = await inscrire(page, shh.origin, `Max${randomBytes(3).toString("hex")}`);
+  await expect(page.locator("[data-cle-locale]")).toContainText("vos données s'ouvrent grâce à une clé gardée ici");
+  await page.reload();
+  expect(await connecter(page, shh.origin)).toBe("ouvert");
+  await parametres(page, shh.origin);
+  await expect(page.locator("[data-deconnexion-cle]")).toBeVisible();
+  await bouton(page, "Se déconnecter").click();
+  expect(await connecter(page, shh.origin)).toBe("cle");
+  await champ(page, "Clé de récupération").fill(cle);
+  await bouton(page, "Ouvrir").click();
+  await expect(connecte(page)).toBeVisible({ timeout: 30_000 });
+});
+
+test("suppression du compte par un geste de passkey ; ensuite la passkey ne connecte plus ; le serveur ne voit rien", async ({ page, shh, requetes }) => {
+  await crochetPrf(page.context());
+  await authentificateur(page, true);
+  const pseudo = `Ines${randomBytes(3).toString("hex")}`;
+  const cle = await inscrire(page, shh.origin, pseudo, true);
+  await page.reload(); // « Rester connecté »
+  await parametres(page, shh.origin);
+  const reperes = [...(await sortiesPrf(page)), ...formesCle(cle), needle("pseudo affiché", pseudo)];
+  expect(reperes.length).toBeGreaterThan(5);
   const dir = shh.server.dataDir;
-  const fouiller = () => {
-    const fichiers = listFiles(dir);
-    // Témoins : la base du compte existe et la fouille y voit bien un texte connu.
-    expect(fichiers.some((f) => f.endsWith("comptes.db"))).toBe(true);
-    expect(scanDir(dir, [needle("en-tête SQLite", "SQLite format 3")]).some((h) => h.includes("comptes.db"))).toBe(true);
-    return { fichiers, trouves: scanDir(dir, reperes) };
-  };
-
-  // Serveur en marche : comptes.db, ses -wal et -shm (rien n'est encore reporté dans la base).
-  const vivant = fouiller();
-  expect(vivant.fichiers.some((f) => f.endsWith("comptes.db-wal")), `fichiers : ${vivant.fichiers.join(", ")}`).toBe(true);
-  expect(vivant.trouves).toEqual([]);
-  // Serveur arrêté : journal reporté dans la base, fichiers finaux.
+  expect(scanDir(dir, reperes)).toEqual([]);
+  await bouton(page, "Supprimer le compte").click();
+  await expect(page.getByText("Une confirmation par passkey vous sera demandée.")).toBeVisible();
+  await bouton(page, "Supprimer définitivement").click();
+  await bouton(page, "Supprimer").click();
+  await expect(titre(page, "Compte supprimé.")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("[data-passkey-gestionnaire]")).toContainText(`Supprimez aussi la passkey « ${pseudo} »`);
+  await page.goto(shh.origin + "/compte/connexion");
+  await bouton(page, "Se connecter avec une passkey").click();
+  // signalUnknownCredential a pu faire oublier la passkey à l'authentificateur : soit aucune passkey,
+  // soit « liée à aucun compte » ; dans les deux cas, rien ne s'ouvre.
+  await expect(page.getByText("Cette passkey n'est liée à aucun compte.").or(bouton(page, "Se connecter avec une passkey"))).toBeVisible({ timeout: 30_000 });
+  await expect(connecte(page)).toHaveCount(0);
+  for (const r of requetes) expect(r.body, r.url).not.toMatch(/"results"|hmacGetSecret/);
+  expect(scanDir(dir, reperes)).toEqual([]);
   await shh.server.stop();
-  const arrete = fouiller();
-  expect(arrete.trouves).toEqual([]);
-  // Journaux du serveur (stdout, stderr) : rien non plus. Témoin : la ligne d'écoute.
-  expect(findIn(shh.server.stdout(), [needle("témoin", "SHH_LISTENING")])).toEqual(["témoin"]);
+  expect(scanDir(dir, reperes)).toEqual([]);
   expect(findIn(shh.server.stdout(), reperes)).toEqual([]);
   expect(findIn(shh.server.stderr(), reperes)).toEqual([]);
-  expect(existsSync(dir)).toBe(true);
 });
-
-// WebKit écarté (compte.spec.ts seulement) : ce poste n'a pas WebKit, ces tests n'y ont donc
-// jamais tourné ; les activer sans les avoir vus verts risquerait de rendre rouge le job « ui »
-// de la CI pour une cause inconnue. À activer (retirer le test.skip) après un passage vert dans
-// la CI ; coût mesuré sous Chromium : 5 à 16 s par test.
