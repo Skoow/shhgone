@@ -36,7 +36,7 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 	usage := func(msg string) int {
 		fmt.Fprintln(stderr, msg)
 		fmt.Fprintln(stderr, "usage: shhdrop admin freeze|unfreeze|destroy - (lien lu sur l'entrée standard)|wipe --yes")
-		fmt.Fprintln(stderr, "       shhdrop admin bannir - [--duree 30|365|1095] [--motif 1..10] (lien de salon ou adresse sur l'entrée standard)")
+		fmt.Fprintln(stderr, "       shhdrop admin bannir - [--duree 30|365] [--motif 1..10] (lien de salon ou adresse sur l'entrée standard)")
 		fmt.Fprintln(stderr, "       shhdrop admin paiement revoquer <commande> (32 caractères hexadécimaux, lus chez le prestataire)")
 		fmt.Fprintln(stderr, "       shhdrop admin bannis liste [actifs|suspendus|bientot] | suspendre|reactiver|lever|annuler <B-…> | echeance <B-…> <AAAA-MM-JJ>")
 		return 2
@@ -214,12 +214,12 @@ func runBannis(args []string, cfg config.Config, stdin io.Reader, stdout, stderr
 			switch {
 			case err != nil:
 				return usage("valeur non numérique")
-			case r[0] == "--duree" && (n == 30 || n == 365 || n == 1095):
+			case r[0] == "--duree" && (n == 30 || n == 365):
 				duree = n
 			case r[0] == "--motif" && n >= 1 && n <= 10:
 				motif = uint8(n)
 			default:
-				return usage("--duree 30, 365 ou 1095 ; --motif 1 à 10")
+				return usage("--duree 30 ou 365 ; --motif 1 à 10")
 			}
 		}
 	} else {

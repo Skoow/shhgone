@@ -251,7 +251,7 @@ func TestRoutesBannissements(t *testing.T) {
 		!strings.Contains(corps, `"compte":{"existe":true,"palier":"neuf","anciennete_jours":3,"banni":true}`) {
 		t.Fatal(code, corps)
 	}
-	code, corps = b.post("/api/bannir", `{"email":"`+adresseTapee+`","duree_jours":1095,"motif":10}`)
+	code, corps = b.post("/api/bannir", `{"email":"`+adresseTapee+`","duree_jours":365,"motif":10}`)
 	if code != 200 || strings.Contains(strings.ToLower(corps), "dupont") || !strings.HasPrefix(corps, `{"banni":"compte","ban":{`) {
 		t.Fatal(code, corps)
 	}
@@ -260,7 +260,7 @@ func TestRoutesBannissements(t *testing.T) {
 		t.Fatal(code, corps)
 	}
 	want := []string{"liste actifs 2", "action B-1 suspendre ", "action B-1 lever ", "chercher " + adresseTapee,
-		"bannir " + adresseTapee + "| 1095 10", "bannir |" + lienColle + " 30 4"}
+		"bannir " + adresseTapee + "| 365 10", "bannir |" + lienColle + " 30 4"}
 	if strings.Join(b.bannis, ";") != strings.Join(want, ";") {
 		t.Fatalf("%q", b.bannis)
 	}

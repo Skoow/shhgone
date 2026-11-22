@@ -1102,9 +1102,9 @@ func TestRefundSalonCreate(t *testing.T) {
 	}
 }
 
-// CleBloc : HMAC-SHA-256 du /48 (de l'adresse en IPv4) sous une clé de processus : même bloc →
-// même clé, y compris après minuit ; autre bloc ou autre processus → autre clé ; jamais
-// l'adresse en clair.
+// CleBloc : HMAC-SHA-256 du /48 (de l'adresse en IPv4) : même bloc → même clé dans la journée ;
+// autre bloc, autre processus ou lendemain (clé remplacée à minuit, 22 novembre) → autre clé ;
+// jamais l'adresse en clair.
 func TestCleBloc(t *testing.T) {
 	now := time.Date(2026, 11, 12, 23, 59, 0, 0, time.UTC)
 	l := newLim(&now)
@@ -1122,9 +1122,9 @@ func TestCleBloc(t *testing.T) {
 	if v4 != l.CleBloc(ip("::ffff:198.51.100.1")) {
 		t.Fatal("IPv4 mappée : clé différente")
 	}
-	now = now.Add(2 * time.Minute) // lendemain : la clé ne tourne pas (salon de 24 h au plus)
-	if a != l.CleBloc(ip("2001:db8:9:1::1")) {
-		t.Fatal("clé changée à minuit")
+	now = now.Add(2 * time.Minute) // lendemain : la clé a été remplacée
+	if a == l.CleBloc(ip("2001:db8:9:1::1")) {
+		t.Fatal("clé gardée après minuit")
 	}
 	if a == newLim(&now).CleBloc(ip("2001:db8:9:1::1")) {
 		t.Fatal("deux processus, même clé")

@@ -14,11 +14,13 @@ import (
 // (« B-XXXX-XXXX-XXXXX ») : jamais une adresse, une empreinte, un h ni un pseudo. Le statut
 // « banni » se lit seulement là (actif et non échu), que l'adresse ait un compte ou non.
 
-// Durées permises au moment de bannir (§21.11) : 30 jours, 1 an, 3 ans (défaut).
-var dureesBan = [...]int{30, 365, 1095}
+// Durées permises au moment de bannir (§21.11) : 30 jours, 1 an (défaut). 3 ans retiré
+// (décision du propriétaire du 22 novembre : garder le moins de données, le moins longtemps).
+var dureesBan = [...]int{30, 365}
 
-// DureeBanDefaut : 3 ans (décision du propriétaire du 14 novembre).
-const DureeBanDefaut = 1095
+// DureeBanDefaut : 1 an (décision du propriétaire du 22 novembre, qui remplace les 3 ans du
+// 14 novembre).
+const DureeBanDefaut = 365
 
 // pageBans : lignes par page de la liste (§21.14.4) ; pagesMax borne le décalage demandé.
 const (

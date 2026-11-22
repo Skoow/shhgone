@@ -236,7 +236,7 @@ func TestTableauDeBordComptes(t *testing.T) {
 	if c := note(f.req(t, "POST", "/api/salons/action", `{"ref":"`+s.Ref+`","action":"anciennete"}`)); c != `{"anciennete":"rendue"}` {
 		t.Fatal(c)
 	}
-	c := note(f.req(t, "POST", "/api/salons/action", `{"ref":"`+s.Ref+`","action":"bannir","duree_jours":1095,"motif":2}`))
+	c := note(f.req(t, "POST", "/api/salons/action", `{"ref":"`+s.Ref+`","action":"bannir","duree_jours":365,"motif":2}`))
 	var res adminui.Resultat
 	if json.Unmarshal([]byte(c), &res) != nil || res.Banni != "compte" || res.SalonsFermes != 1 || res.Ban == nil || res.Ban.Motif != 2 {
 		t.Fatal(c)

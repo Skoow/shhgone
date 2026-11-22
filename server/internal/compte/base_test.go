@@ -209,7 +209,7 @@ func TestSessionsEtBannisContraintes(t *testing.T) {
 			strings.Join(v, ",") + `)`)
 		return err
 	}
-	okB := []string{"randomblob(8)", "x'" + strings.Repeat("ab", 32) + "'", itoa(jour), itoa(jour + 86400*1095), "1", "10", "0"}
+	okB := []string{"randomblob(8)", "x'" + strings.Repeat("ab", 32) + "'", itoa(jour), itoa(jour + 86400*365), "1", "10", "0"}
 	if err := insB(okB...); err != nil {
 		t.Fatal("bannissement valide refusé :", err)
 	}

@@ -57,12 +57,12 @@ describe("textes publics et compte par e-mail", () => {
     }
   });
 
-  test("avec __COMPTES__ : Confidentialité dit ce que garde le compte (empreinte, profil lisible, deux coffres, salons, catégories, motif, 7 jours, sauvegardes 30 jours, fournisseur, 13 mois)", () => {
+  test("avec __COMPTES__ : Confidentialité dit ce que garde le compte (empreinte, profil lisible, deux coffres, salons, catégories, motif, 7 jours, sauvegardes 7 jours, fournisseur, 13 mois)", () => {
     const f = texte("confidentialite", "fr", true);
     for (const re of [/Sans compte pour envoyer, recevoir ou rejoindre un salon/u, /qu'en empreinte/u, /pas en clair/u, /fournisseur d'envoi d'e-mails/u, /ne contient que le code/u, /ne quitte jamais votre appareil/u, /le service peut donc les lire/u, /second coffre, chiffré par votre mot de passe seulement/u, /quels salons votre compte a créés/u, /jamais quels partages/u, /au jour/u, /catégorie/u, /bannissement/u, /recours/u, /7 jours|7 jours/u, /30 jours/u, /13 mois/u, /exporter vos données/u])
       expect(f).toMatch(re);
     const e = texte("confidentialite", "en", true);
-    for (const re of [/only as a fingerprint/u, /email delivery provider/u, /can therefore read them/u, /encrypted by your password only/u, /never which shares/u, /category/u, /appeal/u, /7 days/u, /30 days/u, /13 months/u]) expect(e).toMatch(re);
+    for (const re of [/only as a fingerprint/u, /email delivery provider/u, /can therefore read them/u, /encrypted by your password only/u, /never which shares/u, /category/u, /appeal/u, /erased after 7 days/u, /in these copies for up to 7 days/u, /13 months/u]) expect(e).toMatch(re);
     expect(texte("conditions", "fr", true)).toMatch(/au moins 15 ans/u);
     expect(texte("conditions", "en", true)).toMatch(/at least 15/u);
     expect(texte("securite", "fr", true)).toMatch(/Ce que le compte ne protège pas/u);

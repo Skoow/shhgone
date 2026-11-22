@@ -743,7 +743,7 @@ L'accueil connecté est une **liste unique**, triée par activité, de quatre so
 
 ### 21.11 Bannissement révisé (décision 4 ; complète §13)
 
-- **Durée par défaut : 3 ans** ; choix au moment de bannir : 30 jours, 1 an, 3 ans (défaut).
+- ~~**Durée par défaut : 3 ans** ; choix au moment de bannir : 30 jours, 1 an, 3 ans (défaut).~~ **22 novembre (propriétaire : garder le moins longtemps)** : durée par défaut **1 an**, choix 30 jours ou 1 an ; 3 ans retiré.
 - **Actions** sur un bannissement (tableau de bord et ligne de commande) :
   - **Suspendre / Réactiver** : `actif` 0 ou 1 ; suspendu, l'adresse peut recréer un compte et le compte créer des salons ; l'échéance ne bouge pas ;
   - **Changer l'échéance** : allonger ou raccourcir, toute date entre demain et aujourd'hui + 5 ans (au-delà : décision du juriste, la durée de conservation doit rester proportionnée) ;
@@ -777,9 +777,9 @@ Texte de confirmation (`InlineConfirm` sur un écran dédié, mot de passe redem
 - **Fabrication** : chaque jour, sur la machine, `sqlite3 comptes.db ".backup"` vers un fichier temporaire du volume chiffré, puis chiffrement par **age** (format `age-encryption.org/v1`, X25519, outil `age` en version exacte épinglée, construit depuis ses sources ou paquet signé) vers la **clé publique** de l'exploitant ; le clair temporaire est effacé aussitôt ; seul le chiffré sort. Pas de crypto maison, rien dans le serveur Go (aucune sortie de plus pour lui).
 - **Destination** : un stockage objet chez un **autre** fournisseur que l'hébergeur, dans l'UE, avec un compte dédié en écriture seule (le serveur ne peut ni lire ni effacer les anciennes copies : un pirate de la machine ne détruit pas les sauvegardes) ; sortie HTTPS vers ce seul hôte, depuis la machine (pas le conteneur).
 - **Clé privée** : chez l'exploitant, hors ligne (papier ou clé USB chiffrée), **séparée** de la copie hors ligne de `K_serveur` (R19). Sans `K_serveur`, une sauvegarde ne sert à rien : les deux copies sont obligatoires.
-- **Durée** : 30 copies quotidiennes, puis effacement par la règle de cycle de vie du stockage (pas par le serveur).
+- **Durée** : ~~30 copies quotidiennes~~ **7 copies quotidiennes** (décision du propriétaire du 22 novembre : garder le moins longtemps), puis effacement par la règle de cycle de vie du stockage (pas par le serveur).
 - **Restauration** : toujours depuis la plus récente (les suppressions antérieures y sont déjà appliquées) ; `deploy/restaurer.sh` (déchiffre sur le poste de l'exploitant ou sur la machine avec la clé apportée, vérifie `PRAGMA integrity_check`, remplace `comptes.db` serveur arrêté) ; **test de restauration** mensuel et à chaque changement de schéma (`make test-restauration` : sauvegarde, effacement, restauration, connexion d'un compte de test).
-- **Effet sur le droit à l'effacement** : un compte supprimé reste dans les copies jusqu'à 30 jours ; c'est dit dans la page Confidentialité ; une restauration depuis une copie plus ancienne que la plus récente est interdite par la procédure.
+- **Effet sur le droit à l'effacement** : un compte supprimé reste dans les copies jusqu'à ~~30~~ **7** jours (22 novembre) ; c'est dit dans la page Confidentialité ; une restauration depuis une copie plus ancienne que la plus récente est interdite par la procédure.
 
 ### 21.14 Tableau de bord d'administration, finalisé (décision 8 ; complète `2026-11-13-tableau-de-bord-admin-design.md`)
 

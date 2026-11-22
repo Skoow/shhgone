@@ -519,7 +519,7 @@ export const fr = {
   "account.delete.stays.messages": "Vos messages dans les salons des autres : ils s'effacent à la fin de ces salons, pas avant. Ceux qui les ont lus ont pu les copier.",
   "account.delete.stays.unknown": "Les partages créés sur un appareil sans historique, ou absents de votre compte : nous ne pouvons pas les retrouver. Ils s'effacent à leur échéance.",
   "account.delete.stays.received": "Ce que d'autres ont déjà reçu ou enregistré.",
-  "account.delete.stays.kept": "L'empreinte d'une adresse bannie, jusqu'à la fin du bannissement ; les copies de sauvegarde, jusqu'à 30 jours ; les journaux du service d'envoi des codes.",
+  "account.delete.stays.kept": "L'empreinte d'une adresse bannie, jusqu'à la fin du bannissement ; les copies de sauvegarde, jusqu'à 7 jours ; les journaux du service d'envoi des codes.",
   "account.delete.pass": "Votre abonnement Plus sera perdu avec le compte.",
   "account.delete.device": "Effacer aussi les données de cet appareil",
   "account.delete.device.hint": "Historique, liens reçus et téléchargements gardés ici.",

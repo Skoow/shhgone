@@ -8,7 +8,7 @@ import (
 )
 
 // Lot 7 du plan du compte : bannissement révisé (conception §13, §21.11, §21.14.4). Durée
-// choisie (30 jours, 1 an, 3 ans), identifiant opaque B-…, suspendre, réactiver, changer
+// choisie (30 jours, 1 an), identifiant opaque B-…, suspendre, réactiver, changer
 // l'échéance (5 ans au plus), lever, annuler ; 20 bannissements par heure au plus.
 
 // ban : bannissement réussi (échoue sinon).
@@ -31,18 +31,18 @@ func TestBannirFermeLesSalonsOuverts(t *testing.T) {
 	h, j, d := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
 	var fermes [][16]byte
 	b.s.fermerSalons = func(x [16]byte) (int, error) { fermes = append(fermes, x); return 2, nil }
-	r := b.ban(t, Cible{H: &h}, 1095, 6)
+	r := b.ban(t, Cible{H: &h}, 365, 6)
 	if !r.Compte || r.SalonsFermes != 2 || len(fermes) != 1 || fermes[0] != h {
 		t.Fatalf("%+v %v", r, fermes)
 	}
 	auj := b.aujourdhui()
-	if r.Vue.Debut != dateJour(auj) || r.Vue.Jusqu != dateJour(auj+1095*jourS) || !r.Vue.Actif || r.Vue.Motif != 6 ||
+	if r.Vue.Debut != dateJour(auj) || r.Vue.Jusqu != dateJour(auj+365*jourS) || !r.Vue.Actif || r.Vue.Motif != 6 ||
 		r.Vue.SalonsFermes != 2 {
 		t.Fatalf("%+v", r.Vue)
 	}
 	var debut, jusqu, actif, motif, sf int64
 	if err := b.db.QueryRow(`SELECT debut_jour, jusqu_jour, actif, motif, salons_fermes FROM bannis`).Scan(&debut, &jusqu,
-		&actif, &motif, &sf); err != nil || debut != auj || jusqu != auj+1095*jourS || actif != 1 || motif != 6 || sf != 2 {
+		&actif, &motif, &sf); err != nil || debut != auj || jusqu != auj+365*jourS || actif != 1 || motif != 6 || sf != 2 {
 		t.Fatal(debut, jusqu, actif, motif, sf, err)
 	}
 	if _, err := b.s.Session(j); !errors.Is(err, ErrSession) {
@@ -96,10 +96,10 @@ func TestBannirParAdresse(t *testing.T) {
 	}
 }
 
-// Durées : 30, 365 ou 1 095 jours ; motif 1 à 10 ; rien d'autre.
+// Durées : 30 ou 365 jours (3 ans retiré le 22 novembre) ; motif 1 à 10 ; rien d'autre.
 func TestDurees(t *testing.T) {
 	b := nouveauBanc(t)
-	for i, j := range []int{30, 365, 1095} {
+	for i, j := range []int{30, 365} {
 		r := b.ban(t, Cible{Email: []byte("a" + string(rune('0'+i)) + "@exemple.fr")}, j, 10)
 		if r.Vue.Jusqu != dateJour(b.aujourdhui()+int64(j)*jourS) {
 			t.Fatal(j, r.Vue)
@@ -108,7 +108,7 @@ func TestDurees(t *testing.T) {
 	for _, c := range []struct {
 		jours int
 		motif uint8
-	}{{0, 10}, {-30, 10}, {31, 10}, {1094, 10}, {1096, 10}, {1825, 10}, {30, 0}, {30, 11}} {
+	}{{0, 10}, {-30, 10}, {31, 10}, {364, 10}, {366, 10}, {1095, 10}, {1825, 10}, {30, 0}, {30, 11}} {
 		if _, err := b.s.Bannir(Cible{Email: []byte("x@exemple.fr")}, c.jours, c.motif); !errors.Is(err, ErrRequete) {
 			t.Errorf("%+v : %v", c, err)
 		}
@@ -195,7 +195,7 @@ func TestLever(t *testing.T) {
 	h, _, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
 	b.clk.Add(20 * 24 * time.Hour)
 	b.s.Signale(h)
-	r := b.ban(t, Cible{H: &h}, 1095, 6)
+	r := b.ban(t, Cible{H: &h}, 365, 6)
 	avant, apres, err := b.s.ActionBan(r.Vue.ID, "lever", "")
 	if err != nil || apres != nil || avant.ID != r.Vue.ID || !avant.Actif {
 		t.Fatal(avant, apres, err)

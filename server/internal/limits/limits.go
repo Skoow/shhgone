@@ -152,7 +152,7 @@ type Limiter struct {
 	// oublié d'office.
 	prev      []byte
 	prevUntil int64
-	// bloc : clé de processus de CleBloc (crypto/rand à New), jamais tournée ni écrite.
+	// bloc : clé de CleBloc (crypto/rand), jamais écrite, remplacée à minuit UTC (22 novembre).
 	bloc []byte
 	// seg64Max, seg48Max : requêtes de segments par minute (SegmentsPerMin, SegmentsPer48Min,
 	// SetSegmentsPerMin).
@@ -285,6 +285,11 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.secret = make([]byte, 32)
 		if _, err := rand.Read(l.secret); err != nil {
 			panic(err) // crypto/rand ne renvoie pas d'erreur sous Linux
+		}
+		// Clé du plafond des salons par bloc (CleBloc) : remplacée aussi (22 novembre).
+		clear(l.bloc)
+		if _, err := rand.Read(l.bloc); err != nil {
+			panic(err)
 		}
 		l.count64 = map[string]int{}
 		l.count48 = map[string]int{}
@@ -741,10 +746,16 @@ func (l *Limiter) RefundSalonCreate(ip netip.Addr) {
 }
 
 // CleBloc : clé du bloc /48 de ip (l'adresse elle-même en IPv4), pour le plafond des salons
-// vivants par bloc (spec §39.3.6, décision du 12 novembre). HMAC-SHA-256 sous une clé tirée
-// au démarrage, qui ne tourne pas à minuit (un salon vit 24 h au plus) : pseudonyme du
-// processus, gardé en mémoire seulement, jamais écrit.
+// vivants par bloc (spec §39.3.6, décision du 12 novembre). HMAC-SHA-256 sous une clé tirée au
+// hasard, gardée en mémoire seulement, jamais écrite, et remplacée à minuit UTC (décision du
+// propriétaire du 22 novembre : sinon, une lecture de la mémoire relierait chaque salon vivant
+// à l'adresse IPv4 de son créateur en essayant toutes les adresses). Contrepartie : un salon
+// créé la veille compte sous l'ancienne clé, le plafond par bloc repart donc à zéro à minuit
+// (les créations du jour restent bornées par AllowSalonCreate).
 func (l *Limiter) CleBloc(ip netip.Addr) [32]byte {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.rotateLocked(l.now())
 	_, p48 := Prefixes(ip)
 	h := hmac.New(sha256.New, l.bloc)
 	h.Write([]byte("salons-vivants|48|" + p48))
