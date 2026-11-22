@@ -178,6 +178,20 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(a).toHaveAttribute("referrerpolicy", "no-referrer");
     // Coches : « Vu » chez A quand B a vu le message (accusés groupés, 2,5 s).
     await expect(bulle(page, t1).locator(".coche")).toHaveText("· Vu", { timeout: 30_000 });
+    // Fiche « Infos » (v3 §14.2) : nos messages seulement, heure de chaque accusé par lecteur.
+    await bulle(pageB, t1).getByRole("button", { name: "Actions du message" }).click();
+    await expect(bulle(pageB, t1).getByRole("button", { name: "Répondre" })).toBeVisible();
+    await expect(bulle(pageB, t1).getByRole("button", { name: "Infos" })).toHaveCount(0); // pas pour le message d'un autre
+    await bulle(pageB, t1).getByRole("button", { name: "Actions du message" }).click();
+    await bulle(page, t1).getByRole("button", { name: "Actions du message" }).click();
+    await bulle(page, t1).getByRole("button", { name: "Infos", exact: true }).click();
+    const fiche = page.getByRole("dialog", { name: "Infos du message" });
+    await expect(fiche.getByText(/^Envoyé : \d{1,2} h \d{2}$/)).toBeVisible();
+    await expect(fiche.locator("li").filter({ hasText: pseudoB }).locator("dd")).toHaveText([/^\d{1,2} h \d{2}$/, /^\d{1,2} h \d{2}$/]);
+    await capture(page, "salon-infos");
+    expect(await axe(page)).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(fiche).toHaveCount(0);
     // Réaction.
     await bulle(page, `Réponse de B ${r}`).getByRole("button", { name: "Actions du message" }).click();
     await bulle(page, `Réponse de B ${r}`).getByRole("button", { name: "Réagir 👍" }).click();

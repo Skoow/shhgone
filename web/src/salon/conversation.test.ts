@@ -83,6 +83,34 @@ describe("conversation", () => {
     c.message(24, 0, 3, env(33, { k: "piece_ouverte", ids: [id(2)] }));
     expect(bulles(c)[1]!.ouverts).toEqual([]);
   });
+  it("fiche « Infos » (v3 §14.2) : heure de l'envoi, puis de chaque accusé, par lecteur ; le premier compte", () => {
+    const t = { v: 5_000 };
+    const c = conv(0, t);
+    c.pieceEnvoi(-1, { nom: "a.pdf", mime: "application/pdf", taille: 9, sorte: "fichier", dureeMs: null });
+    c.rattacher(-1, 1);
+    c.chiffre(1, id(7));
+    const b = bulles(c)[0]!;
+    expect(c.infos(b)).toEqual({ envoyeMs: null, lecteurs: [{ siege: 1, recu: null, vu: null, ouvert: null, telecharge: null }, { siege: 2, recu: null, vu: null, ouvert: null, telecharge: null }] });
+    t.v = 6_000;
+    c.accepte(1, 12);
+    const a = (n: number, heureMs: number, message: Message): EnveloppeRecue => ({ id: id(n), heureMs, regle: 0, message });
+    c.message(13, 1, 3, a(40, 7_000, { k: "recu", ids: [id(7)] }));
+    c.message(14, 1, 3, a(41, 8_000, { k: "vu", ids: [id(7)] }));
+    c.message(15, 1, 3, a(42, 9_000, { k: "vu", ids: [id(7)] })); // second « vu » : l'heure du premier reste
+    c.message(16, 2, 3, a(43, 10_000, { k: "piece_telechargee", ids: [id(7)] })); // vaut aussi reçu et vu
+    c.message(17, 1, 3, a(44, 11_000, { k: "piece_ouverte", ids: [id(7)] }));
+    c.message(18, 4, 3, a(45, 12_000, { k: "vu", ids: [id(7)] })); // siège non attendu : ignoré
+    expect(c.infos(b)).toEqual({
+      envoyeMs: 6_000,
+      lecteurs: [
+        { siege: 1, recu: 7_000, vu: 8_000, ouvert: 11_000, telecharge: null },
+        { siege: 2, recu: 10_000, vu: 10_000, ouvert: null, telecharge: 10_000 },
+      ],
+    });
+    // Message d'un autre : pas de fiche.
+    c.message(19, 1, 3, env(3, { k: "texte", x: "x" }));
+    expect(c.infos(bulles(c)[1]!)).toBeNull();
+  });
   it("changerDeSiege (exigence C-3 32) : notre pseudonyme suit au siège 0 sans être « pris » par notre ancien siège ; l'ancien occupant garde son nom", () => {
     const c = conv(2);
     c.message(5, 0, 3, env(1, { k: "profil", pseudo: "Lea", couleur: 0, avatar: null }));

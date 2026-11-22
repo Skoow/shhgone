@@ -51,11 +51,23 @@ export type Bulle = {
   /** Pièces (v3 §14.2) : sièges qui l'ont ouverte (affichée ou lue) et téléchargée. */
   ouverts: number[];
   telecharges: number[];
+  /**
+   * Fiche « Infos » (v3 §14.2), nos messages seulement : heure de chaque accusé par siège (heure
+   * d'envoi de l'accusé, donnée par l'appareil du lecteur ; la première reçue compte).
+   */
+  heures: Heures;
+  /** Nos messages : heure où le serveur a accepté l'envoi (cet appareil), ou null. */
+  envoyeMs: number | null;
   /** Réactions : émoji → sièges, dans l'ordre d'arrivée. */
   reactions: { emoji: string; sieges: number[] }[];
   /** Pièce (plan C-4) : fichier, image, vidéo ou vocal ; null pour un texte. */
   piece: PieceInfo | null;
 };
+
+export type Heures = { recu: Map<number, number>; vu: Map<number, number>; ouvert: Map<number, number>; telecharge: Map<number, number> };
+const heuresVides = (): Heures => ({ recu: new Map(), vu: new Map(), ouvert: new Map(), telecharge: new Map() });
+/** Une ligne de la fiche « Infos » : un lecteur attendu et l'heure (ms) de chaque accusé, ou null. */
+export type LigneInfos = { siege: number; recu: number | null; vu: number | null; ouvert: number | null; telecharge: number | null };
 
 /** Pièce d'un message : ce que dit le message chiffré (nom nettoyé par le moteur à l'affichage). */
 export type PieceInfo = {
@@ -286,6 +298,8 @@ export class Conversation {
       vus: [],
       ouverts: [],
       telecharges: [],
+      heures: heuresVides(),
+      envoyeMs: null,
       reactions: [],
       piece: null,
     };
@@ -306,6 +320,7 @@ export class Conversation {
     if (!b) return;
     b.seq = seq;
     b.etat = "envoye";
+    b.envoyeMs ??= this.maintenant();
     // Expéditeur : son compte à rebours local part de l'envoi (v3 §5, `vuParMoiMs`).
     if (!this.vuLe.has(b.cle)) this.vuLe.set(b.cle, this.maintenant());
     this.#parLocal.delete(local);
@@ -374,6 +389,8 @@ export class Conversation {
           vus: [],
           ouverts: [],
           telecharges: [],
+          heures: heuresVides(),
+          envoyeMs: null,
           reactions: [],
           piece: null,
         };
@@ -408,6 +425,8 @@ export class Conversation {
           if (!b || !b.moi || !b.attendus.includes(siege)) continue;
           if (!b.recus.includes(siege)) b.recus.push(siege);
           if (m.k === "vu" && !b.vus.includes(siege)) b.vus.push(siege);
+          noter(b.heures.recu, siege, env.heureMs);
+          if (m.k === "vu") noter(b.heures.vu, siege, env.heureMs);
         }
         this.#change();
         return null;
@@ -423,6 +442,9 @@ export class Conversation {
           if (!l.includes(siege)) l.push(siege);
           if (!b.recus.includes(siege)) b.recus.push(siege);
           if (!b.vus.includes(siege)) b.vus.push(siege);
+          noter(m.k === "piece_ouverte" ? b.heures.ouvert : b.heures.telecharge, siege, env.heureMs);
+          noter(b.heures.recu, siege, env.heureMs);
+          noter(b.heures.vu, siege, env.heureMs);
         }
         this.#change();
         return null;
@@ -536,6 +558,8 @@ export class Conversation {
       vus: [],
       ouverts: [],
       telecharges: [],
+      heures: heuresVides(),
+      envoyeMs: null,
       reactions: [],
       piece: null,
     };
@@ -648,6 +672,12 @@ export class Conversation {
   }
 
   /** Coches d'un de nos messages : envoyé (une), reçu par tous (deux), vu par tous (deux, couleur). */
+  /** Fiche « Infos » d'un de nos messages : envoi, puis chaque lecteur attendu ; null sinon. */
+  infos(b: Bulle): { envoyeMs: number | null; lecteurs: LigneInfos[] } | null {
+    if (!b.moi) return null;
+    const h = (m: Map<number, number>, s: number) => m.get(s) ?? null;
+    return { envoyeMs: b.envoyeMs, lecteurs: b.attendus.map((s) => ({ siege: s, recu: h(b.heures.recu, s), vu: h(b.heures.vu, s), ouvert: h(b.heures.ouvert, s), telecharge: h(b.heures.telecharge, s) })) };
+  }
   coche(b: Bulle): "attente" | "envoye" | "recu" | "vu" | "echec" {
     if (b.etat === "echec") return "echec";
     if (b.etat === "envoi") return "attente";
@@ -699,4 +729,9 @@ function decouper(texte: string): { lien: boolean; t: string }[] {
   }
   if (i < texte.length) out.push({ lien: false, t: texte.slice(i) });
   return out.filter((x) => x.t !== "");
+}
+
+/** Première heure d'un accusé pour ce siège (les suivantes ne la changent pas). */
+function noter(m: Map<number, number>, siege: number, ms: number): void {
+  if (!m.has(siege) && Number.isSafeInteger(ms)) m.set(siege, ms);
 }

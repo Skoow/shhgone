@@ -6,7 +6,7 @@
   // https? seulement, sans aperçu.
   import { onMount, tick, untrack } from "svelte";
   import { t, getLang } from "../../i18n/i18n.svelte";
-  import { formatClock, formatDuration } from "../../i18n/format";
+  import { formatClock, formatDayTime, formatDuration } from "../../i18n/format";
   import { announce } from "../../ui/announce";
   import { routeTitle } from "../../app/title";
   import { morceaux, type Bulle, type Element } from "../../salon/conversation";
@@ -226,6 +226,23 @@
     } catch {
       // Copie refusée par le navigateur : rien d'autre à faire.
     }
+  }
+  // Fiche « Infos » (v3 §14.2) : nos messages seulement, données déjà sur l'appareil.
+  let infosDe = $state<string | null>(null);
+  let infosOuverte = $state(false);
+  const infos = $derived.by(() => {
+    void vue.rev;
+    const b = infosDe ? conv.bulle(infosDe) : undefined;
+    return b ? { b, f: conv.infos(b) } : null;
+  });
+  function ouvrirInfos(b: Bulle): void {
+    menu = null;
+    infosDe = b.id;
+    infosOuverte = true;
+  }
+  function heure(ms: number | null): string {
+    if (ms === null) return t("salon.infos.pas");
+    return new Date(ms).toDateString() === new Date().toDateString() ? formatClock(ms, lang) : formatDayTime(ms, lang);
   }
   function reagir(b: Bulle, e: string): void {
     menu = null;
@@ -463,6 +480,7 @@
                     <Button variant="ghost" dense onpress={() => repondre(e)}>{t("salon.room.reply")}</Button>
                     <Button variant="ghost" dense onpress={() => copier(e)}>{t("salon.room.copy")}</Button>
                     {#if e.moi && e.seq !== null}
+                      <Button variant="ghost" dense onpress={() => ouvrirInfos(e)}>{t("salon.infos")}</Button>
                       <Button variant="ghost" dense onpress={() => editer(e)}>{t("salon.room.edit")}</Button>
                       <InlineConfirm label={t("salon.room.retract")} message={t("salon.room.retract.confirm")} confirmLabel={t("salon.room.retract")} kind="danger" triggerVariant="ghost" onconfirm={() => ((menu = null), S.retirer(e))} />
                     {/if}
@@ -561,6 +579,32 @@
 {#if !large}
   <Sheet bind:open={membres} title={t("salon.room.members")}><Membres /></Sheet>
 {/if}
+<Sheet bind:open={infosOuverte} title={t("salon.infos.titre")} onclose={() => (infosDe = null)}>
+  {#if infos?.f}
+    {@const f = infos.f}
+    <p class="note">{t("salon.infos.envoye", { heure: heure(f.envoyeMs) })}</p>
+    {#if f.lecteurs.length === 0}
+      <p class="note">{t("salon.infos.personne")}</p>
+    {:else}
+      <ul class="infos">
+        {#each f.lecteurs as l (l.siege)}
+          <li>
+            <p class="qui"><bdi>{nom(l.siege)}</bdi></p>
+            <dl>
+              <dt>{t("salon.infos.recu")}</dt><dd>{heure(l.recu)}</dd>
+              <dt>{t("salon.infos.vu")}</dt><dd>{heure(l.vu)}</dd>
+              {#if infos.b.piece}
+                <dt>{t("salon.infos.ouvert")}</dt><dd>{heure(l.ouvert)}</dd>
+                <dt>{t("salon.infos.telecharge")}</dt><dd>{heure(l.telecharge)}</dd>
+              {/if}
+            </dl>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <p class="note">{t("salon.infos.note")}</p>
+  {/if}
+</Sheet>
 <Sheet bind:open={fichiers} title={t("salon.files.title")}><Fichiers onvoir={voir} /></Sheet>
 <VoiceRecorder bind:open={vocal} ondone={(v) => S.envoyerVocal(v)} />
 
@@ -598,6 +642,26 @@
     padding: var(--sp-2) var(--sp-3);
     border: 1px solid var(--warn);
     border-radius: 12px;
+  }
+  .infos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-3);
+  }
+  .infos .qui {
+    margin: 0;
+    font-weight: 600;
+  }
+  .infos dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--sp-1) var(--sp-3);
+    margin: var(--sp-1) 0 0;
+  }
+  .infos dd {
+    margin: 0;
   }
   .confirmer ul {
     margin: 0;
