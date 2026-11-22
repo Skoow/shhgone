@@ -1,0 +1,36 @@
+# Sonde externe (spec §15.2 ; deploy/README.md §4) : toutes les 15 min, le site répond-il, et son
+# certificat a-t-il encore au moins 14 jours ? Caddy n'écrit aucun journal : un renouvellement
+# raté ne se verrait pas autrement. Un échec fait envoyer par GitHub l'e-mail habituel d'échec
+# de workflow. Inactive tant que la variable du dépôt SHH_SONDE_HOTE (ex. shhgone.com) n'est pas
+# posée (Settings → Secrets and variables → Actions → Variables). Ne touche qu'à la page
+# d'accueil publique : aucune donnée, aucun partage.
+name: sonde
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sonde:
+    if: ${{ vars.SHH_SONDE_HOTE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Le site répond (accueil, HTTPS)
+        env:
+          HOTE: ${{ vars.SHH_SONDE_HOTE }}
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$HOTE/")
+          echo "accueil : $code"
+          [ "$code" = 200 ]
+      - name: Le certificat a encore au moins 14 jours
+        env:
+          HOTE: ${{ vars.SHH_SONDE_HOTE }}
+        run: |
+          fin=$(echo | openssl s_client -connect "$HOTE:443" -servername "$HOTE" 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
+          reste=$(( ($(date -d "$fin" +%s) - $(date +%s)) / 86400 ))
+          echo "fin du certificat : $fin ($reste jours)"
+          [ "$reste" -ge 14 ]

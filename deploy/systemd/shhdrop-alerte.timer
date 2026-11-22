@@ -1,0 +1,11 @@
+# Toutes les 15 minutes (deploy/alerte.sh).
+[Unit]
+Description=Alerte de l'exploitant toutes les 15 minutes (Shhgone)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

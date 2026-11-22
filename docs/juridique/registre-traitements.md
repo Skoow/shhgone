@@ -1,0 +1,28 @@
+# Registre des traitements (RGPD, article 30)
+
+22 novembre 2026. **Projet à faire relire par l'avocat avant l'ouverture au public.** Tenu par l'éditeur, mis à jour à chaque changement de ce que le service garde. Sources : spécification §9 (données stockées), §17 (cadre légal), conception du compte (§8, §21), conception du paiement.
+
+Responsable du traitement : l'éditeur de Shhgone (particulier non professionnel ; identité connue de l'hébergeur, LCEN art. 1-1, II). Contact : contact@shhgone.com. Pas de délégué à la protection des données (non obligatoire : ni autorité publique, ni suivi régulier et systématique à grande échelle, ni données sensibles).
+
+Principe commun à tous les traitements : le contenu (fichiers, messages, appels, noms de fichiers) est chiffré sur l'appareil ; le serveur ne reçoit ni ne garde aucun contenu, nom de fichier, clé ou mot de passe en clair, ni aucune adresse IP sur disque.
+
+| # | Traitement | Finalité | Base légale | Données | Durée | Destinataires |
+|---|---|---|---|---|---|---|
+| T1 | Partages | stocker un contenu chiffré jusqu'à son ouverture | exécution du service demandé (art. 6.1.b) | contenu chiffré (illisible) ; taille arrondie ; nombre d'ouvertures ; échéance arrondie au quart d'heure ; vérificateurs dérivés des secrets du lien | jusqu'à l'échéance choisie, la dernière ouverture, 5 mots de passe faux ou la destruction ; aucune sauvegarde | aucun |
+| T2 | Salons | relayer une conversation chiffrée de bout en bout | art. 6.1.b | trames chiffrées (seconde couche, clé en mémoire seulement) ; pièces jointes chiffrées ; places, nombre de membres ; pour un salon créé avec un compte, l'identifiant interne du compte créateur | vie du salon (durée choisie à la création ; un renouvellement efface la conversation) ; rien après sa fin | aucun |
+| T3 | Appels | relayer le son et l'image chiffrés (DTLS-SRTP) | art. 6.1.b | adresses IP des deux bouts, en mémoire du relais, le temps de l'appel ; identifiants temporaires (6 h) | durée de l'appel ; rien sur disque | aucun |
+| T4 | Limites anti-abus | protéger le service (quotas, débit) | intérêt légitime (art. 6.1.f) | empreintes HMAC de l'adresse IP (préfixe /64 ou /48, ou IPv4) sous un secret aléatoire tenu en mémoire et remplacé chaque nuit | de 1 min à minuit UTC ; jamais écrites | aucun |
+| T5 | Signalements | retirer un contenu illicite (DSA art. 16) | obligation légale (art. 6.1.c) et intérêt légitime | catégorie du signalement ; n° de l'ouverture qui signale ; pour un signalement écrit : ce que la personne envoie (lien, explication, nom et e-mail facultatifs) | compteurs en mémoire ; e-mails : le temps du traitement, puis effacés (registre des retraits sans donnée personnelle) | autorités, sur demande légale |
+| T6 | Comptes (facultatifs) | créer des salons ; pseudo unique | art. 6.1.b | empreintes à clé de l'adresse e-mail (jamais l'adresse en clair) ; vérificateur du mot de passe ; profil (pseudo, photo) lisible par le service ; coffre privé chiffré par le mot de passe ; double authentification ; dates au jour ou au mois ; sessions (nom d'appareil chiffré) | jusqu'à la suppression ; effacé après 13 mois sans connexion | fournisseur d'envoi d'e-mails (adresse et code, au moment de l'envoi seulement) |
+| T7 | Bannissements | empêcher un compte nuisible de revenir | intérêt légitime | empreinte à clé de l'adresse e-mail, dates, motif (catégorie) | durée du bannissement : 30 jours, 1 an ou 3 ans (défaut) | aucun |
+| T8 | Sauvegardes du compte | restaurer après un incident | intérêt légitime | copie chiffrée (age) de comptes.db et paiements.db (sans clés d'émission des jetons) | 7 jours (règle de cycle de vie du stockage) | stockage objet dans l'UE, autre fournisseur (sous-traitant, art. 28) : taille et heure d'envoi seulement |
+| T9 | Paiement (quand il sera ouvert) | vendre un pass sans lier l'achat à l'usage | art. 6.1.b ; obligation comptable (art. 6.1.c) | empreinte du pass ; commande (offre, durée, moyen, état, jour) ; référence du prestataire (empreinte) ; jetons dépensés (empreintes, 2 jours) | selon la conception du paiement ; aucune identité, aucun montant, aucun pays chez nous | prestataire de paiement (Stripe, PayPal ou NOWPayments), responsable de ses propres traitements |
+| T10 | Contact | répondre aux personnes et aux autorités | intérêt légitime ; obligation légale | messages reçus à contact@shhgone.com | le temps de la demande | autorités, sur demande légale |
+
+Sous-traitants (art. 28) : OVH SAS (hébergement, France) ; fournisseur d'envoi d'e-mails (comptes) ; stockage des sauvegardes (UE). Contrats de sous-traitance à conserver.
+
+Transferts hors UE : aucun de notre fait. Les prestataires de paiement en assurent pour leurs propres traitements.
+
+Mesures de sécurité : chiffrement de bout en bout sur l'appareil ; volume chiffré LUKS2 ; aucune mémoire d'échange, aucun vidage mémoire ; aucun journal (Caddy, conteneurs, journald en mémoire) ; suivi des connexions du pare-feu ramené à 30 min ; SSH par clé ; mises à jour automatiques ; tests « le serveur ne voit rien » bloquants ; voir spécification §22 et deploy/README.md §1.
+
+Droits des personnes : accès, rectification, effacement, opposition, par contact@shhgone.com ; export et suppression du compte depuis ses paramètres. Sans compte, rien ne permet de retrouver les données d'une personne. Réclamation possible auprès de la CNIL.

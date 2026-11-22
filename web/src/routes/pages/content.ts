@@ -169,6 +169,18 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits ou poser une question, utilisez le contact des mentions légales. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
         ],
       },
+      {
+        h: "Demandes des autorités",
+        p: [
+          "Nous répondons aux demandes légales des autorités, qui s'adressent au contact des mentions légales. Voici ce que nous pouvons leur donner, et ce que nous ne pouvons pas donner, parce que nous ne l'avons pas.",
+        ],
+        list: [
+          "Le contenu d'un partage ou d'un salon : jamais, il est chiffré sur votre appareil et nous n'avons pas la clé.",
+          "Qui a envoyé ou ouvert un partage : rien ne permet de le savoir, aucune adresse IP n'est gardée.",
+          "Sur un lien transmis : nous pouvons détruire le partage ou le salon tout de suite.",
+          "Avec un compte : seulement ce que garde le compte, jamais le contenu ni une adresse IP.",
+        ],
+      },
     ],
   }),
   conditions: (v) => ({
@@ -445,6 +457,18 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "Your rights",
         p: [
           "We keep nothing that could identify you or find your shares from your identity. To exercise your rights or ask a question, use the contact in the legal notice. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
+        ],
+      },
+      {
+        h: "Requests from authorities",
+        p: [
+          "We answer lawful requests from authorities, sent to the contact in the legal notice. Here is what we can give them, and what we cannot give, because we do not have it.",
+        ],
+        list: [
+          "The content of a share or a room: never, it is encrypted on your device and we do not have the key.",
+          "Who sent or opened a share: nothing lets us know, no IP address is kept.",
+          "For a link sent to us: we can destroy the share or the room at once.",
+          "With an account: only what the account keeps, never the content or an IP address.",
         ],
       },
     ],

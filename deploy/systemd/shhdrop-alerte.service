@@ -1,0 +1,19 @@
+# Alerte de l'exploitant (deploy/alerte.sh ; README §4) : signalements, disque, serveur.
+# Installation : copier ce fichier et shhdrop-alerte.timer dans /etc/systemd/system/, en
+# remplaçant /opt/shhdrop par le chemin de la copie du dépôt, puis :
+#   systemctl daemon-reload && systemctl enable --now shhdrop-alerte.timer
+[Unit]
+Description=Alerte de l'exploitant (Shhgone)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/shhdrop/deploy/alerte.sh
+UMask=0077
+RuntimeDirectory=shhdrop-alerte
+RuntimeDirectoryPreserve=yes
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes
+TimeoutStartSec=2min

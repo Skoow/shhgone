@@ -38,7 +38,7 @@ die() {
 	exit "${2:-1}"
 }
 usage() {
-	printf 'usage: deploy.sh sha256:<empreinte> | rollback | status | admin <commande> | diagnose\n' >&2
+	printf 'usage: deploy.sh sha256:<empreinte> | rollback | status | admin <commande> | health | diagnose\n' >&2
 	exit 2
 }
 
@@ -360,6 +360,13 @@ admin)
 	need_current
 	shift
 	dc "$cur" exec -T shhdrop /shhdrop admin "$@"
+	;;
+health)
+	# Santé du serveur en marche (JSON de /healthz : ok, reports_alert ; aucune donnée
+	# d'utilisateur). Lue par alerte.sh (README §4).
+	[ $# -eq 1 ] || usage
+	need_current
+	dc "$cur" exec -T shhdrop /shhcheck health
 	;;
 diagnose)
 	# Le pilote de journal est « none » : un refus de démarrer ne se lit nulle part. Ici le
