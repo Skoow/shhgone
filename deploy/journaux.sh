@@ -109,6 +109,38 @@ controle_journaux() {
 		[[ $v =~ ^[0-9]+$ ]] && [ "$v" -le 1800 ] ||
 			pb+=("nf_conntrack_tcp_timeout_established = $v s (adresses gardées en mémoire) ; le ramener à 1800 (/etc/sysctl.d/, README §1)")
 	fi
+	# 7. Registres des connexions, hors journaux (IP5) : sshd écrit lui-même l'adresse de chaque
+	#    connexion dans wtmp et lastlog, de chaque échec dans btmp, quel que soit LogLevel
+	#    (Ubuntu 24.04) ; ils doivent être des liens vers /dev/null (ou absents).
+	for f in var/log/wtmp var/log/btmp var/log/lastlog; do
+		if [ -L "$r/$f" ]; then
+			[ "$(readlink "$r/$f")" = /dev/null ] ||
+				pb+=("/$f : lien vers $(readlink "$r/$f") ; lien vers /dev/null attendu (tmpfiles 00-shhdrop-connexions.conf, README §1)")
+		elif [ -e "$r/$f" ]; then
+			pb+=("/$f : fichier sur le disque (sshd y écrit l'adresse des connexions) ; le remplacer par un lien vers /dev/null (tmpfiles 00-shhdrop-connexions.conf, README §1)")
+		fi
+	done
+	#    Ubuntu 26.04 : wtmpdb et lastlog2, écrits par PAM (pam_wtmpdb, pam_lastlog2).
+	for f in var/lib/wtmpdb/wtmp.db var/lib/lastlog/lastlog2.db; do
+		[ -f "$r/$f" ] && [ ! -L "$r/$f" ] && [ -s "$r/$f" ] &&
+			pb+=("/$f : base non vide (adresses des connexions) ; pam-auth-update --disable wtmpdb lastlog2, systemctl mask wtmpdb-update-boot.service, puis l'effacer (README §1)")
+	done
+	for f in etc/pam.d/sshd etc/pam.d/common-session etc/pam.d/common-session-noninteractive; do
+		[ -f "$r/$f" ] || continue
+		for v in pam_lastlog pam_lastlog2 pam_wtmpdb; do
+			grep -Eq "^[[:space:]]*[^#[:space:]].*[[:space:]/]$v\.so([[:space:]]|\$)" "$r/$f" &&
+				pb+=("/$f : $v actif (écrit l'adresse des connexions) ; retirer la ligne, ou pam-auth-update --disable wtmpdb lastlog2 (README §1)")
+		done
+	done
+	for f in etc/logrotate.d/wtmp etc/logrotate.d/btmp; do
+		[ -e "$r/$f" ] &&
+			pb+=("/$f présent : logrotate recréerait un fichier à la place du lien vers /dev/null ; l'effacer (README §1)")
+	done
+	# 8. Purge du journal en mémoire tous les quarts d'heure (IP6 ; journald n'applique
+	#    MaxRetentionSec qu'en écrivant).
+	f=$r/etc/systemd/system/timers.target.wants/shhdrop-journal.timer
+	[ -L "$f" ] || [ -e "$f" ] ||
+		pb+=("minuteur shhdrop-journal.timer non activé ; l'installer depuis deploy/systemd/, puis systemctl enable --now shhdrop-journal.timer (README §1)")
 	[ ${#pb[@]} -eq 0 ] && return 0
 	printf '%s\n' "${pb[@]}"
 	return 1
