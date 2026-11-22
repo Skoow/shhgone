@@ -157,7 +157,7 @@ Aucune construction maison. HKDF-SHA-256 du moteur Rust (RustCrypto `hkdf`, `sha
 | `KEK_i` | HKDF(`P_i`, sel vide, info = « shhdrop/v3/compte/enveloppe/prf », 32) → AES-256-GCM | mémoire |
 | `Env_i` | nonce (12) ‖ AES-256-GCM(`KEK_i`, nonce, `K_compte`, AD = « SHH-CENV2 » ‖ `h` ‖ SHA-256(`cred_id_i`)) = **60 octets** | serveur, ligne de la passkey `i` |
 | `R` | clé de récupération : 16 octets aléatoires | chez la personne seulement ; montrée une fois |
-| `R_texte` | base32 de Crockford de `R` (128 bits → 26 caractères, les 2 bits de bourrage de fin à zéro, refusés sinon) ‖ caractère de contrôle (valeur de `R` comme entier gros-boutiste, mod 37, alphabet `0-9A-Z*~$=U`) = 27 caractères ; affichage en groupes de 4 séparés par « - » ; saisie normalisée (majuscules, blancs et tirets retirés, `I`/`L` → `1`, `O` → `0`) | écran, fichier `.txt` téléchargé |
+| `R_texte` | base32 de Crockford de `R` (128 bits → 26 caractères, les 2 bits de bourrage de fin à zéro, refusés sinon) ‖ caractère de contrôle (valeur de `R` comme entier gros-boutiste, mod 37, alphabet de contrôle de Crockford à 37 symboles `0123456789ABCDEFGHJKMNPQRSTVWXYZ*~$=U`, corrigé le 22 novembre) = 27 caractères ; affichage en groupes de 4 séparés par « - » ; saisie normalisée (majuscules, blancs et tirets retirés, `I`/`L` → `1`, `O` → `0`) | écran, fichier `.txt` téléchargé |
 | `A_r` | HKDF(`R`, sel vide, info = « shhdrop/v3/compte/recup/acces », 32) | envoyé à `recup` |
 | `v_r` | SHA-256(`A_r`) | serveur, **index unique** (la clé seule retrouve le compte) |
 | `KEK_r` | HKDF(`R`, sel vide, info = « shhdrop/v3/compte/recup/enveloppe », 32) → AES-256-GCM | mémoire |
@@ -323,7 +323,7 @@ Bornée par les quotas (3 comptes par jour et par connexion, 500 par jour en tou
 |---|---|---|
 | Adresse e-mail, normalisation, domaines jetables, `e_canon`, `e_envoi` | `engine/core/src/compte.rs` (`normaliser`, `sel`), `server/internal/compte/adresse.go`, `jetables*.go/txt`, vecteurs `normaliser` et `sel` | plus d'e-mail |
 | Mot de passe, Argon2id du compte, `A_auth`, `v_mdp`, `Env_mdp`, règles du mot de passe | `compte.rs` (`deriver`, `mot_de_passe_valide`), `web/src/routes/compte/MotDePasse.svelte`, `ReglesMdp.svelte` | remplacé par la passkey ; Argon2id reste dans le moteur pour les partages protégés par mot de passe |
-| Fournisseur d'e-mails (D1), SMTP, relais `shhcheck relais`, exception de `TestNoOutgoingHTTP`, secrets SMTP, enregistrements SPF/DKIM/DMARC | `server/internal/courriel/`, `server/internal/stats_test.go`, `deploy/` | **le serveur revient à « aucune sortie »** : gain de sécurité et d'exploitation net |
+| Fournisseur d'e-mails (D1), SMTP, relais `shhcheck relais`, exception de `TestNoOutgoingHTTP`, secrets SMTP, enregistrements SPF/DKIM/DMARC | `server/internal/courriel/`, `server/internal/stats_test.go`, `deploy/` | **plus aucune sortie SMTP** (corrigé le 22 novembre : les sorties de reCAPTCHA et des prestataires de paiement restent, avec leurs exceptions de `TestNoOutgoingHTTP`) : gain de sécurité et d'exploitation net |
 | Codes envoyés, renvois, quotas d'e-mails (S4), file d'envoi | `etapes.go`, `limits` | idem |
 | TOTP (double authentification) | `server/internal/compte/totp.go`, routes `totp/*`, `K_totp` | une passkey vérifiée (`UV`) est déjà deux facteurs (l'appareil et le visage, le doigt ou le code) ; la garder n'ajouterait qu'une étape. **Recommandé : retirée** (Q4) |
 | Récupération par e-mail (`oubli/*`), attente de 7 jours après récupération (`recup_jour`), retrait de TOTP après 7 jours (`totp_retrait_jour`) | `oubli.go` | leur raison d'être était la **boîte mail volée** (elle devenait la clé du compte, R4) ; une clé de 128 bits que seule la personne détient n'a pas ce défaut. Pas d'attente (Q10 pour le renouvellement de la clé) ; le signalement juridique de l'attente avant suppression (RGPD art. 12.3) disparaît |
@@ -449,3 +449,9 @@ Ordre : P1 → S1 → S2 → W1 → W2 → T1 → D1, chaque lot avec ses tests 
 9. **Q9 — Appareils sans PRF acceptés** (clé de récupération une fois par appareil, puis clé gardée sur l'appareil, protégée par son verrouillage). **Recommandé : oui** ; les refuser exclurait Windows non mis à jour et certains gestionnaires.
 10. **Q10 — Après usage de la clé de récupération** : nouvelle clé proposée (bandeau jusqu'à ce que ce soit fait) ou imposée tout de suite. **Recommandé : proposée** ; l'imposer ajoute une étape à un moment stressant, pour un risque (clé vue en la tapant) que la personne peut juger elle-même. À l'inverse, si la sécurité prime sans réserve : imposée.
 11. **Q11 — « Rester connecté »** : gardé tel que codé (décoché, 30 jours sans usage, 90 au plus), alors que se reconnecter ne coûte plus qu'un geste. **Recommandé : gardé** (rien à recoder, utile sur ordinateur).
+
+## 17. Corrections du 22 novembre (relecture de l'implémentation du moteur)
+
+- Alphabet du caractère de contrôle : 37 symboles de Crockford (le texte d'origine en listait 41).
+- « Aucune sortie » : faux, reCAPTCHA et le paiement sortent encore ; seule la sortie SMTP disparaît.
+- `rp.id` : il découle de `SHH_ORIGIN`. Quand les comptes sont activés, `deploy.sh` refuse tout `SHH_ORIGIN` autre que `https://shhgone.com`, et le démarrage refuse une ancienne variable `SHH_SMTP_*` ou `SHH_MAIL_FROM` au lieu de l'ignorer. Les tests du compte tournent sur `localhost` (les navigateurs refusent une adresse IP comme `rp.id`).
