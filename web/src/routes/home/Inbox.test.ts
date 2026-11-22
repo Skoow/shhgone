@@ -162,19 +162,26 @@ describe("accueil connecté", () => {
     await live.recordReceived({ link: "https://x.test/#" + KEY("a"), expiresAt: T + 4 * H, itemsCount: 6, sizeBytes: 10, format: "image" });
     vi.setSystemTime(T);
     app = mount(Inbox as never, { target: document.body, props: { profile: { pseudo: "Léa", photo: null } } }) as Record<string, unknown>;
-    await vi.advanceTimersByTimeAsync(10);
-    flushSync();
+    // Attentes explicites (et non un temps fixe) : l'historique est déchiffré par WebCrypto, en
+    // temps réel ; sous charge, un délai fixe de faux minuteurs finissait avant lui. vi.waitFor
+    // avance les faux minuteurs à chaque essai (pause aléatoire de 0,5 à 4 s avant la relecture).
+    await vi.waitFor(() => {
+      flushSync();
+      expect(rows()).toHaveLength(1);
+    });
+    const id = live.shares.all[0]!.id;
     rows()[0]!.querySelector("button")!.click();
     flushSync();
+    // Première relecture : faite, et finie (lastSeenAt écrit) avant le second appui.
     button("Actualiser").click();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.waitFor(() => expect(net.meta).toHaveBeenCalledTimes(1), { timeout: 10_000 });
+    await vi.waitFor(() => expect(live.shares.info[id]).toEqual({}), { timeout: 10_000 });
+    // Second appui moins de 5 min après : refusé (« trop tôt », nextAt dans 5 min), sans requête.
     flushSync();
     button("Actualiser").click();
-    await vi.advanceTimersByTimeAsync(5000);
-    flushSync();
+    await vi.waitFor(() => expect(live.shares.info[id]?.nextAt).toBe(live.shares.all[0]!.lastSeenAt + 5 * 60_000), { timeout: 10_000 });
+    expect(live.shares.all[0]!.lastSeenAt).toBeGreaterThanOrEqual(T);
     expect(net.meta).toHaveBeenCalledTimes(1);
-    // Relecture finie (écriture comprise) avant le test suivant.
-    await vi.advanceTimersByTimeAsync(10_000);
     vi.useRealTimers();
     await settle();
   });
