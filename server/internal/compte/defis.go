@@ -107,6 +107,3 @@ func (s *Service) oublierDefisDe(h [16]byte) {
 		}
 	}
 }
-
-// defi : données de la cérémonie WebAuthn (lot S3).
-type defi struct{}

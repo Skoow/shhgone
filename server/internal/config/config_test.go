@@ -331,3 +331,25 @@ func TestComptesConfigRefusee(t *testing.T) {
 		}
 	}
 }
+
+// SHH_WEBAUTHN_ORIGINES_APPS : vide par défaut ; chaque origine exactement
+// android:apk-key-hash:<43 caractères base64url> (conception du compte par passkey §6.2).
+func TestOriginesApps(t *testing.T) {
+	env(t, comptesOK())
+	if c, err := FromEnv(); err != nil || c.WebAuthnOriginesApps != nil {
+		t.Fatal(c.WebAuthnOriginesApps, err)
+	}
+	a := "android:apk-key-hash:" + strings.Repeat("A", 42) + "E"
+	b := "android:apk-key-hash:" + strings.Repeat("_", 42) + "w"
+	env(t, avec(comptesOK(), "SHH_WEBAUTHN_ORIGINES_APPS", a+","+b))
+	if c, err := FromEnv(); err != nil || len(c.WebAuthnOriginesApps) != 2 || c.WebAuthnOriginesApps[1] != b {
+		t.Fatal(c.WebAuthnOriginesApps, err)
+	}
+	for _, v := range []string{"android:apk-key-hash:", a + "A", a[:len(a)-1], a + ", " + b, a + ",", "https://shhgone.com",
+		"android:apk-key-hash:" + strings.Repeat("A", 42) + "B", "ios:" + strings.Repeat("A", 43)} {
+		env(t, avec(comptesOK(), "SHH_WEBAUTHN_ORIGINES_APPS", v))
+		if _, err := FromEnv(); err == nil {
+			t.Errorf("%q accepté", v)
+		}
+	}
+}

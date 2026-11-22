@@ -63,6 +63,11 @@ type Config struct {
 	// ComptesJour (SHH_COMPTES_JOUR, 1 à 100 000, défaut 500) : comptes créés au plus par jour
 	// UTC pour tout le serveur (coupe-circuit, conception du compte par passkey §7.2).
 	ComptesJour int
+	// WebAuthnOriginesApps (SHH_WEBAUTHN_ORIGINES_APPS, vide par défaut) : origines des apps
+	// Android acceptées par les cérémonies WebAuthn, séparées par des virgules, chacune
+	// exactement android:apk-key-hash:<43 caractères base64url> (conception du compte par passkey
+	// §6.2, §10.1). L'app iOS présente l'origine https://<rp.id> : rien à ajouter pour elle.
+	WebAuthnOriginesApps []string
 	// Paiement (SHH_PAIEMENT=1, conception du paiement §10) : vente de Plus et Pro. Désactivé
 	// par défaut (aucune route, aucun fichier, aucun appel sortant) ; exige SHH_ORIGIN, SHH_TVA
 	// et au moins un prestataire complet (Pay).

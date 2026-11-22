@@ -113,6 +113,8 @@
 
 ## Lot S3 — Cérémonies WebAuthn (go-webauthn, configuration figée)
 
+**État : fait le 22 novembre (internal/compte/webauthn.go, authentificateur logiciel internal/compte/webauthntest, importable par les tests des autres paquets ; govulncheck v1.9.0 : 0 vulnérabilité atteinte). Les défis vivent dans les étapes de defis.go (lot S2). Une réponse qui contient une sortie PRF (prf.results) ou hmac-secret est refusée (bad_request) : le site doit les retirer de clientExtensionResults avant l'envoi.**
+
 *Livrable seul : bibliothèque appelée par des tests seulement. Dépend de : S1 (accepté), S2.*
 
 **Files :**
@@ -125,8 +127,8 @@
 - Défis : 32 octets `crypto/rand`, clé = SHA-256(`etape`), usage unique, 5 min, 20 000 au plus (au-delà : `busy`, 503).
 - Stocké d'une passkey : `cred_id`, `cle_pub` (COSE ≤ 1 024), `alg`, `be`, `ajoutee_mois` ; **jamais** AAGUID, transports, attestation, compteur, `BS`. Compteur remis à 0 avant chaque vérification, avertissement de clonage ignoré.
 
-- [ ] **Step 1 : tests** — cérémonie complète pour chaque algorithme ; défi rejoué, défi échu (horloge de test), mauvaise origine, mauvais `rp.id`, `UV` absent, `BE` changé entre inscription et connexion, `userHandle` d'un autre compte, `cred_id` inconnu → même erreur `identifiants` ; attestation autre que `none` refusée ou ignorée sans rien garder ; `TestRPIDProduction` : `SHH_ORIGIN=https://shhgone.com` → `rp.id` = `shhgone.com` ; origine `http://` refusée hors boucle locale ; `localhost` accepté pour les tests (voir Signalements point 3).
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go` ; `govulncheck` (CI). **Step 5 :** commit `feat(serveur): cérémonies WebAuthn (go-webauthn épinglé, configuration figée)`.
+- [x] **Step 1 : tests** — cérémonie complète pour chaque algorithme ; défi rejoué, défi échu (horloge de test), mauvaise origine, mauvais `rp.id`, `UV` absent, `BE` changé entre inscription et connexion, `userHandle` d'un autre compte, `cred_id` inconnu → même erreur `identifiants` ; attestation autre que `none` refusée ou ignorée sans rien garder ; `TestRPIDProduction` : `SHH_ORIGIN=https://shhgone.com` → `rp.id` = `shhgone.com` ; origine `http://` refusée hors boucle locale ; `localhost` accepté pour les tests (voir Signalements point 3).
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-go` ; `govulncheck` (CI). **Step 5 :** commit `feat(serveur): cérémonies WebAuthn (go-webauthn épinglé, configuration figée)`.
 
 ## Lot S4 — Routes : inscription, connexion, récupération
 

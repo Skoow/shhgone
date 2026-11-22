@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -38,6 +39,14 @@ func comptesFromEnv(c *Config) error {
 			return fmt.Errorf("SHH_COMPTES_JOUR invalide (entier de 1 à 100000, comptes créés par jour): %q", v)
 		}
 		c.ComptesJour = n
+	}
+	if v := os.Getenv("SHH_WEBAUTHN_ORIGINES_APPS"); v != "" {
+		for _, o := range strings.Split(v, ",") {
+			if !origineAndroidOK(o) {
+				return fmt.Errorf("SHH_WEBAUTHN_ORIGINES_APPS invalide (android:apk-key-hash:<43 caractères base64url>, séparées par des virgules, sans espace): %q", o)
+			}
+			c.WebAuthnOriginesApps = append(c.WebAuthnOriginesApps, o)
+		}
 	}
 	var err error
 	if c.ComptesCleFile, err = secretFile("SHH_COMPTES_CLE_FILE", c.DataDir); err != nil {
@@ -77,6 +86,17 @@ func RPID(origin string) string {
 		return ""
 	}
 	return h
+}
+
+// origineAndroidOK : android:apk-key-hash: suivi de l'empreinte SHA-256 du certificat de
+// signature de l'app, en base64url sans bourrage (43 caractères, forme canonique).
+func origineAndroidOK(o string) bool {
+	h, ok := strings.CutPrefix(o, "android:apk-key-hash:")
+	if !ok || len(h) != 43 {
+		return false
+	}
+	b, err := base64.RawURLEncoding.DecodeString(h)
+	return err == nil && len(b) == 32 && base64.RawURLEncoding.EncodeToString(b) == h
 }
 
 // sansEmail : le compte par e-mail a été retiré le 22 novembre (conception du compte par passkey

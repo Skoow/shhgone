@@ -23,8 +23,9 @@ import (
 // cohérents avec les clés dont le serveur ne dispose pas.
 type vecteursV3 struct {
 	Constants struct {
-		EnveloppeLen int `json:"enveloppe_len"`
-		CredIDMax    int `json:"cred_id_max"`
+		EnveloppeLen int    `json:"enveloppe_len"`
+		EntreePRF    string `json:"entree_prf"`
+		CredIDMax    int    `json:"cred_id_max"`
 		Reserves     []struct {
 			PCanonHex string `json:"p_canon_hex"`
 		} `json:"reserves"`
