@@ -270,6 +270,38 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(fil(pageB).locator("li.msg.album .auteur")).toHaveCount(1);
     await fil(pageB).locator("li.msg.album").last().scrollIntoViewIfNeeded();
     await capture(pageB, "salon-album");
+    // Mode sélection dans la conversation (v3 §14.3) : appui long sur une photo de l'album, toucher
+    // sur la seconde, « Télécharger (2) » en une archive .zip ; puis au clavier (menu « Sélectionner »).
+    const photo1 = fil(pageB).locator("li.msg.album").first().locator(".bulle");
+    const zoneP = (await photo1.boundingBox())!;
+    await pageB.mouse.move(zoneP.x + zoneP.width / 2, zoneP.y + zoneP.height / 2);
+    await pageB.mouse.down();
+    await pageB.waitForTimeout(800);
+    await pageB.mouse.up();
+    const barre = pageB.getByRole("group", { name: "Sélection" });
+    await expect(barre.getByText("Pièces choisies : 1")).toBeVisible();
+    await fil(pageB).locator("li.msg.album").nth(1).locator(".bulle").click();
+    await expect(barre.getByText("Pièces choisies : 2")).toBeVisible();
+    await capture(pageB, "salon-selection");
+    expect(await axe(pageB)).toEqual([]);
+    const zipAlbum = pageB.waitForEvent("download");
+    await barre.getByRole("button", { name: "Télécharger (2)", exact: true }).click();
+    const octetsAlbum = readFileSync((await (await zipAlbum).path())!);
+    expect(octetsAlbum.includes(Buffer.from(`album-1-${r}.jpg`))).toBe(true);
+    expect(octetsAlbum.includes(Buffer.from(`album-2-${r}.jpg`))).toBe(true);
+    expect(octetsAlbum.includes(Buffer.from(nomDoc))).toBe(false);
+    await expect(barre).toHaveCount(0);
+    const doc = fil(pageB).locator("li").filter({ hasText: nomDoc });
+    await doc.getByRole("button", { name: "Actions du message" }).focus();
+    await pageB.keyboard.press("Enter");
+    await doc.getByRole("button", { name: "Sélectionner", exact: true }).focus();
+    await pageB.keyboard.press("Enter");
+    await expect(pageB.getByRole("checkbox", { name: `Choisir ${nomDoc}` })).toBeFocused();
+    await expect(barre.getByText("Pièces choisies : 1")).toBeVisible();
+    await pageB.keyboard.press("Space");
+    await expect(barre.getByText("Pièces choisies : 0")).toBeVisible();
+    await pageB.keyboard.press("Escape");
+    await expect(barre).toHaveCount(0);
 
     // Captures (preuve) et audit d'accessibilité (WCAG 2.1 A et AA) des écrans du salon.
     await capture(page, "salon-conversation");
