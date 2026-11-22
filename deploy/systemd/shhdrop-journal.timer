@@ -1,0 +1,13 @@
+# Tous les quarts d'heure (shhdrop-journal.service). Pas toutes les heures : un fichier fermé
+# n'est effacé que quand sa DERNIÈRE entrée a plus d'une heure ; à une passe par heure, une
+# entrée pouvait vivre près de 2 h. Au quart d'heure : 1 h 15 au plus.
+[Unit]
+Description=Purge du journal tous les quarts d'heure (Shhgone)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

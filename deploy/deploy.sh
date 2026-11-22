@@ -236,7 +236,8 @@ preflight() {
 	fi
 	# Journaux de la machine (README §1 ; inventaire des adresses IP du 22 novembre, journaux.sh) :
 	# aucun syslog ni ancien journal sur le disque, journald en mémoire une heure au plus, sshd
-	# silencieux, ufw sans journal, suivi des connexions ramené à 30 min. Bloquant.
+	# silencieux, ufw sans journal, suivi des connexions ramené à 30 min, registres des connexions
+	# (wtmp, btmp, lastlog, wtmpdb, lastlog2) vers /dev/null, minuteur de purge du journal. Bloquant.
 	local sshd_t=absent pbs
 	if command -v sshd >/dev/null 2>&1 || [ -x /usr/sbin/sshd ]; then
 		sshd_t=$(PATH=$PATH:/usr/sbin sshd -T 2>/dev/null) || sshd_t=

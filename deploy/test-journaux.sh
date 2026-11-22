@@ -26,6 +26,16 @@ machine() {
 	: >"$r/usr/sbin/ufw"
 	printf 'ENABLED=yes\nLOGLEVEL=off\n' >"$r/etc/ufw/ufw.conf"
 	echo 1800 >"$r/proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established"
+	# Registres des connexions : liens vers /dev/null ; PAM d'Ubuntu 24.04 sans pam_lastlog
+	# (ligne commentée), minuteur de purge activé.
+	mkdir -p "$r/etc/pam.d" "$r/etc/logrotate.d" "$r/etc/systemd/system/timers.target.wants"
+	ln -s /dev/null "$r/var/log/wtmp"
+	ln -s /dev/null "$r/var/log/btmp"
+	ln -s /dev/null "$r/var/log/lastlog"
+	printf '@include common-auth\naccount required pam_nologin.so\n# session optional pam_lastlog.so\nsession optional pam_motd.so motd=/run/motd.dynamic\n@include common-session\n' >"$r/etc/pam.d/sshd"
+	printf 'session [default=1] pam_permit.so\nsession required pam_unix.so\nsession optional pam_systemd.so\n' >"$r/etc/pam.d/common-session"
+	printf '[Unit]\n' >"$r/etc/logrotate.d/apt"
+	ln -s /etc/systemd/system/shhdrop-journal.timer "$r/etc/systemd/system/timers.target.wants/shhdrop-journal.timer"
 	printf '%s\n' "$r"
 }
 
@@ -125,6 +135,54 @@ refuse "ufw sans ufw.conf" "$r" "$SSHD_BON" "ufw logging off"
 r=$(machine conntrack)
 echo 432000 >"$r/proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established"
 refuse "conntrack 5 jours" "$r" "$SSHD_BON" "le ramener à 1800"
+
+# 7. Registres des connexions (IP5). Ubuntu 24.04 : wtmp, btmp, lastlog écrits par sshd.
+for f in wtmp btmp lastlog; do
+	r=$(machine "registre-$f")
+	rm "$r/var/log/$f"
+	: >"$r/var/log/$f" # même vide : sshd y écrira
+	refuse "/var/log/$f fichier" "$r" "$SSHD_BON" "/var/log/$f : fichier sur le disque"
+	r=$(machine "registre-$f-lien")
+	ln -sfn ../autre "$r/var/log/$f"
+	refuse "/var/log/$f lien ailleurs" "$r" "$SSHD_BON" "lien vers /dev/null attendu"
+	r=$(machine "registre-$f-absent")
+	rm "$r/var/log/$f"
+	accepte "/var/log/$f absent" "$r" "$SSHD_BON"
+done
+for f in wtmp btmp; do
+	r=$(machine "logrotate-$f")
+	: >"$r/etc/logrotate.d/$f"
+	refuse "règle logrotate $f" "$r" "$SSHD_BON" "/etc/logrotate.d/$f présent"
+done
+# Ubuntu 26.04 : wtmpdb et lastlog2, écrits par PAM.
+r=$(machine wtmpdb)
+mkdir -p "$r/var/lib/wtmpdb" "$r/var/lib/lastlog"
+: >"$r/var/lib/wtmpdb/wtmp.db"
+: >"$r/var/lib/lastlog/lastlog2.db"
+accepte "bases vides" "$r" "$SSHD_BON"
+echo SQLite >"$r/var/lib/wtmpdb/wtmp.db"
+refuse "wtmp.db non vide" "$r" "$SSHD_BON" "/var/lib/wtmpdb/wtmp.db : base non vide"
+r=$(machine lastlog2)
+mkdir -p "$r/var/lib/lastlog"
+echo SQLite >"$r/var/lib/lastlog/lastlog2.db"
+refuse "lastlog2.db non vide" "$r" "$SSHD_BON" "lastlog2.db : base non vide"
+for cas in "sshd:session optional pam_lastlog.so:pam_lastlog actif" \
+	"common-session:session optional			pam_wtmpdb.so skip_if=sshd:pam_wtmpdb actif" \
+	"common-session:-session optional pam_lastlog2.so:pam_lastlog2 actif" \
+	"common-session-noninteractive:session optional /usr/lib/security/pam_lastlog2.so:pam_lastlog2 actif"; do
+	IFS=: read -r fichier ligne motif <<<"$cas"
+	r=$(machine "pam-$fichier-${motif%% *}")
+	printf '%s\n' "$ligne" >>"$r/etc/pam.d/$fichier"
+	refuse "PAM $fichier : $ligne" "$r" "$SSHD_BON" "/etc/pam.d/$fichier : $motif"
+done
+r=$(machine pam-commente)
+printf '#session optional pam_wtmpdb.so\n  # session optional pam_lastlog2.so\nsession optional pam_lastlogx.so\n' >>"$r/etc/pam.d/common-session"
+accepte "PAM : modules commentés ou autre nom" "$r" "$SSHD_BON"
+
+# 8. Minuteur de purge du journal (IP6).
+r=$(machine minuteur)
+rm "$r/etc/systemd/system/timers.target.wants/shhdrop-journal.timer"
+refuse "minuteur non activé" "$r" "$SSHD_BON" "shhdrop-journal.timer non activé"
 
 # Plusieurs problèmes : tous dits d'un coup.
 r=$(machine tout)
