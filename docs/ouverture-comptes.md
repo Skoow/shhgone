@@ -8,9 +8,9 @@
 
 Avec l'e-mail ont disparu : le code par e-mail, le mot de passe, le mot de passe oublié, la double authentification (TOTP), le séquestre du profil et le relais SMTP.
 
-**Côté serveur, c'est codé et testé** (lots S1 à S8 du plan `docs/superpowers/plans/2026-11-22-compte-passkey.md`). **Le site reste à refaire** contre ces routes (lots W du plan) : le site actuel parle encore à l'ancien compte par e-mail et ne marche plus contre le serveur.
+**C'est codé et testé, serveur et site** (lots S1 à S8, puis W1 à W5 et T1 du plan `docs/superpowers/plans/2026-11-22-compte-passkey.md`). Le site essaie toutes les enveloppes d'une passkey, répare celle qui manque quand la sortie PRF a changé (QR, autre version d'iOS, autre gestionnaire), lit une sortie PRF non conforme (1Password) et retombe sur la clé de récupération, une fois par appareil, quand la passkey n'ouvre pas les données. **Reste bloquant pour l'ouverture : le passage manuel sur appareils réels (point 3).**
 
-Il est **activé en production** (décision D8 du 19 novembre) : `SHH_COMPTES: "1"` dans `deploy/compose.yaml`, site de l'image construit avec `SHH_SITE_COMPTES=1`. `deploy.sh` refuse d'installer sans la clé du serveur (point 4) et pour un autre nom que `shhgone.com`. Dans la démo GitHub Pages, il est **essayable**, avec un faux serveur dans l'onglet ; ce faux serveur est encore celui du compte par e-mail et sera refait avec le site.
+Il est **activé en production** (décision D8 du 19 novembre) : `SHH_COMPTES: "1"` dans `deploy/compose.yaml`, site de l'image construit avec `SHH_SITE_COMPTES=1`. `deploy.sh` refuse d'installer sans la clé du serveur (point 4) et pour un autre nom que `shhgone.com`. Dans la démo GitHub Pages, il est **essayable**, avec un faux serveur dans l'onglet et une passkey **simulée** (aucune passkey n'est créée dans le gestionnaire du visiteur ; la clé de récupération est la vraie).
 
 Ce document liste ce qui manque pour l'ouvrir au public. La procédure technique elle-même est dans `deploy/README.md` §12.
 
@@ -33,6 +33,7 @@ Sources : `docs/superpowers/specs/2026-11-14-compte-email-design.md`, §20 ; `do
 - **Contenus terroristes et pédocriminels** : obligations de l'hébergeur (LCEN, DSA art. 16 à 18, règlement TCO 2021/784) face à des signalements de contenus que Shhgone ne peut pas lire (R15).
 - **Motif de bannissement** gardé sous forme de catégorie : donnée relative à une infraction présumée (RGPD art. 10, R16).
 - **Photo de profil** : contenu hébergé. Depuis le retrait du séquestre (22 novembre), le serveur ne peut plus la lire.
+- **Ce que garde le compte par passkey** (conception du compte par passkey §12) : plus aucune identité civile ; pseudonyme illisible par le serveur (seul un code à sens unique de sa forme canonique est gardé) ; clés publiques des passkeys et `v_r` (code à sens unique de la clé de récupération) ; identifiant du compte tiré au hasard ; dates au jour ou au mois. Données pseudonymes au sens du RGPD (considérant 26) : la page Confidentialité ne dit jamais « aucune donnée personnelle ». Apple, Google ou le gestionnaire de mots de passe apprennent l'existence du compte et le pseudo (nom de la passkey) : leur traitement, dit dans la page Confidentialité.
 - **Bannissement sans adresse** : un compte banni se recrée avec une autre passkey. Est-ce une mesure suffisante face à une demande d'une autorité ? Conception du compte par passkey, §7.4.
 
 ### 2.1 Conservation des IP et des données d'identification : ce que disent les textes (22 novembre 2026)
@@ -56,6 +57,7 @@ Questions à poser à l'avocat :
 
 ## 3. Ce qui manque encore dans le produit
 
+- **Passage manuel du compte par passkey sur appareils réels, bloquant** (conception §14 ; captures à joindre ici) : iPhone (iOS 18.4 ou plus) avec iCloud, en local et par QR depuis un PC ; Android avec le Gestionnaire de mots de passe Google ; Windows 11 à jour avec Windows Hello ; Firefox ; une clé physique ; 1Password ou Bitwarden ; un appareil sans PRF (repli par la clé de récupération). Les tests automatiques ne couvrent que Chromium (authentificateur virtuel) : WebKit n'en a pas.
 - **Le salon** (plans C-3 à C-5) : **codé et testé** au 19 novembre (création, entrée, conversation, pièces, vocaux, règles d'effacement, codes, exclusion avec nouvelle invitation, preuve de membre, destruction ; « le serveur ne voit rien » étendu au salon). Avant l'ouverture publique, il reste :
   - ~~les décisions prises par défaut à valider~~ : validées par le propriétaire le 22 novembre (spécification du salon v3, §16 : preuve de membre en AES-GCM de WebCrypto, sens de « Ouvert », silencieux gardé dans la preuve, délai de l'alerte d'écart, pièces une par une sans album) ;
   - un passage sous WebKit (Safari, iPhone) du parcours `web/ui-e2e/salon.spec.ts` ;
@@ -74,7 +76,7 @@ Questions à poser à l'avocat :
 4. **Configuration** :
    - `deploy/.env` : `SHH_DOMAIN=shhgone.com`, le seul nom accepté avec le compte, car les passkeys sont liées à ce nom. Aucune variable `SHH_SMTP_*` ni `SHH_MAIL_FROM` : elles sont refusées ;
    - `compose.yaml` : `SHH_SALONS: "1"` et `SHH_COMPTES: "1"`.
-5. **Site** construit avec `SHH_SITE_COMPTES=1`, contrôlé par `node scripts/check-dist.mjs --comptes`, **après la refonte du site** (lots W du plan).
+5. **Site** construit avec `SHH_SITE_COMPTES=1`, contrôlé par `node scripts/check-dist.mjs --comptes` (il exige l'appel des passkeys ; la démo, elle, ne doit pas en contenir).
 6. Déploiement : `deploy/deploy.sh sha256:<empreinte>`. Il contrôle les secrets et le nom du site.
 
 ## 5. Preuves déjà en place
@@ -82,6 +84,7 @@ Questions à poser à l'avocat :
 - **Tests du serveur** : `server/internal/compte` (cérémonies WebAuthn avec un authentificateur logiciel, clé de récupération, enveloppes, limites, bannissement, effacement) et `server/internal/api` (routes du compte par HTTP).
 - **Test « le serveur ne voit rien » étendu au compte par passkey** : `web/e2e/compte-sees-nothing.test.ts`, bloquant. Il fouille le dossier de données, les sorties et la mémoire du serveur : ni sortie PRF, ni clé du compte, ni clé de récupération, ni pseudo affiché, ni photo, ni AAGUID sur disque.
 - **Revue de la bibliothèque WebAuthn** (go-webauthn v0.18.2 et ses dépendances) : `docs/superpowers/plans/2026-11-22-revue-go-webauthn.md`.
-- **À refaire avec le site** : tests unitaires du compte dans `web/src/account` et `web/src/routes/compte`, faux serveur de la démo (`web/src/demo/fake-compte.ts`), parcours par l'interface (`web/ui-e2e/compte.spec.ts`, `compte.demo.spec.ts`). Ils sont encore écrits pour le compte par e-mail ; `web/ui-e2e/compte.spec.ts` et `salon.spec.ts` ne démarrent plus, le serveur refusant les variables SMTP qu'ils posent.
+- **Site** : tests unitaires du compte (`web/src/account` : enveloppes, réparation, sortie PRF non conforme, repli sans PRF, clé locale ; `web/src/routes/compte` : écrans), règle de source « `navigator.credentials` seulement dans `web/src/account/navigateur.ts`, aucune requête entre le geste et la cérémonie », faux serveur de la démo (`web/src/demo/fake-compte.ts`, passkey simulée `web/src/demo/passkeys.ts`).
+- **Parcours par l'interface** (Chromium, authentificateur virtuel avec et sans PRF) : `web/ui-e2e/compte.spec.ts` (inscription, connexion, nouvel appareil par la clé, ajout et retrait de passkey, réparation des enveloppes, suppression, « le serveur ne voit rien » vu du navigateur), `salon.spec.ts`, `appel.spec.ts`, `compte.demo.spec.ts` (démo, Chromium et WebKit).
 
-Ce qui reste à votre charge : les décisions (point 1), l'avis du juriste (point 2) et la préparation du point 4. Côté code, il reste la refonte du site (lots W du plan).
+Ce qui reste à votre charge : les décisions (point 1), l'avis du juriste (point 2), le passage manuel sur appareils (point 3) et la préparation du point 4.

@@ -1,7 +1,6 @@
 // Aides des tests des pages du compte : montage, saisie, boutons, attente. Le module de compte
 // et la preuve anti-robot sont remplacés par des doubles dans chaque test (vi.mock).
 import { flushSync, mount, unmount } from "svelte";
-import { vi } from "vitest";
 
 let app: Record<string, unknown> | null = null;
 export async function monter(C: unknown, props: Record<string, unknown> = {}): Promise<void> {
@@ -20,7 +19,6 @@ export async function attendre(n = 30): Promise<void> {
   }
   flushSync();
 }
-export const texte = () => document.body.textContent!.replace(/[ \n\t]+/g, " ");
 export function champ(label: string): HTMLInputElement {
   const l = [...document.querySelectorAll("label")].find((x) => x.textContent!.trim() === label);
   if (!l) throw new Error(`champ « ${label} » absent`);
@@ -57,4 +55,3 @@ export function erreurDe(label: string): string {
     .join(" ");
 }
 export const PREUVE = { altcha: "preuve", hp: "", shown_at: "t" };
-export const preuveDouble = () => ({ preparerPreuve: vi.fn(), obtenirPreuve: vi.fn(async () => PREUVE) });

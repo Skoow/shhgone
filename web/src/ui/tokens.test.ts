@@ -170,33 +170,33 @@ describe("autres jetons (UI §4.2, §5, §7.2)", () => {
       // refonte de l'accueil (12 novembre) : boutons pleins
       "--sig-blue", "--sig-blue-hover",
       // §20.3 matière et aurore
-      "--bg-deep", "--hair", "--hair-2", "--vessel", "--edge-hi", "--seal-light", "--seal-halo",
+      "--bg-deep", "--hair", "--hair-2", "--vessel", "--edge-hi", "--seal-light",
       "--paper", "--ink", "--aur-mint-o", "--aur-tide-o", "--aur-ink-o",
       // §4.1 familles
       "--font-sans", "--font-mono",
       // §4.2
-      "--fs-display", "--lh-display", "--fw-display", "--wd-display", "--ls-display",
+      "--wd-display",
       "--fs-h1", "--lh-h1", "--fw-h1", "--wd-h1",
       "--fs-h2", "--lh-h2", "--fw-h2", "--wd-h2",
       "--fs-h3", "--lh-h3", "--fw-h3", "--wd-h3",
       "--fs-body", "--lh-body", "--fw-body", "--wd-body",
-      "--fs-small", "--lh-small", "--fw-small", "--wd-small",
-      "--fs-micro", "--lh-micro", "--fw-micro", "--wd-micro",
-      "--fs-mono", "--lh-mono", "--fw-mono", "--fs-mono-block",
+      "--fs-small", "--lh-small",
+      "--fs-micro", "--lh-micro",
+      "--fs-mono",
       "--fs-figure", "--lh-figure", "--fw-figure", "--wd-figure", "--ls-figure",
       "--fs-ready", "--wd-ready", "--ls-ready", "--fs-screen", "--wd-screen",
       // §5
-      "--sp-1", "--sp-2", "--sp-3", "--sp-4", "--sp-5", "--sp-6", "--sp-7", "--sp-8", "--sp-9",
+      "--sp-1", "--sp-2", "--sp-3", "--sp-4", "--sp-5", "--sp-6", "--sp-7", "--sp-8",
       "--r-sm", "--r-md", "--r-lg", "--r-xl", "--r-2xl", "--r-pill",
-      "--e-1", "--e-2", "--e-3", "--edge", "--e-vessel",
+      "--e-2", "--e-3", "--edge", "--e-vessel",
       // §7.2
-      "--dur-instant", "--dur-fast", "--dur-base", "--dur-slow", "--dur-moment", "--dur-dissolve",
+      "--dur-instant", "--dur-fast", "--dur-base", "--dur-slow",
       "--ease-out", "--ease-in", "--ease-in-out",
       // §20.3 mouvement v2
-      "--dur-press", "--dur-stagger", "--dur-view", "--dur-reveal", "--dur-orbit", "--dur-ambient",
-      "--dur-ambient-2", "--dur-ambient-3", "--ease-view", "--rise", "--blur-in",
+      "--dur-press", "--dur-view", "--dur-orbit", "--dur-ambient",
+      "--dur-ambient-2", "--dur-ambient-3", "--ease-view",
       // accueil v3
-      "--fs-section", "--ease-settle",
+      "--ease-settle",
       // icônes de format (UI6)
       "--fmt-pdf", "--fmt-doc", "--fmt-sheet", "--fmt-slides", "--fmt-archive", "--fmt-image", "--fmt-video", "--fmt-audio", "--fmt-other", "--on-fmt",
     ].sort();
@@ -204,7 +204,6 @@ describe("autres jetons (UI §4.2, §5, §7.2)", () => {
   });
 
   it("échelle typographique (§4.2)", () => {
-    expect(T.get("--fs-display")).toBe("clamp(2.625rem, 1.1rem + 4.6vw, 5.5rem)");
     expect(T.get("--fs-h1")).toBe("1.75rem");
     expect(T.get("--fs-h2")).toBe("1.4375rem");
     expect(T.get("--fs-h3")).toBe("1.1875rem");
@@ -212,19 +211,15 @@ describe("autres jetons (UI §4.2, §5, §7.2)", () => {
     expect(T.get("--fs-small")).toBe("0.875rem");
     expect(T.get("--fs-micro")).toBe("0.75rem");
     expect(T.get("--fs-mono")).toBe("1.0625rem");
-    expect(T.get("--fs-mono-block")).toBe("1.25rem");
     expect(T.get("--fs-figure")).toBe("clamp(3.5rem, 2rem + 6vw, 5.5rem)");
-    expect(T.get("--fw-display")).toBe("600");
     expect(T.get("--wd-display")).toBe("116%");
-    expect(T.get("--ls-display")).toBe("-0.035em");
     expect(T.get("--fw-body")).toBe("430");
-    expect(T.get("--lh-display")).toBe("0.98");
     expect(T.get("--fs-ready")).toBe("clamp(2rem, 1.4rem + 2.4vw, 3rem)");
     expect(T.get("--fs-screen")).toBe("clamp(1.75rem, 1.3rem + 1.8vw, 2.5rem)");
   });
 
   it("espacements, rayons, mouvement (§5, §7.2)", () => {
-    const sp = [4, 8, 12, 16, 24, 32, 48, 64, 96];
+    const sp = [4, 8, 12, 16, 24, 32, 48, 64];
     sp.forEach((px, i) => expect(T.get(`--sp-${i + 1}`)).toBe(`${px}px`));
     expect(T.get("--r-sm")).toBe("6px");
     expect(T.get("--r-md")).toBe("10px");
@@ -236,12 +231,9 @@ describe("autres jetons (UI §4.2, §5, §7.2)", () => {
     expect(T.get("--dur-fast")).toBe("180ms");
     expect(T.get("--dur-base")).toBe("240ms");
     expect(T.get("--dur-slow")).toBe("400ms");
-    expect(T.get("--dur-moment")).toBe("640ms");
-    expect(T.get("--dur-dissolve")).toBe("1100ms");
     expect(T.get("--ease-out")).toBe("cubic-bezier(0.16, 1, 0.3, 1)");
     expect(T.get("--ease-in")).toBe("cubic-bezier(0.7, 0, 0.84, 0)");
     expect(T.get("--ease-in-out")).toBe("cubic-bezier(0.65, 0, 0.35, 1)");
-    expect(T.get("--e-1")).toBe("0 1px 2px rgb(0 0 0 / 0.40)");
     expect(T.get("--e-2")).toBe(
       "0 8px 24px -8px rgb(0 0 0 / 0.60), 0 2px 6px rgb(0 0 0 / 0.35)",
     );
@@ -259,7 +251,6 @@ describe("direction artistique v2 (UI §20.3)", () => {
       "--vessel": "rgb(17 20 27 / 0.62)",
       "--edge-hi": "inset 0 1px 0 rgb(255 255 255 / 0.06)",
       "--seal-light": "#C9FBE8",
-      "--seal-halo": "rgb(95 227 181 / 0.28)",
       "--paper": "#EEF1F5",
       "--ink": "#0B0D12",
       "--aur-mint-o": "0.18",
@@ -268,16 +259,12 @@ describe("direction artistique v2 (UI §20.3)", () => {
       "--r-2xl": "32px",
       "--e-vessel": "0 40px 80px -32px rgb(0 0 0 / 0.75), 0 12px 24px -12px rgb(0 0 0 / 0.5)",
       "--dur-press": "90ms",
-      "--dur-stagger": "45ms",
       "--dur-view": "420ms",
-      "--dur-reveal": "560ms",
       "--dur-orbit": "7.2s",
       "--dur-ambient": "46s",
       "--dur-ambient-2": "58s",
       "--dur-ambient-3": "64s",
       "--ease-view": "cubic-bezier(0.22, 1, 0.36, 1)",
-      "--rise": "14px",
-      "--blur-in": "6px",
     };
     for (const [k, v] of Object.entries(expected)) expect(T.get(k), k).toBe(v);
   });
@@ -289,7 +276,6 @@ describe("direction artistique v2 (UI §20.3)", () => {
     expect(values.at(-1)).toBe(1);
     for (let i = 1; i < values.length; i++) expect(values[i]!).toBeGreaterThanOrEqual(values[i - 1]!);
     for (const v of values) expect(v).toBeLessThanOrEqual(1);
-    expect(T.get("--fs-section")).toBe("clamp(2.25rem, 1.3rem + 3.2vw, 4rem)");
     const expected: Record<string, string> = {};
     for (const [k, v] of Object.entries(expected)) expect(T.get(k), k).toBe(v);
   });

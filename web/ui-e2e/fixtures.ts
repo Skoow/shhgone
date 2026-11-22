@@ -231,11 +231,14 @@ export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpt
   shhServer: [{}, { option: true }],
   shh: async ({ page, shhServer }, use) => {
     const server = await startServer({ binary: shhServer.binary, comptes: shhServer.comptes, paiement: shhServer.paiement, env: { SHH_STATIC_DIR: DIST, ...shhServer.env } });
+    // Compte activé : le site est ouvert sur http://localhost:<port> (SHH_ORIGIN du serveur de
+    // test) : c'est le rp.id des passkeys, et les navigateurs refusent une adresse IP comme rp.id.
+    const origin = shhServer.comptes ? server.origin.replace("//127.0.0.1:", "//localhost:") : server.origin;
     try {
       await probe(server.origin + "/");
-      retryFirstGoto(page, server.origin);
-      const g = await guard(page, server.origin);
-      await use({ origin: server.origin, server, ...g });
+      retryFirstGoto(page, origin);
+      const g = await guard(page, origin);
+      await use({ origin, server, ...g });
       expect(g.cspViolations).toEqual([]);
       expect(g.foreignRequests).toEqual([]);
     } finally {

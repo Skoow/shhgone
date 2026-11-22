@@ -1371,6 +1371,8 @@ But : que le serveur, et quiconque le lit (hébergeur, pirate, réquisition), ap
 
 ## 37. Décision du propriétaire (v2.7, 5 novembre) — compte facultatif
 
+> **22 novembre 2026** : pour l'identité, la connexion et la récupération, le compte suit désormais `docs/superpowers/specs/2026-11-22-compte-passkey-design.md` (passkey et clé de récupération de 128 bits, enveloppes de `K_compte` par la sortie PRF de chaque passkey et par la clé ; plus d'e-mail, de mot de passe, de double authentification ni de séquestre). Il reprend l'idée de cette section (passkey, PRF, clé de secours) avec un identifiant de site `shhgone.com` ; la démo simule la passkey. Les notes ci-dessous restent pour l'historique.
+>
 > **14 novembre 2026 (D42-26)** : pour le compte, cette section est remplacée par la conception `docs/superpowers/specs/2026-11-14-compte-email-design.md` (e-mail, mot de passe, double authentification facultative ; compte obligatoire pour créer un salon), **à valider par le propriétaire**. Le texte ci-dessous est gardé pour l'historique.
 
 Le propriétaire a décidé qu'un **compte facultatif** peut exister. Il n'est **jamais** demandé pour envoyer, recevoir, gérer, garder dans le coffre ni signaler. Il ne sert qu'à deux choses : **synchroniser entre appareils** un coffre de données chiffré (historique des envois de §33 et réglages), et **ranger** un pass de l'offre payante (§38) pour qui en a un. Cette section remplace le point « Plus tard, hors V1 » de §33 et amende §3 (« Jamais : comptes ») : les profils, contacts, pseudonymes et annuaires restent exclus. Le registre du contrôleur (ledger, ligne « Spécifié en §35 ») visait cette section : §35 était déjà prise.

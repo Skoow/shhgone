@@ -5,7 +5,7 @@
 //   nonce (12) ‖ AES-256-GCM(K_etiquette, nonce, clair (36), AD = « SHH-CETQ1 » ‖ h),
 //   clair = longueur (1) ‖ nom en UTF-8 (35 octets au plus, coupé sur un caractère) ‖ zéros.
 // Format défini ici (la conception ne le fixait pas) : à ajouter aux vecteurs communs
-// (engine/vectors/compte.json) avant les apps (D42-20).
+// (engine/vectors/compte-v3.json) avant les apps (D42-20).
 import { concat, utf8 } from "../engine/pure";
 
 type Bytes = Uint8Array<ArrayBuffer>;

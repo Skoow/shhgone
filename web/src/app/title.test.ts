@@ -27,13 +27,13 @@ describe("titre de l'onglet", () => {
     setLang("fr");
     expect(routeTitle("inscription")).toBe("Créer un compte · Shhgone");
     expect(routeTitle("connexion")).toBe("Se connecter · Shhgone");
-    expect(routeTitle("oubli")).toBe("Mot de passe oublié · Shhgone");
+    expect(routeTitle("recuperation")).toBe("Clé de récupération · Shhgone");
     expect(routeTitle("compte")).toBe("Compte · Shhgone");
     expect(routeTitle("profil")).toBe("Profil · Shhgone");
     setLang("en");
     expect(routeTitle("inscription")).toBe("Create an account · Shhgone");
     expect(routeTitle("connexion")).toBe("Sign in · Shhgone");
-    expect(routeTitle("oubli")).toBe("Forgotten password · Shhgone");
+    expect(routeTitle("recuperation")).toBe("Recovery key · Shhgone");
     setLang("fr");
   });
   it("progression : « 42 % · Shhgone », pourcentage d'abord, borné, jamais de nom ; puis le titre de l'écran revient", () => {

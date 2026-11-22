@@ -1,8 +1,10 @@
 // Authentificateur logiciel des e2e du compte par passkey (plan 2026-11-22-compte-passkey.md,
 // lot T1 ; écrit au lot S5 pour « le serveur ne voit rien »). Il joue navigator.credentials
 // (create, get) et l'authentificateur sous Node : il lit les options JSON de WebAuthn niveau 3
-// que rend le serveur et rend les réponses JSON que le site enverrait (sortie PRF calculée ici
-// et rendue À PART, jamais dans la réponse : le site la retire de clientExtensionResults).
+// que rend le serveur et rend les réponses JSON telles que le navigateur les donne au script
+// (PublicKeyCredential.toJSON) : la sortie PRF y est, dans clientExtensionResults.prf.results,
+// comme chez un vrai navigateur ; le test les passe par sansSortiePrf du site
+// (web/src/account/webauthn.ts) avant l'envoi, et la sortie PRF est aussi rendue à part (repère).
 // ES256 (P-256) et EdDSA (Ed25519) de node:crypto ; attestation « none » ; AAGUID aléatoire
 // (repère : le serveur ne doit jamais le garder).
 import { createHash, createHmac, generateKeyPairSync, randomBytes, sign, type KeyObject } from "node:crypto";
@@ -98,6 +100,7 @@ export class Authentificateur {
     const att = cbor({ paires: [["fmt", "none"], ["attStmt", { paires: [] }], ["authData", authData]] });
     this.passkeys.push(p);
     const e = options.extensions?.prf?.eval?.first as string | undefined;
+    const sortie = e === undefined ? null : this.sortie(p, unb64u(e));
     return {
       credential: {
         id: b64u(p.id),
@@ -105,10 +108,10 @@ export class Authentificateur {
         type: "public-key",
         authenticatorAttachment: "platform",
         response: { clientDataJSON: b64u(clientData), attestationObject: b64u(att), transports: ["internal", "hybrid"] },
-        clientExtensionResults: { credProps: { rk: true }, prf: { enabled: this.avecPrf } },
+        clientExtensionResults: { credProps: { rk: true }, prf: { enabled: this.avecPrf, ...(sortie ? { results: { first: b64u(sortie) } } : {}) } },
       },
       passkey: p,
-      sortie: e === undefined ? null : this.sortie(p, unb64u(e)),
+      sortie,
     };
   }
 
@@ -120,6 +123,7 @@ export class Authentificateur {
     const clientData = new TextEncoder().encode(JSON.stringify({ type: "webauthn.get", challenge: options.challenge, origin: origine, crossOrigin: false }));
     const sig = this.#signer(p, cat(authData, sha256(clientData)));
     const e = options.extensions?.prf?.eval?.first as string | undefined;
+    const sortie = e === undefined ? null : this.sortie(p, unb64u(e));
     return {
       credential: {
         id: b64u(p.id),
@@ -127,9 +131,9 @@ export class Authentificateur {
         type: "public-key",
         authenticatorAttachment: "platform",
         response: { clientDataJSON: b64u(clientData), authenticatorData: b64u(authData), signature: b64u(sig), userHandle: b64u(p.userHandle) },
-        clientExtensionResults: {},
+        clientExtensionResults: sortie ? { prf: { results: { first: b64u(sortie) } } } : {},
       },
-      sortie: e === undefined ? null : this.sortie(p, unb64u(e)),
+      sortie,
     };
   }
 }

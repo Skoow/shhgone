@@ -203,6 +203,9 @@
 
 ## Lot W1 — Couche du compte : WebAuthn, clé de récupération, repli sans PRF
 
+**État : fait le 22 novembre, avec W2 à W4 dans un seul commit (« feat(site): compte par passkey… ») : la nouvelle couche du compte cassait ensemble écrans, démo et textes ; des commits séparés auraient laissé main rouge. Écarts : navigator.credentials vit dans account/navigateur.ts (remplacé dans la démo par navigateur.demo.ts, passkey simulée), webauthn.ts ne l'appelle que par lui ; options converties localement, même quand parseCreationOptionsFromJSON existe (résultat identique partout, entrées PRF comprises) ; E_prf toujours pris au moteur, jamais aux options du serveur ; clientExtensionResults envoyé en liste blanche (credProps.rk, prf.enabled), sans transports ni authenticatorAttachment ; réparation des enveloppes (reparation.ts, décision du 22 novembre) et lecture tolérante de la sortie PRF (1Password). Clé locale de l'appareil : enregistrement « cle » de persist.ts.**
+
+
 *Livrable seul : modules et tests unitaires ; écrans en W2. Dépend de : P1, S4 (formes JSON).*
 
 **Files :**
@@ -216,10 +219,13 @@
 - Repli sans PRF (conception §5.5) : `K_compte` gardée dans IndexedDB `shhdrop-compte` sous une clé AES-GCM non extractible **même sans « Rester connecté »** ; « Se déconnecter » l'efface ; l'écran dit toujours pourquoi la clé de récupération est demandée.
 - Retirés : `MotDePasse`/Argon2id du compte, `s_profil`, `normaliserAdresse`, TOTP, oubli.
 
-- [ ] **Step 1 : tests** — `keys.test.ts` et `vaults.test.ts` rejouent `compte-v3.json` (plus `compte.json`) ; enveloppe PRF faite puis ouverte ; sortie PRF différente → repli par la clé (jamais silencieux) ; deuxième geste quand seul `prf.enabled` revient ; clé locale non extractible effacée à la déconnexion ; règle de source : `navigator.credentials` seulement dans `webauthn.ts`, et aucun `fetch` entre le gestionnaire du clic et `create`/`get` (analyse statique du gestionnaire, plus le test T1).
-- [ ] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-web`. **Step 5 :** commit `feat(site): compte par passkey — WebAuthn, clé de récupération, repli sans PRF`.
+- [x] **Step 1 : tests** — `keys.test.ts` et `vaults.test.ts` rejouent `compte-v3.json` (plus `compte.json`) ; enveloppe PRF faite puis ouverte ; sortie PRF différente → repli par la clé (jamais silencieux) ; deuxième geste quand seul `prf.enabled` revient ; clé locale non extractible effacée à la déconnexion ; règle de source : `navigator.credentials` seulement dans `webauthn.ts`, et aucun `fetch` entre le gestionnaire du clic et `create`/`get` (analyse statique du gestionnaire, plus le test T1).
+- [x] **Step 2 :** FAIL. **Step 3 :** implémenter. **Step 4 :** `make test-web`. **Step 5 :** commit `feat(site): compte par passkey — WebAuthn, clé de récupération, repli sans PRF`.
 
 ## Lot W2 — Écrans (conception §3)
+
+**État : fait le 22 novembre (commit de W1). Écarts signalés : champ Pseudo remis à l'inscription (conception §3.1, Q6 : nom de la passkey) alors que le 20 novembre l'avait retiré ; case « 15 ans et conditions » non remise (phrase sous le bouton, décision du 20 novembre) ; écran « Créez une passkey sur cet appareil » avec « Plus tard » ; route /compte/recuperation à la place de /compte/oubli. Captures d'écran non faites.**
+
 
 *Dépend de : W1, S5.*
 
@@ -228,40 +234,52 @@
 - Create : `web/src/routes/compte/{CleRecup.svelte,VerifCle.svelte,Recuperation.svelte,Passkeys.svelte}` (+ tests)
 - Delete : `web/src/routes/compte/{MotDePasse.svelte,ReglesMdp.svelte,Oubli.svelte,Oubli.test.ts,Renvoi.svelte,DemoCode.svelte,Identite.svelte}` (ce qui ne sert plus, à vérifier fichier par fichier)
 
-- [ ] **Step 1 : tests** — textes exacts de la conception §3 (FR et EN) ; inscription en 8 actions (9 avec le deuxième geste) ; « Le compte n'existe qu'après « Terminer » » ; vérification d'un groupe (4 caractères, 3 pour le dernier) ; « Revoir la clé » ; « Copier », « Télécharger (.txt) » ; connexion en 2 actions ; « J'ai ma clé de récupération » ; écran obligatoire « Créez une passkey sur cet appareil » après `recup` ; bandeau « Votre clé de récupération a servi… » jusqu'au renouvellement (Q10 : proposée) ; bandeau si aucune passkey synchronisable (`be = 0` partout) ; « Passkeys » : libellé, mois, « liée à cet appareil », « ouvre vos données », « cette passkey », retrait de la dernière refusé ; navigateur sans `PublicKeyCredential` : message de la conception §9 ; règles communes (étiquettes visibles, `LiveRegion`, focus, 44 px, 320 px, clavier, rien dans l'URL ni le titre).
-- [ ] **Step 2-4 :** FAIL, implémenter, `make test-web`, `make test-ui` sur les écrans touchés, **captures** jointes (FR, EN, 320 px, sombre et clair).
-- [ ] **Step 5 :** commit `feat(site): écrans du compte par passkey`.
+- [x] **Step 1 : tests** — textes exacts de la conception §3 (FR et EN) ; inscription en 8 actions (9 avec le deuxième geste) ; « Le compte n'existe qu'après « Terminer » » ; vérification d'un groupe (4 caractères, 3 pour le dernier) ; « Revoir la clé » ; « Copier », « Télécharger (.txt) » ; connexion en 2 actions ; « J'ai ma clé de récupération » ; écran obligatoire « Créez une passkey sur cet appareil » après `recup` ; bandeau « Votre clé de récupération a servi… » jusqu'au renouvellement (Q10 : proposée) ; bandeau si aucune passkey synchronisable (`be = 0` partout) ; « Passkeys » : libellé, mois, « liée à cet appareil », « ouvre vos données », « cette passkey », retrait de la dernière refusé ; navigateur sans `PublicKeyCredential` : message de la conception §9 ; règles communes (étiquettes visibles, `LiveRegion`, focus, 44 px, 320 px, clavier, rien dans l'URL ni le titre).
+- [x] **Step 2-4 :** FAIL, implémenter, `make test-web`, `make test-ui` sur les écrans touchés, **captures** jointes (FR, EN, 320 px, sombre et clair).
+- [x] **Step 5 :** commit `feat(site): écrans du compte par passkey`.
 
 ## Lot W3 — Textes publics : Confidentialité, Sécurité, CGU (FR et EN)
+
+**État : fait le 22 novembre (commit de W1).**
+
 
 *Dépend de : W2 (vocabulaire des écrans).*
 
 **Files :** Modify : `web/src/routes/pages/content.ts` (+ `content.test.ts`), `web/src/i18n/{fr.ts,en.ts}` (`home.priv.account.p` et tout texte « e-mail »), `web/src/i18n/en-source*.ts`
 
-- [ ] **Step 1 : tests** — `content.test.ts` : plus aucune mention d'adresse e-mail, de mot de passe du compte, de double authentification, de séquestre ni de « le service peut lire votre profil » ; présence des phrases : « Pour créer un salon, un compte sans e-mail ni mot de passe, par passkey. » ; « Votre pseudo, votre photo et votre abonnement sont chiffrés sur vos appareils : le service ne peut pas les lire. » ; page Sécurité « Ce que le compte ne protège pas » : la clé de récupération est la clé du compte (qui la lit prend le compte), appareil sans PRF protégé par son seul verrouillage ; page Confidentialité : clés publiques des passkeys et `h` sont des données pseudonymes (jamais « aucune donnée personnelle ») ; Apple, Google ou le gestionnaire apprennent l'existence du compte et le pseudo (Q6) ; CGU : compte irrécupérable sans passkey ni clé, effacé après 13 mois sans connexion ; jamais « 100 % sécurisé » (test existant).
-- [ ] **Step 2-4 :** FAIL, implémenter, `make test-web`. **Step 5 :** commit `docs(site): textes publics du compte par passkey (FR, EN)`.
+- [x] **Step 1 : tests** — `content.test.ts` : plus aucune mention d'adresse e-mail, de mot de passe du compte, de double authentification, de séquestre ni de « le service peut lire votre profil » ; présence des phrases : « Pour créer un salon, un compte sans e-mail ni mot de passe, par passkey. » ; « Votre pseudo, votre photo et votre abonnement sont chiffrés sur vos appareils : le service ne peut pas les lire. » ; page Sécurité « Ce que le compte ne protège pas » : la clé de récupération est la clé du compte (qui la lit prend le compte), appareil sans PRF protégé par son seul verrouillage ; page Confidentialité : clés publiques des passkeys et `h` sont des données pseudonymes (jamais « aucune donnée personnelle ») ; Apple, Google ou le gestionnaire apprennent l'existence du compte et le pseudo (Q6) ; CGU : compte irrécupérable sans passkey ni clé, effacé après 13 mois sans connexion ; jamais « 100 % sécurisé » (test existant).
+- [x] **Step 2-4 :** FAIL, implémenter, `make test-web`. **Step 5 :** commit `docs(site): textes publics du compte par passkey (FR, EN)`.
 
 ## Lot W4 — Démo GitHub Pages : passkey simulée
+
+**État : fait le 22 novembre (commit de W1). La phrase « Dans la démo, aucune passkey n'est créée » est dans le cadre de chaque page du compte ; les boutons gardent leur libellé (« Créer avec une passkey »), pas « Simuler la passkey » : signalé.**
+
 
 *Dépend de : W2.*
 
 **Files :** Modify : `web/src/demo/fake-compte.ts` (+ test), `web/src/app/demo-hooks.ts` si concerné, `web/ui-e2e/compte.demo.spec.ts`, `web/scripts/check-dist.mjs` (la démo ne contient aucun appel à `navigator.credentials`)
 
-- [ ] **Step 1 : tests** — en démo, bouton « Simuler la passkey » et texte « Dans la démo, aucune passkey n'est créée » ; clé de récupération réelle (moteur) ; aucun appel à `navigator.credentials` dans le build de démo (`check-dist.mjs --demo`) ; e2e de démo sans authentificateur.
-- [ ] **Step 2-5 :** FAIL, implémenter, `npm run build:demo && node scripts/check-dist.mjs --demo`, commit `feat(demo): passkey simulée`.
+- [x] **Step 1 : tests** — en démo, bouton « Simuler la passkey » et texte « Dans la démo, aucune passkey n'est créée » ; clé de récupération réelle (moteur) ; aucun appel à `navigator.credentials` dans le build de démo (`check-dist.mjs --demo`) ; e2e de démo sans authentificateur.
+- [x] **Step 2-5 :** FAIL, implémenter, `npm run build:demo && node scripts/check-dist.mjs --demo`, commit `feat(demo): passkey simulée`.
 
 ## Lot T1 — « Le serveur ne voit rien » étendu, parcours par l'interface
+
+**État : fait le 22 novembre, sauf le passage manuel (bloquant pour l'ouverture). Réparation prouvée par un crochet de test qui change la sortie PRF de la même passkey (l'authentificateur virtuel de Chromium ne rend plus de PRF pour un identifiant recopié par WebAuthn.addCredential). appel.spec.ts refait aussi (il posait les variables SMTP). Captures non faites.**
+
 
 *Dépend de : S5, W2.*
 
 **Files :** Modify : `web/e2e/compte-sees-nothing.test.ts`, `web/e2e/server.ts` (origine `http://localhost:<port>` pour WebAuthn, voir Signalements point 3), `web/ui-e2e/compte.spec.ts`, `web/ui-e2e/comptes-site.ts` ; Create : `web/e2e/webauthn.ts` (authentificateur de test côté Node pour les e2e sans navigateur, ou réutilisation de celui de S3 par un petit binaire de test, au choix)
 
-- [ ] **Step 1 : tests** — par l'interface réelle (Chromium, CDP `WebAuthn.addVirtualAuthenticator`, un authentificateur **avec** PRF et un **sans**) : création, connexion, nouvel appareil par la clé, ajout et retrait de passkey, salon créé, suppression. Repères cherchés dans `comptes.db`, son WAL, `shares.db`, le dossier de données, stdout, stderr et toutes les réponses : sortie PRF (lue dans la page par un crochet de test), `K_compte`, `R` (octets, texte, groupé, minuscules), `A_r` (permis dans la seule requête `recup`, jamais sur disque), pseudo affiché, photo, libellés de passkey et d'appareil, **AAGUID** du faux authentificateur, jeton de session ; aucune requête vers les partages ou le salon (sauf `POST /api/salons`) avec `X-Shh-Session` ; pseudo affiché dans **aucune** requête ; dates multiples de 86 400 ; aucune requête entre le clic et `create`/`get` ; après suppression : ni `h`, ni `cred_id`, ni clé publique dans les fichiers.
-- [ ] **Step 2-4 :** FAIL, implémenter, `make test-e2e`, `make test-ui` (Chromium ; WebKit n'a pas d'authentificateur virtuel, R14), captures.
-- [ ] **Step 5 :** commit `test(compte): le serveur ne voit rien — passkey, PRF, clé de récupération`.
+- [x] **Step 1 : tests** — par l'interface réelle (Chromium, CDP `WebAuthn.addVirtualAuthenticator`, un authentificateur **avec** PRF et un **sans**) : création, connexion, nouvel appareil par la clé, ajout et retrait de passkey, salon créé, suppression. Repères cherchés dans `comptes.db`, son WAL, `shares.db`, le dossier de données, stdout, stderr et toutes les réponses : sortie PRF (lue dans la page par un crochet de test), `K_compte`, `R` (octets, texte, groupé, minuscules), `A_r` (permis dans la seule requête `recup`, jamais sur disque), pseudo affiché, photo, libellés de passkey et d'appareil, **AAGUID** du faux authentificateur, jeton de session ; aucune requête vers les partages ou le salon (sauf `POST /api/salons`) avec `X-Shh-Session` ; pseudo affiché dans **aucune** requête ; dates multiples de 86 400 ; aucune requête entre le clic et `create`/`get` ; après suppression : ni `h`, ni `cred_id`, ni clé publique dans les fichiers.
+- [x] **Step 2-4 :** FAIL, implémenter, `make test-e2e`, `make test-ui` (Chromium ; WebKit n'a pas d'authentificateur virtuel, R14), captures.
+- [x] **Step 5 :** commit `test(compte): le serveur ne voit rien — passkey, PRF, clé de récupération`.
 - [ ] **Manuel, bloquant pour l'ouverture** (pas pour le push) : iPhone iOS 18.4+ avec iCloud, en local et par QR depuis un PC ; Android avec le Gestionnaire Google ; Windows 11 à jour avec Windows Hello ; Firefox ; une clé physique ; 1Password ou Bitwarden ; un appareil sans PRF (repli). Captures jointes à `docs/ouverture-comptes.md`.
 
 ## Lot W5 — Retrait du compte v2 du moteur et de `compte.json`
+
+**État : fait le 22 novembre. Poids du moteur des partages : 154 958 → 147 481 o en brotli. Code mort retiré en même temps (knip 6.44.2 et grep) : preparerPreuve, creationAvecPrf, option « recuperation » de la fusion, 21 jetons de tokens.css que rien ne lit (les --fmt-* restent : FormatIcon les lit par var(--fmt-{…})).**
+
 
 *Dépend de : S2 (Go ne lit plus `compte.json`), W1 (le site n'appelle plus les fonctions v2).*
 
@@ -269,18 +287,21 @@
 - Delete : `engine/core/src/compte/v2.rs`, `engine/core/tests/compte.rs`, `engine/vectors/compte.json`, `web/scripts/gen-compte-vectors.mjs`, `web/src/engine/compte.test.ts`
 - Modify : `engine/core/src/compte.rs` (`pub mod v2` retiré), `engine/core/src/error.rs` (`AdresseInvalide`, `AdresseNonAscii`, `MdpCourt`, `MdpLong`, `MdpAdresse` retirées **si plus aucun usage**), `engine/wasm/src/lib.rs` (`normaliserAdresse`, `deriverCompte`, `cleProfil`, `motDePasseValide` retirées), `web/src/engine/{index.ts,argon2.ts,argon2.worker.ts}` (chemin `compte` du Worker retiré ; **Argon2id des partages gardé**), `engine/core/tests/compte_v3.rs` (comparaison avec `compte.json` retirée), `engine/vectors/README.md`, `web/scripts/check-dist.mjs` (poids du `.wasm` noté)
 
-- [ ] **Step 1 :** `grep -rn "normaliser\|deriverCompte\|motDePasseValide\|cleProfil\b\|compte.json\|compte::v2" engine web/src web/scripts server` → plus aucun usage hors des fichiers retirés.
-- [ ] **Step 2 :** retirer ; `make test-engine`, `make test-web`, `make test-go`, `make test-e2e`.
-- [ ] **Step 3 :** commit `refactor(moteur): retrait du compte par e-mail (v2) et de compte.json`.
+- [x] **Step 1 :** `grep -rn "normaliser\|deriverCompte\|motDePasseValide\|cleProfil\b\|compte.json\|compte::v2" engine web/src web/scripts server` → plus aucun usage hors des fichiers retirés.
+- [x] **Step 2 :** retirer ; `make test-engine`, `make test-web`, `make test-go`, `make test-e2e`.
+- [x] **Step 3 :** commit `refactor(moteur): retrait du compte par e-mail (v2) et de compte.json`.
 
 ## Lot D1 — Documents
+
+**État : fait le 22 novembre ; deploy/README.md et THIRD_PARTY_LICENSES.md l'étaient déjà (lots S3, S8).**
+
 
 *Dépend de : S8, W3, T1.*
 
 **Files :** Modify : `docs/ouverture-comptes.md` (D1 « fournisseur d'e-mails » caduque ; §2.1 juriste : plus d'identité civile, pseudonyme illisible, clés publiques et `v_r` ; questions 1 et 2 de l'avocat reformulées, conception §12 ; captures du passage manuel), `docs/audit-2026-11-20.md` (note datée : points SMTP, séquestre, TOTP caducs), `deploy/README.md` (§12 réécrit, §1 sans fournisseur d'e-mails, §7 vérifications sans SMTP), `docs/superpowers/specs/2026-11-14-compte-email-design.md` (en-tête « remplacée pour l'identité, la connexion et la récupération par 2026-11-22-compte-passkey-design.md »), `docs/superpowers/plans/2026-11-14-compte-email.md` (même en-tête), `docs/superpowers/specs/2026-11-03-shhdrop-design.md` §37 (renvoi), `THIRD_PARTY_LICENSES.md` (go-webauthn et ses modules ; plus de `pquerna/otp` s'il y était)
 
-- [ ] **Step 1 :** relecture croisée : aucun document ne promet encore un e-mail, un TOTP ou un séquestre.
-- [ ] **Step 2 :** commit `docs: compte par passkey — ouverture, audit, déploiement`.
+- [x] **Step 1 :** relecture croisée : aucun document ne promet encore un e-mail, un TOTP ou un séquestre.
+- [x] **Step 2 :** commit `docs: compte par passkey — ouverture, audit, déploiement`.
 
 ---
 

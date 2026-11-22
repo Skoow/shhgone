@@ -1,5 +1,7 @@
 # Compte par e-mail et mot de passe (D42-26) — conception
 
+> **Remplacée le 22 novembre 2026 pour l'identité, la connexion et la récupération** par `docs/superpowers/specs/2026-11-22-compte-passkey-design.md` (passkey et clé de récupération, sans e-mail, sans mot de passe, sans double authentification ni séquestre ; codé : serveur lots S1 à S8, site lots W1 à W5 et T1 du plan `docs/superpowers/plans/2026-11-22-compte-passkey.md`). Le reste (pseudo §21.5, coffres §21.2.2, sessions §8.5, ancienneté §11, bannissement §21.11 sauf la clé, accueil §21.7, signalements §21.10, suppression §21.12, sauvegarde §21.13, tableau de bord §21.14 sauf la recherche par adresse) reste valable.
+>
 > **Révision 2 du 14 novembre 2026 (décisions du propriétaire du même jour, 11 points) : §21, à lire en premier.** Elle remplace le code de secours par une récupération par e-mail sans perte du profil, et ajoute pseudo unique, profil, accueil connecté, téléchargements, signalements par catégorie, suppression totale, sauvegarde et le tableau de bord finalisé. Les passages remplacés plus bas sont barrés ou annotés « → §21 ».
 >
 > **À valider par le propriétaire.** Rien n'est codé. Date : 14 novembre 2026. Remplace, pour le compte, §37 de la spécification principale (passkey sans e-mail) et la partie « compte » de D42-25. Les décisions qui lui reviennent sont en §20 (liste courte, avec recommandation).

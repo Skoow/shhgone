@@ -7,8 +7,8 @@
 //   ou le libellé local (salon) ou le titre du partage (envoi, 19 novembre : `libelle`) ; JAMAIS
 //   un mot de passe, un nom d'élément ni un contenu (cleanEntry à la relecture).
 //   L'état des relectures (ouvertures, « détruit ») n'est pas synchronisé : chaque appareil relit.
-// - Fusion : les entrées de l'appareil absentes du coffre y entrent (toutes après une récupération
-//   par e-mail, sinon seulement celles créées ici) ; celles du coffre absentes de l'appareil y
+// - Fusion : les entrées de l'appareil absentes du coffre y entrent (seulement celles créées
+//   ici) ; celles du coffre absentes de l'appareil y
 //   viennent (origine « compte ») ; une entrée « compte » absente du coffre a été retirée sur un
 //   autre appareil et part d'ici ; une entrée finie depuis 7 jours part du coffre.
 // Limite assumée : une entrée créée sur A, retirée sur B, revient dans le coffre à la prochaine
@@ -109,7 +109,7 @@ export function retirerEntree(p: CoffrePrive, e: HistoryEntry): CoffrePrive {
 export function fusionner(
   local: readonly HistoryEntry[],
   coffre: CoffrePrive,
-  o: { now: number; recuperation: boolean },
+  o: { now: number },
 ): { coffre: CoffrePrive | null; importer: HistoryEntry[]; retirer: string[] } {
   let change = false;
   // Les pass des offres payantes (pass.ts) ne sont pas de l'historique : gardés tels quels.
@@ -129,10 +129,10 @@ export function fusionner(
   const cles = new Set(duCoffre.map(linkKey));
   const ici = new Set(local.map(linkKey));
   const importer = duCoffre.filter((e) => !ici.has(linkKey(e)));
-  const retirer = o.recuperation ? [] : local.filter((e) => e.origine === "compte" && !cles.has(linkKey(e))).map((e) => e.id);
+  const retirer = local.filter((e) => e.origine === "compte" && !cles.has(linkKey(e))).map((e) => e.id);
   let p = garde;
   for (const e of local) {
-    if ((o.recuperation || e.origine === "local") && !cles.has(linkKey(e)) && !fini(e, o.now)) {
+    if (e.origine === "local" && !cles.has(linkKey(e)) && !fini(e, o.now)) {
       const next = ajouterEntree(p, e);
       if (next !== p) {
         p = next;

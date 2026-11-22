@@ -25,7 +25,7 @@
   // Pages du compte (plan du compte, lot 10) : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Accueil, Connexion, Inscription, Oubli, Parametres, Profil, connecte, ecouterAutresOnglets, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
+  import { Accueil, Connexion, Inscription, Parametres, Recuperation, Profil, connecte, ecouterAutresOnglets, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
   // Écrans du salon (plan C-3) : seulement si __SALONS__ (site avec compte, hors démo) ; sans lui,
   // le greffon shh-salons remplace ce module par pages.off.ts (aucun écran, aucun client).
   import { Salon, SalonNouveau } from "./routes/salon/pages";
@@ -161,8 +161,8 @@
     <Downloads />
   {:else if router.current.name === "inscription"}
     <Inscription />
-  {:else if router.current.name === "oubli"}
-    <Oubli />
+  {:else if router.current.name === "recuperation"}
+    <Recuperation />
   {:else if router.current.name === "compte" && (connected || (__COMPTES__ && supprime()))}
     <!-- Paramètres et profil (lot 13) : avec une session ouverte seulement (et l'écran de fin
          d'une suppression faite ici, alors que la session n'existe plus). -->

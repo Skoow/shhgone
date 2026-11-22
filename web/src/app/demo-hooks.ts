@@ -15,8 +15,8 @@ export type DemoHooks = {
   readonly securityGaps: string;
   /** Mention sous le lien de « Lien prêt » (langue courante) : le lien de démo ne marche que dans cet onglet. */
   readonly readyNote: string;
-  /** Compte essayable (19 novembre) : dernier code « envoyé » (aucun e-mail en démo), montré à l'écran. */
-  compteCode(): { email: string; code: string } | null;
+  /** Compte essayable : passkey simulée (demo/passkeys.ts), lue par account/navigateur.demo.ts seulement. */
+  readonly passkeys: unknown;
   /** Phrase des pages du compte (langue courante) : rien n'est envoyé, le compte vit dans cet onglet. */
   readonly compteNote: string;
   /** Bandeau permanent, rendu dans l'emplacement `banner` de AppShell. */

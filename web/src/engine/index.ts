@@ -13,7 +13,7 @@
 //   Les codes propres au moteur, inconnus de l'interface (aleatoire_indisponible,
 //   chiffrement_echec, entree_invalide), deviennent paquet_corrompu à l'ouverture ; à l'envoi, ils
 //   restent des erreurs inattendues (écran « erreur d'envoi » générique, flows/send.svelte.ts).
-import { compteKeys, passwordKey as kdfOpen, passwordKeyForCreate as kdfCreate } from "./argon2";
+import { passwordKey as kdfOpen, passwordKeyForCreate as kdfCreate } from "./argon2";
 import { loadEngine, resetEngine, type Engine } from "./load";
 import type { JsAccessKeys, JsContentKeys, JsElementSealer, JsReader, JsSeed } from "./pkg/shhdrop_wasm.js";
 import { type KAcces, type KdfParams, type KeepTtl, type KLien, type KMdp, type KPreuve, type Manifest, type ManifestClean, type Palier, type Piece, PREVIEW_MAX, type Rights, type SGestion, utf8 } from "./pure";
@@ -191,39 +191,11 @@ export function passwordKeyForCreate(password: string, salt: Uint8Array<ArrayBuf
   return run(async (e) => (await kdfCreate(e, password, salt)) as KMdp);
 }
 
-// --- Compte v2 (conception compte v2 §5.1, §6, §21.2.2, §21.5) -------------------------------------
-
-/** Adresse normalisée : `canon` (sel, connexion), `exacte` (envoi des codes). */
-export type Adresse = { canon: string; exacte: string };
-
-/** Normalise une adresse ; sinon adresse_invalide ou adresse_non_ascii. */
-export function normaliserAdresse(email: string): Promise<Adresse> {
-  return run((e) => e.wasm.normaliserAdresse(email) as Adresse);
-}
-
-/**
- * A_auth (envoyé au serveur) et KEK_mdp (enveloppe de K_compte), dans un Worker neuf
- * (Argon2id de 64 Mio) ; l'appelant efface les deux après usage. Refus : mot_de_passe_vide.
- */
-export function deriverCompte(password: string, canon: string): Promise<{ aAuth: Uint8Array<ArrayBuffer>; kekMdp: Uint8Array<ArrayBuffer> }> {
-  return run(async (e) => {
-    const k = await compteKeys(e, password, canon);
-    try {
-      return { aAuth: k.slice(0, 32), kekMdp: k.slice(32, 64) };
-    } finally {
-      k.fill(0);
-    }
-  });
-}
+// --- Compte : clés des coffres tirées de K_compte (conception du compte par passkey §5.1) -----------
 
 /** K_prive = HKDF(K_compte, « shhdrop/v2/compte/blob ») ; l'appelant l'efface. */
 export function clePrive(kCompte: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
   return run((e) => e.wasm.clePrive(kCompte) as Uint8Array<ArrayBuffer>);
-}
-
-/** K_profil = HKDF(s_profil, « shhdrop/v2/compte/profil ») ; l'appelant l'efface. */
-export function cleProfil(sProfil: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
-  return run((e) => e.wasm.cleProfil(sProfil) as Uint8Array<ArrayBuffer>);
 }
 
 /** K_etiquette = HKDF(K_compte, « shhdrop/v2/compte/appareil ») ; l'appelant l'efface. */
@@ -235,16 +207,55 @@ export function cleAppareil(kCompte: Uint8Array): Promise<Uint8Array<ArrayBuffer
 // pseudoReserve), qui a déjà les tables Unicode de sa règle ; ici, elles pèseraient 50 Ko de plus
 // en brotli sur toutes les pages de partage.
 
-/** Mot de passe d'un nouveau compte ; sinon mdp_court, mdp_long, mdp_adresse. */
-export function motDePasseValide(password: string, adresse: Adresse): Promise<void> {
+// --- Compte par passkey (conception 2026-11-22-compte-passkey-design.md §5 ; vecteurs
+// engine/vectors/compte-v3.json) : le moteur dérive (HKDF, codage de la clé de récupération),
+// WebCrypto chiffre (web/src/account/keys.ts). Les copies rendues sont effacées par l'appelant.
+
+/** E_prf = SHA-256(« shhdrop/v3/compte/prf/1 ») : valeur de prf.eval.first (32 octets, publique). */
+export function entreePrf(): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.entreePrf() as Uint8Array<ArrayBuffer>);
+}
+
+/** KEK_i = HKDF(P_i, « shhdrop/v3/compte/enveloppe/prf ») ; sortie PRF de 32 octets. */
+export function kekPrf(p: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.kekPrf(p) as Uint8Array<ArrayBuffer>);
+}
+
+/** AD de l'enveloppe PRF : « SHH-CENV2 » ‖ h ‖ SHA-256(cred_id) ; sinon cred_id_invalide. */
+export function adEnveloppePrf(h: Uint8Array, credId: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.adEnveloppePrf(h, credId) as Uint8Array<ArrayBuffer>);
+}
+
+/** AD de l'enveloppe de récupération : « SHH-CENV2 » ‖ h ‖ « recup ». */
+export function adEnveloppeRecup(h: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.adEnveloppeRecup(h) as Uint8Array<ArrayBuffer>);
+}
+
+/** K_profil = HKDF(K_compte, « shhdrop/v3/compte/profil »). */
+export function cleProfilCompte(kCompte: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.cleProfilCompte(kCompte) as Uint8Array<ArrayBuffer>);
+}
+
+/** Clé de récupération R (16 octets) affichée : 7 groupes « XXXX-…-XXX ». */
+export function cleRecupAffichage(r: Uint8Array): Promise<string> {
+  return run((e) => e.wasm.cleRecupAffichage(r) as string);
+}
+
+/** R lue d'une saisie (tolérante) ; sinon cle_recup_longueur, cle_recup_caractere, cle_recup_controle. */
+export function cleRecupLire(saisie: string): Promise<Uint8Array<ArrayBuffer>> {
   return run((e) => {
-    const pw = utf8(password);
+    const t = utf8(saisie);
     try {
-      e.wasm.motDePasseValide(pw, adresse.canon, adresse.exacte);
+      return e.wasm.cleRecupLire(t) as Uint8Array<ArrayBuffer>;
     } finally {
-      pw.fill(0);
+      t.fill(0);
     }
   });
+}
+
+/** A_r (envoyé à recup seulement), v_r = SHA-256(A_r), KEK_r (jamais envoyée). */
+export function cleRecupDerivees(r: Uint8Array): Promise<{ aR: Uint8Array<ArrayBuffer>; vR: Uint8Array<ArrayBuffer>; kekR: Uint8Array<ArrayBuffer> }> {
+  return run((e) => e.wasm.cleRecupDerivees(r) as { aR: Uint8Array<ArrayBuffer>; vR: Uint8Array<ArrayBuffer>; kekR: Uint8Array<ArrayBuffer> });
 }
 
 // --- Graine, clés, enveloppe ---------------------------------------------------------------------

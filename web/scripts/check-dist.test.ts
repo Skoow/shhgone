@@ -141,17 +141,13 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(both, false).join("\n")).toContain("dictionnaire anglais dans le script principal");
   });
 
-  it("U13 : domaines jetables dans leur fichier, cité avec son empreinte, jamais orphelin ni dans un script ; exigé avec --comptes", () => {
-    const liste = '["0-mail.com","guerrillamail.com"]';
-    const ok = site({ "index.html": PROD_INDEX, "assets/index-a.js": `const s="/assets/jetables-AbCdEf12.js",i="${sha384(Buffer.from(liste))}";`, "assets/jetables-AbCdEf12.js": liste });
-    expect(checkDist(ok, false)).toEqual([]);
-    expect(checkDist(site({ "index.html": PROD_INDEX, "assets/jetables-AbCdEf12.js": liste }), false).join("\n")).toContain("assets/jetables-AbCdEf12.js : orphelin");
-    const noSri = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'const s="/assets/jetables-AbCdEf12.js";', "assets/jetables-AbCdEf12.js": liste });
-    expect(checkDist(noSri, false).join("\n")).toContain("assets/jetables-AbCdEf12.js : son empreinte SHA-384");
-    const enLigne = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'const l="0-mail.com\\nguerrillamail.com\\n";' });
-    expect(checkDist(enLigne, false).join("\n")).toContain("assets/index-a.js : liste des domaines jetables dans un script");
-    const sansListe = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'fetch(o+"/api/compte/connexion")' });
-    expect(checkDist(sansListe, false, true).join("\n")).toContain("assets/jetables-*.js absent alors que --comptes est demandé");
+  it("passkeys : appel de navigator.credentials exigé avec --comptes, interdit dans la démo (passkey simulée)", () => {
+    const sans = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'fetch(o+"/api/compte/connexion/debut")' });
+    expect(checkDist(sans, false, true).join("\n")).toContain("appel des passkeys (navigator.credentials) absent alors que --comptes est demandé");
+    const avec = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'fetch(o+"/api/compte/connexion/debut");const c=globalThis.navigator?.credentials' });
+    expect(checkDist(avec, false, true)).toEqual([]);
+    const demo = site({ "index.html": DEMO_INDEX, "404.html": DEMO_INDEX, "assets/index-a.js": `const MARK="__SHH_DEMO__";${DEMO_ENGINE};navigator.credentials.get({})` });
+    expect(checkDist(demo, true).join("\n")).toContain("assets/index-a.js : appel des passkeys du navigateur dans la démo");
   });
 
   it("passe sans marque", () => {
@@ -166,8 +162,7 @@ describe("check-dist.mjs, production", () => {
       expect(r.code, trace).toBe(1);
       expect(r.err, trace).toMatch(/assets\/index-a\.js : module de compte « (\/api\/compte|shhdrop-compte) » dans un build sans __COMPTES__/);
       if (trace.includes("/api/compte")) {
-        const liste = '["0-mail.com"]';
-        const avec = site({ "index.html": PROD_INDEX, "assets/index-a.js": `${trace};const j="/assets/jetables-AbCdEf12.js",i="${sha384(Buffer.from(liste))}";`, "assets/jetables-AbCdEf12.js": liste });
+        const avec = site({ "index.html": PROD_INDEX, "assets/index-a.js": `${trace};const c=globalThis.navigator?.credentials;` });
         expect(run(["--comptes", avec]), trace).toEqual({ code: 0, err: "" });
       }
     }

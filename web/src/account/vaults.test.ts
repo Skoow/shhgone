@@ -21,7 +21,7 @@ import {
   type Transport,
 } from "./vaults";
 
-const V = JSON.parse(readFileSync(new URL("../../../engine/vectors/compte.json", import.meta.url), "utf8"));
+const V = JSON.parse(readFileSync(new URL("../../../engine/vectors/compte-v3.json", import.meta.url), "utf8"));
 const unhex = (s: string) => new Uint8Array(Buffer.from(s, "hex"));
 const hex = (b: Uint8Array) => Buffer.from(b).toString("hex");
 const aes = async (raw: Uint8Array) => crypto.subtle.importKey("raw", raw as Uint8Array<ArrayBuffer>, "AES-GCM", false, ["encrypt", "decrypt"]);

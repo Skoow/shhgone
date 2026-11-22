@@ -1,14 +1,17 @@
-// « Rester connecté sur cet appareil » (conception compte §9, D7) : jeton, K_compte et s_profil
-// chiffrés par une clé AES-GCM NON EXTRACTIBLE dans IndexedDB `shhdrop-compte` ; rien en clair.
+// Ce que le compte garde sur l'appareil (conception compte §9, D7 ; conception du compte par
+// passkey §5.5) : session gardée (« Rester connecté ») et clé locale (passkey qui n'ouvre pas les
+// données ici), chiffrées par une clé AES-GCM NON EXTRACTIBLE dans IndexedDB `shhdrop-compte` ;
+// rien en clair ; « Se déconnecter » supprime la base entière.
 import { describe, expect, it } from "vitest";
 import { fakeIndexedDB } from "../history/fake-idb.test-helper";
-import { COMPTE_DB, effacer, lire, sauver, type Sauvegarde } from "./persist";
+import { COMPTE_DB, effacer, lire, lireCle, oublierSession, sauver, sauverCle, type Sauvegarde } from "./persist";
 
 const sv = (): Sauvegarde => ({
   jeton: "J".repeat(42) + "A", // base64url canonique de 32 octets
   h: new Uint8Array(16).fill(0x11),
   kCompte: new Uint8Array(32).fill(0x22),
-  sProfil: new Uint8Array(32).fill(0x33),
+  credId: new Uint8Array(20).fill(0x33),
+  parRecup: false,
   genProfil: 4,
   genPrive: 9,
 });
@@ -29,17 +32,20 @@ function disque(idb: ReturnType<typeof fakeIndexedDB>): { bytes: Uint8Array[]; k
 }
 const has = (hay: Uint8Array, needle: Uint8Array) => Buffer.from(hay).includes(Buffer.from(needle));
 
-describe("persistance de la session", () => {
+describe("persistance de la session et de la clé locale", () => {
   it("lire sans base : null, et rien n'est créé", async () => {
     const idb = fakeIndexedDB();
     expect(await lire(idb)).toBeNull();
+    expect(await lireCle(idb, new Uint8Array(16))).toBeNull();
     expect([...idb.raw().keys()]).toEqual([]);
   });
 
   it("sauver puis lire : même contenu ; base shhdrop-compte ; clé non extractible ; aucun clair", async () => {
     const idb = fakeIndexedDB();
     await sauver(idb, sv());
+    await sauverCle(idb, { h: sv().h, kCompte: new Uint8Array(32).fill(0x44) });
     expect(await lire(idb)).toEqual(sv());
+    expect(await lireCle(idb, sv().h)).toEqual(new Uint8Array(32).fill(0x44));
     expect([...idb.raw().keys()]).toEqual([COMPTE_DB]);
     expect(COMPTE_DB).toBe("shhdrop-compte");
     const d = disque(idb);
@@ -47,19 +53,31 @@ describe("persistance de la session", () => {
     expect(d.keys[0]!.extractable).toBe(false);
     expect(d.text).not.toContain("JJJJ");
     for (const b of d.bytes) {
-      for (const secret of [sv().kCompte, sv().sProfil, sv().h, new TextEncoder().encode("JJJJJJJJ")]) expect(has(b, secret)).toBe(false);
+      for (const secret of [sv().kCompte, new Uint8Array(32).fill(0x44), sv().h, sv().credId!, new TextEncoder().encode("JJJJJJJJ")]) expect(has(b, secret)).toBe(false);
     }
   });
 
-  it("effacer : la base disparaît ; lire rend null", async () => {
+  it("clé locale : seulement pour son compte ; session sans passkey liée (clé de récupération)", async () => {
     const idb = fakeIndexedDB();
-    await sauver(idb, sv());
-    await effacer(idb);
-    expect([...idb.raw().keys()]).toEqual([]);
-    expect(await lire(idb)).toBeNull();
+    await sauverCle(idb, { h: sv().h, kCompte: sv().kCompte });
+    expect(await lireCle(idb, new Uint8Array(16).fill(0x12))).toBeNull();
+    await sauver(idb, { ...sv(), credId: null, parRecup: true });
+    expect(await lire(idb)).toMatchObject({ credId: null, parRecup: true });
   });
 
-  it("enregistrement abîmé ou illisible : null (la session redemande le mot de passe)", async () => {
+  it("oublierSession : la session gardée part, la clé locale reste ; effacer : tout part", async () => {
+    const idb = fakeIndexedDB();
+    await sauver(idb, sv());
+    await sauverCle(idb, { h: sv().h, kCompte: sv().kCompte });
+    await oublierSession(idb);
+    expect(await lire(idb)).toBeNull();
+    expect(await lireCle(idb, sv().h)).toEqual(sv().kCompte);
+    await effacer(idb);
+    expect([...idb.raw().keys()]).toEqual([]);
+    expect(await lireCle(idb, sv().h)).toBeNull();
+  });
+
+  it("enregistrement abîmé ou illisible : null (la session redemande la passkey)", async () => {
     const idb = fakeIndexedDB();
     await sauver(idb, sv());
     for (const [, stores] of idb.raw()) for (const [, m] of stores) for (const [, v] of m) if ((v as { ct?: Uint8Array }).ct) (v as { ct: Uint8Array }).ct[0]! ^= 1;

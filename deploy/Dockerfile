@@ -74,8 +74,6 @@ COPY web/package.json web/package-lock.json ./
 # --ignore-scripts : aucun script d'installation d'une dépendance n'est exécuté.
 RUN npm ci --ignore-scripts
 COPY web/ ./
-# Listes de domaines jetables du serveur, importées par la page d'inscription (verifs.ts).
-COPY server/internal/compte/jetables.txt server/internal/compte/jetables-ajouts.txt /src/server/internal/compte/
 # Moteurs construits à l'étape précédente ; build:engine vérifie seulement leur présence.
 COPY --from=engine /out/pkg ./src/engine/pkg
 COPY --from=engine /out/salon/pkg ./src/salon/pkg

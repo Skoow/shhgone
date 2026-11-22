@@ -7,7 +7,7 @@ const absente = (() => {
 }) as unknown as Component;
 export const Connexion = absente;
 export const Inscription = absente;
-export const Oubli = absente;
+export const Recuperation = absente;
 export const restaurer = async (): Promise<void> => undefined;
 export const seDeconnecter = async (): Promise<void> => undefined;
 export const ecouterAutresOnglets = (): (() => void) => () => undefined;

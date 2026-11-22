@@ -46,7 +46,7 @@ export const INFO_PATHS: Readonly<Record<string, InfoRoute>> = {
 };
 
 /** Pages du compte (plan du compte, lot 10), seulement si __COMPTES__ : chemin → route. */
-export type CompteRoute = "compte" | "inscription" | "connexion" | "oubli" | "profil";
+export type CompteRoute = "compte" | "inscription" | "connexion" | "recuperation" | "profil";
 
 /**
  * Pages du salon (plan C-3), seulement si __SALONS__ (site avec compte, hors démo) : « /salon »
@@ -65,7 +65,7 @@ const COMPTE_PATHS: Readonly<Record<string, CompteRoute>> = {
   "/compte": "compte",
   "/compte/inscription": "inscription",
   "/compte/connexion": "connexion",
-  "/compte/oubli": "oubli",
+  "/compte/recuperation": "recuperation",
   "/compte/profil": "profil",
 };
 

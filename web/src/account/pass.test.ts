@@ -23,7 +23,7 @@ describe("pass dans le coffre privé", () => {
     expect(new TextDecoder().decode(priveEnJson(priveVide()))).toBe('{"v":1,"salons":[],"recus":[],"rejoints":[],"envois":[]}');
     const p = { ...priveVide(), pass: [passEnEntree(g())] };
     expect(priveDeJson(priveEnJson(p))).toEqual(p);
-    const f = fusionner([], { ...p, recus: [{ id: "x" }] }, { now: 0, recuperation: false });
+    const f = fusionner([], { ...p, recus: [{ id: "x" }] }, { now: 0 });
     expect(f.coffre?.pass).toEqual(p.pass);
   });
 

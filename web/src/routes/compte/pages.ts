@@ -3,7 +3,7 @@
 // (vite.config.ts) remplace ce module par pages.off.ts, et rien du compte n'est construit.
 export { default as Connexion } from "./Connexion.svelte";
 export { default as Inscription } from "./Inscription.svelte";
-export { default as Oubli } from "./Oubli.svelte";
+export { default as Recuperation } from "./Recuperation.svelte";
 export { ecouterAutresOnglets, restaurer, seDeconnecter, verifierAuRetour } from "../../account/session.svelte";
 export { default as Accueil } from "./Accueil.svelte";
 export { default as Parametres } from "./Parametres.svelte";

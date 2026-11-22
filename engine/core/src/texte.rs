@@ -3,7 +3,7 @@
 //! toujours accepté dans un salon. Déplacée telle quelle de `engine/salon/src/texte.rs` le
 //! 14 novembre ; seule différence : trois erreurs au lieu d'une (`pseudo_longueur`,
 //! `pseudo_caracteres`, `pseudo_ecritures`), que le salon ramène à `pseudo_invalide`. Les
-//! vecteurs `pseudo` de `salon-v3.json` et de `compte.json` le prouvent.
+//! vecteurs `pseudo` de `salon-v3.json` et de `compte-v3.json` le prouvent.
 //!
 //! **Affichage** (`pseudo_valide`) : 1. NFC ; 2. retrait des contrôles, des inversions de sens et
 //! de tout `Default_Ignorable_Code_Point` (l'apostrophe typographique U+2019 devient `'`) ; 3. NFC ;

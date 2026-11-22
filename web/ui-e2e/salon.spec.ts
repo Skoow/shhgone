@@ -1,42 +1,33 @@
 // Salon de bout en bout PAR L'INTERFACE (plan C-3, Task 7) : vrai binaire Go avec SHH_SALONS=1 et
 // SHH_COMPTES=1 (créer un salon exige un compte, D42-26), site construit avec SHH_SITE_COMPTES=1
-// (web/dist-comptes, comptes-site.ts), faux SMTP sur la boucle locale (e2e/smtp.ts). Deux
-// navigateurs : la créatrice (inscription, création, salon prêt, entrée) et un invité (lien,
-// mot de passe, page d'explication, pseudonyme), qui échangent de vrais messages chiffrés par
-// MLS : texte, lien, réponse, réaction, modification, retrait, « écrit », coches « vu ».
+// (web/dist-comptes, comptes-site.ts), origine http://localhost:<port> (rp.id des passkeys).
+// Deux navigateurs : la créatrice (compte par passkey avec l'authentificateur virtuel de Chromium,
+// création, salon prêt, entrée) et un invité (lien, mot de passe, page d'explication, pseudonyme),
+// qui échangent de vrais messages chiffrés par MLS : texte, lien, réponse, réaction,
+// modification, retrait, « écrit », coches « vu ».
 // Puis le test bloquant « le serveur ne voit rien » étendu au salon par l'interface : aucun
 // texte de message, pseudonyme, mot de passe, clé du lien ni de gestion dans le dossier de
 // données (base, WAL, conversations, pièces) ni dans les sorties du serveur.
+// WebKit : aucun authentificateur virtuel (CDP) pour créer le compte ; écarté (R14).
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { findIn, needle, scanDir } from "../e2e/scan";
-import { codeDuCourriel, demarrerSMTP, type FauxSMTP } from "../e2e/smtp";
 import { siteComptes } from "./comptes-site";
 import { axe, capture, expect, test as base } from "./fixtures";
 
-const FROM = "Shhgone <ne-pas-repondre@shhgone.test>";
 const FICHIERS = fileURLToPath(new URL("./files", import.meta.url));
-const SMTP_MDP = "SmtpUiSecretVq4nRw";
 
-const test = base.extend<{ smtp: FauxSMTP }, { site: string }>({
+const test = base.extend<object, { site: string }>({
   site: [async ({}, use) => use(await siteComptes()), { scope: "worker", timeout: 360_000 }],
-  smtp: async ({}, use) => {
-    const smtp = await demarrerSMTP();
-    try {
-      await use(smtp);
-    } finally {
-      await smtp.fermer();
-    }
-  },
-  shhServer: async ({ smtp, site }, use) =>
-    use({ comptes: { cle: new Uint8Array(randomBytes(32)), smtpPort: smtp.port, smtpMdp: SMTP_MDP, from: FROM }, env: { SHH_STATIC_DIR: site } }),
+  shhServer: async ({ site }, use) => use({ comptes: { cle: new Uint8Array(randomBytes(32)) }, env: { SHH_STATIC_DIR: site } }),
 });
 
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", actionTimeout: 30_000 });
 test.setTimeout(600_000); // parcours long : rechargement, exclusion, troisième et quatrième navigateurs
+test.skip(({ browserName }) => browserName !== "chromium", "salon.spec.ts : Chromium seulement — la créatrice crée son compte avec une passkey, et WebKit n'a pas d'authentificateur virtuel WebAuthn (CDP) ; passage manuel sur iPhone et Mac avant l'ouverture (conception du compte par passkey, R14)");
 
 const champ = (page: Page, label: string) => page.getByLabel(label, { exact: true }).and(page.locator("input"));
 const bouton = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
@@ -46,23 +37,28 @@ const saisie = (page: Page) => page.getByLabel("Message", { exact: true });
 const zone = (page: Page) => page.getByRole("region", { name: "Conversation", exact: true });
 
 /**
- * Inscription complète par l'interface (adresse, mot de passe et confirmation, code reçu), suite
- * « salon » ; rend le pseudo provisoire attribué (20 novembre : plus de pseudo à l'inscription).
+ * Inscription complète par l'interface avec une passkey (authentificateur virtuel), suite
+ * « salon » : pseudo, passkey, clé de récupération notée, un groupe retapé.
  */
-async function inscrire(page: Page, origin: string, smtp: FauxSMTP, email: string, mdp: string): Promise<string> {
+async function inscrire(page: Page, origin: string, pseudo: string): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable", { enableUI: false });
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true },
+  });
   await page.goto(origin + "/compte/inscription?suite=salon");
   await expect(titre(page, "Créer un compte")).toBeVisible();
-  await champ(page, "Adresse e-mail").fill(email);
-  await champ(page, "Mot de passe").fill(mdp);
-  await champ(page, "Confirmer le mot de passe").fill(mdp);
-  await bouton(page, "Créer").click();
-  const code = codeDuCourriel(await smtp.attendre(1)).code;
-  await champ(page, "Code reçu par e-mail").fill(code);
-  await bouton(page, "Valider").click();
+  await champ(page, "Pseudo").fill(pseudo);
+  await expect(page.locator("[data-dispo]")).toHaveText("Disponible", { timeout: 30_000 });
+  await bouton(page, "Créer avec une passkey").click();
+  await expect(titre(page, "Votre clé de récupération")).toBeVisible({ timeout: 30_000 });
+  const cle = (await page.locator("[data-cle] .g").allTextContents()).join("-");
+  await bouton(page, "Je l'ai notée").click();
+  const label = (await page.locator("label").filter({ hasText: "Tapez le groupe" }).textContent())!;
+  await page.getByLabel(label.trim(), { exact: true }).fill(cle.split("-")[Number(/n°\s*(\d)/u.exec(label)![1]) - 1]!);
+  await bouton(page, "Terminer").click();
   await expect(titre(page, "Compte créé.")).toBeVisible({ timeout: 30_000 });
-  return /«\s*(\S+)\s*»/u.exec((await page.locator("[data-pseudo-temp]").textContent()) ?? "")![1]!;
 }
-
 async function envoyer(page: Page, texte: string): Promise<void> {
   await saisie(page).fill(texte);
   await zone(page).getByRole("button", { name: "Envoyer", exact: true }).click();
@@ -72,18 +68,13 @@ async function envoyer(page: Page, texte: string): Promise<void> {
 /** Bulle d'un message par son texte (élément de liste du fil). */
 const bulle = (page: Page, texte: string) => fil(page).locator("li").filter({ has: page.locator("p.texte", { hasText: texte }) });
 
-test("deux navigateurs : création avec un compte, invitation, messages chiffrés, et le serveur ne voit rien", async ({ page, shh, smtp, browser, browserName }, info) => {
+test("deux navigateurs : création avec un compte, invitation, messages chiffrés, et le serveur ne voit rien", async ({ page, shh, browser, browserName }, info) => {
   const r = randomBytes(4).toString("hex");
-  const email = `Salon.${r}@exemple.org`;
-  const mdpCompte = `MdpCompteSalon-${r}-9`;
-  // Pseudo du compte : provisoire, tiré à l'inscription (20 novembre).
+  const pseudoA = `Lea${r.slice(0, 4)}`;
   const pseudoB = `Hugo${r.slice(4, 8)}`;
 
-  // --- Créatrice : compte, création, salon prêt -----------------------------------------------------
-  const provisoire = await inscrire(page, shh.origin, smtp, email, mdpCompte);
-  expect(provisoire).toMatch(/^Membre\d{6}$/);
-  // Vrai pseudo choisi à la première entrée dans un salon (20 novembre) : lettres et chiffres.
-  const pseudoA = `Lea${r.slice(0, 4)}`;
+  // --- Créatrice : compte (pseudo choisi à l'inscription), création, salon prêt ----------------------
+  await inscrire(page, shh.origin, pseudoA);
   await bouton(page, "Continuer").click();
   await expect(titre(page, "Créer un salon")).toBeVisible();
   await capture(page, "salon-nouveau");
@@ -106,13 +97,9 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   expect(gestion).toMatch(/\/salon#s[A-Za-z0-9_-]{43}$/);
   await bouton(page, "Entrer dans le salon").click();
   await expect(titre(page, "Un salon qui s'efface")).toBeVisible();
-  // Pseudo provisoire : rien de proposé ; le pseudo choisi ici devient celui du compte.
-  await expect(champ(page, "Pseudonyme pour ce salon")).toHaveValue("");
-  await expect(page.locator("[data-pseudo-compte]")).toBeVisible();
-  await champ(page, "Pseudonyme pour ce salon").fill("Lea Dupont");
-  await bouton(page, "Entrer dans le salon").click();
-  await expect(page.getByText("Lettres et chiffres sans accent seulement (A-Z, 0-9).")).toBeVisible();
-  await champ(page, "Pseudonyme pour ce salon").fill(pseudoA);
+  // Compte avec son pseudo (choisi à l'inscription) : le salon le prend, non modifiable ici.
+  await expect(champ(page, "Pseudonyme pour ce salon")).toHaveValue(pseudoA);
+  await expect(page.locator("[data-pseudo-fige]")).toBeVisible();
   await bouton(page, "Entrer dans le salon").click();
   await expect(fil(page)).toBeVisible();
 

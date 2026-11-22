@@ -4,10 +4,12 @@
   // les paramètres. Avant de confirmer, l'écran dit ce qui sera supprimé (salons créés, partages
   // connus, compte) et, honnêtement, ce qui ne peut pas être garanti (messages dans les salons
   // d'autrui, partages oubliés qui s'effacent à leur échéance, ce que d'autres ont reçu, copies de
-  // sauvegarde, empreinte d'une adresse bannie) ; un pass en cours est annoncé perdu. Mot de passe
-  // redemandé (session « récente »), confirmation sur place, progression annoncée, puis la fin.
-  import { tick, untrack } from "svelte";
-  import { account, adresseConnue, confirmerIdentite, partagesASupprimer, supprimerTout, type EtatServeur, type Progres } from "../../account/session.svelte";
+  // sauvegarde) ; un pass en cours est annoncé perdu. Geste de passkey (session « récente »,
+  // conception du compte par passkey §3.6), confirmation sur place, progression annoncée, puis la
+  // fin : chaque passkey est signalée inconnue au gestionnaire là où c'est possible, et l'écran dit
+  // de la supprimer aussi du gestionnaire.
+  import { untrack } from "svelte";
+  import { account, confirmerParPasskey, partagesASupprimer, preparerReauth, supprimerTout, type EtatServeur, type Progres } from "../../account/session.svelte";
   import { navigate } from "../../app/router.svelte";
   import { t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
@@ -16,47 +18,42 @@
   import InlineConfirm from "../../ui/InlineConfirm.svelte";
   import Cadre from "./Cadre.svelte";
   import Case from "./Case.svelte";
-  import { erreur, jourLong, type Champ } from "./erreurs";
-  import Identite from "./Identite.svelte";
+  import { annulee, erreur } from "./erreurs";
 
   type Props = { etat: EtatServeur | null; onretour: () => void };
   let { etat, onretour }: Props = $props();
-  const uid = $props.id();
-  const demanderEmail = !adresseConnue();
   let partages = $state<number | null>(null);
   let appareil = $state(true);
-  let email = $state("");
-  let mdp = $state("");
-  let code = $state("");
-  let errs = $state<Partial<Record<Champ, string>>>({});
-  let els: Partial<Record<Champ, HTMLInputElement | undefined>> = $state({});
   let global = $state("");
   let progres = $state.raw<Progres | null>(null);
   let fini = $state.raw<Extract<Progres, { etape: "fini" }> | null>(null);
   const pass = account.profil?.pass ?? null;
+  const pseudo = account.profil?.pseudo ?? "";
   const salons = $derived(etat?.salonsActifs ?? 0);
-  const bloque = $derived(etat?.recupJusqu ? t("account.forgot.recup", { date: jourLong(etat.recupJusqu) }) : "");
 
   $effect(() =>
     untrack(() => {
+      preparerReauth().catch(() => undefined);
       partagesASupprimer().then(
         (n) => (partages = n),
         () => (partages = 0),
       );
+      // Cérémonie rechargée avant son échéance (5 min au serveur) : le geste n'attend jamais de requête.
+      const m = setInterval(() => preparerReauth().catch(() => undefined), 240_000);
+      return () => clearInterval(m);
     }),
   );
 
   const enCours = $derived(progres?.etape === "partages" ? t("account.delete.progress", { fait: progres.fait, total: progres.total }) : progres?.etape === "compte" ? t("account.delete.progressAccount") : "");
 
   async function supprimer() {
-    errs = {};
     global = "";
     try {
-      await confirmerIdentite(mdp, etat?.totp ? code : "", demanderEmail ? email : undefined);
+      await confirmerParPasskey();
     } catch (e) {
+      preparerReauth().catch(() => undefined);
       return montrer(e);
     }
-    mdp = code = "";
     try {
       for await (const p of supprimerTout({ effacerAppareil: appareil })) {
         if (p.etape === "fini") fini = p;
@@ -73,18 +70,16 @@
     announce(t("account.delete.done"));
   }
   function montrer(e: unknown) {
-    const x = erreur(e, "parametres");
-    if (x.champ) {
-      errs = { [x.champ]: x.texte };
-      void tick().then(() => els[x.champ!]?.focus());
-    } else global = x.texte;
-    announce(x.texte);
+    if (annulee(e)) return;
+    global = erreur(e, "parametres").texte;
+    announce(global);
   }
 </script>
 
 {#if fini}
   <Cadre titre={t("account.delete.done")}>
     <div class="art"><DestroyedArt /></div>
+    <p class="note" data-passkey-gestionnaire>{t("account.delete.passkey", { pseudo })}</p>
     {#if fini.partagesEchoues > 0}<p class="note">{t("account.delete.failed", { n: fini.partagesEchoues })}</p>{/if}
     <div class="actions"><Button onpress={() => navigate("/")}>{t("account.delete.home")}</Button></div>
   </Cadre>
@@ -111,8 +106,7 @@
 
     <form novalidate onsubmit={(e) => e.preventDefault()}>
       <Case label={t("account.delete.device")} hint={t("account.delete.device.hint")} bind:checked={appareil} />
-      <Identite {demanderEmail} totp={!!etat?.totp} bind:email bind:mdp bind:code bind:errs bind:els />
-      {#if bloque}<p id="{uid}-r" class="raison">{bloque}</p>{/if}
+      <p class="note">{t("account.delete.gesture")}</p>
       {#if global}<p class="err" role="alert">{global}</p>{/if}
       {#if enCours}<p class="note" aria-busy="true">{enCours}</p>{/if}
       <div class="actions">
@@ -122,7 +116,7 @@
           confirmLabel={t("account.delete.yes")}
           kind="danger"
           triggerVariant="danger"
-          disabled={!!bloque || etat === null || progres !== null}
+          disabled={etat === null || progres !== null}
           onconfirm={supprimer}
         />
         <Button variant="ghost" onpress={onretour}>{t("account.delete.back")}</Button>
@@ -147,8 +141,7 @@
     gap: var(--sp-2);
     color: var(--text-2);
   }
-  .warn,
-  .raison {
+  .warn {
     margin: 0;
     color: var(--warn);
   }

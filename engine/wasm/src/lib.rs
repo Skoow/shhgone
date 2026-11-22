@@ -759,41 +759,13 @@ pub fn password_key_for_create(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Compte v2 (conception compte v2 §5.1, §6, §21.2.2, §21.5)
+// Compte (clés des coffres tirées de K_compte ; conception du compte par passkey §5.1)
 // ---------------------------------------------------------------------------------------------
 // Le pseudo (`pseudoValide`, `pseudoReserve` ; `p_canon` = `cleUnicite`) est exposé par le module
 // du salon (`shhdrop-salon-wasm`), qui a déjà les tables Unicode de sa règle : ici, elles pèseraient
 // 50 Ko de plus en brotli sur toutes les pages de partage (mesuré le 14 novembre).
 
-/// Adresse normalisée : `{ canon, exacte }`, ou `adresse_invalide`, `adresse_non_ascii`.
-#[wasm_bindgen(
-    js_name = normaliserAdresse,
-    unchecked_return_type = "{ canon: string; exacte: string }"
-)]
-pub fn normaliser_adresse(email: &str) -> core::result::Result<Object, JsValue> {
-    let a = compte::v2::normaliser(email).map_err(js_err)?;
-    let o = Object::new();
-    set(&o, "canon", &JsValue::from_str(&a.canon));
-    set(&o, "exacte", &JsValue::from_str(&a.exacte));
-    Ok(o)
-}
-
-/// `{ aAuth, kekMdp }` : Argon2id (64 Mio) puis HKDF ; mot de passe en UTF-8. Calcul de
-/// 64 Mio : la couche TypeScript l'appelle dans un Worker neuf (web/src/engine/argon2.ts).
-#[wasm_bindgen(
-    js_name = deriverCompte,
-    unchecked_return_type = "{ aAuth: Uint8Array; kekMdp: Uint8Array }"
-)]
-pub fn deriver_compte(pw: &Uint8Array, canon: &str) -> core::result::Result<Object, JsValue> {
-    let pw = secret_text(pw, Error::MotDePasseVide).map_err(js_err)?;
-    let (a, k) = compte::v2::deriver(&pw, canon).map_err(js_err)?;
-    let o = Object::new();
-    set(&o, "aAuth", &bytes(&*a));
-    set(&o, "kekMdp", &bytes(&*k));
-    Ok(o)
-}
-
-/// Clé de 32 octets venue de JavaScript (`K_compte`, `s_profil`), recopiée dans un tampon effacé.
+/// Clé de 32 octets venue de JavaScript (`K_compte`, sortie PRF), recopiée dans un tampon effacé.
 fn key32(a: &Uint8Array) -> Result<Zeroizing<[u8; 32]>> {
     let v = secret(a);
     let mut k = Zeroizing::new([0u8; 32]);
@@ -811,34 +783,11 @@ pub fn cle_prive(k_compte: &Uint8Array) -> core::result::Result<Uint8Array, JsVa
     Ok(Uint8Array::from(&compte::cle_prive(&k)[..]))
 }
 
-/// `K_profil` (coffre de profil) tirée de `s_profil`.
-#[wasm_bindgen(js_name = cleProfil)]
-pub fn cle_profil(s_profil: &Uint8Array) -> core::result::Result<Uint8Array, JsValue> {
-    let k = key32(s_profil).map_err(js_err)?;
-    Ok(Uint8Array::from(&compte::v2::cle_profil(&k)[..]))
-}
-
 /// `K_etiquette` (nom d'appareil d'une session) tirée de `K_compte`.
 #[wasm_bindgen(js_name = cleAppareil)]
 pub fn cle_appareil(k_compte: &Uint8Array) -> core::result::Result<Uint8Array, JsValue> {
     let k = key32(k_compte).map_err(js_err)?;
     Ok(Uint8Array::from(&compte::cle_appareil(&k)[..]))
-}
-
-/// Règle du mot de passe d'un nouveau compte (`mdp_court`, `mdp_long`, `mdp_adresse`) ; `canon`
-/// et `exacte` viennent de `normaliserAdresse`.
-#[wasm_bindgen(js_name = motDePasseValide)]
-pub fn mot_de_passe_valide(
-    pw: &Uint8Array,
-    canon: &str,
-    exacte: &str,
-) -> core::result::Result<(), JsValue> {
-    let pw = secret_text(pw, Error::MdpCourt).map_err(js_err)?;
-    let a = compte::v2::Adresse {
-        canon: canon.to_string(),
-        exacte: exacte.to_string(),
-    };
-    compte::v2::mot_de_passe_valide(&pw, &a).map_err(js_err)
 }
 
 // ---------------------------------------------------------------------------------------------

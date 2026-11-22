@@ -179,7 +179,7 @@ func TestVecteursV3Coffres(t *testing.T) {
 	}
 }
 
-// Mêmes p_canon et mêmes réservés que compte.json : l'empreinte du pseudo (HMAC de K_pseudo) ne
+// p_canon et réservés de compte-v3.json (les mêmes que le compte par e-mail) : l'empreinte du pseudo (HMAC de K_pseudo) ne
 // change pas avec le compte par passkey.
 func TestVecteursV3Pseudo(t *testing.T) {
 	v := lireVecteursV3(t)

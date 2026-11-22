@@ -9,9 +9,10 @@ import { getLang } from "../i18n/i18n.svelte";
 import { SHARE_FRAGMENT, type CaptchaProof } from "../index";
 import DemoBanner from "./DemoBanner.svelte";
 import { createFauxCompte } from "./fake-compte";
+import { passkeysSimulees } from "./passkeys";
 import { createFakeServer } from "./fake-server";
 import { fakeXHRClass } from "./fake-xhr";
-import { loadCompte, openDemoStore, saveCompte } from "./persist";
+import { loadCompte, loadPasskeys, openDemoStore, saveCompte, savePasskeys } from "./persist";
 
 export const MARK = "__SHH_DEMO__";
 
@@ -28,10 +29,10 @@ const READY_NOTE = {
   fr: "Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.",
   en: "Demo: this link only works in this tab. Nothing is sent.",
 } as const;
-/** Pages du compte : rien n'est envoyé, le compte n'existe que dans cet onglet. */
+/** Pages du compte : aucune passkey créée, le compte n'existe que dans cet onglet. */
 const COMPTE_NOTE = {
-  fr: "Démo\u202f: aucun e-mail n'est envoyé ; ce compte n'existe que dans cet onglet et disparaît à sa fermeture.",
-  en: "Demo: no e-mail is sent; this account only exists in this tab and disappears when it closes.",
+  fr: "Dans la démo, aucune passkey n'est créée (la feuille du système est simulée)\u202f; ce compte n'existe que dans cet onglet et disparaît à sa fermeture.",
+  en: "In the demo, no passkey is created (the system sheet is simulated); this account only exists in this tab and disappears when it closes.",
 } as const;
 const INVALID_LINK_NOTE = {
   fr: "(normal en démo : un partage n'existe que dans l'onglet qui l'a créé)",
@@ -81,8 +82,10 @@ export async function installDemo(w: Window): Promise<void> {
     onSegment: store ? (id, n, d) => store.saveSegment(id, n, d) : undefined,
   });
   store?.release();
-  // Compte essayable (19 novembre) : faux serveur du compte de cet onglet, aucun e-mail envoyé.
+  // Compte essayable (19 novembre) : faux serveur du compte de cet onglet et passkey simulée
+  // (conception du compte par passkey §11, Q8 : aucune passkey de démo dans le gestionnaire).
   const compte = createFauxCompte({ restore: loadCompte(w), onChange: (s) => saveCompte(w, s) });
+  const passkeys = passkeysSimulees({ restore: loadPasskeys(w), onChange: (l) => savePasskeys(w, l) });
   const isApi = (u: URL) => u.origin === w.location.origin && isApiPath(u.pathname);
   const isCompte = (u: URL) => /^\/api\/compte(\/|$)/.test(u.pathname);
 
@@ -119,7 +122,7 @@ export async function installDemo(w: Window): Promise<void> {
     get readyNote() {
       return READY_NOTE[getLang()];
     },
-    compteCode: () => compte.dernierCode(),
+    passkeys,
     get compteNote() {
       return COMPTE_NOTE[getLang()];
     },

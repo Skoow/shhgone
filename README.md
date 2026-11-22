@@ -28,6 +28,7 @@ Envoyez des fichiers, des photos, des vidéos, des notes ou un message vocal par
 ## Ce que fait Shhgone
 
 - **Sans compte** : on dépose, on choisit la durée et le nombre d'ouvertures, on partage le lien et le mot de passe. Aucune adresse e-mail n'est demandée.
+- **Compte facultatif, pour créer un salon** (pas encore ouvert) : sans e-mail ni mot de passe, par passkey, avec une clé de récupération à noter. Le profil et les listes sont chiffrés sur l'appareil ; le serveur ne garde que les clés publiques des passkeys et un code à sens unique de la clé de récupération.
 - **Tous les contenus** : fichiers, photos, vidéos (pellicule ou appareil photo), notes, mémo vocal, jusqu'à 200 éléments par partage.
 - **Liens qui disparaissent** : durée de 1, 6, 12 ou 24 heures, de 1 à 5 ouvertures ; à l'échéance, plus rien n'est lisible ni stocké.
 - **Mot de passe toujours généré** : il ne part jamais dans le lien partagé ; on l'envoie par un autre moyen (sauf le QR code « en face à face », qui contient les deux).

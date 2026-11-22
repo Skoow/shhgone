@@ -11,6 +11,7 @@
 // - Toute erreur (stockage refusé, quota) : la démo continue en mémoire, comme avant.
 // Jamais dans le build de production (garde demoGuard, check-dist).
 import type { InstantaneCompte } from "./fake-compte";
+import type { PasskeySimulee } from "./passkeys";
 import type { Snapshot } from "./fake-server";
 
 export const MARK = "__SHH_DEMO__";
@@ -200,7 +201,8 @@ export async function openDemoStore(w: Window, now: () => number = Date.now): Pr
 
 /**
  * Compte essayable de la démo (19 novembre) : l'état du faux serveur du compte de CET onglet
- * (demo/fake-compte.ts : adresses, A_auth, enveloppes et coffres chiffrés, sessions), en
+ * (demo/fake-compte.ts : identifiants des passkeys simulées, enveloppes et coffres chiffrés,
+ * v_r, sessions), en
  * sessionStorage, pour qu'un rechargement retrouve le compte ; perdu à la fermeture de l'onglet,
  * jamais vu par un autre onglet ni envoyé. Refus du stockage : le compte vit le temps de la page.
  */
@@ -211,7 +213,7 @@ export function loadCompte(w: Window): InstantaneCompte | null {
     const t = w.sessionStorage.getItem(COMPTE_KEY);
     if (t === null) return null;
     const v = JSON.parse(t) as InstantaneCompte;
-    return v?.v === 1 && Array.isArray(v.comptes) && Array.isArray(v.sessions) && Array.isArray(v.pseudos) ? v : null;
+    return v?.v === 2 && Array.isArray(v.comptes) && Array.isArray(v.sessions) && Array.isArray(v.pseudos) ? v : null;
   } catch {
     return null;
   }
@@ -223,5 +225,31 @@ export function saveCompte(w: Window, s: InstantaneCompte): void {
     else w.sessionStorage.setItem(COMPTE_KEY, JSON.stringify(s));
   } catch {
     /* stockage refusé ou plein : le compte vit le temps de la page */
+  }
+}
+
+/**
+ * Passkeys SIMULÉES de la démo (demo/passkeys.ts) : leurs secrets restent dans cet onglet, comme
+ * ceux d'un authentificateur, en sessionStorage ; perdues à la fermeture de l'onglet.
+ */
+export const PASSKEYS_KEY = "shh.demo.passkeys";
+
+export function loadPasskeys(w: Window): PasskeySimulee[] | null {
+  try {
+    const t = w.sessionStorage.getItem(PASSKEYS_KEY);
+    if (t === null) return null;
+    const v: unknown = JSON.parse(t);
+    return Array.isArray(v) && v.every((p) => typeof p?.id === "string" && typeof p?.userHandle === "string" && typeof p?.secret === "string") ? (v as PasskeySimulee[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function savePasskeys(w: Window, l: PasskeySimulee[]): void {
+  try {
+    if (l.length === 0) w.sessionStorage.removeItem(PASSKEYS_KEY);
+    else w.sessionStorage.setItem(PASSKEYS_KEY, JSON.stringify(l));
+  } catch {
+    /* stockage refusé ou plein : les passkeys simulées vivent le temps de la page */
   }
 }

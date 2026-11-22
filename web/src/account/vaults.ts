@@ -1,7 +1,7 @@
 // Les deux coffres du compte (conception compte §21.2, §21.5, §37.2 ; serveur : compte/coffres.go).
-// Forme commune, prouvée par engine/vectors/compte.json : « SHH-ACCT1 » (privé, clé K_prive tirée
-// de K_compte, donc du mot de passe seulement) ou « SHH-PROF1 » (profil, clé K_profil tirée de
-// s_profil, séquestré par le serveur) (9) ‖ gen (8, gros-boutiste) ‖ nonce (12) ‖
+// Forme commune, prouvée par engine/vectors/compte-v3.json : « SHH-ACCT1 » (privé, clé K_prive tirée
+// de K_compte) ou « SHH-PROF1 » (profil, clé K_profil tirée elle aussi de K_compte : plus de
+// séquestre, le serveur ne lit ni l'un ni l'autre) (9) ‖ gen (8, gros-boutiste) ‖ nonce (12) ‖
 // AES-256-GCM(clé, nonce, clair, AD = en-tête ‖ h ‖ gen) ; clair = longueur (4) ‖ JSON ‖ zéros,
 // au plus petit palier de 4, 16, 64 ou 256 Kio qui le contient.
 // - Coffre de profil : pseudo, photo (≤ 64 Ko), langue, réglages, pass ; RIEN d'autre (aucune
@@ -84,8 +84,8 @@ export type Profil = { pseudo: string; photo: Uint8Array | null; langue: string;
 export type EntreePrivee = { id: string } & Record<string, unknown>;
 /**
  * `pass` (conception du paiement §6.2, DP-8) : pass des offres payantes, dans le coffre PRIVÉ
- * (ouvert par le mot de passe seulement, jamais par le séquestre du profil) ; écrit seulement s'il
- * en existe (un coffre sans pass garde exactement sa forme d'avant, vecteurs compte.json).
+ * (ouvert par une passkey ou la clé de récupération, comme le profil) ; écrit seulement s'il
+ * en existe (un coffre sans pass garde exactement sa forme d'avant, vecteurs compte-v3.json).
  */
 export type CoffrePrive = { salons: EntreePrivee[]; recus: EntreePrivee[]; rejoints: EntreePrivee[]; envois: EntreePrivee[]; pass?: EntreePrivee[] };
 const LISTES = ["salons", "recus", "rejoints", "envois"] as const;
