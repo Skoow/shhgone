@@ -514,6 +514,8 @@ export const fr = {
   "lost.hint":
     "Ce navigateur l'avait déjà ouvert, mais le serveur ne le reconnaît plus\u202f: il a été détruit ou a expiré, ou notre serveur a redémarré alors que toutes ses ouvertures étaient prises. Demandez à l'expéditeur de vous l'envoyer à nouveau.",
   "lost.limit": "Ce partage a déjà été rouvert 20\u202ffois depuis cet appareil\u202f; il ne reste aucune ouverture. Demandez à l'expéditeur de vous l'envoyer à nouveau.",
+  "egress": "Ce partage a atteint sa limite de téléchargement.",
+  "egress.hint": "Le serveur n'en envoie plus rien. Demandez à l'expéditeur de vous l'envoyer à nouveau.",
   "corrupt": "Le contenu a été modifié en route\u202f; il n'a pas été ouvert.",
   "corrupt.hint": "Ce que le serveur a renvoyé ne correspond pas à ce que l'expéditeur a chiffré\u202f: rien n'a été affiché. Demandez à l'expéditeur de vous l'envoyer à nouveau.",
   "incomplete": "Lien incomplet",
@@ -695,6 +697,7 @@ export const fr = {
   "dl.done": "Téléchargé",
   "dl.fail.network": "Coupure réseau\u202f: la partie déjà reçue est gardée.",
   "dl.fail.budget": "Cette ouverture ne peut plus relire ce fichier.",
+  "dl.fail.egress": "Ce partage a atteint sa limite de téléchargement.",
   "dl.fail.limit": "Trop de demandes, réessayez dans un instant.",
   "dl.fail.disk": "Plus de place sur cet appareil. Le fichier incomplet a été supprimé.",
   "dl.fail.write": "Enregistrement interrompu\u202f: le fichier incomplet a été supprimé.",

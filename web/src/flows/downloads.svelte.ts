@@ -25,7 +25,7 @@ import type { Tracker } from "./gone.svelte";
 
 export type RowState = "idle" | "queued" | "downloading" | "paused" | "done" | "failed";
 /** `activation` : le sélecteur d'enregistrement a été refusé faute d'appui récent (il faut appuyer à nouveau). */
-export type FailReason = "network" | "budget" | "limit" | "disk_full" | "write" | "gone" | "activation" | "corrupt";
+export type FailReason = "network" | "budget" | "egress" | "limit" | "disk_full" | "write" | "gone" | "activation" | "corrupt";
 
 export type Row = {
   readonly state: RowState;
@@ -89,6 +89,8 @@ const isNetwork = (e: unknown) => e instanceof Error && (e.message === "reseau" 
 export function classify(e: unknown): { reason: FailReason; retryable: boolean; keepPartial: boolean } {
   const n = errName(e);
   if (n === "ReadBudgetError") return { reason: "budget", retryable: false, keepPartial: false };
+  // Limite de téléchargement du partage (403 egress_limit) : définitive ; arrêt, partiel supprimé.
+  if (n === "EgressLimitError") return { reason: "egress", retryable: false, keepPartial: false };
   if (n === "NotFoundError" || n === "GoneError") return { reason: "gone", retryable: false, keepPartial: false };
   // Contenu modifié en route (audit web D3) : refusé, le fichier partiel est supprimé ; relire ne changerait rien.
   if (n === "CorruptError") return { reason: "corrupt", retryable: false, keepPartial: false };

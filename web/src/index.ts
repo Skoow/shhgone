@@ -15,6 +15,7 @@ export {
   LimitError,
   NotFoundError,
   ReadBudgetError,
+  EgressLimitError,
   ServerError,
   collectToBlob,
   createShare,

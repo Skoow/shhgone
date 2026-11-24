@@ -94,6 +94,7 @@ import {
   LimitError,
   NotFoundError,
   ReadBudgetError,
+  EgressLimitError,
   ServerError,
   collectToBlob,
   createShare,
@@ -1622,6 +1623,38 @@ describe("budget de lecture par ouverture (audit M1, spec §24)", () => {
     const o2 = await openShare(LINK, PW, ORIGIN, undefined, t.net);
     expect(same(await o2.item(0), pseudo(5.5 * 1048576, 3))).toBe(true);
     expect(busy).toBe(3);
+  }, 30_000);
+});
+
+describe("limite de téléchargement du partage (403 egress_limit, 24 novembre)", () => {
+  it("au déverrouillage : EgressLimitError, une seule requête ; sur un segment : EgressLimitError, aucun nouvel essai", async () => {
+    const pk = await pack([{ kind: "file", name: "a", mime: "x/y", data: new Blob([pseudo(5.5 * 1048576, 4)]) }]);
+    let unlocks = 0;
+    const u = server((m, p) => {
+      if (p.endsWith("/unlock")) {
+        unlocks++;
+        return j(403, { error: "egress_limit" });
+      }
+      return packRoute(pk)(m, p);
+    });
+    const e = await reject(openShare(LINK, PW, ORIGIN, undefined, u.net));
+    expect(e).toBeInstanceOf(EgressLimitError);
+    expect((e as Error).message).toBe("limite_telechargement");
+    expect(unlocks).toBe(1);
+    let segCalls = 0;
+    const s = server((m, p) => {
+      if (p.endsWith("/segments/1")) {
+        segCalls++;
+        return j(403, { error: "egress_limit" });
+      }
+      return packRoute(pk)(m, p);
+    });
+    const o = await openShare(LINK, PW, ORIGIN, undefined, s.net);
+    expect(await reject(o.item(0))).toBeInstanceOf(EgressLimitError);
+    expect(segCalls).toBe(1);
+    // Un autre 403 n'est pas pris pour la limite.
+    const other = server((m, p) => (p.endsWith("/unlock") ? j(403, { error: "forbidden" }) : packRoute(pk)(m, p)));
+    expect(await reject(openShare(LINK, PW, ORIGIN, undefined, other.net))).not.toBeInstanceOf(EgressLimitError);
   }, 30_000);
 });
 

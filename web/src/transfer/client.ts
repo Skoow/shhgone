@@ -93,6 +93,17 @@ export class ReadBudgetError extends Error {
 }
 
 /**
+ * Le partage a atteint sa limite de téléchargement (403 « egress_limit », plafond d'octets servis
+ * par partage) : définitif, aucun nouvel essai, ni au déverrouillage ni pour un segment.
+ */
+export class EgressLimitError extends Error {
+  constructor() {
+    super("limite_telechargement");
+    this.name = "EgressLimitError";
+  }
+}
+
+/**
  * Octroi d'ouverture refusé (409 grant_invalid : expiré, redémarrage du serveur, ouverture
  * terminée, spec §41.4) : ni ouverture ni essai consommé ; déverrouiller sans octroi en
  * consommera une nouvelle (à dire avant).
@@ -148,7 +159,8 @@ const isNetwork = (e: unknown) => e instanceof Error && e.message === "reseau";
 
 // Erreurs côté destinataire et gestion (openShare, destroyShare, shareStatus, fetchMeta) :
 // coupure persistante → Error("reseau") ; 429 « budget » → ReadBudgetError (définitif,
-// sans nouvel essai) ; autre 429 → LimitError ; mauvais mot de passe →
+// sans nouvel essai) ; 403 « egress_limit » → EgressLimitError (définitif) ; autre 429 →
+// LimitError ; mauvais mot de passe →
 // BadPasswordError ; 5xx → ServerError (texte fixe) ; contenu modifié (paquet corrompu, segment
 // tronqué) → CorruptError (audit web D3) ; tout le reste (404, paramètres KDF refusés, réponse
 // invalide, autre code) → NotFoundError : rien d'exploitable
@@ -159,6 +171,7 @@ function readerError(e: unknown): Error {
     e instanceof LimitError ||
     e instanceof NotFoundError ||
     e instanceof ReadBudgetError ||
+    e instanceof EgressLimitError ||
     e instanceof ServerError ||
     e instanceof GrantInvalidError ||
     e instanceof ReopenLimitError ||
@@ -168,6 +181,7 @@ function readerError(e: unknown): Error {
   if (isNetwork(e)) return e as Error;
   if (e instanceof Error && e.message === "paquet_corrompu") return new CorruptError();
   if (api.isBudget(e)) return new ReadBudgetError();
+  if (api.isEgressLimit(e)) return new EgressLimitError();
   if (e instanceof api.HttpError) {
     if (e.status === 409 && e.code === "grant_invalid") return new GrantInvalidError();
     if (e.status === 429 && e.code === "reopen_limit") return new ReopenLimitError();

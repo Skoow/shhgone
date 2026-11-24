@@ -1,6 +1,7 @@
 <script lang="ts">
   // Lien invalide, lien incomplet, retour impossible (UI §9.11, D42-22), contenu modifié en route
-  // (audit web D3 : texte fixe choisi par le client) : message unique pour
+  // (audit web D3 : texte fixe choisi par le client), limite de téléchargement du partage
+  // (403 egress_limit) : message unique pour
   // un lien inconnu (spec §5.2, avec la limite des retours : même navigateur seulement), retour à l'envoi,
   // dans la facture commune des pages d'état (StatusPage, tâche UP). En démo seulement, une
   // phrase explique pourquoi un lien de démo ouvert ailleurs est invalide (crochet getDemo,
@@ -12,7 +13,7 @@
   import StatusPage from "../ui/StatusPage.svelte";
 
   /** limit : retour refusé par la limite des retours (20), sans ouverture restante. */
-  type Props = { kind: "invalid" | "incomplete" | "return_lost" | "corrupt"; limit?: boolean };
+  type Props = { kind: "invalid" | "incomplete" | "return_lost" | "corrupt" | "egress"; limit?: boolean };
   let { kind, limit = false }: Props = $props();
   const demo = getDemo();
 </script>
@@ -22,8 +23,8 @@
     {kind}
     screen={kind === "incomplete" ? "incomplete" : "invalid"}
     icon={kind === "corrupt" ? ShieldAlert : Link2}
-    title={t(kind === "invalid" ? "invalid" : kind === "incomplete" ? "incomplete" : kind === "corrupt" ? "corrupt" : "lost")}
-    lede={t(kind === "invalid" ? "invalid.hint" : kind === "incomplete" ? "incomplete.hint" : kind === "corrupt" ? "corrupt.hint" : limit ? "lost.limit" : "lost.hint")}
+    title={t(kind === "invalid" ? "invalid" : kind === "incomplete" ? "incomplete" : kind === "corrupt" ? "corrupt" : kind === "egress" ? "egress" : "lost")}
+    lede={t(kind === "invalid" ? "invalid.hint" : kind === "incomplete" ? "incomplete.hint" : kind === "corrupt" ? "corrupt.hint" : kind === "egress" ? "egress.hint" : limit ? "lost.limit" : "lost.hint")}
   >
     {#if kind === "invalid" && demo}<p class="lede demo-note">{demo.invalidLinkNote}</p>{/if}
     {#snippet action()}<a class="send" href={href("/")} onclick={(e) => followLink(e, "/")}>{t("invalid.send")}</a>{/snippet}

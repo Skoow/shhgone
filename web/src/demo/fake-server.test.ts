@@ -8,6 +8,7 @@ import {
   BadPasswordError,
   GrantInvalidError,
   NotFoundError,
+  EgressLimitError,
   ReopenLimitError,
   collectToBlob,
   createShare,
@@ -182,6 +183,27 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     await o.done();
     expect(fake.shares()).toBe(0);
     await expect(shareStatus(r.manage, ORIGIN, net)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("plafond de téléchargement (egressLimitBytes, 24 novembre) : segment puis déverrouillage → 403 egress_limit, EgressLimitError, ouverture non consommée", async ({ expect }) => {
+    // Palier de 10 Mio (segments de 4, 4 et 2 Mio) : l'ouverture lit les segments 0 et 2 (6 Mio),
+    // le fichier lit ensuite le segment 1, qui dépasserait un plafond de 7 Mio.
+    const { net, statuses } = setup({ egressLimitBytes: 7 * 1048576 });
+    const r = await share(net, 3, [bigFile()]);
+    const o = await openShare(r.link, PW, ORIGIN, undefined, net);
+    await expect(o.item(0)).rejects.toBeInstanceOf(EgressLimitError);
+    expect(statuses.filter((x) => / \/api\/shares\/segments\/\d+ 403$/.test(x))).toHaveLength(1); // aucun nouvel essai
+    // Plafond atteint : le déverrouillage est refusé, sans consommer d'ouverture.
+    const zero = setup({ egressLimitBytes: 0 });
+    const z = await share(zero.net, 3, [bigFile()]);
+    await expect(openShare(z.link, PW, ORIGIN, undefined, zero.net)).rejects.toBeInstanceOf(EgressLimitError);
+    expect(zero.statuses.filter((x) => x.startsWith("POST /api/shares/unlock"))).toEqual(["POST /api/shares/unlock 403"]);
+    expect((await fetchMeta(z.link, ORIGIN, zero.net)).opensLeft).toBe(3);
+    // Sans plafond : rien ne change.
+    const free = setup();
+    const r2 = await share(free.net, 1, [bigFile()]);
+    const o2 = await openShare(r2.link, PW, ORIGIN, undefined, free.net);
+    expect((await o2.item(0)).length).toBe(5 * 1048576);
   });
 
   it("fetchMeta et unlock : ouvertures restantes, une de moins après chaque ouverture (ruling 5)", async ({ expect }) => {

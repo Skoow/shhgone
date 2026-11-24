@@ -48,6 +48,11 @@ export class HttpError extends Error {
 
 /** Budget de lecture de l'ouverture épuisé (429 {"error":"budget"}) : définitif. */
 export const isBudget = (e: unknown): e is HttpError => e instanceof HttpError && e.status === 429 && e.code === "budget";
+/**
+ * Plafond de téléchargement du partage atteint (403 {"error":"egress_limit"}, sur un segment ou
+ * au déverrouillage ; sans Retry-After) : définitif, jamais rejoué.
+ */
+export const isEgressLimit = (e: unknown): e is HttpError => e instanceof HttpError && e.status === 403 && e.code === "egress_limit";
 
 /** Réponse 2xx inattendue (champ manquant, taille de segment fausse…) : ce n'est pas une coupure. */
 export class BadResponse extends Error {

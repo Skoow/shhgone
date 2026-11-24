@@ -87,6 +87,8 @@ export async function installDemo(w: Window): Promise<void> {
   const fake = createFakeServer({
     rateBytesPerS: rate,
     outage: q.has("coupure") ? OUTAGE : undefined,
+    // `?plafond` : limite de téléchargement du partage atteinte dès le déverrouillage.
+    egressLimitBytes: q.has("plafond") ? 0 : undefined,
     restore: store?.snap ? { snap: store.snap, segment: (id, n) => store.segment(id, n) } : undefined,
     onChange: store ? (s) => store.saveMeta(s) : undefined,
     onSegment: store ? (id, n, d) => store.saveSegment(id, n, d) : undefined,

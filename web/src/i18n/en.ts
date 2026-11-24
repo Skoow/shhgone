@@ -512,6 +512,8 @@ export const en = {
   "lost.hint":
     "This browser had already opened it, but the server no longer recognizes it: it was destroyed or expired, or our server restarted while all its opens were used. Ask the sender to send it again.",
   "lost.limit": "This share has already been reopened 20\u00a0times from this device; no opens are left. Ask the sender to send it again.",
+  "egress": "This share has reached its download limit.",
+  "egress.hint": "The server no longer sends anything from it. Ask the sender to send it again.",
   "corrupt": "The content was modified on the way; it was not opened.",
   "corrupt.hint": "What the server sent back does not match what the sender encrypted: nothing was shown. Ask the sender to send it again.",
   "incomplete": "Incomplete link",
@@ -691,6 +693,7 @@ export const en = {
   "lock.recv.error": "Not verified",
   "dl.done": "Downloaded",
   "dl.fail.network": "Network cut: the part already received is kept.",
+  "dl.fail.egress": "This share has reached its download limit.",
   "dl.fail.budget": "This opening can no longer read this file again.",
   "dl.fail.limit": "Too many requests, try again in a moment.",
   "dl.fail.disk": "No space left on this device. The incomplete file was deleted.",

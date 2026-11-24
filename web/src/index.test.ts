@@ -47,6 +47,7 @@ describe("interface publique", () => {
         "PASSWORD_LEN",
         "PW_TRIES",
         "ReadBudgetError",
+        "EgressLimitError",
         "ServerError",
         "TTL_HOURS",
         "TTL_MAX_HOURS",

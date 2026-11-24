@@ -30,6 +30,7 @@ import {
   CorruptError,
   NotFoundError,
   ReopenLimitError,
+  EgressLimitError,
   ServerError,
   fetchMeta,
   grantTag,
@@ -61,6 +62,7 @@ export type ReceiveState =
   | "destroyed_by_password"
   | "incomplete"
   | "corrupt" // contenu modifié en route (audit web D3) : refusé, rien n'a été affiché
+  | "egress" // limite de téléchargement du partage atteinte (403 egress_limit) : définitif
   | "return_lost" // octroi gardé ici, mais le serveur ne connaît plus le partage (D42-22)
   | "error"; // fetchMeta impossible (réseau, limite, serveur, maintenance) : page d'erreur, Réessayer
 
@@ -266,7 +268,7 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     return tagP.then((t) => (t === null ? undefined : d.returns.forget(t))).catch(() => undefined);
   };
 
-  const end = (state: "invalid" | "destroyed_by_password" | "incomplete" | "return_lost" | "corrupt") => {
+  const end = (state: "invalid" | "destroyed_by_password" | "incomplete" | "return_lost" | "corrupt" | "egress") => {
     secret = null;
     drop();
     s.state = state;
@@ -527,6 +529,9 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
         } else if (e instanceof CorruptError) {
           // Audit web D3 : texte fixe, jamais « ce lien n'existe pas ».
           end("corrupt");
+        } else if (e instanceof EgressLimitError) {
+          // Limite de téléchargement du partage : définitive, aucun nouvel essai proposé.
+          end("egress");
         } else if (e instanceof NotFoundError) {
           // A23 : le dernier essai a échoué → le partage vient d'être détruit (la personne sait qu'il existait).
           end(s.attemptsLeft === 1 ? "destroyed_by_password" : grant !== null ? "return_lost" : "invalid");
