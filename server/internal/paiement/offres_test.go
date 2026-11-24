@@ -59,26 +59,20 @@ func TestFormulesPermises(t *testing.T) {
 	}
 }
 
-// TestDroitsAppelsBientot : les appels sont dans le format (conception §11) et marqués bientôt ;
-// Plus et Pro comprennent l'audio et la vidéo (décision du propriétaire, 24 novembre).
-func TestDroitsAppelsBientot(t *testing.T) {
-	has := func(l []string, s string) bool {
-		for _, x := range l {
-			if x == s {
-				return true
-			}
-		}
-		return false
-	}
+// TestDroitsAppels : Plus et Pro comprennent l'audio et la vidéo (décision du propriétaire,
+// 24 novembre), devenus un vrai droit le même jour (conception des appels §5.1) : plus rien
+// n'est « bientôt » (liste vide, jamais nil, pour que l'API rende [] et non null).
+func TestDroitsAppels(t *testing.T) {
 	for _, o := range []Offre{Plus, Pro} {
-		if !has(o.Detail().Droits, "appel_video") || !has(o.Detail().Droits, "appel_audio") {
+		if !o.A("appel_video") || !o.A("appel_audio") {
 			t.Error(o, "droits d'appel")
 		}
 	}
-	for _, b := range []string{"appel_audio", "appel_video"} {
-		if !has(Bientot, b) {
-			t.Error(b, "pas marqué bientôt")
-		}
+	if Offre(0).A("appel_audio") || Offre(3).A("appel_audio") || Plus.A("partage_pro") || Pro.A("inconnu") {
+		t.Error("droit hors de l'offre")
+	}
+	if Bientot == nil || len(Bientot) != 0 {
+		t.Errorf("bientôt : %#v", Bientot)
 	}
 	if Plus.Detail().JetonsPeriod != 30 || Pro.Detail().JetonsPeriod != 100 {
 		t.Error("réserves de jetons (spec §38.8.1)")

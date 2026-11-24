@@ -6,6 +6,9 @@
 // chacun reçoit vraiment l'image et le son des autres, TOUT le média passe par le relais (aucune
 // connexion directe : paires de candidats « relay » des deux côtés), micro et caméra se coupent,
 // raccrocher retire la tuile chez les autres. Rien à installer : Go suffit (déjà exigé par les tests).
+// Appels réservés aux offres Plus et Pro (24 novembre) : sans pass, « Appel audio » explique
+// « Réservé aux offres Plus et Pro » sans rien demander ; A, qui a un pass Plus payé (pass-helpers.ts),
+// lance l'appel avec un jeton anonyme (seule requête qui en porte un) ; B et C le rejoignent sans offre.
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -16,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { siteComptes } from "./comptes-site";
 import { axe, capture, expect, test as base } from "./fixtures";
+import { passPaye } from "./pass-helpers";
 
 const SHHCHECK = fileURLToPath(new URL("../../deploy/shhcheck", import.meta.url));
 
@@ -81,9 +85,12 @@ const test = base.extend<{ relais: Relais }, { site: string; shhcheck: string }>
       rmSync(dir, { recursive: true, force: true });
     }
   },
+  // Paiement activé (bacs à sable, aucun appel sortant) : les appels sont réservés aux offres
+  // Plus et Pro (24 novembre) ; sans paiement, le serveur ne les propose pas.
   shhServer: async ({ site, relais }, use) =>
     use({
       comptes: { cle: new Uint8Array(randomBytes(32)) },
+      paiement: { webhookStripe: "whsec_e2e_appel", ipnNOWPayments: "ipn-e2e-appel" },
       env: { SHH_STATIC_DIR: site, SHH_TURN_URLS: relais.url, SHH_TURN_SECRET_FILE: relais.secretFile },
     }),
 });
@@ -187,12 +194,19 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
   const r = randomBytes(4).toString("hex");
   await espionner(context);
 
-  // --- A crée le salon et y entre ----------------------------------------------------------------------
+  // --- A range un pass Plus payé sur son appareil, crée son compte, puis le salon, et y entre ----------
+  // (Le pass est d'abord : il appartient à l'appareil, pas au compte, et la session du compte ne
+  // survit pas aux pages chargées par passPaye.)
+  await passPaye(page, shh);
   await inscrire(page, shh.origin, `Lea${r.slice(0, 4)}`);
   await bouton(page, "Continuer").click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
-  const lien = (await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
+  // Historique désactivé par défaut, même avec un compte (24 novembre, B) : le lien de gestion est
+  // montré d'emblée, pour être gardé à la main.
+  await expect(page.locator("[data-manage]")).toContainText("Il n'est pas gardé dans l'historique de cet appareil");
+  await expect(bouton(page, "Afficher le lien de gestion")).toHaveCount(0);
+  const lien =(await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
   const mdp = (await page.locator(".cf").filter({ hasText: "Mot de passe" }).locator(".val").textContent())!.trim();
   await bouton(page, "Entrer dans le salon").click();
   await expect(champ(page, "Pseudonyme pour ce salon")).toHaveValue(`Lea${r.slice(0, 4)}`); // pseudo du compte
@@ -207,11 +221,32 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
     await page.getByRole("region", { name: "Conversation", exact: true }).getByRole("button", { name: "Envoyer", exact: true }).click();
     for (const p of [b.page, c.page]) await expect(fil(p).getByText(`Avant l'appel ${r}`, { exact: true })).toBeVisible({ timeout: 60_000 });
 
-    // --- A lance un appel vidéo ; B et C le voient et le rejoignent ----------------------------------
+    // --- Demandes d'identifiants du relais, sur les trois pages : qui porte un jeton anonyme ? -------
+    const demandes: { qui: string; jeton: boolean }[] = [];
+    for (const [qui, p] of [["A", page], ["B", b.page], ["C", c.page]] as const)
+      p.on("request", (q) => {
+        if (new URL(q.url()).pathname === "/api/salons/appel") demandes.push({ qui, jeton: /^PrivateToken token=[A-Za-z0-9_-]{472}$/.test(q.headers()["authorization"] ?? "") });
+      });
+
+    // --- B, sans offre, touche « Appel audio » : l'explication, sans micro ni requête ---------------
+    await bouton(b.page, "Appel audio").click();
+    const reserve = b.page.locator("[data-appel-reserve]");
+    await expect(reserve).toContainText("Réservé aux offres Plus et Pro.");
+    await expect(reserve.getByRole("link", { name: "Voir les offres", exact: true })).toHaveAttribute("href", "/offres");
+    await expect(appel(b.page)).toHaveCount(0);
+    expect(await axe(b.page)).toEqual([]);
+    await capture(b.page, "appel-reserve");
+    expect(demandes).toEqual([]);
+
+    // --- A (pass Plus) lance un appel vidéo ; B et C le voient et le rejoignent sans offre ----------
     await bouton(page, "Appel vidéo").click();
     await expect(appel(page)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("En attente des autres participants…")).toBeVisible();
     for (const p of [b.page, c.page]) await expect(p.getByText("Appel en cours (1)")).toBeVisible({ timeout: 30_000 });
+    // L'appel sonne chez B : l'explication s'efface, « Rejoindre » est ouvert à tous.
+    await expect(reserve).toHaveCount(0);
+    // A : une demande sans jeton (appels fermés, 402), puis la même avec un jeton anonyme.
+    expect(demandes).toEqual([{ qui: "A", jeton: false }, { qui: "A", jeton: true }]);
     await capture(b.page, "appel-bandeau");
     await bouton(b.page, "Rejoindre avec la caméra").click();
     await expect(appel(b.page)).toBeVisible({ timeout: 30_000 });
@@ -224,6 +259,9 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
       await expect(tuiles(p)).toHaveCount(3, { timeout: 60_000 });
       await expect(tuiles(p).and(p.locator("[data-lien='lie']"))).toHaveCount(2, { timeout: 90_000 });
     }
+    // B et C sont entrés sans jeton : les appels sont ouverts pour tout le salon ; un seul jeton dépensé.
+    expect(demandes.filter((d) => d.qui !== "A")).toEqual([{ qui: "B", jeton: false }, { qui: "C", jeton: false }]);
+    expect(demandes.filter((d) => d.jeton)).toHaveLength(1);
     // Le panneau d'appel reste collé sous la barre du site, même la page défilée.
     await expect(appel(page)).toBeInViewport();
     await capture(page, "appel-a-trois");

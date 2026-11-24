@@ -18,10 +18,9 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(shh.origin + "/offres");
   const co = page.locator("[data-checkout]");
-  // Appels des salons : « bientôt », jamais en vente.
-  // Appels (20 novembre) : Plus et Pro « Inclus » avec « bientôt (pas encore disponible) » (24 novembre :
-  // pas compris aujourd'hui), Gratuit « Non inclus ».
-  for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus\s+bientôt \(pas encore disponible\)$/);
+  // Appels des salons (24 novembre) : Plus et Pro « Inclus », réservés à ces offres, sans
+  // « bientôt » ; Gratuit « Non inclus ».
+  for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus$/);
   await expect(co.locator('[data-tier="free"] [data-calls]')).toHaveText(/^Appels audio et vidéo\s+Non inclus$/);
   await co.locator('[data-tier="pro"] .big').click();
   await co.locator("[data-billing]").getByText("Annuel").click();
@@ -167,7 +166,8 @@ test("Retour : reçu, puis arrêt du renouvellement ; en attente ; sans commande
 
 test("Le vrai serveur : GET /api/paiement, état d'un pass inconnu, webhook Stripe mal signé refusé", async ({ shh, request }) => {
   const o = await (await request.get(shh.origin + "/api/paiement")).json();
-  expect(o).toEqual({ v: 1, moyens: ["carte", "crypto"], pays: expect.arrayContaining(["DE", "FR"]), bientot: ["appel_audio", "appel_video"], tva: { regime: "oss", taux: expect.objectContaining({ DE: 1900, FR: 2000 }) } });
+  // Sous SHH_TVA=oss, la crypto n'est pas proposée (décision du 24 novembre, TestCryptoRefuseEnOSS).
+  expect(o).toEqual({ v: 1, moyens: ["carte"], pays: expect.arrayContaining(["DE", "FR"]), bientot: [], tva: { regime: "oss", taux: expect.objectContaining({ DE: 1900, FR: 2000 }) } });
   const pass = Buffer.alloc(32, 5).toString("base64url");
   const e = await request.post(shh.origin + "/api/paiement/etat", { headers: { "X-Shh-Pass": pass } });
   expect(await e.json()).toEqual({ v: 1, etat: "inconnue", offre: null, fin: null, renouvelle: false, droits: [] });

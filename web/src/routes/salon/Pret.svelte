@@ -24,9 +24,15 @@
       <CopyField label={t("salon.ready.password")} value={vue.pret.mdp} whole />
       <p class="note">{t("salon.ready.password.hint")}</p>
     </div>
-    {#if gestion}
-      <CopyField label={t("salon.ready.manage")} value={vue.pret.gestion} />
-      <Banner kind="warn">{t("salon.manage.warn")}</Banner>
+    <!-- Historique désactivé (par défaut, avec ou sans compte : 24 novembre, B) ou indisponible :
+         le lien de gestion n'est gardé nulle part, il est montré d'emblée pour être gardé à la main.
+         Gardé dans l'historique : derrière un bouton, comme avant. -->
+    {#if gestion || !vue.pret.garde}
+      <div class="gestion" data-manage>
+        <CopyField label={t("salon.ready.manage")} value={vue.pret.gestion} />
+        {#if !vue.pret.garde}<p class="note">{t("salon.ready.manage.keep")}</p>{/if}
+        <Banner kind="warn">{t("salon.manage.warn")}</Banner>
+      </div>
     {:else}
       <div><Button variant="ghost" onpress={() => {
             gestion = true;
@@ -40,7 +46,8 @@
   .qr {
     width: min(100%, 12rem);
   }
-  .mdp {
+  .mdp,
+  .gestion {
     display: grid;
     gap: var(--sp-2);
   }

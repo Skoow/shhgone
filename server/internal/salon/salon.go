@@ -146,6 +146,10 @@ type salon struct {
 	depart uint64
 	gen    atomic.Uint64
 	regle  bool
+	// appelsJusqua : appels ouverts dans ce salon jusqu'à cette heure (appels.go : un membre a
+	// dépensé un jeton d'offre payante) ; zéro : fermés. En mémoire seulement, sans identifiant
+	// ni siège : rien ne dit qui l'a ouvert ; perdu avec l'état du salon (fin, redémarrage).
+	appelsJusqua time.Time
 }
 
 // globAtteint : ce salon ne peut plus ranger de trame en mémoire (pot nil : sans plafond

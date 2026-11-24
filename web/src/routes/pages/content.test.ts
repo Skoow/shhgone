@@ -110,16 +110,16 @@ describe("textes publics et compte par passkey", () => {
     expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
   });
 
-  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut sans compte, 7 jours, comment l'effacer (24 novembre)", () => {
+  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut avec ou sans compte (24 novembre, B), 7 jours, comment l'effacer (24 novembre)", () => {
     for (const comptes of [false, true]) {
       const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!.find((l) => l.startsWith("L'historique de vos envois"))!;
       expect(fr).toMatch(/lien de gestion[^.]*jamais le lien de partage ni le mot de passe\./u);
-      expect(fr).toMatch(/Sans compte, il est désactivé par défaut : rien n'est gardé tant que vous n'activez pas vous-même « Garder dans mon historique »\./u);
+      expect(fr).toMatch(/Il est désactivé par défaut, avec ou sans compte : rien n'est gardé tant que vous n'activez pas vous-même « Garder dans mon historique » ; « Lien prêt » et « Salon prêt » vous montrent alors le lien de gestion/u);
       expect(fr).toMatch(/7 jours après la fin/u);
       expect(fr).toMatch(/« Effacer l'historique » dans « Mes partages » efface tout\./u);
       const en = infoPage("confidentialite", "en", comptes).blocks.find((b) => b.h === "On your device")!.list!.find((l) => l.startsWith("The history of what you send"))!;
       expect(en).toMatch(/management link[^.]*never the share link or the password\./u);
-      expect(en).toMatch(/Without an account, it is off by default: nothing is kept until you turn on “Keep in my history” yourself\./u);
+      expect(en).toMatch(/It is off by default, with or without an account: nothing is kept until you turn on “Keep in my history” yourself; “Link ready” and “Room ready” then show you the management link/u);
       expect(en).toMatch(/7 days after the share or room ends/u);
       expect(en).toMatch(/“Clear history” in “My shares” erases it all\./u);
     }
@@ -178,6 +178,12 @@ describe("Confidentialité : section paiement", () => {
         /annonce ses clés sept jours à l'avance/u,
         /refuse, avec un avertissement, une clé différente pour un jour déjà annoncé/u,
         /dès le premier contact ne serait pas détecté par cet appareil seul/u,
+        // Appels réservés à Plus et Pro (24 novembre) : un jeton ouvre les appels du salon ; ce
+        // que voit le serveur, y compris quand c'est le créateur (connu par son compte).
+        /appels audio et vidéo des salons sont réservés à Plus et Pro/u,
+        /ouvre les appels pour tout le salon jusqu'à sa fin ; les autres participants n'ont besoin d'aucune offre/u,
+        /si c'est le créateur du salon[^.]*ce compte a Plus ou Pro/u,
+        /de même pour un appel lancé juste après/u,
       ])
         expect(t).toMatch(re);
     }
@@ -202,6 +208,10 @@ describe("Confidentialité : section paiement", () => {
         /announces its keys seven days ahead/u,
         /refuses, with a warning, a different key for a day already announced/u,
         /from the very first contact would not be detected by that device alone/u,
+        /calls in rooms are reserved for Plus and Pro/u,
+        /opens calls for the whole room until it ends; the other participants need no plan/u,
+        /if it is the room's creator[^.]*this account has Plus or Pro/u,
+        /the same goes for a call started right after/u,
       ])
         expect(t).toMatch(re);
     }

@@ -84,8 +84,8 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   await expect(ferme).toHaveText("Le paiement n'est pas encore ouvert sur ce serveur. Rien n'est demand\u00e9 ni pr\u00e9lev\u00e9 aujourd'hui.");
   expect((await ferme.boundingBox())!.y).toBeLessThan((await co.locator('[data-tier="free"]').boundingBox())!.y);
   for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-soon]`)).toHaveText("Bient\u00f4t");
-  // Appels (24 novembre) : inclus dans Plus et Pro, mais pas encore disponibles ; dit sans ambiguïté.
-  for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus\s+bientôt \(pas encore disponible\)$/);
+  // Appels (24 novembre) : inclus dans Plus et Pro, réservés à ces offres ; plus de « bientôt ».
+  for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus$/);
   await expect(co.locator('[data-tier="free"] [data-calls]')).toHaveText(/^Appels audio et vidéo\s+Non inclus$/);
   expect(lectures).toEqual([shh.origin + "/api/paiement"]);
   // Trois offres, une seule fois chacune (plus de tableau qui redisait les cartes).

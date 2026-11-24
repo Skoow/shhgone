@@ -50,11 +50,12 @@ export const shares = $state({
 // Avec un compte : son réglage « garder les reçus ».
 export const keepReceivedDefault = (): boolean => (shares.account ? shares.account.keepReceived : false);
 /**
- * « Garder dans mon historique » de « Lien prêt » (envoi) : sans compte, le réglage de l'appareil,
- * désactivé par défaut (24 novembre : le lien de gestion resterait sur un appareil peut-être
- * partagé ; « Lien prêt » le montre alors). Avec un compte : activé, l'historique suit son coffre.
+ * « Garder dans mon historique » de « Lien prêt » (envoi) et de la création d'un salon : le réglage
+ * de l'appareil, désactivé par défaut, AVEC OU SANS compte (décisions du 24 novembre : le lien de
+ * gestion resterait sur un appareil peut-être partagé ; « Lien prêt » et « Salon prêt » le montrent
+ * alors). La personne l'active elle-même ; avec un compte, ce qui est gardé suit ensuite son coffre.
  */
-export const keepSentDefault = (): boolean => shares.account !== null || shares.enabled;
+export const keepSentDefault = (): boolean => shares.enabled;
 export function setAccountPrefs(p: { keepReceived: boolean } | null): void {
   shares.account = p;
   accountFlag.connected = p !== null;

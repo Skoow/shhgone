@@ -62,6 +62,14 @@ type envPaiement struct {
 func newEnvPaiement(t *testing.T, autres ...paiement.Prestataire) envPaiement {
 	t.Helper()
 	e := newEnv(t, false, nil)
+	s, p := servicePaiement(t, e, autres...)
+	e.h = newHandler(e.srv, htmlStatic(), Salons{Paiement: s})
+	return envPaiement{e, p}
+}
+
+// servicePaiement : service de paiement de test (prestataire factice, base dans e.dir).
+func servicePaiement(t *testing.T, e *env, autres ...paiement.Prestataire) (*paiement.Service, *prestTest) {
+	t.Helper()
 	db, err := paiement.OuvrirBase(filepath.Join(e.dir, "paiements.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -73,8 +81,7 @@ func newEnvPaiement(t *testing.T, autres ...paiement.Prestataire) envPaiement {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.h = newHandler(e.srv, htmlStatic(), Salons{Paiement: s})
-	return envPaiement{e, p}
+	return s, p
 }
 
 func passB64(n byte) string { return base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{n}, 32)) }
@@ -104,7 +111,7 @@ func TestPaiementOffre(t *testing.T) {
 	w := e.do(req{method: "GET", path: "/api/paiement"})
 	m := jsonOf(t, w)
 	if w.Code != 200 || m["v"] != 1.0 || len(m["moyens"].([]any)) != 1 || m["moyens"].([]any)[0] != "carte" ||
-		len(m["pays"].([]any)) != 27 || !strings.Contains(w.Body.String(), `"bientot":["appel_audio","appel_video"]`) ||
+		len(m["pays"].([]any)) != 27 || !strings.Contains(w.Body.String(), `"bientot":[]`) ||
 		!strings.Contains(w.Body.String(), `"tva":{"regime":"oss","taux":{"AT":2000,"BE":2100,`) || !strings.Contains(w.Body.String(), `"DE":1900,`) {
 		t.Fatal(w.Code, w.Body.String())
 	}

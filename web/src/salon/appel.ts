@@ -58,8 +58,11 @@ export type DepsAppel = {
 };
 
 export type Participant = { siege: number; video: boolean; flux: MediaStream | null; lien: "connexion" | "lie" | "coupe" };
-/** « perdu » : le micro s'est arrêté en cours d'appel (débranché, autorisation retirée). */
-export type ErreurAppel = "micro" | "relais" | "complet" | "perdu";
+/**
+ * « perdu » : le micro s'est arrêté en cours d'appel (débranché, autorisation retirée) ; « offre » :
+ * appels fermés dans le salon et aucun jeton d'offre Plus ou Pro sur cet appareil (24 novembre).
+ */
+export type ErreurAppel = "micro" | "relais" | "complet" | "perdu" | "offre";
 export type Face = "user" | "environment";
 
 type Paire = {
@@ -188,10 +191,11 @@ export class Appel {
     }
     try {
       this.#relais = await this.#d.relais();
-    } catch {
+    } catch (e) {
       for (const t of flux.getTracks()) t.stop();
       this.#entree = false;
-      this.erreur = "relais";
+      // Appels réservés aux offres payantes (salon/appel-offre.ts, OFFRE_REQUISE).
+      this.erreur = e instanceof Error && e.message === "offre_requise" ? "offre" : "relais";
       this.#d.change();
       return;
     }

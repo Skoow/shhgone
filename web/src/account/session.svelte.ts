@@ -375,7 +375,7 @@ export async function creerPasskey(pseudo: string, langue: string): Promise<"cle
   const h = typeof user?.id === "string" ? unb64u(user.id) : new Uint8Array(0);
   if (h.length !== 16) throw new Error("reponse_invalide");
   const c = await creer(optionsCreation(ins.options, affiche, ins.ePrf));
-  const profil: Profil = { pseudo: affiche, photo: null, langue, reglages: { proposerProfil: true, garderRecus: true, garderSalons: true }, pass: null };
+  const profil: Profil = { pseudo: affiche, photo: null, langue, reglages: { proposerProfil: true, garderRecus: true }, pass: null };
   const r = recupCle.nouvelleCle();
   creee?.kCompte.fill(0);
   creee = { etape: ins.etape, h, c, prf: c.prf, affiche, pCanon, profil, kCompte: aleatoire32(), r, texte: await recupCle.affichage(r) };

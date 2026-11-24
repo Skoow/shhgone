@@ -690,7 +690,7 @@ L'accueil connecté est une **liste unique**, triée par activité, de quatre so
 
 - **État** calculé localement : temps restant (`Countdown`) ou « Expiré » quand `expiresAt` est passé ; « Détruit » seulement si une relecture l'a constaté. Relecture d'une entrée (partage : `meta` ou `manage/status` ; salon : `meta`) seulement à son ouverture ou sur « Actualiser », au plus une fois par 5 min, étalée (§33.1) : une salve de requêtes au chargement relierait en direct les entrées d'une même connexion.
 - Entrées expirées ou détruites gardées 7 jours, atténuées, puis retirées (§33).
-- Réglages (§21.15.4) : « Garder les liens que j'ouvre » et « Garder les salons que je rejoins » (activés) ; sur la page d'ouverture d'un partage et l'écran d'entrée d'un salon, une case « Garder dans mon accueil » (cochée selon le réglage) pour un cas isolé.
+- Réglages (§21.15.4) : « Garder les liens que j'ouvre » ~~et « Garder les salons que je rejoins »~~ (activé ; « Garder les salons que je rejoins », lu nulle part, retiré le 24 novembre : l'historique des envois et des salons créés suit le seul réglage de l'appareil « Garder dans mon historique », désactivé par défaut avec ou sans compte, spec principale §33) ; sur la page d'ouverture d'un partage et l'écran d'entrée d'un salon, une case « Garder dans mon accueil » (cochée selon le réglage) pour un cas isolé.
 - **Sans compte**, la même liste existe sur l'appareil seulement (historique local étendu) : l'accueil connecté n'est que sa version synchronisée.
 - Dépendances : les entrées « salon » n'apparaissent qu'avec les écrans du salon (C-3, C-5), pas encore faits.
 
@@ -859,7 +859,7 @@ Liste de sections (`<section aria-labelledby>`, titres `--fs-h3`), chaque régla
 3. **Mot de passe** → sous-page : actuel, nouveau (10 caractères au moins), case « Déconnecter mes autres appareils » (cochée).
 4. **Double authentification** : `Switch` ; activation (QR `QrCode`, secret groupé par 4 avec Copier, premier code) ; texte : « Si vous perdez ce téléphone, la récupération par e-mail prendra 7 jours. » ; demande de retrait en cours : `Banner warn` et « Annuler la demande ».
 5. **Appareils** : liste de §8.5, « Déconnecter », « Déconnecter tous les autres appareils ».
-6. **Confidentialité** : `Switch` « Proposer mon pseudo et ma photo dans les salons » (activé ; désactivé = « Me demander à chaque salon ») ; `Switch` « Garder les liens que j'ouvre dans mon accueil » ; `Switch` « Garder les salons que je rejoins » ; `Switch` « Historique des téléchargements sur cet appareil » ; `Switch` « Rester connecté sur cet appareil ».
+6. **Confidentialité** : `Switch` « Proposer mon pseudo et ma photo dans les salons » (activé ; désactivé = « Me demander à chaque salon ») ; `Switch` « Garder les liens que j'ouvre dans mon accueil » ; ~~`Switch` « Garder les salons que je rejoins »~~ (retiré le 24 novembre, voir ci-dessus) ; `Switch` « Historique des téléchargements sur cet appareil » ; `Switch` « Rester connecté sur cet appareil ».
 7. **Abonnement** : état du pass, « Voir les offres » ; note R5.
 8. **Langue** : sélecteur existant.
 9. **Récupération** (texte seul) : ce qui est gardé et perdu après un mot de passe oublié (§21.2.1) ; « Gardez l'accès à votre boîte mail. »

@@ -106,7 +106,7 @@ export type Entree = {
   maxMembers: number;
   membersCanDestroy: boolean;
   budgetLeft: number;
-  /** Appels audio et vidéo offerts par ce serveur (relais TURN configuré). */
+  /** Appels audio et vidéo offerts par ce serveur (relais TURN configuré et paiement ouvert : appels réservés à Plus et Pro). */
   appels: boolean;
 };
 
@@ -153,9 +153,16 @@ export type Relais = { urls: string[]; username: string; credential: string; ttl
 
 const URL_RELAIS = /^turns?:[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:[0-9]{1,5})?(\?transport=(udp|tcp))?$/;
 
-/** POST /api/salons/appel : identifiants du relais pour ce membre. 404 : pas d'appels sur ce serveur ; 429 : trop de demandes. */
-export async function relaisAppel(n: Net, jeton: string): Promise<Relais> {
-  const o = await appel(n, "POST", "/appel", { "X-Shh-Membre": jeton }, {});
+/**
+ * POST /api/salons/appel : identifiants du relais pour ce membre. Appels réservés aux offres Plus
+ * et Pro (24 novembre) : tant qu'ils sont fermés dans le salon, `jetonAnonyme` (Privacy Pass,
+ * « Authorization: PrivateToken », jamais un pass ni un compte) les ouvre pour tout le salon.
+ * 402 offre_requise : fermés et aucun jeton ; 404 : pas d'appels sur ce serveur ; 429 : trop de demandes.
+ */
+export async function relaisAppel(n: Net, jeton: string, jetonAnonyme?: string): Promise<Relais> {
+  const h: Record<string, string> = { "X-Shh-Membre": jeton };
+  if (jetonAnonyme !== undefined) h.Authorization = `PrivateToken token=${jetonAnonyme}`;
+  const o = await appel(n, "POST", "/appel", h, {});
   const { urls, username, credential } = o;
   if (!Array.isArray(urls) || urls.length < 1 || urls.length > 4 || !urls.every((u) => typeof u === "string" && URL_RELAIS.test(u))) throw invalide();
   if (typeof username !== "string" || !/^[0-9]{1,12}:[0-9a-f]{32}$/.test(username) || typeof credential !== "string" || !/^[A-Za-z0-9+/]{27}=$/.test(credential)) throw invalide();

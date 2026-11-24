@@ -74,9 +74,15 @@ export async function ouvrir(sorte: Sorte, cle: CryptoKey, h: Uint8Array, blob: 
 
 // --- Contenu ---------------------------------------------------------------------------------
 
-/** Réglages du compte (§21.15.4 ; ceux de l'appareil seul, comme « Rester connecté », n'y sont pas). */
-export type Reglages = { proposerProfil: boolean; garderRecus: boolean; garderSalons: boolean };
-export const REGLAGES_DEFAUT: Reglages = { proposerProfil: true, garderRecus: true, garderSalons: true };
+/**
+ * Réglages du compte (§21.15.4 ; ceux de l'appareil seul, comme « Rester connecté », n'y sont pas).
+ * `garder_salons` (« Garder les salons que je rejoins ») retiré le 24 novembre : il n'était lu nulle
+ * part (aucun salon rejoint n'est gardé) ; un coffre ancien qui le porte est lu sans erreur (champ
+ * inconnu ignoré) et réécrit sans lui. L'historique des envois et des salons créés suit le seul
+ * réglage de l'appareil, « Garder dans mon historique » (history/live.svelte.ts).
+ */
+export type Reglages = { proposerProfil: boolean; garderRecus: boolean };
+export const REGLAGES_DEFAUT: Reglages = { proposerProfil: true, garderRecus: true };
 
 export type Profil = { pseudo: string; photo: Uint8Array | null; langue: string; reglages: Reglages; pass: string | null };
 
@@ -118,7 +124,7 @@ export function profilEnJson(p: Profil): Bytes {
     pseudo: p.pseudo,
     photo: p.photo === null ? null : b64u(p.photo as Bytes),
     langue: p.langue,
-    reglages: { proposer_profil: r.proposerProfil === true, garder_recus: r.garderRecus === true, garder_salons: r.garderSalons === true },
+    reglages: { proposer_profil: r.proposerProfil === true, garder_recus: r.garderRecus === true },
     pass: typeof p.pass === "string" ? p.pass : null,
   });
 }
@@ -149,7 +155,7 @@ export function profilDeJson(b: Uint8Array): Profil {
     pseudo: o.pseudo,
     photo,
     langue: o.langue,
-    reglages: { proposerProfil: bool("proposer_profil", true), garderRecus: bool("garder_recus", true), garderSalons: bool("garder_salons", true) },
+    reglages: { proposerProfil: bool("proposer_profil", true), garderRecus: bool("garder_recus", true) },
     pass: typeof o.pass === "string" ? o.pass : null,
   };
 }
