@@ -106,7 +106,7 @@ export type Entree = {
   maxMembers: number;
   membersCanDestroy: boolean;
   budgetLeft: number;
-  /** Appels audio et vidéo offerts par ce serveur (relais TURN configuré). */
+  /** Appels audio et vidéo offerts par ce serveur (relais TURN configuré et paiement ouvert : appels réservés à Plus et Pro). */
   appels: boolean;
 };
 

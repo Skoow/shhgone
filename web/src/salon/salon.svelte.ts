@@ -474,13 +474,15 @@ function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
  * Sans pass payé sur cet appareil, l'explication est affichée et rien n'est demandé (ni micro,
  * ni réseau) ; sinon l'appel est lancé (un jeton anonyme l'ouvre au besoin, appel-offre.ts).
  */
-export function lancerAppel(video: boolean): void {
+export async function lancerAppel(video: boolean): Promise<void> {
+  // Relu sur l'appareil si la première lecture (demarrer) n'a rien trouvé ou n'est pas finie.
+  if (!vue.offreAppel) vue.offreAppel = (await offresAppel().catch(() => [])).length > 0;
   if (!vue.offreAppel) {
     vue.appelReserve = true;
     return;
   }
   vue.appelReserve = false;
-  void s?.appel?.rejoindre(video);
+  await s?.appel?.rejoindre(video);
 }
 
 // Onglet fermé ou quitté (aussi vers le cache de retour arrière) : on raccroche en le disant,
