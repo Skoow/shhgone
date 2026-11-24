@@ -83,9 +83,10 @@ services:
       SHH_TRUSTED_PROXY: 172.30.53.1/32
       SHH_STORAGE_MAX: ${SHH_STORAGE_MAX:-214748364800}
       SHH_SHARE_EGRESS_MAX: ${SHH_SHARE_EGRESS_MAX:-}
-      # Salon (spec §39, plan C-2) : ACTIVÉ (décision du propriétaire du 19 novembre, avec le
-      # compte, qui l'exige), sans l'avis du juriste sur l'hébergement des conversations
-      # (Q-SAL8, §39.7), risque écrit dans docs/ouverture-comptes.md. Le couper : "0" ici.
+      # Salon (spec §39, plan C-2) : ACTIVÉ et OUVERT AU PUBLIC dès le premier déploiement
+      # (décisions du propriétaire du 19 et du 24 novembre, avec le compte, qui l'exige). Le
+      # propriétaire assume le risque sans l'avis du juriste sur l'hébergement des conversations
+      # (Q-SAL8, §39.7). Le couper : "0" ici.
       SHH_SALONS: "1"
       # Origine publique du site, comparée à l'en-tête Origin du WebSocket et copiée dans la CSP.
       # Vérifiée même salon coupé : une valeur refusée (majuscules dans SHH_DOMAIN, par exemple)
@@ -108,9 +109,10 @@ services:
       # Trames non volatiles rangées au plus par salon (100 000 ≈ 417 Mo de disque).
       SHH_SALON_FRAMES_MAX: ${SHH_SALON_FRAMES_MAX:-}
       # Compte par passkey (conception docs/superpowers/specs/2026-11-22-compte-passkey-design.md,
-      # README §12) : ACTIVÉ (décision D8 du propriétaire, 19 novembre, sans l'avis du juriste :
-      # risque LCEN écrit dans docs/ouverture-comptes.md ; ne pas ouvrir au public avant le
-      # passage manuel sur appareils, conception §14). Exige SHH_SALONS: "1" et, pour deploy.sh,
+      # README §12) : ACTIVÉ et OUVERT AU PUBLIC dès le premier déploiement (décision D8 du
+      # propriétaire, 19 novembre, confirmée le 24 novembre). Le propriétaire assume le risque
+      # sans le passage manuel sur appareils réels (conception §14) et sans l'avis du juriste
+      # (risque LCEN, spec §37). Exige SHH_SALONS: "1" et, pour deploy.sh,
       # SHH_DOMAIN=shhgone.com : l'hôte de SHH_ORIGIN est le rp.id des passkeys, définitif (R1).
       # Aucun e-mail, aucun relais, aucune sortie. Le couper : "0" ici (fichier relu, commité).
       SHH_COMPTES: "1"

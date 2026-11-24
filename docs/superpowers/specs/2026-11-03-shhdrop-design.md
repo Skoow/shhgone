@@ -1374,6 +1374,8 @@ But : que le serveur, et quiconque le lit (hébergeur, pirate, réquisition), ap
 
 > **22 novembre 2026** : pour l'identité, la connexion et la récupération, le compte suit désormais `docs/superpowers/specs/2026-11-22-compte-passkey-design.md` (passkey et clé de récupération de 128 bits, enveloppes de `K_compte` par la sortie PRF de chaque passkey et par la clé ; plus d'e-mail, de mot de passe, de double authentification ni de séquestre). Il reprend l'idée de cette section (passkey, PRF, clé de secours) avec un identifiant de site `shhgone.com` ; la démo simule la passkey. Les notes ci-dessous restent pour l'historique.
 >
+> **24 novembre 2026** : le compte (par passkey, conception `2026-11-22-compte-passkey-design.md`) est **ouvert au public dès le premier déploiement**, risque assumé par le propriétaire, sans le passage manuel sur appareils réels ni l'avis du juriste (§39.7).
+>
 > **14 novembre 2026 (D42-26)** : pour le compte, cette section est remplacée par la conception `docs/superpowers/specs/2026-11-14-compte-email-design.md` (e-mail, mot de passe, double authentification facultative ; compte obligatoire pour créer un salon), **à valider par le propriétaire**. Le texte ci-dessous est gardé pour l'historique.
 
 Le propriétaire a décidé qu'un **compte facultatif** peut exister. Il n'est **jamais** demandé pour envoyer, recevoir, gérer, garder dans le coffre ni signaler. Il ne sert qu'à deux choses : **synchroniser entre appareils** un coffre de données chiffré (historique des envois de §33 et réglages), et **ranger** un pass de l'offre payante (§38) pour qui en a un. Cette section remplace le point « Plus tard, hors V1 » de §33 et amende §3 (« Jamais : comptes ») : les profils, contacts, pseudonymes et annuaires restent exclus. Le registre du contrôleur (ledger, ligne « Spécifié en §35 ») visait cette section : §35 était déjà prise.
@@ -2192,6 +2194,8 @@ Longueurs exactes en base64url : secrets et jetons 43 caractères, identifiants 
 - **Accessibilité** : liste en `role="log"` (annonce polie des nouveaux messages : « Alice : … » ; regroupées au-delà de 3 en 2 s : « 5 nouveaux messages ») ; tout au clavier (flèches entre messages, `Échap` ferme le sélecteur et les menus, focus rendu au champ) ; mouvement réduit : aucune entrée animée, « Alice écrit… » en texte fixe ; `forced-colors` : filets de couleur remplacés par le pseudonyme souligné ; textes agrandis à 200 % sans débordement.
 
 ### 39.7 Cadre légal et abus (à faire valider par un juriste avant l'ouverture au public)
+
+> **24 novembre 2026 (décision du propriétaire, risque assumé)** : le salon et le compte sont **ouverts au public dès le premier déploiement** (`SHH_SALONS: "1"`, `SHH_COMPTES: "1"`, `deploy/compose.yaml`), **sans** l'avis du juriste demandé ici et **sans** le passage manuel du compte sur appareils réels (conception du compte par passkey §14). Les points du tableau ci-dessous restent à soumettre au juriste.
 
 | Gravité | Sujet | Problème | Proposition |
 |---|---|---|---|

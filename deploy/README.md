@@ -326,7 +326,7 @@ Un job rouge = une faille connue : GitHub envoie un e-mail d'échec au propriét
 
 ## 10. Salon (activé)
 
-Le salon (spécification §39 et `docs/superpowers/specs/2026-11-11-salon-v3-design.md`) est **activé** depuis la décision du propriétaire du 19 novembre (le compte, ouvert le même jour, l'exige) : `compose.yaml` pose `SHH_SALONS: "1"`. **Risque assumé par le propriétaire** : l'avis du juriste sur l'hébergement des conversations chiffrées (Q-SAL8, §39.7) n'a pas été demandé (`docs/ouverture-comptes.md`). Le couper : `SHH_SALONS: "0"` (et `SHH_COMPTES: "0"`, qui l'exige). Avec `SHH_SALONS=0`, aucune route `/api/salons/*` n'existe (même réponse 404 qu'une route inconnue).
+Le salon (spécification §39 et `docs/superpowers/specs/2026-11-11-salon-v3-design.md`) est **activé et ouvert au public dès le premier déploiement** (décisions du propriétaire du 19 et du 24 novembre ; le compte, ouvert le même jour, l'exige) : `compose.yaml` pose `SHH_SALONS: "1"`. **Risque assumé par le propriétaire** (24 novembre) : ouverture sans l'avis du juriste sur l'hébergement des conversations chiffrées (Q-SAL8, §39.7) et sans le passage manuel sur appareils réels. Le couper : `SHH_SALONS: "0"` (et `SHH_COMPTES: "0"`, qui l'exige). Avec `SHH_SALONS=0`, aucune route `/api/salons/*` n'existe (même réponse 404 qu'une route inconnue).
 
 Variables :
 
@@ -338,7 +338,7 @@ Variables :
 
 À savoir avant d'activer :
 
-- **Conditions bloquantes d'activation** (sans elles, `SHH_SALONS` reste à `0`) : (1) l'avis du juriste (Q-SAL8) ; (2) un **essai long** du WebSocket à travers Caddy, au-delà de la première coupure possible à 5 min (`read_body 5m`) : `SALON_GARDE=660 CADDY=… make test-proxy`, réussi avec le Caddy de l'image épinglée ; (3) un **essai dans WebKit et dans Chromium à travers Caddy en HTTP/2**, mise à niveau par la RFC 8441 comprise (parcours du salon de C-3). Spec v3 §3.6.1, exigence C-3 21.
+- **Conditions d'activation prévues à l'origine** (le propriétaire a ouvert le salon sans attendre la première, risque assumé le 24 novembre ; les deux essais restent à passer et à refaire à chaque changement de Caddy) : (1) l'avis du juriste (Q-SAL8) ; (2) un **essai long** du WebSocket à travers Caddy, au-delà de la première coupure possible à 5 min (`read_body 5m`) : `SALON_GARDE=660 CADDY=… make test-proxy`, réussi avec le Caddy de l'image épinglée ; (3) un **essai dans WebKit et dans Chromium à travers Caddy en HTTP/2**, mise à niveau par la RFC 8441 comprise (parcours du salon de C-3). Spec v3 §3.6.1, exigence C-3 21.
 
 - **`SHH_ORIGIN` est vérifiée même salon coupé** : une valeur refusée empêche le serveur de démarrer **et** fait échouer `shhdrop admin` (`deploy.sh admin …`), qui lit la même configuration. Corriger `SHH_DOMAIN` (minuscules) d'abord.
 - **Schéma de base 2 sans retour arrière** : le premier démarrage d'une version qui contient le salon ajoute les tables `salons` et `salon_pieces` (schéma 2), **même avec `SHH_SALONS=0`**. Une image plus ancienne refuse ensuite cette base : `deploy.sh rollback` vers une version d'avant le salon ne marche plus sans effacer la base (`admin wipe --yes`, partages perdus). Le schéma 2 n'a jamais été publié avant sa forme finale (colonne `rotation_r` comprise) : une base de développement créée par une version intermédiaire est à effacer, pas à reprendre.
@@ -381,7 +381,7 @@ Aucune limite de capacité n'est fixée en dur (décision du propriétaire du 13
 
 Le compte est **activé** (décision D8 du propriétaire, 19 novembre). Depuis le 22 novembre, il fonctionne **sans e-mail** : une passkey et une clé de récupération (conception `docs/superpowers/specs/2026-11-22-compte-passkey-design.md`, qui remplace la partie e-mail de `2026-11-14-compte-email-design.md`). `compose.yaml` pose `SHH_COMPTES: "1"`, et le site de l'image est construit avec le compte (`deploy/Dockerfile`, `SHH_SITE_COMPTES=1`, `check-dist.mjs --comptes`).
 
-**Risque assumé par le propriétaire** : l'avis du juriste sur la conservation des données de création de compte (LCEN et décret 2021-1362 ; conception §12) n'a pas été demandé.
+**Ouvert au public dès le premier déploiement** (décision du propriétaire, 24 novembre). **Risque assumé par le propriétaire** : ni l'avis du juriste sur la conservation des données de création de compte (LCEN et décret 2021-1362 ; conception §12), ni le passage manuel sur appareils réels (conception par passkey §14) n'ont été faits avant l'ouverture.
 
 Avec `SHH_COMPTES: "0"` : aucune route `/api/compte/*` et aucun fichier lu dans `secrets/` pour le compte.
 
