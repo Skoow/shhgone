@@ -52,7 +52,8 @@
   const MEANS: readonly Means[] = ["card", "paypal", "crypto"];
   const API: Readonly<Record<Means, Moyen>> = { card: "carte", paypal: "paypal", crypto: "crypto" };
   // Appels des salons (19 novembre) : prévus, jamais vendus ni promis comme disponibles.
-  // Ce que l'offre choisie ajoute au gratuit (lu dans PAID et limits.ts).
+  // Ce que l'offre choisie ajoute au gratuit (lu dans PAID et limits.ts). Le départ du compte à
+  // rebours à la première ouverture n'est pas encore codé : dit « bientôt » (24 novembre).
   const adds = $derived(
     chosen
       ? [
@@ -201,7 +202,7 @@
             <ul class="dt num">
               {#each details(x).slice(1) as d (d.k)}<li><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></li>{/each}
               <!-- Appels des salons (20 novembre) : Plus et Pro inclus (« bientôt »), Gratuit non. -->
-              <li data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}{#if x !== "free"}{" "}<span class="sbadge">{t("foot.soon")}</span>{/if}</span></li>
+              <li data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}{#if x !== "free"}{" "}<span class="sbadge" data-calls-soon>{t("offers.calls.soon")}</span>{/if}</span></li>
             </ul>
           </div>
         {/each}

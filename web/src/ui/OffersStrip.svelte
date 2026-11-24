@@ -60,7 +60,7 @@
             {#each details(x) as d (d.k)}<span class="dr"><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></span>{/each}
             <!-- Appels des salons (20 novembre) : une ligne de l'offre ; Plus et Pro : inclus, avec
                  « bientôt » tant qu'ils ne sont pas ouverts ; Gratuit : non inclus. -->
-            <span class="dr" data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}{#if x !== "free"}{" "}<span class="sbadge">{t("foot.soon")}</span>{/if}</span></span>
+            <span class="dr" data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}{#if x !== "free"}{" "}<span class="sbadge" data-calls-soon>{t("offers.calls.soon")}</span>{/if}</span></span>
           </span>
           <!-- Plus de flèche ronde (retours du propriétaire du 17 novembre) : un bouton texte en bas
                de la carte ; toute la carte reste le lien. -->
