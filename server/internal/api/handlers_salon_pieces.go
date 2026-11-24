@@ -225,7 +225,8 @@ func (a salonAPI) finaliserPiece(w http.ResponseWriter, r *http.Request) {
 }
 
 // lireSegmentPiece : GET /api/salons/pieces/segments/{n} (X-Shh-Membre, X-Shh-Piece), en flux
-// sous débit minimal, patron de getSegment ; HEAD et autres méthodes : 405. Budget de lecture épuisé : 429 budget. Pièce
+// sous débit minimal, patron de getSegment ; HEAD et autres méthodes : 405. Budget de lecture épuisé : 429 budget.
+// Plafond de sortie de la pièce atteint (salon.SortieMax) : 403 egress_limit, définitif. Pièce
 // effacée ou jeton révoqué pendant la lecture : connexion coupée tout de suite.
 func (a salonAPI) lireSegmentPiece(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet { // HEAD : 405 avant le budget de lecture
@@ -256,6 +257,11 @@ func (a salonAPI) lireSegmentPiece(w http.ResponseWriter, r *http.Request) {
 	l, err := a.m.OuvrirSegment(r.Context(), mb, id, n)
 	if errors.Is(err, salon.ErrBudget) {
 		writeRetry(w, http.StatusTooManyRequests, "budget", budgetRetry)
+		return
+	}
+	if errors.Is(err, salon.ErrSortie) {
+		// Comme le plafond de sortie d'un partage : aucun délai, aucun nouvel essai utile.
+		writeErr(w, http.StatusForbidden, "egress_limit")
 		return
 	}
 	if err != nil {
