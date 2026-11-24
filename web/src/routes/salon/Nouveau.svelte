@@ -16,6 +16,8 @@
   import Button from "../../ui/Button.svelte";
   import Banner from "../../ui/Banner.svelte";
   import { formatDayTime } from "../../i18n/format";
+  import { untrack } from "svelte";
+  import { keepSentDefault, loadHistory, setHistoryEnabled } from "../../history/live.svelte";
 
   const connecte = $derived(__COMPTES__ && account.etat === "ouvert");
   let duree = $state<Duree>(24);
@@ -35,10 +37,22 @@
       .catch(() => undefined);
   });
   let detruire = $state(false);
-  // Cochée : la création exige un compte, et avec un compte l'historique des envois et des salons
-  // créés est activé (history/live.svelte.ts, keepSentDefault ; sans compte, désactivé par défaut
-  // depuis le 24 novembre). Décochée : le lien de gestion reste montré sur « Salon prêt ».
-  let garder = $state(true);
+  // « Garder dans mon historique » : le réglage de l'appareil (history/live.svelte.ts,
+  // keepSentDefault), désactivé par défaut même avec un compte (décision du 24 novembre, B) ; la
+  // personne l'active. Changé ici, il vaut aussi pour les envois suivants, comme sur « Lien prêt ».
+  // Décochée : « Salon prêt » montre le lien de gestion d'emblée, pour qu'il soit gardé à la main.
+  let garder = $state(false);
+  // Touchée avant la lecture de l'historique : le choix de la personne l'emporte.
+  let touche = false;
+  $effect(() => {
+    untrack(() =>
+      void loadHistory()
+        .then(() => {
+          if (!touche) garder = keepSentDefault();
+        })
+        .catch(() => undefined),
+    );
+  });
   let etape = $state<"cles" | "robot" | "envoi" | null>(null);
   let erreur = $state<ErreurCreation | null>(null);
 
@@ -54,6 +68,8 @@
 
   async function lancer(): Promise<void> {
     erreur = null;
+    // Le réglage de l'appareil suit la case, comme la bascule de « Lien prêt ».
+    if (garder !== keepSentDefault()) await setHistoryEnabled(garder).catch(() => undefined);
     const e = await creer({ ttlHours: duree, maxMembers: ouvert ? maxPlaces : places, membersCanDestroy: detruire, garder, onEtape: (x) => (etape = x) });
     etape = null;
     if (e) {
@@ -97,7 +113,7 @@
         </div>
       {/if}
       <Switch label={t("salon.new.destroy")} checked={detruire} onchange={(v) => (detruire = v)} />
-      <Switch label={t("salon.new.keep")} hint={t("salon.manage.warn")} checked={garder} onchange={(v) => (garder = v)} />
+      <Switch label={t("salon.new.keep")} hint={t("salon.manage.warn")} checked={garder} onchange={(v) => ((touche = true), (garder = v))} />
       <p class="note">{t("salon.new.password")}</p>
       {#if erreur}
         <Banner kind="danger">{texteErreur(erreur)}</Banner>

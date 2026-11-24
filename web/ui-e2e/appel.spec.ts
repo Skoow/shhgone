@@ -202,7 +202,11 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
   await bouton(page, "Continuer").click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
-  const lien = (await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
+  // Historique désactivé par défaut, même avec un compte (24 novembre, B) : le lien de gestion est
+  // montré d'emblée, pour être gardé à la main.
+  await expect(page.locator("[data-manage]")).toContainText("Il n'est pas gardé dans l'historique de cet appareil");
+  await expect(bouton(page, "Afficher le lien de gestion")).toHaveCount(0);
+  const lien =(await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
   const mdp = (await page.locator(".cf").filter({ hasText: "Mot de passe" }).locator(".val").textContent())!.trim();
   await bouton(page, "Entrer dans le salon").click();
   await expect(champ(page, "Pseudonyme pour ce salon")).toHaveValue(`Lea${r.slice(0, 4)}`); // pseudo du compte
@@ -239,14 +243,14 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
     await expect(appel(page)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("En attente des autres participants…")).toBeVisible();
     for (const p of [b.page, c.page]) await expect(p.getByText("Appel en cours (1)")).toBeVisible({ timeout: 30_000 });
-    await capture(b.page, "appel-bandeau");
-    await bouton(b.page, "Rejoindre avec la caméra").click();
-    await expect(appel(b.page)).toBeVisible({ timeout: 30_000 });
-    await expect(c.page.getByText("Appel en cours (2)")).toBeVisible({ timeout: 30_000 });
     // L'appel sonne chez B : l'explication s'efface, « Rejoindre » est ouvert à tous.
     await expect(reserve).toHaveCount(0);
     // A : une demande sans jeton (appels fermés, 402), puis la même avec un jeton anonyme.
     expect(demandes).toEqual([{ qui: "A", jeton: false }, { qui: "A", jeton: true }]);
+    await capture(b.page, "appel-bandeau");
+    await bouton(b.page, "Rejoindre avec la caméra").click();
+    await expect(appel(b.page)).toBeVisible({ timeout: 30_000 });
+    await expect(c.page.getByText("Appel en cours (2)")).toBeVisible({ timeout: 30_000 });
     await bouton(c.page, "Rejoindre").click(); // sans caméra
     await expect(appel(c.page)).toBeVisible({ timeout: 30_000 });
 
@@ -255,13 +259,13 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
       await expect(tuiles(p)).toHaveCount(3, { timeout: 60_000 });
       await expect(tuiles(p).and(p.locator("[data-lien='lie']"))).toHaveCount(2, { timeout: 90_000 });
     }
+    // B et C sont entrés sans jeton : les appels sont ouverts pour tout le salon ; un seul jeton dépensé.
+    expect(demandes.filter((d) => d.qui !== "A")).toEqual([{ qui: "B", jeton: false }, { qui: "C", jeton: false }]);
+    expect(demandes.filter((d) => d.jeton)).toHaveLength(1);
     // Le panneau d'appel reste collé sous la barre du site, même la page défilée.
     await expect(appel(page)).toBeInViewport();
     await capture(page, "appel-a-trois");
     expect(await axe(page)).toEqual([]);
-    // B et C sont entrés sans jeton : les appels sont ouverts pour tout le salon ; un seul jeton dépensé.
-    expect(demandes.filter((d) => d.qui !== "A")).toEqual([{ qui: "B", jeton: false }, { qui: "C", jeton: false }]);
-    expect(demandes.filter((d) => d.jeton)).toHaveLength(1);
 
     // --- Le média arrive vraiment, et seulement par le relais ----------------------------------------
     await expect

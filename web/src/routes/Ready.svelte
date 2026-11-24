@@ -55,9 +55,9 @@
   );
 
   // ---------- « Garder dans mon historique » (spec §33, §33.1) ----------
-  // Sans compte : désactivé par défaut (décision du 24 novembre), le lien de gestion est alors
-  // montré ici ; activé par la personne, le réglage vaut pour les envois suivants. Avec un
-  // compte : activé (keepSentDefault). Une fois activé, gardé dès l'affichage (fermer l'onglet
+  // Désactivé par défaut, avec ou sans compte (décisions du 24 novembre ; keepSentDefault), le
+  // lien de gestion est alors montré ici ; activé par la personne, le réglage vaut pour les envois
+  // suivants. Une fois activé, gardé dès l'affichage (fermer l'onglet
   // sans « Terminé » ne le perd pas) : le lien de gestion,
   // l'heure locale, la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures et le
   // nom du partage (19 novembre) ; jamais le lien de partage, le mot de passe ni les noms des

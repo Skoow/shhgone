@@ -108,16 +108,16 @@ describe("textes publics et compte par passkey", () => {
     expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
   });
 
-  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut sans compte, 7 jours, comment l'effacer (24 novembre)", () => {
+  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut avec ou sans compte (24 novembre, B), 7 jours, comment l'effacer (24 novembre)", () => {
     for (const comptes of [false, true]) {
       const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!.find((l) => l.startsWith("L'historique de vos envois"))!;
       expect(fr).toMatch(/lien de gestion[^.]*jamais le lien de partage ni le mot de passe\./u);
-      expect(fr).toMatch(/Sans compte, il est désactivé par défaut : rien n'est gardé tant que vous n'activez pas vous-même « Garder dans mon historique »\./u);
+      expect(fr).toMatch(/Il est désactivé par défaut, avec ou sans compte : rien n'est gardé tant que vous n'activez pas vous-même « Garder dans mon historique » ; « Lien prêt » et « Salon prêt » vous montrent alors le lien de gestion/u);
       expect(fr).toMatch(/7 jours après la fin/u);
       expect(fr).toMatch(/« Effacer l'historique » dans « Mes partages » efface tout\./u);
       const en = infoPage("confidentialite", "en", comptes).blocks.find((b) => b.h === "On your device")!.list!.find((l) => l.startsWith("The history of what you send"))!;
       expect(en).toMatch(/management link[^.]*never the share link or the password\./u);
-      expect(en).toMatch(/Without an account, it is off by default: nothing is kept until you turn on “Keep in my history” yourself\./u);
+      expect(en).toMatch(/It is off by default, with or without an account: nothing is kept until you turn on “Keep in my history” yourself; “Link ready” and “Room ready” then show you the management link/u);
       expect(en).toMatch(/7 days after the share or room ends/u);
       expect(en).toMatch(/“Clear history” in “My shares” erases it all\./u);
     }

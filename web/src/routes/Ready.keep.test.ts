@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// « Lien prêt » et l'historique des envois (décision du 24 novembre) : sans compte, « Garder dans
+// « Lien prêt » et l'historique des envois (décisions du 24 novembre) : avec ou sans compte, « Garder dans
 // mon historique » est désactivé par défaut ; le lien de gestion est alors montré à l'écran (seul
 // moyen de suivre ou de supprimer le partage plus tard), et rien n'est gardé. Activé par la
 // personne : l'entrée est gardée, le réglage vaut pour l'envoi suivant (comportement d'avant).
@@ -85,11 +85,12 @@ describe("Lien prêt : « Garder dans mon historique »", () => {
     expect(live.shares.enabled).toBe(false);
   });
 
-  it("avec un compte : activé", async () => {
-    live.setAccountPrefs({ keepReceived: false });
+  it("avec un compte aussi (24 novembre, B) : désactivé par défaut, lien de gestion montré, rien n'est gardé", async () => {
+    live.setAccountPrefs({ keepReceived: true });
     await show();
-    expect(sw().getAttribute("aria-checked")).toBe("true");
-    expect(document.querySelector("[data-manage]")).toBeNull();
+    expect(sw().getAttribute("aria-checked")).toBe("false");
+    expect(document.querySelector("[data-manage]")!.textContent).toContain(MANAGE);
+    expect(await live.allEntries()).toEqual([]);
     live.setAccountPrefs(null);
   });
 });

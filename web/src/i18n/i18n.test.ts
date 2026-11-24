@@ -127,7 +127,6 @@ describe("dictionnaires", () => {
       "account.card.confirme": `Confirmé${N}: {salons}${N}salons à la fois, {places}${N}places.`,
       "account.privacy.propose": "Proposer mon pseudo et ma photo dans les salons",
       "account.privacy.links": "Garder les liens que j'ouvre dans mon accueil",
-      "account.privacy.rooms": "Garder les salons que je rejoins",
       "account.privacy.downloads": "Historique des téléchargements sur cet appareil",
       "account.privacy.stay": "Rester connecté sur cet appareil",
       "account.recovery.body": "Elle remplace vos passkeys si vous les perdez toutes. Sans passkey ni clé, le compte ne peut pas être récupéré.",

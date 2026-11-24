@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Cases « Garder » : décochées par défaut sans compte (le lien et sa clé, ou le lien de gestion,
+// Cases « Garder » : décochées par défaut (le lien et sa clé, ou le lien de gestion,
 // resteraient sur un appareil peut-être partagé) ; avec un compte, son réglage (reçus) ou activée
 // (envois, l'historique suit le coffre du compte).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -56,8 +56,14 @@ describe("keepSentDefault : historique des envois (24 novembre)", () => {
     expect(live.shares.enabled).toBe(false);
     expect(live.keepSentDefault()).toBe(false);
   });
-  it("avec un compte : activé", () => {
-    live.setAccountPrefs({ keepReceived: false });
+  it("avec un compte aussi : désactivé par défaut (24 novembre, B) ; activé par la personne, activé", async () => {
+    for (const keepReceived of [false, true]) {
+      live.setAccountPrefs({ keepReceived });
+      expect(live.keepSentDefault()).toBe(false);
+    }
+    await live.loadHistory(true);
+    expect(live.keepSentDefault()).toBe(false);
+    await live.setHistoryEnabled(true);
     expect(live.keepSentDefault()).toBe(true);
   });
 });

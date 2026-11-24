@@ -56,8 +56,12 @@ export const vue = $state({
   finMs: 0,
   places: 0,
   createur: false,
-  /** Salon prêt (créateur) : lien d'invitation, mot de passe, lien de gestion (affichés, jamais gardés). */
-  pret: null as { lien: string; mdp: string; gestion: string } | null,
+  /**
+   * Salon prêt (créateur) : lien d'invitation, mot de passe, lien de gestion (affichés, jamais
+   * gardés ici). `garde` : le lien de gestion est réellement dans l'historique de l'appareil ; faux
+   * (historique désactivé, par défaut, ou indisponible) : « Salon prêt » le montre d'emblée.
+   */
+  pret: null as { lien: string; mdp: string; gestion: string; garde: boolean } | null,
   /** Créateur, après une exclusion ou « Nouveau lien d'invitation » : la nouvelle invitation (affichée, jamais gardée en clair). */
   nouvelleInvitation: null as { lien: string; mdp: string } | null,
   /** Lien de gestion ouvert seul (« #s… ») : sièges occupés, ou null. */
@@ -76,10 +80,6 @@ export const vue = $state({
   /** Le serveur offre les appels audio et vidéo (relais TURN configuré et paiement ouvert). */
   appels: false,
   /**
-   * Lien de gestion collé dans la conversation (exigence C-3 32), jamais envoyé : « proposee »
-   * (membre : retrouver les droits ?), « deja » (déjà créateur), « autre » (pas ce salon),
-   * « horsligne », « fait », ou null. Le secret lui-même n'est jamais dans cet état.
-  /**
    * Appels réservés aux offres Plus et Pro (24 novembre) : un pass payé est gardé sur cet appareil
    * (lecture locale, salon/appel-offre.ts). Faux : lancer un appel explique « Réservé aux offres
    * Plus et Pro » sans rien demander ; rejoindre un appel en cours reste ouvert à tous.
@@ -87,6 +87,10 @@ export const vue = $state({
   offreAppel: false,
   /** « Appel audio » ou « Appel vidéo » touché sans offre sur cet appareil : l'explication est affichée. */
   appelReserve: false,
+  /**
+   * Lien de gestion collé dans la conversation (exigence C-3 32), jamais envoyé : « proposee »
+   * (membre : retrouver les droits ?), « deja » (déjà créateur), « autre » (pas ce salon),
+   * « horsligne », « fait », ou null. Le secret lui-même n'est jamais dans cet état.
    */
   gestionCollee: null as "proposee" | "deja" | "autre" | "horsligne" | "erreur" | "fait" | null,
   /**
@@ -398,14 +402,15 @@ export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCan
     const r = await creerAvecSession(p.entetes, { ...p.corps, altcha: preuve.payload, hp: "", shown_at: cap.shownAt });
     const lien = lienSalon(origin, "c", p.kLien, import.meta.env.BASE_URL);
     const gestion = lienSalon(origin, "s", p.sGestion, import.meta.env.BASE_URL);
-    if (o.garder)
-      await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: Date.now() + r.expiresInS * 1000, maxOpens: 0 });
+    const garde =
+      o.garder &&
+      (await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: Date.now() + r.expiresInS * 1000, maxOpens: 0 })) !== null;
     s = { eng, kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, kMaitre: p.kMaitre, preuve: { index: await indexMembre(p.kLien), cle: null, sel: null }, stop: [] };
     void preparerPreuve(s, mdp);
     const d = deps(eng);
     const entree = await ClientSalon.rejoindre(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion });
     demarrer(s, ClientSalon.ouvrir(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, creerGroupe: true }, entree), entree);
-    vue.pret = { lien, mdp, gestion };
+    vue.pret = { lien, mdp, gestion, garde };
     vue.etape = "pret";
     return null;
   } catch (e) {
@@ -451,11 +456,6 @@ function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
   vue.membresPeuventDetruire = e.membersCanDestroy;
   vue.fin = null;
   vue.appels = e.appels;
-  x.appel?.fermer();
-  x.appel = nouvelAppel(x, c);
-  x.stop.push(c.ecouter((ev) => surEvenement(x, ev)));
-}
-
   vue.appelReserve = false;
   // Lecture locale seulement (aucune requête) : un pass payé est-il gardé sur cet appareil ?
   if (e.appels)
@@ -464,11 +464,11 @@ function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
         if (s === x) vue.offreAppel = l.length > 0;
       })
       .catch(() => undefined);
-// Onglet fermé ou quitté (aussi vers le cache de retour arrière) : on raccroche en le disant,
-// au lieu de laisser les autres attendre 40 s qu'on soit compté absent.
-if (typeof addEventListener === "function") addEventListener("pagehide", () => s?.appel?.quitter());
+  x.appel?.fermer();
+  x.appel = nouvelAppel(x, c);
+  x.stop.push(c.ecouter((ev) => surEvenement(x, ev)));
+}
 
-/** Appel branché sur ce client : messages chiffrés par le salon, média par le relais seulement (appel.ts). */
 /**
  * « Appel audio » ou « Appel vidéo » (aucun appel en cours) : réservés aux offres Plus et Pro.
  * Sans pass payé sur cet appareil, l'explication est affichée et rien n'est demandé (ni micro,
@@ -483,6 +483,11 @@ export function lancerAppel(video: boolean): void {
   void s?.appel?.rejoindre(video);
 }
 
+// Onglet fermé ou quitté (aussi vers le cache de retour arrière) : on raccroche en le disant,
+// au lieu de laisser les autres attendre 40 s qu'on soit compté absent.
+if (typeof addEventListener === "function") addEventListener("pagehide", () => s?.appel?.quitter());
+
+/** Appel branché sur ce client : messages chiffrés par le salon, média par le relais seulement (appel.ts). */
 function nouvelAppel(x: Session, c: ClientSalon): Appel {
   return new Appel({
     moi: c.siege,
@@ -551,13 +556,13 @@ function surEvenement(x: Session, ev: EvClient): void {
       const m = ev.enveloppe.message;
       if (m.k === "appel_present" || m.k === "appel_fin" || m.k === "appel_signal") {
         x.appel?.recu(ev.siege, m);
+        // Un appel sonne : l'explication « Réservé aux offres » touchée avant n'a plus lieu d'être.
+        if (m.k === "appel_present") vue.appelReserve = false;
         break;
       }
       const r = conv.message(ev.seq, ev.siege, ev.epoque, ev.enveloppe);
       if (r) c.accuser("recu", [r.recu]);
       // Notre pseudonyme pris par un siège arrivé avant : retour au champ (exigence 11).
-        // Un appel sonne : l'explication « Réservé aux offres » touchée avant n'a plus lieu d'être.
-        if (m.k === "appel_present") vue.appelReserve = false;
       if (conv.pseudoRefuse && vue.etape === "conversation") {
         vue.monPseudo = null;
         vue.etape = "explication";

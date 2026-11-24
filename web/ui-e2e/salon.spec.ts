@@ -82,6 +82,13 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   await expect(page).toHaveURL(/\/salon\/nouveau$/);
   // Compte récent : 4 places au plus (conception du compte §11) ; « Ouvert » les prend toutes.
   await expect(page.getByText("Ouvert, 4 au plus")).toBeVisible();
+  // Historique désactivé par défaut, même avec un compte (24 novembre, B) : la créatrice l'active
+  // elle-même ici (la suite s'appuie sur le lien de gestion gardé : « Détruire le salon » après
+  // délogement). Sans cela, « Salon prêt » montre le lien de gestion d'emblée (appel.spec.ts).
+  const garder = page.getByRole("switch", { name: "Garder dans mon historique" });
+  await expect(garder).toHaveAttribute("aria-checked", "false");
+  await garder.click();
+  await expect(garder).toHaveAttribute("aria-checked", "true");
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
   await capture(page, "salon-pret");

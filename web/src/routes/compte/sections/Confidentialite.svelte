@@ -1,7 +1,8 @@
 <script lang="ts">
   // Confidentialité (conception compte §21.5, §21.7, §21.9, §21.15.4 point 6 ; plan, lot 13 ; monté
-  // seulement avec __COMPTES__). Trois réglages du compte, écrits dans le coffre de profil :
-  // proposer pseudo et photo dans les salons, garder les liens ouverts, garder les salons rejoints.
+  // seulement avec __COMPTES__). Deux réglages du compte, écrits dans le coffre de profil :
+  // proposer pseudo et photo dans les salons, garder les liens ouverts (« Garder les salons que je
+  // rejoins », lu nulle part, retiré le 24 novembre).
   // Deux réglages de cet appareil : l'historique des téléchargements (downloads/, jamais envoyé) et
   // « Rester connecté » (seulement coupé d'ici : la durée de la session est fixée par le serveur à
   // la connexion).
@@ -34,7 +35,6 @@
   <div class="sws">
     <Switch label={t("account.privacy.propose")} hint={t("account.privacy.propose.hint")} checked={r.proposerProfil} disabled={!account.profil} onchange={(v) => regler("proposerProfil", v)} />
     <Switch label={t("account.privacy.links")} checked={r.garderRecus} disabled={!account.profil} onchange={(v) => regler("garderRecus", v)} />
-    <Switch label={t("account.privacy.rooms")} checked={r.garderSalons} disabled={!account.profil} onchange={(v) => regler("garderSalons", v)} />
     <Switch label={t("account.privacy.downloads")} hint={t("downloads.keep.hint")} checked={downloads.enabled} onchange={(v) => void setDownloadsEnabled(v)} />
     <Switch label={t("account.privacy.stay")} checked={account.persistante} disabled={!account.persistante} reason="{uid}-stay" onchange={(v) => void (v ? undefined : arreterResterConnecte())} />
     {#if !account.persistante}<p id="{uid}-stay" class="note">{t("account.privacy.stay.off")}</p>{/if}
