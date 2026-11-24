@@ -239,15 +239,10 @@ var paiementPermis = map[string]bool{"http.Client": true, "http.Transport": true
 
 // TestNoOutgoingHTTP : aucun client sortant hors de internal/paiement/http.go (prestataires de
 // paiement seulement) ; aucun client SMTP nulle part (plus d'exception SMTP, conception du compte
-// par passkey §8). Le saut ci-dessous de internal/captcha/recaptcha.go est un reste du repli
-// reCAPTCHA (spec §26, retiré le 24 novembre) : ce fichier n'existe pas et ne doit pas être créé ;
-// le saut est à retirer (changement de code, hors de cette mise à jour des commentaires).
+// par passkey §8). Aucun saut : le repli reCAPTCHA (spec §26) a été retiré le 24 novembre.
 func TestNoOutgoingHTTP(t *testing.T) {
 	paiementVu := false
 	for _, g := range sources(t, "..") {
-		if strings.HasSuffix(g.rel, "internal/captcha/recaptcha.go") {
-			continue
-		}
 		paiementGo := g.rel == "internal/paiement/http.go"
 		for _, imp := range g.f.Imports {
 			p, _ := strconv.Unquote(imp.Path.Value)
