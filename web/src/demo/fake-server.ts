@@ -5,8 +5,8 @@
 // expiration, 404 uniformes ; v2 (spec §29.8, §32) : aucun id dans les chemins, partage
 // trouvé par V_accès ou V_gestion (calculés ici depuis K_accès et S_gestion reçus en
 // en-tête ; 400 si l'un existe déjà), désigné ensuite par le jeton signé ; id interne tiré
-// ici ; sel, Argon2id, V_preuve et enveloppe à la finalisation, bourrage [fill_from, fill_to)
-// rempli d'aléa, enveloppe rendue par unlock. Disparition pendant un téléchargement (spec
+// ici ; sel, Argon2id, V_preuve et enveloppe à la finalisation du brouillon, morceaux
+// manquants remplis d'aléa, enveloppe rendue par unlock. Disparition pendant un téléchargement (spec
 // §41.8) : 410 « gone » pour un jeton valide d'un partage disparu ; ouvertures actives (un
 // segment dans les 120 s) servies jusqu'à 2 h après l'échéance ou la suppression ;
 // signalement : aucune grâce, lectures en cours coupées ; GET /api/shares/watch tenue 25 s.
@@ -515,7 +515,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     ((s.have ??= [])[n] ??= new Uint8Array(SEG_CHUNKS)).fill(1, from, from + k);
   }
 
-  const FINALIZE_KEYS = ["salt", "kdf_ops", "kdf_mem", "proof_v", "envelope", "ttl_hours", "max_opens", "fill_from", "fill_to", "bucket", "header", "tail", "void"];
+  const FINALIZE_KEYS = ["salt", "kdf_ops", "kdf_mem", "proof_v", "envelope", "ttl_hours", "max_opens", "bucket", "header", "tail", "void"];
 
   function uploading(req: Request): [string, Share] {
     const { id } = checkToken(req, "upload");
@@ -565,15 +565,10 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
   async function finalize(req: Request): Promise<Response> {
     const { id } = checkToken(req, "upload");
     const b = await readJSON(req, FINALIZE_KEYS, MAX_FINALIZE_JSON);
-    const draft = b.bucket !== undefined;
-    if (draft !== (b.header !== undefined) || draft !== (b.tail !== undefined)) throw badRequest();
-    if (draft && (b.fill_from !== undefined || b.fill_to !== undefined)) throw badRequest();
-    if (!draft && b.void !== undefined) throw badRequest();
+    // Brouillon seul (spec H-5) : bucket, header et tail exigés ; fill_from et fill_to sont des
+    // champs inconnus (400 par readJSON), comme sur le vrai serveur.
+    if (b.bucket === undefined || b.header === undefined || b.tail === undefined) throw badRequest();
     const ttl = int(b.ttl_hours), maxOpens = int(b.max_opens), ops = int(b.kdf_ops), mem = int(b.kdf_mem);
-    // fill_from et fill_to ensemble, ou aucun des deux (spec §36 S4 : tout le bourrage envoyé).
-    const noFill = b.fill_from === undefined && b.fill_to === undefined;
-    if (!noFill && (typeof b.fill_from !== "number" || typeof b.fill_to !== "number")) throw badRequest();
-    const from = int(b.fill_from), to = int(b.fill_to);
     const salt = decodeB64(b.salt, 16), proofV = decodeB64(b.proof_v, 32), envelope = decodeB64(b.envelope, 60);
     emptyHash ??= await sha256(new Uint8Array(0));
     if (
@@ -586,64 +581,44 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
       throw badRequest();
     const s = live(id);
     if (s.state !== "uploading" || s.uploadDeadline <= now()) throw notFound();
-    if (draft) {
-      const fb = int(b.bucket);
-      const hdr = decodeB64(b.header, HEADER), tail = decodeB64(b.tail, CHUNK_CT);
-      if (!(BUCKETS as readonly number[]).includes(fb) || fb > s.bucket || fb > growLimit(s.top ?? 0)) throw badRequest();
-      const segs = segmentCount(fb);
-      // Morceaux de petits éléments retirés (audit H-2) : vérifiés, puis remplacés par de l'aléa.
-      const voids = b.void === undefined ? [] : b.void;
-      if (!Array.isArray(voids) || voids.length > 512) throw badRequest();
-      for (const v of voids as unknown[])
-        if (!Array.isArray(v) || v.length !== 2 || !Number.isInteger(v[0]) || !Number.isInteger(v[1]) || !(v[0] >= 0 && v[0] < v[1] && v[1] <= fb - 1)) throw badRequest();
-      // Aléa borné par les morceaux reçus (D42-6) : morceaux absents ou retirés du palier final.
-      const voided = new Set<number>();
-      for (const v of voids as [number, number][]) for (let c = v[0]; c < v[1]; c++) voided.add(c);
-      let fill = 0;
-      for (let n = 0; n < segs; n++)
-        for (let c = 0; c < chunksIn(fb, n); c++) if (s.have?.[n]?.[c] !== 1 || voided.has(n * SEG_CHUNKS + c)) fill++;
-      if (fill > PAD_FACTOR * (s.recv ?? 0) + PAD_MARGIN) throw new HttpFail(409, "incomplete");
-      const out: Uint8Array[] = [];
-      for (let n = 0; n < segs; n++) {
-        const size = segmentSize(fb, n);
-        const got = s.segments[n];
-        const seg = new Uint8Array(size);
-        if (got) seg.set(got.subarray(0, size));
-        else for (let o = 0; o < size; o += 65536) crypto.getRandomValues(seg.subarray(o, Math.min(size, o + 65536)));
-        out.push(seg);
-      }
-      for (const v of voids as [number, number][]) {
-        for (let c = v[0]; c < v[1]; c++) {
-          const n = Math.floor(c / SEG_CHUNKS), at = (n === 0 ? HEADER : 0) + (c % SEG_CHUNKS) * CHUNK_CT;
-          for (let o = at; o < at + CHUNK_CT; o += 65536) crypto.getRandomValues(out[n]!.subarray(o, Math.min(at + CHUNK_CT, o + 65536)) as Uint8Array<ArrayBuffer>);
-        }
-      }
-      out[0]!.set(hdr, 0);
-      const L = Math.floor((fb - 1) / SEG_CHUNKS);
-      out[L]!.set(tail, (L === 0 ? HEADER : 0) + ((fb - 1) % SEG_CHUNKS) * CHUNK_CT);
-      for (const x of s.segments) x?.fill(0);
-      s.segments = out;
-      s.bucket = fb;
-      out.forEach((x, n) => opts.onSegment?.(id, n, x));
-      Object.assign(s, { salt, kdf: { ops, mem }, proofV, envelope, ttlHours: ttl, maxOpens, opensLeft: maxOpens });
-      s.state = "ready";
-      forgetUpload(s);
-      s.expiresAt = ceil15(now() + ttl * 3600);
-      s.uploadDeadline = 0;
-      s.progressAt = null;
-      return json(200, { expires_in_s: s.expiresAt - now() });
+    const fb = int(b.bucket);
+    const hdr = decodeB64(b.header, HEADER), tail = decodeB64(b.tail, CHUNK_CT);
+    if (!(BUCKETS as readonly number[]).includes(fb) || fb > s.bucket || fb > growLimit(s.top ?? 0)) throw badRequest();
+    const segs = segmentCount(fb);
+    // Morceaux de petits éléments retirés (audit H-2) : vérifiés, puis remplacés par de l'aléa.
+    const voids = b.void === undefined ? [] : b.void;
+    if (!Array.isArray(voids) || voids.length > 512) throw badRequest();
+    for (const v of voids as unknown[])
+      if (!Array.isArray(v) || v.length !== 2 || !Number.isInteger(v[0]) || !Number.isInteger(v[1]) || !(v[0] >= 0 && v[0] < v[1] && v[1] <= fb - 1)) throw badRequest();
+    // Aléa borné par les morceaux reçus (D42-6) : morceaux absents ou retirés du palier final.
+    const voided = new Set<number>();
+    for (const v of voids as [number, number][]) for (let c = v[0]; c < v[1]; c++) voided.add(c);
+    let fill = 0;
+    for (let n = 0; n < segs; n++)
+      for (let c = 0; c < chunksIn(fb, n); c++) if (s.have?.[n]?.[c] !== 1 || voided.has(n * SEG_CHUNKS + c)) fill++;
+    if (fill > PAD_FACTOR * (s.recv ?? 0) + PAD_MARGIN) throw new HttpFail(409, "incomplete");
+    const out: Uint8Array[] = [];
+    for (let n = 0; n < segs; n++) {
+      const size = segmentSize(fb, n);
+      const got = s.segments[n];
+      const seg = new Uint8Array(size);
+      if (got) seg.set(got.subarray(0, size));
+      else for (let o = 0; o < size; o += 65536) crypto.getRandomValues(seg.subarray(o, Math.min(size, o + 65536)));
+      out.push(seg);
     }
-    const segs = s.segments.length;
-    // Bourrage : vide [k, k), ou [from, to) avec 1 ≤ from < to ≤ dernier segment (exclu).
-    if (!(from >= 0 && from <= to && to <= segs - 1 && (from === to || from >= 1))) throw badRequest();
-    if (s.segments.some((x, n) => x === undefined && (n < from || n >= to))) throw new HttpFail(409, "incomplete");
-    if ((to - from) * SEG_CHUNKS > PAD_FACTOR * (s.recv ?? 0) + PAD_MARGIN) throw new HttpFail(409, "incomplete"); // D42-6
-    for (let n = from; n < to; n++) {
-      const pad = new Uint8Array(segmentSize(s.bucket, n));
-      for (let o = 0; o < pad.length; o += 65536) crypto.getRandomValues(pad.subarray(o, o + 65536));
-      s.segments[n] = pad;
-      opts.onSegment?.(id, n, pad);
+    for (const v of voids as [number, number][]) {
+      for (let c = v[0]; c < v[1]; c++) {
+        const n = Math.floor(c / SEG_CHUNKS), at = (n === 0 ? HEADER : 0) + (c % SEG_CHUNKS) * CHUNK_CT;
+        for (let o = at; o < at + CHUNK_CT; o += 65536) crypto.getRandomValues(out[n]!.subarray(o, Math.min(at + CHUNK_CT, o + 65536)) as Uint8Array<ArrayBuffer>);
+      }
     }
+    out[0]!.set(hdr, 0);
+    const L = Math.floor((fb - 1) / SEG_CHUNKS);
+    out[L]!.set(tail, (L === 0 ? HEADER : 0) + ((fb - 1) % SEG_CHUNKS) * CHUNK_CT);
+    for (const x of s.segments) x?.fill(0);
+    s.segments = out;
+    s.bucket = fb;
+    out.forEach((x, n) => opts.onSegment?.(id, n, x));
     Object.assign(s, { salt, kdf: { ops, mem }, proofV, envelope, ttlHours: ttl, maxOpens, opensLeft: maxOpens });
     s.state = "ready";
     forgetUpload(s);
