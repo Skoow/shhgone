@@ -201,8 +201,8 @@
             {/if}
             <ul class="dt num">
               {#each details(x).slice(1) as d (d.k)}<li><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></li>{/each}
-              <!-- Appels des salons (20 novembre) : Plus et Pro inclus (« bientôt »), Gratuit non. -->
-              <li data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}{#if x !== "free"}{" "}<span class="sbadge" data-calls-soon>{t("offers.calls.soon")}</span>{/if}</span></li>
+              <!-- Appels des salons : Plus et Pro inclus (disponibles et réservés à ces offres depuis le 24 novembre), Gratuit non. -->
+              <li data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}</span></li>
             </ul>
           </div>
         {/each}

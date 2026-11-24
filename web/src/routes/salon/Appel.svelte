@@ -6,6 +6,7 @@
   // Ajouts du 21 novembre : la tuile de qui parle s'allume (salon/parole.ts, mesure locale) ;
   // caméra de face ou de dos quand l'appareil en a deux ; écran gardé allumé pendant l'appel.
   import { t } from "../../i18n/i18n.svelte";
+  import { href } from "../../app/router.svelte";
   import * as S from "../../salon/salon.svelte";
   import { APPEL_MAX } from "../../salon/appel";
   import { ecouterParole } from "../../salon/parole";
@@ -18,6 +19,9 @@
   const etat = $derived((void vue.rev, S.appel()?.etat ?? "aucun"));
   const participants = $derived((void vue.rev, S.appel()?.participants ?? []));
   const erreur = $derived((void vue.rev, S.appel()?.erreur ?? null));
+  // « Réservé aux offres Plus et Pro » : bouton touché sans offre sur l'appareil (S.lancerAppel),
+  // ou le serveur a dit les appels fermés sans jeton disponible (erreur « offre »).
+  const reserve = $derived(erreur === "offre" || (vue.appelReserve && etat === "aucun"));
   const micro = $derived((void vue.rev, S.appel()?.micro ?? true));
   const camera = $derived((void vue.rev, S.appel()?.camera ?? false));
   const local = $derived((void vue.rev, S.appel()?.local ?? null));
@@ -94,7 +98,14 @@
   }
 </script>
 
-{#if erreur}
+{#if reserve}
+  <!-- Appels réservés aux offres Plus et Pro (24 novembre) : les offres s'ouvrent dans un autre
+       onglet, pour que le salon reste ouvert dans celui-ci. -->
+  <p class="appel-err reserve" role="alert" data-appel-reserve>
+    <span>{t("salon.appel.err.offre")}</span>
+    <a href={href("/offres")} target="_blank" rel="noopener noreferrer">{t("salon.appel.offres")}</a>
+  </p>
+{:else if erreur}
   <p class="appel-err" role="alert">{t(`salon.appel.err.${erreur}`, { n: APPEL_MAX })}</p>
 {/if}
 {#if etat === "sonne"}
@@ -175,6 +186,16 @@
   }
   .appel-err {
     color: var(--danger);
+  }
+  /* Pas une panne : une explication, au ton du texte. */
+  .appel-err.reserve {
+    justify-content: flex-start;
+    color: var(--text);
+  }
+  .reserve a {
+    color: inherit;
+    font-weight: 600;
+    text-decoration: underline;
   }
   .actions {
     display: inline-flex;

@@ -513,8 +513,8 @@
     </div>
     <div class="boutons">
       {#if vue.appels && etatAppel === "aucun"}
-        <IconButton label={t("salon.appel.audio")} variant="secondary" onpress={() => void S.appel()?.rejoindre(false)}><Phone size={20} /></IconButton>
-        <IconButton label={t("salon.appel.video")} variant="secondary" onpress={() => void S.appel()?.rejoindre(true)}><Video size={20} /></IconButton>
+        <IconButton label={t("salon.appel.audio")} variant="secondary" onpress={() => S.lancerAppel(false)}><Phone size={20} /></IconButton>
+        <IconButton label={t("salon.appel.video")} variant="secondary" onpress={() => S.lancerAppel(true)}><Video size={20} /></IconButton>
       {/if}
       <!-- Revue du 20 novembre (U8) : sur téléphone, boutons à icône de 44 px sur une ligne (le
            libellé reste le nom accessible) ; ailleurs, icône et libellé. -->

@@ -176,6 +176,12 @@ describe("Confidentialité : section paiement", () => {
         /annonce ses clés sept jours à l'avance/u,
         /refuse, avec un avertissement, une clé différente pour un jour déjà annoncé/u,
         /dès le premier contact ne serait pas détecté par cet appareil seul/u,
+        // Appels réservés à Plus et Pro (24 novembre) : un jeton ouvre les appels du salon ; ce
+        // que voit le serveur, y compris quand c'est le créateur (connu par son compte).
+        /appels audio et vidéo des salons sont réservés à Plus et Pro/u,
+        /ouvre les appels pour tout le salon jusqu'à sa fin ; les autres participants n'ont besoin d'aucune offre/u,
+        /si c'est le créateur du salon[^.]*ce compte a Plus ou Pro/u,
+        /de même pour un appel lancé juste après/u,
       ])
         expect(t).toMatch(re);
     }
@@ -200,6 +206,10 @@ describe("Confidentialité : section paiement", () => {
         /announces its keys seven days ahead/u,
         /refuses, with a warning, a different key for a day already announced/u,
         /from the very first contact would not be detected by that device alone/u,
+        /calls in rooms are reserved for Plus and Pro/u,
+        /opens calls for the whole room until it ends; the other participants need no plan/u,
+        /if it is the room's creator[^.]*this account has Plus or Pro/u,
+        /the same goes for a call started right after/u,
       ])
         expect(t).toMatch(re);
     }

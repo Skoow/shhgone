@@ -11,6 +11,7 @@ import { SvelteSet } from "svelte/reactivity";
 import { ClientSalon, type EvClient, type Fin } from "./client";
 import { Conversation, type Bulle, type PieceInfo } from "./conversation";
 import { Appel } from "./appel";
+import { offresAppel, relaisReserve } from "./appel-offre";
 import { AFFICHE_MAX, PIECE_MAX, envoyerPiece, lirePiece } from "./pieces";
 import { IMAGES_SURES, typeAffichage } from "./affichage";
 import { previewable } from "../media/dimensions";
@@ -72,12 +73,20 @@ export const vue = $state({
   membresPeuventDetruire: false,
   /** Créateur délogé : « Reprendre la main ici » est proposé (le lien lui-même n'est pas dans cet état : reprendreLaMain). */
   reprise: false,
-  /** Le serveur offre les appels audio et vidéo (relais TURN configuré). */
+  /** Le serveur offre les appels audio et vidéo (relais TURN configuré et paiement ouvert). */
   appels: false,
   /**
    * Lien de gestion collé dans la conversation (exigence C-3 32), jamais envoyé : « proposee »
    * (membre : retrouver les droits ?), « deja » (déjà créateur), « autre » (pas ce salon),
    * « horsligne », « fait », ou null. Le secret lui-même n'est jamais dans cet état.
+  /**
+   * Appels réservés aux offres Plus et Pro (24 novembre) : un pass payé est gardé sur cet appareil
+   * (lecture locale, salon/appel-offre.ts). Faux : lancer un appel explique « Réservé aux offres
+   * Plus et Pro » sans rien demander ; rejoindre un appel en cours reste ouvert à tous.
+   */
+  offreAppel: false,
+  /** « Appel audio » ou « Appel vidéo » touché sans offre sur cet appareil : l'explication est affichée. */
+  appelReserve: false,
    */
   gestionCollee: null as "proposee" | "deja" | "autre" | "horsligne" | "erreur" | "fait" | null,
   /**
@@ -194,7 +203,7 @@ export function oublier(): void {
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, reprise: false, appels: false, gestionCollee: null, detruireFin: null });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, reprise: false, appels: false, offreAppel: false, appelReserve: false, gestionCollee: null, detruireFin: null });
   lienReprise = null;
   oublierGestionCollee();
 }
@@ -447,16 +456,38 @@ function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
   x.stop.push(c.ecouter((ev) => surEvenement(x, ev)));
 }
 
+  vue.appelReserve = false;
+  // Lecture locale seulement (aucune requête) : un pass payé est-il gardé sur cet appareil ?
+  if (e.appels)
+    void offresAppel()
+      .then((l) => {
+        if (s === x) vue.offreAppel = l.length > 0;
+      })
+      .catch(() => undefined);
 // Onglet fermé ou quitté (aussi vers le cache de retour arrière) : on raccroche en le disant,
 // au lieu de laisser les autres attendre 40 s qu'on soit compté absent.
 if (typeof addEventListener === "function") addEventListener("pagehide", () => s?.appel?.quitter());
 
 /** Appel branché sur ce client : messages chiffrés par le salon, média par le relais seulement (appel.ts). */
+/**
+ * « Appel audio » ou « Appel vidéo » (aucun appel en cours) : réservés aux offres Plus et Pro.
+ * Sans pass payé sur cet appareil, l'explication est affichée et rien n'est demandé (ni micro,
+ * ni réseau) ; sinon l'appel est lancé (un jeton anonyme l'ouvre au besoin, appel-offre.ts).
+ */
+export function lancerAppel(video: boolean): void {
+  if (!vue.offreAppel) {
+    vue.appelReserve = true;
+    return;
+  }
+  vue.appelReserve = false;
+  void s?.appel?.rejoindre(video);
+}
+
 function nouvelAppel(x: Session, c: ClientSalon): Appel {
   return new Appel({
     moi: c.siege,
     envoyer: (m) => x.client?.appel(m) ?? false,
-    relais: () => api.relaisAppel(net(), c.jeton),
+    relais: () => relaisReserve((j) => api.relaisAppel(net(), c.jeton, j)),
     media: (o) =>
       navigator.mediaDevices.getUserMedia({
         audio: o.audio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true } : false,
@@ -525,6 +556,8 @@ function surEvenement(x: Session, ev: EvClient): void {
       const r = conv.message(ev.seq, ev.siege, ev.epoque, ev.enveloppe);
       if (r) c.accuser("recu", [r.recu]);
       // Notre pseudonyme pris par un siège arrivé avant : retour au champ (exigence 11).
+        // Un appel sonne : l'explication « Réservé aux offres » touchée avant n'a plus lieu d'être.
+        if (m.k === "appel_present") vue.appelReserve = false;
       if (conv.pseudoRefuse && vue.etape === "conversation") {
         vue.monPseudo = null;
         vue.etape = "explication";

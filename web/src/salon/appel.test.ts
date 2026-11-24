@@ -107,6 +107,8 @@ class Monde {
   pcs = new Map<number, FauxPC[]>();
   refuseMedia = new Set<number>();
   refuseRelais = new Set<number>();
+  /** Sièges sans offre Plus ou Pro alors que les appels du salon sont fermés (24 novembre). */
+  sansOffre = new Set<number>();
   refuseFace = new Set<string>();
   refuseEcran = false;
   moteurOccupe = false;
@@ -126,6 +128,7 @@ class Monde {
         return true;
       },
       relais: async () => {
+        if (this.sansOffre.has(siege)) throw new Error("offre_requise");
         if (this.refuseRelais.has(siege)) throw new Error("reseau");
         return { urls: ["turn:turn.example:3478?transport=udp"], username: "1:00", credential: "x", ttlS: 60 };
       },
@@ -445,6 +448,20 @@ describe("cas limites", () => {
     expect([a.etat, a.erreur]).toEqual(["aucun", "relais"]);
     expect(w.locaux.get(0)![0]!.getTracks().every((p) => p.arretee)).toBe(true);
     expect(w.envoyes).toEqual([]);
+  });
+
+  it("appels fermés et aucune offre Plus ou Pro : erreur « offre », rien n'est envoyé ni ne reste allumé", async () => {
+    const w = new Monde();
+    const a = w.membre(0);
+    w.sansOffre.add(0);
+    await a.rejoindre(true);
+    expect([a.etat, a.erreur]).toEqual(["aucun", "offre"]);
+    expect(w.locaux.get(0)![0]!.getTracks().every((p) => p.arretee)).toBe(true);
+    expect(w.envoyes).toEqual([]);
+    // Une fois l'offre là (ou les appels ouverts par un autre), l'appel part et l'erreur s'efface.
+    w.sansOffre.clear();
+    await a.rejoindre(false);
+    expect([a.etat, a.erreur]).toEqual(["dans", null]);
   });
 
   it("deux appels lancés en même temps : tous se rallient au plus petit identifiant", async () => {
