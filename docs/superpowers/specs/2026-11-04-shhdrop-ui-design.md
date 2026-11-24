@@ -1466,7 +1466,7 @@ Ces points remplacent ce qui les contredit plus haut (§21 compris).
 
 ## 23. Vérification du 11 novembre (audit) — amendements
 
-Rapport et décisions du propriétaire : `docs/superpowers/audits/2026-11-11-verification-complete.md` (section 6). Ces points remplacent ce qui les contredit plus haut (§21 et §22 compris).
+Rapport tenu hors du dépôt (archive du propriétaire) ; les décisions du propriétaire sont reportées ci-dessous. Ces points remplacent ce qui les contredit plus haut (§21 et §22 compris).
 
 - **Plus de Réglages** : ni bouton engrenage dans l'en-tête, ni feuille Réglages, ni onglet Réglages. Ce qu'ils contenaient est dans le pied de page.
 - **Pied de page partout** (`ui/AppShell.svelte`), ordinateur et téléphone : les trois colonnes de §22, puis trois blocs (**12 novembre : blocs Langue et Fichiers retirés, seul « À propos » reste, §24**). **Langue** : un bouton par langue, écrit dans sa langue (aujourd'hui « Français » et « English »), `aria-pressed` sur la langue choisie. **Fichiers** : interrupteur « Nettoyage automatique » (désactivé par défaut, oublié à la fermeture de l'onglet), deux phrases d'explication, et « En savoir plus » qui déplie le détail (audit M19). **À propos** : une phrase. Aucun stockage.

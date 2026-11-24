@@ -749,7 +749,7 @@ Héberger hors UE **ne soustrait pas un exploitant résidant en France** au droi
 
 ## 25. Durcissement après audit (v2.4, 4 novembre 2026)
 
-Audit « sharp edges » du 4 novembre (`docs/superpowers/audits/2026-11-04-sharp-edges.md`) : 4 moyens, 11 faibles, aucun critique. Tous corrigés ; détail, tests et preuves dans `docs/superpowers/audits/2026-11-04-correctifs.md`.
+Audit « sharp edges » du 4 novembre (rapport tenu hors du dépôt (archive du propriétaire)) : 4 moyens, 11 faibles, aucun critique. Tous corrigés ; les corrections sont dans le tableau ci-dessous.
 
 | Point | Correction |
 |---|---|
@@ -2655,7 +2655,7 @@ Demande du propriétaire : « dès qu'un fichier est ajouté, il commence déjà
 
 ## 42. Décisions du propriétaire et corrections de la revue complète (v2.12, 10 novembre 2026)
 
-Revue complète du dépôt le 10 novembre (serveur, client et chiffrement, performance, tests, déploiement) : rapport dans `docs/superpowers/audits/2026-11-10-revue-complete.md`. Le propriétaire a validé les corrections proposées, sauf la protection contre les connexions lentes (D42-9). Chaque ligne dit ce qu'elle remplace.
+Revue complète du dépôt le 10 novembre (serveur, client et chiffrement, performance, tests, déploiement) : rapport tenu hors du dépôt (archive du propriétaire) ; les décisions sont dans le journal ci-dessous (§42.0). Le propriétaire a validé les corrections proposées, sauf la protection contre les connexions lentes (D42-9). Chaque ligne dit ce qu'elle remplace.
 
 ### 42.0 Journal des décisions
 
@@ -2702,7 +2702,7 @@ Revue complète du dépôt le 10 novembre (serveur, client et chiffrement, perfo
 
 ### 42.2 Corrections de la vérification du 11 novembre (audit)
 
-Rapport et décisions du propriétaire : `docs/superpowers/audits/2026-11-11-verification-complete.md` (section 6). Chaque changement est écrit à sa place, marqué « 11 novembre » :
+Rapport tenu hors du dépôt (archive du propriétaire) ; les décisions du propriétaire sont reportées ci-dessous. Chaque changement est écrit à sa place, marqué « 11 novembre » :
 
 - Serveur : débit minimal et 4 transferts par envoi ou par ouverture (§8, §24, §9.5, D42-9) ; quotas en données utiles (§24, §41.14) ; envoi de la veille finalisé après minuit (D42-1) ; signalement d'un partage déjà disparu (§41.8) ; segments refusés pendant `finalize` (§41.14) ; envois effacés hors du serveur oubliés au balayage (§9.5) ; tableaux JSON de taille fixe (§8) ; version du schéma et vidage du WAL (§9.1) ; sortie d'erreur (§9.4).
 - Chaîne : identifiant de build obligatoire (§28.1) ; cadre PDF en `sandbox` (D42-5) ; plafonds des conteneurs et en-tête `Server` (D42-13).
