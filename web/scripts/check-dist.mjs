@@ -54,6 +54,8 @@ const SALON_BROTLI_MAX = 435_000;
 const ENGINE_BROTLI_MAX = 156_000;
 
 /** Traces de démo interdites en production (le texte du bandeau, sans ponctuation typographique). */
+/** Phrase visible de la démo (demo/install.ts, HOST_NOTE) : exigée dans la démo, interdite en production. */
+const HOST_NOTE_EN = "hosted by GitHub, which sees your IP address";
 const FORBIDDEN_IN_PROD = [
   MARK,
   "fake-server",
@@ -62,6 +64,9 @@ const FORBIDDEN_IN_PROD = [
   'http-equiv="Content-Security-Policy"',
   "le lien ne marche que dans cet onglet",
   "the link only works in this tab",
+  // Phrase de l'hébergeur de la démo (pied de page, 24 novembre).
+  "hébergée par GitHub, qui voit",
+  HOST_NOTE_EN,
   `${DEMO_BASE}assets/`, // base de la démo dans un build de production
 ];
 
@@ -358,6 +363,9 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   // son faux serveur n'exige aucune preuve de travail ; new Worker(url) le lancerait sans contrôle.
   for (const f of all)
     if (/^assets\/[^/]*worker[^/]*\.js$/i.test(f.rel)) problems.push(`${f.rel} : script de Worker dans la démo (lancé sans contrôle d'intégrité)`);
+  // Décision du 24 novembre : la démo dit, visiblement, que GitHub l'héberge et voit l'adresse IP.
+  if (!all.some((f) => /\.m?js$/.test(f.rel) && f.data.includes(HOST_NOTE_EN)))
+    problems.push(`phrase de l'hébergeur absente des scripts de la démo (« ${HOST_NOTE_EN} »)`);
   if (!all.some((f) => /\.m?js$/.test(f.rel) && f.data.includes("AGFzbQEAAAA")))
     problems.push("moteur WebAssembly absent des scripts de la démo (base64 « AGFzbQEAAAA ») : elle ne pourrait ni chiffrer ni ouvrir");
   // Les balises de la démo, dans l'ordre, en tout premier dans <head>.

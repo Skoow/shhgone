@@ -40,11 +40,13 @@ describe("installDemo", async () => {
     expect(d.signupPasskey).toBe("Simuler la passkey");
     expect(d.securityGaps).toContain("frame-ancestors");
     expect(d.securityGaps).toContain("GitHub reçoit votre adresse IP");
+    expect(d.hostNote).toBe("Démo hébergée par GitHub, qui voit votre adresse IP.");
     setLang("en");
     expect(d.invalidLinkNote).toBe("(expected in the demo: a share only exists in the tab that created it)");
     expect(d.signupPasskey).toBe("Simulate the passkey");
     expect(d.securityGaps).toContain("HSTS");
     expect(d.securityGaps).toContain("GitHub receives your IP address");
+    expect(d.hostNote).toBe("Demo hosted by GitHub, which sees your IP address.");
   });
 
   it("openAsRecipient : charge /s#<43> dans le même onglet (16 novembre) ; refuse un autre lien", () => {

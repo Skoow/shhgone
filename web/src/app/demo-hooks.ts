@@ -21,6 +21,8 @@ export type DemoHooks = {
   readonly compteNote: string;
   /** Bouton de l'inscription (langue courante) : « Simuler la passkey », aucune passkey n'étant créée. */
   readonly signupPasskey: string;
+  /** Phrase visible du pied de page (langue courante, 24 novembre) : GitHub héberge la démo et voit l'adresse IP. */
+  readonly hostNote: string;
   /** Bandeau permanent, rendu dans l'emplacement `banner` de AppShell. */
   Banner: Component;
 };

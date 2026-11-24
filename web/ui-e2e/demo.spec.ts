@@ -38,6 +38,12 @@ test.describe("fr-FR", () => {
     // sur-titre depuis le 15 novembre).
     await expect(page.locator("[data-eyebrow]")).toHaveCount(0);
     await expect(page.getByText(/Hébergé en Europe/)).toHaveCount(0);
+    // Décision du 24 novembre : une phrase visible, au pied de chaque page, dit l'hébergeur et ce qu'il voit.
+    const host = page.locator("footer[data-foot] [data-demo-host]");
+    await host.scrollIntoViewIfNeeded();
+    await expect(host).toHaveText("Démo hébergée par GitHub, qui voit votre adresse IP.");
+    await expect(host).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 0));
 
     const head = await page.evaluate(() =>
       [...document.head.children].slice(0, 3).map((e) => e.outerHTML),
@@ -392,6 +398,7 @@ test.describe("en-US", () => {
   test("bandeau en anglais ; capture", async ({ page, demo }) => {
     await page.goto(demo.url);
     await expect(page.getByRole("note")).toHaveText(BANNER_EN);
+    await expect(page.locator("footer[data-foot] [data-demo-host]")).toHaveText("Demo hosted by GitHub, which sees your IP address.");
     await expect(page).toHaveTitle("Shhgone · Share in secret, then it's gone");
     await page.waitForTimeout(700);
     await capture(page, "demo-home-en");

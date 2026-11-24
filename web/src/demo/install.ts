@@ -39,6 +39,11 @@ const SIGNUP_PASSKEY = {
   fr: "Simuler la passkey",
   en: "Simulate the passkey",
 } as const;
+/** Pied de toutes les pages, visible (décision du propriétaire du 24 novembre) : l'hébergeur de la démo voit l'adresse IP. */
+const HOST_NOTE = {
+  fr: "Démo hébergée par GitHub, qui voit votre adresse IP.",
+  en: "Demo hosted by GitHub, which sees your IP address.",
+} as const;
 const INVALID_LINK_NOTE = {
   fr: "(normal en démo : un partage n'existe que dans l'onglet qui l'a créé)",
   en: "(expected in the demo: a share only exists in the tab that created it)",
@@ -123,6 +128,9 @@ export async function installDemo(w: Window): Promise<void> {
     },
     get invalidLinkNote() {
       return INVALID_LINK_NOTE[getLang()];
+    },
+    get hostNote() {
+      return HOST_NOTE[getLang()];
     },
     get readyNote() {
       return READY_NOTE[getLang()];
