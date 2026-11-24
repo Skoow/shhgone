@@ -115,7 +115,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         "Contenu, noms, types et textes : AES-256-GCM (WebCrypto), clés dérivées par HKDF-SHA-256 ; aucune cryptographie maison.",
         "Mot de passe : Argon2id (RustCrypto, dans le moteur WebAssembly du site), 64 Mio de mémoire, 3 passes, combiné à la clé du fragment du lien (après #), jamais transmise au serveur.",
         `Ouverture : le serveur vérifie une preuve dérivée de la clé et du mot de passe, sans recevoir ni l'une ni l'autre ; ${v.tries} preuves fausses détruisent le partage.`,
-        "Taille : le contenu chiffré occupe des paliers fixes ; le serveur ne connaît que le palier.",
+        "Taille : l'envoi chiffré commence dès qu'un fichier est ajouté, avant « Chiffrer et envoyer ». Pendant l'envoi, le serveur voit la taille à 4 Mio près, car le contenu part en morceaux chiffrés de 4 Mio. Une fois l'envoi fini, le contenu chiffré occupe un palier de taille fixe : le serveur ne connaît plus que ce palier.",
         "Navigateur : en-têtes stricts (Content-Security-Policy, Permissions-Policy) ; aucun script, police ni traceur d'un autre site.",
       ],
       links: [
@@ -153,6 +153,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Salon : pour retrouver votre place après un rechargement, votre jeton de membre, le nom que vous y portez et la clé du salon sont gardés chiffrés sur cet appareil, lisibles seulement avec le mot de passe du salon ; ils s'effacent à la fin du salon.",
           "Offres payantes : le pass, son état lu le jour même, les jetons anonymes qu'il donne (avec l'heure où chacun a été obtenu) et les clés de jetons déjà vues sont gardés chiffrés sur cet appareil.",
           "Si vous cochez « Garder ce partage », le lien reçu (avec sa clé), sa taille et son échéance sont gardés chiffrés sur cet appareil, jamais le mot de passe. Ils s'effacent 7 jours après l'échéance, ou quand vous les retirez.",
+          "L'historique de vos envois (« Mes partages ») garde chiffrés sur cet appareil le lien de gestion de chaque partage envoyé, son nom, sa taille, son nombre d'éléments, son échéance et ses ouvertures, et, pour un salon créé, son lien d'invitation et son lien de gestion ; jamais le lien de partage ni le mot de passe. Sans compte, il est désactivé par défaut : rien n'est gardé tant que vous n'activez pas vous-même « Garder dans mon historique ». Chaque entrée s'efface 7 jours après la fin du partage ou du salon ; « Retirer de la liste » en retire une, « Effacer l'historique » dans « Mes partages » efface tout.",
           "L'historique des téléchargements est désactivé par défaut : rien n'est gardé tant que vous ne l'activez pas vous-même. Activé, il garde chiffrés sur cet appareil le nom, la taille et la sorte de chaque fichier enregistré, sa provenance et l'heure ; il n'est jamais envoyé, et ne contient jamais le lien ni le mot de passe. Chaque entrée s'efface après 30 jours ; le désactiver efface tout.",
         ],
       },
@@ -421,7 +422,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         "Content, names, types and texts: AES-256-GCM (WebCrypto), keys derived with HKDF-SHA-256; no home-made cryptography.",
         "Password: Argon2id (RustCrypto, in the site's WebAssembly engine), 64 MiB of memory, 3 passes, combined with the key in the link fragment (after #), which is never sent to the server.",
         `Opening: the server checks a proof derived from the key and the password, without receiving either; ${v.tries} wrong proofs destroy the share.`,
-        "Size: encrypted content fills fixed tiers; the server only knows the tier.",
+        "Size: the encrypted upload starts as soon as a file is added, before “Encrypt and send”. During the upload, the server sees the size to within 4 MiB, because the content goes up in encrypted 4 MiB pieces. Once the upload is done, the encrypted content fills a fixed size tier: the server then knows only that tier.",
         "Browser: strict headers (Content-Security-Policy, Permissions-Policy); no script, font or tracker from another site.",
       ],
       links: [
@@ -459,6 +460,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Room: to get your seat back after a reload, your member token, the name you use there and the room key are kept encrypted on this device, readable only with the room password; they are erased when the room ends.",
           "Paid plans: the pass, its status read that same day, the anonymous tokens it gives (with the time each one was obtained) and the token keys already seen are kept encrypted on this device.",
           "If you tick “Keep this share”, the received link (with its key), its size and its expiry are kept encrypted on this device, never the password. They are erased 7 days after expiry, or when you remove them.",
+          "The history of what you send (“My shares”) keeps, encrypted on this device, the management link of each sent share, its name, size, number of items, expiry and opens, and, for a created room, its invitation link and management link; never the share link or the password. Without an account, it is off by default: nothing is kept until you turn on “Keep in my history” yourself. Each entry is erased 7 days after the share or room ends; “Remove from list” removes one, “Clear history” in “My shares” erases it all.",
           "The downloads history is off by default: nothing is kept until you turn it on yourself. When on, it keeps the name, size and kind of each saved file, where it came from and the time, encrypted on this device; it is never sent, and never holds the link or the password. Each entry is erased after 30 days; turning it off erases it all.",
         ],
       },
