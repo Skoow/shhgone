@@ -213,7 +213,8 @@ func TestNoUnlistedCounter(t *testing.T) {
 }
 
 // sortants : appels qui ouvrent une connexion sortante (spec §35.1) ; interdits partout, sauf
-// captcha/recaptcha.go (repli de §26) et internal/paiement/http.go (prestataires de paiement).
+// internal/paiement/http.go (prestataires de paiement). Le repli reCAPTCHA (spec §26) est retiré
+// le 24 novembre et n'a jamais été codé : aucune exception pour lui.
 // Plus aucune sortie SMTP depuis le 22 novembre (compte par passkey) : net/smtp est interdit
 // partout.
 var sortants = map[string]bool{
@@ -236,9 +237,11 @@ var paquetsReseau = map[string]bool{"net": true, "net/http": true, "net/smtp": t
 // ni net.Dial, ni tls.Dial, ni http.Get ou http.DefaultClient.
 var paiementPermis = map[string]bool{"http.Client": true, "http.Transport": true, "http.NewRequestWithContext": true}
 
-// TestNoOutgoingHTTP : aucun client sortant hors de captcha/recaptcha.go et, pour les
-// prestataires de paiement seulement, internal/paiement/http.go ; aucun client SMTP nulle part
-// (plus d'exception SMTP, conception du compte par passkey §8).
+// TestNoOutgoingHTTP : aucun client sortant hors de internal/paiement/http.go (prestataires de
+// paiement seulement) ; aucun client SMTP nulle part (plus d'exception SMTP, conception du compte
+// par passkey §8). Le saut ci-dessous de internal/captcha/recaptcha.go est un reste du repli
+// reCAPTCHA (spec §26, retiré le 24 novembre) : ce fichier n'existe pas et ne doit pas être créé ;
+// le saut est à retirer (changement de code, hors de cette mise à jour des commentaires).
 func TestNoOutgoingHTTP(t *testing.T) {
 	paiementVu := false
 	for _, g := range sources(t, "..") {

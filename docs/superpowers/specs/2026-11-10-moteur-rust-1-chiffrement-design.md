@@ -44,7 +44,7 @@ Décisions du propriétaire (10 novembre) :
 - `crypto/passphrase.ts`, `crypto/wordlist-eff.ts` (aucun appelant hors tests) ;
 - `sealStream` et la lecture de l'ancien format (entrées sans `k`) : aucun partage de cet ancien format ne peut encore exister (24 h de vie au plus, plus 2 h de grâce).
 
-**Hors périmètre** : apps, interface Svelte, serveur, envoi et réception (sous-projet 2), nettoyage (sous-projet 3), `web/src/vault/` (gardé, non utilisé).
+**Hors périmètre** : apps, interface Svelte, serveur, envoi et réception (sous-projet 2), nettoyage (sous-projet 3), `web/src/vault/` (~~gardé, non utilisé~~ supprimé le 24 novembre comme code mort ; à refaire si le coffre est construit, spec §27).
 
 ## 4. Organisation
 
