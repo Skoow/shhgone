@@ -560,7 +560,7 @@ chown 65532:65532 /srv/shhdrop/secrets/shh_stripe_cle && chmod 0400 /srv/shhdrop
 
 ## 14. Appels audio et vidéo du salon : relais TURN intégré
 
-Conception : `docs/superpowers/specs/2026-11-20-appels-design.md`. Les appels sont **activés par défaut** et **rien n'est à installer**, ni sur la machine ni chez les utilisateurs : le relais fait partie de notre image (`/shhcheck turn`, `deploy/shhcheck/turn.go`, bibliothèque pion/turn épinglée), lancé par `compose.yaml` (service `relais-turn`, profil « appels »).
+Conception : `docs/superpowers/specs/2026-11-20-appels-design.md`. Les appels sont **activés par défaut** et **rien n'est à installer**, ni sur la machine ni chez les utilisateurs : le relais fait partie de notre image (`/shhcheck turn`, `deploy/shhcheck/turn.go`, bibliothèque pion/turn épinglée), lancé par `compose.yaml` (service `relais-turn`, profil « appels »). **Depuis le 24 novembre, les appels sont réservés aux offres Plus et Pro** (conception des appels §5.1) : le serveur ne les propose (route `/api/salons/appel`, `calls: true`, boutons) que si le paiement est aussi ouvert (`SHH_PAIEMENT=1`). Paiement fermé, le relais tourne sans servir : `SHH_APPELS=0` l'arrête d'ici là.
 
 `deploy.sh` fait tout à chaque installation :
 
