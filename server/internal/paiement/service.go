@@ -202,11 +202,20 @@ func (s *Service) Regime() Regime { return s.regime }
 func (s *Service) Moyens() []Moyen {
 	var out []Moyen
 	for m := Carte; m <= Crypto; m++ {
-		if s.prest[m] != nil {
+		if s.vendable(m) {
 			out = append(out, m)
 		}
 	}
 	return out
+}
+
+// vendable : le moyen m peut prendre une nouvelle commande. Sous le régime OSS, jamais la crypto
+// (décision du propriétaire, 24 novembre ; conception §9.1, S3) : au-delà du seuil, l'OSS exige
+// deux preuves de localisation non contradictoires, et un paiement crypto n'en donne qu'une (le
+// pays déclaré). Le prestataire reste inscrit pour ses webhooks (PrestataireDe) : un paiement
+// tardif ou un remboursement d'une commande passée avant le changement de régime est traité.
+func (s *Service) vendable(m Moyen) bool {
+	return m >= Carte && m <= Crypto && s.prest[m] != nil && !(m == Crypto && s.regime == OSS)
 }
 
 // Prestataire du webhook nommé (nil : inconnu ou non configuré).
@@ -228,10 +237,10 @@ func (s *Service) Commander(ctx context.Context, p Pass, f Formule, pays string,
 	if !renonciation {
 		return "", ErrRenonciation
 	}
-	pr := s.prest[f.Moyen]
-	if pr == nil {
+	if !s.vendable(f.Moyen) {
 		return "", ErrMoyen
 	}
+	pr := s.prest[f.Moyen]
 	v, err := Ventiler(s.regime, pays, Prix(f.Offre, f.Jours))
 	if err != nil {
 		return "", err

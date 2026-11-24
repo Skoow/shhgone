@@ -541,7 +541,7 @@ Fichiers de `<SHH_DATA_ROOT>/secrets` (compte 65532, droits 0400, comme §12.2),
 | PayPal | `shh_paypal_secret` | `SHH_PAYPAL_CLIENT_ID`, `SHH_PAYPAL_WEBHOOK_ID`, `SHH_PAYPAL_PLANS` |
 | NOWPayments (crypto) | `shh_nowpayments_cle`, `shh_nowpayments_ipn` | rien |
 
-et, pour tous, `SHH_TVA` (`franchise`, `france` ou `oss` : régime choisi par le propriétaire avec son comptable). Paiement activé, `deploy.sh` refuse d'installer sans `SHH_TVA`, sans aucun prestataire, ou si un fichier attendu manque, est un lien ou n'a pas le bon propriétaire et les bons droits. Le serveur, lui, refuse de démarrer avec une clé Stripe de production en essai ou l’inverse, ou un prestataire à moitié configuré (message sans valeur).
+et, pour tous, `SHH_TVA` (`franchise`, `france` ou `oss` : régime choisi par le propriétaire avec son comptable ; en `oss`, la crypto n'est ni proposée ni acceptée, même avec les secrets NOWPayments en place, car elle ne donne qu'une preuve de localisation : décision du 24 novembre, conception du paiement §9.1 ; ses webhooks restent traités). Paiement activé, `deploy.sh` refuse d'installer sans `SHH_TVA`, sans aucun prestataire, ou si un fichier attendu manque, est un lien ou n'a pas le bon propriétaire et les bons droits. Le serveur, lui, refuse de démarrer avec une clé Stripe de production en essai ou l’inverse, ou un prestataire à moitié configuré (message sans valeur).
 
 ```sh
 (umask 077 && cat > /srv/shhdrop/secrets/shh_stripe_cle)   # coller la clé, Entrée, Ctrl-D
