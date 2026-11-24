@@ -9,6 +9,12 @@ describe("match", () => {
     expect(match("/")).toEqual({ name: "home" });
     expect(match("/securite")).toEqual({ name: "securite" });
     expect(match("/confidentialite")).toEqual({ name: "confidentialite" });
+    // « Vérifier cette version » (spec §28.4) : page d'information bilingue, servie par son fichier.
+    expect(match("/verifier")).toEqual({ name: "verifier" });
+    expect(match("/verifier.html")).toEqual({ name: "verifier" });
+    expect(match("/en/verifier", "", "/", false, false, false, true)).toEqual({ name: "verifier" });
+    expect(otherEntry("/verifier")).toBe(true);
+    expect(href("/verifier", "en", true)).toBe("/en/verifier");
     // Page d'envoi vide (retours DROP) : « Commencer » y mène ; un « # » n'y ouvre rien.
     expect(match("/envoyer")).toEqual({ name: "envoyer" });
     expect(match("/envoyer", `#${KEY}`)).toEqual({ name: "envoyer" });

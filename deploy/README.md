@@ -7,7 +7,8 @@ Caddy (TLS) devant le serveur Go, dans Docker. Références : spécification §8
 | `Caddyfile` | TLS 1.3, échange de clés hybride, remplacement de `X-Shh-Client-IP`, aucun journal |
 | `Dockerfile` | image du serveur : binaire Go statique + site, sur `scratch`, compte 65532 |
 | `compose.yaml` | les deux conteneurs (plus les relais du paiement et des appels, §13 et §14), en lecture seule, sans capacité, sans journal |
-| `deploy.sh` | installe une version par empreinte, contrôle, revient en arrière ; commandes d'administration |
+| `deploy.sh` | installe une version par empreinte, après vérification de sa provenance (§3), contrôle, revient en arrière ; commandes d'administration |
+| `provenance.sh`, `test-provenance.sh` | vérification de provenance du site (manifeste signé par cosign, spec §28.7), chargée par `deploy.sh` ; son banc d'essai, sans réseau (§3) |
 | `shhcheck/` | petit programme Go : santé du conteneur, test TLS hybride, relais de sortie du paiement (§13), contrôle d'un hôte joignable en TLS (`joindre`), relais TURN (§14) ; `salonws_test.go` et `compte_test.go` : essais de banc (tests seulement, hors du binaire) |
 | `test-proxy.sh` | test du proxy : le Caddyfile devant le vrai serveur (salon activé), sur la boucle locale |
 | `journaux.sh`, `test-journaux.sh` | contrôles des journaux de la machine (aucune adresse IP sur le disque, une heure au plus en mémoire), bloquants dans `deploy.sh` ; leur banc d'essai, sur une machine factice (§1) |
@@ -116,9 +117,10 @@ install -d -o 65532 -g 65532 -m 0700 /srv/shhdrop/data
 install -d -o 65532 -g 65532 -m 0700 /srv/shhdrop/caddy
 install -d -o root -g 65532 -m 0750 /srv/shhdrop/secrets
 
-# Réglages, puis installation d'une version (empreinte de l'image, voir §3).
+# Réglages, cosign (§3.2), puis installation d'une version (empreinte de l'image et numéro de
+# sa Release signée, voir §3).
 cp deploy/env.example deploy/.env && editor deploy/.env
-deploy/deploy.sh sha256:<empreinte>
+deploy/deploy.sh sha256:<empreinte> <x.y.z>
 ```
 
 Ne pas inscrire le volume dans `/etc/fstab` ni `/etc/crypttab` avec une clé : il se déverrouille à la main (§5).
@@ -127,33 +129,85 @@ Ne pas inscrire le volume dans `/etc/fstab` ni `/etc/crypttab` avec une clé : i
 
 ## 3. Mise à jour et retour arrière
 
-L'image est construite ailleurs que sur le serveur, depuis un commit précis, puis publiée dans le registre choisi (`SHH_IMAGE_REPO`) :
+### 3.1 Publier une version : étiquette, Release signée
+
+Une version publique est une **étiquette `web-v<x.y.z>`** posée par le propriétaire sur un commit de `main` dont la CI est verte (`git tag web-v1.0.0 <commit> && git push origin web-v1.0.0`). Le workflow `.github/workflows/release.yml` (spec §28.2) :
+
+1. relance toute la CI sur ce commit (tests, `repro` sur deux machines, `repro-docker` : le site de l'image = celui des builds de la CI) ; exige que le commit soit dans `main` ;
+2. reconstruit le site (`SHH_SITE_COMPTES=1`, comme l'image), vérifie qu'il est identique aux builds du job `repro`, et écrit `release.json` (version, commit, chemin, taille et SHA-256 de chaque fichier, `web/scripts/release-manifest.mjs`), `SHA256SUMS` et `dist.tar.gz` (archive déterministe) ;
+3. dans un job à part, qui ne lance aucun code npm, signe `release.json` **sans clé** (`cosign sign-blob`, jeton OIDC de GitHub Actions, certificat Fulcio, inscription dans le journal public Rekor), revérifie sa signature avec l'identité exacte qu'utilise `deploy.sh`, et publie la Release GitHub : `release.json`, `release.json.sigstore.json` (le bundle), `SHA256SUMS`, `dist.tar.gz`.
+
+Aucun secret : la signature vient de l'identité du workflow (`id-token: write` dans ce seul job). Ce que la signature prouve : « construit par `release.yml` de `Skoow/shhgone`, depuis ce commit public ». Ce qu'elle ne prouve pas : que ce code est sain. Un compte GitHub volé peut signer une version piégée : elle sera publique et inscrite dans Rekor (détectable, pas empêché).
+
+Le manifeste n'est **pas** commité dans le dépôt avant l'étiquette, contrairement à la première rédaction de la spec §28.2 : le numéro de version du site est le commit lui-même (`SHH_BUILD_ID`), un commit ne peut donc pas contenir le manifeste de son propre build (spec §28.2, corrigée le 24 novembre). Pour prouver « build local = build CI », reconstruire le site de ce commit (§3.3) et comparer à `release.json` de la Release.
+
+### 3.2 Construire l'image, puis l'installer
+
+L'image est construite ailleurs que sur le serveur, depuis le commit de l'étiquette, puis publiée dans le registre choisi (`SHH_IMAGE_REPO`) :
 
 ```sh
+git checkout web-v<x.y.z>
 c=$(git rev-parse --short=7 HEAD)
 docker build -f deploy/Dockerfile --build-arg SHH_BUILD_ID="$c" -t <registre>/shhdrop:"$c" . && docker push <registre>/shhdrop:"$c"
 # « digest: sha256:… » affiché par push : c'est l'empreinte à donner à deploy.sh.
 ```
 
-`SHH_BUILD_ID` est obligatoire (le build s'arrête sans lui) : c'est le numéro de version affiché par le site, et il doit être celui du commit pour que le site de l'image soit, octet pour octet, celui des builds de la CI (job `repro-docker`, spec §28). Construire depuis un arbre propre (`git status` vide) : des modifications non commitées entreraient dans l'image sous ce numéro.
+`SHH_BUILD_ID` est obligatoire (le build s'arrête sans lui) : c'est le numéro de version affiché par le site, et il doit être celui du commit pour que le site de l'image soit, octet pour octet, celui des builds de la CI (job `repro-docker`, spec §28), donc celui du manifeste signé. Construire depuis un arbre propre (`git status` vide) : des modifications non commitées entreraient dans l'image, et `deploy.sh` la refuserait.
 
-Vérification du site servi, à faire à la main depuis un autre poste tant que la provenance signée n'existe pas (§9) : construire le site du même commit (`cd web && npm ci --ignore-scripts && npm run build`), en tirer le manifeste (`node scripts/release-manifest.mjs dist --name shhdrop-web --version 0.0.0 --commit "$c" --out /tmp/rel`), puis `node scripts/verify-site.mjs https://<site> /tmp/rel/release.json`.
+**cosign sur le serveur** (une fois, puis à chaque montée de version ; version et empreinte épinglées, les mêmes que `deploy/provenance.sh`, qui refuse tout autre binaire) : cosign **v3.1.4** (publiée le 20 octobre 2026 ; empreinte relevée le 24 novembre 2026 dans `cosign_checksums.txt` de la Release et recalculée sur le binaire téléchargé). La v3.1.5, publiée le 24 novembre, est trop récente (règle des 7 jours, spec §24) : à réexaminer.
+
+```sh
+curl -fsSL -o /tmp/cosign https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
+echo "424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa  /tmp/cosign" | sha256sum -c -
+install -m 0755 -o root -g root /tmp/cosign /usr/local/bin/cosign && rm /tmp/cosign
+```
+
+cosign lit la racine de confiance de Sigstore (TUF) sur `tuf-repo-cdn.sigstore.dev` et la garde dans `~/.sigstore` ; le serveur doit aussi joindre `github.com` (téléchargement du manifeste) et Docker Hub (image Node épinglée du contrôle). Un pare-feu sortant doit les laisser passer pendant `deploy.sh`.
 
 Sur le serveur :
 
 ```sh
-git pull                              # Caddyfile, compose.yaml, deploy.sh à jour
-deploy/deploy.sh sha256:<empreinte>   # installe, contrôle, revient en arrière si le contrôle échoue
-deploy/deploy.sh status               # version en service, version précédente, conteneurs
-deploy/deploy.sh rollback             # réinstalle la version précédente
+git pull                                      # Caddyfile, compose.yaml, deploy.sh à jour
+deploy/deploy.sh sha256:<empreinte> <x.y.z>   # vérifie la provenance, installe, contrôle, revient en arrière si le contrôle échoue
+deploy/deploy.sh status                       # version en service, version précédente, conteneurs
+deploy/deploy.sh rollback                     # réinstalle la version précédente (provenance revérifiée)
 ```
 
-Contrôle fait par `deploy.sh`, sans option pour le sauter : conteneur en bonne santé (`/healthz` local) ; `https://<site>/api/captcha` répond 200 à travers Caddy ; page d'accueil avec HSTS ; poignée de main TLS 1.3 limitée à `X25519MLKEM768` (test bloquant de la §30).
+**Vérification de provenance** (spec §28.7 ; `deploy/provenance.sh`), avant que rien ne démarre, sans option, variable ni commande pour la sauter (spec §28.8, C2) :
+
+1. le binaire `cosign` a l'empreinte épinglée ;
+2. `release.json` et son bundle sont téléchargés depuis la Release `web-v<x.y.z>` (https seulement, 4 Mio au plus ; gardés dans `deploy/.provenance/<x.y.z>/` une fois vérifiés, mais revérifiés à chaque installation) ;
+3. `cosign verify-blob` avec l'émetteur `https://token.actions.githubusercontent.com` et l'identité **exacte** `https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v<x.y.z>` (jamais d'expression ouverte, jamais `--insecure-ignore-tlog`) ;
+4. le dossier `/site` de l'image (copié sans la lancer) doit redonner `release.json` **octet pour octet** : mêmes fichiers, ni plus ni moins, mêmes tailles, mêmes empreintes, même version. Le manifeste est recalculé en shell (`manifeste_de`, identique à `release-manifest.mjs`, prouvé par le banc d'essai et par `release.yml`) : aucun analyseur JSON ne lit un fichier reçu.
+
+Un refus arrête tout (`installation refusée`) : le site en service n'est pas touché.
+
+### 3.3 Vérifier soi-même un site en ligne
+
+Depuis un autre poste, avec une copie du dépôt qui ne vient pas du site, et cosign :
+
+```sh
+v=<x.y.z>
+curl -fsSLO https://github.com/Skoow/shhgone/releases/download/web-v$v/release.json
+curl -fsSLO https://github.com/Skoow/shhgone/releases/download/web-v$v/release.json.sigstore.json
+cosign verify-blob release.json --bundle release.json.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity "https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v$v"
+node web/scripts/verify-site.mjs https://shhgone.com release.json
+```
+
+Pour prouver en plus « build local = build CI » : se placer sur l'étiquette (`git checkout web-v$v`), puis `cd web && npm ci --ignore-scripts && SHH_SITE_COMPTES=1 SHH_BUILD_ID=$(git rev-parse --short=7 HEAD) SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npm run build`, et `node scripts/release-manifest.mjs dist --name shhdrop-web --version $v --commit $(git rev-parse HEAD) --out /tmp/rel && cmp /tmp/rel/release.json ../release.json`. La page `/verifier` du site dit la même chose, en clair.
+
+### 3.4 Contrôles et limites
+
+Contrôle fait par `deploy.sh` après le démarrage, sans option pour le sauter : conteneur en bonne santé (`/healthz` local) ; `https://<site>/api/captcha` répond 200 à travers Caddy ; page d'accueil avec HSTS ; poignée de main TLS 1.3 limitée à `X25519MLKEM768` (test bloquant de la §30) ; **le site servi à travers Caddy est celui du manifeste signé** (`web/scripts/verify-site.mjs` de la copie du dépôt, lancé dans l'image Node épinglée du `Dockerfile` : chaque fichier, ses variantes `.br`/`.gz` et le repli monopage ; spec §28.7). Un échec ramène la version précédente.
 
 À savoir :
 
 - **chaque redémarrage du serveur efface les envois en cours et les partages en cours de lecture** (les jetons ne survivent pas, §36 S12). Relancer `deploy.sh` avec la même empreinte ne redémarre rien ;
 - le retour arrière ne concerne que l'image. Pour ramener `Caddyfile` ou `compose.yaml` en arrière : `git checkout <commit> -- deploy/`, puis `deploy.sh` ;
+- une version installée avant la vérification de provenance n'a pas de numéro (`deploy/.release.version` absent) : `rollback` vers elle est refusé, et le contrôle d'un retour arrière automatique vers elle échoue (le site reste alors à vérifier à la main). Réinstaller avec `deploy/deploy.sh sha256:<empreinte> <x.y.z>` ;
+- `deploy/deploy.sh "$(cat deploy/.release)"` (après un redémarrage, §5) réinstalle l'image en service avec sa version déjà vérifiée (`deploy/.release.version`) : la provenance est revérifiée, ce qui demande Sigstore (et `github.com` si le manifeste n'est pas déjà gardé dans `deploy/.provenance/`) ;
 - si le serveur refuse de démarrer, son message n'est écrit nulle part (aucun journal). Pour le lire : `deploy/deploy.sh diagnose`.
 
 ## 4. Commandes d'administration (§15.3)
@@ -172,6 +226,7 @@ Le lien signalé ne se donne **jamais** en argument (il irait dans l'historique 
 ### Surveillance (22 novembre)
 
 - **Sonde externe** (`.github/workflows/sonde.yml`) : toutes les 15 min, GitHub vérifie que l'accueil répond en HTTPS et que le certificat a encore au moins 14 jours (Caddy n'écrit aucun journal : un renouvellement raté ne se verrait pas autrement). Un échec : e-mail de GitHub. À activer après la mise en ligne : variable du dépôt `SHH_SONDE_HOTE` (ex. `shhgone.com`).
+- **Code servi** (`.github/workflows/verifier-site.yml`, 24 novembre ; spec §28.7) : toutes les heures, GitHub prend les trois dernières Releases `web-v<x.y.z>`, vérifie la signature de chaque manifeste (cosign épinglé, identité exacte de §3.2), puis lance `web/scripts/verify-site.mjs` contre `https://$SHH_SONDE_HOTE` : chaque fichier, ses variantes compressées et le repli monopage doivent être ceux de l'une d'elles (la plus récente, ou l'une des deux d'avant, pour le temps d'une mise en ligne ou d'un retour arrière). Un écart, une signature refusée ou une erreur réseau : échec, donc e-mail de GitHub (jamais « vert » sur une erreur). Inactive, comme la sonde, tant que `SHH_SONDE_HOTE` n'est pas posée, et sans Release. Limites : il ne voit que ce que le serveur lui sert (un serveur compromis peut piéger une seule victime, selon son adresse ou son navigateur) ; un retour à une des deux versions d'avant passe sans alerte (le journal dit laquelle est servie) ; les en-têtes ne sont pas contrôlés.
 - **Alerte de la machine** (`deploy/alerte.sh`, minuteur `systemd/shhdrop-alerte.timer`, toutes les 15 min ; banc d'essai `deploy/test-alerte.sh`, en CI) : e-mail à `SHH_ALERTE_A` (dans `deploy/.env`, par exemple `contact@shhgone.com`) pour prévenir **avant** que le problème n'arrive. Chaque sujet revient au plus une fois par période : 1 h pour l'urgent, 1 jour ou 7 jours pour ce qui se prévoit.
   - **URGENT** : machine redémarrée (accès possible : vérifier avant de déverrouiller) ; volume chiffré verrouillé ; certificat inconnu dans les journaux publics ; serveur muet ; 5 signalements dans l'heure ; conteneur malade ; disque (données ou système) ou inodes à 90 % ; mémoire disponible sous 10 % ; certificat TLS à moins de 7 jours ; domaine ou location du serveur à moins de 7 jours de l'échéance ; nom de domaine qui ne pointe plus vers la machine (détournement, expiration) ; aucune sauvegarde réussie depuis 26 h ; disque qui annonce une panne (`smartctl`, paquet `smartmontools`).
   - **À prévoir** : disque à 75 %, ou plein dans moins de 14 jours au rythme du jour ; certificat à moins de 21 jours (Caddy renouvelle à 30 : le renouvellement échoue) ; domaine ou location à moins de 45 jours ; échéance du domaine illisible ; mises à jour de sécurité du système en attente ; redémarrage demandé ; commits de retard sur GitHub (correctif à déployer) ; horloge non synchronisée ; unité systemd en échec ; charge trop haute.
@@ -235,7 +290,7 @@ Le site reste hors service tant que le volume n'est pas déverrouillé (les cont
 ```sh
 cryptsetup open /dev/sdb shhdrop
 mount -o noatime,nodev,nosuid,noexec /dev/mapper/shhdrop /srv/shhdrop
-deploy/deploy.sh "$(cat deploy/.release)"
+deploy/deploy.sh "$(cat deploy/.release)"   # provenance revérifiée (§3.4)
 ```
 
 ## 6. Plan d'incident (§15.5)
@@ -310,7 +365,7 @@ docker run --rm --network host --log-driver none -v /etc/ssl/certs/ca-certificat
 
 ```sh
 CADDY=/chemin/vers/caddy deploy/test-proxy.sh     # Caddy 2.10 ou plus, curl 7.83 ou plus, Go, web/dist construit (≈ 2 min 30 : WebSocket gardé 75 s)
-make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte et des journaux, go vet et tests de shhcheck
+make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux et de la provenance (Node exigé), go vet et tests de shhcheck
 SHH_IMAGE=shhdrop:ci make test-sortie             # sorties : configuration, puis réseau réel (démon Docker ; code 3 sans démon)
 sudo make test-restauration                       # sauvegarde et restauration d'un compte de test, en mémoire (≈ 45 s)
 ```
@@ -330,7 +385,7 @@ Un job rouge = une faille connue : GitHub envoie un e-mail d'échec au propriét
 ## 9. Ce que ce kit ne fait pas
 
 - **Démarches légales (§17)** : avis d'un juriste sur la conservation des données d'identification (LCEN, décret 2021-1362, en conflit avec « aucune adresse IP enregistrée »), point de contact DSA, déclaration ANSSI, mentions légales, CGU. Rien n'ouvre au public avant.
-- **Provenance du code (§28.7)** : `web/scripts/release-manifest.mjs` et `verify-site.mjs` existent, et la CI prouve que le site de l'image est celui de ses builds (`repro-docker`), mais il n'y a ni `release.yml`, ni signature `cosign` de l'image ou d'un `release.json`, ni registre choisi. `deploy.sh` installe donc l'empreinte qu'on lui donne, sans rien vérifier de sa provenance, et le rappelle à chaque fois ; `verify-site.mjs` se lance à la main (§3).
+- **Provenance du code (§28.7)** : ~~ni `release.yml`, ni signature~~ **24 novembre** : `release.yml` signe le manifeste du site (cosign sans clé), `deploy.sh` refuse une image dont le site n'est pas celui d'un manifeste signé et vérifie le site servi à travers Caddy (§3), une surveillance horaire compare le site en ligne aux derniers manifestes signés (`.github/workflows/verifier-site.yml`, §4). **Reste** : (1) les **binaires** de l'image (serveur, `shhcheck`) ne sont ni signés ni comparés à un build public (le serveur ne voit que du chiffré : cette preuve servirait l'exploitation, spec §28.7) ; l'image n'est pas construite par la CI et aucun registre n'est choisi ; (2) la première étiquette `web-v<x.y.z>` et la protection des étiquettes `web-v*` (règle du dépôt, création réservée au propriétaire) sont à faire par le propriétaire ; (3) la vérification ne protège pas une victime ciblée par un serveur compromis (spec §28.8) ; (4) `verify-site.mjs` ne contrôle pas les en-têtes (CSP…) ; (5) la démo (GitHub Pages) n'est pas signée (Q-C3).
 - ~~**Surveillance (§15.2)** : ni sonde externe, ni script horaire d'alerte.~~ **22 novembre** : sonde externe et alerte de la machine en place (§4, « Surveillance »).
 - **Déverrouillage (§22)** : pas de `deploy/unlock.sh` ; les trois commandes du §5 en tiennent lieu. Pas d'alerte « redémarrage nécessaire ».
 - **Dates et tailles des fichiers** (audit adverse du 13 novembre, stockage, F4). Les dates de contenu et d'accès sont au 1er janvier 1970 ; la date de changement d'inode (`ctime`) de tous les fichiers est ramenée, une fois par minute, à l'heure de ce passage. Restent lisibles par qui lit le disque déverrouillé : la **date de création** (`btime`, sur ext4) de chaque fichier de partage, de pièce et de conversation, qu'aucun appel système ne permet de changer, donc l'heure de création de chaque partage vivant et du premier message de chaque salon ; pendant une minute au plus, le `ctime` d'un fichier qui vient d'être écrit ; la taille d'une conversation, par paliers de 64 messages (plus le nombre exact) ; l'ordre de création (numéros d'inode). Le dossier de données lui-même, `frozen`, `kill/`, `kill.key`, `shares.db`, `shares.db-wal` et `shares.db-shm` ont, depuis la 3ᵉ campagne de l'audit adverse (stockage, F5), leurs dates de contenu et d'accès remises à l'epoch à chaque passage du janitor (une fois par minute) et leur `ctime` ramené à l'heure de ce passage : l'heure du dernier gel, dégel, destruction par l'administrateur ou écriture en base ne se lit plus qu'à la minute près ; un gel et un dégel remettent aussi les dates aussitôt. Restent : la **date de création de `frozen`**, qui donne l'heure du gel en cours tant qu'il dure, et celle de `kill/`, créé au premier passage du serveur (heure du démarrage, sans rapport avec une destruction). Seuls le volume chiffré et l'absence d'instantanés les protègent.
@@ -453,7 +508,7 @@ Elle ne se change pas non plus (conception §5.2). Donc, dès sa création :
 1. Créer le secret du §12.2 et en faire la copie hors ligne.
 2. Dans `deploy/.env`, mettre `SHH_DOMAIN=shhgone.com` et ne laisser aucune variable `SHH_SMTP_*` ni `SHH_MAIL_FROM` (modèle dans `env.example`). On peut y régler aussi `SHH_COMPTES_JOUR`, le plafond d'inscriptions par jour pour tout le site (500 par défaut).
 3. Dans `compose.yaml`, poser `SHH_SALONS: "1"` et `SHH_COMPTES: "1"` (fichier relu et commité, comme pour le salon).
-4. Lancer `deploy/deploy.sh sha256:<empreinte>` : le secret est contrôlé.
+4. Lancer `deploy/deploy.sh sha256:<empreinte> <x.y.z>` : le secret est contrôlé.
 5. Installer la sauvegarde du §12.4 **le même jour**, puis essayer une restauration (§12.5).
 
 Désactiver : poser `SHH_COMPTES: "0"`, puis lancer `deploy.sh`. `comptes.db` reste intacte sur le volume.

@@ -4,14 +4,22 @@
 // §41.8, D41-28, D41-29). Règles : jamais « 100 % », aucune allégation d'audit ni de pays
 // d'hébergement (plan B3), aucune identité d'éditeur ni d'hébergeur inventée (champs « à
 // compléter par le propriétaire »), aucune adresse e-mail. Chiffres lus dans les constantes.
+// « Vérifier cette version » (spec §28.4, 24 novembre) : comment n'importe qui vérifie que le site
+// servi est le build public signé ; la page n'affiche aucune empreinte calculée par elle-même (une
+// preuve qui se certifierait seule, §28.8 C7) et dit qu'elle ne peut pas prouver sa propre intégrité.
 // Compte par passkey (conception 2026-11-22-compte-passkey-design.md §8, §12) : les textes qui
 // DÉCRIVENT le compte ne s'ajoutent qu'avec __COMPTES__ (COMPTE_FR, COMPTE_EN) : le site public
 // n'annonce pas une fonction absente. Les phrases communes restent vraies dans les deux cas.
+import { BUILD_ID } from "../../app/build";
 import { CONTENT_MAX, MAX_ITEMS, MAX_OPENS, PW_TRIES, TTL_MAX_HOURS } from "../../limits";
 import { formatBytes, type Lang } from "../../i18n/format";
 
-export type InfoName = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler";
-export type Block = { id?: string; h: string; p?: string[]; list?: string[] };
+export type InfoName = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler" | "verifier";
+/**
+ * Section : paragraphes, liste, puis (page « Vérifier ») des lignes de commande à recopier,
+ * affichées telles quelles, et des paragraphes après elles ; `link` : lien vers une autre page du site.
+ */
+export type Block = { id?: string; h: string; p?: string[]; list?: string[]; code?: string[]; after?: string[]; link?: { label: string; path: string } };
 /** Section repliée en bas de page (Sécurité : détails techniques pour les experts, liens publics). */
 export type Tech = { h: string; p?: string[]; list?: string[]; links: { label: string; url: string }[] };
 export type InfoPage = { title: string; lede: string; draft?: boolean; blocks: Block[]; tech?: Tech };
@@ -19,6 +27,29 @@ export type InfoPage = { title: string; lede: string; draft?: boolean; blocks: B
 /** Dépôt public du code (lien sortant simple : rien n'est chargé depuis GitHub). */
 export const SOURCE_URL = "https://github.com/Skoow/shhgone";
 export const SPEC_URL = "https://github.com/Skoow/shhgone/blob/main/docs/superpowers/specs/2026-11-03-shhdrop-design.md";
+/** Releases signées (spec §28.2) et mode d'emploi détaillé (deploy/README.md §3.3). */
+export const RELEASES_URL = "https://github.com/Skoow/shhgone/releases";
+export const VERIFY_DOC_URL = "https://github.com/Skoow/shhgone/blob/main/deploy/README.md";
+/** Journal public de transparence de Sigstore (Rekor), consultable par tous. */
+export const REKOR_URL = "https://search.sigstore.dev/";
+
+/**
+ * Commandes de vérification (deploy/README.md §3.3) : identité exacte du signataire, jamais une
+ * expression ouverte (spec §28.2, §28.8 C1). `v` : texte à la place du numéro de version.
+ */
+export function verifyCommands(v: string): string[] {
+  const rel = "https://github.com/Skoow/shhgone/releases/download/web-v$v";
+  return [
+    `v=${v}`,
+    `curl -fsSLO ${rel}/release.json`,
+    `curl -fsSLO ${rel}/release.json.sigstore.json`,
+    "cosign verify-blob release.json --bundle release.json.sigstore.json \\",
+    "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\",
+    '  --certificate-identity "https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v$v"',
+    "git clone https://github.com/Skoow/shhgone",
+    "node shhgone/web/scripts/verify-site.mjs https://shhgone.com release.json",
+  ];
+}
 
 /** `comptes` : drapeau de construction __COMPTES__ (paramètre pour les tests). */
 export function infoPage(name: InfoName, lang: Lang, comptes: boolean = __COMPTES__): InfoPage {
@@ -92,6 +123,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Vous protéger d'un site piégé : si notre serveur ou notre code était compromis, le site servi pourrait voler les clés. C'est pour cela que le code est public et que le site se reconstruit à l'identique depuis ce code.",
           "Cacher votre adresse IP au serveur et à l'hébergeur pendant la connexion.",
         ],
+        link: { label: "Vérifier que ce site sert bien le code public", path: "/verifier" },
       },
       {
         id: "qr",
@@ -345,6 +377,73 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       },
     ],
   }),
+  verifier: () => ({
+    title: "Vérifier cette version",
+    lede: "Vous n'avez pas à nous croire sur parole : n'importe qui peut vérifier que les fichiers servis par ce site sont exactement ceux construits depuis notre code public.",
+    blocks: [
+      {
+        id: "pourquoi",
+        h: "Pourquoi vérifier",
+        p: [
+          "Vos fichiers sont chiffrés dans votre navigateur, par le code que ce site vous envoie. Si ce code était modifié, par exemple sur un serveur piraté, il pourrait voler les clés. Le chiffrement ne vaut donc que ce que vaut le code servi.",
+        ],
+      },
+      {
+        id: "preuve",
+        h: "Comment c'est prouvé",
+        list: [
+          "Le code du site est public, et le site se reconstruit à l'identique depuis ce code : deux constructions, sur deux machines différentes, donnent les mêmes octets.",
+          "Pour chaque version, GitHub reconstruit le site et publie la liste de tous ses fichiers, avec la taille et l'empreinte de chacun : le manifeste (release.json).",
+          "Ce manifeste est signé par Sigstore, un service public de signature, sans clé secrète que nous pourrions perdre ou nous faire voler : la signature dit qu'il vient de notre procédure de publication sur GitHub, à partir d'un commit précis du code public. Elle est inscrite dans un journal public que tout le monde peut consulter.",
+          "Notre serveur refuse d'installer une version dont les fichiers ne sont pas exactement ceux d'un manifeste signé. Et toutes les heures, un contrôle automatique, hors de notre serveur, compare le site en ligne au manifeste signé et nous alerte au moindre écart.",
+        ],
+      },
+      {
+        id: "version",
+        h: "La version de ce site",
+        p: [
+          `Ce site annonce la version ${BUILD_ID} : ce sont les premiers caractères du commit depuis lequel il a été construit. Sur la page des versions publiées (lien en bas), cherchez la version « web-v… » dont le commit commence ainsi : son numéro (par exemple 1.0.0) est celui à vérifier.`,
+        ],
+      },
+      {
+        id: "commandes",
+        h: "Vérifier vous-même",
+        p: [
+          "Sur un ordinateur, avec cosign (l'outil de Sigstore), Node.js et git. Le code du vérificateur se télécharge depuis GitHub, jamais depuis ce site. Remplacez 1.0.0 par le numéro de la version :",
+        ],
+        code: verifyCommands("1.0.0"),
+        after: [
+          "La commande cosign prouve que le manifeste vient de notre publication : elle doit répondre « Verified OK ». Le vérificateur télécharge ensuite chaque fichier du site et compare sa taille et son empreinte au manifeste : il doit répondre « conforme ». Toute autre réponse est un écart : écrivez-nous (l'adresse est dans les mentions légales).",
+        ],
+      },
+      {
+        id: "limites",
+        h: "Ce que la vérification ne prouve pas",
+        list: [
+          "Cette page ne peut pas prouver sa propre intégrité : un serveur piégé pourrait la modifier aussi. Vérifiez avec un outil qui ne vient pas de ce site.",
+          "Un serveur compromis pourrait servir un code piégé à une seule personne, choisie selon son adresse ou son navigateur, et le bon code à tous les autres, contrôle automatique compris. La vérification ne protège vraiment que la personne qui la fait elle-même, avant d'utiliser le site.",
+          "La signature prouve d'où vient le code, pas qu'il est sans défaut : c'est la relecture du code public qui peut le dire.",
+          "Les réglages de sécurité envoyés avec les pages (les en-têtes du serveur) ne sont pas vérifiés : seul le contenu des fichiers l'est.",
+          "Les futures applications iOS et Android embarqueront ce code, signé par les magasins d'applications : il ne viendra plus de notre serveur à chaque visite. Ce sera la protection la plus forte contre ce risque.",
+        ],
+      },
+    ],
+    tech: {
+      h: "Détails techniques (pour les experts)",
+      list: [
+        "Manifeste : release.json (schéma 1) donne la version, le commit, et pour chaque fichier servi, variantes .br et .gz comprises, son chemin, sa taille et son SHA-256 ; écrit par web/scripts/release-manifest.mjs, publié avec SHA256SUMS et dist.tar.gz.",
+        "Signature : cosign sign-blob, sans clé, par le workflow release.yml sur une étiquette web-v<x.y.z> (jeton OIDC de GitHub Actions, certificat Fulcio, journal Rekor). Vérifiez toujours avec l'identité exacte, jamais avec une expression ouverte, et jamais sans le journal de transparence.",
+        "Vérificateur : web/scripts/verify-site.mjs, sans dépendance. Il refuse les redirections, vérifie les variantes compressées et le repli monopage, et ne répond jamais « conforme » après une erreur réseau.",
+        "Limite post-quantique : les signatures de Sigstore sont en ECDSA P-256 ; elles seront remplacées quand Sigstore proposera une signature post-quantique.",
+      ],
+      links: [
+        { label: "Versions publiées et manifestes signés (GitHub)", url: RELEASES_URL },
+        { label: "Mode d'emploi détaillé (§3.3)", url: VERIFY_DOC_URL },
+        { label: "Journal public de Sigstore", url: REKOR_URL },
+        { label: "Code source public (GitHub)", url: SOURCE_URL },
+      ],
+    },
+  }),
 };
 
 const EN: Record<InfoName, (v: V) => InfoPage> = {
@@ -399,6 +498,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Protect you from a tampered site: if our server or code were compromised, the site could steal keys. That is why the code is public and the site can be rebuilt identically from it.",
           "Hide your IP address from the server and the host while you are connected.",
         ],
+        link: { label: "Check that this site serves the public code", path: "/verifier" },
       },
       {
         id: "qr",
@@ -641,6 +741,73 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         ],
       },
     ],
+  }),
+  verifier: () => ({
+    title: "Verify this version",
+    lede: "You don't have to take our word for it: anyone can check that the files this site serves are exactly the ones built from our public code.",
+    blocks: [
+      {
+        id: "pourquoi",
+        h: "Why verify",
+        p: [
+          "Your files are encrypted in your browser, by the code this site sends you. If that code were modified, for example on a hacked server, it could steal the keys. Encryption is only as good as the code that is served.",
+        ],
+      },
+      {
+        id: "preuve",
+        h: "How it is proven",
+        list: [
+          "The site's code is public, and the site can be rebuilt identically from it: two builds, on two different machines, give the same bytes.",
+          "For every version, GitHub rebuilds the site and publishes the list of all its files, with the size and fingerprint of each: the manifest (release.json).",
+          "This manifest is signed by Sigstore, a public signing service, without any secret key we could lose or have stolen: the signature says it comes from our publishing process on GitHub, built from a precise commit of the public code. It is recorded in a public log that anyone can search.",
+          "Our server refuses to install a version whose files are not exactly those of a signed manifest. And every hour, an automatic check, outside our server, compares the live site with the signed manifest and alerts us at the slightest difference.",
+        ],
+      },
+      {
+        id: "version",
+        h: "The version of this site",
+        p: [
+          `This site announces version ${BUILD_ID}: the first characters of the commit it was built from. On the page of published versions (link below), look for the "web-v…" version whose commit starts this way: its number (for example 1.0.0) is the one to verify.`,
+        ],
+      },
+      {
+        id: "commandes",
+        h: "Verify it yourself",
+        p: [
+          "On a computer, with cosign (the Sigstore tool), Node.js and git. The verifier's code is downloaded from GitHub, never from this site. Replace 1.0.0 with the version number:",
+        ],
+        code: verifyCommands("1.0.0"),
+        after: [
+          "The cosign command proves that the manifest comes from our publishing process: it must answer \"Verified OK\". The verifier then downloads every file of the site and compares its size and fingerprint with the manifest: it must answer \"conforme\" (matches). Any other answer is a difference: write to us (the address is in the legal notice).",
+        ],
+      },
+      {
+        id: "limites",
+        h: "What verification does not prove",
+        list: [
+          "This page cannot prove its own integrity: a tampered server could change it too. Verify with a tool that does not come from this site.",
+          "A compromised server could serve tampered code to a single person, chosen by their address or browser, and the right code to everyone else, the automatic check included. Verification only truly protects the person who runs it themselves, before using the site.",
+          "The signature proves where the code comes from, not that it is flawless: only reviewing the public code can tell.",
+          "The security settings sent with the pages (the server's headers) are not verified: only the content of the files is.",
+          "The future iOS and Android apps will embed this code, signed by the app stores: it will no longer come from our server on every visit. That will be the strongest protection against this risk.",
+        ],
+      },
+    ],
+    tech: {
+      h: "Technical details (for experts)",
+      list: [
+        "Manifest: release.json (schema 1) gives the version, the commit, and for every served file, .br and .gz variants included, its path, size and SHA-256; written by web/scripts/release-manifest.mjs, published with SHA256SUMS and dist.tar.gz.",
+        "Signature: cosign sign-blob, keyless, by the release.yml workflow on a web-v<x.y.z> tag (GitHub Actions OIDC token, Fulcio certificate, Rekor log). Always verify with the exact identity, never an open expression, and never without the transparency log.",
+        "Verifier: web/scripts/verify-site.mjs, with no dependency. It refuses redirects, checks compressed variants and the single-page fallback, and never answers \"conforme\" after a network error.",
+        "Post-quantum limit: Sigstore signatures use ECDSA P-256; they will be replaced when Sigstore offers a post-quantum signature.",
+      ],
+      links: [
+        { label: "Published versions and signed manifests (GitHub)", url: RELEASES_URL },
+        { label: "Detailed instructions (§3.3)", url: VERIFY_DOC_URL },
+        { label: "Sigstore public log", url: REKOR_URL },
+        { label: "Public source code (GitHub)", url: SOURCE_URL },
+      ],
+    },
   }),
 };
 

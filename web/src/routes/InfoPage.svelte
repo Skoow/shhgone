@@ -7,6 +7,7 @@
   // cadre ; un grand en-tête sur le fond du site, fermé par une couture en demi-teinte ; sur
   // ordinateur, le sommaire reste à gauche pendant la lecture et suit la section lue ; sur
   // téléphone, il devient une rangée de pastilles. Sections espacées, texte plus grand.
+  import { followLink, href } from "../app/router.svelte";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { infoPage, type InfoName } from "./pages/content";
 
@@ -65,6 +66,18 @@
           {#each b.p ?? [] as para, j (j)}<p>{para}</p>{/each}
           {#if b.list}
             <ul>{#each b.list as li, j (j)}<li>{li}</li>{/each}</ul>
+          {/if}
+          <!-- Commandes à recopier (page « Vérifier cette version », spec §28.4) : texte seul, jamais
+               exécuté. Le bloc défile en largeur : il doit pouvoir prendre le focus au clavier
+               (règle « scrollable-region-focusable » d'axe), d'où tabindex. -->
+          {#if b.code}
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <pre class="cmd" tabindex="0" aria-label={t("info.commands")} data-cmd><code>{b.code.join("\n")}</code></pre>
+          {/if}
+          {#each b.after ?? [] as para, j (j)}<p>{para}</p>{/each}
+          {#if b.link}
+            {@const l = b.link}
+            <p><a class="more" href={href(l.path)} onclick={(e) => followLink(e, l.path)}>{l.label}</a></p>
           {/if}
         </section>
       {/each}
@@ -268,6 +281,28 @@
     background: var(--accent);
     box-shadow: 0 0 8px rgb(95 227 181 / 0.5);
   }
+  /* Commandes à recopier : défilent seules en largeur, la page ne défile jamais de côté. */
+  .cmd {
+    margin: 0;
+    padding: var(--sp-4) var(--sp-5);
+    overflow-x: auto;
+    border-radius: var(--r-lg, 14px);
+    background: rgb(3 9 8 / 0.55);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.18);
+    color: #d7fbe9;
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    line-height: 1.6;
+    white-space: pre;
+  }
+  .cmd:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .more {
+    color: var(--accent);
+    font-weight: 600;
+  }
   /* Détails techniques : un terminal replié. */
   .tech {
     border-radius: var(--r-xl);
@@ -329,7 +364,8 @@
     .toc button[aria-current] {
       border-width: 2px;
     }
-    .tech {
+    .tech,
+    .cmd {
       border: 1px solid CanvasText;
     }
   }

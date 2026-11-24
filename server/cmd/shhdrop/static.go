@@ -214,6 +214,7 @@ var appRoutes = map[string]bool{
 	"/conditions":       true,
 	"/mentions-legales": true,
 	"/signaler":         true,
+	"/verifier":         true,
 	"/offres":           true,
 	"/envoyer":          true,
 	"/envois":           true,
@@ -234,6 +235,7 @@ var pageFiles = map[string]string{
 	"/conditions":       "conditions.html",
 	"/mentions-legales": "mentions-legales.html",
 	"/signaler":         "signaler.html",
+	"/verifier":         "verifier.html",
 	// Liens de partage et de gestion sous « /s » (16 novembre) : page d'ouverture seule.
 	"/s": "s.html",
 	// Versions anglaises des pages bilingues (20 novembre, web/vite.config.ts, infoPages).
@@ -244,6 +246,7 @@ var pageFiles = map[string]string{
 	"/en/conditions":       "en-conditions.html",
 	"/en/mentions-legales": "en-mentions-legales.html",
 	"/en/signaler":         "en-signaler.html",
+	"/en/verifier":         "en-verifier.html",
 }
 
 // enVersion : page française → sa version anglaise (web/src/app/langues.ts, PAGES_BILINGUES).
@@ -257,6 +260,7 @@ var enVersion = map[string]string{
 	"/conditions":       "/en/conditions",
 	"/mentions-legales": "/en/mentions-legales",
 	"/signaler":         "/en/signaler",
+	"/verifier":         "/en/verifier",
 }
 
 // salonRoutes : pages du salon (table SALON_PATHS de web/src/app/router.svelte.ts, plan C-3),

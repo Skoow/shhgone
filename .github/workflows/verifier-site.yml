@@ -1,0 +1,77 @@
+# Surveillance du code servi (spec §28.7 ; deploy/README.md §4, « Surveillance ») : toutes les
+# heures, le site en ligne doit être, octet pour octet, celui d'une des trois dernières Releases
+# signées web-v<x.y.z> (la plus récente, ou l'une des deux d'avant : le temps d'une mise en ligne
+# ou d'un retour arrière). Chaque manifeste est d'abord vérifié par cosign (épinglé, identité
+# exacte : deploy/provenance.sh), puis web/scripts/verify-site.mjs, copie de ce dépôt (pas du
+# site vérifié), télécharge chaque fichier, ses variantes compressées et le repli monopage.
+# Un écart, une signature refusée ou une erreur réseau fait échouer le job : GitHub envoie
+# l'e-mail habituel d'échec de workflow. Jamais « vert » sur une erreur.
+#
+# Inactive tant que la variable du dépôt SHH_SONDE_HOTE (celle de sonde.yml, ex. shhgone.com)
+# n'est pas posée. Limites : ce job ne voit que ce que le serveur LUI sert ; un serveur compromis
+# qui ne piège que certaines victimes (adresse IP, navigateur) passe inaperçu ; les en-têtes
+# (CSP…) ne sont pas contrôlés.
+name: verifier-site
+
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  verifier:
+    if: ${{ vars.SHH_SONDE_HOTE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # lire les Releases
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: web/.node-version
+          package-manager-cache: false
+      # Même version et même empreinte que deploy/provenance.sh (deploy/test-provenance.sh).
+      - name: cosign v3.1.4
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/cosign" https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
+          echo "424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa  $RUNNER_TEMP/cosign" | sha256sum -c -
+          chmod 0755 "$RUNNER_TEMP/cosign"
+      - name: Site en ligne = une Release signée
+        env:
+          HOTE: ${{ vars.SHH_SONDE_HOTE }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . deploy/provenance.sh
+          [[ $HOTE =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || { echo "SHH_SONDE_HOTE hors format : $HOTE" >&2; exit 1; }
+          # Les trois dernières Releases publiées (ordre de création), étiquettes web-v<x.y.z> seulement.
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 50 --exclude-drafts --exclude-pre-releases \
+            --json tagName --jq '.[].tagName' > "$RUNNER_TEMP/etiquettes"
+          versions=()
+          while read -r e; do
+            v=${e#web-v}
+            if [ "$e" != "$v" ] && version_valide "$v" && [ "${#versions[@]}" -lt 3 ]; then versions+=("$v"); fi
+          done < "$RUNNER_TEMP/etiquettes"
+          # Un site en ligne sans Release signée n'est pas vérifiable : échec (deploy.sh en exige une).
+          [ "${#versions[@]}" -gt 0 ] || { echo "aucune Release web-v<x.y.z> : le site en ligne n'est pas vérifiable" >&2; exit 1; }
+          for v in "${versions[@]}"; do
+            d="$RUNNER_TEMP/web-v$v"
+            mkdir -p "$d"
+            gh release download "web-v$v" --repo "$GITHUB_REPOSITORY" --dir "$d" \
+              --pattern release.json --pattern release.json.sigstore.json
+            # Une Release dont la signature ne tient pas est une alerte en soi : arrêt.
+            verifier_signature "$RUNNER_TEMP/cosign" "$v" "$d/release.json" "$d/release.json.sigstore.json"
+            if node web/scripts/verify-site.mjs "https://$HOTE" "$d/release.json"; then
+              if [ "$v" != "${versions[0]}" ]; then
+                echo "::warning::https://$HOTE sert web-v$v, pas la dernière Release (web-v${versions[0]})"
+              fi
+              exit 0
+            fi
+            echo "https://$HOTE n'est pas web-v$v (ligne ci-dessus)"
+          done
+          echo "::error::https://$HOTE ne sert aucune des Releases signées ${versions[*]}"
+          exit 1

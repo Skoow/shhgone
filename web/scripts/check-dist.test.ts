@@ -96,6 +96,13 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><img src="/src/assets/a.png">') }), false, false, ["securite.html"]).join("\n")).toMatch(/adresse de développement/);
     expect(checkDist(site({ ...ok, "assets/page-a.js": 'const e="/assets/engine-x.wasm";' }), false, false, ["securite.html"]).join("\n")).toMatch(/cite le moteur/);
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><a href="https://github.com/x">code</a>') }), false, false, ["securite.html"])).toEqual([]);
+    // Commandes à recopier (page « Vérifier », spec §28.4) : adresses en texte seul admises ; une
+    // balise dans le bloc, ou un bloc hors d'une page d'information, reste contrôlé.
+    const cmd = (inner: string) => `<h1>V</h1><pre class="cmd" tabindex="0" data-cmd=""><code>${inner}</code></pre>`;
+    expect(checkDist(site({ ...ok, "securite.html": PAGE(cmd("curl -fsSLO https://github.com/x/release.json")) }), false, false, ["securite.html"])).toEqual([]);
+    expect(checkDist(site({ ...ok, "securite.html": PAGE(cmd('x <img src="https://pistage.example/p.png"> y')) }), false, false, ["securite.html"]).join("\n")).toMatch(/securite\.html : adresse externe « https:\/\/pistage\.example/);
+    expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>V</h1><pre class="cmd"><code>https://evil.example/x</code></pre>') }), false, false, ["securite.html"]).join("\n")).toMatch(/adresse externe « https:\/\/evil\.example/);
+    expect(checkDist(site({ ...ok, "s.html": S().replace("</body>", '<pre data-cmd=""><code>https://evil.example/s</code></pre></body>') }), false, false, ["securite.html"]).join("\n")).toMatch(/s\.html : adresse externe/);
     // Versions anglaises (20 novembre) : <html lang="en">, accueil anglais écrit.
     const EN_HOME = HOME("<h1>One link</h1>").replace("<html", '<html lang="en"');
     const EN_PAGE = PAGE("<h1>Security</h1>").replace("<html", '<html lang="en"');

@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# Mise en ligne de Shhdrop (spec §15.3, D3) : installe une version précise, désignée par
-# l'empreinte de son image, contrôle la santé, et revient à la version précédente si le
+# Mise en ligne de Shhdrop (spec §15.3, D3, §28.7) : installe une version précise, désignée par
+# l'empreinte de son image et le numéro de sa Release signée, vérifie que le site de l'image est
+# celui du manifeste signé, contrôle la santé, et revient à la version précédente si le
 # contrôle échoue. Lancé à la main, sur le serveur, depuis une copie du dépôt.
 #
-#   deploy/deploy.sh sha256:<64 chiffres hexadécimaux>   installe cette version
+#   deploy/deploy.sh sha256:<64 chiffres hexadécimaux> <x.y.z>
+#                                                         installe cette image, dont le site doit
+#                                                         être celui de la Release web-v<x.y.z>
+#   deploy/deploy.sh sha256:<empreinte en service>        la réinstalle (après un redémarrage),
+#                                                         avec sa version déjà vérifiée
 #   deploy/deploy.sh rollback                             réinstalle la version précédente
 #   deploy/deploy.sh status                               versions et état des conteneurs
 #   deploy/deploy.sh admin freeze|unfreeze|destroy -|wipe --yes
@@ -21,15 +26,22 @@
 # SHH_MAIL_FROM, ou un ancien secret shh_smtp_mdp, fait refuser l'installation). Paiement
 # activé (SHH_PAIEMENT: "1") : un relais par prestataire dont les secrets sont dans
 # <SHH_DATA_ROOT>/secrets (README §13).
-# État : deploy/.release (empreinte en service) et deploy/.release.prev (la précédente).
+# État : deploy/.release (empreinte en service) et deploy/.release.prev (la précédente), leurs
+# versions dans deploy/.release.version et deploy/.release.prev.version ; manifestes vérifiés
+# dans deploy/.provenance/<x.y.z>/.
+#
+# Provenance (spec §28.7 ; deploy/provenance.sh, README §3) : avant tout démarrage, cosign
+# (binaire contrôlé par son empreinte épinglée) vérifie que release.json de la Release
+# web-v<x.y.z> est signé par release.yml de ce dépôt sur cette étiquette exactement ; puis le
+# /site de l'image doit être ce manifeste, octet pour octet, ni plus ni moins. Après le
+# démarrage, le contrôle de santé lance verify-site.mjs à travers Caddy (le retour arrière suit
+# un écart). Aucune option, variable ni commande ne saute ces vérifications (spec §28.8, C2).
 #
 # Limites, dites aussi dans le README :
 #   - le retour arrière ne concerne que l'image ; Caddyfile et compose.yaml viennent de la
 #     copie du dépôt (pour les ramener en arrière : git, puis relancer ce script) ;
-#   - la vérification de provenance de la spec §28.7 n'est pas faite : web/scripts/
-#     release-manifest.mjs et verify-site.mjs existent, mais ni release.yml ni signature cosign
-#     (aucun release.json signé à vérifier) ; ce script ne la fait pas, et le rappelle à chaque
-#     installation (README, §3 et §9).
+#   - seuls les fichiers du site sont prouvés : les binaires de l'image (serveur, shhcheck) ne
+#     sont pas signés (README §9).
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -42,7 +54,7 @@ die() {
 	exit "${2:-1}"
 }
 usage() {
-	printf 'usage: deploy.sh sha256:<empreinte> | rollback | status | admin <commande> | health | diagnose\n' >&2
+	printf 'usage: deploy.sh sha256:<empreinte> [<x.y.z>] | rollback | status | admin <commande> | health | diagnose\n' >&2
 	exit 2
 }
 
@@ -55,6 +67,10 @@ set +a
 : "${SHH_DOMAIN:?SHH_DOMAIN manquant dans deploy/.env}"
 : "${SHH_DATA_ROOT:?SHH_DATA_ROOT manquant dans deploy/.env}"
 : "${SHH_IMAGE_REPO:?SHH_IMAGE_REPO manquant dans deploy/.env}"
+# Après deploy/.env : ses constantes (dépôt, identité, cosign épinglé) sont en lecture seule et
+# l'emportent sur toute variable du même nom venue de deploy/.env.
+# shellcheck source=deploy/provenance.sh
+. ./provenance.sh
 # Autorités pour le contrôle TLS. Changé seulement par les essais (autorité interne de Caddy).
 ca=${SHH_CHECK_CA:-/etc/ssl/certs/ca-certificates.crt}
 
@@ -63,6 +79,8 @@ export SHH_CADDYFILE_SHA256
 
 cur=$(cat .release 2>/dev/null || true)
 prev=$(cat .release.prev 2>/dev/null || true)
+cur_v=$(cat .release.version 2>/dev/null || true)
+prev_v=$(cat .release.prev.version 2>/dev/null || true)
 valid() { [[ $1 =~ ^sha256:[0-9a-f]{64}$ ]]; }
 
 # Compte par passkey (README §12) : activé seulement par compose.yaml (SHH_COMPTES: "1", fichier
@@ -264,9 +282,9 @@ $pbs"
 	fi
 }
 
-# Contrôle de santé d'une version en service. Rend 0 si tout passe.
+# Contrôle de santé d'une version en service : check <empreinte> <x.y.z>. Rend 0 si tout passe.
 check() {
-	local i code
+	local i code node manifeste=$here/.provenance/$2/release.json
 	# 1. Le conteneur du serveur se dit en bonne santé (/healthz local, via shhcheck).
 	dc "$1" up -d --wait --wait-timeout 120 >/dev/null 2>&1 || {
 		echo "contrôle : conteneurs pas en bonne santé (attente : 120 s au plus)" >&2
@@ -306,20 +324,37 @@ check() {
 			--log-driver none --entrypoint /shhcheck "$SHH_IMAGE_REPO@$1" stun 127.0.0.1:3478 ||
 			echo "AVERTISSEMENT : le relais des appels ne répond pas sur 127.0.0.1:3478 (README §14) : les appels ne marcheront pas." >&2
 	fi
+	# 6. Le site servi à travers Caddy est celui du manifeste signé (spec §28.7) : chaque fichier,
+	#    ses variantes compressées et le repli monopage (web/scripts/verify-site.mjs de la copie du
+	#    dépôt, lancé par le Node épinglé du Dockerfile).
+	if ! version_valide "$2" || [ ! -f "$manifeste" ]; then
+		echo "contrôle : aucun manifeste vérifié pour la version « $2 » (installée avant la vérification de provenance ?)" >&2
+		return 1
+	fi
+	node=$(image_node Dockerfile) || return 1
+	verifier_site_servi docker "$node" "$here/../web/scripts/verify-site.mjs" "$manifeste" "$SHH_DOMAIN" "$ca" || {
+		echo "contrôle : le site servi par https://$SHH_DOMAIN n'est pas celui du manifeste signé web-v$2" >&2
+		return 1
+	}
 }
 
 install_version() {
-	local new=$1
+	local new=$1 new_v=$2 cosign
 	valid "$new" || usage
 	# Une seule installation à la fois (status et admin restent possibles pendant ce temps).
 	exec 9>.deploy.lock
 	flock -n 9 || die "une autre installation est en cours"
 	preflight
+	cosign=$(command -v cosign || true)
+	controle_cosign "$cosign" "$COSIGN_SHA256" || exit 1
 	secret_turn
 	ports_turn
-	echo "RAPPEL : vérification de provenance (spec §28.7) NON faite : aucun release.json signé (cosign) à vérifier ; verify-site.mjs se lance à la main, depuis un autre poste (README, §3)."
 	# Image absente : téléchargée par empreinte (le contenu est donc vérifié par Docker).
 	docker image inspect "$SHH_IMAGE_REPO@$new" >/dev/null 2>&1 || docker pull "$SHH_IMAGE_REPO@$new"
+	# Provenance (spec §28.7), avant tout démarrage : rien de l'image ne tourne tant que son site
+	# n'est pas celui du manifeste signé web-v<x.y.z>.
+	verifier_provenance "$cosign" docker curl "$SHH_IMAGE_REPO@$new" "$new_v" "$here/.provenance" ||
+		die "installation refusée : le site de $new n'est pas prouvé conforme à la Release web-v$new_v (README §3)"
 
 	echo "installation de $new"
 	dc "$new" up -d --remove-orphans || true # l'échec éventuel est constaté par check
@@ -330,19 +365,23 @@ install_version() {
 	if [ "$avec_paypal" = 0 ]; then dc "$new" rm -sf relais-paypal >/dev/null 2>&1 || true; fi
 	if [ "$avec_nowpayments" = 0 ]; then dc "$new" rm -sf relais-nowpayments >/dev/null 2>&1 || true; fi
 	if [ "$appels" = 0 ]; then dc "$new" rm -sf relais-turn >/dev/null 2>&1 || true; fi
-	if check "$new"; then
+	if check "$new" "$new_v"; then
 		if [ "$new" != "$cur" ]; then
-			if valid "$cur"; then printf '%s\n' "$cur" >.release.prev; fi
+			if valid "$cur"; then
+				printf '%s\n' "$cur" >.release.prev
+				printf '%s\n' "$cur_v" >.release.prev.version
+			fi
 			printf '%s\n' "$new" >.release.tmp && mv .release.tmp .release
 		fi
-		echo "en service : $new"
+		printf '%s\n' "$new_v" >.release.version.tmp && mv .release.version.tmp .release.version
+		echo "en service : $new (web-v$new_v)"
 		return 0
 	fi
 
 	if valid "$cur" && [ "$cur" != "$new" ]; then
 		echo "ÉCHEC du contrôle : retour à $cur" >&2
 		dc "$cur" up -d --remove-orphans || true
-		if check "$cur"; then
+		if check "$cur" "$cur_v"; then
 			echo "retour arrière fait : $cur est en service" >&2
 		else
 			echo "ATTENTION : le retour arrière échoue aussi au contrôle. Site à vérifier à la main." >&2
@@ -356,18 +395,27 @@ install_version() {
 
 case $1 in
 sha256:*)
-	[ $# -eq 1 ] || usage
-	install_version "$1"
+	if [ $# -eq 2 ]; then
+		install_version "$1" "$2"
+	elif [ $# -eq 1 ] && [ "$1" = "$cur" ] && version_valide "$cur_v"; then
+		install_version "$1" "$cur_v" # réinstallation (après un redémarrage) : provenance revérifiée
+	elif [ $# -eq 1 ]; then
+		die "version manquante : deploy/deploy.sh $1 <x.y.z> (Release web-v<x.y.z> dont le manifeste signé décrit le site de cette image, README §3)" 2
+	else
+		usage
+	fi
 	;;
 rollback)
 	[ $# -eq 1 ] || usage
 	valid "$prev" || die "aucune version précédente (deploy/.release.prev absent)"
-	install_version "$prev"
+	version_valide "$prev_v" ||
+		die "version de la précédente inconnue (installée avant la vérification de provenance) : deploy/deploy.sh $prev <x.y.z>"
+	install_version "$prev" "$prev_v"
 	;;
 status)
 	[ $# -eq 1 ] || usage
-	echo "en service : ${cur:-aucune}"
-	echo "précédente : ${prev:-aucune}"
+	echo "en service : ${cur:-aucune}${cur_v:+ (web-v$cur_v)}"
+	echo "précédente : ${prev:-aucune}${prev_v:+ (web-v$prev_v)}"
 	if valid "$cur"; then dc "$cur" ps -a; fi
 	;;
 admin)

@@ -1,6 +1,8 @@
 // Vignette EXIF gardée (décision du propriétaire) : elle peut montrer la photo d'avant un
 // recadrage ou une retouche ; la bulle du balai, la confirmation et la page Sécurité le disent (test d'intrusion
 // du 11 novembre).
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { en } from "../../i18n/en";
 import { fr } from "../../i18n/fr";
@@ -203,5 +205,63 @@ describe("Confidentialité : section paiement", () => {
       ])
         expect(t).toMatch(re);
     }
+  });
+});
+
+// « Vérifier cette version » (spec §28.4, §28.8 C1 et C7 ; 24 novembre).
+describe("page Vérifier cette version", () => {
+  const page = (lang: "fr" | "en") => infoPage("verifier", lang);
+  const textes = (lang: "fr" | "en") => {
+    const p = page(lang);
+    return [p.title, p.lede, ...p.blocks.flatMap((b) => [b.h, ...(b.p ?? []), ...(b.list ?? []), ...(b.code ?? []), ...(b.after ?? [])]), ...(p.tech ? [p.tech.h, ...(p.tech.list ?? [])] : [])].join("\n");
+  };
+  // Identité exacte du signataire, lue dans deploy/provenance.sh : la page dit ce que vérifie deploy.sh.
+  const provenance = readFileSync(fileURLToPath(new URL("../../../../deploy/provenance.sh", import.meta.url)), "utf8");
+  const depot = /^readonly PROVENANCE_DEPOT=(\S+)$/mu.exec(provenance)?.[1];
+
+  test("la phrase imposée par la spec, en français et en anglais", () => {
+    expect(textes("fr")).toContain("Cette page ne peut pas prouver sa propre intégrité : un serveur piégé pourrait la modifier aussi. Vérifiez avec un outil qui ne vient pas de ce site.");
+    expect(textes("en")).toContain("This page cannot prove its own integrity: a tampered server could change it too. Verify with a tool that does not come from this site.");
+  });
+
+  test("limites honnêtes : victime ciblée, contrôle automatique compris ; apps natives ; en-têtes ; jamais « 100 % »", () => {
+    expect(textes("fr")).toMatch(/code piégé à une seule personne[^.]*contrôle automatique compris/u);
+    expect(textes("fr")).toMatch(/applications iOS et Android/u);
+    expect(textes("fr")).toMatch(/en-têtes du serveur\) ne sont pas vérifiés/u);
+    expect(textes("en")).toMatch(/tampered code to a single person[^.]*automatic check included/u);
+    expect(textes("en")).toMatch(/iOS and Android apps/u);
+    for (const lang of ["fr", "en"] as const) expect(textes(lang)).not.toMatch(/100\s?%|garanti|guarantee/iu);
+  });
+
+  test("commandes : identité exacte de deploy/provenance.sh, émetteur de GitHub, jamais d'expression ouverte ni sans journal", () => {
+    expect(depot).toBe("Skoow/shhgone");
+    for (const lang of ["fr", "en"] as const) {
+      const code = page(lang).blocks.find((b) => b.id === "commandes")?.code ?? [];
+      const tout = code.join("\n");
+      expect(tout).toContain(`--certificate-identity "https://github.com/${depot}/.github/workflows/release.yml@refs/tags/web-v$v"`);
+      expect(tout).toContain("--certificate-oidc-issuer https://token.actions.githubusercontent.com");
+      expect(tout).toContain(`https://github.com/${depot}/releases/download/web-v$v/release.json.sigstore.json`);
+      expect(tout).toMatch(/verify-site\.mjs https:\/\/shhgone\.com release\.json$/mu);
+      expect(tout).not.toMatch(/regexp|\.\*|insecure|ignore-tlog/u);
+      // Le vérificateur vient de GitHub, pas du site vérifié.
+      expect(tout).toContain(`clone https://github.com/${depot}`);
+      expect(tout).not.toMatch(/curl[^\n]*shhgone\.com/u);
+    }
+  });
+
+  test("aucune empreinte calculée ni affichée par la page (C7) ; version du build citée", () => {
+    for (const lang of ["fr", "en"] as const) {
+      expect(textes(lang)).not.toMatch(/\b[0-9a-f]{40,}\b/u);
+      expect(page(lang).blocks.find((b) => b.id === "version")?.p?.join(" ")).toContain("dev"); // BUILD_ID des tests
+    }
+  });
+
+  test("liens : seulement le dépôt public et le journal de Sigstore (liens sortants, rien n'est chargé)", () => {
+    for (const lang of ["fr", "en"] as const)
+      for (const l of page(lang).tech?.links ?? []) expect(l.url).toMatch(/^https:\/\/(github\.com\/Skoow\/shhgone(\/|$)|search\.sigstore\.dev\/$)/u);
+  });
+
+  test("la page Sécurité mène à /verifier, en français et en anglais", () => {
+    for (const lang of ["fr", "en"] as const) expect(infoPage("securite", lang).blocks.find((b) => b.id === "limites")?.link?.path).toBe("/verifier");
   });
 });

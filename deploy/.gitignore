@@ -3,6 +3,10 @@
 /.env
 /.release
 /.release.prev
+/.release.version
+/.release.prev.version
+# Manifestes signés déjà vérifiés (deploy/provenance.sh), revérifiés à chaque installation.
+/.provenance/
 /.deploy.lock
 # Garde-fou : secrets et sauvegardes n'ont rien à faire dans la copie du dépôt (README §12).
 /secrets/

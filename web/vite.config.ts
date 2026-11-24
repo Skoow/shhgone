@@ -361,7 +361,7 @@ export function demoMeta(): Plugin {
  * construits. À placer AVANT sri : chaque page reçoit ensuite ses empreintes.
  */
 export const SITE_ORIGIN = "https://shhgone.com";
-export const PAGE_PATHS = ["/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/signaler"] as const;
+export const PAGE_PATHS = ["/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/signaler", "/verifier"] as const;
 export function infoPages(base: string, demo: boolean): Plugin {
   const here = fileURLToPath(new URL(".", import.meta.url));
   let outDir = "";
