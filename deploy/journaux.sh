@@ -86,7 +86,8 @@ controle_journaux() {
 	done
 	# 4. sshd silencieux : ni adresse des connexions, ni refus, dans le journal.
 	if [ "$sshd_t" != absent ]; then
-		grep -qix 'loglevel quiet' <<<"$sshd_t" ||
+		# OpenSSH 10 affiche « silent », autre nom de QUIET (Ubuntu 26.04).
+		grep -qixE 'loglevel (quiet|silent)' <<<"$sshd_t" ||
 			pb+=("sshd : LogLevel n'est pas QUIET (sshd -T) ; poser LogLevel QUIET dans /etc/ssh/sshd_config.d/10-shhdrop.conf, puis sshd -t && systemctl reload ssh (README §1)")
 		# Mot de passe ou clavier : PAM écrirait l'adresse (rhost=) à chaque échec.
 		for v in passwordauthentication kbdinteractiveauthentication; do

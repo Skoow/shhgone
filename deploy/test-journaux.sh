@@ -118,6 +118,7 @@ refuse "MaxFileSec absent (1 mois)" "$r" "$SSHD_BON" "poser MaxFileSec=15min"
 
 # 4. sshd.
 r=$(machine sshd)
+accepte "sshd LogLevel SILENT (OpenSSH 10)" "$r" "${SSHD_BON/loglevel QUIET/loglevel SILENT}"
 refuse "sshd LogLevel INFO" "$r" "${SSHD_BON/loglevel QUIET/loglevel INFO}" "LogLevel QUIET"
 refuse "sshd sans sortie (sshd -T échoue)" "$r" "" "LogLevel QUIET"
 refuse "sshd mot de passe" "$r" "${SSHD_BON/passwordauthentication no/passwordauthentication yes}" "passwordauthentication"
