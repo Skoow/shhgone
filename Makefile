@@ -34,13 +34,14 @@ test-repro:
 	web/scripts/repro.sh
 
 # Scripts de déploiement et de build : syntaxe, ShellCheck (0.11.0 en CI, job deploy-lint),
-# banc de l'alerte (deploy/test-alerte.sh, sans réseau), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais de sortie,
+# bancs de l'alerte et de la provenance (deploy/test-alerte.sh, deploy/test-provenance.sh : sans réseau, Node exigé), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais de sortie,
 # contrôle « joindre » ; les essais de banc, sans leurs variables, sont sautés).
 lint-deploy:
 	for f in deploy/*.sh web/scripts/*.sh; do bash -n "$$f" || exit 1; done
 	shellcheck deploy/*.sh web/scripts/*.sh
 	deploy/test-alerte.sh
 	deploy/test-journaux.sh
+	deploy/test-provenance.sh
 	cd deploy/shhcheck && go vet ./... && go test -race -count=1 ./...
 
 # Test du proxy (deploy/test-proxy.sh) : Caddy 2.10 ou plus dans le PATH (ou CADDY=…), site

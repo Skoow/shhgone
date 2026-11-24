@@ -1,14 +1,21 @@
 name: ci
 on:
   push:
+    # Branches seulement : une étiquette web-v* lance release.yml, qui appelle ce workflow.
+    branches: ["**"]
     paths-ignore: ["docs/**", "**/*.md"]
   pull_request:
     paths-ignore: ["docs/**", "**/*.md"]
   # Lancement à la main (onglet Actions, « Run workflow ») : seul moyen de lancer le job ui
   # (Playwright WebKit, ≈ 1 h 30), réservé au produit final (décision du propriétaire, 12 novembre).
   workflow_dispatch:
+  # Appelé par release.yml (spec §28.2) : toute la CI, sur le commit de l'étiquette, avant de
+  # signer. Le job ui n'y tourne pas (workflow_dispatch seulement).
+  workflow_call:
+# github.workflow vaut « release » quand release.yml appelle ce workflow : groupe à part, jamais
+# annulé par un push.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -285,6 +292,11 @@ jobs:
         with:
           go-version-file: deploy/shhcheck/go.mod
           cache: false
+      # Node pour deploy/test-provenance.sh (release-manifest.mjs sert de référence) ; aucun npm.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: web/.node-version
+          package-manager-cache: false
       # ShellCheck 0.11.0, publié le 4 août 2025 ; empreinte relevée le 11 novembre 2026 (le
       # binaire extrait est identique à celui d'une installation indépendante).
       - name: ShellCheck 0.11.0
