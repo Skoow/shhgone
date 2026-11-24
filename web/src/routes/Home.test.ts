@@ -91,7 +91,7 @@ describe("Home (UI §9.1)", () => {
     expect(norm(card("pro").querySelectorAll(".dv")[2]!.textContent)).toBe(String(PAID.pro.opens));
     // Appels (20 novembre) : absents de l'offre gratuite, inclus dans Plus et Pro, marqués « bientôt ».
     expect(norm(card("free").querySelector("[data-calls] .dv")!.textContent)).toBe("Non inclus");
-    for (const x of ["plus", "pro"]) expect(norm(card(x).querySelector("[data-calls] .dv")!.textContent)).toMatch(/^Inclus ?bientôt$/);
+    for (const x of ["plus", "pro"]) expect(norm(card(x).querySelector("[data-calls] .dv")!.textContent)).toMatch(/^Inclus ?bientôt \(pas encore disponible\)$/);
     expect(document.querySelectorAll("details[name=faq]")).toHaveLength(5);
     expect(document.querySelector('[data-slot="compose"]')).toBeNull(); // composeur : page d'envoi seulement
   });
