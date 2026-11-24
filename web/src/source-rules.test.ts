@@ -278,6 +278,50 @@ describe("règles de sources", () => {
       everySource.filter((f) => !f.rel.startsWith("viewers/") && /getImageData/.test(f.text)).map((f) => f.rel),
     ).toEqual([]));
 
+  // Empreinte de l'appareil (décision du 24 novembre) : aucune API qui sert surtout à reconnaître
+  // un navigateur, dans tout src/ (démo comprise). Seuls les usages de cette liste, relus un par
+  // un, sont admis, chacun pour sa raison ; une entrée qui ne sert plus fait échouer le test.
+  // Les commentaires de ligne entière sont ignorés ; tout le reste compte (chaînes comprises).
+  const FINGERPRINT: Record<string, RegExp> = {
+    getBattery: /\bgetBattery\b/,
+    hardwareConcurrency: /\bhardwareConcurrency\b/,
+    "navigator.plugins": /\bnavigator\s*\??\.\s*plugins\b/,
+    deviceMemory: /\bdeviceMemory\b/,
+    toDataURL: /\btoDataURL\b/,
+    getImageData: /\bgetImageData\b/,
+    toBlob: /\.\s*toBlob\s*\(/,
+    convertToBlob: /\bconvertToBlob\b/,
+  };
+  const FINGERPRINT_ALLOWED: Record<string, { apis: string[]; why: string }> = {
+    "ui/avatar.ts": { apis: ["toBlob"], why: "réencode la photo de profil choisie par la personne (sans EXIF), jamais une toile de test" },
+    "media/capture.ts": { apis: ["toBlob"], why: "photo prise avec la caméra, réencodée en JPEG pour l'envoyer chiffrée" },
+    "app/env.ts": { apis: ["deviceMemory"], why: "prévenir avant un fichier de plus de 200 Mio sur un appareil à petite mémoire ; lu sur place, jamais envoyé" },
+  };
+  const codeOnly = (text: string) =>
+    text
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n")
+      .filter((l) => !/^\s*\/\//.test(l))
+      .join("\n");
+  it("API d'empreinte (getBattery, hardwareConcurrency, navigator.plugins, deviceMemory, lecture d'une toile) : seulement les usages admis", () => {
+    const found: Record<string, string[]> = {};
+    for (const f of everySource) {
+      const code = codeOnly(f.text);
+      const apis = Object.entries(FINGERPRINT)
+        .filter(([, re]) => re.test(code))
+        .map(([k]) => k);
+      if (apis.length) found[f.rel] = apis;
+    }
+    expect(found).toEqual(Object.fromEntries(Object.entries(FINGERPRINT_ALLOWED).map(([k, v]) => [k, v.apis])));
+    for (const v of Object.values(FINGERPRINT_ALLOWED)) expect(v.why.length).toBeGreaterThan(20);
+  });
+  it("API d'empreinte : la règle voit bien ces appels (témoins)", () => {
+    const hit = (s: string) => Object.values(FINGERPRINT).some((re) => re.test(codeOnly(s)));
+    for (const s of ["await navigator.getBattery()", "navigator.hardwareConcurrency", "navigator.plugins.length", "navigator?.plugins", "(navigator as any).deviceMemory", "c.toDataURL()", "ctx.getImageData(0, 0, 1, 1)", "canvas.toBlob(cb)", "await off.convertToBlob()"])
+      expect(hit(s), s).toBe(true);
+    for (const s of ["// navigator.deviceMemory dans un commentaire", "/** canvas.toBlob */", "blob.arrayBuffer()", "cfg.plugins"]) expect(hit(s), s).toBe(false);
+  });
+
   // Task R2 (spec §28.3, §41.6) : l'écrivain .zip, les visionneuses et les écrans sont importés
   // statiquement ; aucun import() dynamique hors de main.ts (démo).
   it("aucun import() dynamique dans zip/, viewers/, flows/, ui/, routes/", () =>
