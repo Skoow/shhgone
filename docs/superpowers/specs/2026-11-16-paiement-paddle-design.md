@@ -15,7 +15,7 @@ Décisions du propriétaire du 16 novembre : ouvrir les étapes « compte » et 
 CLAUDE.md interdit toute ressource tierce sur le site. Le paiement Paddle « classique » charge **Paddle.js** (script de Paddle) sur une page du vendeur. Deux voies, à confirmer dans la documentation de Paddle (`developer.paddle.com`, inaccessible depuis cette session) :
 
 - **A (préférée)** : page de paiement **hébergée par Paddle** (redirection complète vers un domaine Paddle, puis retour vers `/offres?paye=1`). Aucun script tiers chez nous. À vérifier : que Paddle Billing permet une page hébergée sans « lien de paiement par défaut » sur notre domaine, et qu'on peut y attacher `Q` (`custom_data` de la transaction créée par notre serveur via l'API).
-- **B (exception à valider)** : une page de paiement sur un **sous-domaine séparé** (par exemple `paiement.shhgone.com`) qui charge Paddle.js, comme l'exception reCAPTCHA (§26) : jamais sur une page qui détient des clés, aucun accès à l'origine du site, `Q` seul transmis. Demande une décision écrite du propriétaire.
+- **B (exception à valider)** : une page de paiement sur un **sous-domaine séparé** (par exemple `paiement.shhgone.com`) qui charge Paddle.js, comme l'exception reCAPTCHA (§26, retirée le 24 novembre) : jamais sur une page qui détient des clés, aucun accès à l'origine du site, `Q` seul transmis. Demande une décision écrite du propriétaire.
 
 ## Ce qu'il faut du propriétaire avant de coder la partie Paddle
 

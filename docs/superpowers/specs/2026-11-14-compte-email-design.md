@@ -278,7 +278,7 @@ Salon (`server/internal/api/handlers_salon.go`), avec `SHH_COMPTES=1` :
 
 | Quoi | Limite |
 |---|---|
-| Anti-robot | ALTCHA (`server/internal/captcha`, difficulté partagée) sur `inscription/debut` et `oubli/debut` ; repli reCAPTCHA (§26) quand il existera |
+| Anti-robot | ALTCHA (`server/internal/captcha`, difficulté partagée) sur `inscription/debut` et `oubli/debut` ; ~~repli reCAPTCHA (§26) quand il existera~~ (repli retiré le 24 novembre) |
 | Inscriptions | 3 par jour par connexion, 10 par /48 (§37.5) ; `SHH_COMPTES_MAX` |
 | E-mails | ~~3 par jour et par adresse (`e_canon`)~~ → **20 novembre (audit S4)** : pour chaque motif (inscription, récupération, changement d'adresse, renvois compris) 3 par jour et par (adresse, bloc /48) et 9 par adresse ; 10 par jour par connexion, 30 par /48, tous motifs ; renvoi après 60 s. Les compteurs ne dépendent que des demandes, jamais de l'existence d'un compte |
 | Codes e-mail | 6 chiffres, 15 min, **5 essais** par code (puis l'étape meurt) |

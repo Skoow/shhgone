@@ -341,7 +341,7 @@ Bornée par les quotas (3 comptes par jour et par connexion, 500 par jour en tou
 
 - `web/src/account/` reste seul détenteur du jeton et de `K_compte` ; nouveau `webauthn.ts` (appels `create`/`get`, conversion JSON niveau 3 avec `PublicKeyCredential.parseCreationOptionsFromJSON` quand il existe, sinon conversion base64url locale ; lecture de `prf.results` et `credProps`) et `recup.ts` (saisie, contrôle, appels au moteur).
 - Détection : `PublicKeyCredential` absent → « Ce navigateur ne gère pas les passkeys. Tout Shhgone marche sans compte ; seule la création de salon en demande un. » ; `PublicKeyCredential.getClientCapabilities()` sert seulement à annoncer d'avance le deuxième geste, jamais à refuser.
-- Le repli reCAPTCHA (§26) reste possible sur `inscription/debut` : `K_compte` n'est tirée qu'après le geste de passkey.
+- ~~Le repli reCAPTCHA (§26) reste possible sur `inscription/debut` : `K_compte` n'est tirée qu'après le geste de passkey.~~ Repli reCAPTCHA retiré le 24 novembre (spec §26) : ALTCHA seul.
 - Aucun `mediation: "conditional"` (remplissage automatique) : il demande un champ d'identifiant, que nous n'avons plus ; le bouton suffit.
 
 ## 10. Apps natives futures (D42-20)
@@ -454,7 +454,7 @@ Ordre : P1 → S1 → S2 → W1 → W2 → T1 → D1, chaque lot avec ses tests 
 ## 17. Corrections du 22 novembre (relecture de l'implémentation du moteur)
 
 - Alphabet du caractère de contrôle : 37 symboles de Crockford (le texte d'origine en listait 41).
-- « Aucune sortie » : faux, reCAPTCHA et le paiement sortent encore ; seule la sortie SMTP disparaît.
+- « Aucune sortie » : faux, reCAPTCHA et le paiement sortent encore ; seule la sortie SMTP disparaît. **24 novembre** : reCAPTCHA retiré (jamais codé côté serveur) ; seul le paiement sort.
 - `rp.id` : il découle de `SHH_ORIGIN`. Quand les comptes sont activés, `deploy.sh` refuse tout `SHH_ORIGIN` autre que `https://shhgone.com`, et le démarrage refuse une ancienne variable `SHH_SMTP_*` ou `SHH_MAIL_FROM` au lieu de l'ignorer. Les tests du compte tournent sur `localhost` (les navigateurs refusent une adresse IP comme `rp.id`).
 - **Enveloppes multiples** (décision du propriétaire, 22 novembre) : une seule colonne `passkeys.env` ne suffit pas. Une même passkey synchronisée peut donner des sorties PRF différentes selon le gestionnaire ou l'appareil (R6, R10), et la dernière enveloppe posée écraserait celle d'un autre appareil. La colonne est remplacée par la table `enveloppes` (§6.3), avec 4 enveloppes au plus par passkey, sans date ni ordre d'usage. `connexion/fin` et `reauth/fin` rendent la liste `enveloppes`, que l'appareil essaie une à une. `passkeys/enveloppe` n'ajoute que pour la passkey qui a signé l'assertion de **cette** session : le lien est gardé en mémoire avec la session, jamais pris dans le corps, pour qu'une session ne pose rien sur une autre passkey. Une enveloppe fait exactement 60 octets, la cinquième renvoie 409 et un doublon est sans effet. Aucune route ne retire d'enveloppe. Le lien entre session et passkey est perdu au redémarrage du serveur : `sans_passkey` (403), puis `reauth`.
 - **Étape d'inscription de 15 min** (22 novembre, après le lot W) : l'étape d'inscription couvre aussi le temps de noter puis de vérifier la clé de récupération, entre la feuille de passkey et `inscription/fin`. À 5 min, une personne lente obtenait `not_found` et sa passkey restait orpheline dans le gestionnaire. Les étapes de connexion, de réauthentification et d'ajout de passkey restent à 5 min ; le pseudo reste réservé 15 min au plus (borne : 20 000 étapes vivantes).

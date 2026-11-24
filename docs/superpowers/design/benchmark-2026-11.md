@@ -1,5 +1,7 @@
 # Shhdrop — étude comparative design et expérience (novembre 2026)
 
+> **24 novembre 2026** : le repli Google reCAPTCHA (spec §26) est **retiré** (décision du propriétaire ; jamais codé côté serveur). Toutes les mentions de ce repli ci-dessous sont caduques.
+
 Date : 5 novembre 2026 · Statut : document de travail, à valider par le propriétaire
 Références : spécification `docs/superpowers/specs/2026-11-03-shhdrop-design.md` (« spec ») et spécification de l'interface `docs/superpowers/specs/2026-11-04-shhdrop-ui-design.md` (« UI »), dont la direction artistique v2 « Nuit chiffrée, vivante » (UI §20).
 
