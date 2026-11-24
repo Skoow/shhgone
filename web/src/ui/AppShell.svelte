@@ -2,6 +2,7 @@
   import type { Snippet } from "svelte";
   import { BUILD_ID } from "../app/build";
   import { chrome } from "../app/chrome.svelte";
+  import { getDemo } from "../app/demo-hooks";
   import { currentPath, followLink, href, navigate, router } from "../app/router.svelte";
   import { SOURCE_URL } from "../routes/pages/content";
   import { t } from "../i18n/i18n.svelte";
@@ -27,6 +28,8 @@
     tabs?: boolean;
   };
   let { children, banner, busy = false, tabs = false }: Props = $props();
+  // Démo GitHub Pages seulement (null en production) : phrase de l'hébergeur au pied de page.
+  const demo = getDemo();
 
   // Téléphone : la page réserve la hauteur de la barre d'onglets (base.css, html.has-tabbar).
   $effect(() => {
@@ -214,6 +217,7 @@
     <div class="base">
       <!-- Retours UI9 : le nom en bas à gauche, « © 2026 » à côté (plus de mention « aucune publicité »). -->
       <p class="sig"><span class="wm" translate="no">Shhgone</span><span>{t("foot.copy")}</span></p>
+      {#if demo}<p class="host" data-demo-host>{demo.hostNote}</p>{/if}
       <p class="num" data-build>{t("foot.version", { v: BUILD_ID })}</p>
     </div>
   </div>
@@ -546,6 +550,9 @@
   }
   .base p {
     margin: 0;
+  }
+  .base .host {
+    color: var(--text-2);
   }
   /* Version : discrète, plus petite que le nom. */
   .base [data-build] {

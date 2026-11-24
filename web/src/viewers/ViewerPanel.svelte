@@ -64,7 +64,7 @@
 
   // Chargement de l'élément montré ; le précédent est abandonné, son URL révoquée.
   // noPreview : image de plus de 50 mégapixels ou aux dimensions introuvables (media/dimensions).
-  type Phase = "loading" | "shown" | "undecodable" | "noPreview" | "error" | "corrupt";
+  type Phase = "loading" | "shown" | "undecodable" | "noPreview" | "error" | "corrupt" | "egress";
   let phase = $state<Phase>("loading");
   let got = $state(0);
   let url = $state<string | null>(null);
@@ -101,8 +101,10 @@
         phase = "shown";
       },
       (e: unknown) => {
-        // Contenu modifié en route (audit web D3) : texte fixe, distinct d'une coupure.
-        if (!ctl.signal.aborted) phase = e instanceof Error && e.name === "CorruptError" ? "corrupt" : "error";
+        // Contenu modifié en route (audit web D3) : texte fixe, distinct d'une coupure ; limite de
+        // téléchargement du partage (403 egress_limit) : définitive, dite telle quelle.
+        const name = e instanceof Error ? e.name : "";
+        if (!ctl.signal.aborted) phase = name === "CorruptError" ? "corrupt" : name === "EgressLimitError" ? "egress" : "error";
       },
     );
     return () => {
@@ -179,6 +181,8 @@
         <p class="msg" role="alert">{t("content.interrupted")}</p>
       {:else if phase === "corrupt"}
         <p class="msg" role="alert">{t("content.corrupt")}</p>
+      {:else if phase === "egress"}
+        <p class="msg" role="alert" data-egress>{t("dl.fail.egress")}</p>
       {:else if phase === "noPreview"}
         <p class="msg" role="alert">{viewOnly ? t("content.notViewable") : t("content.undecodable")}</p>
       {:else if phase === "undecodable"}

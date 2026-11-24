@@ -171,13 +171,36 @@ describe("historique chiffré (IndexedDB simulé)", () => {
     expect(await h.list()).toEqual([]);
   });
 
-  it("préférence « Garder dans mon historique » : activée par défaut (Q-H2), gardée", async () => {
+  it("préférence « Garder dans mon historique » : désactivée par défaut (24 novembre), activée par un geste, gardée", async () => {
     const idb = fakeIndexedDB();
     const h = (await openHistory({ backend: idbBackend(idb) }))!;
-    expect(await h.enabled()).toBe(true);
+    expect(await h.enabled()).toBe(false);
+    await h.setEnabled(true);
+    expect(await (await openHistory({ backend: idbBackend(idb) }))!.enabled()).toBe(true);
     await h.setEnabled(false);
     expect(await (await openHistory({ backend: idbBackend(idb) }))!.enabled()).toBe(false);
+  });
+
+  it("ancien drapeau « off » absent (activé par défaut avant le 24 novembre) : ne vaut plus activation ; entrées gardées", async () => {
+    const b = memoryBackend();
+    const h = (await openHistory({ backend: b, now: () => T0 }))!;
+    const a = await h.add(fresh());
+    expect(await h.enabled()).toBe(false); // aucune trace d'un geste : désactivé
+    await b.setFlag("off", true); // ancien choix « désactivé »
+    expect(await h.enabled()).toBe(false);
     await h.setEnabled(true);
+    expect(await b.flag("off")).toBeUndefined(); // l'ancien drapeau part au premier choix
+    expect(await h.enabled()).toBe(true);
+    expect((await h.list()).map((x) => x.id)).toEqual([a.id]); // le lien de gestion reste
+  });
+
+  it("« Effacer l'historique » (clear) ne change pas le choix de la personne", async () => {
+    const idb = fakeIndexedDB();
+    const h = (await openHistory({ backend: idbBackend(idb), now: () => T0 }))!;
+    await h.setEnabled(true);
+    await h.add(fresh());
+    await h.clear();
+    expect(await h.list()).toEqual([]);
     expect(await h.enabled()).toBe(true);
   });
 

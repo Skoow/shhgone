@@ -147,7 +147,12 @@ describe("isRiskyName", () => {
       expect(isRiskyName(`facture.${e}`), e).toBe(true);
       expect(isRiskyName(`facture.${e.toUpperCase()}`), e).toBe(true);
     }
-    for (const n of ["photo.jpeg", "tableur.xlsx", "texte.docx", "diapo.pptx", "x.ms", "x.imgs"]) expect(isRiskyName(n), n).toBe(false);
+    // Spec §12, D41-13 (code du 24 novembre) : formats PowerShell, informations d'installation Windows.
+    for (const e of ["ps1xml", "inf"]) {
+      expect(isRiskyName(`pilote.${e}`), e).toBe(true);
+      expect(isRiskyName(`pilote.${e.toUpperCase()}`), e).toBe(true);
+    }
+    for (const n of ["photo.jpeg", "tableur.xlsx", "texte.docx", "diapo.pptx", "x.ms", "x.imgs", "x.info", "x.ps1x", "x.in"]) expect(isRiskyName(n), n).toBe(false);
     expect(isRiskyName(".exe")).toBe(true); // nom qui commence par le point : aussi
     expect(isRiskyName(".bashrc")).toBe(false);
     for (const n of ["photo.jpg", "doc.pdf", "exe", "notes.txt", "fichier"]) expect(isRiskyName(n), n).toBe(false);

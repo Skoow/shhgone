@@ -380,7 +380,7 @@ export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCan
     o.onEtape?.("robot");
     const origin = location.origin;
     const cap = await captchaDuServeur(transferCtx(origin));
-    const preuve = await solvePow(cap.challenge, { fallbackOrigin: cap.fallbackOrigin, mode: "pow" });
+    const preuve = await solvePow(cap.challenge);
     // Le serveur refuse une création moins de 3 s après le défi (même règle que les partages).
     // (receivedAt : horloge monotone de la page, comme la validité du défi, transfer/api.ts).
     await new Promise((r) => setTimeout(r, Math.max(0, cap.receivedAt + CAPTCHA_MIN_MS - performance.now())));
@@ -1197,7 +1197,7 @@ export async function renouveler(h: Duree): Promise<string | null> {
   if (!x?.client) return "forbidden";
   const cap = await captchaDuServeur(transferCtx(location.origin)).catch(() => null);
   if (!cap) return "reseau";
-  const p = await solvePow(cap.challenge, { fallbackOrigin: cap.fallbackOrigin, mode: "pow" }).catch(() => null);
+  const p = await solvePow(cap.challenge).catch(() => null);
   if (!p || p.kind !== "pow") return "robot";
   await new Promise((r) => setTimeout(r, Math.max(0, cap.receivedAt + CAPTCHA_MIN_MS - performance.now())));
   const j = x.client.jetonGestion();

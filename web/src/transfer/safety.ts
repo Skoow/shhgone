@@ -115,7 +115,9 @@ const RISKY = new Set(["exe", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "
   // Revue du 10 novembre : bibliothèques et compléments, modèles et classeurs à macros,
   // installeurs et correctifs, scripts, raccourcis de recherche.
   "dll", "xll", "wsh", "msp", "cab", "dotm", "xltm", "potm", "ppsm", "sldm", "xlsb", "py", "jnlp", "diagcab",
-  "library-ms", "search-ms", "inetloc", "deb", "rpm", "appimage"]);
+  "library-ms", "search-ms", "inetloc", "deb", "rpm", "appimage",
+  // Décision du 24 novembre (spec §12, D41-13) : formats PowerShell et informations d'installation Windows.
+  "ps1xml", "inf"]);
 
 /** Extension exécutable ou interprétée : avertir avant l'enregistrement (spec §12). À appeler sur un nom passé par safeName. */
 export function isRiskyName(name: string): boolean {

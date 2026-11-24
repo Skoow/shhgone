@@ -16,7 +16,7 @@
   import { createSender, type Sender, type SendOpts } from "../flows/send.svelte";
   import { formatBytes } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
-  import { createDraft, destroyShare, type CaptchaCtx, type Draft, type TtlHours } from "../index";
+  import { createDraft, destroyShare, type Draft, type TtlHours } from "../index";
   import { limitesDe, type Formule } from "../limits";
   import { formulesDisponibles, planifierReapprovisionnement, prendreJeton, refusCles } from "../paiement/jetons";
   import { idbDuNavigateur } from "../paiement/pass";
@@ -43,13 +43,13 @@
   let note = $state("");
 
   // Démo : preuve factice acceptée par le faux serveur seulement. Production : preuve de travail
-  // dans un Worker (version minimale, Task 14 pour le pré-calcul et le repli).
+  // dans un Worker (aucun repli : le repli reCAPTCHA, jamais construit, est retiré le 24 novembre).
   const demo = getDemo();
   let powAbort: AbortController | undefined;
-  function solveCaptcha(challenge: unknown, ctx: CaptchaCtx) {
-    if (demo) return demo.solveCaptcha(challenge, ctx);
+  function solveCaptcha(challenge: unknown) {
+    if (demo) return demo.solveCaptcha(challenge);
     powAbort = new AbortController();
-    return solvePow(challenge, ctx, powAbort.signal);
+    return solvePow(challenge, powAbort.signal);
   }
 
   // Brouillon d'envoi (spec §41.14) : créé au premier fichier, chaque fichier envoyé dès son

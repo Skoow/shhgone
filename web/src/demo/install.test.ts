@@ -19,7 +19,8 @@ describe("installDemo", async () => {
 
   it("/api/* de l'origine → faux serveur ; le reste → réseau", async () => {
     const cap = await (await window.fetch("/api/captcha")).json();
-    expect(cap).toMatchObject({ fallback: null });
+    expect(cap).toMatchObject({ algorithm: "SHA-256" });
+    expect(cap).not.toHaveProperty("fallback");
     expect((await window.fetch(`${location.origin}/API/x`)).status).toBe(404);
     expect(await (await window.fetch("/assets/a.js")).text()).toBe("site");
     expect(await (await window.fetch("https://ailleurs.test/api/captcha")).text()).toBe("site");
@@ -34,17 +35,19 @@ describe("installDemo", async () => {
 
   it("crochets : preuve factice, phrase de « Lien invalide » et écarts dans la langue courante", async () => {
     const d = getDemo()!;
-    expect(await d.solveCaptcha({}, { fallbackOrigin: null, mode: "pow" })).toEqual({ kind: "pow", payload: "demo" });
+    expect(await d.solveCaptcha({})).toEqual({ kind: "pow", payload: "demo" });
     setLang("fr");
     expect(d.invalidLinkNote).toBe("(normal en démo : un partage n'existe que dans l'onglet qui l'a créé)");
     expect(d.signupPasskey).toBe("Simuler la passkey");
     expect(d.securityGaps).toContain("frame-ancestors");
     expect(d.securityGaps).toContain("GitHub reçoit votre adresse IP");
+    expect(d.hostNote).toBe("Démo hébergée par GitHub, qui voit votre adresse IP.");
     setLang("en");
     expect(d.invalidLinkNote).toBe("(expected in the demo: a share only exists in the tab that created it)");
     expect(d.signupPasskey).toBe("Simulate the passkey");
     expect(d.securityGaps).toContain("HSTS");
     expect(d.securityGaps).toContain("GitHub receives your IP address");
+    expect(d.hostNote).toBe("Demo hosted by GitHub, which sees your IP address.");
   });
 
   it("openAsRecipient : charge /s#<43> dans le même onglet (16 novembre) ; refuse un autre lien", () => {

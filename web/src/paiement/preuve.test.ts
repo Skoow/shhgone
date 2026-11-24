@@ -12,7 +12,7 @@ afterEach(() => {
 
 describe("preuve d'une commande", () => {
   it("défi lu une fois, champs rendus après le délai minimal du serveur", async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify({ algorithm: "SHA-256", challenge: "c", salt: "s", signature: "x", maxnumber: 10, shown_at: "JETON", fallback: "https://autre.example" }), { status: 200 }));
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ algorithm: "SHA-256", challenge: "c", salt: "s", signature: "x", maxnumber: 10, shown_at: "JETON" }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     const { obtenirPreuve, preparerPreuve } = await import("./preuve");
     const t0 = performance.now();

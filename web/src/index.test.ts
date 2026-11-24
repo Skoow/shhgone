@@ -47,6 +47,7 @@ describe("interface publique", () => {
         "PASSWORD_LEN",
         "PW_TRIES",
         "ReadBudgetError",
+        "EgressLimitError",
         "ServerError",
         "TTL_HOURS",
         "TTL_MAX_HOURS",
@@ -89,4 +90,4 @@ describe("interface publique", () => {
 });
 
 // Types exportés (contrôle à la compilation par tsc).
-export type _Types = [pub.CaptchaProof, pub.CaptchaCtx, pub.PreparedCaptcha, pub.GeneratedPassword, pub.Rights, pub.KeepTtl, pub.ManifestV2, pub.TtlHours];
+export type _Types = [pub.CaptchaProof, pub.PreparedCaptcha, pub.GeneratedPassword, pub.Rights, pub.KeepTtl, pub.ManifestV2, pub.TtlHours];

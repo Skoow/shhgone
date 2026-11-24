@@ -16,7 +16,7 @@
 // données, et elles seules, pour qu'un rechargement de l'onglet retrouve ses partages
 // (`restore`) ; aucun secret du client (lien, mot de passe, clé) n'en fait partie.
 // Non simulés : limites par connexion, quotas, place disque, gel. Aucune preuve anti-robot
-// n'est vérifiée (anti-robot désactivé en démo ; `fallback: null`).
+// n'est vérifiée (anti-robot désactivé en démo).
 import { BUCKETS, CHUNK_CT, HEADER, SEG_CHUNKS, segmentCount, segmentSize } from "../engine/pure";
 import { MAX_OPENS } from "../limits";
 
@@ -111,6 +111,12 @@ export type FakeServerOpts = {
   onChange?: (snap: Snapshot) => void;
   /** Segment reçu ou bourrage tiré (à garder avec l'état). */
   onSegment?: (id: string, n: number, data: Uint8Array) => void;
+  /**
+   * Plafond d'octets servis par partage (comme le vrai serveur, 24 novembre) : 403
+   * {"error":"egress_limit"}, sans Retry-After, pour un segment qui le dépasserait, et au
+   * déverrouillage une fois le plafond atteint. Absent : aucun plafond.
+   */
+  egressLimitBytes?: number;
 };
 
 export type FakeServer = {
@@ -234,6 +240,10 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
   const dead = new Map<string, { share: Share; graceEnd: number; opens: Set<number> }>();
   const watchers = new Map<string, Set<() => void>>();
   const revoked = new Set<string>();
+  /** Octets de segments servis par partage (plafond egressLimitBytes), en mémoire seulement. */
+  const served = new Map<string, number>();
+  const egressReached = (id: string, more = 0) =>
+    opts.egressLimitBytes !== undefined && (more === 0 ? (served.get(id) ?? 0) >= opts.egressLimitBytes : (served.get(id) ?? 0) + more > opts.egressLimitBytes);
   const ak = (id: string, n: number) => `${id}:${n}`;
   // Octrois d'ouverture (spec §41.4, D42-22) : chaîne opaque → ouverture, valable jusqu'à
   // l'échéance du partage ; (id, n) → retours acceptés, comme le serveur (en mémoire).
@@ -404,7 +414,6 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
       salt: `demo?expires=${exp}`,
       signature: "demo",
       shown_at: tok,
-      fallback: null,
     });
   }
 
@@ -677,6 +686,8 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     const b = await readJSON(req, ["proof"]);
     const kp = decodeB64(b.proof, 32);
     const [id, s] = await reopenable(ka, g); // clé d'accès fausse : 404, aucun essai compté
+    // Plafond de téléchargement du partage atteint : 403, ni ouverture ni essai consommé.
+    if (egressReached(id)) throw new HttpFail(403, "egress_limit");
     // Octroi invalide (falsifié, autre partage, expiré, ouverture terminée) : 409, ni ouverture
     // ni essai consommé.
     const reopenN = g === null ? null : liveGrant(g, id, s);
@@ -742,6 +753,8 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     const s = readableBy(tok);
     if (n >= s.segments.length) throw badRequest();
     const data = s.segments[n]!;
+    if (egressReached(id, Math.max(1, data.length))) throw new HttpFail(403, "egress_limit");
+    served.set(id, (served.get(id) ?? 0) + data.length);
     const key = ak(id, tok.openN);
     const a = active.get(key) ?? { last: now(), inflight: 0 };
     active.set(key, a);

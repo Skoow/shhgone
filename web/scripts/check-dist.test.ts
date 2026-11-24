@@ -18,8 +18,8 @@ afterEach(() => {
 
 const esc = (s: string) => s.replace(/'/g, "&#39;");
 const PROD_INDEX = `<!doctype html><html><head>\n<meta charset="utf-8" />\n<script type="module" crossorigin src="/assets/index-a.js"></script>\n</head><body></body></html>`;
-/** Démo : le moteur WebAssembly est intégré à un script (base64 du module, Task 11). */
-const DEMO_ENGINE = 'const wasm="AGFzbQEAAAAB";';
+/** Démo : le moteur WebAssembly est intégré à un script (base64 du module, Task 11), avec la phrase de l'hébergeur (24 novembre). */
+const DEMO_ENGINE = 'const wasm="AGFzbQEAAAAB";const host="Demo hosted by GitHub, which sees your IP address.";';
 const DEMO_INDEX = `<!doctype html><html><head>
     <meta http-equiv="Content-Security-Policy" content="${esc(DEMO_CSP)}">
     <meta name="referrer" content="no-referrer">
@@ -436,6 +436,13 @@ describe("check-dist.mjs --demo", () => {
     expect(r.code).toBe(0);
   });
 
+  it("échoue sans la phrase visible de l'hébergeur (24 novembre) ; la phrase est interdite en production", () => {
+    const sans = { ...good(), "assets/install-a.js": 'const MARK="__SHH_DEMO__";const wasm="AGFzbQEAAAAB";' };
+    expect(checkDist(site(sans), true)).toEqual(["phrase de l'hébergeur absente des scripts de la démo (« hosted by GitHub, which sees your IP address »)"]);
+    for (const s of ['x="Demo hosted by GitHub, which sees your IP address."', 'x="Démo hébergée par GitHub, qui voit votre adresse IP."'])
+      expect(checkDist(site({ "index.html": PROD_INDEX, "a.js": s }), false)).toHaveLength(1);
+  });
+
   it("échoue sans la marque", () => {
     const r = run(["--demo", site({ ...good(), "assets/install-a.js": "x" })]);
     expect(r.code).toBe(1);
@@ -471,7 +478,7 @@ describe("check-dist.mjs --demo", () => {
   });
 
   it("moteur WebAssembly présent dans un script de la démo (Task 11) : sinon elle ne pourrait ni chiffrer ni ouvrir", () => {
-    expect(checkDist(site({ ...good(), "assets/install-a.js": 'const MARK="__SHH_DEMO__"' }), true)).toEqual([
+    expect(checkDist(site({ ...good(), "assets/install-a.js": 'const MARK="__SHH_DEMO__";x="Demo hosted by GitHub, which sees your IP address."' }), true)).toEqual([
       "moteur WebAssembly absent des scripts de la démo (base64 « AGFzbQEAAAA ») : elle ne pourrait ni chiffrer ni ouvrir",
     ]);
   });

@@ -17,6 +17,7 @@
     loadHistory,
     refreshAll,
     refreshShare,
+    keepSentDefault,
     setHistoryEnabled,
     shares,
     stopRefresh,
@@ -114,7 +115,7 @@
         <path d="M8 4h32l16 16v52a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="2" />
         <path d="M40 4v16h16" fill="none" stroke="currentColor" stroke-width="2" />
       </svg>
-      {#if shares.enabled}
+      {#if keepSentDefault()}
         <h2 class="et">{t("hist.empty.title")}</h2>
         <p class="sub">{t("hist.empty.body")}</p>
         <p class="sub">{t("hist.honest")}</p>
@@ -165,7 +166,7 @@
         {/each}
       </ul>
     {/if}
-    {#if !shares.enabled}
+    {#if !keepSentDefault()}
       <div class="off">
         <p class="sub">{t("hist.off.title")}. {t("hist.off.body")}</p>
         <Button variant="ghost" dense onpress={enable}>{t("hist.off.cta")}</Button>

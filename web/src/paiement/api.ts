@@ -249,7 +249,7 @@ export async function lireDefi(n: Net = netParDefaut()): Promise<Defi | "limite"
   }
   const receivedAt = performance.now();
   if (typeof o !== "object" || o === null) return null;
-  const { shown_at, fallback: _f, ...challenge } = o as Record<string, unknown>;
+  const { shown_at, ...challenge } = o as Record<string, unknown>;
   if (typeof shown_at !== "string" || shown_at.length > 512) return null;
   return { challenge, shownAt: shown_at, receivedAt };
 }

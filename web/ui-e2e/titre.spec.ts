@@ -38,7 +38,7 @@ test.describe("fr-FR", () => {
 
   test("nom du partage : Lien prêt, ouverture, contenu, Mes partages (chiffré, renommé ici seulement)", async ({ page, shh, browser, isMobile }) => {
     test.setTimeout(180_000);
-    const sent = await sendShare(page, shh.origin + "/", { text: "Le code est 4471.", title: TYPED, isMobile });
+    const sent = await sendShare(page, shh.origin + "/", { text: "Le code est 4471.", title: TYPED, isMobile, keep: true });
 
     // « Lien prêt » : le nom (nettoyé par le moteur) en tête du bloc d'informations, en texte brut.
     const facts = page.locator("[data-ready-card] [data-ready-facts]");

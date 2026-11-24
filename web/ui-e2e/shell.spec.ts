@@ -43,6 +43,8 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   // Plus d'« Envoyer », de « Mes partages » ni de « Salon » (16 novembre) : le logo et le menu y mènent.
   for (const l of ["Envoyer", "Mes partages"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}$`) })).toHaveCount(0);
   await expect(foot.getByText(/^Salon/)).toHaveCount(0);
+  // Phrase de l'hébergeur de la démo (24 novembre) : dans la démo seulement.
+  await expect(foot.locator("[data-demo-host]")).toHaveCount(0);
   // Plus d'« Offres » ni de « Licence » (17 novembre) : la licence est dite sur GitHub.
   for (const l of ["Sécurité", "Confidentialité", "Open source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales"])
     await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toBeVisible();

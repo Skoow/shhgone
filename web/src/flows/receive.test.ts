@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BadPasswordError, CorruptError, GrantInvalidError, LimitError, NotFoundError, ReopenLimitError, ServerError, type Opened } from "../index";
+import { BadPasswordError, CorruptError, EgressLimitError, GrantInvalidError, LimitError, NotFoundError, ReopenLimitError, ServerError, type Opened } from "../index";
 import type { OpenGrantEntry } from "../session/open-grant";
 import { createReceiver, type ReceiverDeps } from "./receive.svelte";
 
@@ -183,6 +183,16 @@ describe("createReceiver (UI §9.7)", () => {
     await flush();
     await r.unlock(PW);
     expect([r.state, r.error]).toEqual(["corrupt", null]);
+  });
+
+  it("limite de téléchargement du partage (EgressLimitError) au déverrouillage → « egress », définitif, aucun nouvel essai", async () => {
+    const { r, openShare } = setup({ openShare: vi.fn(async () => Promise.reject(new EgressLimitError())) });
+    await flush();
+    await r.unlock(PW);
+    expect([r.state, r.error]).toEqual(["egress", null]);
+    await r.unlock(PW);
+    await flush();
+    expect(openShare).toHaveBeenCalledTimes(1);
   });
 
   it("LimitError(120) à l'ouverture → locked, retryAfterS, aucun appel avant l'échéance", async () => {

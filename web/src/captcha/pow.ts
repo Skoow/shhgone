@@ -1,14 +1,13 @@
 // Preuve de travail anti-robot (UI §9.4.2), version minimale : un Worker dédié neuf cherche la
 // solution ; arrêt par `signal`. Son script est lu avec son empreinte et lancé depuis un Blob en
 // production (pow-source.verified.ts, spec §28.3, audit du 20 novembre W3).
-// Pas encore de pré-calcul ni de borne vraie avec repli (Task 14) : sans repli, le calcul va
+// Aucun repli (le repli reCAPTCHA, jamais construit, est retiré le 24 novembre) : le calcul va
 // jusqu'au bout, comme le prévoit la spécification.
-import type { CaptchaCtx, CaptchaProof } from "../index";
+import type { CaptchaProof } from "../index";
 import { parseChallenge, payload } from "./search";
 import { startPowWorker } from "./pow-source";
 
-export async function solvePow(challenge: unknown, ctx: CaptchaCtx, signal?: AbortSignal, onTried?: (tried: number) => void): Promise<CaptchaProof> {
-  if (ctx.mode !== "pow") throw new Error("repli_indisponible"); // Tasks 15–16
+export async function solvePow(challenge: unknown, signal?: AbortSignal, onTried?: (tried: number) => void): Promise<CaptchaProof> {
   const aborted = () => new DOMException("Aborted", "AbortError");
   let c: ReturnType<typeof parseChallenge>;
   let w: Worker;

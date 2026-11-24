@@ -1,7 +1,7 @@
 // File de téléchargements (UI §9.8.6) : pause, reprise, arrêt, nouvel essai à l'octet près,
 // budget de lecture, archive, fermeture « partage disparu ».
 import { describe, expect, it, vi } from "vitest";
-import { createDownloads, readSkipping, summarize, type DownloadDeps, type ItemSink } from "./downloads.svelte";
+import { classify, createDownloads, readSkipping, summarize, type DownloadDeps, type ItemSink } from "./downloads.svelte";
 import { createReadMeter } from "./read-meter";
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -211,6 +211,30 @@ describe("file de téléchargements", () => {
     await until(() => d.rows[0]!.state === "failed");
     expect(d.rows[0]).toMatchObject({ reason: "budget", retryable: false });
     expect(s.files.get(0)!.aborted).toBe(true);
+  });
+
+  it("limite de téléchargement du partage (EgressLimitError) pendant l'enregistrement : arrêt, partiel supprimé, aucun nouvel essai (24 novembre)", async () => {
+    const s = memSinks();
+    const meter = createReadMeter([{ kind: "file", offset: 0, size: 10 }]);
+    const err = Object.assign(new Error("limite_telechargement"), { name: "EgressLimitError" });
+    let reads = 0;
+    const d = createDownloads([10], {
+      read: async (_i, _from, onChunk) => {
+        reads++;
+        await onChunk(new Uint8Array(4) as Uint8Array<ArrayBuffer>);
+        throw err;
+      },
+      openSink: s.openSink,
+      meter,
+      now: () => 0,
+    });
+    d.start([0]);
+    await until(() => d.rows[0]!.state === "failed");
+    expect(d.rows[0]).toMatchObject({ reason: "egress", retryable: false });
+    expect(s.files.get(0)!.aborted).toBe(true);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(reads).toBe(1);
+    expect(classify(err)).toEqual({ reason: "egress", retryable: false, keepPartial: false });
   });
 
   it("sélecteur fermé : retour silencieux à l'état de départ", async () => {

@@ -35,6 +35,9 @@
       .catch(() => undefined);
   });
   let detruire = $state(false);
+  // Cochée : la création exige un compte, et avec un compte l'historique des envois et des salons
+  // créés est activé (history/live.svelte.ts, keepSentDefault ; sans compte, désactivé par défaut
+  // depuis le 24 novembre). Décochée : le lien de gestion reste montré sur « Salon prêt ».
   let garder = $state(true);
   let etape = $state<"cles" | "robot" | "envoi" | null>(null);
   let erreur = $state<ErreurCreation | null>(null);

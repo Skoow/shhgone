@@ -59,7 +59,6 @@ import {
   sleep,
   throwIfAborted,
   withBudget,
-  type CaptchaCtx,
   type CaptchaProof,
   type CreateOpts,
 } from "./client";
@@ -84,7 +83,7 @@ export type ElementStatus = { phase: ElementPhase; sent: number; total: number; 
 
 export type DraftOpts = api.Net & {
   /** Défi anti-robot résolu en arrière-plan à la création du brouillon (Worker). */
-  solveCaptcha?: (challenge: unknown, ctx: CaptchaCtx) => Promise<CaptchaProof>;
+  solveCaptcha?: (challenge: unknown) => Promise<CaptchaProof>;
   /** Défi déjà récupéré et sa preuve en cours (Task 14). */
   prepared?: () => { cap: PreparedCaptcha; proof: Promise<CaptchaProof> } | undefined;
   /**
@@ -263,9 +262,9 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
         const fresh = await abortable(readCaptcha(c), signal);
         throwIfAborted(signal);
         cap = takeCaptcha(fresh, origin)!;
-        proof = solve(fresh.challenge, { fallbackOrigin: fresh.fallbackOrigin, mode: "pow" });
+        proof = solve(fresh.challenge);
       }
-      const fields = proofFields(await abortable(proof, signal), cap);
+      const fields = proofFields(await abortable(proof, signal));
       const wait = cap.receivedAt + CAPTCHA_MIN_MS - performance.now();
       if (wait > 0) await sleep(wait, signal);
       throwIfAborted(signal);
@@ -315,7 +314,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       .then(
         (cap) => {
           if (closed || created) return;
-          const proof = solve(cap.challenge, { fallbackOrigin: cap.fallbackOrigin, mode: "pow" });
+          const proof = solve(cap.challenge);
           proof.catch(() => undefined);
           warmed = { cap, proof };
         },

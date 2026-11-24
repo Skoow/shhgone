@@ -6,7 +6,6 @@ import {
   NotFoundError,
   SERVER_STALL_MS,
   failedElement,
-  type CaptchaCtx,
   type CaptchaProof,
   type CreateOpts,
   type Item,
@@ -26,7 +25,7 @@ export const STALL_MS = 10_000;
 export const PAUSE_MIN_LEFT_MS = 15 * 60_000;
 const TICK_MS = 250;
 
-export type Phase = "idle" | "keys" | "captcha" | "fallback" | "upload" | "paused" | "offline" | "finalize" | "sealed" | "cancelled" | "error";
+export type Phase = "idle" | "keys" | "captcha" | "upload" | "paused" | "offline" | "finalize" | "sealed" | "cancelled" | "error";
 /** `element` : un élément n'a pas pu être envoyé (refus du serveur), sa ligne est `failedItem`. */
 export type SendError = "reseau" | "interrompu" | "limite" | "plein" | "gele" | "captcha" | "fichier_modifie" | "element" | "inattendu";
 /** Coches sous la capsule (benchmark M3) : chacune seulement après un progrès réel. */
@@ -38,7 +37,7 @@ type Created = { link: string; manage: string; expiresInS: number; title?: strin
 
 export type SendDeps = {
   createShare: (origin: string, items: Item[], opts: CreateOpts) => Promise<Created>;
-  solveCaptcha: (challenge: unknown, ctx: CaptchaCtx) => Promise<CaptchaProof>;
+  solveCaptcha: (challenge: unknown) => Promise<CaptchaProof>;
   /** Preuve pré-calculée (Task 14) ; absent en démo. */
   prefetcher?: { take(): Prepared | undefined; stop(): void };
   now?: () => number;
@@ -120,7 +119,7 @@ export function createSender(deps: SendDeps) {
   let releasePause: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
 
-  const cancellable = () => ["keys", "captcha", "fallback", "upload", "paused", "offline"].includes(phase);
+  const cancellable = () => ["keys", "captcha", "upload", "paused", "offline"].includes(phase);
 
   function step(s: Step) {
     if (steps.includes(s)) return;
@@ -222,17 +221,15 @@ export function createSender(deps: SendDeps) {
     startTimer();
 
     // Ordre des essais (UI §9.4.2) : (1) preuve pré-calculée ou preuve de travail ; (2) preuve
-    // de travail sans pré-calcul ; (3) repli Google seulement si fallbackOrigin ≠ null.
-    let fallbackOrigin: string | null = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      const mode: CaptchaCtx["mode"] = attempt === 3 ? "fallback" : "pow";
+    // de travail sans pré-calcul. Aucun troisième essai : le repli reCAPTCHA, jamais construit,
+    // est retiré (24 novembre).
+    for (let attempt = 1; attempt <= 2; attempt++) {
       let solverFailed = false;
       const live = () => id === run && !signal.aborted;
       let prepared: Prepared | undefined;
       if (attempt === 1) {
         const p = deps.prefetcher?.take();
         if (p) {
-          fallbackOrigin = p.cap.fallbackOrigin;
           prepared = {
             cap: p.cap,
             proof: p.proof.catch((e: unknown) => {
@@ -253,11 +250,10 @@ export function createSender(deps: SendDeps) {
           ...(o.title === undefined ? {} : { title: o.title }),
           prepared,
           signal,
-          solveCaptcha: async (challenge, ctx) => {
-            fallbackOrigin = ctx.fallbackOrigin;
-            if (live()) phase = mode === "fallback" ? "fallback" : "captcha";
+          solveCaptcha: async (challenge) => {
+            if (live()) phase = "captcha";
             try {
-              return await deps.solveCaptcha(challenge, { fallbackOrigin: ctx.fallbackOrigin, mode });
+              return await deps.solveCaptcha(challenge);
             } catch (e) {
               solverFailed = true;
               throw e;
@@ -271,7 +267,7 @@ export function createSender(deps: SendDeps) {
             if (done === 0) {
               createdOnServer = true;
               createdAt ??= t;
-              if (phase === "keys" || phase === "captcha" || phase === "fallback") phase = "upload";
+              if (phase === "keys" || phase === "captcha") phase = "upload";
             } else backOnline();
             // n = 0 : texte seul, rien à envoyer (spec §41.14) : finalisation tout de suite.
             // « Envoyé » attend le lien (audit M12) : rien n'est partagé avant la finalisation.
@@ -322,8 +318,7 @@ export function createSender(deps: SendDeps) {
         if (id !== run || signal.aborted || isAbort(e)) return;
         const captchaFailed = failedElement(e) === undefined && !createdOnServer && (errMsg(e) === "bad_request" || solverFailed);
         if (captchaFailed) {
-          const next = attempt + 1;
-          if (next === 2 || (next === 3 && fallbackOrigin !== null)) {
+          if (attempt === 1) {
             phase = "keys";
             continue;
           }

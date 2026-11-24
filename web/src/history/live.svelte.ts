@@ -30,8 +30,11 @@ export const shares = $state({
   entries: [] as HistoryEntry[],
   /** Toutes les entrées de l'appareil (envois, reçus, salons), triées comme l'historique. */
   all: [] as HistoryEntry[],
-  /** « Garder dans mon historique » (Q-H2 : activé par défaut). */
-  enabled: true,
+  /**
+   * « Garder dans mon historique » de cet appareil (envois et salons créés) : désactivé par
+   * défaut (décision du 24 novembre, comme les téléchargements) ; la personne l'active.
+   */
+  enabled: false,
   info: {} as Record<string, ShareInfo>,
   /**
    * Compte ouvert sur cet appareil (posé par account/session.svelte.ts, jamais lu du stockage) :
@@ -46,6 +49,12 @@ export const shares = $state({
 // garde sa clé sur l'appareil, qui peut être partagé ; la personne coche si elle le veut.
 // Avec un compte : son réglage « garder les reçus ».
 export const keepReceivedDefault = (): boolean => (shares.account ? shares.account.keepReceived : false);
+/**
+ * « Garder dans mon historique » de « Lien prêt » (envoi) : sans compte, le réglage de l'appareil,
+ * désactivé par défaut (24 novembre : le lien de gestion resterait sur un appareil peut-être
+ * partagé ; « Lien prêt » le montre alors). Avec un compte : activé, l'historique suit son coffre.
+ */
+export const keepSentDefault = (): boolean => shares.account !== null || shares.enabled;
 export function setAccountPrefs(p: { keepReceived: boolean } | null): void {
   shares.account = p;
   accountFlag.connected = p !== null;
@@ -149,7 +158,7 @@ export async function loadHistory(force = false): Promise<History | null> {
     shares.entries = [];
     shares.all = [];
     presence.any = false;
-    shares.enabled = true;
+    shares.enabled = false; // aucune base : jamais activé sur cet appareil
     shares.status = "ready";
     return null;
   }

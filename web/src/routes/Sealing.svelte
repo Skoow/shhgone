@@ -44,7 +44,6 @@
       case "idle":
       case "keys":
       case "captcha":
-      case "fallback":
         return "spin" as const;
       case "upload":
         return "progress" as const;
@@ -68,7 +67,6 @@
       case "keys":
         return t("seal.keys");
       case "captcha":
-      case "fallback":
         return t("seal.phase.captcha");
       case "upload":
         return t("seal.upload");
@@ -92,7 +90,6 @@
       case "keys":
         return t("seal.sub.keys");
       case "captcha":
-      case "fallback":
         return t("seal.sub.captcha");
       case "upload":
       case "paused":
@@ -116,7 +113,6 @@
       case "keys":
         return 0;
       case "captcha":
-      case "fallback":
         return 1;
       case "upload":
       case "paused":

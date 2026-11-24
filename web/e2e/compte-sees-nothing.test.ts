@@ -109,7 +109,7 @@ describe("le serveur ne voit rien : compte par passkey", () => {
   async function preuve() {
     const r = await marked(`${srv.origin}/api/captcha`);
     const recu = Date.now();
-    const { shown_at, fallback: _f, ...defi } = (await r.json()) as Record<string, unknown>;
+    const { shown_at, ...defi } = (await r.json()) as Record<string, unknown>;
     const p = await solveAltcha(defi);
     await dormir(Math.max(0, recu + 3100 - Date.now()));
     if (p.kind !== "pow") throw new Error("preuve inattendue");

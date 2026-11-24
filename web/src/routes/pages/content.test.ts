@@ -108,6 +108,38 @@ describe("textes publics et compte par passkey", () => {
     expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
   });
 
+  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut sans compte, 7 jours, comment l'effacer (24 novembre)", () => {
+    for (const comptes of [false, true]) {
+      const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!.find((l) => l.startsWith("L'historique de vos envois"))!;
+      expect(fr).toMatch(/lien de gestion[^.]*jamais le lien de partage ni le mot de passe\./u);
+      expect(fr).toMatch(/Sans compte, il est désactivé par défaut : rien n'est gardé tant que vous n'activez pas vous-même « Garder dans mon historique »\./u);
+      expect(fr).toMatch(/7 jours après la fin/u);
+      expect(fr).toMatch(/« Effacer l'historique » dans « Mes partages » efface tout\./u);
+      const en = infoPage("confidentialite", "en", comptes).blocks.find((b) => b.h === "On your device")!.list!.find((l) => l.startsWith("The history of what you send"))!;
+      expect(en).toMatch(/management link[^.]*never the share link or the password\./u);
+      expect(en).toMatch(/Without an account, it is off by default: nothing is kept until you turn on “Keep in my history” yourself\./u);
+      expect(en).toMatch(/7 days after the share or room ends/u);
+      expect(en).toMatch(/“Clear history” in “My shares” erases it all\./u);
+    }
+    // Les libellés cités sont ceux de l'interface.
+    expect([fr["ready.keep"], fr["hist.clear"], fr["hist.remove"], fr["hist.title"]]).toEqual(["Garder dans mon historique", "Effacer l'historique", "Retirer de la liste", "Mes partages"]);
+    expect([en["ready.keep"], en["hist.clear"], en["hist.remove"], en["hist.title"]]).toEqual(["Keep in my history", "Clear history", "Remove from list", "My shares"]);
+  });
+
+  test("Sécurité, détails techniques : taille exacte (à 4 Mio près pendant l'envoi, qui commence dès l'ajout ; palier seul au repos)", () => {
+    const tech = (lang: "fr" | "en") => infoPage("securite", lang).tech!.list!.find((l) => l.startsWith(lang === "fr" ? "Taille" : "Size"))!;
+    expect(tech("fr")).toMatch(/commence dès qu'un fichier est ajouté, avant « Chiffrer et envoyer »/u);
+    expect(tech("fr")).toMatch(/Pendant l'envoi, le serveur voit la taille à 4 Mio près/u);
+    expect(tech("fr")).toMatch(/le serveur ne connaît plus que ce palier\./u);
+    expect(tech("en")).toMatch(/starts as soon as a file is added, before “Encrypt and send”/u);
+    expect(tech("en")).toMatch(/During the upload, the server sees the size to within 4 MiB/u);
+    expect(tech("en")).toMatch(/the server then knows only that tier\./u);
+    expect(fr["options.submit"]).toBe("Chiffrer et envoyer");
+    expect(en["options.submit"]).toBe("Encrypt and send");
+    expect(JSON.stringify(infoPage("securite", "fr"))).not.toMatch(/ne connaît que le palier/u);
+    expect(JSON.stringify(infoPage("securite", "en"))).not.toMatch(/only knows the tier/u);
+  });
+
   test("accueil : la carte « Partage sans compte » ne parle du compte qu'avec __COMPTES__", () => {
     expect(fr["home.priv.account.p"]).not.toMatch(/salon|empreinte|en clair/u);
     expect(fr["home.priv.account.p.comptes"]).toMatch(/Pour créer un salon, un compte sans e-mail ni mot de passe, par passkey\./u);
