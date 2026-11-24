@@ -45,7 +45,7 @@ type Detail struct {
 var details = [3]Detail{
 	{},
 	{Nom: "plus", Libelle: "Shhgone Plus", Mois: 700, An: 7000, JetonsPeriod: 30,
-		Droits: []string{"partage_plus", "premiere_ouverture", "salon_plus", "appel_audio"}},
+		Droits: []string{"partage_plus", "premiere_ouverture", "salon_plus", "appel_audio", "appel_video"}},
 	{Nom: "pro", Libelle: "Shhgone Pro", Mois: 2000, An: 20000, JetonsPeriod: 100,
 		Droits: []string{"partage_pro", "premiere_ouverture", "salon_pro", "appel_audio", "appel_video"}},
 }

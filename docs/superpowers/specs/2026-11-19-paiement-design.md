@@ -27,8 +27,8 @@
 | Compte à rebours à la première ouverture | oui | oui |
 | Partages payants par période de 30 jours (jetons) | 30 | 100 |
 | Salons payants par période de 30 jours (même réserve de jetons) | compris dans les 30 | compris dans les 100 |
-| Appels audio dans un salon | **bientôt** (DP-14, à valider) | **bientôt** |
-| Appels vidéo dans un salon | non | **bientôt** |
+| Appels audio dans un salon | **bientôt** (DP-14) | **bientôt** |
+| Appels vidéo dans un salon | **bientôt** (DP-14, décision du propriétaire, 24 novembre) | **bientôt** |
 
 Chiffres lus dans un seul endroit par couche : `web/src/limits.ts` (`PAID`) pour le site, `server/internal/paiement/offres.go` (`Offres`) pour le serveur ; un test compare les deux (prix, durées des périodes, jetons).
 
@@ -294,11 +294,11 @@ Liste fermée de droits, en texte, rendue par `/api/paiement/etat` et attachée 
 | `partage_pro` (limites Pro : 30 Gio, 2, 3 ou 7 j, 20 ouvertures) | — | oui | **fait** (tâche 12) |
 | `premiere_ouverture` (compte à rebours au premier déverrouillage) | oui | oui | §38.9.1, à coder |
 | `salon_plus`, `salon_pro` (§38.8.1 : 3 j, 20 personnes, 5 Go ; 7 j, 50 personnes, 20 Go) | `salon_plus` | `salon_pro` | à coder |
-| `appel_audio` | oui (**DP-14, à valider**) | oui | **non : bientôt** |
-| `appel_video` | — | oui | **non : bientôt** |
+| `appel_audio` | oui (DP-14) | oui | **non : bientôt** |
+| `appel_video` | oui (DP-14, décision du propriétaire, 24 novembre ; `offres.go`, `TestDroitsAppelsBientot`) | oui | **non : bientôt** |
 
 - Un jeton dépensé à la création d'un salon fixe le niveau du salon (`tier`) ; les appels liront ce niveau, jamais un pass ni un compte (même règle que les fonctions de §38.9.0 point 3).
-- **Appels : jamais vendus ni promis comme disponibles** tant qu'ils n'existent pas : sur la page Offres et les cartes des offres, une ligne « Appels audio et vidéo dans les salons · bientôt » (Pro) et « Appels audio · bientôt » (Plus), sans aucune incidence sur le prix ; les CGV disent que l'offre ne comprend pas les appels aujourd'hui. Spécification des appels à écrire avant tout code (salon v3 §8 : TURN relais seulement, SFrame, coût en bande passante).
+- **Appels : jamais vendus ni promis comme disponibles** tant qu'ils n'existent pas : sur la page Offres et les cartes des offres, une ligne « Appels audio et vidéo dans les salons · bientôt » (Plus et Pro, décision du propriétaire, 24 novembre ; avant : « Appels audio · bientôt » pour Plus), sans aucune incidence sur le prix ; les CGV disent que l'offre ne comprend pas les appels aujourd'hui. Spécification des appels à écrire avant tout code (salon v3 §8 : TURN relais seulement, SFrame, coût en bande passante).
 - Version du format : champ `v: 1` dans la réponse d'état ; un droit inconnu est ignoré par un client ancien.
 - **Limites payantes appliquées (tâche 12)** : contrôle **côté site et côté serveur**. Paliers de taille payants (`PAID_BUCKETS` du moteur, vecteurs `engine/vectors/v5-paliers.json`) ; le serveur (`share/tier.go`) fixe la formule de l'envoi d'après le jeton dépensé, vérifie palier, durée (Plus 48 ou 72 h, Pro 48, 72 ou 168 h), ouvertures (10, 20) et la fenêtre d'envoi (24 h) ; quotas du jour à part pour le payant (Plus 40 Gio par connexion /64 et 80 Gio par /48, Pro 100 et 200 Gio). Le site ne propose une formule payante que si un pass payé est sur l'appareil (Options) ; changer de formule recommence l'envoi. **Pas encore faits** : `premiere_ouverture`, salons payants, et une réserve de stockage séparée pour le payant (les partages payants partagent `SHH_STORAGE_MAX` avec les gratuits).
 
@@ -351,7 +351,7 @@ Liste fermée de droits, en texte, rendue par `/api/paiement/etat` et attachée 
 | DP-11 | Remboursement partiel : aucun effet automatique |
 | DP-12 | Rétention : commande non payée 7 jours ; commande payée jusqu'à la fin + 180 jours ; pass jusqu'à la fin + 31 jours |
 | DP-13 | Retour unique `/offres/retour`, sans paramètre ; l'état vient du serveur |
-| DP-14 | Appels audio dans Plus, audio et vidéo dans Pro, « bientôt » |
+| DP-14 | ~~Appels audio dans Plus, audio et vidéo dans Pro, « bientôt »~~ **Tranché le 24 novembre (propriétaire)** : appels audio **et** vidéo dans Plus **et** dans Pro, « bientôt » |
 
 ## 15. Signalements
 

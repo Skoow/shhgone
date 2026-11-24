@@ -130,7 +130,7 @@ func TestPaiementCommandeEtEtat(t *testing.T) {
 	e.p.evs = []paiement.Evenement{{Sorte: paiement.Confirme, Commande: c, AvecCommande: true, Ref: "pi_1", Montant: 700, Devise: "eur"}}
 	expect(t, e.do(req{method: "POST", path: "/api/paiement/webhook/stripe", body: []byte(`{"id":"evt"}`)}), 200, `{}`)
 	w = e.do(req{method: "POST", path: "/api/paiement/etat", hdr: hp, body: []byte(`{}`)})
-	if w.Code != 200 || w.Body.String() != `{"v":1,"etat":"payee","offre":"plus","fin":"2026-12-04","renouvelle":true,"droits":["partage_plus","premiere_ouverture","salon_plus","appel_audio"]}` {
+	if w.Code != 200 || w.Body.String() != `{"v":1,"etat":"payee","offre":"plus","fin":"2026-12-04","renouvelle":true,"droits":["partage_plus","premiere_ouverture","salon_plus","appel_audio","appel_video"]}` {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// Pass inconnu.

@@ -59,7 +59,8 @@ func TestFormulesPermises(t *testing.T) {
 	}
 }
 
-// TestDroitsAppelsBientot : les appels sont dans le format (conception §11) et marqués bientôt.
+// TestDroitsAppelsBientot : les appels sont dans le format (conception §11) et marqués bientôt ;
+// Plus et Pro comprennent l'audio et la vidéo (décision du propriétaire, 24 novembre).
 func TestDroitsAppelsBientot(t *testing.T) {
 	has := func(l []string, s string) bool {
 		for _, x := range l {
@@ -69,8 +70,10 @@ func TestDroitsAppelsBientot(t *testing.T) {
 		}
 		return false
 	}
-	if !has(Pro.Detail().Droits, "appel_video") || !has(Pro.Detail().Droits, "appel_audio") || has(Plus.Detail().Droits, "appel_video") {
-		t.Error("droits d'appel")
+	for _, o := range []Offre{Plus, Pro} {
+		if !has(o.Detail().Droits, "appel_video") || !has(o.Detail().Droits, "appel_audio") {
+			t.Error(o, "droits d'appel")
+		}
 	}
 	for _, b := range []string{"appel_audio", "appel_video"} {
 		if !has(Bientot, b) {
