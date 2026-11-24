@@ -324,7 +324,7 @@ Un job rouge = une faille connue : GitHub envoie un e-mail d'échec au propriét
 - **Envoi complet à travers Caddy** : `test-proxy.sh` prouve le relais (`/api/captcha`, corps d'un segment, en-têtes, octets), pas la création puis l'ouverture d'un partage par un navigateur. À faire à la main après la première installation (tests manuels de la §14).
 - **WebSocket du salon** : `test-proxy.sh` le garde ouvert 75 s à travers Caddy, en HTTP/1.1. Un WebSocket par HTTP/2 (RFC 8441, que certains navigateurs emploient) n'est pas essayé, et l'essai court ne dépasse pas les délais de Caddy : la première coupure possible est à **5 min** (`read_body 5m`). L'essai long se lance avec `SALON_GARDE=660`. Conditions bloquantes d'activation : §10.
 
-## 10. Salon (désactivé)
+## 10. Salon (activé)
 
 Le salon (spécification §39 et `docs/superpowers/specs/2026-11-11-salon-v3-design.md`) est **activé** depuis la décision du propriétaire du 19 novembre (le compte, ouvert le même jour, l'exige) : `compose.yaml` pose `SHH_SALONS: "1"`. **Risque assumé par le propriétaire** : l'avis du juriste sur l'hébergement des conversations chiffrées (Q-SAL8, §39.7) n'a pas été demandé (`docs/ouverture-comptes.md`). Le couper : `SHH_SALONS: "0"` (et `SHH_COMPTES: "0"`, qui l'exige). Avec `SHH_SALONS=0`, aucune route `/api/salons/*` n'existe (même réponse 404 qu'une route inconnue).
 
