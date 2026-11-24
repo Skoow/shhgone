@@ -556,6 +556,7 @@ En cas de doute sur la sécurité du serveur ou du code :
 2. Changer les accès (SSH, GitHub, registraire).
 3. Réinstaller le serveur depuis zéro.
 4. Publier un avis sur le site.
+5. **Violation de données personnelles (RGPD art. 33 et 34 ; ajouté le 24 novembre)** : quand elle touche `comptes.db`, `paiements.db` ou une de leurs sauvegardes, ou quand le serveur a été pris (adresses IP et pass en direct, code du site modifiable) : (a) **notification à la CNIL dans les 72 heures** après sa découverte, sauf absence de risque pour les personnes (raison écrite au registre) ; (b) **information des personnes concernées** quand le risque est élevé : faute d'e-mail ou de téléphone (aucun n'est collecté), par un **avis sur le site** (accueil et page Sécurité), communication publique permise par l'art. 34.3 c ; inutile pour des données restées illisibles (art. 34.3 a) ; (c) **registre des violations** (art. 33.5), tenu hors du serveur comme le registre des retraits, modèle `docs/juridique/registre-violations-modele.md`. Procédure détaillée : `deploy/README.md` §6.
 
 ---
 
