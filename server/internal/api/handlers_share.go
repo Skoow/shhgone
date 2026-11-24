@@ -331,7 +331,9 @@ func (s *server) finalize(w http.ResponseWriter, r *http.Request) {
 	req.ProofV, errs[1] = secret(b.ProofV, 32)
 	req.Envelope, errs[2] = secret(b.Envelope, share.EnvelopeLen)
 	// fill_from et fill_to ensemble, ou aucun des deux (spec §36 S4, Q-MIN1 : le navigateur a
-	// envoyé lui-même tout le bourrage ; tous les segments sont alors exigés).
+	// envoyé lui-même tout le bourrage ; tous les segments sont alors exigés). Ancienne
+	// finalisation sans brouillon : le mode « au clic » qu'elle servait est abandonné (24
+	// novembre) et aucun client ne l'appelle ; gardée comme banc des tests, à retirer (spec H-5).
 	if errs != [3]error{} || (b.FillFrom == nil) != (b.FillTo == nil) {
 		fail(w, errBadRequest)
 		return
