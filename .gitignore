@@ -18,3 +18,7 @@ web/src/paiement/pkg/
 
 # Captures des tests du navigateur (ui-e2e), jamais versionnées
 .superpowers/
+
+# Binaires construits localement (go build), jamais versionnés
+server/cmd/shhdrop/shhdrop
+deploy/shhcheck/shhcheck
