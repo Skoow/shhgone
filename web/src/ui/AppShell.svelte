@@ -97,6 +97,8 @@
         // « Open source sur GitHub » ; la licence (AGPL-3.0) est dite sur GitHub, plus dans le pied
         // (décision du propriétaire du 17 novembre).
         { label: t("foot.source"), url: SOURCE_URL },
+        // « Vérifier cette version » (spec §28.4) : liée depuis le pied de page et la page Sécurité.
+        { label: t("foot.verify"), path: "/verifier" },
         { label: t("foot.report"), path: "/signaler", report: true },
       ],
     },

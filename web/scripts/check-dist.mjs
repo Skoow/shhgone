@@ -117,7 +117,7 @@ const ACCOUNT_TRACES = ["/api/compte", "shhdrop-compte"];
 
 /** Rend la liste des problèmes (vide si tout va bien). `comptes` : build de production avec __COMPTES__ (la démo l'a toujours). */
 /** Pages d'information servies par leur propre fichier (vite.config.ts, PAGE_PATHS). */
-export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html", "conditions.html", "mentions-legales.html", "signaler.html"];
+export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html", "conditions.html", "mentions-legales.html", "signaler.html", "verifier.html"];
 /** Versions anglaises (pages bilingues du 20 novembre, src/app/langues.ts), production seulement : accueil et pages d'information. */
 export const EN_PAGES = ["en.html", ...INFO_PAGES.map((p) => "en-" + p)];
 
@@ -243,6 +243,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     if (INFO_PAGES.includes(f.rel) || EN_PAGES.includes(f.rel) || f.rel === "index.html" || f.rel === "app.html" || f.rel === "404.html")
       text = text
         .replace(/<a\b[^>]*\shref="https:\/\/[^"]*"[^>]*>/g, "<a>")
+        // Page « Vérifier cette version » (spec §28.4) : les commandes à recopier citent des
+        // adresses en texte, dans <pre data-cmd><code>…</code></pre>. Seul un texte sans aucune
+        // balise est admis (rien ne s'y charge) ; une balise dedans laisse tout le bloc contrôlé.
+        .replace(/<pre\b[^>]*\sdata-cmd(?:="")?(?:\s[^>]*)?><code>[^<]*<\/code><\/pre>/g, "<pre></pre>")
         .replace(/<link rel="(?:canonical|alternate" hreflang="(?:fr|en|x-default))" href="https:\/\/shhgone\.com\/[a-z/-]*" \/>/g, "");
     for (const url of findExternalUrls(text)) problems.push(`${f.rel} : adresse externe « ${url} » (aucune ressource tierce)`);
   }
