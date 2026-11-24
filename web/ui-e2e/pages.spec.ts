@@ -99,7 +99,7 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   // Gratuit : l'offre en cours, rien à choisir.
   await expect(co.locator('[data-tier="free"] input')).toHaveCount(0);
   await expect(co.locator("[data-summary]")).toHaveCount(0);
-  await co.locator('[data-tier="pro"]').getByText("Choisir Pro").click();
+  await co.locator('[data-tier="pro"] .big').click();
   const sum = co.locator("[data-summary]");
   expect(norm(await sum.innerText())).toMatch(/Pro · Mensuel · 20 € \/ mois/);
   // Paiement pas ouvert sur ce serveur (sans SHH_PAIEMENT) : le bouton le dit, aucun prélèvement.

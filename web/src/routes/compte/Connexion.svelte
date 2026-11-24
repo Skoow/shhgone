@@ -15,6 +15,7 @@
   import { announce } from "../../ui/announce";
   import Banner from "../../ui/Banner.svelte";
   import Button from "../../ui/Button.svelte";
+  import { KeyRound, User } from "../../ui/Icon";
   import TextField from "../../ui/TextField.svelte";
   import Cadre from "./Cadre.svelte";
   import Case from "./Case.svelte";
@@ -153,14 +154,88 @@
     <p class="note" data-sans-passkey>{t("account.nopasskey")}</p>
     <ul class="liens"><li><a href={href(versCle)} onclick={(e) => followLink(e, versCle)}>{t("account.login.key")}</a></li></ul>
   {:else}
-    <form novalidate onsubmit={(e) => e.preventDefault()}>
-      <Case label={t("account.stay")} bind:checked={rester} />
+    <!-- 24 novembre (propriétaire) : « Rester connecté » sous le bouton ; les deux autres chemins
+         en boutons secondaires, après un séparateur « ou ». -->
+    <form novalidate class="connexion" onsubmit={(e) => e.preventDefault()}>
       <Button type="submit" onpress={connecter}>{envoi ? t("account.verifying") : t("account.login.passkey")}</Button>
+      <Case label={t("account.stay")} bind:checked={rester} />
     </form>
-    <!-- « Créer un compte » à droite (propriétaire, 20 novembre). -->
-    <ul class="liens split">
-      <li><a href={href(versCle)} onclick={(e) => followLink(e, versCle)} data-cle>{t("account.login.key")}</a></li>
-      <li><a href={href(versInscription)} onclick={(e) => followLink(e, versInscription)} data-create>{t("account.login.create")}</a></li>
+    <p class="ou" aria-hidden="true"><span>{t("account.login.or")}</span></p>
+    <ul class="autres">
+      <li><a class="autre" href={href(versCle)} onclick={(e) => followLink(e, versCle)} data-cle><KeyRound size={18} strokeWidth={2} aria-hidden="true" />{t("account.login.key")}</a></li>
+      <li><a class="autre" href={href(versInscription)} onclick={(e) => followLink(e, versInscription)} data-create><User size={18} strokeWidth={2} aria-hidden="true" />{t("account.login.create")}</a></li>
     </ul>
   {/if}
 </Cadre>
+
+<style>
+  /* « Rester connecté » centré sous le bouton (24 novembre). */
+  .connexion {
+    gap: var(--sp-3);
+  }
+  .connexion :global(.case) {
+    justify-self: center;
+  }
+  /* Séparateur « ou » : deux filets et le mot au milieu. */
+  .ou {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--fs-small);
+  }
+  .ou::before,
+  .ou::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--hair-2);
+  }
+  .autres {
+    display: grid;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* Liens en forme de bouton secondaire, icône à gauche, texte centré. */
+  .autre {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-height: 48px;
+    padding: 0 20px;
+    border: 1px solid var(--hair-2);
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.045);
+    box-shadow: var(--edge-hi);
+    color: var(--text);
+    font-size: 0.9375rem;
+    font-weight: 560;
+    text-decoration: none;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out);
+  }
+  .autre :global(svg) {
+    color: var(--accent);
+  }
+  @media (hover: hover) {
+    .autre:hover {
+      background: rgb(255 255 255 / 0.08);
+      border-color: rgb(233 236 242 / 0.2);
+    }
+  }
+  .autre:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (forced-colors: active) {
+    .autre {
+      border-color: ButtonText;
+    }
+  }
+</style>

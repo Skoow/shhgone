@@ -19,6 +19,7 @@
   import { CONTENT_MAX, MAX_OPENS, PAID, TTL_MAX_HOURS, type PaidTier } from "../limits";
   import { commander, lireOffre, type ErreurCommande, type Moyen, type OffreServeur, type Preuve } from "../paiement/api";
   import { garder, idbDuNavigateur, nouvelId, oublier, tirerPass } from "../paiement/pass";
+  import { paysProbable } from "../paiement/pays";
   import { href } from "../app/router.svelte";
   import { LimiteDefi, obtenirPreuve, preparerPreuve } from "../paiement/preuve";
   import { Check, Lock, Timer } from "./Icon";
@@ -86,6 +87,14 @@
   const renewAsked = $derived(billing === "year" && means !== "crypto");
   const renouvelle = $derived(means === "crypto" ? false : billing === "month" ? true : renew === "auto");
   let pays = $state("");
+  // Pays proposé d'avance (24 novembre), une fois la liste du serveur lue : deviné sur l'appareil
+  // (fuseau horaire, langue), jamais envoyé avant la commande ; la personne le vérifie.
+  let propose = false;
+  $effect(() => {
+    if (propose || serveur === null) return;
+    propose = true;
+    if (pays === "") pays = paysProbable(serveur.pays);
+  });
   let waiver = $state(false);
   const regions = $derived.by(() => {
     let dn: Intl.DisplayNames | null = null;
@@ -170,8 +179,19 @@
       <fieldset class="tiers">
         <legend class="sr-only">{t("offers.choose.label")}</legend>
         {#each TIERS as x (x)}
-          <div class={["card", x, { on: chosen === x }]} data-tier={x}>
-            <p class="nm">{name(x)}{#if x === "free"}<span class="cur">{t("offers.free.now")}</span>{/if}</p>
+          <!-- Toute la carte choisit l'offre (propriétaire, 24 novembre) : clic n'importe où ; le
+               clavier passe par le bouton radio de la pastille, en haut à droite. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class={["card", x, { on: chosen === x, pickable: x !== "free" }]} data-tier={x} onclick={x === "free" ? undefined : () => (chosen = x)}>
+            <p class="nm">{name(x)}{#if x === "free"}<span class="cur">{t("offers.free.now")}</span>{:else if ferme}<span class="sbadge" data-soon>{t("offers.soon")}</span>{/if}</p>
+            {#if x !== "free"}
+              {@const tier = x}
+              <label class="pick">
+                <input type="radio" name="{uid}-tier" value={tier} bind:group={chosen} />
+                <span class="sr-only">{name(tier)}</span>
+                <span class="ring" aria-hidden="true">{#if chosen === tier}<Check size={14} strokeWidth={3} />{/if}</span>
+              </label>
+            {/if}
             <p class="big num"><span class="bv">{details(x)[0]!.v}</span> <span class="bu">{t("offers.big.unit")}</span></p>
             {#if x === "free"}
               <p class="pr num"><span class="pv">{eur(0)}</span>{" "}<span class="pu">{t("offers.card.free")}</span></p>
@@ -183,14 +203,6 @@
               <!-- Appels des salons (20 novembre) : Plus et Pro inclus (« bientôt »), Gratuit non. -->
               <li data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}{#if x !== "free"}{" "}<span class="sbadge">{t("foot.soon")}</span>{/if}</span></li>
             </ul>
-            {#if x !== "free"}
-              {@const tier = x}
-              <label class="pick">
-                <input type="radio" name="{uid}-tier" value={tier} bind:group={chosen} />
-                <span>{chosen === tier ? t("offers.chosen") : t("offers.choose", { tier: name(tier) })}{#if ferme}{" "}<span class="sbadge" data-soon>{t("offers.soon")}</span>{/if}</span>
-                {#if chosen === tier}<Check size={18} strokeWidth={2.4} aria-hidden="true" />{/if}
-              </label>
-            {/if}
           </div>
         {/each}
       </fieldset>
@@ -359,6 +371,7 @@
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   }
   .card {
+    position: relative;
     display: grid;
     align-content: start;
     gap: var(--sp-2);
@@ -456,22 +469,56 @@
     font-weight: 600;
     vertical-align: 1px;
   }
+  /* Carte cliquable en entier (24 novembre) ; pastille ronde en haut à droite : vide, puis
+     pleine et cochée quand l'offre est choisie. Zone de 44 px autour de la pastille. */
+  .card.pickable .nm {
+    padding-inline-end: 36px;
+  }
+  .card.pickable {
+    cursor: pointer;
+    transition:
+      box-shadow var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .card.pickable:not(.on):hover {
+      background: var(--surface-2);
+    }
+  }
   .pick {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-2);
-    min-height: 44px;
-    margin-block-start: var(--sp-2);
-    border-radius: var(--r-md);
-    background: var(--surface-2);
-    color: var(--text);
-    font-weight: 600;
+    position: absolute;
+    inset-block-start: 6px;
+    inset-inline-end: 6px;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--r-pill);
     cursor: pointer;
   }
-  .card.on .pick {
-    background: var(--accent);
+  .ring {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--r-pill);
+    box-shadow: inset 0 0 0 2px rgb(233 236 242 / 0.35);
     color: var(--on-accent);
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .card.on .ring {
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgb(95 227 181 / 0.18);
+  }
+  @media (forced-colors: active) {
+    .ring {
+      border: 2px solid ButtonText;
+    }
+    .card.on .ring {
+      background: Highlight;
+    }
   }
   .pick input,
   .billing input,

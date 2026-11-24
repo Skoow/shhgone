@@ -9,7 +9,7 @@
 import { fileURLToPath } from "node:url";
 import { axe, expect, test } from "./fixtures";
 
-test.use({ locale: "fr-FR", shhServer: { paiement: { webhookStripe: "whsec_e2e_test", ipnNOWPayments: "ipn-e2e" } } });
+test.use({ locale: "fr-FR", timezoneId: "Europe/Berlin", shhServer: { paiement: { webhookStripe: "whsec_e2e_test", ipnNOWPayments: "ipn-e2e" } } });
 const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-19-paiement/shots/", import.meta.url));
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 const PASS = /^[A-Za-z0-9_-]{43}$/;
@@ -22,7 +22,7 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   // Appels (20 novembre) : Plus et Pro « Inclus » avec « bientôt », Gratuit « Non inclus ».
   for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus\s+bientôt$/);
   await expect(co.locator('[data-tier="free"] [data-calls]')).toHaveText(/^Appels audio et vidéo\s+Non inclus$/);
-  await co.locator('[data-tier="pro"]').getByText("Choisir Pro").click();
+  await co.locator('[data-tier="pro"] .big').click();
   await co.locator("[data-billing]").getByText("Annuel").click();
   const sum = co.locator("[data-summary]");
   const go = sum.locator("[data-pay]");
@@ -36,6 +36,10 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   await expect(co.locator("[data-renew] input:checked")).toHaveCount(0);
   await expect(pourquoi).toHaveText("Choisissez paiement unique ou renouvellement automatique.");
   await co.locator("[data-renew]").getByText("Paiement unique").click();
+  // Pays proposé d'avance d'après le fuseau horaire de l'appareil (24 novembre), modifiable ;
+  // vidé, il bloque de nouveau.
+  await expect(co.locator("[data-pays]")).toHaveValue("DE");
+  await co.locator("[data-pays]").selectOption("");
   await expect(pourquoi).toHaveText("Choisissez votre pays de résidence.");
   // 27 pays de l'UE (plus « Choisir… »), pas le Royaume-Uni.
   await expect(co.locator("[data-pays] option")).toHaveCount(28);
@@ -114,7 +118,7 @@ test("Retour : reçu, puis arrêt du renouvellement ; en attente ; sans commande
   // Une commande Plus mensuelle (abonnement) passée sur cet appareil.
   await page.goto(shh.origin + "/offres");
   const co = page.locator("[data-checkout]");
-  await co.locator('[data-tier="plus"]').getByText("Choisir Plus").click();
+  await co.locator('[data-tier="plus"] .big').click();
   await co.locator("[data-pays]").selectOption("FR");
   await co.locator("[data-waiver]").check();
   await page.route("**/api/paiement/commande", (route) =>
