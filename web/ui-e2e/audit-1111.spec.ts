@@ -1,5 +1,4 @@
-// Corrections de l'audit du 11 novembre (docs/superpowers/audits/2026-11-11-verification-complete.md),
-// vérifiées dans le navigateur : garde du bouton Retour (I2), en-tête et pied pendant l'envoi.
+// Corrections de l'audit du 11 novembre, vérifiées dans le navigateur : garde du bouton Retour (I2), en-tête et pied pendant l'envoi.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { freshPage, sendShare, settle, unlock, pwField, unlockButton } from "./open-helpers";
