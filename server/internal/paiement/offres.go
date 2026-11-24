@@ -51,11 +51,26 @@ var details = [3]Detail{
 }
 
 // Bientot : droits prévus dans le format mais pas encore disponibles (conception §11) : jamais
-// vendus ni promis ; rendus à part par l'API pour que l'écran dise « bientôt ».
-var Bientot = []string{"appel_audio", "appel_video"}
+// vendus ni promis ; rendus à part par l'API pour que l'écran dise « bientôt ». Vide depuis le
+// 24 novembre : les appels (appel_audio, appel_video) sont un vrai droit, vérifié par
+// POST /api/salons/appel (conception des appels §5.1). Toujours une liste (jamais null en JSON).
+var Bientot = []string{}
 
 // Valide : offre connue.
 func (o Offre) Valide() bool { return o == Plus || o == Pro }
+
+// A : l'offre comprend le droit d.
+func (o Offre) A(d string) bool {
+	if !o.Valide() {
+		return false
+	}
+	for _, x := range details[o].Droits {
+		if x == d {
+			return true
+		}
+	}
+	return false
+}
 
 // Detail de l'offre (o valide).
 func (o Offre) Detail() Detail { return details[o] }

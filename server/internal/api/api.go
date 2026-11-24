@@ -348,8 +348,9 @@ func NewWithProbes(svc *share.Service, sig *token.Signer, lim *limits.Limiter, c
 // New ; indépendant du salon et du compte.
 type Salons struct {
 	Origin string
-	// Turn : relais des appels (SHH_TURN_URLS, SHH_TURN_SECRET_FILE) ; URLs vide : pas d'appels
-	// (aucune route /api/salons/appel).
+	// Turn : relais des appels (SHH_TURN_URLS, SHH_TURN_SECRET_FILE) ; URLs vide, ou paiement
+	// fermé (appels réservés aux offres payantes, 24 novembre) : pas d'appels (aucune route
+	// /api/salons/appel, `calls: false`).
 	Turn     Turn
 	M        *salon.Manager
 	Comptes  *compte.Service
@@ -380,6 +381,11 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 	api.HandleFunc("POST /api/manage/destroy", s.manageDestroy)
 	// Salon (SHH_SALONS=1) : sans gestionnaire, aucune route /api/salons/* (404 uniforme).
 	s.salons = sal.M
+	// Jetons anonymes posés avant les routes du salon : les appels en dépendent (réservés aux
+	// offres payantes, handlers_salon_appel.go).
+	if sal.Paiement != nil {
+		s.jetons = sal.Paiement.Jetons()
+	}
 	if sal.M != nil {
 		salonAPI{server: s, m: sal.M, origin: sal.Origin, comptes: sal.Comptes, turn: sal.Turn}.routes(api)
 	}
@@ -387,7 +393,6 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 		compteAPI{server: s, c: sal.Comptes}.routes(api)
 	}
 	if sal.Paiement != nil {
-		s.jetons = sal.Paiement.Jetons()
 		paiementAPI{server: s, p: sal.Paiement}.routes(api)
 	} else {
 		// Paiement fermé (audit du 20 novembre, P6) : l'offre répond 200 « aucun moyen » plutôt
