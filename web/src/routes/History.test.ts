@@ -66,3 +66,27 @@ describe("Mes partages : filtre « Reçus »", () => {
     expect(document.body.textContent).toContain("Aucun partage reçu gardé sur cet appareil.");
   });
 });
+
+describe("Mes partages : historique des envois désactivé par défaut (24 novembre)", () => {
+  it("sans compte ni choix : « L'historique est désactivé » ; « L'activer » le garde pour les envois suivants", async () => {
+    await live.setHistoryEnabled(false);
+    app = mount(History as never, { target: document.body }) as Record<string, unknown>;
+    await settle();
+    expect(document.querySelector("[data-history-empty] h2")!.textContent).toBe("L'historique est désactivé");
+    expect(document.body.textContent).toContain("Par défaut, vos envois ne sont pas gardés sur cet appareil");
+    const on = [...document.querySelectorAll("button")].find((b) => b.textContent!.trim() === "L'activer pour les prochains envois")!;
+    on.click();
+    await settle();
+    expect(live.shares.enabled).toBe(true);
+    expect(document.querySelector("[data-history-empty] h2")!.textContent).toBe("Aucun partage pour l'instant");
+    await live.setHistoryEnabled(false);
+  });
+  it("avec un compte : jamais « désactivé »", async () => {
+    await live.setHistoryEnabled(false);
+    live.setAccountPrefs({ keepReceived: true });
+    app = mount(History as never, { target: document.body }) as Record<string, unknown>;
+    await settle();
+    expect(document.querySelector("[data-history-empty] h2")!.textContent).toBe("Aucun partage pour l'instant");
+    live.setAccountPrefs(null);
+  });
+});

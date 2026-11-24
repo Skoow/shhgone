@@ -470,8 +470,16 @@ export async function openHistory(deps: { backend: Backend | null; now?: () => n
     },
     remove: (id) => b.del(id),
     clear: () => b.clear(),
-    enabled: async () => (await b.flag("off")) !== true,
-    setEnabled: (v) => b.setFlag("off", v ? undefined : true),
+    // « Garder dans mon historique » (décision du 24 novembre) : désactivé par défaut, activé
+    // seulement par un geste de la personne (setEnabled(true)) : drapeau « on ». L'ancien drapeau
+    // « off » (activé par défaut, avant le 24 novembre) ne vaut plus rien et part au premier choix.
+    // Les entrées déjà gardées restent : elles portent des liens de gestion, seul moyen de
+    // supprimer ces partages ; « Effacer l'historique » ou « Oublier » les retire.
+    enabled: async () => (await b.flag("on")) === true,
+    async setEnabled(v) {
+      await b.setFlag("on", v ? true : undefined);
+      await b.setFlag("off", undefined);
+    },
   };
   // Écriture d'essai : un stockage en lecture seule ou plein se voit tout de suite.
   try {

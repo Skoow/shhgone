@@ -179,7 +179,7 @@ test("relecture (A) : deux onglets ; B tient la base des retours, A efface l'his
   const ctx = page.context();
   // Envoi depuis ce navigateur : une entrée d'historique, donc « Effacer l'historique ».
   const sender = await ctx.newPage();
-  const sent = await sendShare(sender, shh.origin + "/", { text: TEXT, opens: 2, isMobile });
+  const sent = await sendShare(sender, shh.origin + "/", { text: TEXT, opens: 2, isMobile, keep: true });
   await sender.close();
   // Onglet B : ouvre le partage (retour écrit, connexion à la base gardée).
   const b = await ctx.newPage();

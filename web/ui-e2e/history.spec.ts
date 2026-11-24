@@ -86,8 +86,8 @@ test.describe("fr-FR", () => {
     // Repère cherché dans la base : long et hors de l'alphabet hexadécimal, il ne peut pas surgir par
     // hasard de l'hex des octets chiffrés (« 4471 » y tombait parfois), ni, en pratique, de leurs octets bruts.
     const MARK = "REPERE-HISTORIQUE-QZWXKJ";
-    const sent = await sendShare(page, shh.origin + "/", { text: `Le code de la porte est ${MARK}.`, isMobile });
-    // « Lien prêt » : bascule activée par défaut (Q-H2), avec sa phrase honnête.
+    const sent = await sendShare(page, shh.origin + "/", { text: `Le code de la porte est ${MARK}.`, isMobile, keep: true });
+    // « Lien prêt » : bascule activée par la personne (désactivée par défaut, 24 novembre), avec sa phrase honnête.
     await expect(keepSwitch(page)).toHaveAttribute("aria-checked", "true");
     await expect(page.getByText("jamais le lien de partage ni le mot de passe", { exact: false })).toBeVisible();
     await expect.poll(async () => (await rawDb(page)).count).toBe(1);
@@ -191,7 +191,7 @@ test.describe("fr-FR", () => {
     test.setTimeout(150_000);
     await page.clock.install();
     const calls = statusCalls(page);
-    await sendShare(page, shh.origin + "/", { text: "Bonjour", isMobile });
+    await sendShare(page, shh.origin + "/", { text: "Bonjour", isMobile, keep: true });
     await expect.poll(async () => (await rawDb(page)).count).toBe(1);
     await finish(page);
 
@@ -228,7 +228,7 @@ test.describe("fr-FR", () => {
 
   test("lien de gestion #m… : relecture puis « Supprimer maintenant » → l'entrée de l'historique passe à « Détruit » (test d'intrusion du 11 novembre)", async ({ page, shh, isMobile }) => {
     test.setTimeout(150_000);
-    const sent = await sendShare(page, shh.origin + "/", { text: "Bonjour", isMobile });
+    const sent = await sendShare(page, shh.origin + "/", { text: "Bonjour", isMobile, keep: true });
     await expect.poll(async () => (await rawDb(page)).count).toBe(1);
     await finish(page);
     await page.goto(sent.manage);
@@ -245,13 +245,15 @@ test.describe("fr-FR", () => {
     expect((await rawDb(page)).count).toBe(1);
   });
 
-  test("bascule désactivée sur « Lien prêt » : aucune entrée, aucune bande ; /envois dit « désactivé » et propose de l'activer", async ({ page, shh, isMobile }) => {
+  test("sans compte, bascule désactivée par défaut sur « Lien prêt » (24 novembre) : lien de gestion montré, aucune entrée, aucune bande ; /envois dit « désactivé » et propose de l'activer", async ({ page, shh, isMobile }) => {
     test.setTimeout(120_000);
-    await sendShare(page, shh.origin + "/", { text: "Rien à garder", isMobile });
-    await expect(keepSwitch(page)).toHaveAttribute("aria-checked", "true");
-    await keepSwitch(page).click();
+    const sent = await sendShare(page, shh.origin + "/", { text: "Rien à garder", isMobile });
     await expect(keepSwitch(page)).toHaveAttribute("aria-checked", "false");
-    await expect.poll(async () => (await rawDb(page)).count).toBe(0);
+    await expect(page.locator("[data-manage] .sr-only").first()).toHaveText(sent.manage);
+    await expect(page.locator("[data-keep][data-kept]")).toHaveCount(0);
+    // Rien n'est écrit dans le navigateur : pas même la base de l'historique.
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))).not.toContain("shhdrop-history");
     await finish(page);
     await page.goto(shh.origin + "/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

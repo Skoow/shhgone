@@ -1034,7 +1034,7 @@ export const fr = {
   "hist.empty.cta": "Envoyer quelque chose",
   "hist.empty.filter": "Aucun partage dans ce filtre.",
   "hist.off.title": "L'historique est désactivé",
-  "hist.off.body": "Les prochains envois ne seront pas gardés sur cet appareil.",
+  "hist.off.body": "Par défaut, vos envois ne sont pas gardés sur cet appareil\u202f: gardez vous-même le lien de gestion affiché après l'envoi.",
   "hist.off.cta": "L'activer pour les prochains envois",
   "hist.on.done": "Historique activé pour les prochains envois.",
   "hist.unavailable.title": "Historique indisponible dans ce navigateur",
@@ -1145,7 +1145,7 @@ export const fr = {
   "hist.remove": "Retirer de la liste",
   "hist.autoremove": "Retiré de la liste 7\u202fjours après la fin.",
   "ready.keep": "Garder dans mon historique",
-  "ready.keep.hint": "Sur cet appareil seulement, chiffré dans ce navigateur\u202f: le lien de gestion, le nom du partage, la taille et l'état, jamais le lien de partage ni le mot de passe. Désactivez-le sur un appareil partagé.",
+  "ready.keep.hint": "Sur cet appareil seulement, chiffré dans ce navigateur\u202f: le lien de gestion, le nom du partage, la taille et l'état, jamais le lien de partage ni le mot de passe. Laissez-le désactivé sur un appareil partagé.",
   "ready.keep.unavailable": "Historique indisponible dans ce navigateur (navigation privée stricte ou stockage refusé)\u202f: gardez vous-même le lien de gestion.",
   // Historique des téléchargements (conception compte §21.9, §21.15.5).
   "title.telechargements": "Téléchargements",

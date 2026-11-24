@@ -119,8 +119,8 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   };
   const link = await read("Lien");
   const password = await read("Mot de passe");
-  // Lien de gestion : montré seulement sans historique (19 novembre).
-  await page.getByRole("switch", { name: "Garder dans mon historique" }).click();
+  // Lien de gestion : montré seulement sans historique (19 novembre), désactivé par défaut (24 novembre).
+  await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveAttribute("aria-checked", "false");
   const manage = (await page.locator("[data-manage] .sr-only").first().textContent()) ?? "";
 
   const rc = await browser.newContext(ctxOpts);

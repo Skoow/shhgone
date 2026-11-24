@@ -1031,7 +1031,7 @@ export const en = {
   "hist.empty.cta": "Send something",
   "hist.empty.filter": "No share in this filter.",
   "hist.off.title": "History is turned off",
-  "hist.off.body": "Your next shares will not be kept on this device.",
+  "hist.off.body": "By default, your shares are not kept on this device: save the management link shown after sending.",
   "hist.off.cta": "Turn it on for next shares",
   "hist.on.done": "History turned on for your next shares.",
   "hist.unavailable.title": "History unavailable in this browser",
@@ -1142,7 +1142,7 @@ export const en = {
   "hist.remove": "Remove from list",
   "hist.autoremove": "Removed from the list 7\u00a0days after it ended.",
   "ready.keep": "Keep in my history",
-  "ready.keep.hint": "On this device only, encrypted in this browser: the management link, the share name, size and status, never the share link or the password. Turn it off on a shared device.",
+  "ready.keep.hint": "On this device only, encrypted in this browser: the management link, the share name, size and status, never the share link or the password. Leave it off on a shared device.",
   "ready.keep.unavailable": "History unavailable in this browser (strict private browsing or storage refused): keep the management link yourself.",
   // Download history (account design §21.9, §21.15.5).
   "title.telechargements": "Downloads",

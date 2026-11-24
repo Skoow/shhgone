@@ -11,7 +11,13 @@ test("démo : envoi → « Vos envois » (en mémoire), aucune base IndexedDB d'
   await addText(page, "Démo");
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveAttribute("aria-checked", "true");
+  // Désactivé par défaut (24 novembre) : la personne l'active.
+  const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
+  await expect(keep).toHaveAttribute("aria-checked", "false");
+  await expect(keep).toBeEnabled();
+  await keep.click();
+  await expect(keep).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator("[data-keep][data-kept]")).toHaveCount(1);
   await page.getByRole("button", { name: "Terminé" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Terminer" }).or(page.locator(".ready").getByRole("button", { name: "Terminer" })).filter({ visible: true }).first().click();
   await expect(readyHeading(page)).toBeHidden();

@@ -25,7 +25,7 @@
   import { canShareLink, haptic, shareText } from "../ui/native";
   import Sheet from "../ui/Sheet.svelte";
   import Switch from "../ui/Switch.svelte";
-  import { forgetShare, loadHistory, markDestroyed, recordShare, setHistoryEnabled, shares } from "../history/live.svelte";
+  import { forgetShare, keepSentDefault, loadHistory, markDestroyed, recordShare, setHistoryEnabled, shares } from "../history/live.svelte";
   import "../ui/seal.css";
 
   /** `title` : nom du partage tel que le moteur l'a écrit (nettoyé, 19 novembre) ; absent sans nom. */
@@ -54,13 +54,16 @@
     t("ready.selfdestruct", { opens: t("ready.opens", { n: maxOpens }), ttl: formatDuration(ttlHours * 3600, lang) }),
   );
 
-  // ---------- « Garder dans mon historique » (spec §33, §33.1 ; Q-H2 : activé par défaut) ----------
-  // Gardé dès l'affichage (fermer l'onglet sans « Terminé » ne le perd pas) : le lien de gestion,
+  // ---------- « Garder dans mon historique » (spec §33, §33.1) ----------
+  // Sans compte : désactivé par défaut (décision du 24 novembre), le lien de gestion est alors
+  // montré ici ; activé par la personne, le réglage vaut pour les envois suivants. Avec un
+  // compte : activé (keepSentDefault). Une fois activé, gardé dès l'affichage (fermer l'onglet
+  // sans « Terminé » ne le perd pas) : le lien de gestion,
   // l'heure locale, la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures et le
   // nom du partage (19 novembre) ; jamais le lien de partage, le mot de passe ni les noms des
   // éléments. Désactiver retire l'entrée et vaut pour les prochains envois. Opérations à la file : une bascule rapide garde l'ordre.
   const createdAt = Date.now();
-  let keep = $state(true);
+  let keep = $state(false);
   let keepReady = $state(false);
   let keepId: string | null = $state(null); // lu par data-kept : entrée réellement écrite
   let chain: Promise<void> = Promise.resolve();
@@ -75,7 +78,7 @@
     untrack(() =>
       queue(async () => {
         await loadHistory();
-        keep = shares.status === "ready" && shares.enabled;
+        keep = shares.status === "ready" && keepSentDefault();
         keepReady = true;
         if (keep) await save();
       }),
