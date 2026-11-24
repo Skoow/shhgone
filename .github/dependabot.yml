@@ -2,13 +2,17 @@ version: 2
 updates:
   # cooldown : une version n'est proposée que 7 jours après sa publication, le temps que
   # les paquets piégés soient repérés et retirés (audit du 5 novembre, M2). Les mises à
-  # jour de sécurité de Dependabot n'attendent pas.
+  # jour de sécurité de Dependabot n'attendent pas. Une version majeure attend 14 jours
+  # (semver-major-days, décision du propriétaire du 24 novembre) ; Dependabot n'applique ce
+  # réglage qu'aux écosystèmes à versions SemVer (pour github-actions, docker et docker-compose,
+  # selon l'étiquette, default-days peut seul s'appliquer).
   - package-ecosystem: npm
     directory: /web
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+      semver-major-days: 14
   # Outil de vérification des composants Svelte (npm run check), verrou à part (M10).
   - package-ecosystem: npm
     directory: /web/tools/svelte-check
@@ -16,12 +20,14 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+      semver-major-days: 14
   - package-ecosystem: gomod
     directory: /server
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+      semver-major-days: 14
   # Moteur Rust (engine/Cargo.lock). wasm-bindgen, js-sys et wasm-bindgen-futures sont publiés
   # ensemble et épinglés par « = » : une seule proposition pour les trois. Une montée de
   # wasm-bindgen demande aussi de changer la version de wasm-bindgen-cli (0.2.130) dans
@@ -37,6 +43,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+      semver-major-days: 14
     groups:
       wasm-bindgen:
         patterns: ["wasm-bindgen", "wasm-bindgen-futures", "js-sys"]
@@ -46,6 +53,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+      semver-major-days: 14
   # Images de base de deploy/Dockerfile (étiquette ET empreinte, M10). Chaque image doit rester
   # alignée sur sa source de vérité, sinon le build ou la comparaison avec la CI échoue (job
   # repro-docker) : rust = engine/rust-toolchain.toml, node = web/.node-version, golang ≥
@@ -57,6 +65,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+      semver-major-days: 14
   # Image de Caddy de deploy/compose.yaml (2.10 au minimum). Avant fusion : relancer
   # deploy/test-proxy.sh avec ce binaire (la CI le fait, job repro-docker).
   - package-ecosystem: docker-compose
@@ -65,3 +74,4 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+      semver-major-days: 14
