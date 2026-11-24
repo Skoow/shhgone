@@ -411,7 +411,8 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	lim.SetSegmentsPerMin(cfg.Capacity.SegmentsPerMin)
 	svc, err := share.NewService(share.Config{DB: db, OnAbandon: func(id string, _ int) { lim.AbandonUpload(id) },
 		Blobs: &blob.Store{Dir: filepath.Join(cfg.DataDir, "blobs"), NoSparse: cfg.BehindProxy, Gate: gate},
-		Now:   cfg.Now, StorageMax: cfg.StorageMaxBytes, FrozenFile: filepath.Join(cfg.DataDir, "frozen"), Vidage: vidage})
+		Now:   cfg.Now, StorageMax: cfg.StorageMaxBytes, FrozenFile: filepath.Join(cfg.DataDir, "frozen"), Vidage: vidage,
+		EgressMax: cfg.ShareEgressMax})
 	if err != nil {
 		return err
 	}

@@ -221,9 +221,9 @@ func (s *Service) openOnce(parent context.Context, id string, n, openN int) (seg
 		return nil, false, 0, errRetry
 	}
 	// Compté après l'ouverture réussie : une erreur du serveur ne consomme pas le budget.
-	if !s.budget.charge(k, size, s.budgetLocked(k, bucket), now) {
+	if err := s.budget.chargeAll(k, size, s.budgetLocked(k, bucket), s.egressMax, now); err != nil {
 		sec.Close()
-		return nil, false, 0, ErrBudget
+		return nil, false, 0, err
 	}
 	return s.startLocked(parent, k, sec, size, func() { sec.Close() }, nil), false, 0, nil
 }
@@ -275,8 +275,8 @@ func (s *Service) serveDetachedLocked(parent context.Context, id string, d *deta
 		return nil, ErrBadSegment
 	}
 	size := int64(SegmentSize(d.bucket, n))
-	if !s.budget.charge(k, size, s.budgetLocked(k, d.bucket), now) {
-		return nil, ErrBudget
+	if err := s.budget.chargeAll(k, size, s.budgetLocked(k, d.bucket), s.egressMax, now); err != nil {
+		return nil, err
 	}
 	d.refs++
 	sec := io.NewSectionReader(s.Blobs.ReaderAt(d.f), segOffset(d.bucket, n), size) // sous la borne des appels de fichiers

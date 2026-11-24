@@ -41,6 +41,9 @@ var (
 	ErrBusy = errors.New("finalisation déjà en cours")
 	// ErrBudget : l'ouverture a déjà lu son budget d'octets (ReadBudget).
 	ErrBudget = errors.New("budget de lecture épuisé")
+	// ErrEgressLimit : le partage a servi son plafond d'octets, toutes ouvertures confondues
+	// (DefaultEgressMax) ; définitif pour ce partage (403 egress_limit).
+	ErrEgressLimit = errors.New("plafond de téléchargement du partage atteint")
 )
 
 // BadPassword : mot de passe faux, avec les essais restants (0 = partage détruit).
@@ -155,6 +158,9 @@ type Config struct {
 	// un Vidage propre au service, sans boucle (commandes d'administration, tests : seuls les
 	// vidages faits dans l'appelant, Maintenant, ont lieu).
 	Vidage *store.Vidage
+	// EgressMax (SHH_SHARE_EGRESS_MAX) : octets servis au plus par un partage, toutes
+	// ouvertures confondues ; 0 : DefaultEgressMax ; négatif : refusé.
+	EgressMax int64
 }
 
 // NewService valide la configuration : une valeur zéro ne doit jamais désactiver le gel
@@ -171,9 +177,14 @@ func NewService(c Config) (*Service, error) {
 		return nil, errors.New("share : StorageMax doit être > 0")
 	case c.FrozenFile == "" || !filepath.IsAbs(c.FrozenFile):
 		return nil, errors.New("share : FrozenFile doit être un chemin absolu")
+	case c.EgressMax < 0:
+		return nil, errors.New("share : EgressMax doit être ≥ 0")
 	}
 	s := &Service{DB: c.DB, Blobs: c.Blobs, Now: c.Now, StorageMax: c.StorageMax, FrozenFile: c.FrozenFile,
-		OnAbandon: c.OnAbandon, KillWait: c.KillWait, ExtraUsed: c.ExtraUsed, Vidage: c.Vidage}
+		OnAbandon: c.OnAbandon, KillWait: c.KillWait, ExtraUsed: c.ExtraUsed, Vidage: c.Vidage, egressMax: c.EgressMax}
+	if s.egressMax == 0 {
+		s.egressMax = DefaultEgressMax
+	}
 	if s.Vidage == nil {
 		s.Vidage = store.NewVidage(c.DB)
 	}
@@ -208,7 +219,8 @@ type Service struct {
 	// lecture ; Erase, Grow, la fin de Finalize et sweepOne en écriture, pour attendre la
 	// fin des écritures en vol de cet envoi. Jamais deux à la fois : aucun ordre à tenir.
 	uploadMus [256]sync.RWMutex
-	budget    readBudget // octets lus par ouverture, en mémoire seulement
+	budget    readBudget // octets lus par ouverture et par partage, en mémoire seulement
+	egressMax int64      // plafond de sortie par partage (Config.EgressMax)
 	// mem : échéances d'envoi, minute du dernier segment reçu et purge des « draining », en
 	// mémoire seulement (spec §36 S5, S12) : un redémarrage efface de toute façon ces partages
 	// (PurgeAtStart), aucun jeton n'y survivant.
@@ -991,9 +1003,10 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 	}
 	now := s.now()
 	var accessV, proofV, envelope []byte
-	err := s.DB.QueryRow(`SELECT access_v, proof_v, envelope FROM shares WHERE id=? AND state='ready' AND expires_at>?
+	var bucket int
+	err := s.DB.QueryRow(`SELECT access_v, proof_v, envelope, bucket FROM shares WHERE id=? AND state='ready' AND expires_at>?
 		AND failed_attempts<? AND proof_v IS NOT NULL AND envelope IS NOT NULL`, id, now, maxAttempts).
-		Scan(&accessV, &proofV, &envelope)
+		Scan(&accessV, &proofV, &envelope, &bucket)
 	if err != nil {
 		return Opened{}, notFound(err)
 	}
@@ -1001,6 +1014,12 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 		return Opened{}, ErrNotFound // ne compte pas comme essai
 	}
 	if match(kPreuve, proofV) {
+		// Plafond de sortie (décision du 24 novembre) : une nouvelle ouverture n'est consommée
+		// que si un téléchargement complet tient encore sous le plafond du partage ; sinon
+		// ErrEgressLimit, sans ouverture ni essai consommé. Dit seulement à qui a le mot de passe.
+		if s.budget.shareUsed(id, now) > s.egressMax-totalSize(bucket) {
+			return Opened{}, ErrEgressLimit
+		}
 		var openN, left int
 		var state string
 		var exp int64

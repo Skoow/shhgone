@@ -19,6 +19,10 @@ type Config struct {
 	DataDir         string // SHH_DATA_DIR : chemin absolu (audit F5)
 	Listen          string // SHH_LISTEN : boucle locale, sauf derrière un proxy déclaré (audit M3)
 	StorageMaxBytes int64
+	// ShareEgressMax (SHH_SHARE_EGRESS_MAX, octets, au moins 32 Gio) : octets servis au plus
+	// par un partage, toutes ouvertures confondues (décision du propriétaire du 24 novembre) ;
+	// 0 (absent) : share.DefaultEgressMax (250 Gio).
+	ShareEgressMax int64
 	// BehindProxy (SHH_BEHIND_PROXY=1) : une requête sans X-Shh-Client-IP valide, ou venue
 	// d'un pair qui n'est pas un proxy de confiance, est refusée au lieu de partager les
 	// limites de l'adresse locale. Active aussi le refus des fichiers creux (audit F6).
@@ -79,6 +83,10 @@ type Config struct {
 	Pay      Paiement
 }
 
+// minShareEgress : share.MinEgressMax (un téléchargement complet du plus grand palier payant) ;
+// même valeur vérifiée par TestFromEnvShareEgressMax (config ne dépend d'aucun autre paquet).
+const minShareEgress int64 = 32 << 30
+
 func FromEnv() (Config, error) {
 	c := Config{
 		Listen:          "127.0.0.1:8080",
@@ -101,6 +109,13 @@ func FromEnv() (Config, error) {
 			return Config{}, fmt.Errorf("SHH_STORAGE_MAX invalide: %q", v)
 		}
 		c.StorageMaxBytes = n
+	}
+	if v := os.Getenv("SHH_SHARE_EGRESS_MAX"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n < minShareEgress || !digits(v) || v[0] == '0' {
+			return Config{}, fmt.Errorf("SHH_SHARE_EGRESS_MAX invalide (octets, au moins %d) : %q", minShareEgress, v)
+		}
+		c.ShareEgressMax = n
 	}
 	switch v := os.Getenv("SHH_BEHIND_PROXY"); v {
 	case "", "0":

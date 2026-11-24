@@ -629,6 +629,10 @@ func fail(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusTooManyRequests, "reopen_limit")
 	case errors.Is(err, share.ErrBudget):
 		writeRetry(w, http.StatusTooManyRequests, "budget", budgetRetry)
+	case errors.Is(err, share.ErrEgressLimit):
+		// Plafond de sortie du partage (SHH_SHARE_EGRESS_MAX) : définitif, aucun délai utile.
+		// Seulement derrière le mot de passe (unlock) ou un jeton signé (segment).
+		writeErr(w, http.StatusForbidden, "egress_limit")
 	case errors.Is(err, share.ErrFrozen):
 		writeErr(w, http.StatusServiceUnavailable, "frozen")
 	default:

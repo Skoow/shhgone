@@ -8,6 +8,8 @@
 #                  Doit contenir « data » et « caddy » (compte 65532, mode 0700).
 # Variables facultatives :
 #   SHH_STORAGE_MAX  plafond de stockage en octets (défaut : 200 Gio, spec §24)
+#   SHH_SHARE_EGRESS_MAX  octets servis au plus par un partage, toutes ouvertures confondues
+#                    (défaut : 250 Gio, au moins 32 Gio ; README §11, décision du 24 novembre)
 #   SHH_UPLOADS_MAX, SHH_DOWNLOADS_MAX, SHH_WATCH_MAX, SHH_WS_MAX, SHH_DISK_OPS_MAX : capacité
 #                    (défaut : calculée d'après GOMEMLIMIT et nofile, README §11)
 #   SHH_SALONS_MAX   salons vivants au plus (défaut : 200 ; 50 proposé pour un usage personnel),
@@ -80,6 +82,7 @@ services:
       # où Caddy écoute. /32 : le serveur ne croit X-Shh-Client-IP de personne d'autre.
       SHH_TRUSTED_PROXY: 172.30.53.1/32
       SHH_STORAGE_MAX: ${SHH_STORAGE_MAX:-214748364800}
+      SHH_SHARE_EGRESS_MAX: ${SHH_SHARE_EGRESS_MAX:-}
       # Salon (spec §39, plan C-2) : ACTIVÉ (décision du propriétaire du 19 novembre, avec le
       # compte, qui l'exige), sans l'avis du juriste sur l'hébergement des conversations
       # (Q-SAL8, §39.7), risque écrit dans docs/ouverture-comptes.md. Le couper : "0" ici.
