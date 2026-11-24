@@ -10,8 +10,9 @@ const FIN: FinalizeBody = {
   envelope: "e".repeat(80),
   ttl_hours: 1,
   max_opens: 2,
-  fill_from: 3,
-  fill_to: 6,
+  bucket: 400,
+  header: "h".repeat(64),
+  tail: "t".repeat(87403),
 };
 
 afterEach(() => {

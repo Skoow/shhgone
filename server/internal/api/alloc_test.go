@@ -53,7 +53,7 @@ func TestPutSegmentBodyRead(t *testing.T) {
 	}
 
 	expect(t, e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken),
-		body: mustJSON(k.finBody(1, 1))}), 200, "")
+		body: mustJSON(k.finSent(1, 1, 80, [][]byte{seg0, seg1}))}), 200, "")
 	tok, _ := e.unlock(t, c.ID, k)
 	for n, want := range [][]byte{seg0, seg1} {
 		got := e.do(req{method: "GET", path: "/api/shares/segments/" + string(rune('0'+n)), hdr: auth(tok)})

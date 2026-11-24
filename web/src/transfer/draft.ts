@@ -893,7 +893,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       forget(r);
       forget(ak.kEnv);
       throwIfAborted(f.signal);
-      const body: api.DraftFinalizeBody = {
+      const body: api.FinalizeBody = {
         salt: b64u(salt),
         kdf_ops: KDF_CREATE.ops,
         kdf_mem: KDF_CREATE.mem,

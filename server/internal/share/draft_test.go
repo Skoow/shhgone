@@ -3,6 +3,7 @@ package share
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -443,10 +444,19 @@ func TestFinalizeDraftVoidValidation(t *testing.T) {
 			t.Fatal(v[:min(len(v), 2)], err)
 		}
 	}
-	r := fin(id)
-	r.Void = [][2]int{{0, 1}}
-	if err := ValidateFinalize(r); !errors.Is(err, ErrBadRequest) {
-		t.Fatal("void hors brouillon", err)
+	// Spec H-5 : plus de finalisation hors brouillon ; sans palier final, en-tête ni
+	// manifeste, toute finalisation est refusée (l'ancienne forme, bourrage compris).
+	for _, mut := range []func(*FinalizeReq){
+		func(r *FinalizeReq) { r.Bucket, r.Header, r.Tail = 0, nil, nil },
+		func(r *FinalizeReq) { r.Bucket = 0 },
+		func(r *FinalizeReq) { r.Header = nil },
+		func(r *FinalizeReq) { r.Tail = nil },
+	} {
+		r := fin(id)
+		mut(&r)
+		if err := ValidateFinalize(r); !errors.Is(err, ErrBadRequest) {
+			t.Fatal("finalisation hors brouillon", err)
+		}
 	}
 }
 
@@ -454,8 +464,8 @@ func TestFinalizeDraftVoidValidation(t *testing.T) {
 // une plage de morceaux du même envoi est refusé (ErrBusy) : sinon l'aléa du bourrage pouvait
 // écraser des données reçues au même moment, ou l'inverse.
 func TestPutRefusedDuringFinalize(t *testing.T) {
-	for _, draft := range []bool{false, true} {
-		t.Run(map[bool]string{false: "classique", true: "brouillon"}[draft], func(t *testing.T) {
+	for _, bucket := range []int{160, 80} {
+		t.Run(fmt.Sprint("palier final ", bucket), func(t *testing.T) {
 			s, _ := newSvc(t)
 			id, _, err := s.createAny(newKeys().req(160, 1, 1))
 			if err != nil {
@@ -474,12 +484,7 @@ func TestPutRefusedDuringFinalize(t *testing.T) {
 				return orig(w, off, b)
 			}
 			t.Cleanup(func() { fillWrite = orig })
-			r := fin(id)
-			if draft {
-				r = draftFin(id, 160)
-			} else {
-				r.FillFrom, r.FillTo = 1, 2
-			}
+			r := draftFin(id, bucket)
 			done := make(chan error, 1)
 			go func() { _, err := s.Finalize(id, r); done <- err }()
 			<-started
@@ -497,15 +502,15 @@ func TestPutRefusedDuringFinalize(t *testing.T) {
 	}
 }
 
-// Audit F6 : une finalisation refusée (envoi incomplet) rend la main : les segments manquants
-// sont de nouveau acceptés.
+// Audit F6 : une finalisation refusée après la fermeture de l'envoi (ici, palier final plus
+// grand que la réservation) rend la main : les segments manquants sont de nouveau acceptés.
 func TestPutAcceptedAfterFailedFinalize(t *testing.T) {
 	s, _ := newSvc(t)
 	id, _, err := s.createAny(newKeys().req(160, 1, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Finalize(id, fin(id)); !errors.Is(err, ErrIncomplete) {
+	if _, err := s.Finalize(id, draftFin(id, 400)); !errors.Is(err, ErrBadRequest) {
 		t.Fatal(err)
 	}
 	if err := s.PutSegment(id, 0, segBody(160, 0, 1)); err != nil {

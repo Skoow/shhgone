@@ -29,6 +29,14 @@ Chez l'hébergeur et le registraire :
 - instantanés et sauvegardes de la machine **désactivés** chez l'hébergeur, aucun agent de surveillance de l'hébergeur ;
 - **aucun outil qui ouvre `shares.db` pendant que le serveur tourne** (seule exception, pour `comptes.db` et non `shares.db` : la sauvegarde quotidienne du compte, §12.4, qui la lit une seconde environ) (sauvegarde à chaud, réplication de type Litestream, `sqlite3` pour « regarder ») : un lecteur d'un autre processus empêche le vidage du journal de la base (`shares.db-wal`), qui garde alors les lignes des partages et des salons déjà effacés. Le tableau de bord d'administration l'affiche (« Vidages de la base ratés ») ; le compte doit rester à 0 (audit adverse du 13 novembre, stockage, F3) ;
 - DNS : `A` et `AAAA` vers le serveur ; **DNSSEC** activé ; `CAA 0 issue "letsencrypt.org"`, puis, après le premier certificat, lié à **notre** compte ACME : `CAA 0 issue "letsencrypt.org; accounturi=<URI du compte>"` (l'URI est dans le fichier du compte, sous `<SHH_DATA_ROOT>/caddy/acme/acme-v02.api.letsencrypt.org-directory/users/`) et `CAA 0 issuewild ";"` (aucun certificat générique) ; double authentification et verrou de transfert (§15.4).
+- **`www` (24 novembre)** : `www.shhgone.com` redirige en 308 vers `https://shhgone.com`, chemin et requête gardés (`Caddyfile`, bloc `www.{$SHH_DOMAIN}` ; rien d'autre n'y est servi, aucun journal). Enregistrements à ajouter chez le registraire, aux mêmes adresses que le nom du site :
+
+  | Nom | Type | Valeur |
+  |---|---|---|
+  | `www` | `A` | `54.38.93.126` |
+  | `www` | `AAAA` | `2001:41d0:403:1f7e::` |
+
+  Pas de `CNAME` (un `CNAME` vers le nom du site marcherait aussi, mais des adresses directes ne dépendent que d'une seule zone signée). Conséquences : (1) Caddy demande **un second certificat**, pour `www.shhgone.com`, au même Let's Encrypt, avec **le même compte ACME** et le même profil de 6 jours (bloc `tls` commun) ; tant que l'enregistrement n'existe pas, cette demande échoue et Caddy la réessaie en silence (journaux coupés), sans gêner le site ; (2) **CAA** : un enregistrement CAA du nom vaut aussi pour `www` (la recherche remonte au nom parent tant que `www` n'a pas le sien) ; `issue "letsencrypt.org; accounturi=…"` laisse donc passer `www`, puisque c'est le même compte ; ne **pas** poser de CAA propre à `www`, ou alors identique ; `issuewild ";"` ne change rien (le certificat de `www` n'est pas générique) ; (3) DNSSEC couvre `www` dès qu'il est dans la zone signée ; (4) **surveillance** : `alerte.sh` lit aussi le certificat servi pour `www` et les certificats de `www` dans les journaux publics (crt.sh, deuxième requête, seul le nom public envoyé) : le certificat de `www` servi par Caddy est connu, tout autre certificat de `www` émis ces 3 derniers jours donne l'alerte URGENT `certificat-inconnu`. L'échéance du certificat de `www` n'est pas surveillée à part : s'il expire, seule la redirection tombe (le site reste servi), et le même renouvellement que celui du site est en cause, déjà surveillé.
 
 ### Hébergeur et certificat (22 novembre)
 
@@ -39,7 +47,7 @@ Ce que l'hébergeur (ou qui prend la machine) peut faire, et ce qui l'en empêch
 - **Dédié plutôt que VPS** : sur un VPS, l'hébergeur lit la mémoire de la machine (donc la clé du volume ouvert et la clé TLS) d'une simple commande ; sur un dédié, il lui faut une intervention physique. Chiffrement de la mémoire par le processeur (AMD SME/TSME, Intel TME) : à activer dans le BIOS si le modèle l'a (pas le Xeon-D 2141I du SYS-2, trop ancien).
 - **Certificats de 6 jours** (profil « shortlived » de Let's Encrypt, `Caddyfile`) : une clé volée ne sert que quelques jours. Caddy renouvelle seul vers 2 jours restants ; chaque renouvellement crée une **nouvelle clé**, sur la machine, qui ne voyage jamais (seule une preuve de contrôle du domaine passe par le réseau) : aucun risque de plus par renouvellement. Alerte URGENT sous 36 h restantes ; panne de Let's Encrypt de plusieurs jours : retirer le bloc `issuer acme` du `Caddyfile` et redéployer, retour aux certificats de 90 jours. Sonde externe adaptée (36 h pour un certificat de 6 jours, 14 jours sinon).
 - **Redémarrage** : alerte URGENT `redemarre` dès que la machine a redémarré (lire le disque ou la mémoire à froid passe presque toujours par là), puis `volume` tant que le volume est verrouillé. Redémarrage inattendu, sans maintenance annoncée par l'hébergeur : ne pas déverrouiller avant d'avoir compris (espace client, tickets, intervention), et en cas de doute suivre le plan d'incident (§6).
-- **Le vrai risque est la clé du certificat TLS** : avec elle (ou avec le DNS), on peut se faire passer pour Shhgone et servir un site modifié qui volerait les clés. Défenses : DNSSEC, verrou de transfert, CAA lié à notre compte ACME (plus haut), et **surveillance des journaux publics de certificats** : `alerte.sh` envoie une alerte URGENT `certificat-inconnu` si un certificat émis ces 3 derniers jours pour le nom n'est pas celui que sert le site (crt.sh, une fois par jour ; seul le nom du domaine, public, est envoyé). Si l'alerte n'est pas un renouvellement de Caddy : révoquer le certificat, changer les clés, vérifier le DNS, prévenir les utilisateurs (§6).
+- **Le vrai risque est la clé du certificat TLS** : avec elle (ou avec le DNS), on peut se faire passer pour Shhgone et servir un site modifié qui volerait les clés. Défenses : DNSSEC, verrou de transfert, CAA lié à notre compte ACME (plus haut), et **surveillance des journaux publics de certificats** : `alerte.sh` envoie une alerte URGENT `certificat-inconnu` si un certificat émis ces 3 derniers jours pour le nom ou pour `www` n'est pas l'un de ceux que sert le site (crt.sh, une fois par jour ; seul le nom du domaine, public, est envoyé). Si l'alerte n'est pas un renouvellement de Caddy : révoquer le certificat, changer les clés, vérifier le DNS, prévenir les utilisateurs (§6).
 - **Limite qui reste** (dite dans la page Sécurité) : le site est servi par le serveur à chaque visite ; un serveur pris peut servir un autre code. Les applications natives prévues (D42-20), signées et installées une fois, et le build reproductible (§28.1, empreintes publiées) la réduisent.
 
 Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plus) :
@@ -264,9 +272,12 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://$D/healthz
 openssl s_client -connect $D:443 -servername $D -groups X25519MLKEM768 </dev/null 2>/dev/null | grep -iE 'group|protocol'
 curl -sS --tls-max 1.2 -o /dev/null https://$D/ ; echo "code de sortie $? (attendu : non nul)"
 curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://$D/
+# www : 308 vers le site, chemin et requête gardés (attendu : « 308 https://$D/a?b=1 »).
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' "https://www.$D/a?b=1"
 
 # 5. DNS.
 dig +short CAA $D ; dig +dnssec +short $D | head -n 2
+dig +short A www.$D ; dig +short AAAA www.$D   # 54.38.93.126 et 2001:41d0:403:1f7e::
 ```
 
 Sur le serveur, après avoir visité le site depuis une adresse connue (`MOI=<votre adresse IP>`) :

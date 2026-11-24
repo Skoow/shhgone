@@ -40,6 +40,9 @@ sain() {
 	# un ancien de 40 jours (renouvelé depuis) : rien de suspect.
 	export SHH_ALERTE_CERT_SERIE='0A1B' SHH_ALERTE_CT
 	SHH_ALERTE_CT="echo '[{\"id\":1,\"entry_timestamp\":\"x\",\"not_before\":\"$(jour -1)T10:00:00\",\"serial_number\":\"0a1b\"},{\"id\":2,\"not_before\":\"$(jour -40)T10:00:00\",\"serial_number\":\"ffee\"}]'"
+	# www.<nom> (redirection 308) : son certificat (série 0c:1d, émis hier) est servi aussi.
+	export SHH_ALERTE_CERT_WWW='echo serial=0C1D' SHH_ALERTE_CT_WWW
+	SHH_ALERTE_CT_WWW="echo '[{\"id\":3,\"not_before\":\"$(jour -1)T11:00:00\",\"serial_number\":\"0c1d\"}]'"
 	export SHH_ALERTE_DNS='echo "192.0.2.10 STREAM exemple.test"' SHH_ALERTE_IPS='echo "1: lo inet 127.0.0.1/8"; echo "2: eth0 inet 192.0.2.10/24"'
 	export SHH_ALERTE_SAUVEGARDE_OK="$work/sauvegarde-ok"
 	echo $((NOW - 3600)) >"$work/sauvegarde-ok"
@@ -150,6 +153,19 @@ case $(sujets "$work/renouv.out2" | paste -sd, -) in *certificat-inconnu*) ko "r
 SHH_ALERTE_CT="echo '[{\"not_before\":\"$(jour -1)T10:00:00\",\"serial_number\":\"dead\"}]'"
 SHH_ALERTE_MAINTENANT=$((NOW + 1800)) relance renouv
 case $(sujets "$work/renouv.out2" | paste -sd, -) in *"URGENT certificat-inconnu"*) ;; *) ko "renouv : certificat jamais servi non signalé" ;; esac
+
+# 3 ter bis. www.<nom> : son certificat servi est connu ; un certificat www jamais servi : alerte ;
+# www sans certificat (enregistrement pas encore posé) : le site seul compte.
+sain
+lance www
+case $(sujets "$work/www.out" | paste -sd, -) in *certificat-inconnu*) ko "www : certificat servi de www pris pour suspect" ;; esac
+SHH_ALERTE_CT_WWW="echo '[{\"not_before\":\"$(jour -1)T10:00:00\",\"serial_number\":\"beef\"}]'"
+lance www-inconnu
+case $(sujets "$work/www-inconnu.out" | paste -sd, -) in *"URGENT certificat-inconnu"*) ;; *) ko "www : certificat www jamais servi non signalé" ;; esac
+grep -q "pour exemple.test ou www.exemple.test" "$work/www-inconnu.out" || ko "www : message sans www"
+export SHH_ALERTE_CERT_WWW='true' SHH_ALERTE_CT_WWW="echo '[]'"
+lance www-absent
+attendu www-absent "Bilan bilan,Rappel restauration"
 
 # 3 quater. Redémarrage : premier passage, l'identifiant est retenu sans alerte ; nouveau
 # démarrage → URGENT redemarre et volume verrouillé ; ensuite, plus d'alerte de redémarrage.

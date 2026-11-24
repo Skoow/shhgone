@@ -3,9 +3,11 @@ package share
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -35,63 +37,46 @@ outer:
 	return id
 }
 
-func withFill(id string, from, to int) FinalizeReq {
-	r := fin(id)
-	r.FillFrom, r.FillTo = from, to
-	return r
-}
-
-func TestFinalizeFillRules(t *testing.T) {
-	cases := []struct {
-		name     string
-		skip     []int
-		from, to int
-		want     error
-	}{
-		{name: "bourrage [3, 6) absent : accepté", skip: []int{3, 4, 5}, from: 3, to: 6},
-		{name: "segment manquant hors bourrage", skip: []int{2, 3, 4, 5}, from: 3, to: 6, want: ErrIncomplete},
-		{name: "fill_to dépasse le palier", skip: []int{3, 4, 5}, from: 3, to: 8, want: ErrBadRequest},
-		{name: "fill touche le dernier segment", skip: []int{3, 4, 5, 6}, from: 3, to: 7, want: ErrBadRequest},
-		{name: "fill touche le segment 0", skip: []int{0, 1}, from: 0, to: 2, want: ErrBadRequest},
-		{name: "fill à l'envers", skip: []int{3}, from: 4, to: 3, want: ErrBadRequest},
-		{name: "fill négatif", from: -1, to: 0, want: ErrBadRequest},
-		{name: "vide [0, 0) : tout exigé", skip: []int{4}, from: 0, to: 0, want: ErrIncomplete},
-		{name: "vide [6, 6) accepté", from: 6, to: 6},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+// Spec H-5 : l'ancienne finalisation désignait le bourrage [fill_from, fill_to) et refusait
+// tout autre segment manquant. Le brouillon (seule finalisation) remplit d'aléa tout morceau
+// manquant du palier final, sans plage à désigner : ce qui était refusé (trou hors bourrage,
+// segment 0 ou dernier segment absent) devient un trou rempli d'aléa, sous la seule borne
+// padAllowed des morceaux reçus (TestFinalizePaddingBoundedByReceived, amplify_test.go). Les
+// segments envoyés restent intacts, l'en-tête et le manifeste sont ceux de la finalisation.
+func TestFinalizeFillsAnyMissingSegment(t *testing.T) {
+	for _, skip := range [][]int{{3, 4, 5}, {2, 3, 4, 5}, {0, 1}, {6}, {4}, {1, 2, 3, 4, 5}, nil} {
+		t.Run(fmt.Sprint(skip), func(t *testing.T) {
 			s, _ := newSvc(t)
 			k := newKeys()
-			id := upload400(t, s, k, tc.skip...)
-			_, err := s.Finalize(id, withFill(id, tc.from, tc.to))
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("Finalize = %v, attendu %v", err, tc.want)
+			id := upload400(t, s, k, skip...)
+			r := draftFin(id, 400)
+			if _, err := s.Finalize(id, r); err != nil {
+				t.Fatal(err)
+			}
+			f := fileBytes(t, s, id)
+			if int64(len(f)) != totalSize(400) || !bytes.Equal(f[:Header], r.Header) || !bytes.Equal(f[len(f)-ChunkCT:], r.Tail) {
+				t.Fatal("taille, en-tête ou manifeste")
+			}
+			for n := 0; n < 7; n++ {
+				seg := f[segOffset(400, n) : segOffset(400, n)+int64(SegmentSize(400, n))]
+				// Hors en-tête (segment 0) et manifeste (dernier morceau) : écrits à part.
+				lo, hi := 0, len(seg)
+				if n == 0 {
+					lo = Header
+				}
+				if n == 6 {
+					hi -= ChunkCT
+				}
+				sent := !slices.Contains(skip, n)
+				if want := segBody(400, n, byte(n+1))[lo:hi]; sent != bytes.Equal(seg[lo:hi], want) {
+					t.Fatalf("segment %d : envoyé %v, intact %v", n, sent, !sent)
+				}
+				// Bourrage tiré de crypto/rand : aucune suite de 4 096 zéros.
+				if !sent && bytes.Contains(seg[lo:hi], make([]byte, 4096)) {
+					t.Fatal("suite de 4 096 zéros dans le bourrage", n)
+				}
 			}
 		})
-	}
-}
-
-// Bourrage rempli par crypto/rand : aucune suite de 4 096 zéros dans [fill_from, fill_to),
-// segments envoyés intacts.
-func TestFinalizeFillsRandom(t *testing.T) {
-	s, _ := newSvc(t)
-	k := newKeys()
-	id := upload400(t, s, k, 3, 4, 5)
-	if _, err := s.Finalize(id, withFill(id, 3, 6)); err != nil {
-		t.Fatal(err)
-	}
-	f, err := os.ReadFile(filepath.Join(s.Blobs.Dir, id))
-	if err != nil {
-		t.Fatal(err)
-	}
-	pad := f[segOffset(400, 3):segOffset(400, 6)]
-	if bytes.Contains(pad, make([]byte, 4096)) {
-		t.Fatal("suite de 4 096 zéros dans le bourrage")
-	}
-	for _, n := range []int{0, 1, 2, 6} {
-		if !bytes.Equal(f[segOffset(400, n):segOffset(400, n)+int64(SegmentSize(400, n))], segBody(400, n, byte(n+1))) {
-			t.Fatal("segment envoyé modifié", n)
-		}
 	}
 }
 
@@ -112,7 +97,7 @@ func TestUnlockEnvelopeOnlyWhenReady(t *testing.T) {
 	if _, err := s.Meta(k.acces); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
-	r := withFill(id, 3, 6)
+	r := fin(id)
 	if _, err := s.Finalize(id, r); err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +210,7 @@ func TestFinalizeConcurrentFillsOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	got := map[string]int{}
-	r := withFill(id, 1, 6)
+	r := fin(id)
 	for i := 0; i < N; i++ {
 		wg.Add(1)
 		go func() {
@@ -266,7 +251,7 @@ func TestFinalizeResetsSegmentsMask(t *testing.T) {
 	s, _ := newSvc(t)
 	k := newKeys()
 	id := upload400(t, s, k, 3, 4, 5)
-	if _, err := s.Finalize(id, withFill(id, 3, 6)); err != nil {
+	if _, err := s.Finalize(id, fin(id)); err != nil {
 		t.Fatal(err)
 	}
 	var mask []byte

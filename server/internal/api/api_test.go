@@ -218,11 +218,24 @@ func manage(k keys) map[string]string {
 	return map[string]string{"X-Shh-Manage": enc.EncodeToString(k.gestion)}
 }
 
-// finBody : finalisation v2 pour les clés k (V_preuve), bourrage vide.
-func (k keys) finBody(opens, ttl int) map[string]any {
+// finBody : finalisation du brouillon (spec §41.14, seule finalisation depuis H-5) pour les
+// clés k (V_preuve), au palier final bucket, en-tête et manifeste aléatoires ; tout morceau
+// non reçu est rempli d'aléa par le serveur.
+func (k keys) finBody(opens, ttl, bucket int) map[string]any {
 	return map[string]any{"salt": enc.EncodeToString(rnd(16)), "kdf_ops": 3, "kdf_mem": 67108864,
 		"proof_v": v(k.preuve), "envelope": enc.EncodeToString(rnd(share.EnvelopeLen)),
-		"ttl_hours": ttl, "max_opens": opens, "fill_from": 0, "fill_to": 0}
+		"ttl_hours": ttl, "max_opens": opens, "bucket": bucket,
+		"header": enc.EncodeToString(rnd(share.Header)), "tail": enc.EncodeToString(rnd(share.ChunkCT))}
+}
+
+// finSent : finBody dont l'en-tête et le manifeste sont ceux des segments envoyés segs (un
+// envoi complet garde ainsi ses octets).
+func (k keys) finSent(opens, ttl, bucket int, segs [][]byte) map[string]any {
+	m := k.finBody(opens, ttl, bucket)
+	last := segs[len(segs)-1]
+	m["header"] = enc.EncodeToString(segs[0][:share.Header])
+	m["tail"] = enc.EncodeToString(last[len(last)-share.ChunkCT:])
+	return m
 }
 
 func mustJSON(x any) []byte { b, _ := json.Marshal(x); return b }
@@ -281,7 +294,7 @@ func (e *env) uploadTTL(t *testing.T, c created, bucket, ttl int) [][]byte {
 			hdr: auth(c.UploadToken)}), 204, "")
 	}
 	w := e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken),
-		body: mustJSON(c.k.finBody(c.opens, ttl))})
+		body: mustJSON(c.k.finSent(c.opens, ttl, bucket, segs))})
 	expect(t, w, 200, "")
 	if s := jsonOf(t, w)["expires_in_s"].(float64); s < float64(ttl)*3600 || s > float64(ttl)*3600+900 {
 		t.Fatalf("expires_in_s = %v", s)
@@ -552,15 +565,14 @@ func TestPutWrongSize(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Fatal("fichier modifié par un envoi refusé")
 	}
-	// Finalisation incomplète.
-	expect(t, e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken), body: mustJSON(newKeys().finBody(1, 1))}),
-		409, `{"error":"incomplete"}`)
+	// Finalisation incomplète (409) : seulement au-delà de la borne de l'aléa depuis le retrait
+	// de l'ancienne finalisation (spec H-5), voir TestDraftAmplificationRefused.
 	// Sans jeton, jeton malformé.
 	expect(t, e.do(req{method: "PUT", path: "/api/shares/segments/0", body: make([]byte, size)}), 400, badRequest)
 	expect(t, put("0", make([]byte, size), "n'importe.quoi"), 404, notFound)
 	// Envoi après finalisation refusé.
 	expect(t, put("0", make([]byte, size), c.UploadToken), 204, "")
-	expect(t, e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken), body: mustJSON(newKeys().finBody(1, 1))}), 200, "")
+	expect(t, e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken), body: mustJSON(newKeys().finBody(1, 1, 16))}), 200, "")
 	expect(t, put("0", make([]byte, size), c.UploadToken), 404, notFound)
 }
 
@@ -591,7 +603,7 @@ func TestTokenDesignatesShare(t *testing.T) {
 	// Jeton d'envoi refusé en lecture ; jeton de téléchargement refusé à l'envoi.
 	expect(t, e.do(req{method: "GET", path: "/api/shares/segments/0", hdr: auth(a.UploadToken)}), 404, notFound)
 	expect(t, e.do(req{method: "POST", path: "/api/shares/done", hdr: auth(a.UploadToken)}), 404, notFound)
-	expect(t, e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(dlA), body: mustJSON(newKeys().finBody(1, 1))}), 404, notFound)
+	expect(t, e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(dlA), body: mustJSON(newKeys().finBody(1, 1, 1))}), 404, notFound)
 	expect(t, e.do(req{method: "PUT", path: "/api/shares/segments/0", body: make([]byte, size), hdr: auth(dlA)}), 404, notFound)
 	// Le jeton de A lit A, et seulement A.
 	w := e.do(req{method: "GET", path: "/api/shares/segments/0", hdr: auth(dlA)})
@@ -672,7 +684,7 @@ func TestTokenLifetimes(t *testing.T) {
 	expect(t, e.do(req{method: "PUT", path: "/api/shares/segments/0", body: rnd(share.SegmentSize(1, 0)),
 		hdr: auth(c.UploadToken)}), 204, "")
 	expect(t, e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken),
-		body: mustJSON(k.finBody(1, 24))}), 200, "")
+		body: mustJSON(k.finBody(1, 24, 1))}), 200, "")
 	dl, _ := e.unlock(t, c.ID, k)
 	if _, exp, err := e.sig.CheckExp(dl, token.Download, c.ID); err != nil || !exp.Equal(e.clk.Now().Add(6*time.Hour)) {
 		t.Fatal("jeton de téléchargement (24 h)", exp, err)
@@ -892,7 +904,8 @@ func TestCreateQuota(t *testing.T) {
 }
 
 // Spec §29.8 : mêmes K_accès et S_gestion qu'un envoi existant → 400 sans toucher au
-// partage ; finalize en JSON strict, longueurs exactes, bourrage contrôlé ; unlock rend l'enveloppe.
+// partage ; finalize en JSON strict, longueurs exactes, brouillon seul (spec H-5 : plus de
+// fill_from ni fill_to) ; segments manquants remplis d'aléa ; unlock rend l'enveloppe.
 func TestCreateConflictAndFinalizeV2(t *testing.T) {
 	e := newEnv(t, false, nil)
 	k := newKeys()
@@ -912,11 +925,7 @@ func TestCreateConflictAndFinalizeV2(t *testing.T) {
 	fin := func(m map[string]any) *httptest.ResponseRecorder {
 		return e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken), body: mustJSON(m)})
 	}
-	good := func() map[string]any {
-		m := k.finBody(2, 1)
-		m["fill_from"], m["fill_to"] = 3, 6
-		return m
-	}
+	good := func() map[string]any { return k.finBody(2, 1, 400) }
 	bad := []func(m map[string]any){
 		func(m map[string]any) { m["envelope"] = enc.EncodeToString(rnd(59)) },
 		func(m map[string]any) { m["envelope"] = enc.EncodeToString(rnd(61)) },
@@ -927,12 +936,24 @@ func TestCreateConflictAndFinalizeV2(t *testing.T) {
 		func(m map[string]any) { m["kdf_mem"] = 1 << 20 },
 		func(m map[string]any) { m["ttl_hours"] = 2 },
 		func(m map[string]any) { m["max_opens"] = 11 },
-		func(m map[string]any) { m["fill_to"] = 7 },   // dernier segment
-		func(m map[string]any) { m["fill_to"] = 8 },   // hors palier
-		func(m map[string]any) { m["fill_from"] = 0 }, // segment 0
-		func(m map[string]any) { delete(m, "fill_from") },
-		func(m map[string]any) { m["fill_to"] = nil },
-		func(m map[string]any) { m["fill_to"] = 5.5 },
+		func(m map[string]any) { m["bucket"] = 800 }, // au-delà de la réservation
+		func(m map[string]any) { m["bucket"] = 401 }, // pas un palier
+		func(m map[string]any) { m["bucket"] = 0 },
+		func(m map[string]any) { m["bucket"] = nil },
+		func(m map[string]any) { m["bucket"] = 5.5 },
+		func(m map[string]any) { delete(m, "bucket") },
+		func(m map[string]any) { delete(m, "header") },
+		func(m map[string]any) { delete(m, "tail") },
+		func(m map[string]any) { m["header"] = enc.EncodeToString(rnd(47)) },
+		func(m map[string]any) { m["tail"] = enc.EncodeToString(rnd(share.ChunkCT - 1)) },
+		// Ancienne finalisation sans brouillon (spec H-5) : champs inconnus, refusés.
+		func(m map[string]any) { m["fill_from"], m["fill_to"] = 3, 6 },
+		func(m map[string]any) {
+			delete(m, "bucket")
+			delete(m, "header")
+			delete(m, "tail")
+			m["fill_from"], m["fill_to"] = 0, 0
+		},
 		func(m map[string]any) { m["inconnu"] = 1 },
 	}
 	for i, f := range bad {
@@ -943,21 +964,14 @@ func TestCreateConflictAndFinalizeV2(t *testing.T) {
 		}
 	}
 	for _, mut := range []func(string) string{
-		func(b string) string { return strings.Replace(b, `"fill_to":6`, `"fill_to":6,"FILL_TO":5`, 1) },
+		func(b string) string { return strings.Replace(b, `"bucket":400`, `"bucket":400,"BUCKET":160`, 1) },
 		func(b string) string { return strings.Replace(b, `"envelope"`, `"Envelope"`, 1) },
 	} {
 		w := e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken), body: []byte(mut(string(mustJSON(good()))))})
 		expect(t, w, 400, badRequest)
 	}
-	m := good()
-	m["fill_from"] = 4
-	expect(t, fin(m), 409, `{"error":"incomplete"}`) // segment 3 attendu
-	// Spec §36 S4, Q-MIN1 (mode « au clic ») : sans fill_from ni fill_to, aucun bourrage n'est
-	// rempli par le serveur : tous les segments doivent avoir été envoyés.
-	m = good()
-	delete(m, "fill_from")
-	delete(m, "fill_to")
-	expect(t, fin(m), 409, `{"error":"incomplete"}`)
+	// Segments 3 à 5 jamais reçus : remplis d'aléa (plus de plage à désigner, ni de 409 pour
+	// un trou : spec H-5 ; borne de l'aléa dans TestDraftAmplificationRefused).
 	g := good()
 	expect(t, fin(g), 200, "")
 	expect(t, fin(g), 404, notFound) // rejeu

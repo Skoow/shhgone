@@ -1545,6 +1545,7 @@ export const fr = {
   "salon.piece.annuler": "Ne pas envoyer",
   "salon.piece.err.indisponible": "Fichier indisponible\u202f: il a été retiré ou effacé.",
   "salon.piece.err.lecture": "Le fichier n'a pas pu être ouvert. Réessayez.",
+  "salon.piece.err.sortie": "Ce fichier a atteint sa limite de téléchargement\u202f: le serveur n'en envoie plus rien. Demandez à l'expéditeur de l'envoyer à nouveau.",
   "salon.piece.err.trop_gros": "Fichier trop lourd : 500 Mo au plus par fichier.",
   "salon.piece.err.limite": "Doucement : réessayez dans {duree}.",
   "salon.piece.err.budget": "Le salon est plein : 2 Go atteints.",

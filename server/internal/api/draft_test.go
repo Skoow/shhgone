@@ -74,11 +74,7 @@ func TestDraftRoutes(t *testing.T) {
 	if code := post("/api/shares/keep", nil, c.UploadToken); code != 204 {
 		t.Fatal("keep", code)
 	}
-	fin := k.finBody(1, 1)
-	delete(fin, "fill_from")
-	delete(fin, "fill_to")
-	fin["bucket"] = 400
-	fin["header"] = enc.EncodeToString(rnd(48))
+	fin := k.finBody(1, 1, 400)
 	fin["tail"] = enc.EncodeToString(rnd(65552)[:100])
 	if code := post("/api/shares/finalize", fin, c.UploadToken); code != 400 {
 		t.Fatal("tail trop court", code)
@@ -86,7 +82,7 @@ func TestDraftRoutes(t *testing.T) {
 	fin["tail"] = enc.EncodeToString(rnd(65552))
 	fin["fill_from"], fin["fill_to"] = 0, 0
 	if code := post("/api/shares/finalize", fin, c.UploadToken); code != 400 {
-		t.Fatal("bucket et fill_* ensemble", code)
+		t.Fatal("fill_* (ancienne finalisation, spec H-5) accepté", code)
 	}
 	delete(fin, "fill_from")
 	delete(fin, "fill_to")
@@ -134,12 +130,7 @@ func TestDraftAmplificationRefused(t *testing.T) {
 			hdr: auth(c.UploadToken)}), 204, "")
 		bucket = next
 	}
-	fin := k.finBody(1, 1)
-	delete(fin, "fill_from")
-	delete(fin, "fill_to")
-	fin["bucket"] = 1600
-	fin["header"] = enc.EncodeToString(rnd(48))
-	fin["tail"] = enc.EncodeToString(rnd(65552))
+	fin := k.finBody(1, 1, 1600)
 	expect(t, e.do(req{method: "POST", path: "/api/shares/finalize", body: mustJSON(fin), hdr: auth(c.UploadToken)}),
 		409, `{"error":"incomplete"}`)
 	raw, err := os.ReadFile(filepath.Join(e.dir, "blobs", c.ID))

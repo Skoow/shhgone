@@ -73,6 +73,21 @@ const (
 	BourrageMarge   = 8 * share.SegChunks
 )
 
+// SortieFacteur : octets servis au plus par pièce, tous jetons confondus, en multiples de son
+// budget de lecture par jeton (share.ReadBudget : 2 × le fichier chiffré, plus les segments 0
+// et dernier) : un téléchargement complet avec reprise pour chacun des nbSieges sièges. Le
+// budget par jeton se renouvelle avec chaque nouveau jeton (départ puis retour, reprise) ;
+// aujourd'hui, le plancher des pièces (lisibleLocked) empêche déjà un jeton neuf de lire une
+// pièce plus ancienne que lui, ce qui borne la sortie au même total : ce plafond la borne
+// sans dépendre de cette règle. Plus grande pièce (palier 8 000) : environ 10,6 Go, sous le
+// plus petit plafond de sortie d'un partage (share.MinEgressMax, 32 Gio ;
+// SHH_SHARE_EGRESS_MAX, 250 Gio par défaut). Variable pour les tests seulement.
+var SortieFacteur int64 = nbSieges
+
+// SortieMax : octets servis au plus par une pièce de palier bucket, toutes lectures confondues
+// (compteur en mémoire seulement, oublié avec la pièce ; aucune adresse, aucune heure).
+func SortieMax(bucket int) int64 { return SortieFacteur * share.ReadBudget(bucket) }
+
 // VocalPaliers : paliers d'un vocal (plan, point 3 : 10 min tiennent dans 80).
 var VocalPaliers = []int{1, 16, 80}
 
@@ -111,6 +126,7 @@ type piece struct {
 	ecrit     int64     // octets de segments acceptés, réécritures comprises (EcritureMax)
 	activite  time.Time // création, dernier segment reçu, puis finalisation
 	lus       map[[32]byte]int64
+	servis    int64 // octets servis, tous jetons confondus (SortieMax)
 	efface    bool
 }
 
@@ -558,8 +574,9 @@ func (l *Lecture) Close() error {
 
 // OuvrirSegment ouvre le segment n de la pièce id pour mb : pièce « ready » de son salon,
 // créée (ou liée à une trame) à partir du plancher du jeton (rang de son arrivée), sinon
-// ErrNotFound ; n hors du palier : ErrBadRequest ; budget de lecture du jeton pour cette pièce
-// (share.ReadBudget) dépassé : ErrBudget. Le flux est inscrit sous "m:" + hex(SHA-256(jeton))
+// ErrNotFound ; n hors du palier : ErrBadRequest ; plafond de sortie de la pièce (SortieMax)
+// dépassé : ErrSortie ; budget de lecture du jeton pour cette pièce (share.ReadBudget)
+// dépassé : ErrBudget. Le flux est inscrit sous "m:" + hex(SHA-256(jeton))
 // et "p:" + id (révocation par exclusion ou effacement de la pièce).
 func (m *Manager) OuvrirSegment(ctx context.Context, mb Membre, id string, n int) (*Lecture, error) {
 	s := mb.salon
@@ -623,7 +640,8 @@ func (m *Manager) lisible(s *salon, mb Membre, id string, n int) (int, error) {
 }
 
 // commencerLecture : revérifie la pièce sous le verrou (effacée pendant l'ouverture du
-// fichier : ErrNotFound), compte le budget, inscrit le flux. Sous ce verrou, un effacement
+// fichier : ErrNotFound), compte le plafond de sortie de la pièce (d'abord : il ne se recharge
+// jamais) et le budget du jeton, inscrit le flux. Sous ce verrou, un effacement
 // voit le flux inscrit (et le coupe) ou a déjà retiré la pièce.
 func (m *Manager) commencerLecture(ctx context.Context, s *salon, mb Membre, id string, n int, sec *blob.Section,
 	taille int64) (*Lecture, error) {
@@ -633,11 +651,15 @@ func (m *Manager) commencerLecture(ctx context.Context, s *salon, mb Membre, id 
 	if err != nil {
 		return nil, err
 	}
+	if p.servis+taille > SortieMax(p.bucket) {
+		return nil, ErrSortie
+	}
 	jv := s.sieges[mb.siege].jetonV
 	if p.lus[jv]+taille > share.ReadBudget(p.bucket) {
 		return nil, ErrBudget
 	}
 	p.lus[jv] += taille
+	p.servis += taille
 	ctxM, finM := m.flux.Start(ctx, cleFluxMembre(jv))
 	ctxP, finP := m.flux.Start(ctxM, cleFluxPiece(id))
 	return &Lecture{sec: sec, ctx: ctxP, fin: func() { finP(); finM() }}, nil

@@ -18,6 +18,17 @@ export const PALIERS_VOCAUX = [1, 16, 80] as const;
 
 export type RefPiece = { r: Uint8Array; piece: Uint8Array; palier: number };
 
+/**
+ * Cause d'une lecture de pièce ratée, pour le message : « indisponible » (404 : retirée ou
+ * effacée), « sortie » (403 egress_limit : plafond de sortie de la pièce atteint sur le serveur,
+ * définitif, jamais réessayé), sinon « lecture » (réessayable).
+ */
+export function causeLecture(e: unknown): "indisponible" | "sortie" | "lecture" {
+  if (e instanceof api.SalonError && e.status === 404) return "indisponible";
+  if (e instanceof api.SalonError && e.status === 403 && e.code === "egress_limit") return "sortie";
+  return "lecture";
+}
+
 const segments = (bucket: number) => Math.ceil(bucket / SEG_CHUNKS);
 const chunksDuSegment = (bucket: number, n: number) => Math.min(SEG_CHUNKS, bucket - n * SEG_CHUNKS);
 

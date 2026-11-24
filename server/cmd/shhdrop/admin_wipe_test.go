@@ -29,7 +29,7 @@ func TestAdminWipeCutsDetachedReads(t *testing.T) {
 		}
 	}
 	if _, err := s.Finalize(id, share.FinalizeReq{TTLHours: 1, MaxOpens: 2, KdfOps: 3, KdfMem: 64 << 20,
-		Salt: r(16), ProofV: sum(kp), Envelope: r(share.EnvelopeLen)}); err != nil {
+		Salt: r(16), ProofV: sum(kp), Envelope: r(share.EnvelopeLen), Bucket: 80, Header: r(share.Header), Tail: r(share.ChunkCT)}); err != nil {
 		t.Fatal(err)
 	}
 	open, _, err := s.Unlock(id, ka, kp)

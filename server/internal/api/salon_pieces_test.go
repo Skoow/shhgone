@@ -193,6 +193,26 @@ func TestLectureBudget(t *testing.T) {
 	expect(t, e.getPiece(j[0], id, 0), 200, "")
 }
 
+// Plafond de sortie par pièce (salon.SortieMax) : 403 egress_limit, sans Retry-After, même
+// pour un membre qui a encore son budget de lecture.
+func TestLecturePlafondDeSortie(t *testing.T) {
+	avant := salon.SortieFacteur
+	salon.SortieFacteur = 1
+	t.Cleanup(func() { salon.SortieFacteur = avant })
+	e, _ := salonEnv(t)
+	j := salonMembres(t, e, 2)
+	id, _ := e.envoyerPiece(t, j[0], 1)
+	taille := int64(share.SegmentSize(1, 0))
+	for lus := taille; lus <= share.ReadBudget(1); lus += taille {
+		expect(t, e.getPiece(j[1], id, 0), 200, "")
+	}
+	w := e.getPiece(j[0], id, 0)
+	expect(t, w, 403, `{"error":"egress_limit"}`)
+	if w.Header().Get("Retry-After") != "" {
+		t.Fatal("Retry-After sur un refus définitif")
+	}
+}
+
 // slowGETPiece envoie un GET de segment de pièce et ne lit jamais la réponse.
 func slowGETPiece(t *testing.T, srv *httptest.Server, jeton, id string, n int) net.Conn {
 	t.Helper()

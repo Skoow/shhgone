@@ -461,10 +461,11 @@ describe("faux serveur de démo : requêtes brutes", () => {
     expect((await put("00", segmentSize(16, 0))).status).toBe(400);
     expect((await put("0", segmentSize(16, 0), null)).status).toBe(400);
     expect((await put("0", segmentSize(16, 0), "Bearer inconnu")).status).toBe(404);
+    // Finalisation refusée (palier final au-delà de la réservation) : l'envoi reste ouvert.
     const fin = await fake.handle(
       new Request(`${ORIGIN}/api/shares/finalize`, { method: "POST", headers: { Authorization: `Bearer ${upload_token}` }, body: JSON.stringify(FIN) }),
     );
-    expect(fin.status).toBe(409);
+    expect(fin.status).toBe(400);
     expect((await put("0", segmentSize(16, 0))).status).toBe(204);
   });
 
@@ -476,11 +477,12 @@ describe("faux serveur de démo : requêtes brutes", () => {
     envelope: b64u(new Uint8Array(60).fill(6)),
     ttl_hours: 1,
     max_opens: 1,
-    fill_from: 0,
-    fill_to: 0,
+    bucket: 400,
+    header: b64u(new Uint8Array(HEADER).fill(7)),
+    tail: b64u(new Uint8Array(CHUNK_CT).fill(8)),
   };
 
-  it("finalize v2 : champs exacts ; bourrage [fill_from, fill_to) rempli d'aléa ; unlock rend l'enveloppe", async () => {
+  it("finalize du brouillon : champs exacts ; plus de fill_from ni fill_to (spec H-5) ; segments manquants remplis d'aléa ; unlock rend l'enveloppe", async () => {
     let offset = 0;
     const fake = createFakeServer({ now: () => Date.now() + offset });
     const { r, body } = await created(fake, () => (offset += 4000), 400); // 7 segments
@@ -493,26 +495,28 @@ describe("faux serveur de démo : requêtes brutes", () => {
     }
     const fin = (b: object) => call("/finalize", { method: "POST", headers: auth, body: JSON.stringify(b) });
     for (const bad of [
-      { fill_to: 7 }, // touche le dernier segment
-      { fill_from: 0, fill_to: 3 }, // touche le segment 0 (en-tête)
-      { fill_from: 4, fill_to: 3 },
+      { bucket: 800 }, // au-delà de la réservation
+      { bucket: 401 }, // pas un palier
+      { bucket: undefined },
+      { header: undefined },
+      { tail: undefined },
+      { header: b64u(new Uint8Array(HEADER - 1)) },
+      { tail: b64u(new Uint8Array(CHUNK_CT - 1)) },
       { envelope: b64u(new Uint8Array(59)) },
       { salt: b64u(new Uint8Array(15)) },
       { kdf_ops: 2 },
       { max_opens: 11 },
       { ttl_hours: 2 },
       { extra: 1 },
-      { fill_from: undefined },
+      // Ancienne finalisation sans brouillon (spec H-5) : champs inconnus.
+      { fill_from: 3, fill_to: 6 },
+      { bucket: undefined, header: undefined, tail: undefined, fill_from: 0, fill_to: 0 },
     ]) {
-      expect((await fin({ ...FIN, fill_from: 3, fill_to: 6, ...bad })).status, JSON.stringify(bad)).toBe(400);
+      expect((await fin({ ...FIN, ...bad })).status, JSON.stringify(bad)).toBe(400);
     }
-    expect((await fin({ ...FIN, fill_from: 4, fill_to: 6 })).status).toBe(409); // segment 3 manquant hors bourrage
-    // Ni fill_from ni fill_to (spec §36 S4) : tous les segments exigés.
-    const { fill_from: _f, fill_to: _t, ...noFill } = FIN;
-    expect((await fin({ ...noFill, fill_from: undefined, fill_to: undefined })).status).toBe(409);
-    expect((await fin({ ...FIN, fill_from: 3, fill_to: 6 })).status).toBe(200);
+    expect((await fin(FIN)).status).toBe(200); // segments 3 à 5 jamais reçus : remplis d'aléa
     // Rejeu de finalize : plus en envoi → 404.
-    expect((await fin({ ...FIN, fill_from: 3, fill_to: 6 })).status).toBe(404);
+    expect((await fin(FIN)).status).toBe(404);
     // unlock rend l'enveloppe telle que reçue ; le bourrage lu n'a aucune suite de 4 096 zéros.
     const k = (n: number) => b64u(new Uint8Array(32).fill(n));
     const u = await call("/unlock", { method: "POST", headers: { "X-Shh-Access": k(2) }, body: JSON.stringify({ proof: k(3) }) });
@@ -547,9 +551,7 @@ describe("faux serveur de démo : requêtes brutes", () => {
       if (next === 800) expect((await grow(800)).status).toBe(204);
       bucket = next;
     }
-    const { fill_from: _f, fill_to: _t, ...noFill } = FIN;
-    const fin = (b: number) =>
-      call("/finalize", { method: "POST", headers: auth, body: JSON.stringify({ ...noFill, bucket: b, header: b64u(new Uint8Array(HEADER)), tail: b64u(new Uint8Array(CHUNK_CT)) }) });
+    const fin = (b: number) => call("/finalize", { method: "POST", headers: auth, body: JSON.stringify({ ...FIN, bucket: b }) });
     const res = await fin(1600); // 1 596 morceaux d'aléa pour 3 reçus
     expect([res.status, await res.json()]).toEqual([409, { error: "incomplete" }]);
     expect(fake.inspect()[0]).toMatchObject({ state: "uploading", bucket: 1600 });

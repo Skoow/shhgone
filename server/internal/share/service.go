@@ -92,15 +92,13 @@ func StorageLimit(storageMax int64, newcomer bool) int64 {
 	return storageMax - storageMax/StorageReserve
 }
 
-// FinalizeReq : tout ce qui dépend du mot de passe, la durée, les ouvertures, et le
-// bourrage [FillFrom, FillTo) que le serveur remplit d'aléa (spec §29.3, §29.8).
-//
-// Envoi dès l'ajout (spec §41.14) : Bucket ≠ 0 donne le palier final (≤ la réservation) ;
-// Header (48 octets) et Tail (morceau chiffré du manifeste) sont écrits par le serveur, et
-// tous les segments manquants du palier final sont remplis d'aléa (FillFrom = FillTo = 0).
+// FinalizeReq : tout ce qui dépend du mot de passe, la durée, les ouvertures, et le palier
+// final d'un brouillon (spec §29.8, §41.14) : Bucket (≤ la réservation) ; Header (48 octets)
+// et Tail (morceau chiffré du manifeste) sont écrits par le serveur, et tous les morceaux
+// manquants du palier final sont remplis d'aléa. Seule finalisation depuis le 24 novembre
+// (spec H-5 : l'ancienne, sans brouillon, avec bourrage [fill_from, fill_to), est retirée).
 type FinalizeReq struct {
 	TTLHours, MaxOpens, KdfOps, KdfMem int
-	FillFrom, FillTo                   int
 	Salt, ProofV, Envelope             []byte
 	Bucket                             int
 	Header, Tail                       []byte
@@ -584,18 +582,10 @@ func ValidateFinalizeTier(r FinalizeReq, t Tier) error {
 		len(r.Salt) != 16 || len(r.ProofV) != 32 || len(r.Envelope) != EnvelopeLen || !notEmptyHash(r.ProofV) {
 		return ErrBadRequest
 	}
-	draft := r.Bucket != 0
-	if draft && (!bucketAllowed(r.Bucket, t) || len(r.Header) != Header || len(r.Tail) != ChunkCT || r.FillFrom != 0 || r.FillTo != 0 || !validVoid(r.Void, r.Bucket)) ||
-		!draft && (r.Header != nil || r.Tail != nil || r.Void != nil) {
+	if !bucketAllowed(r.Bucket, t) || len(r.Header) != Header || len(r.Tail) != ChunkCT || !validVoid(r.Void, r.Bucket) {
 		return ErrBadRequest
 	}
 	return nil
-}
-
-// validFill : bourrage vide [k, k) avec 0 ≤ k ≤ segs − 1, ou [from, to) avec
-// 1 ≤ from < to ≤ segs − 1 : jamais le segment 0 (en-tête) ni le dernier (manifeste).
-func validFill(from, to, segs int) bool {
-	return from >= 0 && from <= to && to <= segs-1 && (from == to || from >= 1)
 }
 
 // UsedShares : octets des partages seuls (fichiers et descripteurs détachés), jamais
@@ -738,11 +728,10 @@ func (s *Service) markReceived(id string, n int) error {
 	}
 }
 
-// Finalize termine un envoi (spec §29.4, point 4) : tous les segments hors bourrage
-// présents, bourrage rempli d'octets aléatoires (crypto/rand, indiscernables d'un chiffré
-// pour qui lit le disque), puis passage en « ready » avec le sel, Argon2id, V_preuve, E,
-// la durée et les ouvertures. Le bourrage est écrit hors du verrou de l'envoi (jusqu'à
-// 2 Gio) ; le changement d'état revérifie les segments sous ce verrou. Rejoué après succès : 404.
+// Finalize termine un brouillon (spec §29.4, point 4, §41.14) : palier final, morceaux
+// manquants remplis d'octets aléatoires (crypto/rand, indiscernables d'un chiffré pour qui lit
+// le disque), en-tête et manifeste écrits, puis passage en « ready » avec le sel, Argon2id,
+// V_preuve, E, la durée et les ouvertures (finalizeDraft). Rejoué après succès : 404.
 func (s *Service) Finalize(id string, r FinalizeReq) (time.Duration, error) {
 	if !validID(id) {
 		return 0, ErrNotFound
@@ -759,86 +748,11 @@ func (s *Service) Finalize(id string, r FinalizeReq) (time.Duration, error) {
 		return 0, ErrNotFound
 	}
 	var bucket int
-	var mask []byte
-	err := s.DB.QueryRow(`SELECT bucket, segments_mask FROM shares WHERE id=? AND state='uploading'`, id).Scan(&bucket, &mask)
+	err := s.DB.QueryRow(`SELECT bucket FROM shares WHERE id=? AND state='uploading'`, id).Scan(&bucket)
 	if err != nil {
 		return 0, notFound(err)
 	}
-	if r.Bucket != 0 {
-		return s.finalizeDraft(id, bucket, r)
-	}
-	segs := SegmentCount(bucket)
-	if !validFill(r.FillFrom, r.FillTo, segs) {
-		return 0, ErrBadRequest
-	}
-	if !hasAllBut(mask, segs, r.FillFrom, r.FillTo) {
-		return 0, ErrIncomplete
-	}
-	// Bourrage borné par les morceaux reçus (D42-6) : [FillFrom, FillTo) ne touche jamais le
-	// dernier segment, ses segments sont pleins.
-	if recv, _ := s.received(id); int64(r.FillTo-r.FillFrom)*SegChunks > padAllowed(recv) {
-		return 0, ErrIncomplete
-	}
-	if err := s.fillRandom(id, bucket, r.FillFrom, r.FillTo); err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return 0, ErrNotFound // effacé pendant le remplissage
-		}
-		return 0, err
-	}
-	// Le gros du fichier (jusqu'à 2 Gio) atteint le disque ici, hors du verrou de l'envoi ; la
-	// synchronisation sous le verrou ne porte plus que sur les dernières écritures (revue B4).
-	if err := s.syncFile(id); err != nil {
-		return 0, err
-	}
-
-	mu := s.uploadLock(id)
-	mu.Lock() // plus aucune écriture de segment en vol pour cet envoi
-	defer mu.Unlock()
-	now := s.now()
-	if !s.uploadOpen(id, now) {
-		return 0, ErrNotFound
-	}
-	err = s.DB.QueryRow(`SELECT segments_mask FROM shares WHERE id=? AND state='uploading'`, id).Scan(&mask)
-	if err != nil {
-		return 0, notFound(err)
-	}
-	if !hasAllBut(mask, segs, r.FillFrom, r.FillTo) {
-		return 0, ErrIncomplete
-	}
-	// Dernière écriture faite : le fichier est sur le disque avant d'être annoncé « ready ».
-	if err := s.syncFile(id); err != nil {
-		return 0, err
-	}
-	exp := ceil15(now + int64(r.TTLHours)*3600)
-	// segments_mask passe à « tous reçus » : la base ne garde pas la frontière du bourrage,
-	// qui donnerait la taille du contenu à 4 Mio près (revue K1, I3).
-	// Échéance d'envoi et dernier segment oubliés (mémoire) ; ttl_hours reste NULL : avec
-	// expires_at, il donnerait l'heure de création à 15 min près (spec §36 S11).
-	var got int64
-	err = s.DB.QueryRow(`UPDATE shares SET state='ready', expires_at=?, ttl_hours=NULL,
-		max_opens=?, opens_left=?, salt=?, kdf_ops=?, kdf_mem=?, proof_v=?, envelope=?, segments_mask=?
-		WHERE id=? AND state='uploading' AND segments_mask=? RETURNING expires_at`,
-		exp, r.MaxOpens, r.MaxOpens, r.Salt, r.KdfOps, r.KdfMem, r.ProofV, r.Envelope, fullMask(segs),
-		id, mask).Scan(&got)
-	if err != nil {
-		return 0, notFound(err)
-	}
-	s.Vidage.Demander() // ttl_hours retiré de la ligne : l'ancienne valeur ne reste pas dans le WAL
-	s.forget(id)
-	return secs(got - now), nil
-}
-
-// hasAllBut : tous les segments de [0, segs) sont reçus, sauf peut-être ceux de [from, to).
-func hasAllBut(mask []byte, segs, from, to int) bool {
-	if len(mask) != (segs+7)/8 {
-		return false
-	}
-	for n := 0; n < segs; n++ {
-		if (n < from || n >= to) && mask[n/8]&(1<<(n%8)) == 0 {
-			return false
-		}
-	}
-	return true
+	return s.finalizeDraft(id, bucket, r)
 }
 
 // claimFinalize réserve l'id pour un seul Finalize à la fois ; faux s'il est déjà pris.
@@ -927,14 +841,6 @@ var fillWrite = func(w io.WriterAt, off int64, b []byte) error { _, err := w.Wri
 
 // fillChunk : taille maximale des écritures du bourrage (un seul tampon par plage, réutilisé).
 const fillChunk = 4 << 20
-
-// fillRandom écrit des octets de crypto/rand dans les segments [from, to).
-func (s *Service) fillRandom(id string, bucket, from, to int) error {
-	if from >= to {
-		return nil
-	}
-	return s.fillRange(id, segOffset(bucket, from), segOffset(bucket, to))
-}
 
 // fillRange écrit des octets de crypto/rand dans [start, end) du fichier id.
 func (s *Service) fillRange(id string, start, end int64) error {

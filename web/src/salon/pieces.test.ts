@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Lots, envoyerPiece, lirePiece } from "./pieces";
-import type { Net } from "./api";
+import { Lots, causeLecture, envoyerPiece, lirePiece } from "./pieces";
+import { SalonError, type Net } from "./api";
 
 /** Faux serveur des pièces : segments gardés tels quels, tailles exactes vérifiées. */
 function fauxServeur() {
@@ -83,5 +83,30 @@ describe("pièces du salon", () => {
     const f = fauxServeur();
     const ref = await envoyerPiece(f.n, "J".repeat(43), new Blob([new Uint8Array(10)]), { nom: "a", mime: "text/plain", vocal: false });
     await expect(lirePiece(f.n, "J".repeat(43), { ...ref, r: new Uint8Array(32) })).rejects.toThrow();
+  });
+  // Plafond de sortie par pièce (serveur : salon.SortieMax) : 403 egress_limit, définitif ; la
+  // lecture échoue au premier refus, sans nouvel essai, et la cause est « sortie ».
+  it("plafond de sortie de la pièce : 403 egress_limit, une seule requête, cause « sortie »", async () => {
+    const f = fauxServeur();
+    const ref = await envoyerPiece(f.n, "J".repeat(43), new Blob([new Uint8Array(10)]), { nom: "a", mime: "text/plain", vocal: false });
+    const lire = f.n.fetch;
+    let refus = 0;
+    f.n.fetch = async (url, init) => {
+      if (init?.method !== "GET") return lire(url, init);
+      refus++;
+      return new Response(JSON.stringify({ error: "egress_limit" }), { status: 403 });
+    };
+    const e = await lirePiece(f.n, "J".repeat(43), ref).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(SalonError);
+    expect([(e as SalonError).status, (e as SalonError).code]).toEqual([403, "egress_limit"]);
+    expect(causeLecture(e)).toBe("sortie");
+    expect(refus).toBe(1); // aucun nouvel essai
+  });
+  it("causeLecture : 404 indisponible, 403 egress_limit sortie, le reste lecture (réessayable)", () => {
+    expect(causeLecture(new SalonError(404, "not_found"))).toBe("indisponible");
+    expect(causeLecture(new SalonError(403, "egress_limit"))).toBe("sortie");
+    expect(causeLecture(new SalonError(403, "excluded"))).toBe("lecture");
+    expect(causeLecture(new SalonError(429, "budget"))).toBe("lecture");
+    expect(causeLecture(new Error("reseau"))).toBe("lecture");
   });
 });

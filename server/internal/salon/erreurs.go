@@ -26,6 +26,9 @@ var (
 	ErrForbidden = errors.New("salon: action interdite")
 	// ErrBudget : budget de pièces du salon (2 Gio) ou budget de lecture épuisé.
 	ErrBudget = errors.New("salon: budget épuisé")
+	// ErrSortie : plafond de sortie de la pièce atteint (SortieMax, toutes lectures et tous
+	// jetons confondus ; 403 egress_limit) : définitif, aucun nouvel essai utile.
+	ErrSortie = errors.New("salon: plafond de sortie de la pièce atteint")
 	// ErrStale : exclusion qui ne correspond plus à l'état (siège, nonce_arrivée).
 	ErrStale = errors.New("salon: état dépassé")
 	// ErrLimit : limite atteinte sans délai d'attente utile.

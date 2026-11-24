@@ -723,6 +723,80 @@ func TestLectureBudgetSalon(t *testing.T) {
 	}
 }
 
+// Plafond de sortie par pièce (SortieMax) : tous jetons confondus, en mémoire seulement ;
+// atteint, toute lecture de la pièce est refusée (ErrSortie, avant le budget du jeton), même
+// par un membre qui a encore du budget ; une autre pièce n'est pas touchée.
+func TestSortieParPiece(t *testing.T) {
+	if SortieFacteur != nbSieges || SortieMax(PalierMax) > share.MinEgressMax || SortieMax(1) != nbSieges*share.ReadBudget(1) {
+		t.Fatal("plafond par défaut :", SortieFacteur, SortieMax(PalierMax))
+	}
+	avant := SortieFacteur
+	SortieFacteur = 2 // deux budgets de lecture, pour l'atteindre avec trois membres
+	t.Cleanup(func() { SortieFacteur = avant })
+	b := nouveauBanc(t, 200)
+	c := b.creer(t, 4)
+	_, mb := b.entrerMembre(t, c, true)
+	_, l1 := b.entrerMembre(t, c, false)
+	_, l2 := b.entrerMembre(t, c, false)
+	id := b.pretePiece(t, mb, 1, false)
+	autre := b.pretePiece(t, mb, 1, false)
+	taille := int64(share.SegmentSize(1, 0))
+	servis := int64(0)
+	for _, l := range []Membre{l1, l2} {
+		for lus := taille; lus <= share.ReadBudget(1); lus += taille {
+			if _, err := b.lire(t, l, id, 0); err != nil {
+				t.Fatal(err)
+			}
+			servis += taille
+		}
+	}
+	// Le créateur n'a rien lu : son budget est intact, mais la pièce a servi son plafond.
+	if servis+taille <= SortieMax(1) {
+		t.Fatal("banc : plafond non atteint", servis, SortieMax(1))
+	}
+	if _, err := b.lire(t, mb, id, 0); !errors.Is(err, ErrSortie) {
+		t.Fatal("au-delà du plafond de la pièce :", err)
+	}
+	if _, err := b.lire(t, l1, id, 0); !errors.Is(err, ErrSortie) {
+		t.Fatal("plafond avant le budget du jeton :", err)
+	}
+	if _, err := b.lire(t, mb, autre, 0); err != nil {
+		t.Fatal("autre pièce :", err)
+	}
+	// Un refus ne compte rien ; le compteur vit dans la pièce et disparaît avec elle.
+	s := mb.salon
+	s.mu.Lock()
+	got := s.lesPieces[id].servis
+	s.mu.Unlock()
+	if got != servis {
+		t.Fatal("octets servis :", got, servis)
+	}
+}
+
+// Un jeton neuf (départ puis retour, reprise du créateur) ne lit pas une pièce plus ancienne
+// que son arrivée (plancher) : c'est ce qui borne déjà la sortie d'une pièce aux jetons
+// présents à sa création, SortieMax la borne sans dépendre de cette règle.
+func TestJetonNeufNeLitPasLesAnciennesPieces(t *testing.T) {
+	b := nouveauBanc(t, 200)
+	c := b.creer(t, 4)
+	_, mb := b.entrerMembre(t, c, true)
+	e1, l1 := b.entrerMembre(t, c, false)
+	id := b.pretePiece(t, mb, 1, false)
+	b.lier(t, mb, 0, id)
+	if _, err := b.lire(t, l1, id, 0); err != nil {
+		t.Fatal(err)
+	}
+	b.depart(mb.salon, e1.Siege)
+	_, l1b := b.entrerMembre(t, c, false)
+	if _, err := b.lire(t, l1b, id, 0); !errors.Is(err, ErrNotFound) {
+		t.Fatal("invité revenu :", err)
+	}
+	_, mb2 := b.entrerMembre(t, c, true)
+	if _, err := b.lire(t, mb2, id, 0); !errors.Is(err, ErrNotFound) {
+		t.Fatal("créateur repris :", err)
+	}
+}
+
 // Place totale (StorageMax) réservée dans la même section atomique que sa vérification : une
 // réservation en cours compte déjà (une seconde création qui ne tiendrait plus est refusée).
 func TestPlaceAtomique(t *testing.T) {

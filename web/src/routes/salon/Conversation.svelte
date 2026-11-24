@@ -264,7 +264,7 @@
     const e = await S.telechargerArchive(selectionnables.filter((b) => choix.has(b.cle)));
     selEnCours = false;
     if (e === null) finSelection();
-    else selMessage = t(e === "trop_gros" ? "salon.files.zip.gros" : e === "indisponible" ? "salon.piece.err.indisponible" : "salon.piece.err.lecture");
+    else selMessage = t(e === "trop_gros" ? "salon.files.zip.gros" : e === "indisponible" ? "salon.piece.err.indisponible" : e === "sortie" ? "salon.piece.err.sortie" : "salon.piece.err.lecture");
   }
   // Sélection : les pièces retirées ou effacées entre-temps quittent le choix.
   $effect(() => {

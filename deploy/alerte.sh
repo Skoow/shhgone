@@ -19,8 +19,9 @@
 #     sauvegarde     aucune sauvegarde réussie depuis 26 h
 #     smart          un disque annonce une panne (smartctl)
 #   et, une fois par jour :
-#     certificat-inconnu  un certificat émis pour le nom ces 3 derniers jours n'est pas celui que
-#                    sert le site (journaux publics Certificate Transparency, via crt.sh)
+#     certificat-inconnu  un certificat émis pour le nom ou pour www.<nom> ces 3 derniers jours
+#                    n'est pas l'un de ceux que sert le site (journaux publics Certificate
+#                    Transparency, via crt.sh)
 #   à prévoir (« À prévoir ») :
 #     disque-bientot  75 % ou plus, ou plein (95 %) dans moins de 14 jours au rythme du jour
 #     certificat-bientot  moins de 21 jours (Caddy renouvelle à 30 : le renouvellement échoue)
@@ -61,7 +62,7 @@
 # Essais (deploy/test-alerte.sh) : SHH_ENV_FILE, SHH_ALERTE_ETAT, SHH_ALERTE_MAINTENANT (heure
 # Unix), et une commande ou un fichier de remplacement par contrôle : SHH_ALERTE_SANTE,
 # SHH_ALERTE_DF (sortie « pcent ipcent » d'un dossier), SHH_ALERTE_MEMINFO, SHH_ALERTE_LOADAVG,
-# SHH_ALERTE_NPROC, SHH_ALERTE_DOCKER, SHH_ALERTE_CERT_FIN, SHH_ALERTE_CERT_DEBUT, SHH_ALERTE_CERT_SERIE, SHH_ALERTE_CT, SHH_ALERTE_RDAP, SHH_ALERTE_DNS,
+# SHH_ALERTE_NPROC, SHH_ALERTE_DOCKER, SHH_ALERTE_CERT_FIN, SHH_ALERTE_CERT_DEBUT, SHH_ALERTE_CERT_SERIE, SHH_ALERTE_CERT_WWW (sortie « serial=… » du certificat de www), SHH_ALERTE_CT, SHH_ALERTE_CT_WWW, SHH_ALERTE_RDAP, SHH_ALERTE_DNS,
 # SHH_ALERTE_IPS, SHH_ALERTE_SAUVEGARDE_OK, SHH_ALERTE_SMART, SHH_ALERTE_APT,
 # SHH_ALERTE_REBOOT, SHH_ALERTE_RETARD, SHH_ALERTE_NTP, SHH_ALERTE_UNITES, SHH_ALERTE_BOOT_ID,
 # SHH_ALERTE_DEMARRAGE, SHH_ALERTE_MONTE (« oui » ou « non »), SHH_ALERTE_MDP_FICHIER.
@@ -246,6 +247,12 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 	fin_cert=${SHH_ALERTE_CERT_FIN:-$(printf '%s\n' "$cert_servi" | sed -n 's/^notAfter=//p')}
 	debut_cert=${SHH_ALERTE_CERT_DEBUT:-$(printf '%s\n' "$cert_servi" | sed -n 's/^notBefore=//p')}
 	serie_servie=${SHH_ALERTE_CERT_SERIE:-$(printf '%s\n' "$cert_servi" | sed -n 's/^serial=//p')}
+	# www.<nom> (redirection 308 vers le site, Caddyfile) : son propre certificat, demandé par
+	# le même Caddy avec le même compte ACME ; sa série est connue comme celle du site. Lu sur
+	# la même adresse (le nom du site) : aucun enregistrement www n'est nécessaire pour le lire.
+	# shellcheck disable=SC2016 # $1 est développé par le bash -c, pas ici
+	serie_www=$(lire SHH_ALERTE_CERT_WWW bash -c 'openssl s_client -connect "$1:443" -servername "www.$1" </dev/null 2>/dev/null |
+		openssl x509 -noout -serial' _ "$SHH_DOMAIN" | sed -n 's/^serial=//p')
 	jours_cert="" heures_cert="" court=0
 	if [ -n "$fin_cert" ]; then
 		jours_cert=$(jours_jusqua "$fin_cert")
@@ -301,8 +308,11 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 	if [ -f "$ct_cache" ] && [ $((now - $(stat -c %Y "$ct_cache"))) -lt $JOUR ] && [ -z "${SHH_ALERTE_CT:-}" ]; then
 		ct=$(cat "$ct_cache")
 	else
+		# Le nom, puis www.<nom> (crt.sh ne rend que les certificats du nom exact demandé).
 		ct=$(lire SHH_ALERTE_CT curl -sS --fail --max-time 60 --proto '=https' \
 			"https://crt.sh/?q=$SHH_DOMAIN&output=json&exclude=expired")
+		ct=$ct$(lire SHH_ALERTE_CT_WWW curl -sS --fail --max-time 60 --proto '=https' \
+			"https://crt.sh/?q=www.$SHH_DOMAIN&output=json&exclude=expired")
 		printf '%s' "$ct" >"$ct_cache"
 	fi
 	norm() { tr 'A-F' 'a-f' | tr -d ':' | sed 's/^0*//'; }
@@ -311,7 +321,9 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 	# certificats de 6 jours, deux certificats légitimes peuvent tomber dans la fenêtre.
 	series="$etat/series-servies"
 	touch "$series"
-	if [ -n "$serie_ok" ] && ! grep -q " $serie_ok\$" "$series"; then printf '%s %s\n' "$now" "$serie_ok" >>"$series"; fi
+	for vue in "$serie_ok" "$(printf '%s' "$serie_www" | norm)"; do
+		if [ -n "$vue" ] && ! grep -q " $vue\$" "$series"; then printf '%s %s\n' "$now" "$vue" >>"$series"; fi
+	done
 	awk -v lim=$((now - 10 * JOUR)) '$1 >= lim' "$series" >"$series.n" && mv "$series.n" "$series"
 	if [ -n "$ct" ] && [ -n "$serie_ok" ]; then
 		inconnus=0
@@ -323,7 +335,7 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 		done < <(printf '%s' "$ct" | tr '{' '\n' | tr '}' '\n' | grep '"serial_number"' |
 			sed -n 's/.*"not_before" *: *"\([^"]*\)".*"serial_number" *: *"\([^"]*\)".*/\1|\2/p; t; s/.*"serial_number" *: *"\([^"]*\)".*"not_before" *: *"\([^"]*\)".*/\2|\1/p' || true)
 		if [ "$inconnus" -gt 0 ]; then
-			envoyer certificat-inconnu $JOUR "$inconnus certificat(s) émis pour $SHH_DOMAIN ces 3 derniers jours, autre(s) que celui que sert le site : vérifier sur crt.sh ; si ce n'est pas un renouvellement de Caddy, le DNS ou la clé est compromis (README, « Hébergeur et certificat »)"
+			envoyer certificat-inconnu $JOUR "$inconnus certificat(s) émis pour $SHH_DOMAIN ou www.$SHH_DOMAIN ces 3 derniers jours, autre(s) que ceux que sert le site : vérifier sur crt.sh ; si ce n'est pas un renouvellement de Caddy, le DNS ou la clé est compromis (README, « Hébergeur et certificat »)"
 		fi
 	fi
 

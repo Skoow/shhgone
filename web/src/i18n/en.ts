@@ -1541,6 +1541,7 @@ export const en = {
   "salon.piece.annuler": "Don't send",
   "salon.piece.err.indisponible": "File unavailable: it was removed or erased.",
   "salon.piece.err.lecture": "The file could not be opened. Try again.",
+  "salon.piece.err.sortie": "This file has reached its download limit: the server no longer sends it. Ask the sender to send it again.",
   "salon.piece.err.trop_gros": "File too large: 500 MB at most per file.",
   "salon.piece.err.limite": "Slow down: try again in {duree}.",
   "salon.piece.err.budget": "The room is full: 2 GB reached.",

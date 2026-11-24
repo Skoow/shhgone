@@ -110,7 +110,9 @@ func TestFinalizePaddingBoundedByReceived(t *testing.T) {
 			t.Fatalf("aléa écrit : %d octets pour 3 morceaux reçus (état %s)", *n, stateOf(t, s, id))
 		}
 	})
-	t.Run("ancien finalize (fill_from, fill_to) : même borne", func(t *testing.T) {
+	// Ancien cas « fill_from, fill_to » (retiré, spec H-5) : le même envoi, segment 0 et
+	// dernier segment compris, reste borné par la finalisation du brouillon.
+	t.Run("segment 0 et dernier segment reçus : même borne", func(t *testing.T) {
 		s, _ := newSvc(t)
 		n := countFills(t)
 		id, _, err := s.Create(newKeys().req(160, 1, 1))
@@ -125,9 +127,8 @@ func TestFinalizePaddingBoundedByReceived(t *testing.T) {
 		if err := s.PutSegment(id, 24, segBody(1600, 24, 2)); err != nil { // dernier segment
 			t.Fatal(err)
 		}
-		r := fin(id)
-		r.FillFrom, r.FillTo = 1, 24 // 1 472 morceaux d'aléa pour 131 reçus
-		if _, err := s.Finalize(id, r); !errors.Is(err, ErrIncomplete) {
+		// 1 472 morceaux d'aléa pour 131 reçus
+		if _, err := s.Finalize(id, draftFin(id, 1600)); !errors.Is(err, ErrIncomplete) {
 			t.Errorf("Finalize = %v, attendu %v", err, ErrIncomplete)
 		}
 		if *n != 0 || stateOf(t, s, id) != "uploading" {

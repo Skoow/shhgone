@@ -65,7 +65,8 @@ func ready(t *testing.T, s *share.Service) string {
 		}
 	}
 	if _, err := s.Finalize(id, share.FinalizeReq{TTLHours: 1, MaxOpens: 1, KdfOps: 3, KdfMem: 67108864,
-		Salt: rnd(16), ProofV: sum(rnd(8)), Envelope: rnd(share.EnvelopeLen)}); err != nil {
+		Salt: rnd(16), ProofV: sum(rnd(8)), Envelope: rnd(share.EnvelopeLen),
+		Bucket: 1, Header: rnd(share.Header), Tail: rnd(share.ChunkCT)}); err != nil {
 		t.Fatal(err)
 	}
 	return id
