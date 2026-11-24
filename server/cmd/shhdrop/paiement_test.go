@@ -53,7 +53,8 @@ func TestSetupPaiement(t *testing.T) {
 	if err != nil || fi.Mode().Perm() != 0o600 {
 		t.Fatal(fi, err)
 	}
-	if m := p.svc.Moyens(); len(m) != 2 {
+	// Régime OSS : la crypto n'est pas proposée (décision du 24 novembre), ses webhooks restent lus.
+	if m := p.svc.Moyens(); len(m) != 1 || m[0] != paiement.Carte || p.svc.PrestataireDe("nowpayments") == nil {
 		t.Fatal("moyens", m)
 	}
 }
