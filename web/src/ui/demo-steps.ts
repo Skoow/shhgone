@@ -7,11 +7,36 @@ export const STEP_MIN_MS = 2500;
 /**
  * Durée d'une étape selon la quantité de texte affichée sous la scène (titre et description ;
  * propriétaire, 20 novembre : « adapter la vitesse à la quantité de texte », puis « 9 s trop
- * long ») : 1 s, plus 30 ms par caractère (environ 33 caractères par seconde), entre 2,5 et 5,5 s ;
+ * long ») : 1 s, plus 30 ms par caractère (environ 33 caractères par seconde), comptés à partir du
+ * moment où la description s'affiche (descA, en lettres : reperesEtape), entre 2,5 et 5,5 s ;
  * au moins la frappe du journal de l'étape (lettres) plus 1 s, pour lire la ligne finie.
  */
-export function dureeEtape(texte: string, lettres = 0): number {
-  return Math.min(STEP_MS, Math.max(STEP_MIN_MS, 1000 + [...texte].length * 30, lettres * TYPE_MS + 1000));
+export function dureeEtape(texte: string, lettres = 0, descA = 0): number {
+  return Math.min(STEP_MS, Math.max(STEP_MIN_MS, descA * TYPE_MS + 1000 + [...texte].length * 30, lettres * TYPE_MS + 1000));
+}
+/**
+ * Repères de l'étape n, en lettres tapées depuis son début (synchronisation du 24 novembre : la
+ * scène, le journal et le cadre du dessous suivent la même horloge) :
+ * - late : début de la ligne de l'attaquant (il apparaît dans la scène à ce moment), ou null ;
+ * - desc : début de l'état de la dernière ligne (« ✓ … » ou « ✕ … ») : la description de l'étape
+ *   s'affiche alors dans le cadre du dessous, et les étiquettes « ✕ » de la scène avec elle.
+ * La durée de lecture de la description (dureeEtape, troisième argument) part de desc.
+ */
+export function reperesEtape(n: number, t: (k: Key) => string): { late: number | null; desc: number } {
+  let k = 0;
+  let late: number | null = null;
+  let desc = 0;
+  for (const l of LOG) {
+    if (l.n !== n) continue;
+    if (l.late) {
+      k += PAUSE;
+      late = k;
+    }
+    k += [...t(l.text)].length;
+    desc = k;
+    k += [...`✓ ${t(l.st)}`].length;
+  }
+  return { late, desc };
 }
 /** Lettres tapées dans le journal pendant l'étape n (texte et état de ses lignes, pause comprise). */
 export function lettresEtape(n: number, t: (k: Key) => string): number {

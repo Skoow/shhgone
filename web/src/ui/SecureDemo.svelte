@@ -9,7 +9,7 @@
   import { t, type Key } from "../i18n/i18n.svelte";
   import { FileText, Pause, Play } from "./Icon";
   import { cipherText, rng } from "./decor";
-  import { LOG, PAUSE, STEPS, TYPE_MS, dureeEtape, lettresEtape, type Line } from "./demo-steps";
+  import { LOG, PAUSE, STEPS, TYPE_MS, dureeEtape, lettresEtape, reperesEtape, type Line } from "./demo-steps";
 
   const uid = $props.id();
   // Section de l'accueil qui porte le titre visible (19 novembre, 3) : sinon, titre caché propre.
@@ -43,7 +43,7 @@
     if (!playing) return;
     const now = step; // relu à chaque étape : un minuteur par étape
     // Durée selon le texte de l'étape (titre et description, 20 novembre).
-    const ms = dureeEtape(t(`demo.s${now}.t` as Key) + t(`demo.s${now}.d` as Key), lettresEtape(now, t));
+    const ms = dureeEtape(t(`demo.s${now}.t` as Key) + t(`demo.s${now}.d` as Key), lettresEtape(now, t), reperesEtape(now, t).desc);
     const timer = setTimeout(() => {
       step = now === STEPS.length ? 1 : now + 1;
       typed = 0; // la frappe de l'étape suivante repart du début
@@ -121,6 +121,11 @@
     // Deux lignes au plus (19 novembre, 3) : la scène prend la place ; les étapes sont à droite.
     return all.slice(-2);
   });
+  // Synchronisation (24 novembre) : l'attaquant entre dans la scène quand sa ligne commence, la
+  // description du cadre du dessous et les étiquettes « ✕ » arrivent avec l'état de la dernière
+  // ligne. En pause, la description est montrée tout de suite (on s'arrête souvent pour lire).
+  const rep = $derived(reperesEtape(shown, t));
+  const descOn = $derived(!playing || typed >= rep.desc);
   /** Fin de la frappe de l'étape (en lettres) : le minuteur s'arrête là. */
   const total = $derived(rows.reduce((m, r) => (r.full ? m : Math.max(m, r.start + r.text.length + r.st.length)), 0));
   $effect(() => {
@@ -150,6 +155,8 @@
   data-demo
   data-ambient
   data-step={shown}
+  style:--late="{(rep.late ?? 0) * TYPE_MS}ms"
+  style:--desc="{rep.desc * TYPE_MS}ms"
   role="group"
   aria-labelledby={labelledby ?? `${uid}-t`}
   onfocusin={() => (focused = true)}
@@ -342,7 +349,7 @@
   {#if !reduced}
     <div class="now-cap" aria-hidden="true" data-demo-now>
       {#key shown}
-        <p class="cap"><span class="st">{t(`demo.s${shown}.t` as "demo.s1.t")}</span><span class="sd">{t(`demo.s${shown}.d` as "demo.s1.d")}</span></p>
+        <p class="cap"><span class="st">{t(`demo.s${shown}.t` as "demo.s1.t")}</span><span class={["sd", { off: !descOn }]} data-demo-desc>{t(`demo.s${shown}.d` as "demo.s1.d")}</span></p>
       {/key}
     </div>
   {/if}
@@ -814,8 +821,16 @@
   .thief .hood {
     transition: transform 600ms var(--ease-settle);
   }
+  /* L'attaquant entre quand sa ligne du journal commence (--late, 24 novembre). */
+  .thief.on {
+    transition-delay: var(--late, 0ms);
+  }
   .thief.on .hood {
-    animation: peek 1600ms var(--ease-in-out) both;
+    animation: peek 1600ms var(--ease-in-out) var(--late, 0ms) both;
+  }
+  /* Ses « ✕ » arrivent avec l'état de sa ligne et la description du cadre (--desc). */
+  .tags.on {
+    transition-delay: var(--desc, 0ms);
   }
   .thief.done .hood {
     animation: shrug 1800ms var(--ease-in-out) both;
@@ -1039,6 +1054,13 @@
     font-size: 0.9375rem;
     line-height: 1.5;
     text-wrap: pretty;
+  }
+  /* Description du cadre : place gardée (rien ne saute), fondu quand le journal tape l'état. */
+  .now-cap .sd {
+    transition: opacity 420ms var(--ease-out);
+  }
+  .now-cap .sd.off {
+    opacity: 0;
   }
   .steps .st {
     font-size: 0.9375rem;

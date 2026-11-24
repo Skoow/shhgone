@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "../i18n/en";
 import { fr } from "../i18n/fr";
 import { setLang } from "../i18n/i18n.svelte";
-import { LOG, PAUSE, STEP_MIN_MS, STEP_MS, STEPS, TYPE_MS, dureeEtape, lettresEtape } from "./demo-steps";
+import { LOG, PAUSE, STEP_MIN_MS, STEP_MS, STEPS, TYPE_MS, dureeEtape, lettresEtape, reperesEtape } from "./demo-steps";
 import SecureDemo from "./SecureDemo.svelte";
 
 let c: Record<string, unknown> | null = null;
@@ -91,10 +91,54 @@ describe("SecureDemo", () => {
           lettres += [...dict[l.text]!].length + [...`✓ ${dict[l.st]!}`].length;
         }
         expect(lettresEtape(n, (k) => dict[k]!)).toBe(lettres);
-        const dur = dureeEtape(dict[`demo.s${n}.t`]! + dict[`demo.s${n}.d`]!, lettres);
+        const tr = (k: string) => dict[k]!;
+        const dur = dureeEtape(dict[`demo.s${n}.t`]! + dict[`demo.s${n}.d`]!, lettres, reperesEtape(n, tr).desc);
         expect(lettres * TYPE_MS, `étape ${n}`).toBeLessThanOrEqual(dur - 500);
+        // La description reste au moins 2 s à l'écran avant l'étape suivante.
+        expect(dur - reperesEtape(n, tr).desc * TYPE_MS, `étape ${n}`).toBeGreaterThanOrEqual(2000);
       }
     }
+  });
+
+  it("repères (24 novembre) : l'attaquant entre avec sa ligne ; la description arrive avec le dernier état", () => {
+    const tr = (k: string) => fr[k as keyof typeof fr];
+    // Étape 3 : « envoi chiffré au serveur » + « ✓ ok », pause, puis la ligne de l'attaquant.
+    const s3 = reperesEtape(3, tr);
+    expect(s3.late).toBe([...fr["demo.log.send"]].length + [...`✓ ${fr["demo.st.ok"]}`].length + PAUSE);
+    expect(s3.desc).toBe(s3.late! + [...fr["demo.log.intercept"]].length);
+    // Étape 1 : pas d'attaquant ; description à l'état de la seule ligne.
+    expect(reperesEtape(1, tr)).toEqual({ late: null, desc: [...fr["demo.log.drop"]].length });
+    for (const n of STEPS) expect(reperesEtape(n, tr).desc).toBeLessThan(lettresEtape(n, tr));
+  });
+
+  it("cadre du dessous synchronisé avec le journal : description cachée jusqu'à l'état, montrée en pause", () => {
+    show();
+    const desc = () => document.querySelector<HTMLElement>("[data-demo-desc]")!;
+    const r1 = reperesEtape(1, (k) => fr[k as keyof typeof fr]);
+    expect(desc().classList.contains("off")).toBe(true);
+    for (let k = 0; k < r1.desc - 1; k++) {
+      vi.advanceTimersByTime(TYPE_MS);
+      flushSync();
+    }
+    expect(desc().classList.contains("off")).toBe(true);
+    vi.advanceTimersByTime(TYPE_MS * 2);
+    flushSync();
+    expect(desc().classList.contains("off")).toBe(false);
+    // Étape suivante : de nouveau cachée ; la pause la montre aussitôt.
+    vi.advanceTimersByTime(STEP_MS);
+    flushSync();
+    expect(step()).toBe(2);
+    expect(desc().classList.contains("off")).toBe(true);
+    toggle().click();
+    flushSync();
+    expect(desc().classList.contains("off")).toBe(false);
+    // Délai de l'attaquant posé sur la racine (étape 3) en millisecondes.
+    toggle().click();
+    flushSync();
+    vi.advanceTimersByTime(STEP_MS);
+    flushSync();
+    expect(step()).toBe(3);
+    expect(root().style.getPropertyValue("--late")).toBe(`${reperesEtape(3, (k) => fr[k as keyof typeof fr]).late! * TYPE_MS}ms`);
   });
 
   it("bouton pause/lecture visible : arrête puis reprend la boucle", () => {
@@ -179,7 +223,8 @@ describe("journal tapé (18 novembre) : un seul curseur, mots entiers", () => {
     for (let n = 1; n <= STEPS.length; n++) {
       // Pendant la frappe : un curseur au plus.
       // Pas de 35 ms (TYPE_MS) : chaque lettre relance son minuteur au passage des effets.
-      const dur = dureeEtape(fr[`demo.s${n}.t` as keyof typeof fr] + fr[`demo.s${n}.d` as keyof typeof fr], lettresEtape(n, (k) => fr[k as keyof typeof fr]));
+      const tr = (k: string) => fr[k as keyof typeof fr];
+      const dur = dureeEtape(fr[`demo.s${n}.t` as keyof typeof fr] + fr[`demo.s${n}.d` as keyof typeof fr], lettresEtape(n, tr), reperesEtape(n, tr).desc);
       const ticks = Math.floor((dur - 100) / 35);
       for (let k = 0; k < ticks; k++) {
         vi.advanceTimersByTime(35);
