@@ -33,11 +33,11 @@ func TestFinalizeSyncsBeforeReady(t *testing.T) {
 	for name, tc := range map[string]struct {
 		prepare func(t *testing.T, s *Service) (string, FinalizeReq)
 	}{
-		"au clic": {func(t *testing.T, s *Service) (string, FinalizeReq) {
+		"brouillon, segments 1 à 5 manquants": {func(t *testing.T, s *Service) (string, FinalizeReq) {
 			id := upload400(t, s, newKeys(), 1, 2, 3, 4, 5)
-			return id, withFill(id, 1, 6)
+			return id, fin(id)
 		}},
-		"brouillon": {func(t *testing.T, s *Service) (string, FinalizeReq) {
+		"brouillon ramené à un palier plus petit": {func(t *testing.T, s *Service) (string, FinalizeReq) {
 			id, _, err := s.createAny(newKeys().req(160, 1, 1))
 			if err != nil {
 				t.Fatal(err)
@@ -81,7 +81,7 @@ func TestFinalizeSyncsBeforeReady(t *testing.T) {
 // « uploading », et un nouvel essai aboutit.
 func TestFinalizeAbortsWhenSyncFails(t *testing.T) {
 	boom := errors.New("disque en erreur")
-	for name, draft := range map[string]bool{"au clic": false, "brouillon": true} {
+	for name, bucket := range map[string]int{"palier réservé": 0, "palier final donné": 16} {
 		t.Run(name, func(t *testing.T) {
 			s, _ := newSvc(t)
 			id, _, err := s.createAny(newKeys().req(16, 1, 1))
@@ -92,8 +92,8 @@ func TestFinalizeAbortsWhenSyncFails(t *testing.T) {
 				t.Fatal(err)
 			}
 			r := fin(id)
-			if draft {
-				r = draftFin(id, 16)
+			if bucket != 0 {
+				r = draftFin(id, bucket)
 			}
 			hookSync(t, func(*blob.Store, string) error { return boom })
 			if _, err := s.Finalize(id, r); !errors.Is(err, boom) {

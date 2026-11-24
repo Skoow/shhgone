@@ -72,7 +72,7 @@ func TestFormules(t *testing.T) {
 		}
 	}
 	ok := FinalizeReq{TTLHours: 1, MaxOpens: 1, KdfOps: 3, KdfMem: 64 << 20, Salt: make([]byte, 16), ProofV: append([]byte{1}, make([]byte, 31)...),
-		Envelope: make([]byte, EnvelopeLen)}
+		Envelope: make([]byte, EnvelopeLen), Bucket: 1, Header: make([]byte, Header), Tail: make([]byte, ChunkCT)}
 	for _, c := range []struct {
 		ttl, opens int
 		t          Tier

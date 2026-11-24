@@ -2,7 +2,7 @@ package share
 
 // Rapport de performance du 13 novembre, A12 : temps de Finalize d'un partage de 200 Mo
 // (palier 4000, 256 Mio : 49 segments de 4 Mio envoyés, ≈ 205 Mo, puis le dernier ; bourrage
-// des segments 49 à 61, ≈ 54 Mo d'aléa). Sur le disque du dossier temporaire.
+// des segments 49 à 61, ≈ 54 Mo d'aléa, par la finalisation du brouillon). Sur le disque du dossier temporaire.
 //
 //	go test -run '^$' -bench Finalize200Mo -benchtime 5x ./internal/share/
 
@@ -32,8 +32,7 @@ func BenchmarkFinalize200Mo(b *testing.B) {
 		// Un envoi réel dure des dizaines de secondes : laisser finir l'écriture de fond.
 		s.waitBackgroundSync()
 		time.Sleep(10 * time.Millisecond)
-		r := fin(id)
-		r.FillFrom, r.FillTo = sent, segs-1
+		r := fin(id) // brouillon : segments 49 à 61 remplis d'aléa
 		b.StartTimer()
 		if _, err := s.Finalize(id, r); err != nil {
 			b.Fatal(err)

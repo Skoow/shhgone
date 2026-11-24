@@ -103,7 +103,7 @@ func finaliser(e envPaiement, c created, opens, ttl int) (int, float64) {
 	for n := 0; n < c.Segments; n++ {
 		e.do(req{method: "PUT", path: fmt.Sprintf("/api/shares/segments/%d", n), body: rnd(share.SegmentSize(1, n)), hdr: auth(c.UploadToken)})
 	}
-	w := e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken), body: mustJSON(c.k.finBody(opens, ttl))})
+	w := e.do(req{method: "POST", path: "/api/shares/finalize", hdr: auth(c.UploadToken), body: mustJSON(c.k.finBody(opens, ttl, 1))})
 	var m map[string]any
 	json.Unmarshal(w.Body.Bytes(), &m)
 	s, _ := m["expires_in_s"].(float64)

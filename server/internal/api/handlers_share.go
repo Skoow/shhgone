@@ -312,9 +312,8 @@ func (s *server) finalize(w http.ResponseWriter, r *http.Request) {
 		Envelope string `json:"envelope"`
 		TTLHours int    `json:"ttl_hours"`
 		MaxOpens int    `json:"max_opens"`
-		FillFrom *int   `json:"fill_from"`
-		FillTo   *int   `json:"fill_to"`
-		// Brouillon (spec §41.14) : palier final, en-tête et manifeste chiffré, sans fill_*.
+		// Brouillon (spec §41.14), seule finalisation (spec H-5) : palier final, en-tête et
+		// manifeste chiffré.
 		Bucket *int    `json:"bucket"`
 		Header *string `json:"header"`
 		Tail   *string `json:"tail"`
@@ -326,36 +325,21 @@ func (s *server) finalize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req := share.FinalizeReq{TTLHours: b.TTLHours, MaxOpens: b.MaxOpens, KdfOps: b.KdfOps, KdfMem: b.KdfMem}
-	var errs [3]error
+	var errs [5]error
 	req.Salt, errs[0] = secret(b.Salt, 16)
 	req.ProofV, errs[1] = secret(b.ProofV, 32)
 	req.Envelope, errs[2] = secret(b.Envelope, share.EnvelopeLen)
-	// fill_from et fill_to ensemble, ou aucun des deux (spec §36 S4, Q-MIN1 : le navigateur a
-	// envoyé lui-même tout le bourrage ; tous les segments sont alors exigés). Ancienne
-	// finalisation sans brouillon : le mode « au clic » qu'elle servait est abandonné (24
-	// novembre) et aucun client ne l'appelle ; gardée comme banc des tests, à retirer (spec H-5).
-	if errs != [3]error{} || (b.FillFrom == nil) != (b.FillTo == nil) {
+	if b.Bucket == nil || b.Header == nil || b.Tail == nil {
 		fail(w, errBadRequest)
 		return
 	}
-	if b.FillFrom != nil {
-		req.FillFrom, req.FillTo = *b.FillFrom, *b.FillTo
-	}
-	draft := b.Bucket != nil
-	if draft != (b.Header != nil) || draft != (b.Tail != nil) || draft && b.FillFrom != nil || !draft && b.Void != nil {
+	req.Bucket = *b.Bucket
+	req.Void = b.Void
+	req.Header, errs[3] = secret(*b.Header, share.Header)
+	req.Tail, errs[4] = secret(*b.Tail, share.ChunkCT)
+	if errs != [5]error{} || req.Bucket == 0 {
 		fail(w, errBadRequest)
 		return
-	}
-	if draft {
-		var e1, e2 error
-		req.Bucket = *b.Bucket
-		req.Void = b.Void
-		req.Header, e1 = secret(*b.Header, share.Header)
-		req.Tail, e2 = secret(*b.Tail, share.ChunkCT)
-		if e1 != nil || e2 != nil || req.Bucket == 0 {
-			fail(w, errBadRequest)
-			return
-		}
 	}
 	// Bourrage déjà payé : le palier final ne dépasse pas la réservation débitée (audit M1).
 	left, err := s.svc.Finalize(id, req)

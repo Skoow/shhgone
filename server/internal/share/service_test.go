@@ -52,12 +52,15 @@ func (k keys) req(bucket, ttl, opens int) CreateReq {
 	id := base64.RawURLEncoding.EncodeToString(rnd(16))
 	finMu.Lock()
 	finOf[id] = FinalizeReq{TTLHours: ttl, MaxOpens: opens, KdfOps: 3, KdfMem: 67108864,
-		Salt: rnd(16), ProofV: sum(k.preuve), Envelope: rnd(EnvelopeLen)}
+		Salt: rnd(16), ProofV: sum(k.preuve), Envelope: rnd(EnvelopeLen), Bucket: bucket,
+		Header: bytes.Repeat([]byte{1}, Header), Tail: bytes.Repeat([]byte{byte(SegmentCount(bucket))}, ChunkCT)}
 	finMu.Unlock()
 	return CreateReq{ID: id, Bucket: bucket, AccessV: sum(k.acces), ManageV: sum(k.gestion)}
 }
 
-// fin : finalisation de l'envoi id (bourrage vide).
+// fin : finalisation de l'envoi id (spec §41.14, seule finalisation depuis H-5), au palier
+// réservé, en-tête et manifeste tels que ready et upload400 les envoient (segBody(b, n, n+1)) :
+// un envoi complet garde ses octets ; tout morceau manquant est rempli d'aléa.
 func fin(id string) FinalizeReq {
 	finMu.Lock()
 	defer finMu.Unlock()
@@ -162,10 +165,6 @@ func TestSizing(t *testing.T) {
 	if ContentBytes(16385) != 1<<30 || ContentBytes(1) != 0 {
 		t.Fatal("ContentBytes")
 	}
-	if !hasAllBut([]byte{0xff, 0xff, 0xff, 0xff, 0x01}, 33, 0, 0) || hasAllBut([]byte{0xff, 0xff, 0xff, 0xff, 0x00}, 33, 0, 0) ||
-		!hasAllBut([]byte{0b10000111}, 8, 3, 7) || hasAllBut([]byte{0xff}, 9, 0, 0) {
-		t.Fatal("hasAllBut")
-	}
 	for _, b := range Buckets {
 		var total int64
 		for n := 0; n < SegmentCount(b); n++ {
@@ -248,15 +247,10 @@ func TestFinalizeRounding(t *testing.T) {
 	}
 }
 
-func TestFinalizeIncomplete(t *testing.T) {
-	s, _ := newSvc(t)
-	k := newKeys()
-	id, _, _ := s.createAny(k.req(80, 1, 1))
-	s.PutSegment(id, 1, segBody(80, 1, 1))
-	if _, err := s.Finalize(id, fin(id)); !errors.Is(err, ErrIncomplete) {
-		t.Fatal(err)
-	}
-}
+// TestFinalizeIncomplete (segment manquant refusé) appartenait à l'ancienne finalisation sans
+// brouillon (retirée, spec H-5). Le brouillon remplit d'aléa tout morceau manquant
+// (TestFinalizeFillsAnyMissingSegment) ; ErrIncomplete ne vient plus que de la borne de l'aléa
+// (TestFinalizePaddingBoundedByReceived).
 
 func TestPutSegmentRules(t *testing.T) {
 	s, c := newSvc(t)
@@ -278,7 +272,9 @@ func TestPutSegmentRules(t *testing.T) {
 	s.PutSegment(id, 0, segBody(80, 0, 1))
 	s.PutSegment(id, 0, segBody(80, 0, 9))
 	s.PutSegment(id, 1, segBody(80, 1, 2))
-	if _, err := s.Finalize(id, fin(id)); err != nil {
+	r := fin(id)
+	r.Header = segBody(80, 0, 9)[:Header] // en-tête du segment renvoyé
+	if _, err := s.Finalize(id, r); err != nil {
 		t.Fatal(err)
 	}
 	if n, _, _ := s.Unlock(id, k.acces, k.preuve); n != 1 {

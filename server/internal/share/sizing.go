@@ -74,5 +74,11 @@ func TotalSize(bucket int) int64 { return totalSize(bucket) }
 // SegOffset : position du segment n dans le fichier (pièces du salon).
 func SegOffset(bucket, n int) int64 { return segOffset(bucket, n) }
 
-// ValidFill : bourrage [from, to) permis pour segs segments (validFill ; pièces du salon).
+// ValidFill : bourrage [from, to) permis pour segs segments des pièces du salon : vide [k, k)
+// avec 0 ≤ k ≤ segs − 1, ou [from, to) avec 1 ≤ from < to ≤ segs − 1, jamais le segment 0
+// (en-tête) ni le dernier (manifeste).
 func ValidFill(from, to, segs int) bool { return validFill(from, to, segs) }
+
+func validFill(from, to, segs int) bool {
+	return from >= 0 && from <= to && to <= segs-1 && (from == to || from >= 1)
+}
