@@ -64,7 +64,7 @@
   {#if p.progres !== null && b.moi}
     <progress max="1" value={p.progres} aria-label={t("salon.piece.envoi", { nom })}></progress>
   {/if}
-  {#if erreur}<p class="err" role="status">{t(`salon.piece.err.${erreur === "indisponible" ? "indisponible" : "lecture"}`)}</p>{/if}
+  {#if erreur}<p class="err" role="status">{t(`salon.piece.err.${erreur === "indisponible" || erreur === "sortie" ? erreur : "lecture"}`)}</p>{/if}
   <div class="acts">
     {#if p.sorte === "video" && !url && p.ref}
       <Button variant="secondary" dense onpress={() => S.afficherPiece(b)}>{t("salon.piece.lire")}</Button>

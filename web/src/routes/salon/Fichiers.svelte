@@ -32,7 +32,7 @@
     const e = await S.telechargerArchive(liste.filter((b) => choix.has(b.cle)));
     enCours = false;
     if (e === null) choix.clear();
-    else message = t(e === "trop_gros" ? "salon.files.zip.gros" : e === "indisponible" ? "salon.piece.err.indisponible" : "salon.piece.err.lecture");
+    else message = t(e === "trop_gros" ? "salon.files.zip.gros" : e === "indisponible" ? "salon.piece.err.indisponible" : e === "sortie" ? "salon.piece.err.sortie" : "salon.piece.err.lecture");
   }
   const membres = $derived((void vue.rev, [{ value: -1, label: t("salon.files.tous") }, ...[...conv.presents].sort((a, b) => a - b).map((s) => ({ value: s, label: nom(s) }))]));
   const liste = $derived.by(() => {

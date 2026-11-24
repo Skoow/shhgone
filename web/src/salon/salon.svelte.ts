@@ -11,7 +11,7 @@ import { SvelteSet } from "svelte/reactivity";
 import { ClientSalon, type EvClient, type Fin } from "./client";
 import { Conversation, type Bulle, type PieceInfo } from "./conversation";
 import { Appel } from "./appel";
-import { AFFICHE_MAX, PIECE_MAX, envoyerPiece, lirePiece } from "./pieces";
+import { AFFICHE_MAX, PIECE_MAX, causeLecture, envoyerPiece, lirePiece } from "./pieces";
 import { IMAGES_SURES, typeAffichage } from "./affichage";
 import { previewable } from "../media/dimensions";
 import { stripMetadata } from "../media/strip";
@@ -951,6 +951,7 @@ export async function afficherPiece(b: Bulle): Promise<void> {
   if (!x?.client || !p?.ref || pieces.urls[b.cle]) return;
   const mime = typeAffichage(p.sorte, p.mime);
   if (!mime || p.taille > (p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX)) return;
+  if (pieces.erreurs[b.cle] === "sortie") return; // plafond de sortie : définitif, aucun nouvel essai
   try {
     const blob = await lirePiece(net(), x.client.jeton, p.ref, p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX);
     if (s !== x) return;
@@ -962,7 +963,7 @@ export async function afficherPiece(b: Bulle): Promise<void> {
     if (s !== x) return;
     pieces.urls[b.cle] = URL.createObjectURL(new Blob([blob], { type: mime }));
   } catch (e) {
-    pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+    pieces.erreurs[b.cle] = causeLecture(e);
   }
 }
 
@@ -971,6 +972,7 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
   const x = s;
   const p = b.piece;
   if (!x?.client || !p) return;
+  if (pieces.erreurs[b.cle] === "sortie" && !originaux.has(b.cle)) return; // plafond de sortie : aucun nouvel essai
   try {
     const blob = originaux.get(b.cle) ?? (p.ref ? await lirePiece(net(), x.client.jeton, p.ref) : null);
     if (!blob) return;
@@ -985,7 +987,7 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
     setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
     accuserPiece(b, "piece_telechargee");
   } catch (e) {
-    pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+    pieces.erreurs[b.cle] = causeLecture(e);
   }
 }
 
@@ -995,7 +997,7 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
  * zipName). 200 Mio au plus (l'archive est assemblée en mémoire). Chaque fichier envoie son
  * accusé « Téléchargé ». Rend null, ou le code d'erreur.
  */
-export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "lecture" | "indisponible" | null> {
+export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "lecture" | "indisponible" | "sortie" | null> {
   const x = s;
   if (!x?.client || bs.length === 0) return "lecture";
   const choisies = bs.filter((b) => b.piece && !b.retire && (b.piece.ref || originaux.has(b.cle)));
@@ -1007,8 +1009,12 @@ export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "le
     abort: async () => void (parts.length = 0),
   });
   const pris = new Set<string>();
+  // Plafond de sortie déjà atteint pour une pièce choisie : aucun nouvel essai.
+  if (choisies.some((b) => pieces.erreurs[b.cle] === "sortie" && !originaux.has(b.cle))) return "sortie";
+  let courante: Bulle | undefined;
   try {
     for (const b of choisies) {
+      courante = b;
       const p = b.piece!;
       const blob = originaux.get(b.cle) ?? (await lirePiece(net(), x.client.jeton, p.ref!));
       const octets = new Uint8Array(await blob.arrayBuffer());
@@ -1025,7 +1031,9 @@ export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "le
     await z.finish();
   } catch (e) {
     await z.abort().catch(() => undefined);
-    return e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+    const c = causeLecture(e);
+    if (c === "sortie" && courante) pieces.erreurs[courante.cle] = "sortie";
+    return c;
   }
   const url = URL.createObjectURL(new Blob(parts, { type: "application/zip" }));
   parts.length = 0;
