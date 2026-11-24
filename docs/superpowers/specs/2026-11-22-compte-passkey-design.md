@@ -374,7 +374,9 @@ Rien dans les formats (enveloppes, clé de récupération, routes, JSON) ne dép
 
 Aujourd'hui essayable avec un faux serveur (§22 de la conception du compte). Une vraie passkey de la démo serait enregistrée pour `skoow.github.io` dans le gestionnaire de la personne et y resterait. **Recommandé (Q8)** : en démo, passkey **simulée** (bouton « Simuler la passkey », texte « Dans la démo, aucune passkey n'est créée »), clé de récupération réelle (calculs du moteur), tout le reste comme aujourd'hui. Les e2e de démo restent sans authentificateur.
 
-## 12. Juridique (pour le juriste ; complète `docs/ouverture-comptes.md` §2.1)
+## 12. Juridique (pour le juriste ; la recherche du 22 novembre et les questions à l'avocat sont tenues hors du dépôt, propriétaire)
+
+Deux points de gravité élevée de cette recherche restent à soumettre au juriste : l'injonction « sécurité nationale » du décret n° 2026-920 (identifiant et heure de chaque partage et de chaque salon, 1 an) et le statut d'opérateur du salon (CPCE L32 et L34-1, spec §39.7).
 
 | Donnée | Collectée ? | Catégorie (décret 2021-1362, numérotation à vérifier par le juriste) | Durée de conservation possible |
 |---|---|---|---|
@@ -411,6 +413,7 @@ Aujourd'hui essayable avec un faux serveur (§22 de la conception du compte). Un
 | R14 | Faible, essais | e2e WebKit | aucun authentificateur virtuel dans WebKit | Chromium (CDP `WebAuthn.addVirtualAuthenticator`, `hasPrf`) en CI ; passage manuel sur iPhone et Mac (ouverture faite sans lui, risque assumé par le propriétaire le 24 novembre ; captures gardées hors du dépôt) |
 | R15 | Faible, inutile retiré | §37.6 | rotation de `K_compte`, plusieurs clés de récupération | non repris (§5.6) |
 | R16 | Faible, sécurité | `connexion/debut` sans preuve | création massive de défis | borne de 20 000 défis, 60 par minute par connexion |
+| R17 | Faible, abus (usurpation) | pseudo, `p_canon` calculé par l'appareil | le serveur ne voit que `p_canon` (forme canonique tirée par le client) et son empreinte : un **client modifié** peut envoyer un `p_canon` qui ne correspond pas au pseudo affiché, donc enregistrer un pseudo qui **ressemble** à celui d'un autre (lettres semblables d'autres écritures, espaces invisibles) ; le pseudo affiché est chiffré, le serveur ne peut pas le contrôler | **Limite acceptée** (décision du propriétaire, 24 novembre). Le code de vérification du salon (empreinte de la clé, salon v3 §9 point 4) reste la seule preuve d'identité ; le dire dans l'aide du salon |
 
 ## 14. Tests (bloquants)
 
@@ -422,7 +425,7 @@ Aujourd'hui essayable avec un faux serveur (§22 de la conception du compte). Un
 
 ## 15. Migration et plan de travail
 
-**Migration : aucune.** Le service n'a jamais été ouvert (`deploy.sh` refusait d'installer sans fournisseur d'e-mails, `docs/ouverture-comptes.md` §1) : aucun compte n'existe. Le schéma 3 remplace le schéma 2 ; au démarrage, une base `comptes.db` de schéma 2 **non vide** fait refuser le démarrage avec un message (jamais d'effacement silencieux) ; vide, elle est recréée. Le code du compte par e-mail est retiré, pas gardé « au cas où » (simplicité).
+**Migration : aucune.** Le service n'a jamais été ouvert (`deploy.sh` refusait d'installer sans fournisseur d'e-mails) : aucun compte n'existe. Le schéma 3 remplace le schéma 2 ; au démarrage, une base `comptes.db` de schéma 2 **non vide** fait refuser le démarrage avec un message (jamais d'effacement silencieux) ; vide, elle est recréée. Le code du compte par e-mail est retiré, pas gardé « au cas où » (simplicité).
 
 | Lot | Sous-projet | Contenu | Estimation |
 |---|---|---|---|
@@ -432,7 +435,7 @@ Aujourd'hui essayable avec un faux serveur (§22 de la conception du compte). Un
 | W1 | Site | `webauthn.ts`, `recup.ts`, écrans §3 (inscription, connexion, clé, vérification, passkeys, récupération, suppression), repli sans PRF, textes FR et EN, textes publics (§8 dernière ligne, page Sécurité « Ce que le compte ne protège pas » : la clé de récupération est la clé du compte) ; retrait des écrans e-mail, mot de passe, TOTP | 4 jours |
 | W2 | Démo | faux serveur passkey simulée (§11) | 1 jour |
 | T1 | Tests de bout en bout | « le serveur ne voit rien » étendu, parcours par l'interface avec authentificateurs virtuels, passage manuel sur appareils (§14) | 2 jours |
-| D1 | Documents | `docs/ouverture-comptes.md` (D1 caduque, juriste mis à jour), §37 de la spécification (renvoi), conception du compte (en-tête « remplacée pour l'identité »), `deploy/README.md` (plus de SMTP) | 0,5 jour |
+| D1 | Documents | liste d'ouverture (D1 caduque, juriste mis à jour ; tenue hors du dépôt depuis le 24 novembre), §37 de la spécification (renvoi), conception du compte (en-tête « remplacée pour l'identité »), `deploy/README.md` (plus de SMTP) | 0,5 jour |
 | | **Total** | | **≈ 13,5 jours** |
 
 Ordre : P1 → S1 → S2 → W1 → W2 → T1 → D1, chaque lot avec ses tests au vert avant le push sur `main`.

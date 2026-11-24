@@ -509,7 +509,7 @@ Découpage interne des paquets ; forme exacte des tests au-delà des noms et ass
 1. **D1 — Fournisseur d'e-mail** : un fournisseur d'envoi dans l'UE par SMTP (Scaleway Transactional Email ou Brevo), suivi désactivé, contrat de sous-traitance. Sans e-mail du tout, le bannissement par adresse ne vaut plus rien. **Recommandé : Scaleway TEM** (France, SMTP standard).
 2. **D2 — Code de secours obligatoire à l'inscription** (affiché une fois, à confirmer par ses 4 derniers caractères). **Recommandé : oui** ; sans lui, un mot de passe oublié efface pseudo, photo et gestion des salons.
 3. **D3 — Durée du bannissement** : **recommandé : 3 ans**, levable sur recours par le fondateur.
-4. **D4 — Un signalement remet l'ancienneté à zéro automatiquement** (un invité malveillant peut en abuser). **Recommandé : oui**, avec « Rendre l'ancienneté » dans le tableau de bord.
+4. **D4 — Un signalement remet l'ancienneté à zéro automatiquement** (un invité malveillant peut en abuser). **Recommandé : oui**, avec « Rendre l'ancienneté » dans le tableau de bord. **Tranchée le 24 novembre (propriétaire)** : oui, un signalement remet à zéro l'ancienneté du créateur du salon, comme codé.
 5. **D5 — Supprimer son compte ferme ses salons en cours** (sinon des salons sans responsable bannissable). **Recommandé : oui**, dit avant de confirmer.
 6. **D6 — Sauvegarde de `comptes.db`** (aujourd'hui rien n'est sauvegardé ; une machine réinitialisée perdrait tous les comptes) : **recommandé : copie chiffrée quotidienne hors de la machine**, clé du serveur gardée à part, hors ligne.
 7. **D7 — « Rester connecté »** : **recommandé : proposé, décoché par défaut**, 30 jours sans usage, 90 jours au plus.
@@ -926,7 +926,7 @@ Textes publics à ajouter à ceux de §16 : page Confidentialité, bloc « Si vo
 4. **R-D4 — « Liens partagés avec lui » = liens qu'il a ouverts**, pas d'envoi à un pseudo ; pseudo du compte proposé (modifiable) dans chaque salon. **Recommandé : oui** ; un envoi à un pseudo apprendrait au serveur qui écrit à qui.
 5. **R-D5 — Sauvegarde** : chaque jour, `comptes.db` seule, chiffrée par age vers la clé de l'exploitant, stockage UE chez un autre fournisseur en écriture seule, 30 jours, restauration testée chaque mois. **Recommandé : oui.**
 
-Restent ouvertes de §20, inchangées : D1 (fournisseur d'e-mail : Scaleway TEM recommandé), D4 (signalement qui remet l'ancienneté à zéro : oui), D7 (« Rester connecté » décoché : oui), D8 (ouverture au public après le juriste ; **prise depuis** : ouvert le 19 novembre sans le juriste, confirmé le 24 novembre, §22). Tranchées : D3 (3 ans, modifiable, §21.11), D5 (suppression totale, §21.12), D6 (§21.13). Caduque : D2.
+Restent ouvertes de §20, inchangées : D1 (fournisseur d'e-mail : Scaleway TEM recommandé), D4 (signalement qui remet l'ancienneté à zéro : oui ; **tranchée le 24 novembre**, comme codé), D7 (« Rester connecté » décoché : oui), D8 (ouverture au public après le juriste ; **prise depuis** : ouvert le 19 novembre sans le juriste, confirmé le 24 novembre, §22). Tranchées : D3 (3 ans, modifiable, §21.11), D5 (suppression totale, §21.12), D6 (§21.13). Caduque : D2.
 
 ## Décisions du propriétaire (14 novembre, après la v2)
 

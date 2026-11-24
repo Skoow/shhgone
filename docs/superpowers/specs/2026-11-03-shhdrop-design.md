@@ -912,6 +912,8 @@ Rien de fiable. Sans service worker, chaque lancement recharge le code depuis le
 
 ### 28.6 Service worker minimal d'épinglage : discussion et recommandation
 
+> **Abandonné le 24 novembre 2026 (décision du propriétaire, Q-C1)** : aucun service worker d'épinglage ; le site reste sans service worker (§10). Les applications natives (D42-20) restent la défense contre un serveur qui servirait un autre code. Texte gardé pour l'historique.
+
 - **Ce qu'il apporte** : (1) l'application démarre sans réseau, ce qu'exige le coffre hors ligne (§27.5) ; (2) les fichiers sont servis depuis un cache vérifié : chaque fichier de la version installée est téléchargé une fois, haché (WebCrypto) et comparé à son manifeste, embarqué dans `sw.js` ; un fichier modifié sur le serveur, sans changement de `sw.js`, est refusé et signalé ; (3) un changement de version devient un événement visible (« Nouvelle version {x} : vérifier »).
 - **Ce qu'il n'apporte pas** : un serveur compromis remplace `sw.js` lui-même. Le navigateur revérifie `sw.js` en contournant le service worker (au plus toutes les 24 h, et à chaque navigation) ; le nouveau, s'il appelle `skipWaiting()`, prend la main. L'ancien code peut seulement prévenir les pages ouvertes (`controllerchange`) : il verrouille le coffre et affiche « Le code de Shhdrop vient de changer ». Ce n'est donc **pas** une garantie de sécurité.
 - **Ce qu'il coûte** : contredit §1, §10 et UI §14.1 (« pas de service worker ») ; une surface de code de plus, qui persiste ; un cache à purger correctement.
@@ -942,7 +944,7 @@ Limite résiduelle assumée (à ajouter à §18) : une victime ciblée par un se
 
 | # | Question | Défaut recommandé |
 |---|---|---|
-| Q-C1 | Service worker minimal d'épinglage (§28.6) | Oui, seulement avec le coffre, dans la forme de §28.6 ; sinon non |
+| Q-C1 | Service worker minimal d'épinglage (§28.6) | ~~Oui, seulement avec le coffre, dans la forme de §28.6 ; sinon non~~ **Abandonné le 24 novembre (décision du propriétaire)** : aucun service worker |
 | Q-C2 | Extension de navigateur de vérification | Non en V1 ; application native d'abord (§16) |
 | Q-C3 | Démo signée elle aussi | Oui (même workflow, coût nul) |
 
@@ -1059,7 +1061,7 @@ Le test « le serveur ne voit rien » ajoute un repère de mot de passe saisi **
 - **Transport** : TLS protège `K_accès`, `K_preuve`, `E` et le chiffré, jamais `K_lien` ni le mot de passe. Un enregistrement « stocker maintenant, déchiffrer plus tard » ne donnerait donc pas le contenu, mais des métadonnées et des secrets d'accès. Défense en profondeur : **échange de clés hybride X25519MLKEM768 obligatoire** sur Caddy (proposé par défaut par Go 1.24 et plus, et par Caddy 2.10 et plus ; écrit explicitement dans le Caddyfile, `curves x25519mlkem768 x25519`). Repli X25519 seul toléré pour les navigateurs qui n'ont pas encore l'hybride (question Q-PQ1). **Test du Plan 3** : un client Go limité à `CurvePreferences: [X25519MLKEM768]` se connecte et `ConnectionState().CurveID` vaut `X25519MLKEM768` ; il bloque la mise en ligne.
 - **Passkeys du coffre** (§27) : la sortie PRF est un HMAC calculé dans l'authentificateur, donc symétrique ; les signatures ECDSA de la passkey ne protègent rien ici.
 - **Signatures de version** (§28.2) : ECDSA, donc à migrer vers une signature post-quantique quand Sigstore la proposera.
-- Q-PQ1 : refuser les connexions sans hybride ? Défaut recommandé : non en V1 (Safari et Firefox anciens exclus sinon), à revoir avant l'ouverture au public.
+- Q-PQ1 : refuser les connexions sans hybride ? ~~Défaut recommandé : non en V1 (Safari et Firefox anciens exclus sinon), à revoir avant l'ouverture au public.~~ **Tranché le 24 novembre (propriétaire)** : x25519 reste accepté en repli ; pas de TLS « hybride seulement » (Safari et Firefox anciens resteraient sinon exclus).
 
 ---
 
@@ -2689,7 +2691,7 @@ Revue complète du dépôt le 10 novembre (serveur, client et chiffrement, perfo
 ### 42.1 Encore ouvert après cette revue
 
 - **Code vérifiable (§28), suite** : signature du manifeste (cosign, `release.yml`), provenance contrôlée par `deploy.sh`, surveillance, page `/verifier` (voir D42-16). SRI seule ne protège pas d'un serveur compromis (§28.3).
-- **COEP** (idée I3 de l'audit du 8 novembre) : l'essai du 10 novembre n'a pas donné de mesure fiable ; à reprendre à part.
+- ~~**COEP** (idée I3 de l'audit du 8 novembre) : l'essai du 10 novembre n'a pas donné de mesure fiable ; à reprendre à part.~~ **Isolation COEP abandonnée le 24 novembre (décision du propriétaire)** : pas de `Cross-Origin-Embedder-Policy` (§10, inchangé).
 - **Gros fichier reçu en flux (OPFS)** : non retenu pour l'instant. Une copie en clair resterait dans le stockage du site si l'onglet est fermé avant le nettoyage, contraire à « aucun stockage ». À la place : avertissement à l'écran (UI §9.2.5).
 - **Worker anti-robot** : encore lancé par `new Worker(url)`, sans empreinte ; peut reprendre le mécanisme de D42-14.
 - **Un PUT annulé mais déjà reçu** peut être écrit après l'`erase` ; si un nouvel élément a pris cette place, le destinataire verra une erreur de déchiffrement (existait avant). Remède : compteur de génération par brouillon vérifié par `PutSegment`.
@@ -2776,3 +2778,24 @@ Demande : « permettre de mettre un nom de partage, pour les gens et pour lui da
   - *Faible, apps* : le nettoyage dépend des tables Unicode de `unicode-normalization` (NFC) et de la liste `est_ignorable` (Unicode 15.1/16) : les apps passent par le même moteur Rust, rien ne dépend du navigateur. Le comptage est en points de code (pas en graphèmes) pour rester identique partout ; l'interface d'une app devra borner la saisie de même (le champ du site borne à 80 unités UTF-16, toujours au plus 80 points de code).
   - *Faible, exactitude* : un nom de 80 points de code peut, en théorie, en compter plus après NFC (U+0344, U+0958…) ; le composeur compare donc NFC(saisie) à `TITLE_MAX` (majorant du nom nettoyé) et bloque l'envoi avant le moteur.
 
+## Amendement du 24 novembre 2026 : décisions du propriétaire
+
+Décisions prises le 24 novembre, reportées dans leurs sections :
+
+| Sujet | Décision | Où |
+|---|---|---|
+| Appels | Plus **et** Pro comprennent l'audio et la vidéo (`appel_audio`, `appel_video`) | conception du paiement DP-14, §1, §11 |
+| Crypto et OSS | Sous `SHH_TVA=oss`, la crypto n'est ni proposée ni acceptée (une seule preuve de localisation) | conception du paiement §9.1, S3 |
+| Sortie par partage | Plafond codé, `SHH_SHARE_EGRESS_MAX`, 250 Gio par défaut (à valider) | §38.6, §9.5, Q-P11 |
+| Envoi au clic | Abandonné : l'envoi chiffré commence dès l'ajout (D41-19) | Q-K1, Q-K2, Q-MIN1, S4, S20, H-5 |
+| Repli reCAPTCHA | Retiré (jamais codé côté serveur) : ALTCHA seul, aucune ressource tierce sans exception | §26 |
+| Compte et salon | Ouverts au public dès le premier déploiement, sans le passage manuel sur appareils réels ni l'avis du juriste, risque assumé | §37, §39.7 |
+| Violations de données | Notification CNIL sous 72 h, information par avis sur le site, registre hors du serveur | §15.5 |
+| Service worker d'épinglage, isolation COEP | Abandonnés | §28.6, Q-C1, §28.7 |
+| Q-PQ1 | x25519 gardé en repli ; pas de TLS hybride seulement | §30 |
+| D4 (conception du compte) | Un signalement remet à zéro l'ancienneté du créateur du salon, comme codé | conception du compte §20 |
+| Pseudo ressemblant | Un client modifié peut enregistrer un pseudo qui ressemble à un autre : limite acceptée | conception du compte par passkey §13, R17 |
+| A1 (apps natives) | Les apps ne vendent rien : elles lisent le pass, la vente se fait sur le site | conception du paiement §6.3, S7 |
+| S18 (numéros de facture) | Tenus dans l'outil comptable du propriétaire ; la note de vente reste un récapitulatif | conception du paiement §9.3, S18 |
+| Idées d'interface | Closes, non retenues : aperçu « comme le destinataire » avant l'envoi, code de vérification de 4 mots entre expéditeur et destinataire, texte à lecture unique dans un partage | — |
+| Marges | Analyse de marge tenue hors du dépôt (propriétaire) | §38.8.3 |
