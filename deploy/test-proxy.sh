@@ -9,7 +9,8 @@
 #      contourne pas en changeant l'en-tête ;
 #   4. les en-têtes du serveur Go arrivent une seule fois, les octets ne changent pas ; aucune
 #      réponse, même fabriquée par Caddy (308, 413, 502), ne porte « Server » ni « Via » ;
-#   5. TLS 1.3, échange de clés X25519MLKEM768, redirection HTTP vers HTTPS ; HTTP/3 annoncé
+#   5. TLS 1.3, échange de clés X25519MLKEM768, redirection HTTP vers HTTPS ; www.<nom> : 308
+#      vers le site (chemin et requête gardés), rien d'autre servi, mêmes réglages TLS ; HTTP/3 annoncé
 #      (Alt-Svc) et écouté en UDP (la requête HTTP/3 elle-même n'est pas faite), 0-RTT refusé
 #      dans la configuration adaptée (« allow_0rtt »:false ; aucune requête 0-RTT n'est faite) ;
 #   6. aucune adresse de client dans ce que Caddy et le serveur écrivent (fichiers, sorties) ;
@@ -330,6 +331,27 @@ check "HTTP → HTTPS : « $loc »" test "$loc" = "308 https://$name/abc"
 curl -sS --noproxy '*' --max-time 10 --interface "$client" -o /dev/null -D "$cli/h-308" \
 	-H "Host: $name" "http://127.0.0.1:$p_http/abc"
 check "308 de Caddy : ni Server, ni Via" bash -c "! grep -qiE '^(server|via):' '$cli/h-308'"
+# www.<nom> (24 novembre) : HTTP vers HTTPS sur www d'abord (préchargement HSTS), puis 308 vers
+# le site, chemin et requête gardés ; rien d'autre servi (ni le serveur Go ni l'écho : Caddy B,
+# devant l'écho, répond de même) ; mêmes réglages TLS que le site (bloc tls commun).
+www=www.$name
+loc=$(curl -sS --noproxy '*' --max-time 10 --interface "$client" -o /dev/null -w '%{http_code} %{redirect_url}' \
+	-H "Host: $www" "http://127.0.0.1:$p_http/abc?x=1&y=%2F")
+check "www, HTTP → HTTPS sur www : « $loc »" test "$loc" = "308 https://$www/abc?x=1&y=%2F"
+for port in "$p_https" "$p_https_e"; do
+	got=$(curl -sS --noproxy '*' --max-time 10 --cacert "$ca" --interface "$client" --resolve "$www:$port:127.0.0.1" \
+		-D "$cli/h-www-$port" -o "$cli/b-www-$port" -w '%{http_code} %{redirect_url}' "https://$www:$port/abc?x=1&y=%2F")
+	check "www (port $port) → site, 308, chemin et requête gardés : « $got »" test "$got" = "308 https://$name/abc?x=1&y=%2F"
+	check "www (port $port) : corps vide, ni Server, ni Via, rien du serveur Go" \
+		bash -c "test ! -s '$cli/b-www-$port' && ! grep -qiE '^(server|via|content-security-policy|x-shh-[a-z-]*):' '$cli/h-www-$port'"
+done
+code_www=$(curl -sS --noproxy '*' --max-time 10 --cacert "$ca" --interface "$client" --resolve "$www:$p_https:127.0.0.1" \
+	-X POST -d x -o /dev/null -w '%{http_code}' "https://$www:$p_https/api/shares")
+check "www : POST /api/shares redirigé aussi (308), jamais relayé ($code_www)" test "$code_www" = 308
+tlswww=$(SSL_CERT_FILE=$ca "$shhcheck" tls "127.0.0.1:$p_https" "$www" 2>&1) || true
+check "www : TLS 1.3 avec X25519MLKEM768 : « $tlswww »" test "$tlswww" = "TLS 1.3, X25519MLKEM768"
+check "www : TLS 1.2 refusé" bash -c "! curl -sS --noproxy '*' --max-time 10 --cacert '$ca' --tls-max 1.2 \
+	--resolve '$www:$p_https:127.0.0.1' -o /dev/null 'https://$www:$p_https/'"
 # HTTP/3 (décision du 13 novembre) : h1, h2 et h3 dans la configuration, et Caddy écoute en UDP
 # sur le port HTTPS (QUIC). La requête HTTP/3 elle-même n'est pas faite : le curl de la CI n'a
 # pas HTTP/3 ; l'annonce Alt-Svc est vérifiée en section 4.

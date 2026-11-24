@@ -15,6 +15,9 @@
 #
 # À faire chez le registraire, pas ici (spec §15.4) : DNSSEC, et un enregistrement
 #   CAA 0 issue "letsencrypt.org"   (seul Let's Encrypt peut émettre ; cohérent avec acme_ca ci-dessous).
+# www.{$SHH_DOMAIN} (24 novembre) : redirigé en 308 vers le site ; il lui faut ses enregistrements
+# A et AAAA (mêmes adresses) et il prend son propre certificat, du même compte ACME (le CAA du
+# nom s'applique aussi à www, README §1).
 {
 	# Ni API d'administration, ni métriques (spec §35.1).
 	admin off
@@ -68,16 +71,8 @@
 	}
 }
 
-# Port 80 : redirection vers HTTPS, et défi ACME (traité par Caddy avant ce bloc). Écrit
-# en toutes lettres pour que les délais et protocoles ci-dessus s'y appliquent aussi (la
-# redirection automatique de Caddy crée un serveur à part, avec ses réglages par défaut).
-http://{$SHH_DOMAIN} {
-	# « Server: Caddy » retiré (voir le bloc du site ci-dessous).
-	header -Server
-	redir https://{host}{uri} 308
-}
-
-{$SHH_DOMAIN} {
+# Réglages TLS communs au site et à www (un seul exemplaire : ils ne peuvent pas diverger).
+(tls_shh) {
 	tls {
 		# Certificats de 6 jours (profil « shortlived » de Let's Encrypt, 22 novembre) : une clé
 		# volée ne sert que quelques jours. Caddy renouvelle seul, bien avant la fin ; le compte
@@ -93,6 +88,28 @@ http://{$SHH_DOMAIN} {
 		# Hybride post-quantique d'abord, X25519 seul en repli (spec §30, Q-PQ1).
 		curves x25519mlkem768 x25519
 	}
+}
+
+# Port 80 : redirection vers HTTPS, et défi ACME (traité par Caddy avant ce bloc). Écrit
+# en toutes lettres pour que les délais et protocoles ci-dessus s'y appliquent aussi (la
+# redirection automatique de Caddy crée un serveur à part, avec ses réglages par défaut).
+# www aussi, vers HTTPS sur le même nom d'abord (règle du préchargement HSTS), puis vers le site.
+http://{$SHH_DOMAIN}, http://www.{$SHH_DOMAIN} {
+	# « Server: Caddy » retiré (voir le bloc du site ci-dessous).
+	header -Server
+	redir https://{host}{uri} 308
+}
+
+# www : redirection permanente (308) vers le site, chemin et requête gardés ({uri}). Rien
+# d'autre : aucun contenu, aucun relais vers le serveur Go, aucun journal (global ci-dessus).
+www.{$SHH_DOMAIN} {
+	import tls_shh
+	header -Server
+	redir https://{$SHH_DOMAIN}{uri} 308
+}
+
+{$SHH_DOMAIN} {
+	import tls_shh
 
 	# Pas de « encode », pas de « templates », aucune réécriture : Caddy ne change aucun
 	# octet des réponses (spec §28.7). Le serveur Go sert lui-même les variantes .br et
