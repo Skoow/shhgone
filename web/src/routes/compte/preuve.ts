@@ -2,8 +2,8 @@
 // §3.1 : calculée dès l'ouverture de la page, avant inscription/debut) : défi lu, preuve de
 // travail dans son Worker, puis les champs { altcha, hp, shown_at } au plus
 // tôt 3,1 s après la réception (proofForm). Un défi sert une fois ; échu (2 min) ou bientôt
-// échu : un nouveau est lu. Aucune clé n'existe encore à ce moment (le repli reCAPTCHA, §26,
-// resterait possible ici : la clé du compte n'est tirée qu'après, par account/session.svelte.ts).
+// échu : un nouveau est lu. Aucune clé n'existe encore à ce moment : la clé du compte n'est
+// tirée qu'après, par account/session.svelte.ts.
 import { getDemo } from "../../app/demo-hooks";
 import { solvePow } from "../../captcha/pow";
 import { PREPARED_MIN_LEFT_MS, prepareCaptcha, proofForm, type CaptchaProof, type PreparedCaptcha } from "../../index";
@@ -15,7 +15,7 @@ const origine = () => location.origin;
 
 function lancer() {
   const cap = prepareCaptcha(origine());
-  const proof = cap.then((c) => solvePow(c.challenge, { fallbackOrigin: c.fallbackOrigin, mode: "pow" }));
+  const proof = cap.then((c) => solvePow(c.challenge));
   proof.catch(() => undefined);
   prete = { cap, proof };
 }

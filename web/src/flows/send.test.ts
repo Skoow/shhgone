@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LimitError, NotFoundError, SERVER_STALL_MS, type CaptchaCtx, type CaptchaProof, type CreateOpts, type Item } from "../index";
+import { LimitError, NotFoundError, SERVER_STALL_MS, type CaptchaProof, type CreateOpts, type Item } from "../index";
 import { markElementFailure } from "../transfer/draft";
 import { PAUSE_MAX_MS, STALL_MS, UPLOAD_WINDOW_MS, createSender, type SendDeps, type Step } from "./send.svelte";
 
@@ -18,7 +18,7 @@ function setup(extra: Partial<SendDeps> = {}) {
   const createShare = vi.fn((_o: string, items: Item[], opts: CreateOpts) =>
     new Promise<Res>((resolve, reject) => calls.push({ opts, resolve, reject, items })),
   );
-  const solveCaptcha = vi.fn(async (_c: unknown, _x: CaptchaCtx): Promise<CaptchaProof> => ({ kind: "pow", payload: "p" }));
+  const solveCaptcha = vi.fn(async (_c: unknown): Promise<CaptchaProof> => ({ kind: "pow", payload: "p" }));
   const wake = { acquire: vi.fn(), release: vi.fn() };
   const unload = vi.fn();
   const steps: Step[] = [];
@@ -38,7 +38,7 @@ function setup(extra: Partial<SendDeps> = {}) {
 /** Création faite côté serveur : captcha résolu puis onProgress(0, n). */
 async function toUpload(t: ReturnType<typeof setup>, segments = 3, bytes = 300) {
   const o = t.last().opts;
-  await o.solveCaptcha({ c: 1 }, { fallbackOrigin: null, mode: "pow" });
+  await o.solveCaptcha({ c: 1 });
   o.onProgress!(0, segments);
   o.onBytes!(0, bytes);
   return o;
@@ -60,9 +60,9 @@ describe("createSender : phases (UI §9.4.1)", () => {
     const o = t.last().opts;
     expect(o.base).toBe("/");
     expect(o.ttlHours).toBe(12);
-    const proof = o.solveCaptcha({ c: 1 }, { fallbackOrigin: null, mode: "pow" });
+    const proof = o.solveCaptcha({ c: 1 });
     expect(t.s.phase).toBe("captcha");
-    expect(t.solveCaptcha).toHaveBeenCalledWith({ c: 1 }, { fallbackOrigin: null, mode: "pow" });
+    expect(t.solveCaptcha).toHaveBeenCalledWith({ c: 1 });
     await proof;
     expect(t.s.phase).toBe("captcha");
     o.onProgress!(0, 3);
@@ -88,7 +88,7 @@ describe("createSender : phases (UI §9.4.1)", () => {
   it("texte seul (spec §41.14) : onProgress(0, 0) → créé sur le serveur, puis finalisation directe", async () => {
     const t = setup();
     void t.s.start(ITEMS, OPTS);
-    await t.last().opts.solveCaptcha({ c: 1 }, { fallbackOrigin: null, mode: "pow" });
+    await t.last().opts.solveCaptcha({ c: 1 });
     t.last().opts.onProgress!(0, 0);
     expect(t.s.createdOnServer).toBe(true);
     expect(t.s.phase).toBe("finalize");
@@ -335,8 +335,8 @@ describe("createSender : erreurs (UI §9.4.6)", () => {
     expect(u.s.limitKind).toBe("envoi");
   });
 
-  it("bad_request, repli désactivé : 2 essais (le second sans pré-calcul) puis captcha", async () => {
-    const take = vi.fn(() => ({ cap: { challenge: 1, fallbackOrigin: null, expiresAt: 0 }, proof: Promise.resolve({ kind: "pow", payload: "pre" } as CaptchaProof) }));
+  it("bad_request : 2 essais (le second sans pré-calcul) puis captcha", async () => {
+    const take = vi.fn(() => ({ cap: { challenge: 1, expiresAt: 0 }, proof: Promise.resolve({ kind: "pow", payload: "pre" } as CaptchaProof) }));
     const t = setup({ prefetcher: { take, stop: vi.fn() } });
     void t.s.start(ITEMS, OPTS);
     expect(t.calls[0]!.opts.prepared).toBeDefined();
@@ -344,8 +344,8 @@ describe("createSender : erreurs (UI §9.4.6)", () => {
     await flush();
     expect(t.createShare).toHaveBeenCalledTimes(2);
     expect(t.calls[1]!.opts.prepared).toBeUndefined();
-    await t.calls[1]!.opts.solveCaptcha({}, { fallbackOrigin: null, mode: "pow" });
-    expect(t.solveCaptcha).toHaveBeenLastCalledWith({}, { fallbackOrigin: null, mode: "pow" });
+    await t.calls[1]!.opts.solveCaptcha({});
+    expect(t.solveCaptcha).toHaveBeenLastCalledWith({});
     t.calls[1]!.reject(new Error("bad_request"));
     await flush();
     expect(t.createShare).toHaveBeenCalledTimes(2);
@@ -379,34 +379,31 @@ describe("createSender : erreurs (UI §9.4.6)", () => {
     expect(t.s.error).toBe("fichier_modifie");
   });
 
-  it("bad_request, repli actif : 3 essais, le dernier en mode fallback", async () => {
+  it("bad_request deux fois : jamais de troisième essai (repli reCAPTCHA retiré, 24 novembre) ; la preuve est demandée avec le défi seul", async () => {
     const t = setup();
     void t.s.start(ITEMS, OPTS);
-    await t.calls[0]!.opts.solveCaptcha({}, { fallbackOrigin: "https://verif.test", mode: "pow" });
+    const p = t.calls[0]!.opts.solveCaptcha({});
+    expect(t.s.phase).toBe("captcha");
+    await p;
+    expect(t.solveCaptcha.mock.calls.at(-1)).toEqual([{}]);
     t.calls[0]!.reject(new Error("bad_request"));
     await flush();
-    await t.calls[1]!.opts.solveCaptcha({}, { fallbackOrigin: "https://verif.test", mode: "pow" });
+    await t.calls[1]!.opts.solveCaptcha({});
+    expect(t.s.phase).toBe("captcha");
     t.calls[1]!.reject(new Error("bad_request"));
     await flush();
-    expect(t.createShare).toHaveBeenCalledTimes(3);
-    const p = t.calls[2]!.opts.solveCaptcha({}, { fallbackOrigin: "https://verif.test", mode: "pow" });
-    expect(t.s.phase).toBe("fallback");
-    await p;
-    expect(t.solveCaptcha).toHaveBeenLastCalledWith({}, { fallbackOrigin: "https://verif.test", mode: "fallback" });
-    t.calls[2]!.reject(new Error("bad_request"));
-    await flush();
-    expect(t.createShare).toHaveBeenCalledTimes(3);
+    expect(t.createShare).toHaveBeenCalledTimes(2);
     expect(t.s.error).toBe("captcha");
   });
 
-  it("échec du calcul sur l'appareil (Worker absent) sans repli : captcha local après 2 essais", async () => {
+  it("échec du calcul sur l'appareil (Worker absent) : captcha local après 2 essais", async () => {
     const t = setup({ solveCaptcha: vi.fn(async () => Promise.reject(new Error("pow_indisponible"))) });
     void t.s.start(ITEMS, OPTS);
-    const p0 = t.calls[0]!.opts.solveCaptcha({}, { fallbackOrigin: null, mode: "pow" });
+    const p0 = t.calls[0]!.opts.solveCaptcha({});
     await expect(p0).rejects.toThrow();
     t.calls[0]!.reject(new Error("pow_indisponible"));
     await flush();
-    const p1 = t.calls[1]!.opts.solveCaptcha({}, { fallbackOrigin: null, mode: "pow" });
+    const p1 = t.calls[1]!.opts.solveCaptcha({});
     await expect(p1).rejects.toThrow();
     t.calls[1]!.reject(new Error("pow_indisponible"));
     await flush();
@@ -414,14 +411,14 @@ describe("createSender : erreurs (UI §9.4.6)", () => {
     expect(t.s.captchaLocal).toBe(true);
   });
 
-  it("bad_request sur une preuve pré-calculée : nouvel essai en preuve de travail, pas le repli", async () => {
-    const take = vi.fn(() => ({ cap: { challenge: 1, fallbackOrigin: "https://verif.test", expiresAt: 0 }, proof: Promise.resolve({ kind: "pow", payload: "pre" } as CaptchaProof) }));
+  it("bad_request sur une preuve pré-calculée : nouvel essai en preuve de travail", async () => {
+    const take = vi.fn(() => ({ cap: { challenge: 1, expiresAt: 0 }, proof: Promise.resolve({ kind: "pow", payload: "pre" } as CaptchaProof) }));
     const t = setup({ prefetcher: { take, stop: vi.fn() } });
     void t.s.start(ITEMS, OPTS);
     t.calls[0]!.reject(new Error("bad_request"));
     await flush();
-    await t.calls[1]!.opts.solveCaptcha({}, { fallbackOrigin: "https://verif.test", mode: "pow" });
-    expect(t.solveCaptcha).toHaveBeenLastCalledWith({}, { fallbackOrigin: "https://verif.test", mode: "pow" });
+    await t.calls[1]!.opts.solveCaptcha({});
+    expect(t.solveCaptcha).toHaveBeenLastCalledWith({});
   });
 
   it("retry() rappelle createShare en entier (nouveau take())", async () => {

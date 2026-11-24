@@ -25,17 +25,16 @@ const net = (body: unknown, date?: string) => {
 };
 
 describe("prepareCaptcha", () => {
-  it("GET /api/captcha ; défi sans shown_at ni fallback ; sans en-tête Date : expiresAt = performance.now() + 120 s", async () => {
+  it("GET /api/captcha ; défi sans shown_at ; sans en-tête Date : expiresAt = performance.now() + 120 s", async () => {
     vi.useFakeTimers({ toFake: ["Date", "performance"] });
-    const s = net(challenge({ fallback: "https://verif.test" }));
+    const s = net(challenge());
     const t = performance.now();
     const p = await prepareCaptcha(ORIGIN, s.net);
     expect(s.calls).toEqual(["GET https://srv.test/api/captcha"]);
     expect(p.challenge).toEqual({ algorithm: "SHA-256", challenge: "c", maxNumber: 1, salt: salt(1_800_000_120), signature: "g" });
-    expect(p.fallbackOrigin).toBe("https://verif.test");
     expect(p.expiresAt).toBe(t + 120_000); // « expires= » ignoré : aucune heure du serveur à comparer
     // shown_at et l'instant de réception restent internes.
-    expect(Object.keys(p).sort()).toEqual(["challenge", "expiresAt", "fallbackOrigin"]);
+    expect(Object.keys(p).sort()).toEqual(["challenge", "expiresAt"]);
     expect(Object.isFrozen(p)).toBe(true);
   });
   it("en-tête Date : validité = min(120 s, expires − Date), toujours sur l'horloge du client", async () => {
@@ -48,12 +47,6 @@ describe("prepareCaptcha", () => {
     expect((await at(1_799_999_990, date)).expiresAt).toBe(t - 10_000); // déjà périmé selon le serveur
     expect((await at(1_800_000_060, "pas une date")).expiresAt).toBe(t + 120_000);
     expect((await prepareCaptcha(ORIGIN, net(challenge({ salt: "s" }), date).net)).expiresAt).toBe(t + 120_000);
-  });
-  it("fallback absent ou qui n'est pas une origine → null", async () => {
-    expect((await prepareCaptcha(ORIGIN, net(challenge()).net)).fallbackOrigin).toBeNull();
-    for (const fallback of [42, "https://verif.test/chemin", "javascript:alert(1)", ""]) {
-      expect((await prepareCaptcha(ORIGIN, net(challenge({ fallback })).net)).fallbackOrigin, String(fallback)).toBeNull();
-    }
   });
   it("origine invalide : aucune requête ; réponse sans shown_at → erreur", async () => {
     const s = net(challenge());

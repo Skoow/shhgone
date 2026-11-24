@@ -182,14 +182,12 @@ const none = async (r: Response) => {
 };
 
 export type Captcha = {
-  /** Défi transmis à solveCaptcha (réponse du serveur sans shown_at ni fallback). */
+  /** Défi transmis à solveCaptcha (réponse du serveur sans shown_at). */
   challenge: Record<string, unknown>;
   /** Jeton signé de l'heure d'émission, lié au sel du défi. */
   shownAt: string;
-  /** Sel du défi (captcha_salt du repli) ; null s'il manque. */
+  /** Sel du défi (il porte sa fin de validité, « expires= ») ; null s'il manque. */
   salt: string | null;
-  /** Origine du cadre de vérification du repli ; null si le repli est désactivé ou si la valeur n'est pas une origine. */
-  fallbackOrigin: string | null;
   /**
    * Fin de validité du défi sur l'horloge monotone du client (performance.now(), ms) :
    * réception + CAPTCHA_LIFETIME_MS, ou moins si le serveur l'indique (voir captcha()).
@@ -201,15 +199,6 @@ export type Captcha = {
 
 /** Durée de vie d'un défi émis par le serveur (spec D4 : 2 min). */
 export const CAPTCHA_LIFETIME_MS = 120_000;
-
-function originOrNull(v: unknown): string | null {
-  if (typeof v !== "string") return null;
-  try {
-    return checkOrigin(v);
-  } catch {
-    return null;
-  }
-}
 
 /**
  * L'horloge du serveur n'est jamais comparée à celle du client (décalage possible de
@@ -224,14 +213,14 @@ export async function captcha(c: Ctx): Promise<Captcha> {
     date: r.headers.get("Date"),
   }));
   const receivedAt = performance.now();
-  const { shown_at, fallback, ...challenge } = o;
+  const { shown_at, ...challenge } = o;
   if (typeof shown_at !== "string") throw new BadResponse();
   const salt = typeof challenge.salt === "string" ? challenge.salt : null;
   let validMs = CAPTCHA_LIFETIME_MS;
   const exp = salt === null ? null : /[?&]expires=(\d{10})(?:&|$)/.exec(salt);
   const serverNow = date === null ? NaN : Date.parse(date);
   if (exp && Number.isFinite(serverNow)) validMs = Math.min(validMs, Number(exp[1]) * 1000 - serverNow);
-  return { challenge, shownAt: shown_at, salt, fallbackOrigin: originOrNull(fallback), expiresAt: receivedAt + validMs, receivedAt };
+  return { challenge, shownAt: shown_at, salt, expiresAt: receivedAt + validMs, receivedAt };
 }
 
 /** Création (spec §29.8) : ni id, ni durée, ni ouvertures, ni sel, ni V_preuve à ce stade. */
@@ -239,7 +228,8 @@ export type CreateBody = {
   bucket: number;
   hp: string;
   shown_at: string;
-} & ({ altcha: string } | { recaptcha: string; captcha_salt: string });
+  altcha: string;
+};
 
 /**
  * Réponse 201 : jeton d'envoi et nombre de segments du palier. K_accès et S_gestion passent en

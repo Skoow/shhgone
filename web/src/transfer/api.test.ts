@@ -127,17 +127,16 @@ describe("choix du transport des segments", () => {
   });
 });
 
-it("captcha : défi sans shown_at ni fallback, sel du défi et origine de repli lus ; échéance sur l'horloge monotone", async () => {
+it("captcha : défi sans shown_at, sel du défi lu ; échéance sur l'horloge monotone", async () => {
   vi.useFakeTimers({ toFake: ["Date", "performance"] });
   const t = performance.now();
-  const body = { algorithm: "SHA-256", challenge: "c", maxNumber: 1, salt: "s?expires=1800000030&", signature: "g", shown_at: "j", fallback: "https://v.test" };
+  const body = { algorithm: "SHA-256", challenge: "c", maxNumber: 1, salt: "s?expires=1800000030&", signature: "g", shown_at: "j" };
   const f = vi.fn(async () => new Response(JSON.stringify(body), { headers: { Date: new Date(1_800_000_000_000).toUTCString() } }));
   const r = await captcha(ctx("http://x", { fetch: f as unknown as typeof fetch }));
   expect(r).toMatchObject({
     challenge: { algorithm: "SHA-256", challenge: "c", maxNumber: 1, salt: "s?expires=1800000030&", signature: "g" },
     shownAt: "j",
     salt: "s?expires=1800000030&",
-    fallbackOrigin: "https://v.test",
     receivedAt: t,
     expiresAt: t + 30_000,
   });

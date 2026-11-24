@@ -117,14 +117,14 @@ describe("solvePow", () => {
   it("Worker de pow-source ; échec de création : Error(\"pow_indisponible\")", async () => {
     vi.doMock("./pow-source", () => ({ startPowWorker: async () => Promise.reject(new Error("reseau")) }));
     const { solvePow } = await import("./pow");
-    expect(await errorOf(() => solvePow(CHALLENGE, { fallbackOrigin: "", mode: "pow" }))).toBe("pow_indisponible");
+    expect(await errorOf(() => solvePow(CHALLENGE))).toBe("pow_indisponible");
   });
 
   it("solution rendue par le Worker : preuve ; Worker arrêté", async () => {
     vi.doMock("./pow-source", () => ({ startPowWorker: async () => new FakeWorker() as unknown as Worker }));
     const { solvePow } = await import("./pow");
     const tried: number[] = [];
-    const p = solvePow(CHALLENGE, { fallbackOrigin: "", mode: "pow" }, undefined, (n) => tried.push(n));
+    const p = solvePow(CHALLENGE, undefined, (n) => tried.push(n));
     await vi.waitFor(() => expect(FakeWorker.last?.posted.length).toBe(1));
     const w = FakeWorker.last!;
     w.reply({ tried: 5 });
@@ -142,7 +142,7 @@ describe("solvePow", () => {
     vi.doMock("./pow-source", () => ({ startPowWorker: async () => (await ready, w as unknown as Worker) }));
     const { solvePow } = await import("./pow");
     const ac = new AbortController();
-    const p = solvePow(CHALLENGE, { fallbackOrigin: "", mode: "pow" }, ac.signal);
+    const p = solvePow(CHALLENGE, ac.signal);
     ac.abort();
     release();
     await expect(p).rejects.toMatchObject({ name: "AbortError" });

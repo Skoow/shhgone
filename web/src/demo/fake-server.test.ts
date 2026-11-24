@@ -376,7 +376,8 @@ const HDR = { "X-Shh-Access": b64u(new Uint8Array(32).fill(2)), "X-Shh-Manage": 
 describe("faux serveur de démo : requêtes brutes", () => {
   async function created(fake: ReturnType<typeof createFakeServer>, advance: () => void, bucket = 16) {
     const cap = (await (await fake.handle(new Request(`${ORIGIN}/api/captcha`))).json()) as Record<string, unknown>;
-    expect(cap).toMatchObject({ fallback: null, algorithm: "SHA-256" });
+    expect(cap).toMatchObject({ algorithm: "SHA-256" });
+    expect(cap).not.toHaveProperty("fallback");
     advance();
     const body = { bucket, altcha: "demo", hp: "", shown_at: cap.shown_at };
     const r = await fake.handle(new Request(`${ORIGIN}/api/shares`, { method: "POST", headers: HDR, body: JSON.stringify(body) }));

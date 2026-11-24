@@ -252,13 +252,8 @@ async function parseShare(link: string, expectedOrigin: string): Promise<ShareLi
 }
 
 
-/** Preuve anti-robot : preuve de travail ALTCHA (charge utile base64) ou jeton du repli reCAPTCHA. */
-export type CaptchaProof = { kind: "pow"; payload: string } | { kind: "recaptcha"; token: string };
-/**
- * Contexte de solveCaptcha. createShare passe toujours mode "pow" ; l'écran d'envoi impose
- * "fallback" au dernier essai (UI §9.4.6). fallbackOrigin : null si le repli est désactivé.
- */
-export type CaptchaCtx = { fallbackOrigin: string | null; mode: "pow" | "fallback" };
+/** Preuve anti-robot : preuve de travail ALTCHA (charge utile base64), la seule (24 novembre : le repli reCAPTCHA, jamais construit, est retiré). */
+export type CaptchaProof = { kind: "pow"; payload: string };
 
 export type CreateOpts = api.Net & {
   /**
@@ -281,11 +276,11 @@ export type CreateOpts = api.Net & {
    */
   title?: string;
   /**
-   * Résout le défi (objet renvoyé par GET /api/captcha, sans shown_at ni fallback). Doit
+   * Résout le défi (objet renvoyé par GET /api/captcha, sans shown_at). Doit
    * s'arrêter lui-même sur `signal` (Worker) ; createShare n'attend plus sa réponse après
    * une annulation.
    */
-  solveCaptcha: (challenge: unknown, ctx: CaptchaCtx) => Promise<CaptchaProof>;
+  solveCaptcha: (challenge: unknown) => Promise<CaptchaProof>;
   /**
    * Défi récupéré à l'avance (prepareCaptcha) et sa preuve en cours de calcul : utilisés
    * s'il reste plus de 15 s de validité (et une seule fois), sinon nouveau défi et solveCaptcha.
@@ -390,12 +385,8 @@ export async function withBudget<T>(deadline: number, o: Pick<CreateOpts, "signa
   }
 }
 
-export function proofFields(p: CaptchaProof, cap: api.Captcha): { altcha: string } | { recaptcha: string; captcha_salt: string } {
-  if (p.kind === "pow" && typeof p.payload === "string") return { altcha: p.payload };
-  if (p.kind === "recaptcha" && typeof p.token === "string") {
-    if (cap.salt === null) throw new api.BadResponse();
-    return { recaptcha: p.token, captcha_salt: cap.salt };
-  }
+export function proofFields(p: CaptchaProof): { altcha: string } {
+  if (p?.kind === "pow" && typeof p.payload === "string") return { altcha: p.payload };
   throw new Error("preuve_invalide");
 }
 

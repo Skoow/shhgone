@@ -82,7 +82,7 @@ describe("salon : client de production, vrai serveur", () => {
     secret.sGestion = p.sGestion.slice();
     const cap = await (await fetch(srv.origin + "/api/captcha")).json();
     const recu = Date.now();
-    const { shown_at, fallback: _f, ...defi } = cap;
+    const { shown_at, ...defi } = cap;
     const preuve = await solveAltcha(defi);
     await dormir(Math.max(0, recu + 3100 - Date.now()));
     const r = await fetch(srv.origin + "/api/salons", {
@@ -199,7 +199,7 @@ describe("salon : renouvellement (exigence C-3 22)", () => {
   async function preuve() {
     const cap = await (await fetch(srv.origin + "/api/captcha")).json();
     const recu = Date.now();
-    const { shown_at, fallback: _f, ...defi } = cap;
+    const { shown_at, ...defi } = cap;
     const p = await solveAltcha(defi);
     await dormir(Math.max(0, recu + 3100 - Date.now()));
     return { altcha: (p as { payload: string }).payload, hp: "" as const, shown_at };
@@ -269,7 +269,7 @@ describe("salon : exclusion et nouvelle invitation (exigences 24, 25)", () => {
     const p = await preparer(eng, mdp, { ttlHours: 1, maxMembers: 5, membersCanDestroy: false });
     const cap = await (await fetch(srv.origin + "/api/captcha")).json();
     const recu = Date.now();
-    const { shown_at, fallback: _f, ...defi } = cap;
+    const { shown_at, ...defi } = cap;
     const pv = await solveAltcha(defi);
     await dormir(Math.max(0, recu + 3100 - Date.now()));
     const rc = await fetch(srv.origin + "/api/salons", {
@@ -350,7 +350,7 @@ describe("salon : lien de gestion collé dans la conversation (exigence C-3 32)"
     const p = await preparer(eng, mdp, { ttlHours: 1, maxMembers: 5, membersCanDestroy: false });
     const cap = await (await fetch(srv.origin + "/api/captcha")).json();
     const recu = Date.now();
-    const { shown_at, fallback: _f, ...defi } = cap;
+    const { shown_at, ...defi } = cap;
     const pv = await solveAltcha(defi);
     await dormir(Math.max(0, recu + 3100 - Date.now()));
     const rc = await fetch(srv.origin + "/api/salons", {

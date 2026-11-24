@@ -35,7 +35,7 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   await page.goto(shh.origin + "/confidentialite");
   await expect(page.locator("main")).toContainText("Aucun cookie");
   await expect(page.locator("main")).toContainText("Votre adresse IP n'est pas enregistrée.");
-  // Le repli Google reCAPTCHA n'est pas construit : la page ne l'annonce plus (audit du 20 novembre).
+  // Aucun repli Google reCAPTCHA (retiré le 24 novembre) : la page n'en parle pas.
   await expect(page.locator("#verification")).toContainText("sans service extérieur");
   await expect(page.locator("main")).not.toContainText("Google");
   await page.goto(shh.origin + "/signaler");

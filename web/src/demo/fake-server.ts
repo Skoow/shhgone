@@ -16,7 +16,7 @@
 // données, et elles seules, pour qu'un rechargement de l'onglet retrouve ses partages
 // (`restore`) ; aucun secret du client (lien, mot de passe, clé) n'en fait partie.
 // Non simulés : limites par connexion, quotas, place disque, gel. Aucune preuve anti-robot
-// n'est vérifiée (anti-robot désactivé en démo ; `fallback: null`).
+// n'est vérifiée (anti-robot désactivé en démo).
 import { BUCKETS, CHUNK_CT, HEADER, SEG_CHUNKS, segmentCount, segmentSize } from "../engine/pure";
 import { MAX_OPENS } from "../limits";
 
@@ -404,7 +404,6 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
       salt: `demo?expires=${exp}`,
       signature: "demo",
       shown_at: tok,
-      fallback: null,
     });
   }
 

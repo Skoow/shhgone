@@ -22,7 +22,6 @@ export {
   fetchMeta,
   openShare,
   shareStatus,
-  type CaptchaCtx,
   type Categorie,
   type CaptchaProof,
   type CreateOpts,

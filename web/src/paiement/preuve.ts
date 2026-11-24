@@ -3,7 +3,6 @@
 // Worker vérifié (captcha/pow), champs { altcha, hp, shown_at } rendus au plus tôt 3,1 s après
 // la réception (le serveur refuse avant 3 s). Un défi sert une fois. Ne passe ni par transfer/
 // ni par le moteur de chiffrement : la page Offres est une page d'information (check-dist).
-// Jamais de repli reCAPTCHA ici : la page détient le pass.
 import { getDemo } from "../app/demo-hooks";
 import { solvePow } from "../captcha/pow";
 import { lireDefi, type Preuve } from "./api";
@@ -26,7 +25,7 @@ function lancer(): Promise<{ preuve: Preuve; receivedAt: number }> {
     const d = await lireDefi();
     if (d === "limite") throw new LimiteDefi();
     if (d === null) throw new Error("reseau");
-    const proof = await solvePow(d.challenge, { fallbackOrigin: null, mode: "pow" });
+    const proof = await solvePow(d.challenge);
     if (proof.kind !== "pow" || typeof proof.payload !== "string") throw new Error("reseau");
     return { preuve: { altcha: proof.payload, hp: "", shown_at: d.shownAt }, receivedAt: d.receivedAt };
   })();

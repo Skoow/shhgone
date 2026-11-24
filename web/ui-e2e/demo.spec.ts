@@ -192,7 +192,8 @@ test.describe("fr-FR", () => {
       });
       return { cap, nope: nope.status, xhr };
     });
-    expect(r.cap).toMatchObject({ algorithm: "SHA-256", fallback: null });
+    expect(r.cap).toMatchObject({ algorithm: "SHA-256" });
+    expect(r.cap).not.toHaveProperty("fallback");
     expect(typeof r.cap.shown_at).toBe("string");
     expect(r.nope).toBe(400); // pas d'en-tête X-Shh-Manage : même code que le vrai serveur
     expect(r.xhr).toBe(404); // jeton inconnu

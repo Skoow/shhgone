@@ -166,7 +166,7 @@ export class ClientSalon {
     const acces = eng.cleAcces(lien);
     const cap = await json(srv, "GET", "/api/captcha", {});
     const recu = Date.now();
-    const { shown_at, fallback: _f, ...defi } = cap;
+    const { shown_at, ...defi } = cap;
     const preuve = await solveAltcha(defi);
     // Le serveur refuse une création moins de 3 s après l'émission du défi.
     await dormir(Math.max(0, recu + 3100 - Date.now()));
@@ -705,7 +705,7 @@ export async function reglerSalon(srv: Srv, sGestion: Uint8Array, opts: { maxMem
   if (opts.renouvelerH !== undefined) {
     const cap = await json(srv, "GET", "/api/captcha", {});
     const recu = Date.now();
-    const { shown_at, fallback: _f, ...defi } = cap;
+    const { shown_at, ...defi } = cap;
     const preuve = await solveAltcha(defi);
     await dormir(Math.max(0, recu + 3100 - Date.now()));
     if (preuve.kind !== "pow") throw new Error("preuve inattendue");

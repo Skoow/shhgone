@@ -7,10 +7,8 @@ import { checkOrigin } from "../engine/pure";
 import { CAPTCHA_MIN_MS, senderError, type CaptchaProof } from "./client";
 
 export type PreparedCaptcha = {
-  /** Défi à résoudre (réponse du serveur sans shown_at ni fallback). */
+  /** Défi à résoudre (réponse du serveur sans shown_at). */
   readonly challenge: unknown;
-  /** Origine du cadre de vérification du repli ; null si le repli est désactivé. */
-  readonly fallbackOrigin: string | null;
   /**
    * Fin de validité du défi sur l'horloge monotone du client : à comparer à
    * performance.now(), jamais à Date.now() ni à une heure du serveur. Réception + 2 min au
@@ -25,7 +23,7 @@ const internal = new WeakMap<PreparedCaptcha, Internal>();
 /** Lit un défi (GET /api/captcha) et note l'instant de réception. Utilisé aussi par createShare. */
 export async function readCaptcha(c: api.Ctx): Promise<PreparedCaptcha> {
   const cap = await api.captcha(c);
-  const p: PreparedCaptcha = Object.freeze({ challenge: cap.challenge, fallbackOrigin: cap.fallbackOrigin, expiresAt: cap.expiresAt });
+  const p: PreparedCaptcha = Object.freeze({ challenge: cap.challenge, expiresAt: cap.expiresAt });
   internal.set(p, { origin: c.origin, cap });
   return p;
 }
@@ -56,8 +54,7 @@ export async function prepareCaptcha(origin: string, net?: api.Net): Promise<Pre
 
 /**
  * Champs anti-robot des routes du compte (inscription/debut, oubli/debut, connexion après 5
- * échecs ; plan du compte, lot 10) : les mêmes que POST /api/shares, preuve de travail seulement
- * (le repli n'existe pas encore pour ces routes). Rendus au plus tôt CAPTCHA_MIN_MS après la
+ * échecs ; plan du compte, lot 10) : les mêmes que POST /api/shares (preuve de travail). Rendus au plus tôt CAPTCHA_MIN_MS après la
  * réception du défi (le serveur refuse avant 3 s) ; usage unique (le sel est consommé).
  * Défi forgé, déjà utilisé, d'une autre origine, ou preuve d'une autre sorte : preuve_invalide.
  */

@@ -102,7 +102,6 @@ import {
   forgetMeta,
   openShare,
   shareStatus,
-  type CaptchaCtx,
   type CaptchaProof,
 } from "./client";
 import { prepareCaptcha } from "./prepare";
@@ -868,7 +867,7 @@ const base = (s: ReturnType<typeof sender>) => ({
   ttlHours: 1 as const,
   maxOpens: 1,
   password: PW,
-  solveCaptcha: vi.fn(async (_c: unknown, _x: CaptchaCtx): Promise<CaptchaProof> => ({ kind: "pow", payload: "x" })),
+  solveCaptcha: vi.fn(async (_c: unknown): Promise<CaptchaProof> => ({ kind: "pow", payload: "x" })),
   fetch: s.fetch,
   upload: s.upload,
   retryDelayMs: 1,
@@ -1200,14 +1199,14 @@ describe("createShare : preuve anti-robot typée et défi préparé", () => {
   const kdfSalt = () => b64u(captured.buffers.find((b) => b.length === 16)!);
   const POW_KEYS = ["altcha", "bucket", "hp", "shown_at"];
 
-  it("solveCaptcha reçoit le défi et { fallbackOrigin: null, mode: \"pow\" } ; { kind: \"pow\" } → corps altcha", async () => {
+  it("solveCaptcha reçoit le défi, seul ; { kind: \"pow\" } → corps altcha", async () => {
     const s = sender({ segments: 1 });
     const o = base(s);
     await drive(createShare(ORIGIN, SMALL, o));
     expect(o.solveCaptcha).toHaveBeenCalledTimes(1);
-    const [ch, cx] = o.solveCaptcha.mock.calls[0]!;
+    expect(o.solveCaptcha.mock.calls[0]).toHaveLength(1);
+    const [ch] = o.solveCaptcha.mock.calls[0]!;
     expect(Object.keys(ch as object).sort()).toEqual(["algorithm", "challenge", "maxNumber", "salt", "signature"]);
-    expect(cx).toEqual({ fallbackOrigin: null, mode: "pow" });
     const b = s.bodies[0]!;
     expect(Object.keys(b).sort()).toEqual(POW_KEYS);
     expect(b.altcha).toBe("x");
@@ -1215,21 +1214,14 @@ describe("createShare : preuve anti-robot typée et défi préparé", () => {
     expect(s.finals[0]!.salt).toBe(kdfSalt());
   });
 
-  it("{ kind: \"recaptcha\" } → corps recaptcha + captcha_salt (sel du défi), sans altcha ; salt reste le sel KDF", async () => {
-    const chSalt = capSalt();
-    const s = sender({
-      segments: 1,
-      captcha: () => ({ algorithm: "SHA-256", challenge: "c", maxNumber: 1, salt: chSalt, signature: "g", shown_at: "jeton", fallback: "https://verif.test" }),
-    });
-    const o = { ...base(s), solveCaptcha: vi.fn(async (): Promise<CaptchaProof> => ({ kind: "recaptcha", token: "tok" })) };
-    await drive(createShare(ORIGIN, SMALL, o));
-    expect(o.solveCaptcha.mock.calls[0]).toEqual([expect.anything(), { fallbackOrigin: "https://verif.test", mode: "pow" }]);
-    const b = s.bodies[0]!;
-    expect(Object.keys(b).sort()).toEqual([...POW_KEYS.filter((k) => k !== "altcha"), "captcha_salt", "recaptcha"].sort());
-    expect(b.recaptcha).toBe("tok");
-    expect(b.captcha_salt).toBe(chSalt);
-    expect(s.finals[0]!.salt).toBe(kdfSalt());
-    expect(s.finals[0]!.salt).not.toBe(chSalt);
+  it("seule la preuve de travail passe (repli reCAPTCHA retiré, 24 novembre) : une autre sorte de preuve → preuve_invalide, rien n'est créé", async () => {
+    const s = sender({ segments: 1 });
+    const o = { ...base(s), solveCaptcha: vi.fn(async () => ({ kind: "recaptcha", token: "tok" }) as unknown as CaptchaProof) };
+    const r = createShare(ORIGIN, SMALL, o).catch((e: unknown) => e);
+    const e = await drive(r);
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).toBe("preuve_invalide");
+    expect(s.bodies).toHaveLength(0);
   });
 
   it("défi préparé valable plus de 15 s : ni GET /api/captcha ni solveCaptcha ; preuve préparée utilisée ; aucune attente après 5 s", async () => {
