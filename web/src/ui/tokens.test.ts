@@ -443,7 +443,7 @@ describe("Icon.ts (UI §6, jeu maison UI8)", () => {
     "arrow-down", "lock", "lock-open", "shield-check", "shield-alert", "triangle-alert", "copy",
     "check", "share-2", "qr-code", "refresh-cw", "switch-camera", "eye", "eye-off", "clock", "timer", "pause", "play",
     "download", "file", "file-text", "image", "music", "film", "trash-2", "flag", "chevron-left",
-    "wifi-off", "clipboard-x", "circle-help", "minus", "plus", "info", "link-2", "key-round",
+    "wifi-off", "circle-help", "minus", "plus", "info", "link-2", "key-round",
     "server", "user-x", "chevron-down", "arrow-right",
     "ellipsis", "sliders-horizontal", "file-archive", "upload", "compass", "server-crash",
     "hourglass", "wrench", "monitor-x", "send", "broom", "volume",
