@@ -15,7 +15,7 @@
 </script>
 
 <section class="cadre" aria-labelledby="compte-titre">
-  <h1 id="compte-titre" class="titre" tabindex="-1" data-large-title bind:this={h1}>{titre}</h1>
+  <h1 id="compte-titre" class="titre bandeau" tabindex="-1" data-large-title bind:this={h1}>{titre}</h1>
   {#if sous}<p class="sous">{sous}</p>{/if}
   {#if getDemo()}<p class="note" data-demo-note>{getDemo()!.compteNote}</p>{/if}
   {@render children()}
@@ -48,6 +48,7 @@
     font-stretch: var(--wd-display, 112%);
     letter-spacing: -0.03em;
     line-height: 1.08;
+    justify-self: center;
     text-align: center;
     text-wrap: balance;
   }

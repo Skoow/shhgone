@@ -216,7 +216,7 @@
         <span class="mini" aria-hidden="true" data-capsule><Lock size={22} strokeWidth={1.9} /></span>
         <div class="hd-tx">
           <!-- Titre de niveau 1 : le composeur (et son h1) est masqué pendant cet écran. -->
-          <h1 id="ready-title" class="title" tabindex="-1" data-large-title bind:this={heading}>{t("ready.title")}</h1>
+          <h1 id="ready-title" class="title bandeau" tabindex="-1" data-large-title bind:this={heading}>{t("ready.title")}</h1>
           <p class="meta num">{summary}</p>
         </div>
       </header>

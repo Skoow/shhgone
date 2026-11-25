@@ -43,7 +43,7 @@
 
 <article class="info" data-info={name} aria-labelledby="info-title">
   <header class="hd page-card">
-    <h1 id="info-title" class="title" tabindex="-1" data-large-title>{page.title}</h1>
+    <h1 id="info-title" class="title bandeau" tabindex="-1" data-large-title>{page.title}</h1>
     <p class="lede">{page.lede}</p>
     {#if page.draft}<p class="draft" role="note" data-draft>{t("info.draft")}</p>{/if}
   </header>
