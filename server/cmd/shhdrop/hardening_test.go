@@ -409,10 +409,9 @@ func TestPagesDuSalon(t *testing.T) {
 	}
 }
 
-// SHH_DISABLE_DUMPABLE_HARDENING=1
-// (porte de sortie du test « le serveur ne voit rien ») est refusée en production
-// (SHH_BEHIND_PROXY=1), par le serveur comme par les commandes d'administration, avec un
-// message qui dit quoi retirer ; hors production, elle reste permise.
+// SHH_DISABLE_DUMPABLE_HARDENING=1 (porte de sortie du test « le serveur ne voit rien ») est
+// refusée en production (SHH_BEHIND_PROXY=1), par le serveur comme par les commandes
+// d'administration, avec un message qui dit quoi retirer ; hors production, elle reste permise.
 func TestDurcissementMemoireNonDesactivableEnProduction(t *testing.T) {
 	t.Setenv("SHH_DISABLE_DUMPABLE_HARDENING", "1")
 	cfg := baseCfg(t.TempDir())

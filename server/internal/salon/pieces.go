@@ -384,12 +384,11 @@ func (m *Manager) PieceEnvoi(id string) (vocal, ok bool) {
 	return p.vocal, true
 }
 
-// PutSegment écrit le segment n de la pièce id (jeton d'envoi) : taille exacte du palier
-// (sinon ErrBadRequest) ; total reçu pour la pièce, réécritures comprises, au plus
-// EcritureMax × sa taille (sinon ErrTropEcrit, rien compté). L'écriture se fait hors du
-// verrou du salon. Pièce inconnue,
-// finalisée ou effacée, auteur parti : ErrNotFound ; auteur révoqué : ErrExcluded ;
-// finalisation en cours : ErrBusy.
+// PutSegment écrit le segment n de la pièce id (jeton d'envoi) : taille exacte du palier (sinon
+// ErrBadRequest) ; total reçu pour la pièce, réécritures comprises, au plus EcritureMax × sa taille
+// (sinon ErrTropEcrit, rien compté). L'écriture se fait hors du verrou du salon. Pièce inconnue,
+// finalisée ou effacée, auteur parti : ErrNotFound ; auteur révoqué : ErrExcluded ; finalisation en
+// cours : ErrBusy.
 func (m *Manager) PutSegment(id string, n int, body []byte) error {
 	s := m.salonDePiece(id)
 	if s == nil {

@@ -82,18 +82,16 @@ type Reglages struct {
 // renouvellement, qui ne sont donc jamais consommés pour une demande refusée ici) ; son erreur
 // est rendue telle quelle, rien n'est changé.
 //
-// Ordre (sous essaiLock : aucune entrée ni exclusion en même temps ; les sièges occupés ne
-// peuvent que diminuer) : ligne relue ; état mémoire (créé s'il manque, comme Exclure) ;
-// vérifications ; avant ; une requête SQL atomique hors du verrou du salon (expires_at,
-// max_members, ligne vivante seulement) ; échéance du bloc (Manager.vivants) ; nouvelle
-// conversation ouverte hors de tout verrou de salon ; puis, sous le verrou du salon, l'état
-// mémoire seul (renouvelerLocked) et le 0x10 ; ancienne conversation détruite hors du verrou
-// (remplacer) ; enfin les pièces effacées
-// hors du verrou (fichier, puis ligne et budget : pieces_bytes revient à 0 pièce par pièce,
-// jamais par une remise à 0 forcée qui retirerait le budget d'une pièce créée juste après).
-// Si la conversation ne peut pas être recréée (ou l'ancienne détruite), le salon
-// est fini (raison 7, « interrompu par le serveur ») : Tick reprend sa partie disque comme
-// pour toute fin de vie.
+// Ordre (sous essaiLock : aucune entrée ni exclusion en même temps ; les sièges occupés ne peuvent
+// que diminuer) : ligne relue ; état mémoire (créé s'il manque, comme Exclure) ; vérifications ;
+// avant ; une requête SQL atomique hors du verrou du salon (expires_at, max_members, ligne vivante
+// seulement) ; échéance du bloc (Manager.vivants) ; nouvelle conversation ouverte hors de tout
+// verrou de salon ; puis, sous le verrou du salon, l'état mémoire seul (renouvelerLocked) et le
+// 0x10 ; ancienne conversation détruite hors du verrou (remplacer) ; enfin les pièces effacées hors
+// du verrou (fichier, puis ligne et budget : pieces_bytes revient à 0 pièce par pièce, jamais par
+// une remise à 0 forcée qui retirerait le budget d'une pièce créée juste après). Si la conversation
+// ne peut pas être recréée (ou l'ancienne détruite), le salon est fini (raison 7, « interrompu par
+// le serveur ») : Tick reprend sa partie disque comme pour toute fin de vie.
 func (m *Manager) Regler(sGestion []byte, r ReglagesReq, avant func() error) (Reglages, error) {
 	v := share.Verifier(sGestion)
 	if v == nil {

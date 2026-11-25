@@ -8,11 +8,10 @@ import (
 	"time"
 )
 
-// Un siège
-// invité qui n'a jamais ouvert de WebSocket dans les 10 min qui suivent son entrée (réponse de
-// rejoindre perdue, remplissage volontaire) est libéré par un départ 0x03 ; sa place est
-// rendue au plafond max_members, son arrivée reste comptée. Un siège connecté au moins une
-// fois reste réservé à vie.
+// Un siège invité qui n'a jamais ouvert de WebSocket dans les 10 min qui suivent son entrée
+// (réponse de rejoindre perdue, remplissage volontaire) est libéré par un départ 0x03 ; sa place
+// est rendue au plafond max_members, son arrivée reste comptée. Un siège connecté au moins une fois
+// reste réservé à vie.
 
 // Réponse de rejoindre perdue : le salon (max_members = 2) est plein ; à 10 min, le siège
 // fantôme part (0x03) et l'invité peut entrer.

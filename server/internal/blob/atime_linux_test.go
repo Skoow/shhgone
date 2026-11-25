@@ -63,10 +63,9 @@ func ctime(t *testing.T, p string) time.Time {
 	return time.Unix(st.Ctim.Unix())
 }
 
-// La date de changement d'inode (ctime) d'un
-// fichier donnait l'heure de la fin de son envoi. Après ScrubTimes (passage du janitor), le
-// ctime de tous les fichiers et du dossier est l'heure du passage ; les dates de contenu et
-// d'accès restent à l'epoch.
+// La date de changement d'inode (ctime) d'un fichier donnait l'heure de la fin de son envoi. Après
+// ScrubTimes (passage du janitor), le ctime de tous les fichiers et du dossier est l'heure du
+// passage ; les dates de contenu et d'accès restent à l'epoch.
 func TestScrubTimesBrouilleCtime(t *testing.T) {
 	s := newStore(t)
 	if err := s.Reserve(id1, 10); err != nil {

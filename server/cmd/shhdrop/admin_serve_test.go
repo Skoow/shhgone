@@ -268,9 +268,8 @@ func TestAdminDestroyDepuisLaPage(t *testing.T) {
 	}
 }
 
-// Le tableau de bord montre le nombre
-// de vidages du WAL ratés (un entier en mémoire). Un autre processus qui lit la base fait
-// échouer le vidage : le compte monte ; il est nul sinon.
+// Le tableau de bord montre le nombre de vidages du WAL ratés (un entier en mémoire). Un autre
+// processus qui lit la base fait échouer le vidage : le compte monte ; il est nul sinon.
 func TestEtatVidagesRates(t *testing.T) {
 	cfg, svc := adminSetup(t)
 	d := adminDeps{svc: svc, db: svc.DB, start: time.Now(), lim: limits.New(time.Now), probes: sondesVides()}
@@ -384,10 +383,9 @@ func TestRT3SalonDetruitMalgreUnePieceDeposeePendant(t *testing.T) {
 	}
 }
 
-// La destruction
-// d'un salon depuis la page passe par le vidage regroupé (store.Vidage, demande non bloquante).
-// Base lue par un autre programme : la destruction répond « salon » sans attendre, aucune autre
-// requête n'attend, et le vidage raté est compté puis redemandé.
+// La destruction d'un salon depuis la page passe par le vidage regroupé (store.Vidage, demande non
+// bloquante). Base lue par un autre programme : la destruction répond « salon » sans attendre,
+// aucune autre requête n'attend, et le vidage raté est compté puis redemandé.
 func TestRT3DestructionSalonBaseOccupee(t *testing.T) {
 	cfg, svc := adminSetup(t)
 	svc.Vidage = store.NewVidage(svc.DB)

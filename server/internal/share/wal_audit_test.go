@@ -116,11 +116,10 @@ func plusRien(t *testing.T, quoi, dir string, r map[string][]byte) {
 	t.Errorf("%s : encore lisible 5 s après l'effacement : %v", quoi, l)
 }
 
-// TOUT effacement d'un partage vide
-// le WAL dans un délai borné, pas seulement la destruction explicite. Pour chaque chemin, le
-// partage est d'abord replié dans shares.db (plus vieux qu'un passage du janitor : le cas
-// courant), puis effacé ; ni shares.db ni shares.db-wal ne gardent son identifiant, ses
-// vérificateurs, son sel ou son enveloppe.
+// TOUT effacement d'un partage vide le WAL dans un délai borné, pas seulement la destruction
+// explicite. Pour chaque chemin, le partage est d'abord replié dans shares.db (plus vieux qu'un
+// passage du janitor : le cas courant), puis effacé ; ni shares.db ni shares.db-wal ne gardent son
+// identifiant, ses vérificateurs, son sel ou son enveloppe.
 func TestToutEffacementVideLeWAL(t *testing.T) {
 	for nom, effacer := range map[string]func(t *testing.T, s *Service, c *clock, id string, k keys){
 		"fin de téléchargement (Done)": func(t *testing.T, s *Service, c *clock, id string, k keys) {
@@ -223,13 +222,12 @@ func TestDestructionBaseOccupeeSansAttendre(t *testing.T) {
 	plusRien(t, "après le départ du lecteur", dir, r)
 }
 
-// Chaque réécriture de la ligne d'un
-// partage vivant (ouverture, essai faux, fin d'une ouverture, agrandissement, effacement de
-// segments) laissait une version de la ligne dans shares.db-wal jusqu'au janitor (60 s) : un
-// lecteur du disque savait quels partages avaient été ouverts ou essayés dans la dernière
-// minute, et combien de fois. Chacune demande maintenant un vidage regroupé : le WAL est vidé
-// dans un délai borné. La préparation se fait sans boucle de vidage (ses demandes ne comptent
-// pas) ; seule la demande de l'événement peut vider le WAL ensuite.
+// Chaque réécriture de la ligne d'un partage vivant (ouverture, essai faux, fin d'une ouverture,
+// agrandissement, effacement de segments) laissait une version de la ligne dans shares.db-wal
+// jusqu'au janitor (60 s) : un lecteur du disque savait quels partages avaient été ouverts ou
+// essayés dans la dernière minute, et combien de fois. Chacune demande maintenant un vidage
+// regroupé : le WAL est vidé dans un délai borné. La préparation se fait sans boucle de vidage (ses
+// demandes ne comptent pas) ; seule la demande de l'événement peut vider le WAL ensuite.
 func TestReecrituresDemandentUnVidage(t *testing.T) {
 	brouillon := func(t *testing.T, s *Service) string {
 		id, _, err := s.Create(newKeys().req(160, 1, 1))

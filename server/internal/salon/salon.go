@@ -209,10 +209,10 @@ func (s *salon) occupesLocked() int {
 }
 
 // annoncerLocked range une annonce au rang suivant et la diffuse aux connexions en direct.
-// Invariant : len(journal) + sièges
-// occupés ≤ journalMax, si bien qu'un siège occupé peut toujours être annoncé parti (0x03).
-// Toute annonce autre qu'un départ garde donc nbSieges places libres (sinon ErrLimit, rien
-// n'est changé) ; un départ ne peut pas échouer (il libère un siège et prend une place).
+// Invariant : len(journal) + sièges occupés ≤ journalMax, si bien qu'un siège occupé peut toujours
+// être annoncé parti (0x03). Toute annonce autre qu'un départ garde donc nbSieges places libres
+// (sinon ErrLimit, rien n'est changé) ; un départ ne peut pas échouer (il libère un siège et prend
+// une place).
 func (s *salon) annoncerLocked(enr func(seq uint64) []byte, depart bool) (uint64, error) {
 	if !depart && len(s.journal) >= journalMax-nbSieges {
 		return 0, ErrLimit

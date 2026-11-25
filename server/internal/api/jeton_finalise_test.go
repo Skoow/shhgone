@@ -1,10 +1,9 @@
 package api
 
-// Un
-// jeton d'envoi reste signé 6 h après finalize ; putSegment prenait une place et lisait tout le
-// corps AVANT de vérifier l'état du partage, et limits.Receive ignorait un envoi inconnu.
-// Seize jetons « morts » de 8 adresses prenaient les 64 places d'envoi du serveur, et un seul
-// lisait 6,64 Gio sans jamais toucher au quota du jour.
+// Un jeton d'envoi reste signé 6 h après finalize ; putSegment prenait une place et lisait tout le
+// corps AVANT de vérifier l'état du partage, et limits.Receive ignorait un envoi inconnu. Seize
+// jetons « morts » de 8 adresses prenaient les 64 places d'envoi du serveur, et un seul lisait 6,64
+// Gio sans jamais toucher au quota du jour.
 
 import (
 	"fmt"

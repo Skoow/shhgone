@@ -152,14 +152,13 @@ func (f *fermeur) fermer(code int) {
 	})
 }
 
-// Servir sert le WebSocket l d'un membre jusqu'à sa fermeture : accueil dans les 5 s (sinon
-// 4001), jeton révoqué 4002, inconnu 4004 ; une seule connexion par siège (l'ancienne reçoit
-// 0x05 raison 4 et 4005) ; séquence d'accueil
-// (docs/conception/specs/2026-11-11-salon-v3-design.md §17) ; reprise (DepuisReprise) : nouveau
-// nonce_arrivée annoncé par 0x0A, 20 par heure et par siège. autoriser() est consultée avant
-// chaque trame (limits.FrameGuard dans le serveur) : refus → 0x0B jusqu'à la minute suivante,
-// trame non rangée. ctx annulé : 1001. Rend nil, ou une erreur fixe si une panique a été
-// récupérée (rien n'est écrit dans un journal).
+// Servir sert le WebSocket l d'un membre jusqu'à sa fermeture : accueil dans les 5 s (sinon 4001),
+// jeton révoqué 4002, inconnu 4004 ; une seule connexion par siège (l'ancienne reçoit 0x05 raison 4
+// et 4005) ; séquence d'accueil (docs/conception/specs/2026-11-11-salon-v3-design.md §17) ; reprise
+// (DepuisReprise) : nouveau nonce_arrivée annoncé par 0x0A, 20 par heure et par siège. autoriser()
+// est consultée avant chaque trame (limits.FrameGuard dans le serveur) : refus → 0x0B jusqu'à la
+// minute suivante, trame non rangée. ctx annulé : 1001. Rend nil, ou une erreur fixe si une panique
+// a été récupérée (rien n'est écrit dans un journal).
 func (m *Manager) Servir(ctx context.Context, l Lien, autoriser func() bool) (err error) {
 	m.servis.Add(1)
 	defer m.servis.Add(-1) // en dernier : après desinscrire (AttendreConnexions)
@@ -420,11 +419,11 @@ const (
 	genreReglages              // 0x10 (reglages.go)
 )
 
-// diffuserLocked remet enr à chaque connexion sauf sauf, sans jamais attendre. Hors du
-// direct, un rang manqué sera servi par le rattrapage (sauf une trame volatile, perdue :
-// normal) ; une présence manquée fait renvoyer l'état des présences au retour au direct. Un
-// 0x0E ne passe jamais par la file : sa cible va dans c.effaces (écrite en direct, ou au
-// retour au direct), sans plafond autre que l'index ni fermeture. Appelé sous s.mu.
+// diffuserLocked remet enr à chaque connexion sauf celle passée en « sauf », sans jamais attendre.
+// Hors du direct, un rang manqué sera servi par le rattrapage (sauf une trame volatile, perdue :
+// normal) ; une présence manquée fait renvoyer l'état des présences au retour au direct. Un 0x0E ne
+// passe jamais par la file : sa cible va dans c.effaces (écrite en direct, ou au retour au direct),
+// sans plafond autre que l'index ni fermeture. Appelé sous s.mu.
 func (s *salon) diffuserLocked(enr []byte, g genre, sauf *connexion) {
 	for _, c := range s.conns {
 		if c == nil || c == sauf || c.arrete.Load() {

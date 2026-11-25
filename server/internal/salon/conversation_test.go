@@ -37,11 +37,11 @@ func nouvelleConv(t *testing.T, dossier, id string) *Conversation {
 	return c
 }
 
-// Une conversation ne prend jamais de
-// borne des appels disque pour ses ÉCRITURES (l'appelant, Manager, en tient une place, prise
-// hors de tout verrou : redteam_dos_test.go) ; ses LECTURES passent par la borne des lectures
-// (lec), sans jamais la dépasser, même lancées par centaines (le rattrapage en lançait une par
-// connexion, jusqu'à SHH_WS_MAX fils du système au-dessus de pids_limit).
+// Une conversation ne prend jamais de borne des appels disque pour ses ÉCRITURES (l'appelant,
+// Manager, en tient une place, prise hors de tout verrou : redteam_dos_test.go) ; ses LECTURES
+// passent par la borne des lectures (lec), sans jamais la dépasser, même lancées par centaines (le
+// rattrapage en lançait une par connexion, jusqu'à SHH_WS_MAX fils du système au-dessus de
+// pids_limit).
 func TestConversationBorneLesLectures(t *testing.T) {
 	dir := t.TempDir()
 	c := nouvelleConv(t, dir, idConv)

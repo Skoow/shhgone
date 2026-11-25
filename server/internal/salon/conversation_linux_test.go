@@ -82,10 +82,9 @@ func TestSansDateApresEchec(t *testing.T) {
 	}
 }
 
-// Le ctime du fichier de conversation donnait
-// l'heure du dernier message. Après BrouillerDates (une fois par minute, passe disque de
-// l'entretien), le ctime des conversations, des pièces et de leurs dossiers est l'heure du
-// passage.
+// Le ctime du fichier de conversation donnait l'heure du dernier message. Après BrouillerDates (une
+// fois par minute, passe disque de l'entretien), le ctime des conversations, des pièces et de leurs
+// dossiers est l'heure du passage.
 func TestBrouillerDatesCtime(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	c := b.creer(t, 4)

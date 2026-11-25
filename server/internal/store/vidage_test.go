@@ -66,9 +66,8 @@ func lecteurExterne(t *testing.T, dir string) (partir func()) {
 	return partir
 }
 
-// Un vidage demandé est fait par Run sans que
-// l'appelant attende ; plusieurs demandes rapprochées ne font qu'un vidage par intervalle ;
-// une valeur nil ne fait rien.
+// Un vidage demandé est fait par Run sans que l'appelant attende ; plusieurs demandes rapprochées
+// ne font qu'un vidage par intervalle ; une valeur nil ne fait rien.
 func TestVidageRegroupe(t *testing.T) {
 	var absent *Vidage
 	absent.Demander()

@@ -70,10 +70,9 @@ func TestCapaciteReglee(t *testing.T) {
 	}
 }
 
-// Les WebSocket du salon sont
-// dans le budget mémoire (10 % de GOMEMLIMIT, au coût d'un lot de rattrapage par connexion), et
-// un SHH_WS_MAX réglé au-delà refuse le démarrage, avec un message qui dit quoi changer. Sans
-// limite de mémoire connue : pas de contrôle.
+// Les WebSocket du salon sont dans le budget mémoire (10 % de GOMEMLIMIT, au coût d'un lot de
+// rattrapage par connexion), et un SHH_WS_MAX réglé au-delà refuse le démarrage, avec un message
+// qui dit quoi changer. Sans limite de mémoire connue : pas de contrôle.
 func TestWebSocketContreMemoire(t *testing.T) {
 	const mem = 900 << 20
 	c := computeCapacity(mem, 65536)
@@ -105,11 +104,10 @@ func TestWebSocketContreMemoire(t *testing.T) {
 	}
 }
 
-// Contrôle croisé au démarrage entre les
-// fils du système que les appels de fichiers peuvent tenir (partages et pièces, écritures et
-// lectures des conversations) et pids_limit. Les valeurs par défaut tiennent sous le
-// pids_limit de compose.yaml (1 024) ; une valeur réglée trop haut refuse le démarrage, avec
-// un message qui dit quoi changer ; limite inconnue : pas de contrôle.
+// Contrôle croisé au démarrage entre les fils du système que les appels de fichiers peuvent tenir
+// (partages et pièces, écritures et lectures des conversations) et pids_limit. Les valeurs par
+// défaut tiennent sous le pids_limit de compose.yaml (1 024) ; une valeur réglée trop haut refuse
+// le démarrage, avec un message qui dit quoi changer ; limite inconnue : pas de contrôle.
 func TestFilsDuDisqueContrePids(t *testing.T) {
 	c := computeCapacity(900<<20, 65536)
 	if c.ConvDiskOps != 16 || c.DiskThreads() != 96 {

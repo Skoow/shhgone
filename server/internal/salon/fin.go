@@ -396,11 +396,11 @@ func (m *Manager) finHorsPieces(s *salon) {
 	}
 }
 
-// disparus : salons vivants de ce processus dont la ligne vivante a disparu (lignes), place
-// du bloc rendue ; rend ceux qui ont un état (non fini : les tombes n'y sont pas), à finir en
-// raison 2 hors des verrous. Sous createMu : une création en cours a déjà sa ligne ou n'est
-// pas encore comptée. Chaque verrou est
-// rendu par defer : une panique récupérée par Run ne laisse ni createMu ni Manager.mu pris.
+// disparus : salons vivants de ce processus dont la ligne vivante a disparu (lignes), place du bloc
+// rendue ; rend ceux qui ont un état (non fini : les tombes n'y sont pas), à finir en raison 2 hors
+// des verrous. Sous createMu : une création en cours a déjà sa ligne ou n'est pas encore comptée.
+// Chaque verrou est rendu par defer : une panique récupérée par Run ne laisse ni createMu ni
+// Manager.mu pris.
 func (m *Manager) disparus() []*salon {
 	m.createMu.Lock()
 	defer m.createMu.Unlock()

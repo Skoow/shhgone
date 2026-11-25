@@ -10,12 +10,11 @@ import (
 	"testing"
 )
 
-// /pdf-frame.html/
-// (barre finale) servait les octets de pdf-frame.html SANS la directive sandbox ni les en-têtes
-// du cadre, parce que les en-têtes suivent le chemin exact alors que les fichiers étaient
-// servis aussi à des chemins voisins. À travers tout le serveur : un fichier du site n'est
-// servi qu'à son chemin exact. Pour toute variante de chemin, soit la réponse ne contient pas
-// les octets de pdf-frame.html, soit elle porte la CSP du cadre (sandbox allow-scripts).
+// /pdf-frame.html/ (barre finale) servait les octets de pdf-frame.html SANS la directive sandbox ni
+// les en-têtes du cadre, parce que les en-têtes suivent le chemin exact alors que les fichiers
+// étaient servis aussi à des chemins voisins. À travers tout le serveur : un fichier du site n'est
+// servi qu'à son chemin exact. Pour toute variante de chemin, soit la réponse ne contient pas les
+// octets de pdf-frame.html, soit elle porte la CSP du cadre (sandbox allow-scripts).
 func TestCadrePdfCheminExact(t *testing.T) {
 	static := t.TempDir()
 	const cadre, script, style = "<!doctype html><title>cadre PDF</title><script src=\"pdf-frame.js\"></script>",

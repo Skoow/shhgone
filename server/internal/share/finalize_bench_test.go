@@ -1,8 +1,8 @@
 package share
 
-// Temps de Finalize d'un partage de 200 Mo
-// (palier 4000, 256 Mio : 49 segments de 4 Mio envoyés, ≈ 205 Mo, puis le dernier ; bourrage
-// des segments 49 à 61, ≈ 54 Mo d'aléa, par la finalisation du brouillon). Sur le disque du dossier temporaire.
+// Temps de Finalize d'un partage de 200 Mo (palier 4000, 256 Mio : 49 segments de 4 Mio envoyés, ≈
+// 205 Mo, puis le dernier ; bourrage des segments 49 à 61, ≈ 54 Mo d'aléa, par la finalisation du
+// brouillon). Sur le disque du dossier temporaire.
 //
 //	go test -run '^$' -bench Finalize200Mo -benchtime 5x ./internal/share/
 

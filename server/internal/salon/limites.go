@@ -97,8 +97,9 @@ type reserveVocale struct {
 	depuis time.Time // zéro : aucun WebSocket ouvert
 }
 
-// remplir ajoute la présence depuis depuis, à l'octet près (le reste de moins de 250 µs est
-// gardé pour la suite). Horloge qui recule : rien n'est gagné et le décompte repart de now.
+// remplir ajoute la présence écoulée depuis l'instant « depuis », à l'octet près (le reste de moins
+// de 250 µs est gardé pour la suite). Horloge qui recule : rien n'est gagné et le décompte repart
+// de now.
 func (r *reserveVocale) remplir(now time.Time) {
 	if r.depuis.IsZero() {
 		return

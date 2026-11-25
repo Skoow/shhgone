@@ -910,8 +910,8 @@ func TestEffacesParLots(t *testing.T) {
 	}
 }
 
-// 1 500 trames effacées par lecture pendant
-// une coupure ; la reconnexion reçoit les 1 500 0x0E, dans l'ordre, par lots.
+// 1 500 trames effacées par lecture pendant une coupure ; la reconnexion reçoit les 1 500 0x0E,
+// dans l'ordre, par lots.
 func TestReconnexionBeaucoupDe0x0E(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := nouveauBanc(t, 200)

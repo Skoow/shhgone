@@ -445,12 +445,11 @@ func TestFreinApresJetonFaux(t *testing.T) {
 	})
 }
 
-// Après une coupure du tunnel, l'onglet
-// renvoyait le jeton toutes les 5 s à quiconque répondait sur ce port. Le script oublie
-// maintenant le jeton, arrête sa minuterie et revient à la saisie dès un refus (404) ou après
-// trois lectures sans réponse de suite. Le comportement est prouvé hors de ce dépôt de tests Go
-// par un essai du script (faux DOM, faux fetch) ; ici, garde-fou de structure seulement : les
-// pièces de ce comportement sont dans le script servi.
+// Après une coupure du tunnel, l'onglet renvoyait le jeton toutes les 5 s à quiconque répondait sur
+// ce port. Le script oublie maintenant le jeton, arrête sa minuterie et revient à la saisie dès un
+// refus (404) ou après trois lectures sans réponse de suite. Le comportement est prouvé hors de ce
+// dépôt de tests Go par un essai du script (faux DOM, faux fetch) ; ici, garde-fou de structure
+// seulement : les pièces de ce comportement sont dans le script servi.
 func TestPageOublieLeJeton(t *testing.T) {
 	js, err := page.ReadFile("page/admin.js")
 	if err != nil {

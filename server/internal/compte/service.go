@@ -468,8 +468,8 @@ func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
 	})
 }
 
-// fermerSessionsTx : ferme les sessions du compte h, sauf sauf (nil : toutes) ; rend leurs t_v
-// (activité à oublier après la transaction).
+// fermerSessionsTx : ferme les sessions du compte h, sauf celle de t_v « sauf » (nil : toutes) ;
+// rend leurs t_v (activité à oublier après la transaction).
 func fermerSessionsTx(tx *sql.Tx, h [16]byte, sauf *[32]byte) ([][32]byte, error) {
 	rows, err := tx.Query(`SELECT t_v FROM sessions WHERE h=?`, h[:])
 	if err != nil {

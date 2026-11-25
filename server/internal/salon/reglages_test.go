@@ -316,7 +316,7 @@ func TestReglerSansGestion(t *testing.T) {
 	if exp, _ := b.expiresAt(t, s.id); exp != exp0 || !servie(t, s, seq) {
 		t.Fatal("renouvelé malgré le refus")
 	}
-	// Places sous l'occupation : refus avant avant (rien de consommé).
+	// Places sous l'occupation : refus avant toute modification (rien de consommé).
 	b.entrer(t, c, false)
 	b.entrer(t, c, false)
 	if _, err := b.m.Regler(c.gestion, ReglagesReq{Places: 2, Heures: 1}, avant); !errors.Is(err, ErrOccupied) || appels != 1 {

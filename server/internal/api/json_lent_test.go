@@ -1,7 +1,6 @@
 package api
 
-// Un corps JSON
-// envoyé au goutte-à-goutte n'avait pas de débit minimal et tenait sa connexion 300 s
+// Un corps JSON envoyé au goutte-à-goutte n'avait pas de débit minimal et tenait sa connexion 300 s
 // (ReadTimeout) : 50 POST /api/shares/unlock à 0,5 octet/s restaient ouverts après 20 s.
 
 import (
