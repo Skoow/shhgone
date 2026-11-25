@@ -15,6 +15,7 @@ var pdfFrameFiles = map[string]bool{
 // pathHeaders pose les en-têtes qui dépendent du chemin, après les en-têtes communs
 // (plus de X-Robots-Tag : les liens sont à la racine, le secret après « # », spec §32) :
 //   - Cross-Origin-Resource-Policy: cross-origin sur les trois fichiers du cadre PDF ;
+//   - Access-Control-Allow-Origin: * sur pdf-frame.js et pdf-frame.css seulement (pdfFrameCORS) ;
 //   - CSP propre (pdfFrameCSP) et Permissions-Policy fermée sur /pdf-frame.html seulement.
 //
 // pdfFramePermissions : le cadre PDF n'a jamais besoin du micro, de la caméra ni de la position.
@@ -33,9 +34,18 @@ const pdfFramePermissions = "microphone=(), camera=(), publickey-credentials-cre
 const pdfFrameCSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src blob: data:; " +
 	"connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'; sandbox allow-scripts"
 
+// pdfFrameCORS : le cadre PDF (origine opaque, sandbox allow-scripts) charge son script et sa
+// feuille de style avec integrity et crossorigin="anonymous" : requête CORS d'origine « null »,
+// qu'il faut autoriser. Fichiers publics, envoyés sans témoin ni secret : « * » n'ouvre rien
+// d'autre. Jamais sur la page du cadre, sur /api/* ni sur un autre fichier.
+func pdfFrameCORS(p string) bool { return p == "/pdf-frame.js" || p == "/pdf-frame.css" }
+
 func pathHeaders(h http.Header, p string) {
 	if pdfFrameFiles[p] {
 		h.Set("Cross-Origin-Resource-Policy", "cross-origin")
+	}
+	if pdfFrameCORS(p) {
+		h.Set("Access-Control-Allow-Origin", "*")
 	}
 	if p == pdfFramePage {
 		h.Set("Content-Security-Policy", pdfFrameCSP)

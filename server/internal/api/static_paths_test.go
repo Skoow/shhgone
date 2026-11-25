@@ -33,6 +33,37 @@ func TestPdfFrameCORP(t *testing.T) {
 	}
 }
 
+// Le cadre PDF (origine opaque) charge pdf-frame.js et pdf-frame.css avec integrity et
+// crossorigin="anonymous" : Access-Control-Allow-Origin: * sur ces deux fichiers, et nulle part
+// ailleurs (page du cadre, autres fichiers, /api/*, y compris avec une origine dans la requête).
+func TestPdfFrameCORS(t *testing.T) {
+	e := newEnv(t, false, nil)
+	for _, p := range []string{"/pdf-frame.js", "/pdf-frame.css"} {
+		for _, origine := range []string{"", "null"} {
+			hdr := map[string]string{}
+			if origine != "" {
+				hdr["Origin"] = origine
+			}
+			got := e.do(req{method: "GET", path: p, hdr: hdr}).Header()["Access-Control-Allow-Origin"]
+			if len(got) != 1 || got[0] != "*" {
+				t.Errorf("%s (Origin %q) : Access-Control-Allow-Origin = %v, attendu *", p, origine, got)
+			}
+		}
+	}
+	for _, p := range []string{"/", "/index.html", "/pdf-frame.html", "/pdf-frame", "/pdf-frame.map", "/assets/pdf-frame.js",
+		"/pdf-frame.js/x", "/PDF-FRAME.JS", "/s/pdf-frame.js", "/app.js", "/sw.js", "/api/health", "/api/captcha",
+		"/api/pdf-frame.js", "/api/shares/meta", "/api/compte"} {
+		for _, m := range []string{"GET", "POST", "OPTIONS"} {
+			h := e.do(req{method: m, path: p, hdr: map[string]string{"Origin": "null"}}).Header()
+			for k := range h {
+				if strings.HasPrefix(strings.ToLower(k), "access-control-") {
+					t.Errorf("%s %s : en-tête CORS inattendu %s: %v", m, p, k, h[k])
+				}
+			}
+		}
+	}
+}
+
 // Le cadre PDF a sa propre CSP, fermée : il ne charge que son script et sa feuille de style,
 // dessine des <canvas> (images blob: et data:), et n'ouvre aucune connexion, aucun cadre,
 // aucun Worker, aucun WebAssembly (pdf.js y tourne sur le fil principal, useWasm: false).
