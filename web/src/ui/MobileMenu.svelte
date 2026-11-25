@@ -10,7 +10,8 @@
   import { presence } from "../history/presence.svelte";
   import { t } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
-  import { ChevronRight, Download, LogOut, MessagesSquare, Plus, Share2, ShieldCheck, SlidersHorizontal, Tag, User } from "./Icon";
+  import { ChevronRight, Compass, Download, LogOut, MessagesSquare, Plus, Server, Share2, ShieldCheck, SlidersHorizontal, Tag, User } from "./Icon";
+  import { allerSection } from "./section";
   import type { Component } from "svelte";
 
   let { busy = false }: { busy?: boolean } = $props();
@@ -24,7 +25,10 @@
   // puis les écrans du site, chacun avec son icône ; puis le compte (seulement avec __COMPTES__) :
   // « Se connecter » et « Créer un compte », connecté, « Mon compte », « Paramètres » et
   // « Se déconnecter ». Confidentialité, Conditions, Signaler… restent dans le pied de page.
-  type Link = { label: string; path: string; icon: Component; soon?: string };
+  // `subs` : sections de l'accueil sous une entrée (Sécurité : « Comment ça marche », « Ce que voit
+  // le serveur », comme le menu Sécurité de l'ordinateur, TopNav.svelte ; ui/section.ts).
+  type Sub = { id: string; label: string; icon: Component; section: string; faq?: boolean };
+  type Link = { label: string; path: string; icon: Component; soon?: string; subs?: Sub[] };
   const links = $derived<Link[]>([
     // « Mes partages » seulement s'il y a des partages sur cet appareil.
     ...(accountFlag.connected ? [{ label: t("nav.home"), path: "/", icon: Share2 }] : presence.any ? [{ label: t("nav.shares"), path: "/envois", icon: Share2 }] : []),
@@ -32,7 +36,15 @@
     ...(accountFlag.connected || presence.downloads ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
     // Salon : la création ; « bientôt » seulement sans __SALONS__ (démo, site sans compte).
     __SALONS__ ? { label: t("nav.room"), path: "/salon/nouveau", icon: MessagesSquare } : { label: t("nav.room"), path: "", icon: MessagesSquare, soon: t("tabs.soon.chat") },
-    { label: t("nav.security"), path: "/securite", icon: ShieldCheck },
+    {
+      label: t("nav.security"),
+      path: "/securite",
+      icon: ShieldCheck,
+      subs: [
+        { id: "how", label: t("nav.sec.how.t"), icon: Compass, section: "comment" },
+        { id: "server", label: t("nav.sec.server.t"), icon: Server, section: "faq-server", faq: true },
+      ],
+    },
     { label: t("nav.offers"), path: "/offres", icon: Tag },
     // Compte pas encore ouvert (D8) : « Se connecter » visible, bientôt.
     ...(__COMPTES__ ? [] : [{ label: t("account.login.title"), path: "", icon: User, soon: t("nav.login.soon") }]),
@@ -48,6 +60,11 @@
         : [],
   );
   const here = (p: string) => (currentPath() === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
+
+  function versSection(s: Sub) {
+    close();
+    void allerSection(s.section, s.faq);
+  }
 
   async function logout() {
     close();
@@ -154,6 +171,18 @@
               <span class="mm-t">{l.label}</span>
               <ChevronRight size={18} strokeWidth={1.9} aria-hidden="true" />
             </a>
+            {#if l.subs}
+              <ul class="mm-sub">
+                {#each l.subs as s (s.id)}
+                  <li>
+                    <button type="button" class="mm-l mm-s" onclick={() => versSection(s)} data-mm-sec={s.id}>
+                      <span class="mm-ic" aria-hidden="true"><s.icon size={16} strokeWidth={1.9} /></span>
+                      <span class="mm-t">{s.label}</span>
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
           {/if}
         </li>
       {/each}
@@ -447,6 +476,22 @@
   }
   .mm-l.out {
     color: var(--text-2);
+  }
+  /* Sections de l'accueil sous « Sécurité » : en retrait, plus petites. */
+  .mm-sub {
+    display: grid;
+    gap: 2px;
+    padding-inline-start: 26px;
+  }
+  .mm-s {
+    min-height: 44px;
+    color: var(--text-2);
+    font-size: var(--fs-small);
+  }
+  .mm-s .mm-ic {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
   }
   .mm-acct {
     margin-block-start: var(--sp-3);
