@@ -63,7 +63,7 @@ func TestOffrirDurees(t *testing.T) {
 			if !ok || j != jours {
 				t.Fatal(nom, j, ok)
 			}
-			p, a, err := b.s.Offrir(j)
+			p, a, err := b.s.Offrir(j, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -119,7 +119,7 @@ func TestOffrirJamaisPSurDisque(t *testing.T) {
 	}
 	var passes []Pass
 	for i := 0; i < 5; i++ {
-		p, _, err := s.Offrir(JoursOffertAn)
+		p, _, err := s.Offrir(JoursOffertAn, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestOffrirJamaisPSurDisque(t *testing.T) {
 func TestOffrirDureeInvalide(t *testing.T) {
 	b := nouveauBanc(t)
 	for _, j := range []int{0, 1, 29, 31, 366, 3651, -30} {
-		if _, _, err := b.s.Offrir(j); !errors.Is(err, ErrDureeOffert) {
+		if _, _, err := b.s.Offrir(j, ""); !errors.Is(err, ErrDureeOffert) {
 			t.Error(j, err)
 		}
 	}
@@ -172,7 +172,7 @@ func TestOffrirDureeInvalide(t *testing.T) {
 // normale, sans report.
 func TestOffertReserve1000(t *testing.T) {
 	b := nouveauBanc(t)
-	p, _, _ := b.s.Offrir(JoursOffertAn)
+	p, _, _ := b.s.Offrir(JoursOffertAn, "")
 	n, o, err := b.s.Prendre(p, 5000)
 	if err != nil || n != JetonsOffert || o != Pro || JetonsOffert != 1000 {
 		t.Fatal(n, o, err)
@@ -199,7 +199,7 @@ func TestOffertReserve1000(t *testing.T) {
 // un pass Pro payé reste à 20.
 func TestOffertEmissionsDuJour(t *testing.T) {
 	b, j := bancJetons(t)
-	p, _, _ := b.s.Offrir(JoursOffertMois)
+	p, _, _ := b.s.Offrir(JoursOffertMois, "")
 	spki := clePour(t, j, Pro, 0)
 	var finir func([]byte) []byte
 	for lot := 0; lot < EmisParJourOffert/5; lot++ {
@@ -241,7 +241,7 @@ func TestOffertEmissionsDuJour(t *testing.T) {
 // un identifiant mal formé ou déjà révoqué ne sont pas touchés.
 func TestRevoquerOffert(t *testing.T) {
 	b, j := bancJetons(t)
-	p, a, _ := b.s.Offrir(JoursOffertSansFin)
+	p, a, _ := b.s.Offrir(JoursOffertSansFin, "")
 	c := b.commander(t, passN(3), Formule{Pro, JoursMois, true, Carte})
 	if err := b.webhook(t, confirme(c, "pi_3", 2000)); err != nil {
 		t.Fatal(err)
@@ -289,9 +289,9 @@ func TestAccesOffertsListe(t *testing.T) {
 	b := nouveauBanc(t)
 	c := b.commander(t, passN(4), Formule{Pro, JoursMois, true, Carte})
 	b.webhook(t, confirme(c, "pi_4", 2000))
-	p1, a1, _ := b.s.Offrir(JoursOffertMois)
+	p1, a1, _ := b.s.Offrir(JoursOffertMois, "")
 	b.now = b.now.Add(24 * time.Hour)
-	p2, a2, _ := b.s.Offrir(JoursOffertAn)
+	p2, a2, _ := b.s.Offrir(JoursOffertAn, "")
 	b.s.Prendre(p2, 10)
 	l, err := b.s.AccesOfferts()
 	if err != nil || len(l) != 2 || l[0].ID != a2.ID || l[1].ID != a1.ID || l[0].Jetons != JetonsOffert-10 || l[0].Cree != "2026-11-20" {
@@ -317,8 +317,8 @@ func TestAgregatsOfferts(t *testing.T) {
 	b := nouveauBanc(t)
 	c := b.commander(t, passN(5), Formule{Pro, JoursMois, true, Carte})
 	b.webhook(t, confirme(c, "pi_5", 2000))
-	b.s.Offrir(JoursOffertMois)
-	_, a, _ := b.s.Offrir(JoursOffertAn)
+	b.s.Offrir(JoursOffertMois, "")
+	_, a, _ := b.s.Offrir(JoursOffertAn, "")
 	b.s.RevoquerOffert(a.ID)
 	ag, err := b.s.Agregats()
 	if err != nil || ag.PassPro != 1 || ag.PassPlus != 0 || ag.PassRevoques != 0 || ag.AccesOfferts != 1 {

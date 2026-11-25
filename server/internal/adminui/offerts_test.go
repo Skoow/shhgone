@@ -15,8 +15,8 @@ import (
 // bancOfferts : page avec les crochets des accès offerts, qui comptent leurs appels.
 type bancOfferts struct {
 	*banc
-	offrir, listes, revoques []string
-	pass                     paiement.Pass
+	offrir, listes, revoques, noms []string
+	pass                           paiement.Pass
 }
 
 func nouveauBancOfferts(t *testing.T, mod func(*Paiement)) *bancOfferts {
@@ -28,16 +28,20 @@ func nouveauBancOfferts(t *testing.T, mod func(*Paiement)) *bancOfferts {
 	p := &Paiement{
 		Agregats:  func() (paiement.Agregats, error) { return paiement.Agregats{AccesOfferts: 2}, nil },
 		Suspendre: func(bool) {},
-		Offrir: func(jours int) (paiement.Pass, paiement.AccesOffert, error) {
-			b.offrir = append(b.offrir, map[int]string{30: "mois", 365: "an", 3650: "sans_fin"}[jours])
-			return b.pass, paiement.AccesOffert{ID: strings.Repeat("ab", 32), Court: "ababab", Cree: "2026-11-25", Fin: "2027-11-25", Jetons: 1000, Etat: "actif"}, nil
+		Offrir: func(jours int, nom string) (paiement.Pass, paiement.AccesOffert, error) {
+			b.offrir = append(b.offrir, map[int]string{30: "mois", 365: "an", 3650: "sans_fin"}[jours]+"/"+nom)
+			return b.pass, paiement.AccesOffert{ID: strings.Repeat("ab", 32), Court: "ababab", Nom: nom, Cree: "2026-11-25", Fin: "2027-11-25", Jetons: 1000, Etat: "actif"}, nil
 		},
 		Offerts: func() ([]paiement.AccesOffert, error) {
 			b.listes = append(b.listes, "")
-			return []paiement.AccesOffert{{ID: strings.Repeat("cd", 32), Court: "cdcdcd", Cree: "2026-11-01", Fin: "2026-12-01", Jetons: 990, Etat: "actif"}}, nil
+			return []paiement.AccesOffert{{ID: strings.Repeat("cd", 32), Court: "cdcdcd", Nom: "Alice", Cree: "2026-11-01", Fin: "2026-12-01", Jetons: 990, Etat: "actif"}}, nil
 		},
 		RevoquerOffert: func(id string) (bool, error) {
 			b.revoques = append(b.revoques, id)
+			return id == strings.Repeat("cd", 32), nil
+		},
+		NommerOffert: func(id, nom string) (bool, error) {
+			b.noms = append(b.noms, id[:4]+"/"+nom)
 			return id == strings.Repeat("cd", 32), nil
 		},
 		Origine: "https://shhgone.test",
@@ -50,7 +54,9 @@ func nouveauBancOfferts(t *testing.T, mod func(*Paiement)) *bancOfferts {
 	return b
 }
 
-func (b *bancOfferts) appels() int { return len(b.offrir) + len(b.listes) + len(b.revoques) }
+func (b *bancOfferts) appels() int {
+	return len(b.offrir) + len(b.listes) + len(b.revoques) + len(b.noms)
+}
 
 // TestOffertsRefus : sans jeton (une page d'un autre site ne peut pas poser Authorization : c'est
 // la protection contre les requêtes forgées de toute la page), avec un paramètre, la mauvaise
@@ -62,6 +68,7 @@ func TestOffertsRefus(t *testing.T) {
 		{method: "POST", path: "/api/paiement/offrir", corps: `{"duree":"an"}`},
 		{method: "GET", path: "/api/paiement/offerts"},
 		{method: "POST", path: "/api/paiement/offerts/revoquer", corps: `{"id":"` + strings.Repeat("cd", 32) + `"}`},
+		{method: "POST", path: "/api/paiement/offerts/nommer", corps: `{"id":"` + strings.Repeat("cd", 32) + `","nom":"Alice"}`},
 	}
 	pareil := func(nom string, b *bancOfferts, q req) {
 		t.Helper()
@@ -95,6 +102,7 @@ func TestOffertsRefus(t *testing.T) {
 		pareil(r.path+" sans paiement", &bancOfferts{banc: nouveauBanc()}, avec)
 		for nom, mod := range map[string]func(*Paiement){
 			"sans Offrir":        func(p *Paiement) { p.Offrir = nil },
+			"sans NommerOffert":  func(p *Paiement) { p.NommerOffert = nil },
 			"sans origine":       func(p *Paiement) { p.Origine = "" },
 			"origine ftp":        func(p *Paiement) { p.Origine = "ftp://shhgone.test" },
 			"origine nue":        func(p *Paiement) { p.Origine = "https://" },
@@ -112,7 +120,9 @@ func TestOffertsRefus(t *testing.T) {
 // « no-store » ; durée inconnue, champ en trop ou corps illisible : 400 sans rien créer.
 func TestOffrir(t *testing.T) {
 	b := nouveauBancOfferts(t, nil)
-	for _, corps := range []string{``, `{}`, `{"duree":"illimite"}`, `{"duree":"an","note":"Alice"}`, `{"duree":30}`, `{"duree":"an"}{}`, `[]`} {
+	for _, corps := range []string{``, `{}`, `{"duree":"illimite"}`, `{"duree":"an","note":"Alice"}`, `{"duree":30}`, `{"duree":"an"}{}`, `[]`,
+		`{"duree":"an","nom":"` + strings.Repeat("a", 41) + `"}`, `{"duree":"an","nom":"a\nb"}`, `{"duree":"an","nom":"a\u202eb"}`,
+		`{"duree":"an","nom":"a\u0000b"}`, `{"duree":"an","nom":7}`} {
 		w := b.faire(req{method: "POST", path: "/api/paiement/offrir", corps: corps, hdr: [][2]string{bon()}})
 		if w.Code != 400 || w.Body.String() != `{"error":"bad_request"}` {
 			t.Errorf("%s : %d %s", corps, w.Code, w.Body.String())
@@ -146,8 +156,48 @@ func TestOffrir(t *testing.T) {
 			t.Fatalf("%+v", v)
 		}
 	}
-	if strings.Join(b.offrir, ",") != "mois,an,sans_fin" {
+	if strings.Join(b.offrir, ",") != "mois/,an/,sans_fin/" {
 		t.Fatal(b.offrir)
+	}
+	// Avec un nom : nettoyé (espaces autour), transmis au service, rendu dans acces.
+	w := b.faire(req{method: "POST", path: "/api/paiement/offrir", corps: `{"duree":"an","nom":"  Léa  "}`, hdr: [][2]string{bon()}})
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"nom":"Léa"`) || b.offrir[3] != "an/Léa" {
+		t.Fatal(w.Code, w.Body.String(), b.offrir)
+	}
+}
+
+// TestNommerOffert : { id, nom } ; nom vide efface ; bornes et caractères de contrôle refusés
+// avant le service ; inconnu : nomme false ; réponse no-store.
+func TestNommerOffert(t *testing.T) {
+	b := nouveauBancOfferts(t, nil)
+	id := strings.Repeat("cd", 32)
+	for _, corps := range []string{`{}`, `{"id":"` + id + `"}`, `{"id":"cdcd","nom":"A"}`, `{"id":"` + id + `","nom":null}`,
+		`{"id":"` + id + `","nom":"` + strings.Repeat("é", 41) + `"}`, `{"id":"` + id + `","nom":"a\tb"}`,
+		`{"id":"` + id + `","nom":"a\u2028b"}`, `{"id":"` + id + `","nom":"x","note":"y"}`} {
+		w := b.faire(req{method: "POST", path: "/api/paiement/offerts/nommer", corps: corps, hdr: [][2]string{bon()}})
+		if w.Code != 400 || w.Body.String() != `{"error":"bad_request"}` {
+			t.Errorf("%s : %d %s", corps, w.Code, w.Body.String())
+		}
+	}
+	if len(b.noms) != 0 {
+		t.Fatal("service appelé malgré un refus :", b.noms)
+	}
+	for corps, voulu := range map[string]string{
+		`{"id":"` + id + `","nom":" Alice "}`:                   `{"nomme":true}`,
+		`{"id":"` + id + `","nom":""}`:                          `{"nomme":true}`,
+		`{"id":"` + strings.Repeat("ef", 32) + `","nom":"Bob"}`: `{"nomme":false}`,
+	} {
+		w := b.faire(req{method: "POST", path: "/api/paiement/offerts/nommer", corps: corps, hdr: [][2]string{bon()}})
+		if w.Code != 200 || w.Body.String() != voulu || w.Header().Get("Cache-Control") != "no-store" {
+			t.Errorf("%s : %d %s", corps, w.Code, w.Body.String())
+		}
+	}
+	if strings.Join(b.noms, ",") == "" || !strings.Contains(strings.Join(b.noms, ","), "cdcd/Alice") || !strings.Contains(strings.Join(b.noms, ","), "cdcd/") {
+		t.Fatal(b.noms)
+	}
+	w := b.faire(req{method: "GET", path: "/api/paiement/offerts", hdr: [][2]string{bon()}})
+	if !strings.Contains(w.Body.String(), `"nom":"Alice"`) {
+		t.Fatal(w.Body.String())
 	}
 }
 
@@ -186,21 +236,24 @@ func TestOffertsListeEtRevoquer(t *testing.T) {
 	}
 }
 
-// Les noms des accès offerts restent dans le navigateur de l'exploitant : la création n'envoie
-// que la durée, et le script ne fait aucun autre envoi qui porterait un nom.
-func TestNomsOffertsRestentDansLeNavigateur(t *testing.T) {
+// Les noms des accès offerts sont gardés sur le serveur (décision du propriétaire, 25 novembre) :
+// la création envoie la durée et le nom, et le stockage du navigateur ne sert plus qu'à la
+// reprise unique des noms gardés avant (lire puis effacer l'ancienne clé, jamais écrire).
+func TestNomsOffertsSurLeServeur(t *testing.T) {
 	js, err := page.ReadFile("page/admin.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(js)
-	if !strings.Contains(s, "envoyer('POST', '/api/paiement/offrir', { duree })") {
-		t.Fatal("la création d'un accès offert envoie autre chose que la durée")
+	if !strings.Contains(s, "envoyer('POST', '/api/paiement/offrir', { duree, nom })") ||
+		!strings.Contains(s, "envoyer('POST', '/api/paiement/offerts/nommer', { id: o.id, nom: v })") {
+		t.Fatal("la création ou le nommage n'envoient plus le nom au serveur")
 	}
-	if strings.Count(s, "localStorage.") != 2 || !strings.Contains(s, "localStorage.getItem(CLE_NOMS)") || !strings.Contains(s, "localStorage.setItem(CLE_NOMS,") {
-		t.Fatal("le stockage du navigateur ne doit servir qu'aux noms des accès offerts")
+	if strings.Count(s, "localStorage.") != 2 || !strings.Contains(s, "localStorage.getItem(CLE_NOMS)") ||
+		!strings.Contains(s, "localStorage.removeItem(CLE_NOMS)") || strings.Contains(s, "localStorage.setItem") {
+		t.Fatal("le stockage du navigateur ne doit servir qu'à lire puis effacer l'ancienne clé des noms")
 	}
-	if strings.Contains(s, "localStorage.setItem(CLE_NOMS, jeton") || strings.Contains(s, "sessionStorage") || strings.Contains(s, "document.cookie") {
+	if strings.Contains(s, "sessionStorage") || strings.Contains(s, "document.cookie") || strings.Contains(s, "indexedDB") {
 		t.Fatal("aucun autre stockage dans la page")
 	}
 }

@@ -785,23 +785,36 @@ function afficherComptes(a) {
 
 const ETATS_OFFERT = { actif: ['actif', 'etat-ok'], revoque: ['révoqué', 'etat-actif'], echu: ['échu', 'etat-echu'] };
 
-// Noms des accès offerts : gardés dans ce navigateur seulement (localStorage), jamais envoyés au
-// serveur, qui ne garde aucun nom. Clé : l'empreinte de l'accès (o.id), qui ne donne aucun droit.
+// Noms des accès offerts : gardés sur le serveur avec l'accès (décision du propriétaire, 25
+// novembre), effacés avec lui. Avant, ils restaient dans ce navigateur (localStorage, clé
+// CLE_NOMS) : reprise unique ci-dessous, puis plus aucun stockage dans la page.
 const CLE_NOMS = 'shh-admin-noms-offerts';
 const NOM_MAX = 40;
 
-function lireNoms() {
+// reprendreNoms : si ce navigateur garde encore des noms sous l'ancienne clé, les envoyer au
+// serveur (un par accès encore listé, sans écraser un nom déjà posé sur le serveur), puis
+// effacer la clé locale, même si un envoi a échoué (dit dans le résultat : renommer à la main).
+// Rend le nombre de noms repris, ou -1 si rien n'était gardé ici.
+async function reprendreNoms(offerts) {
+  let anciens;
   try {
-    const v = JSON.parse(localStorage.getItem(CLE_NOMS) || '{}');
-    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-  } catch { return {}; }
-}
-
-function nommer(id, nom) {
-  const noms = lireNoms();
-  const propre = String(nom || '').trim().slice(0, NOM_MAX);
-  if (propre) noms[id] = propre; else delete noms[id];
-  try { localStorage.setItem(CLE_NOMS, JSON.stringify(noms)); return true; } catch { return false; }
+    const brut = localStorage.getItem(CLE_NOMS);
+    if (brut === null) return -1;
+    anciens = JSON.parse(brut);
+  } catch { anciens = null; }
+  let repris = 0, rates = 0;
+  if (anciens && typeof anciens === 'object' && !Array.isArray(anciens)) {
+    for (const o of offerts) {
+      const v = anciens[o.id];
+      if (typeof v !== 'string' || !v.trim() || o.nom) continue;
+      const r = await envoyer('POST', '/api/paiement/offerts/nommer', { id: o.id, nom: v.trim().slice(0, NOM_MAX) });
+      if (!r) return repris; // session fermée : la clé reste, la reprise se refera
+      if (r.ok && r.json && r.json.nomme) { o.nom = v.trim().slice(0, NOM_MAX); repris++; } else rates++;
+    }
+  }
+  try { localStorage.removeItem(CLE_NOMS); } catch { /* rien d'autre à faire */ }
+  if (rates > 0) $('offerts-resultat').textContent = rates + ' nom(s) de ce navigateur refusé(s) par le serveur : les redonner avec « Nommer ».';
+  return repris;
 }
 
 function oublierLienOffert() {
@@ -814,8 +827,8 @@ function ligneOffert(o) {
   const li = el('li');
   const tete = el('p', undefined, 'tete');
   const [etat, classe] = ETATS_OFFERT[o.etat] || [o.etat, ''];
-  const nom = lireNoms()[o.id];
-  if (nom) tete.append(el('span', nom), document.createTextNode(' · '));
+  const nom = typeof o.nom === 'string' ? o.nom : '';
+  if (nom) tete.append(el('span', nom, 'nom'), document.createTextNode(' · '));
   tete.append(el('span', o.court, 'code'), document.createTextNode(' · '), el('span', etat, classe));
   li.append(tete);
   // Révoqué : la fin a été ramenée au jour de la révocation (ligne purgée 31 jours après).
@@ -826,10 +839,16 @@ function ligneOffert(o) {
   const outils = el('div', undefined, 'outils');
   const renommer = el('button', nom ? 'Renommer' : 'Nommer', 'discret');
   renommer.type = 'button';
-  renommer.addEventListener('click', () => {
-    const v = prompt('Nom pour ' + o.court + ' (gardé dans ce navigateur seulement, vide pour effacer)', nom || '');
+  renommer.addEventListener('click', async () => {
+    const v = prompt('Nom pour ' + o.court + ' (gardé sur le serveur avec l’accès, ' + NOM_MAX + ' caractères au plus ; vide pour effacer)', nom);
     if (v === null) return;
-    if (!nommer(o.id, v)) $('offerts-resultat').textContent = 'Ce navigateur refuse d’enregistrer le nom.';
+    const r = await envoyer('POST', '/api/paiement/offerts/nommer', { id: o.id, nom: v });
+    if (!r) return;
+    const res = $('offerts-resultat');
+    if (r.ok && r.json && r.json.nomme) res.textContent = v.trim() ? 'Accès ' + o.court + ' nommé.' : 'Nom de ' + o.court + ' effacé.';
+    else if (r.ok) res.textContent = 'Introuvable : accès purgé entre-temps. Rien n’a changé.';
+    else if (r.statut === 400) res.textContent = 'Nom refusé : ' + NOM_MAX + ' caractères au plus, sans saut de ligne ni caractère de contrôle.';
+    else res.textContent = 'Échec : le serveur n’a pas confirmé. Relire la liste.';
     chargerOfferts();
   });
   outils.append(renommer);
@@ -865,6 +884,8 @@ async function chargerOfferts() {
   const ul = $('offerts');
   vider(ul);
   if (!r.ok || !r.json || !Array.isArray(r.json.offerts)) { $('offerts-resultat').textContent = 'Liste illisible : réessayer.'; return; }
+  const repris = await reprendreNoms(r.json.offerts);
+  if (repris > 0) $('offerts-resultat').textContent = repris + ' nom(s) gardé(s) jusqu’ici dans ce navigateur repris sur le serveur ; ce navigateur ne les garde plus.';
   if (r.json.offerts.length === 0) ul.append(el('li', 'Aucun accès offert.', 'vide'));
   for (const o of r.json.offerts) ul.append(ligneOffert(o));
 }
@@ -886,19 +907,19 @@ $('offert-copier').addEventListener('click', async () => {
 confirmer($('offrir-bouton'), 'offrir un accès Pro', async () => {
   oublierLienOffert();
   const duree = $('offrir-duree').value;
-  const nom = $('offrir-nom').value;
-  const r = await envoyer('POST', '/api/paiement/offrir', { duree });
+  const nom = $('offrir-nom').value.trim();
+  const r = await envoyer('POST', '/api/paiement/offrir', { duree, nom });
   if (!r) return;
   const res = $('offerts-resultat');
   if (r.ok && r.json && typeof r.json.lien === 'string' && r.json.acces) {
     $('offert-champ').value = r.json.lien;
     $('offert-court').textContent = r.json.acces.court;
-    if (nom.trim()) nommer(r.json.acces.id, nom);
     $('offrir-nom').value = '';
     $('offert-lien').hidden = false;
     res.textContent = 'Accès ' + r.json.acces.court + ' créé, valable jusqu’au ' + dateFr(veille(r.json.acces.fin)) + '.';
     r.json.lien = '';
-  } else res.textContent = 'Échec : aucun accès créé (ou le serveur n’a pas confirmé : relire la liste).';
+  } else if (r.statut === 400) res.textContent = 'Nom refusé : ' + NOM_MAX + ' caractères au plus, sans saut de ligne ni caractère de contrôle. Aucun accès créé.';
+  else res.textContent = 'Échec : aucun accès créé (ou le serveur n’a pas confirmé : relire la liste).';
   chargerOfferts();
 });
 $('offrir').addEventListener('submit', (ev) => { ev.preventDefault(); $('offrir-bouton').click(); });

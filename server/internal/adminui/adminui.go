@@ -175,9 +175,10 @@ type file struct {
 //	GET  /api/paiement              agrégats du paiement (SHH_PAIEMENT=1)
 //	POST /api/paiement/suspendre    ventes suspendues jusqu'au redémarrage (réversible)
 //	POST /api/paiement/retablir     ventes rétablies
-//	POST /api/paiement/offrir       { duree } : accès offert créé, lien rendu une seule fois
-//	GET  /api/paiement/offerts      accès offerts (empreinte, jours, jetons, état ; jamais le pass)
+//	POST /api/paiement/offrir       { duree, nom? } : accès offert créé, lien rendu une seule fois
+//	GET  /api/paiement/offerts      accès offerts (empreinte, nom, jours, jetons, état ; jamais le pass)
 //	POST /api/paiement/offerts/revoquer { id } : accès offert révoqué
+//	POST /api/paiement/offerts/nommer { id, nom } : nom de l'exploitant posé ou effacé (vide)
 //
 // Tout /api/* exige « Authorization: Bearer <jeton> ». Jeton absent, faux, de mauvaise
 // longueur, route inconnue, mauvaise méthode, pair hors boucle locale, requête relayée, hôte
@@ -328,7 +329,8 @@ func (a *admin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.paiement(w, r)
-	case "GET /api/paiement/offerts", "POST /api/paiement/offrir", "POST /api/paiement/offerts/revoquer":
+	case "GET /api/paiement/offerts", "POST /api/paiement/offrir", "POST /api/paiement/offerts/revoquer",
+		"POST /api/paiement/offerts/nommer":
 		if a.c.Paiement == nil || !a.c.Paiement.offertsActifs() {
 			refuse(w)
 			return

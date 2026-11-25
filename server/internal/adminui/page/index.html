@@ -174,11 +174,11 @@
       <h3 class="titre" id="t-offerts">Accès offerts</h3>
       <button class="discret" type="button" id="offerts-actualiser">Actualiser</button>
     </div>
-    <p class="note">Un accès Pro sans paiement, pour une personne que vous connaissez : partages Pro (30 Go, 7 jours, 20 ouvertures), appels, et 1 000 jetons par période de 30 jours (100 par jour au plus). Le serveur ne garde que l’empreinte du pass : aucun nom, aucune note. Le nom que vous donnez à un accès reste dans ce navigateur seulement (un autre navigateur ne le verra pas).</p>
+    <p class="note">Un accès Pro sans paiement, pour une personne que vous connaissez : partages Pro (30 Go, 7 jours, 20 ouvertures), appels, et 1 000 jetons par période de 30 jours (100 par jour au plus). Le serveur garde l’empreinte du pass, jamais le pass lui-même, et le nom que vous donnez à l’accès (40 caractères au plus, en clair, effacé avec l’accès 31 jours après sa fin) : ne mettez que ce qui vous suffit pour savoir à qui vous l’avez donné.</p>
     <form id="offrir" autocomplete="off">
       <div class="rangee">
         <div>
-          <label for="offrir-nom">Nom ou pseudo (facultatif, dans ce navigateur seulement)</label>
+          <label for="offrir-nom">Nom ou pseudo (facultatif, gardé sur le serveur)</label>
           <input id="offrir-nom" type="text" maxlength="40" autocomplete="off" spellcheck="false">
         </div>
         <div>

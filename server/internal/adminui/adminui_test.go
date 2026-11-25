@@ -254,7 +254,8 @@ func TestPage(t *testing.T) {
 		for _, interdit := range []string{"http://", "https://", "src=\"//", "url(", "@import", "innerhtml", "outerhtml",
 			"insertadjacenthtml", "document.write", "eval(", "localstorage", "sessionstorage", "document.cookie", "indexeddb",
 			"style=\"", "onclick", "<script>", "sendbeacon"} {
-			// localStorage : seulement les noms des accès offerts (TestNomsOffertsRestentDansLeNavigateur).
+			// localStorage : seulement la reprise unique des anciens noms des accès offerts
+			// (TestNomsOffertsSurLeServeur : lue puis effacée, jamais écrite).
 			if interdit == "localstorage" && p == "/admin.js" {
 				continue
 			}

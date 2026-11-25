@@ -495,7 +495,7 @@ func TestSchemaPaiements(t *testing.T) {
 	}
 	want := "cles_jetons.jour cles_jetons.offre cles_jetons.sk " +
 		"commandes.id commandes.q commandes.offre commandes.jours commandes.renouvelle commandes.moyen commandes.etat " +
-		"commandes.abonnement commandes.cree_jour commandes.garde_jour depenses.h depenses.jour passes.q passes.offre passes.debut_jour passes.fin_jour " +
+		"commandes.abonnement commandes.cree_jour commandes.garde_jour depenses.h depenses.jour noms_offerts.q noms_offerts.nom passes.q passes.offre passes.debut_jour passes.fin_jour " +
 		"passes.jetons passes.recharge_jour passes.revoque passes.emis_jour passes.emis_n passes.offert refs.r refs.commande refs.jour"
 	if strings.Join(got, " ") != want {
 		t.Fatalf("schéma :\n%s\nattendu :\n%s", strings.Join(got, " "), want)

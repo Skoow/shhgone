@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
+	"github.com/skoow/shhdrop/server/internal/nom"
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
@@ -21,6 +23,7 @@ import (
 // jours de création et de fin de garde.
 // refs : empreinte SHA-256 d'une référence de paiement du prestataire → commande (idempotence
 // des crédits, remboursements et litiges).
+// noms_offerts (schemaNomsOfferts) : nom donné par l'exploitant à un accès offert.
 const schemaPaiements = `
 CREATE TABLE IF NOT EXISTS passes(
   q BLOB PRIMARY KEY CHECK(typeof(q)='blob' AND length(q)=32),
@@ -60,11 +63,21 @@ CREATE TABLE IF NOT EXISTS depenses(
   h BLOB PRIMARY KEY CHECK(typeof(h)='blob' AND length(h)=32),
   jour INTEGER NOT NULL CHECK(typeof(jour)='integer' AND jour >= 0 AND jour % 86400 = 0)) WITHOUT ROWID`
 
+// schemaNomsOfferts (version 4) : nom ou pseudo qu'a donné l'exploitant à un accès offert, pour
+// une personne qu'il connaît (décision du propriétaire, 25 novembre) : texte UTF-8 de 1 à
+// nom.Max caractères (nom.Propre), gardé en clair, seul texte libre de cette base. Seulement
+// pour un pass offert (offerts.go : écrit par une requête qui l'exige), jamais pour un pass
+// payé ; effacé avec la ligne du pass (purge : ON DELETE CASCADE, foreign_keys(ON) dans le DSN).
+var schemaNomsOfferts = `
+CREATE TABLE IF NOT EXISTS noms_offerts(
+  q BLOB PRIMARY KEY REFERENCES passes(q) ON DELETE CASCADE CHECK(typeof(q)='blob' AND length(q)=32),
+  nom BLOB NOT NULL CHECK(typeof(nom)='blob' AND length(nom) BETWEEN 1 AND ` + strconv.Itoa(nom.OctetsMax) + `)) WITHOUT ROWID`
+
 // VersionBase : version du schéma de paiements.db (PRAGMA user_version). 2 : jetons anonymes
 // (clés d'émission du jour, jetons dépensés, émissions du jour par pass) ; 3 : accès offerts
-// (colonne passes.offert). Une base d'une version plus ancienne est migrée à l'ouverture, une
+// (colonne passes.offert) ; 4 : noms des accès offerts (table noms_offerts). Une base d'une version plus ancienne est migrée à l'ouverture, une
 // version après l'autre, dans une seule transaction.
-const VersionBase = 3
+const VersionBase = 4
 
 // ErrBasePlusRecente : paiements.db écrite par une version plus récente ; message fixe.
 var ErrBasePlusRecente = errors.New("paiements.db créée par une version plus récente de Shhgone : refus d'ouvrir " +
@@ -102,7 +115,7 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 			return nil, fmt.Errorf("migration de paiements.db : %w", err)
 		}
 	}
-	if _, err := db.Exec(schemaPaiements); err != nil {
+	if _, err := db.Exec(schemaPaiements + ";" + schemaNomsOfferts); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("création du schéma de paiements.db : %w", err)
 	}
@@ -124,6 +137,8 @@ var migrations = []string{
 ALTER TABLE passes ADD COLUMN emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)`,
 	// 2 → 3 : accès offerts (valeur 0 : tous les pass d'avant sont payés).
 	`ALTER TABLE passes ADD COLUMN offert INTEGER NOT NULL DEFAULT 0 CHECK(offert IN (0,1))`,
+	// 3 → 4 : noms des accès offerts (aucun nom pour les accès d'avant).
+	schemaNomsOfferts,
 }
 
 // migrer : de la version v à VersionBase, tout ou rien (la version est posée dans la même

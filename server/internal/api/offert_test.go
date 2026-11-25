@@ -17,7 +17,7 @@ func TestAccesOffertCommeUnPassPro(t *testing.T) {
 	e0.h = newHandler(e0.srv, htmlStatic(), Salons{Paiement: s})
 	e := envPaiement{e0, p}
 
-	pass, acces, err := s.Offrir(paiement.JoursOffertAn)
+	pass, acces, err := s.Offrir(paiement.JoursOffertAn, "")
 	if err != nil {
 		t.Fatal(err)
 	}
