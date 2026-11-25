@@ -18,7 +18,7 @@ import (
 
 // Jetons anonymes (conception du paiement §7) : Privacy Pass, émission RFC 9578 type 0x0002,
 // RSABSSA-SHA384-PSS-Deterministic (RFC 9474), RSA 2 048 bits, bibliothèque
-// github.com/cloudflare/circl v1.6.5 (exception écrite dans CLAUDE.md). Le client (moteur Rust,
+// github.com/cloudflare/circl v1.6.5 (exception écrite dans les règles du projet). Le client (moteur Rust,
 // blind-rsa-signatures 0.19.0) et ce serveur donnent les mêmes octets : vecteurs communs
 // engine/vectors/privacypass.json.
 //
