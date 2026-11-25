@@ -1,18 +1,17 @@
 // Point d'entrée des pages d'information (pages séparées). Le HTML
 // arrive déjà rempli (rendu au build, en français) ; le script le remplace par la page vivante
-// (même texte, ou la langue du navigateur). Les liens vers l'application (accueil, envoi, Mes
-// partages) chargent sa page (router.svelte.ts, setEntry).
+// (même texte, ou la langue du navigateur). Les liens vers l'application (accueil, envoi) chargent sa page (router.svelte.ts, setEntry).
 import { mount } from "svelte";
 import { setEntry } from "../app/router.svelte";
 import { probeDownloads } from "../downloads/probe";
-import { probeHistory } from "../history/presence.svelte";
+import { effacerAncienHistorique } from "../storage/ancien-historique";
 import { langReady } from "../i18n/i18n.svelte";
 import { viderSaufAmbiance } from "../ui/ambiance";
 import PagesApp from "./PagesApp.svelte";
 
 setEntry("pages");
-// « Mes partages » dans l'en-tête seulement si l'historique existe sur cet appareil.
-void probeHistory();
+// Historique local des liens retiré (spec §33) : la base d'avant est supprimée, sans erreur.
+void effacerAncienHistorique();
 // « Téléchargements » sans compte seulement si l'historique des téléchargements est activé.
 void probeDownloads();
 // Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau ; titres du site, sans « Démo · »).

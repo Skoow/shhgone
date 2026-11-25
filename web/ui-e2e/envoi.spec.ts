@@ -49,22 +49,15 @@ test("ordinateur : la carte du composeur a un contour entier (pas d'ouverture en
   expect(await track.evaluate((e) => getComputedStyle(e).strokeDasharray)).toBe("none");
 });
 
-test("premier écran : titre, trois assurances, zone de dépôt compacte, offres et Salon, sans défiler", async ({ page, shh, isMobile }) => {
+test("premier écran : titre, zone de dépôt compacte, offres et Salon, sans défiler ; assurances dites une seule fois (héros de l'accueil)", async ({ page, shh, isMobile }) => {
   await openSend(page, shh.origin);
   // Plus le slogan de l'accueil : h1 « Nouveau partage » pour les lecteurs d'écran ;
-  // « Votre envoi » est le titre visible. Les assurances sont dans le cadre de dépôt.
+  // « Votre envoi » est le titre visible. Plus de pastilles « Chiffré · Sans compte ·
+  // S'autodétruit » ici (25 novembre) : dites une seule fois, sous le héros de l'accueil.
   await expect(page.getByRole("heading", { level: 1, name: "Nouveau partage" })).toHaveCount(1);
-  await expect(page.locator("[data-dz-box] [data-assure]")).toBeVisible();
+  await expect(page.locator("[data-assure]")).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "En bref" })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis ça s'efface." })).toHaveCount(0);
-  // Trois assurances : libellés complets lus ; pastilles alignées, même hauteur, une seule ligne.
-  const items = page.getByRole("list", { name: "En bref" }).getByRole("listitem");
-  for (const [i, l] of ["Chiffré dans votre navigateur", "Partage sans compte", "Le lien s'autodétruit"].entries()) await expect(items.nth(i)).toContainText(l);
-  const boxes = await items.evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), h: Math.round(r.height), w: Math.round(r.width) }; }));
-  expect(new Set(boxes.map((b) => b.top)).size).toBe(1);
-  expect(new Set(boxes.map((b) => b.h)).size).toBe(1);
-  // Ordinateur : une ligne (44 px) ; téléphone : l'icône au-dessus du libellé court (56 px).
-  expect(Math.max(...boxes.map((b) => b.h))).toBeLessThanOrEqual(isMobile ? 56 : 44);
-  expect(Math.max(...boxes.map((b) => b.w)) - Math.min(...boxes.map((b) => b.w))).toBeLessThanOrEqual(1);
   const dz = page.locator(".dropzone").filter({ visible: true });
   await expect(dz).toBeInViewport({ ratio: 1 });
   const h = await dz.evaluate((e) => e.getBoundingClientRect().height);

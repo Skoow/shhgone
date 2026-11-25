@@ -148,7 +148,7 @@ test.describe("fr-FR", () => {
 
 test("page courte sur grand écran : le pied de page touche le bas de l'écran, sans bande vide dessous", async ({ page, shh }) => {
   await page.setViewportSize({ width: 2000, height: 1300 });
-  await page.goto(shh.origin + "/envois");
+  await page.goto(shh.origin + "/telechargements");
   const f = foot(page);
   await expect(f).toBeVisible();
   const b = (await f.boundingBox())!;

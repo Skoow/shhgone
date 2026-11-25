@@ -4,7 +4,8 @@
 // page (router.svelte.ts, setEntry).
 import { mount } from "svelte";
 import { setEntry } from "../app/router.svelte";
-import { pageReturns } from "../history/returns";
+import { effacerAncienHistorique } from "../storage/ancien-historique";
+import { pageReturns } from "../storage/returns";
 import { langReady } from "../i18n/i18n.svelte";
 import OpenApp from "./OpenApp.svelte";
 
@@ -14,6 +15,8 @@ if (import.meta.env.MODE === "demo") await (await import("../demo/install")).ins
 
 // Retours gardés (D42-22) : entrées échues retirées au démarrage, sans rien créer.
 void pageReturns().sweep();
+// Historique local des liens retiré (spec §33) : la base d'avant est supprimée, sans erreur.
+void effacerAncienHistorique();
 
 await langReady;
 

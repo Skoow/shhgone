@@ -5,11 +5,12 @@
 // nouvelle clé, coffres, « Rester connecté », déconnexion qui efface tout (clé locale comprise).
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeIndexedDB, type FakeIdb } from "../history/fake-idb.test-helper";
+import { fakeIndexedDB, type FakeIdb } from "../storage/fake-idb.test-helper";
 import { b64u, unb64u } from "../engine/pure";
 import { cleRecupDerivees, cleRecupLire, entreePrf } from "../engine/index";
 import { clesDuCompte, ouvrirEnveloppesPrf, ouvrirRecup } from "./keys";
-import { ouvrir, priveDeJson, profilDeJson, REGLAGES_DEFAUT } from "./vaults";
+import { ouvrir, priveDeJson, priveEnJson, priveVide, profilDeJson, REGLAGES_DEFAUT, sceller } from "./vaults";
+import { accountFlag } from "../app/account-flag.svelte";
 import { ouvrirEtiquette } from "./device";
 import { configurerNavigateur } from "./webauthn";
 import { FauxAuthentificateur, fauxServeur } from "./passkey.test-helper";
@@ -25,7 +26,6 @@ let srv: ReturnType<typeof fauxServeur>;
 let idb: FakeIdb;
 let auth: FauxAuthentificateur;
 let signalees: { rpId: string; credentialId: string }[];
-let planifies: { ms: number; f: () => void; annule: boolean }[];
 /** Tableaux de 32 octets tirés par crypto.getRandomValues côté appareil (K_compte). */
 let tires: Uint8Array[];
 
@@ -37,7 +37,6 @@ function brancher(a: FauxAuthentificateur) {
 beforeEach(() => {
   srv = fauxServeur();
   idb = fakeIndexedDB();
-  planifies = [];
   tires = [];
   signalees = [];
   const real = crypto.getRandomValues.bind(crypto);
@@ -51,11 +50,6 @@ beforeEach(() => {
     idb: () => idb,
     agent: () => UA,
     rpId: () => "shh.test",
-    planifier: (ms, f) => {
-      const p = { ms, f, annule: false };
-      planifies.push(p);
-      return () => (p.annule = true);
-    },
   });
   brancher(new FauxAuthentificateur({ prf: "creation" }));
 });
@@ -589,20 +583,28 @@ describe("coffres", () => {
     expect(C.account.erreur).toBe("coffre_illisible");
   });
 
-  it("ecrirePrive différé : un seul envoi, 2 à 12 min après le premier événement, avec tous les ajouts", async () => {
-    await inscription();
+  it("historique des liens retiré : un coffre privé ancien qui porte des listes est vidé à l'ouverture ; le pass reste", async () => {
+    const texte = await inscription("Lea", true);
     const c = compte();
-    await C.ecrirePrive((p) => ({ ...p, recus: [...p.recus, { id: "r1" }] }), { differe: true });
-    await C.ecrirePrive((p) => ({ ...p, recus: [...p.recus, { id: "r2" }] }), { differe: true });
-    expect(c.coffres.prive.gen).toBe(1);
-    expect(planifies.length).toBe(1);
-    expect(planifies[0]!.ms).toBeGreaterThanOrEqual(120_000);
-    expect(planifies[0]!.ms).toBeLessThanOrEqual(720_000);
-    planifies[0]!.f();
-    await vi.waitFor(() => expect(c.coffres.prive.gen).toBe(2));
-    expect(C.account.prive?.recus.map((e) => e.id)).toEqual(["r1", "r2"]);
-    await C.ecrirePrive((p) => ({ ...p, salons: [{ id: "s1" }] }), { differe: false });
+    const k = await ouvrirRecup((await cleRecupDerivees(await cleRecupLire(texte))).kekR, c.h, unb64u(c.envR));
+    const cles = await clesDuCompte(k);
+    const lien = "https://shh.test/#m" + "G".repeat(43);
+    const ancien = { ...priveVide(), envois: [{ id: "e1", gestion: lien }], recus: [{ id: "r1" }], salons: [{ id: "s1" }], rejoints: [{ id: "j1" }], pass: [{ id: "p1", x: 1 }] };
+    c.coffres.prive = { blob: await sceller("prive", cles.prive, c.h, 2, priveEnJson(ancien)), gen: 2 };
+    recharger();
+    await C.restaurer();
+    expect(C.account.etat).toBe("ouvert");
+    expect(accountFlag.connected).toBe(true);
     expect(c.coffres.prive.gen).toBe(3);
+    const relu = priveDeJson(await ouvrir("prive", cles.prive, c.h, c.coffres.prive.blob, 3));
+    expect(relu).toMatchObject({ salons: [], recus: [], rejoints: [], envois: [] });
+    expect(relu.pass).toEqual([{ id: "p1", x: 1 }]);
+    // Coffre déjà vide : aucune écriture à l'ouverture suivante.
+    recharger();
+    await C.restaurer();
+    expect(c.coffres.prive.gen).toBe(3);
+    await C.seDeconnecter();
+    expect(accountFlag.connected).toBe(false);
   });
 
   it("changerPseudo : p_canon envoyé, puis le profil chiffré porte le nouveau pseudo", async () => {
@@ -640,14 +642,12 @@ describe("session et déconnexion", () => {
   it("déconnexion : le serveur oublie la session, shhdrop-compte effacée, K_compte mise à zéro", async () => {
     await inscription("Lea", true);
     expect(tires.length).toBeGreaterThanOrEqual(1);
-    await C.ecrirePrive((p) => p, { differe: true });
     await C.seDeconnecter();
     expect(srv.sessions.size).toBe(0);
     expect([...idb.raw().keys()]).toEqual([]);
     expect(C.account.etat).toBe("absent");
     expect(C.account.profil).toBeUndefined();
     expect(tires.some((t) => t.every((x) => x === 0))).toBe(true);
-    expect(planifies[0]!.annule).toBe(true);
   });
 
   it("« Rester connecté » coupé : la session gardée est effacée, la clé locale reste", async () => {
@@ -684,32 +684,16 @@ describe("session et déconnexion", () => {
     expect(await C.appareils()).toHaveLength(1);
   });
 
-  it("export : données du serveur (passkeys comprises), profil et listes, sans jeton ni secret de lien", async () => {
-    await inscription();
-    const gestion = "https://shh.test/#m" + "G".repeat(43);
-    await C.ecrirePrive((p) => ({ ...p, envois: [{ id: "e1", cree: 1, expire: 2, gestion, taille: 10, elements: 1, ouvertures_max: 1 }] }), { differe: false });
-    const texte = await C.exporterDonnees();
-    const j = JSON.parse(texte);
-    expect(j.serveur).toMatchObject({ cree_le: "2026-11-14", salons_actifs: 1 });
-    expect(j.serveur.passkeys).toHaveLength(1);
-    expect(j.listes.envois).toEqual([{ cree: 1, expire: 2, taille: 10, elements: 1, ouvertures_max: 1 }]);
-    for (const x of ["G".repeat(43), "#m", ...srv.sessions.keys()]) expect(texte).not.toContain(x);
-  });
-
   it("suppression : après un geste de passkey, le serveur efface le compte ; passkeys signalées ; l'écran de fin reste", async () => {
     const effacerAppareil = vi.fn(async () => undefined);
-    const detruirePartage = vi.fn(async () => undefined);
-    C.configurerCompte({ effacerAppareil, detruirePartage });
+    C.configurerCompte({ effacerAppareil });
     await inscription("Lea", true);
-    const gestion = "https://shh.test/#m" + "G".repeat(42) + "A";
-    await C.ecrirePrive((p) => ({ ...p, envois: [{ id: "e1", cree: 1, expire: Date.now() + 60_000, gestion, taille: 1, elements: 1, ouvertures_max: 1 }] }), { differe: false });
-    expect(await C.partagesASupprimer()).toBe(1);
     srv.vieillir();
     await C.confirmerParPasskey();
     const etapes: string[] = [];
     for await (const p of C.supprimerTout({ effacerAppareil: true })) etapes.push(p.etape);
-    expect(etapes).toEqual(["partages", "partages", "compte", "fini"]);
-    expect(detruirePartage).toHaveBeenCalledWith(gestion);
+    expect(etapes).toEqual(["compte", "fini"]);
+    expect(effacerAppareil).toHaveBeenCalledOnce();
     expect(srv.comptes.size).toBe(0);
     expect(C.account.supprime).toBe(true);
     expect([...idb.raw().keys()]).toEqual([]);

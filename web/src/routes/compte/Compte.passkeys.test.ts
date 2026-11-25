@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Paramètres du compte par passkey (/compte ; conception du compte par passkey §3.4 à §3.6) :
+// Page Compte, sections Passkeys, Clé de récupération et suppression (conception du compte par passkey §3.4 à §3.6, §19) :
 // sections (plus d'adresse, de mot de passe ni de double authentification), « Passkeys » (libellé,
 // mois, « liée à cet appareil », « ouvre vos données », « cette passkey », ajout, renommage,
 // retrait jamais de la dernière, confirmation par passkey si la session n'est plus récente),
@@ -35,7 +35,7 @@ vi.mock("../../account/session.svelte", async (orig) => ({ ...(await orig<object
 // L'illustration de fin ne s'anime pas ici (happy-dom rejette les animations annulées au démontage).
 vi.mock("../../ui/motion", async (orig) => ({ ...(await orig<object>()), reducedMotion: () => true }));
 const { CompteError, account, REGLAGES_DEFAUT } = await import("../../account/session.svelte");
-const { default: Parametres } = await import("./Parametres.svelte");
+const { default: Compte } = await import("./Compte.svelte");
 const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salonsActifs: 1, banniId: null, banniJusqu: null, banniMotif: null };
 
 beforeEach(() => {
@@ -66,7 +66,7 @@ afterEach(() => {
 
 describe("paramètres", () => {
   it("sections : Passkeys et Clé de récupération ; plus d'adresse, de mot de passe ni de double authentification", async () => {
-    await monter(Parametres);
+    await monter(Compte);
     const titres = [...document.querySelectorAll("h2")].map((h) => h.textContent);
     expect(titres).toContain("Passkeys");
     expect(titres).toContain("Clé de récupération");
@@ -75,7 +75,7 @@ describe("paramètres", () => {
   });
 
   it("pas de choix de langue : la langue suit le navigateur (detectLang)", async () => {
-    await monter(Parametres);
+    await monter(Compte);
     const titres = [...document.querySelectorAll("h2")].map((h) => h.textContent);
     expect(titres).not.toContain("Langue");
     expect(document.querySelector("#sec-lang")).toBeNull();
@@ -83,7 +83,7 @@ describe("paramètres", () => {
   });
 
   it("passkeys : libellé, mois, « liée à cet appareil », « ouvre vos données », « cette passkey »", async () => {
-    await monter(Parametres);
+    await monter(Compte);
     expect(texte()).toContain("iPhoneCette passkey");
     expect(texte()).toContain("Ajoutée en novembre 2026 · ouvre vos données");
     expect(texte()).toContain("Passkey sans nom");
@@ -92,7 +92,7 @@ describe("paramètres", () => {
 
   it("une seule passkey : pas de « Retirer » ; toutes liées à un appareil : bandeau", async () => {
     C.listePasskeys.mockResolvedValue([PK({ synchronisable: false })]);
-    await monter(Parametres);
+    await monter(Compte);
     expect(() => bouton("Retirer iPhone")).toThrow();
     expect(texte()).toContain("Ajoutez d'abord une autre passkey");
     expect(texte()).toContain("Toutes vos passkeys sont liées à un seul appareil.");
@@ -100,7 +100,7 @@ describe("paramètres", () => {
 
   it("ajouter : « Ajouter une passkey », nom, « Créer la passkey » ; session plus récente : confirmation par passkey d'abord", async () => {
     C.preparerAjout.mockResolvedValueOnce("recent");
-    await monter(Parametres);
+    await monter(Compte);
     await presser("Ajouter une passkey");
     expect(texte()).toContain("Pour continuer, confirmez avec une passkey.");
     await presser("Confirmer avec une passkey");
@@ -113,7 +113,7 @@ describe("paramètres", () => {
 
   it("retirer : confirmation sur place ; session plus récente : geste de passkey puis retrait ; gestionnaire sans l'API : le dire", async () => {
     C.retirerPasskey.mockRejectedValueOnce(new CompteError(403, "recent")).mockResolvedValueOnce(false);
-    await monter(Parametres);
+    await monter(Compte);
     await presser("Retirer Passkey sans nom");
     expect(texte()).toContain("Retirer cette passkey ? Elle ne pourra plus ouvrir ce compte.");
     const oui = [...document.querySelectorAll("button")].filter((b) => b.textContent!.trim() === "Retirer").at(-1)!;
@@ -126,7 +126,7 @@ describe("paramètres", () => {
 
   it("clé de récupération : nouvelle clé montrée, un groupe retapé, enregistrée ; bandeau après usage de la clé", async () => {
     account.recupere = true;
-    await monter(Parametres);
+    await monter(Compte);
     expect(texte()).toContain("Votre clé de récupération a servi.");
     await presser("Créer une nouvelle clé");
     expect([...document.querySelectorAll("[data-cle] .g")].map((g) => g.textContent)).toEqual(CLE.split("-"));
@@ -140,7 +140,7 @@ describe("paramètres", () => {
 
   it("clé locale : dit dans « Passkeys » et sous « Se déconnecter »", async () => {
     account.cleLocale = true;
-    await monter(Parametres);
+    await monter(Compte);
     expect(texte()).toContain("vos données s'ouvrent grâce à une clé gardée ici");
     expect(texte()).toContain("Se déconnecter efface cette clé");
   });
@@ -154,7 +154,7 @@ describe("suppression du compte", () => {
 
   it("geste de passkey (session récente), puis suppression ; fin : supprimer la passkey du gestionnaire", async () => {
     C.supprimerTout.mockImplementation(() => fin());
-    await monter(Parametres);
+    await monter(Compte);
     await presser("Supprimer le compte");
     expect(texte()).toContain("Une confirmation par passkey vous sera demandée.");
     expect(texte()).not.toMatch(/Mot de passe|adresse bannie|service d'envoi des codes/);
@@ -168,7 +168,7 @@ describe("suppression du compte", () => {
 
   it("geste annulé : rien n'est supprimé, aucun message", async () => {
     C.confirmerParPasskey.mockRejectedValue(new Error("annule"));
-    await monter(Parametres);
+    await monter(Compte);
     await presser("Supprimer le compte");
     await presser("Supprimer définitivement");
     await presser("Supprimer");
@@ -184,7 +184,7 @@ describe("passkeys sur ordinateur", () => {
 
   it("« Ajouter mon téléphone » : nom proposé « Téléphone », QR expliqué, parcours hybride ; sans PRF : message honnête", async () => {
     C.ajouterPasskey.mockResolvedValue("sans_prf");
-    await monter(Parametres);
+    await monter(Compte);
     await presser("Ajouter mon téléphone");
     expect(texte()).toContain("Scannez-le avec l'appareil photo de votre téléphone, puis confirmez sur le téléphone.");
     await presser("Créer la passkey");
@@ -194,7 +194,7 @@ describe("passkeys sur ordinateur", () => {
   });
 
   it("« Ajouter une passkey sur cet ordinateur » : parcours local, nom vide (nom d'appareil par défaut)", async () => {
-    await monter(Parametres);
+    await monter(Compte);
     await presser("Ajouter une passkey sur cet ordinateur");
     expect(texte()).not.toContain("Scannez-le");
     await presser("Créer la passkey");

@@ -25,10 +25,9 @@ describe("match", () => {
     // Page d'envoi vide (retours DROP) : « Commencer » y mène ; un « # » n'y ouvre rien.
     expect(match("/envoyer")).toEqual({ name: "envoyer" });
     expect(match("/envoyer", `#${KEY}`)).toEqual({ name: "envoyer" });
-    // Tableau de bord « Mes partages » (spec §33).
-    expect(match("/envois")).toEqual({ name: "envois" });
+    // Ancien tableau de bord « Mes partages » (historique des liens retiré, spec §33) : l'accueil.
+    expect(match("/envois")).toEqual({ name: "home" });
     expect(match("/telechargements")).toEqual({ name: "telechargements" });
-    expect(match("/envois", `#m${KEY}`)).toEqual({ name: "envois" });
   });
 
   it("spec §41.4 : rechargement d'une ouverture déverrouillée (marque + octroi gardé) → ouverture ; sinon accueil", () => {
@@ -72,7 +71,7 @@ describe("match", () => {
     expect(match("/shhdrop", "", base)).toEqual({ name: "home" });
     expect(match("/shhdrop/securite", "", base)).toEqual({ name: "securite" });
     expect(match("/shhdrop/envoyer", "", base)).toEqual({ name: "envoyer" });
-    expect(match("/shhdrop/envois", "", base)).toEqual({ name: "envois" });
+    expect(match("/shhdrop/envois", "", base)).toEqual({ name: "home" });
     expect(match("/shhdrop/telechargements", "", base)).toEqual({ name: "telechargements" });
     expect(match("/", `#${KEY}`, base)).toEqual({ name: "notfound" });
     expect(match("/shhdropx/", `#${KEY}`, base)).toEqual({ name: "notfound" });
@@ -83,12 +82,12 @@ describe("match", () => {
 // adresse inconnue) ; « ?suite=salon » seul paramètre, et aucune donnée dans l'adresse.
 describe("pages du compte", () => {
   const C = (p: string, base = "/") => match(p, "", base, false, true);
-  it("avec __COMPTES__ : /compte, inscription, connexion, recuperation, profil", () => {
+  it("avec __COMPTES__ : /compte, inscription, connexion, recuperation ; /compte/profil → la page Compte", () => {
     expect(C("/compte")).toEqual({ name: "compte" });
     expect(C("/compte/inscription")).toEqual({ name: "inscription" });
     expect(C("/compte/connexion")).toEqual({ name: "connexion" });
     expect(C("/compte/recuperation")).toEqual({ name: "recuperation" });
-    expect(C("/compte/profil")).toEqual({ name: "profil" });
+    expect(C("/compte/profil")).toEqual({ name: "compte" });
     expect(C("/shhdrop/compte/connexion", "/shhdrop/")).toEqual({ name: "connexion" });
     // Un « # » n'ouvre rien ici (App le retire).
     expect(match("/compte/connexion", `#${KEY}`, "/", false, true)).toEqual({ name: "connexion" });
@@ -120,9 +119,13 @@ describe("pages du compte", () => {
 
 describe("navigate", () => {
   it("met à jour l'adresse et la route, sans rechargement", () => {
+    navigate("/telechargements");
+    expect(location.pathname).toBe("/telechargements");
+    expect(router.current).toEqual({ name: "telechargements" });
+    // Anciennes adresses (25 novembre) : remplacées dans la barre d'adresse.
     navigate("/envois");
-    expect(location.pathname).toBe("/envois");
-    expect(router.current).toEqual({ name: "envois" });
+    expect(location.pathname).toBe("/");
+    expect(router.current).toEqual({ name: "home" });
     navigate("/");
     expect(router.current).toEqual({ name: "home" });
   });

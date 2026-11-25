@@ -5,8 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { createDownloads, type ItemSink } from "../flows/downloads.svelte";
 import { createReadMeter } from "../flows/read-meter";
-import { fakeIndexedDB } from "../history/fake-idb.test-helper";
-import { memoryBackend } from "../history/store";
+import { fakeIndexedDB } from "../storage/fake-idb.test-helper";
+import { memoryBackend } from "../storage/idb";
 import { DOWNLOADS_DB, DOWNLOADS_KEEP_MS, afterSave, byDay, downloadsIdb, openDownloads, type NewDownload } from "./store";
 
 /** Ouvert puis activé (désactivé par défaut) : pour les essais qui écrivent. */

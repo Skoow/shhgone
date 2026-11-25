@@ -93,17 +93,16 @@ test.describe("téléphone façon app", () => {
     const closeButton = page.getByRole("banner").getByRole("button", { name: "Fermer le menu" });
     await expect(closeButton).toHaveAttribute("aria-expanded", "true");
     const menu = page.locator("[data-menu]");
-    // « Nouveau partage », « Mes partages » seulement s'il y a des
-    // partages sur l'appareil (aucun ici), « Offres » ; le reste est dans le pied de page.
-    // Menu : « Nouveau partage », puis Salon (bientôt, un bouton), Sécurité, Offres.
+    // Menu (25 novembre : plus de « Nouveau partage », d'« Accueil » ni de « Mes partages ») :
+    // Salon (bientôt, un bouton), Sécurité, Offres ; le reste est dans le pied de page.
     // Sécurité : accordéon replié à l'ouverture du menu ; un toucher le déplie (ses sections de
     // l'accueil, puis la page « Sécurité en détail »).
-    await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Offres"]);
+    await expect(menu.getByRole("link")).toHaveText(["Offres"]);
     const sec = menu.getByRole("button", { name: "Sécurité", exact: true });
     await expect(sec).toHaveAttribute("aria-expanded", "false");
     await sec.click();
     await expect(sec).toHaveAttribute("aria-expanded", "true");
-    await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Sécurité en détail", "Offres"]);
+    await expect(menu.getByRole("link")).toHaveText(["Sécurité en détail", "Offres"]);
     await expect(menu.getByRole("button", { name: /^Salon/ })).toHaveAttribute("aria-disabled", "true");
     await expect(menu.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
     expect(await smallTargets(page, "header")).toEqual([]);
@@ -114,14 +113,10 @@ test.describe("téléphone façon app", () => {
     await expect(menuButton).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
+    // Ancienne adresse « /envois » (historique des liens retiré) : l'accueil, adresse remplacée.
     await page.goto(shh.origin + "/envois");
-    await expect(page).toHaveURL(/\/envois$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Mes partages" })).toBeVisible();
-    // Plus un onglet racine : Retour en haut à gauche.
-    await expect(page.getByRole("banner").getByRole("button", { name: "Retour" })).toBeVisible();
-    expect(await noHScroll(page)).toBe(true);
-    await page.getByRole("banner").getByRole("button", { name: "Retour" }).click();
     await expect(page).toHaveURL(new RegExp(`${shh.origin.replace(/[.:/]/g, "\\$&")}/$`));
+    await expect(page.getByRole("heading", { level: 1, name: "Mes partages" })).toHaveCount(0);
     // Entrée de l'accueil finie (le cadre de l'infographie grandit un instant) avant de mesurer.
     await page.waitForTimeout(1500);
     expect(await smallTargets(page, "body")).toEqual([]);

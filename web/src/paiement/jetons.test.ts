@@ -6,7 +6,7 @@ import { constants, createPrivateKey, privateDecrypt } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { b64u, unb64u } from "../engine/pure";
-import { fakeIndexedDB } from "../history/fake-idb.test-helper";
+import { fakeIndexedDB } from "../storage/fake-idb.test-helper";
 import type { Net } from "./api";
 import {
   DELAI_MAX_MS,

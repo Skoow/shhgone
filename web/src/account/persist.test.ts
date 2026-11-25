@@ -3,7 +3,7 @@
 // données ici), chiffrées par une clé AES-GCM NON EXTRACTIBLE dans IndexedDB `shhdrop-compte` ;
 // rien en clair ; « Se déconnecter » supprime la base entière.
 import { describe, expect, it } from "vitest";
-import { fakeIndexedDB } from "../history/fake-idb.test-helper";
+import { fakeIndexedDB } from "../storage/fake-idb.test-helper";
 import { COMPTE_DB, effacer, lire, lireCle, oublierSession, sauver, sauverCle, type Sauvegarde } from "./persist";
 
 const sv = (): Sauvegarde => ({

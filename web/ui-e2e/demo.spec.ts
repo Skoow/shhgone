@@ -316,12 +316,8 @@ test.describe("fr-FR : envoi (–18)", () => {
     expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhgone/s#[A-Za-z0-9_-]{43}$`));
     // Le bandeau n'est plus qu'une ligne : l'avertissement est redit sous le lien.
     await expect(page.locator("[data-demo-note]")).toHaveText("Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.");
-    // Lien de gestion montré seulement sans historique : coupé le temps de le lire.
-    const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
-    const wasOn = (await keep.count()) > 0 && (await keep.getAttribute("aria-checked")) === "true";
-    if (wasOn) await keep.click();
+    // Lien de gestion : toujours montré (historique des liens retiré).
     const manage = (await page.locator(".manage .sr-only").first().textContent()) ?? "";
-    if (wasOn) await keep.click();
     expect(manage).toMatch(/\/shhgone\/s#m[A-Za-z0-9_-]{43}$/);
     expect(await storage(page)).toBe(0);
     await capture(page, "demo-ready");

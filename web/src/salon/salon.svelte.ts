@@ -22,7 +22,6 @@ import { lienGestionDans, lienSalon } from "./liens";
 import { captcha as captchaDuServeur, ctx as transferCtx } from "../transfer/api";
 import { CAPTCHA_MIN_MS } from "../transfer/client";
 import { solvePow } from "../captcha/pow";
-import { allEntries, recordShare } from "../history/live.svelte";
 import { b64u } from "../engine/pure";
 import { lireFragment } from "./liens";
 import { exclure } from "./exclusion";
@@ -33,15 +32,6 @@ import { createZip, zipName, ZIP_BLOB_MAX_SMALL } from "../zip/store-zip";
 import { cleMembreLocal, indexMembre } from "../engine/index";
 import { KDF_CREATE } from "../engine/pure";
 
-/**
- * Lien de gestion gardé dans l'historique local pour ce lien d'invitation (entrée `salon_cree`) : S_gestion, ou undefined. Jamais ailleurs dans le stockage du navigateur.
- */
-async function gestionGardee(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer> | undefined> {
-  const frag = "#c" + b64u(kLien as Uint8Array<ArrayBuffer>);
-  const e = (await allEntries().catch(() => [])).find((x) => x.sorte === "salon_cree" && x.link.endsWith(frag) && x.manage !== "");
-  const f = e ? lireFragment(e.manage.slice(e.manage.lastIndexOf("#"))) : null;
-  return f?.sorte === "s" ? f.cle : undefined;
-}
 import { creerSalon as creerAvecSession, profilPourSalon, CompteError } from "../account/session.svelte";
 
 export type Etape = "vide" | "chargement" | "motdepasse" | "explication" | "pret" | "conversation" | "fin" | "gestion";
@@ -58,10 +48,9 @@ export const vue = $state({
   createur: false,
   /**
    * Salon prêt (créateur) : lien d'invitation, mot de passe, lien de gestion (affichés, jamais
-   * gardés ici). `garde` : le lien de gestion est réellement dans l'historique de l'appareil ; faux
-   * (historique désactivé, par défaut, ou indisponible) : « Salon prêt » le montre d'emblée.
+   * gardés : le lien de gestion est montré d'emblée, pour être gardé à la main).
    */
-  pret: null as { lien: string; mdp: string; gestion: string; garde: boolean } | null,
+  pret: null as { lien: string; mdp: string; gestion: string } | null,
   /** Créateur, après une exclusion ou « Nouveau lien d'invitation » : la nouvelle invitation (affichée, jamais gardée en clair). */
   nouvelleInvitation: null as { lien: string; mdp: string } | null,
   /** Lien de gestion ouvert seul (« #s… ») : sièges occupés, ou null. */
@@ -113,11 +102,11 @@ export const vue = $state({
  */
 let lienReprise: string | null = null;
 /**
- * S_gestion encore sur l'appareil pour ce lien d'invitation : historique local, sinon lien de
- * gestion ouvert seul dans cet onglet (« #s », gardé en mémoire). Copie à mettre à zéro, ou undefined.
+ * S_gestion encore dans cet onglet : lien de gestion ouvert seul (« #s », gardé en mémoire).
+ * Copie à mettre à zéro, ou undefined.
  */
-async function gestionLocale(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer> | undefined> {
-  return (await gestionGardee(kLien).catch(() => undefined)) ?? gestionColle?.slice();
+function gestionLocale(): Uint8Array<ArrayBuffer> | undefined {
+  return gestionColle?.slice();
 }
 
 /**
@@ -128,7 +117,7 @@ async function gestionLocale(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer>
 export async function detruireApresDelogement(): Promise<boolean> {
   const f = lienReprise ? lireFragment(lienReprise.slice(lienReprise.lastIndexOf("#"))) : null;
   if (!f) return false;
-  const g = await gestionLocale(f.cle);
+  const g = gestionLocale();
   f.cle.fill(0);
   if (!g) {
     vue.detruireFin = "lien";
@@ -241,9 +230,8 @@ export async function ouvrirInvitation(kLien: Uint8Array<ArrayBuffer>): Promise<
   const acces = eng.cleAcces(kLien);
   try {
     s.meta = await api.meta(net(), acces.k);
-    s.sGestion = await gestionGardee(kLien);
     // Lien de gestion ouvert juste avant dans cet onglet (« #s » seul, 32).
-    if (!s.sGestion && gestionColle) {
+    if (gestionColle) {
       s.sGestion = gestionColle.slice();
       s.gestionColle = true;
     }
@@ -392,10 +380,10 @@ export type ErreurCreation =
 /**
  * Crée le salon (compte exigé, conception §10.4) : clés et mot de passe tirés ici, preuve
  * anti-robot, création avec la session, entrée comme créateur (siège 0, il fonde le groupe),
- * puis « Salon prêt ». `garder` : lien d'invitation et lien de gestion dans l'historique local
- * chiffré (puis le coffre du compte). Rend l'erreur, ou null.
+ * puis « Salon prêt » (lien d'invitation, mot de passe et lien de gestion montrés, jamais gardés).
+ * Rend l'erreur, ou null.
  */
-export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCanDestroy: boolean; garder: boolean; onEtape?: (e: "cles" | "robot" | "envoi") => void }): Promise<ErreurCreation | null> {
+export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCanDestroy: boolean; onEtape?: (e: "cles" | "robot" | "envoi") => void }): Promise<ErreurCreation | null> {
   oublier();
   const eng = await loadSalonEngine().catch(() => null);
   if (!eng) return { code: "reseau" };
@@ -416,15 +404,12 @@ export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCan
     const r = await creerAvecSession(p.entetes, { ...p.corps, altcha: preuve.payload, hp: "", shown_at: cap.shownAt });
     const lien = lienSalon(origin, "c", p.kLien, import.meta.env.BASE_URL);
     const gestion = lienSalon(origin, "s", p.sGestion, import.meta.env.BASE_URL);
-    const garde =
-      o.garder &&
-      (await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: Date.now() + r.expiresInS * 1000, maxOpens: 0 })) !== null;
     s = { eng, kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, kMaitre: p.kMaitre, preuve: { index: await indexMembre(p.kLien), cle: null, sel: null }, stop: [] };
     void preparerPreuve(s, mdp);
     const d = deps(eng);
     const entree = await ClientSalon.rejoindre(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion });
     demarrer(s, ClientSalon.ouvrir(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, creerGroupe: true }, entree), entree);
-    vue.pret = { lien, mdp, gestion, garde };
+    vue.pret = { lien, mdp, gestion };
     vue.etape = "pret";
     return null;
   } catch (e) {
@@ -669,19 +654,21 @@ function surEvenement(x: Session, ev: EvClient): void {
       vue.etape = "fin";
       x.appel?.fermer();
       // Créateur délogé (35) : pas de reconnexion d'elle-même ; « Reprendre la main ici »
-      // rouvre le lien d'invitation (mot de passe redemandé, lien de gestion relu dans l'historique).
+      // rouvre le lien d'invitation (mot de passe redemandé). S_gestion reste EN MÉMOIRE de cet
+      // onglet, comme un lien de gestion collé (gestionColle), pour reprendre la main ou détruire
+      // le salon ; jamais écrit (plus d'historique local des liens, spec §33).
       lienReprise = ev.raison === "remplace" && x.sGestion ? lienSalon(location.origin, "c", x.kLien, import.meta.env.BASE_URL) : null;
       vue.reprise = lienReprise !== null;
-      // « Détruire le salon » proposé si le lien de gestion est encore sur l'appareil.
+      if (lienReprise && x.sGestion) {
+        gestionColle?.fill(0);
+        gestionColle = x.sGestion.slice();
+      }
+      // « Détruire le salon » proposé si le lien de gestion est encore dans l'onglet.
       vue.detruireFin = null;
       if (lienReprise) {
-        const k = x.kLien.slice();
-        void gestionLocale(k)
-          .then((g) => {
-            if (s === x && vue.reprise) vue.detruireFin = g ? "possible" : "lien";
-            g?.fill(0);
-          })
-          .finally(() => k.fill(0));
+        const g = gestionLocale();
+        vue.detruireFin = g ? "possible" : "lien";
+        g?.fill(0);
       }
       // Secrets effacés tout de suite ; ce qui est à l'écran reste jusqu'à ce que la personne parte
       // (sauf exclusion : tout disparaît, spec §39.13.1b).
@@ -1305,8 +1292,7 @@ export async function detruire(signaler = false): Promise<boolean> {
 
 /**
  * Créateur : exclut `siege` (ou change seulement l'invitation) ; la nouvelle invitation est
- * affichée et, si le salon est dans l'historique, gardée comme l'ancienne (lien de gestion
- * inchangé). Rend le code d'erreur, ou null.
+ * affichée (lien de gestion inchangé). Rend le code d'erreur, ou null.
  */
 export async function exclureSiege(siege?: number): Promise<string | null> {
   const x = s;
@@ -1315,10 +1301,6 @@ export async function exclureSiege(siege?: number): Promise<string | null> {
     const inv = await exclure(net(), x.eng, x.client, siege);
     const lien = lienSalon(location.origin, "c", inv.kLien, import.meta.env.BASE_URL);
     vue.nouvelleInvitation = { lien, mdp: inv.mdp };
-    if (await gestionGardee(x.kLien).catch(() => undefined)) {
-      const gestion = lienSalon(location.origin, "s", x.sGestion, import.meta.env.BASE_URL);
-      await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: vue.finMs, maxOpens: 0 });
-    }
     x.lienOrigine ??= x.kLien;
     x.kLien = inv.kLien;
     return null;

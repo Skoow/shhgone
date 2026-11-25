@@ -2,7 +2,7 @@
 // partage peut y revenir depuis le même navigateur jusqu'à l'échéance, sans consommer
 // d'ouverture. Ce module garde pour cela l'octroi d'ouverture (rendu par unlock, valable
 // jusqu'à l'échéance) au-delà de la fermeture de l'onglet. EXCEPTION ÉCRITE à « aucun
-// stockage navigateur », sur le modèle de l'historique (history/store.ts, même mécanisme) :
+// stockage navigateur », même mécanisme que storage/idb.ts :
 // - IndexedDB (base à part, RETURNS_DB), chaque entrée chiffrée AES-256-GCM avec une clé
 //   WebCrypto NON EXTRACTIBLE gardée dans la base ; nonce aléatoire de 96 bits ; identifiant
 //   tiré au hasard (donnée associée authentifiée), sans lien avec le partage.
@@ -19,7 +19,7 @@
 // Honnêtement : la clé est sur le même appareil ; le chiffrement ne protège que d'une lecture
 // naïve du stockage. Démo : mémoire de l'onglet seulement (memoryBackend).
 import { getDemo } from "../app/demo-hooks";
-import { idbBackend, memoryBackend, type Backend, type Rec } from "./store";
+import { idbBackend, memoryBackend, type Backend, type Rec } from "./idb";
 
 export const RETURNS_DB = "shhdrop-returns";
 
@@ -39,7 +39,7 @@ export type Returns = {
   forget(tag: string): Promise<void>;
   /** Démarrage de l'application : retire les entrées échues, sans rien créer. */
   sweep(): Promise<void>;
-  /** « Effacer l'historique » : tout retirer, base comprise. */
+  /** « Effacer les données de cet appareil » (storage/appareil.ts) : tout retirer, base comprise. */
   clear(): Promise<void>;
 };
 

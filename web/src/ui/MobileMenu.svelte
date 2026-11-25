@@ -7,10 +7,10 @@
   // permet de rien retélécharger (le lien n'est jamais gardé), il n'a pas sa place dans le menu.
   import { currentPath, followLink, href, router } from "../app/router.svelte";
   import { accountFlag } from "../app/account-flag.svelte";
-  import { presence } from "../history/presence.svelte";
+  import { presence } from "../downloads/presence.svelte";
   import { t } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
-  import { ChevronDown, ChevronRight, Compass, Download, LogOut, MessagesSquare, Plus, Server, Share2, ShieldCheck, SlidersHorizontal, Tag, User } from "./Icon";
+  import { ChevronDown, ChevronRight, Compass, Download, MessagesSquare, Server, ShieldCheck, Tag, User } from "./Icon";
   import { allerSection } from "./section";
   import type { Component } from "svelte";
 
@@ -23,17 +23,16 @@
   let button: HTMLButtonElement | undefined = $state();
   const uid = $props.id();
 
-  // Un menu plus complet et plus soigné. « Nouveau partage » en tête ;
-  // puis les écrans du site, chacun avec son icône ; puis le compte (seulement avec __COMPTES__) :
-  // « Se connecter » et « Créer un compte », connecté, « Mon compte », « Paramètres » et
-  // « Se déconnecter ». Confidentialité, Conditions, Signaler… restent dans le pied de page.
+  // Les écrans du site, chacun avec son icône ; puis le compte (seulement avec __COMPTES__) :
+  // « Se connecter » et « Créer un compte », ou, connecté, « Mon compte » seul (25 novembre :
+  // plus de « Nouveau partage » ici, c'est le bouton du bas ; plus d'« Accueil », c'est le logo ;
+  // « Se déconnecter » n'est que sur la page Compte). Confidentialité, Conditions, Signaler…
+  // restent dans le pied de page.
   // `subs` : sections de l'accueil sous une entrée (Sécurité : « Comment ça marche », « Ce que voit
   // le serveur », comme le menu Sécurité de l'ordinateur, TopNav.svelte ; ui/section.ts).
   type Sub = { id: string; label: string; icon: Component; section: string; faq?: boolean };
   type Link = { label: string; path: string; icon: Component; soon?: string; subs?: Sub[]; page?: string };
   const links = $derived<Link[]>([
-    // « Mes partages » seulement s'il y a des partages sur cet appareil.
-    ...(accountFlag.connected ? [{ label: t("nav.home"), path: "/", icon: Share2 }] : presence.any ? [{ label: t("nav.shares"), path: "/envois", icon: Share2 }] : []),
     // « Téléchargements » sans compte seulement si l'historique est activé ici.
     ...(accountFlag.connected || presence.downloads ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
     // Salon : la création ; « bientôt » seulement sans __SALONS__ (démo, site sans compte).
@@ -52,26 +51,12 @@
     // Compte pas encore ouvert (D8) : « Se connecter » visible, bientôt.
     ...(__COMPTES__ ? [] : [{ label: t("account.login.title"), path: "", icon: User, soon: t("nav.login.soon") }]),
   ]);
-  const account = $derived<Link[]>(
-    !__COMPTES__
-      ? []
-      : accountFlag.connected
-        ? [
-            { label: t("nav.menu.myAccount"), path: "/compte/profil", icon: User },
-            { label: t("account.settings.title"), path: "/compte", icon: SlidersHorizontal },
-          ]
-        : [],
-  );
+  const account = $derived<Link[]>(__COMPTES__ && accountFlag.connected ? [{ label: t("nav.menu.myAccount"), path: "/compte", icon: User }] : []);
   const here = (p: string) => (currentPath() === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
 
   function versSection(s: Sub) {
     close();
     void allerSection(s.section, s.faq);
-  }
-
-  async function logout() {
-    close();
-    await accountFlag.logout?.();
   }
 
   function close(focusBack = false) {
@@ -143,19 +128,9 @@
   <!-- Voile sous le menu ouvert : la page s'assombrit ; un appui dessus ferme. -->
   {#if open}<div class="mm-scrim" aria-hidden="true"></div>{/if}
   <nav class="mm-p" id="{uid}-menu" aria-label={t("nav.label")} hidden={!open} data-menu>
-    <a
-      class="mm-cta"
-      href={href("/envoyer")}
-      aria-current={here("/envoyer")}
-      onclick={(e) => {
-        close();
-        followLink(e, "/envoyer");
-      }}
-      style:--i="0"><span class="mm-ci" aria-hidden="true"><Plus size={20} strokeWidth={2.4} /></span>{t("send.h1")}</a
-    >
     <ul class="mm-list">
       {#each links as l, i (l.label)}
-        <li style:--i={i + 1}>
+        <li style:--i={i}>
           {#if l.soon}
             <button type="button" class="mm-l soon" aria-disabled="true" aria-describedby="{uid}-soon-{i}" onclick={() => announce(l.soon!)}>
               <span class="mm-ic" aria-hidden="true"><l.icon size={20} strokeWidth={1.9} /></span>
@@ -224,7 +199,7 @@
     </ul>
     {#if __COMPTES__}
       <!-- Compte : seulement si le compte est construit (__COMPTES__). -->
-      <div class="mm-acct" style:--i={links.length + 1}>
+      <div class="mm-acct" style:--i={links.length}>
         <p class="mm-h">{t("nav.menu.account")}</p>
         {#if accountFlag.connected}
           <ul class="mm-list">
@@ -245,14 +220,6 @@
                 </a>
               </li>
             {/each}
-            {#if accountFlag.logout}
-              <li>
-                <button type="button" class="mm-l out" onclick={logout}>
-                  <span class="mm-ic" aria-hidden="true"><LogOut size={20} strokeWidth={1.9} /></span>
-                  <span class="mm-t">{t("account.logout")}</span>
-                </button>
-              </li>
-            {/if}
           </ul>
         {:else}
           <div class="mm-auth">
@@ -406,7 +373,7 @@
     .mm-p:not([hidden]) {
       animation: mm-in 260ms var(--ease-out) both;
     }
-    .mm-p:not([hidden]) :is(.mm-cta, .mm-list > li, .mm-acct) {
+    .mm-p:not([hidden]) :is(.mm-list > li, .mm-acct) {
       animation: mm-item 320ms var(--ease-out) both;
       animation-delay: calc(40ms + var(--i, 0) * 35ms);
     }
@@ -427,38 +394,6 @@
     margin: 0;
     padding: 0;
     list-style: none;
-  }
-  /* « Nouveau partage » : le geste principal, avec le relief du bouton principal du site
-     (ui/Button.svelte) : coins de 12 px, reflets intérieurs, ombre neutre (plus de halo menthe). */
-  .mm-cta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-2);
-    min-height: 52px;
-    margin-block-end: var(--sp-3);
-    border-radius: 12px;
-    background: var(--accent);
-    color: var(--on-accent);
-    font-weight: 600;
-    text-decoration: none;
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.4),
-      inset 0 -1px 0 rgb(0 0 0 / 0.14),
-      0 10px 24px -14px rgb(0 0 0 / 0.9);
-    transition: transform var(--dur-press) var(--ease-out);
-  }
-  .mm-cta:active {
-    transform: scale(0.98);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .mm-cta:active {
-      transform: none;
-    }
-  }
-  .mm-ci {
-    display: grid;
-    place-items: center;
   }
   .mm-list {
     display: grid;
@@ -521,9 +456,6 @@
     color: var(--mint);
     font-size: var(--fs-micro);
     font-weight: 600;
-  }
-  .mm-l.out {
-    color: var(--text-2);
   }
   /* Sections de l'accueil sous « Sécurité » : en retrait, plus petites. */
   .mm-sub:not([hidden]) {
@@ -595,13 +527,12 @@
     box-shadow: inset 0 0 0 1px var(--line-strong);
     color: var(--text);
   }
-  :is(.mm-cta, .mm-l, .mm-in, .mm-up):focus-visible {
+  :is(.mm-l, .mm-in, .mm-up):focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
   @media (forced-colors: active) {
     .mm-p,
-    .mm-cta,
     .mm-in,
     .mm-up {
       border: 1px solid CanvasText;

@@ -2,7 +2,7 @@
 // téléchargements est activé sur cet appareil (UI §26).
 // Module léger pour les pages d'information : ni clé, ni store.ts, ni moteur. Rien n'est créé ni
 // écrit ; aucune requête réseau.
-import { presence } from "../history/presence.svelte";
+import { presence } from "./presence.svelte";
 
 const DOWNLOADS_DB = "shhdrop-telechargements";
 

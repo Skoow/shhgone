@@ -1,7 +1,8 @@
 import { mount } from "svelte";
 import App from "./App.svelte";
 import { moveToLinkPage } from "./app/router.svelte";
-import { pageReturns } from "./history/returns";
+import { effacerAncienHistorique } from "./storage/ancien-historique";
+import { pageReturns } from "./storage/returns";
 import { langReady } from "./i18n/i18n.svelte";
 import { viderSaufAmbiance } from "./ui/ambiance";
 
@@ -15,6 +16,8 @@ if (!moved && import.meta.env.MODE === "demo") await (await import("./demo/insta
 
 // Retours gardés (D42-22) : entrées échues retirées au démarrage, sans rien créer.
 if (!moved) void pageReturns().sweep();
+// Historique local des liens retiré (spec §33) : la base d'avant est supprimée, sans erreur.
+if (!moved) void effacerAncienHistorique();
 
 // Langue du navigateur : le dictionnaire anglais est lu avant l'affichage (production).
 await langReady;

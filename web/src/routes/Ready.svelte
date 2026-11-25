@@ -8,7 +8,7 @@
   // à valider : le lien marche déjà ; confirmation seulement tant que le lien et le mot de passe
   // n'ont pas été copiés, ready-copies.ts). Les valeurs ne viennent que des props (Copier lit l'état, jamais le
   // DOM) ; rien n'est écrit dans la console, le titre, l'URL ou un stockage.
-  import { tick, untrack } from "svelte";
+  import { tick } from "svelte";
   import { getDemo } from "../app/demo-hooks";
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
@@ -26,8 +26,6 @@
   import { reducedMotion } from "../ui/motion";
   import { canShareLink, haptic, shareText } from "../ui/native";
   import Sheet from "../ui/Sheet.svelte";
-  import Switch from "../ui/Switch.svelte";
-  import { forgetShare, keepSentDefault, loadHistory, markDestroyed, recordShare, setHistoryEnabled, shares } from "../history/live.svelte";
   import "../ui/seal.css";
   import { NOTHING_COPIED, confirmLeave, noteCopy, secured, warnOnUnload, type Copied } from "./ready-copies";
 
@@ -39,9 +37,6 @@
     summary: string;
     ttlHours: number;
     maxOpens: number;
-    /** Pour l'historique local (spec §33.1) : nombre d'éléments et taille, jamais leurs noms. */
-    itemsCount: number;
-    sizeBytes: number;
     /** Nouveau partage : retour au composeur vide. */
     ondone: () => void;
     /** Le lien et le mot de passe ont été copiés ou partagés : le Retour ne demande plus rien. */
@@ -51,56 +46,13 @@
     /** « Nouvel envoi » après la suppression. */
     onnew: () => void;
   };
-  let { result, summary, ttlHours, maxOpens, itemsCount, sizeBytes, ondone, onsecured, onforget, onnew }: Props = $props();
+  let { result, summary, ttlHours, maxOpens, ondone, onsecured, onforget, onnew }: Props = $props();
   const lang = $derived(getLang());
   const demo = getDemo();
 
   const selfDestruct = $derived(
     t("ready.selfdestruct", { opens: t("ready.opens", { n: maxOpens }), ttl: formatDuration(ttlHours * 3600, lang) }),
   );
-
-  // ---------- « Garder dans mon historique » (spec §33, §33.1) ----------
-  // Désactivé par défaut, avec ou sans compte (keepSentDefault), le
-  // lien de gestion est alors montré ici ; activé par la personne, le réglage vaut pour les envois
-  // suivants. Une fois activé, gardé dès l'affichage (fermer l'onglet
-  // sans « Nouveau partage » ne le perd pas) : le lien de gestion,
-  // l'heure locale, la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures et le
-  // nom du partage ; jamais le lien de partage, le mot de passe ni les noms des
-  // éléments. Désactiver retire l'entrée et vaut pour les prochains envois. Opérations à la file : une bascule rapide garde l'ordre.
-  const createdAt = Date.now();
-  let keep = $state(false);
-  let keepReady = $state(false);
-  let keepId: string | null = $state(null); // lu par data-kept : entrée réellement écrite
-  let chain: Promise<void> = Promise.resolve();
-  const queue = (fn: () => Promise<void>) => (chain = chain.then(fn).catch(() => undefined));
-  async function save() {
-    const r = result;
-    if (!r || keepId) return;
-    // Nom du partage : gardé dans l'entrée, chiffrée comme le reste (history/store.ts).
-    keepId = await recordShare({ manage: r.manage, createdAt, sizeBytes, itemsCount, expiresAt: createdAt + r.expiresInS * 1000, maxOpens, ...(r.title ? { label: r.title } : {}) });
-  }
-  $effect(() => {
-    untrack(() =>
-      queue(async () => {
-        await loadHistory();
-        keep = shares.status === "ready" && keepSentDefault();
-        keepReady = true;
-        if (keep) await save();
-      }),
-    );
-  });
-  function setKeep(v: boolean) {
-    keep = v;
-    void queue(async () => {
-      await setHistoryEnabled(v);
-      if (v) await save();
-      else if (keepId) {
-        const id = keepId;
-        keepId = null;
-        await forgetShare(id);
-      }
-    });
-  }
 
   // ---------- Garde de sortie : jusqu'à la copie des deux, Nouveau partage ou Supprimer (UI §9.5, A12) ----------
   // État en mémoire seulement : quelles valeurs ont été copiées (ou partagées), jamais les valeurs.
@@ -187,9 +139,6 @@
     }
     // Après la réponse du serveur seulement : dissolution, puis message (UI §7.4).
     finished = true;
-    void queue(async () => {
-      if (keepId) await markDestroyed(keepId);
-    });
     if (panel && typeof panel.animate === "function") {
       const reduce = reducedMotion();
       const a = panel.animate(
@@ -291,22 +240,12 @@
             <p class="self">{selfDestruct}</p>
           </div>
 
-          <!-- « Gérer ce partage » retiré : avec l'historique, le partage se
-               suit et se supprime depuis « Mes partages ». Sans historique, le lien de gestion est le
-               seul moyen de le suivre ou de le supprimer plus tard : il est alors montré ici. -->
+          <!-- Le lien de gestion est le seul moyen de suivre ou de supprimer le partage une fois
+               cette page fermée (rien n'est gardé sur l'appareil ni dans le compte, spec §33). -->
           <h2 class="col-t sep">{t("ready.col.manage")}</h2>
-          <div class="keep" data-keep data-kept={keepId ? "" : undefined}>
-            {#if keepReady && shares.status === "unavailable"}
-              <p class="hint" data-keep-unavailable>{t("ready.keep.unavailable")}</p>
-            {:else}
-              <Switch label={t("ready.keep")} hint={t("ready.keep.hint")} checked={keep} disabled={!keepReady} onchange={setKeep} />
-            {/if}
-            {#if keepReady && (!keep || shares.status === "unavailable")}
-              <div class="manage" data-manage>
-                <CopyField label={t("ready.manage.label")} value={result.manage} />
-                <p class="hint">{t("ready.manage.hint")}</p>
-              </div>
-            {/if}
+          <div class="manage" data-manage>
+            <CopyField label={t("ready.manage.label")} value={result.manage} />
+            <p class="hint">{t("ready.manage.hint")}</p>
           </div>
 
           <div class="danger-zone">
@@ -772,10 +711,6 @@
     gap: var(--sp-1);
     padding-top: var(--sp-3);
     border-top: 1px solid var(--hair-2);
-  }
-  .keep {
-    display: grid;
-    gap: var(--sp-3);
   }
   .manage {
     display: grid;

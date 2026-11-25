@@ -34,13 +34,9 @@ import { creer, obtenir, optionsAssertion, optionsCreation, passkeysDisponibles,
 import { b64u, unb64u } from "../engine/pure";
 import { entreePrf } from "../engine/index";
 import { loadSalonEngine, type SalonEngine } from "../salon/engine";
-import { allEntries, dropAccountEntries, dropEntries, importEntries, onLocalChange, setAccountPrefs } from "../history/live.svelte";
-import type { HistoryEntry } from "../history/store";
-import { ajouterEntree, fusionner, renommerEntree, retirerEntree } from "./sync";
-import { partagesConnus, supprimerTout as suppression, type Progres } from "./suppression";
-import { clearDownloads } from "../downloads/live.svelte";
-import { clearHistory } from "../history/live.svelte";
-import { destroyShare } from "../index";
+import { accountFlag } from "../app/account-flag.svelte";
+import { supprimerTout as suppression, type Progres } from "./suppression";
+import { effacerDonneesAppareil } from "../storage/appareil";
 
 export type { Profil, Reglages, CoffrePrive } from "./vaults";
 export { REGLAGES_DEFAUT } from "./vaults";
@@ -57,48 +53,26 @@ type Deps = {
   net: Net;
   idb: () => IDBFactory | null;
   agent: () => string;
-  /** Lance `f` dans `ms` ; rend l'annulation. */
-  planifier: (ms: number, f: () => void) => () => void;
   salon: () => Promise<PseudoMoteur>;
   /** E_prf du moteur (32 octets). */
   ePrf: () => Promise<Uint8Array>;
-  /** Historique de l'appareil (history/live.svelte.ts). */
-  historique: Historique;
-  /** Suppression du compte : destruction d'un partage par son lien de gestion, effacement de l'appareil. */
-  detruirePartage: (lienGestion: string) => Promise<void>;
+  /** Compte ouvert ici, vu par la coque (en-tête, menu, onglets ; app/account-flag.svelte.ts). */
+  signalerOuvert: (ouvert: boolean) => void;
+  /** Suppression du compte : effacement des données de l'appareil, si demandé. */
   effacerAppareil: () => Promise<void>;
   maintenant: () => number;
   /** RP ID des passkeys (hôte du site) : signalUnknownCredential. */
   rpId: () => string;
 };
 
-/** Ce que la session voit de l'historique de l'appareil. */
-export type Historique = {
-  lister(): Promise<HistoryEntry[]>;
-  importer(es: readonly HistoryEntry[]): Promise<void>;
-  retirer(ids: readonly string[]): Promise<void>;
-  retirerCompte(): Promise<void>;
-  ecouter(f: (c: { kind: "add" | "remove" | "rename"; entry: HistoryEntry }) => void): () => void;
-  regler(p: { keepReceived: boolean } | null): void;
-};
-
 const defaut = (): Deps => ({
   net: netParDefaut(),
   idb: idbDuNavigateur,
   agent: () => globalThis.navigator?.userAgent ?? "",
-  planifier: (ms, f) => {
-    const t = setTimeout(f, ms);
-    return () => clearTimeout(t);
-  },
   salon: loadSalonEngine,
   ePrf: entreePrf,
-  historique: { lister: allEntries, importer: importEntries, retirer: dropEntries, retirerCompte: dropAccountEntries, ecouter: onLocalChange, regler: setAccountPrefs },
-  // Même origine que la page (démo : base du dépôt) ; secret de gestion seul, jamais le jeton de session.
-  detruirePartage: (l) => destroyShare(l, globalThis.location?.origin ?? ""),
-  effacerAppareil: async () => {
-    await clearHistory().catch(() => undefined);
-    await clearDownloads().catch(() => undefined);
-  },
+  signalerOuvert: (v) => void (accountFlag.connected = v),
+  effacerAppareil: effacerDonneesAppareil,
   maintenant: () => Date.now(),
   rpId: () => globalThis.location?.hostname ?? "",
 });
@@ -164,8 +138,6 @@ let cleAttendue: { ouv: api.Ouverture; prf: Bytes | null; persistante: boolean }
 /** Nouvelle clé de récupération montrée, pas encore enregistrée. */
 let nouvelleCle: { r: Bytes; texte: string } | null = null;
 
-let attente: { patches: ((p: CoffrePrive) => CoffrePrive)[]; annuler: () => void } | null = null;
-let arreterEcoute: (() => void) | null = null;
 
 const fraiche = (p: Prete | null): p is Prete => p !== null && deps.maintenant() - p.recue < VALIDITE_MS;
 
@@ -181,10 +153,6 @@ function oublierEtapes(): void {
 
 /** Efface tout ce que la page tient du compte (ce que fait aussi un rechargement). */
 function oublierMemoire(): void {
-  attente?.annuler();
-  attente = null;
-  arreterEcoute?.();
-  arreterEcoute = null;
   ouverte?.kCompte.fill(0);
   ouverte = null;
   oublierEtapes();
@@ -214,38 +182,24 @@ async function oublierAppareil(): Promise<void> {
   oublierMemoire();
   const idb = deps.idb();
   if (idb) await effacer(idb).catch(() => undefined);
-  await oublierHistoriqueDuCompte();
+  deps.signalerOuvert(false);
 }
 
-/** Entrées venues du compte retirées de l'appareil ; la page ne suit plus le réglage du compte. */
-async function oublierHistoriqueDuCompte(): Promise<void> {
-  deps.historique.regler(null);
-  await deps.historique.retirerCompte().catch(() => undefined);
-}
+/** Listes de l'ancien historique des liens (retiré le 25 novembre, spec §33) : vidées dans le coffre privé. */
+const LISTES_RETIREES = ["salons", "recus", "rejoints", "envois"] as const;
 
 /**
- * Fusion de l'historique de l'appareil et du coffre privé (sync.ts), puis écoute des ajouts et
- * retraits faits ici (écriture différée). Au mieux : un échec laisse la session ouverte.
+ * À l'ouverture : la coque apprend que le compte est ouvert ; un coffre privé qui porte encore
+ * les listes de l'ancien historique des liens est réécrit sans elles (son format, vecteurs
+ * communs, garde les quatre listes, vides) ; puis le pass des offres. Au mieux : un échec laisse
+ * la session ouverte, la prochaine connexion recommence.
  */
 async function synchroniser(o: Ouverte): Promise<void> {
-  const h = deps.historique;
-  h.regler({ keepReceived: o.profil.valeur.reglages.garderRecus });
-  arreterEcoute = h.ecouter((c) => {
-    if (ouverte !== o) return;
-    const f = (p: CoffrePrive) => (c.kind === "add" ? ajouterEntree(p, c.entry) : c.kind === "rename" ? renommerEntree(p, c.entry) : retirerEntree(p, c.entry));
-    void ecrirePrive(f, { differe: true }).catch(() => undefined);
-  });
+  deps.signalerOuvert(true);
   try {
-    const local = await h.lister();
-    const r = fusionner(local, o.prive.valeur, { now: Date.now() });
-    if (r.retirer.length > 0) await h.retirer(r.retirer);
-    if (r.importer.length > 0) await h.importer(r.importer);
-    if (r.coffre !== null && ouverte === o) {
-      // Sur 409, la fusion est refaite sur le coffre relu.
-      await ecrireTout(o, [(p) => fusionner(local, p, { now: Date.now() }).coffre ?? p]);
-    }
+    if (ouverte === o && LISTES_RETIREES.some((k) => o.prive.valeur[k].length > 0)) await ecrireTout(o, [(p) => ({ ...p, salons: [], recus: [], rejoints: [], envois: [] })]);
   } catch {
-    // Historique illisible ou coffre refusé : la session reste ouverte ; la prochaine connexion refusionne.
+    // Coffre refusé : la prochaine connexion recommence.
   }
   // Pass des offres payantes (conception du paiement §6.2) : appareil ↔ coffre privé.
   try {
@@ -255,7 +209,7 @@ async function synchroniser(o: Ouverte): Promise<void> {
       if (patch && ouverte === o) await ecrireTout(o, [patch]);
     }
   } catch {
-    // Au mieux, comme l'historique : la prochaine connexion recommence.
+    // Au mieux : la prochaine connexion recommence.
   }
 }
 
@@ -378,7 +332,7 @@ export async function creerPasskey(pseudo: string, langue: string, parcours: Par
   const h = typeof user?.id === "string" ? unb64u(user.id) : new Uint8Array(0);
   if (h.length !== 16) throw new Error("reponse_invalide");
   const c = await creer(optionsCreation(ins.options, affiche, ins.ePrf, parcours));
-  const profil: Profil = { pseudo: affiche, photo: null, langue, reglages: { proposerProfil: true, garderRecus: true }, pass: null };
+  const profil: Profil = { pseudo: affiche, photo: null, langue, reglages: { proposerProfil: true }, pass: null };
   const r = recupCle.nouvelleCle();
   creee?.kCompte.fill(0);
   creee = { etape: ins.etape, h, c, parcours, prf: c.prf, affiche, pCanon, profil, kCompte: aleatoire32(), r, texte: await recupCle.affichage(r) };
@@ -849,46 +803,7 @@ export async function ecrireProfil(patch: Partial<Profil>): Promise<void> {
   const v = await garde(() => o.profil.ecrire((v) => ({ ...v, ...patch })));
   if (ouverte !== o) return;
   account.profil = v;
-  // « Garder les liens que j'ouvre » : la case de la page d'ouverture suit le réglage du compte.
-  if (patch.reglages) deps.historique.regler({ keepReceived: v.reglages.garderRecus });
   await memoriser(o);
-}
-
-/** Délai d'une écriture différée : 2 à 12 min, tiré par crypto.getRandomValues. */
-function delai(): number {
-  const r = crypto.getRandomValues(new Uint32Array(1))[0]!;
-  return 120_000 + Math.floor((r / 2 ** 32) * 600_001);
-}
-
-/**
- * Modifie le coffre privé. `differe` (événement de partage ou de salon) : la modification attend
- * 2 à 12 min ; celles qui arrivent entre-temps partent avec elle (le délai n'est pas relancé). Une
- * écriture immédiate emporte aussi celles qui attendaient. Déconnexion avant l'échéance :
- * modifications abandonnées (elles restent dans l'historique de l'appareil, fusionné à la
- * connexion suivante).
- */
-export async function ecrirePrive(patch: (p: CoffrePrive) => CoffrePrive, opts: { differe: boolean }): Promise<void> {
-  const o = ouverteOuErreur();
-  if (opts.differe) {
-    attente ??= { patches: [], annuler: deps.planifier(delai(), () => void vider().catch(() => undefined)) };
-    attente.patches.push(patch);
-    return;
-  }
-  const avant = prendreAttente();
-  await ecrireTout(o, [...avant, patch]);
-}
-
-function prendreAttente(): ((p: CoffrePrive) => CoffrePrive)[] {
-  const a = attente;
-  attente = null;
-  a?.annuler();
-  return a?.patches ?? [];
-}
-
-async function vider(): Promise<void> {
-  const o = ouverte;
-  const ps = prendreAttente();
-  if (o && ps.length > 0) await ecrireTout(o, ps);
 }
 
 async function ecrireTout(o: Ouverte, ps: ((p: CoffrePrive) => CoffrePrive)[]): Promise<void> {
@@ -919,9 +834,7 @@ export async function restaurer(): Promise<void> {
   if (ouverte) return;
   const idb = deps.idb();
   const s = idb ? await lire(idb) : null;
-  // Aucune session gardée : rien d'un compte ne reste dans l'historique de l'appareil (onglet
-  // fermé sans se déconnecter, session en mémoire seulement).
-  if (!s) return oublierHistoriqueDuCompte();
+  if (!s) return;
   account.etat = "verrouille";
   const local = idb ? await lireCle(idb, s.h) : null;
   const cleLocale = local !== null;
@@ -1025,46 +938,6 @@ export async function deconnecterAutres(): Promise<void> {
 }
 
 /**
- * « Exporter mes données » (§12.4, §21.15.4 point 10 ; conception du compte par passkey §3.6) :
- * fichier JSON fait SUR L'APPAREIL. Données du serveur (GET export), profil déchiffré, et listes
- * du coffre privé SANS leurs secrets (ni lien de gestion, ni lien de partage ou d'invitation, ni
- * identifiant). Jamais le jeton ni la clé de récupération.
- */
-export async function exporterDonnees(): Promise<string> {
-  const o = ouverteOuErreur();
-  const x = await garde(() => api.exporter(deps.net, o.jeton));
-  const p = o.profil.valeur;
-  const prive = o.prive.valeur;
-  const sans = (l: CoffrePrive["envois"], garder: readonly string[]) => l.map((v) => Object.fromEntries(garder.filter((k) => k in v).map((k) => [k, v[k]])));
-  return JSON.stringify(
-    {
-      format: "shhgone-export-compte",
-      v: 2,
-      exporte_le: new Date(deps.maintenant()).toISOString().slice(0, 10),
-      serveur: {
-        cree_le: x.creeLe,
-        anciennete_depuis: x.ancienneteDepuis,
-        derniere_connexion_mois: x.vuMois,
-        banni_jusqu: x.banniJusqu,
-        banni_motif: x.banniMotif,
-        salons_actifs: x.salonsActifs,
-        appareils: x.sessions.map((s) => ({ ajoutee: s.ajoutee, persistante: s.persistante, par_cle_de_recuperation: s.parRecup })),
-        passkeys: x.passkeys.map((k) => ({ ajoutee: k.ajoutee, synchronisable: k.be, ouvre_les_donnees: k.prf, cle_publique: k.clePub })),
-      },
-      profil: { pseudo: p.pseudo, photo: p.photo === null ? null : b64u(p.photo as Bytes), langue: p.langue, reglages: p.reglages, pass: p.pass },
-      listes: {
-        envois: sans(prive.envois, ["cree", "expire", "taille", "elements", "ouvertures_max"]),
-        recus: sans(prive.recus, ["cree", "expire", "taille", "elements", "format"]),
-        salons: sans(prive.salons, ["cree", "expire", "libelle"]),
-        rejoints: sans(prive.rejoints, ["cree", "expire", "libelle"]),
-      },
-    },
-    null,
-    2,
-  );
-}
-
-/**
  * Coupe « Rester connecté » sur cet appareil : la session gardée (persist.ts) est effacée, la
  * session reste ouverte jusqu'au rechargement ; une clé locale de l'appareil reste (§5.5).
  */
@@ -1078,17 +951,6 @@ export async function arreterResterConnecte(): Promise<void> {
 
 // --- Suppression totale (suppression.ts) ----------------------------------------------------------
 
-/** Liens de gestion des partages encore vivants que cet appareil ou le coffre privé connaît. */
-async function liensASupprimer(o: Ouverte): Promise<string[]> {
-  const local = await deps.historique.lister().catch(() => [] as HistoryEntry[]);
-  return partagesConnus(o.prive.valeur, local, deps.maintenant());
-}
-
-/** Nombre de partages connus qui seront détruits (texte de confirmation). */
-export async function partagesASupprimer(): Promise<number> {
-  return (await liensASupprimer(ouverteOuErreur())).length;
-}
-
 /**
  * Supprime le compte (§21.12, §3.6) : après confirmerParPasskey (session récente). Progression
  * pour l'écran ; à la fin, chaque passkey du compte est signalée inconnue au gestionnaire là où
@@ -1101,8 +963,6 @@ export function supprimerTout(opts: { effacerAppareil: boolean }): AsyncGenerato
     avant: async () => {
       ids = (await garde(() => api.passkeys(deps.net, o.jeton))).map((p) => p.credId);
     },
-    partages: () => liensASupprimer(o),
-    detruire: (l) => deps.detruirePartage(l),
     supprimerCompte: async () => (await garde(() => api.supprimer(deps.net, o.jeton))).salonsFermes,
     oublierCompte: async () => {
       account.supprime = true; // avant que la session disparaisse : l'écran de fin reste monté

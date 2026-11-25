@@ -401,42 +401,6 @@ export async function fermerSession(n: Net, session: string, quoi: { sid: string
   await appel(n, "POST", "sessions/fermer", { session, body: "sid" in quoi ? { sid: quoi.sid } : { autres: true } });
 }
 
-/** GET export (§12.4, conception du compte par passkey §3.6) : ce que le serveur garde du compte. */
-export type ExportServeur = {
-  creeLe: string;
-  ancienneteDepuis: string;
-  vuMois: string;
-  banniJusqu: string | null;
-  banniMotif: number | null;
-  salonsActifs: number;
-  sessions: { ajoutee: string; persistante: boolean; parRecup: boolean }[];
-  passkeys: { ajoutee: string; be: boolean; prf: boolean; clePub: string }[];
-};
-
-export async function exporter(n: Net, session: string): Promise<ExportServeur> {
-  const o = await appel(n, "GET", "export", { session });
-  if (typeof o.vu_mois !== "string" || !MOIS.test(o.vu_mois) || !Array.isArray(o.sessions) || !Array.isArray(o.passkeys)) throw invalide();
-  return {
-    creeLe: jour(o, "cree_le"),
-    ancienneteDepuis: jour(o, "anciennete_depuis"),
-    vuMois: o.vu_mois,
-    banniJusqu: jourOuNull(o, "banni_jusqu"),
-    banniMotif: motif(o),
-    salonsActifs: entier(o, "salons_actifs"),
-    sessions: o.sessions.map((v: unknown) => {
-      const s = v as Obj;
-      if (typeof s !== "object" || s === null || typeof s.ajoutee !== "string" || !MOIS.test(s.ajoutee) || typeof s.persistante !== "boolean" || typeof s.par_recup !== "boolean") throw invalide();
-      return { ajoutee: s.ajoutee, persistante: s.persistante, parRecup: s.par_recup };
-    }),
-    passkeys: o.passkeys.map((v: unknown) => {
-      const p = v as Obj;
-      if (typeof p !== "object" || p === null || typeof p.ajoutee !== "string" || !MOIS.test(p.ajoutee) || typeof p.be !== "boolean" || typeof p.prf !== "boolean") throw invalide();
-      octets(p, "cle_pub");
-      return { ajoutee: p.ajoutee, be: p.be, prf: p.prf, clePub: p.cle_pub as string };
-    }),
-  };
-}
-
 /** Suppression du compte (session récente) : salons créés fermés par le serveur. */
 export async function supprimer(n: Net, session: string): Promise<{ salonsFermes: number }> {
   return { salonsFermes: entier(await appel(n, "POST", "supprimer", { session, body: {} }), "salons_fermes") };

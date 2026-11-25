@@ -76,17 +76,20 @@ export async function ouvrir(sorte: Sorte, cle: CryptoKey, h: Uint8Array, blob: 
 
 /**
  * Réglages du compte (§21.15.4 ; ceux de l'appareil seul, comme « Rester connecté », n'y sont pas).
- * `garder_salons` (« Garder les salons que je rejoins ») retiré : il n'était lu nulle
- * part (aucun salon rejoint n'est gardé) ; un coffre ancien qui le porte est lu sans erreur (champ
- * inconnu ignoré) et réécrit sans lui. L'historique des envois et des salons créés suit le seul
- * réglage de l'appareil, « Garder dans mon historique » (history/live.svelte.ts).
+ * `garder_salons` et `garder_recus` (« Garder les liens que j'ouvre ») retirés avec l'historique
+ * local des liens (25 novembre, spec §33) : un coffre ancien qui les porte est lu sans erreur
+ * (champ inconnu ignoré) et réécrit sans eux.
  */
-export type Reglages = { proposerProfil: boolean; garderRecus: boolean };
-export const REGLAGES_DEFAUT: Reglages = { proposerProfil: true, garderRecus: true };
+export type Reglages = { proposerProfil: boolean };
+export const REGLAGES_DEFAUT: Reglages = { proposerProfil: true };
 
 export type Profil = { pseudo: string; photo: Uint8Array | null; langue: string; reglages: Reglages; pass: string | null };
 
-/** Entrée d'une liste du coffre privé ; son contenu est fixé (historique). */
+/**
+ * Entrée d'une liste du coffre privé. Les quatre listes (salons, recus, rejoints, envois) venaient
+ * de l'historique local des liens, retiré le 25 novembre (spec §33) : le format les garde, vides
+ * (session.svelte.ts vide un coffre ancien à l'ouverture), pour ne pas changer la forme du coffre.
+ */
 export type EntreePrivee = { id: string } & Record<string, unknown>;
 /**
  * `pass` (conception du paiement §6.2, DP-8) : pass des offres payantes, dans le coffre PRIVÉ
@@ -124,7 +127,7 @@ export function profilEnJson(p: Profil): Bytes {
     pseudo: p.pseudo,
     photo: p.photo === null ? null : b64u(p.photo as Bytes),
     langue: p.langue,
-    reglages: { proposer_profil: r.proposerProfil === true, garder_recus: r.garderRecus === true },
+    reglages: { proposer_profil: r.proposerProfil === true },
     pass: typeof p.pass === "string" ? p.pass : null,
   });
 }
@@ -155,7 +158,7 @@ export function profilDeJson(b: Uint8Array): Profil {
     pseudo: o.pseudo,
     photo,
     langue: o.langue,
-    reglages: { proposerProfil: bool("proposer_profil", true), garderRecus: bool("garder_recus", true) },
+    reglages: { proposerProfil: bool("proposer_profil", true) },
     pass: typeof o.pass === "string" ? o.pass : null,
   };
 }

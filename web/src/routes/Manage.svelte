@@ -6,8 +6,7 @@
   import { tick, untrack } from "svelte";
   import type { LinkState } from "../app/link";
   import { followLink, href } from "../app/router.svelte";
-  import { managedSummary, syncManaged, type ManagedResult } from "../history/live.svelte";
-  import { formatBytes, formatClock, formatDuration } from "../i18n/format";
+  import { formatClock, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { LimitError, NotFoundError, destroyShare, shareStatus } from "../index";
   import { announce } from "../ui/announce";
@@ -31,20 +30,10 @@
 
   const got = untrack(() => take());
   let secret: string | null = got?.kind === "m" ? got.link : null;
-  // Historique local : relectures et destruction reportées
-  // sur l'entrée du même partage si elle existe (syncManaged : aucune entrée créée).
-  let managed = secret;
-  const sync = (r: ManagedResult) => {
-    if (managed !== null) void syncManaged(managed, r);
-  };
 
   type Status = { opensUsed: number; maxOpens: number; expiresInS: number; state: string };
   let status = $state.raw<Status | null>(null);
   let total = $state(0); // durée de référence du contour : la première mesure de la session
-  // Contexte en tête (audit du 25 novembre) : nom, éléments et taille, seulement s'ils sont dans
-  // l'historique de cet appareil (lecture locale, aucune requête ; le serveur ne les connaît pas).
-  let summary = $state.raw<Awaited<ReturnType<typeof managedSummary>>>(null);
-  if (secret !== null) void managedSummary(secret).then((v) => (summary = v));
   let phase = $state<"loading" | "ready" | "gone" | "incomplete">(secret === null ? "incomplete" : "loading");
   let error = $state("");
   let pausedUntil = 0;
@@ -63,14 +52,12 @@
       readAt = Date.now();
       if (total === 0) total = s.expiresInS;
       status = s;
-      sync({ kind: "status", status: s });
       error = "";
       reads++;
       phase = "ready";
     } catch (e) {
       if (over()) return;
       if (e instanceof NotFoundError || (e instanceof Error && e.message === "lien_invalide")) {
-        if (e instanceof NotFoundError) sync({ kind: "missing" }); // lien mal formé : aucun partage désigné
         return gone();
       }
       if (e instanceof LimitError) {
@@ -86,7 +73,6 @@
   let logo: Logo | undefined = $state();
   async function gone() {
     secret = null;
-    managed = null;
     phase = "gone";
     await tick();
     arrive(goneTitle);
@@ -108,7 +94,6 @@
         return;
       }
     }
-    sync({ kind: "destroyed" });
     // Après la réponse du serveur seulement (UI §7.4).
     if (card && typeof card.animate === "function") {
       await card.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, fill: "forwards" }).finished.catch(() => undefined);
@@ -157,13 +142,7 @@
   </section>
 {:else}
   <section class="manage live" aria-labelledby="m-title" aria-busy={phase === "loading" ? "true" : undefined}>
-    <PageHeader id="m-title" title={t("manage.title")} bind:titleEl={title}>
-      {#if summary}
-        <p class="ctx num" data-manage-context>
-          {#if summary.label}<bdi class="nm" translate="no">{summary.label}</bdi><span aria-hidden="true">{" · "}</span>{/if}{t("hist.items", { n: summary.itemsCount })}<span aria-hidden="true">{" · "}</span>{formatBytes(summary.sizeBytes, lang)}
-        </p>
-      {/if}
-    </PageHeader>
+    <PageHeader id="m-title" title={t("manage.title")} bind:titleEl={title} />
     <div class="grid">
     <div class="card" bind:this={card} data-capsule data-state="open">
       {#if status}
@@ -260,15 +239,6 @@
       border-radius: var(--r-xl);
       box-shadow: inset 0 0 0 1px var(--hair);
     }
-  }
-  .ctx {
-    color: var(--text-2);
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-  .ctx .nm {
-    color: var(--text);
-    font-weight: 600;
   }
   .st-row {
     display: flex;

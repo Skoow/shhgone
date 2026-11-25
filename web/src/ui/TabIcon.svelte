@@ -7,15 +7,9 @@
 
 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
   {#if id === "send"}
-    <path d="M20.5 3.5 3.5 10.4l6.9 3.2 3.2 6.9z" />
-    <path d="m20.5 3.5-10.1 10.1" />
-  {:else if id === "shares"}
-    <circle cx="12" cy="12" r="8.5" />
-    <path d="M12 7.5V12l3 2" />
-  {:else if id === "home"}
-    <!-- messages-square (conception compte §21.15.1) -->
-    <path d="M14.5 9.5a2 2 0 0 1-2 2h-6l-3 3v-9a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z" />
-    <path d="M17.5 8.5h1a2 2 0 0 1 2 2v10l-3-3h-6a2 2 0 0 1-2-2v-1" />
+    <!-- « Nouveau » : un plus (nouveau partage). -->
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
   {:else if id === "profile"}
     <circle cx="12" cy="8.5" r="3.75" />
     <path d="M5 20a7 7 0 0 1 14 0" />

@@ -391,8 +391,6 @@
     {summary}
     ttlHours={sent.ttlHours}
     maxOpens={sent.maxOpens}
-    itemsCount={sent.names.length}
-    sizeBytes={sent.bytes}
     ondone={reset}
     onsecured={() => (readySecured = true)}
     onforget={forget}

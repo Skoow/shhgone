@@ -66,7 +66,6 @@ const CALLS: [string, (n: A.Net) => Promise<unknown>, string, unknown, unknown][
   ["sessions", (n) => A.sessions(n, JETON), "GET sessions", undefined, { sessions: [{ sid: S(16), ajoutee: "2026-11", etiquette: S(64), courante: true, persistante: false, par_recup: false }] }],
   ["fermerSession", (n) => A.fermerSession(n, JETON, { sid: S(16) }), "POST sessions/fermer", { sid: S(16) }, {}],
   ["fermerAutres", (n) => A.fermerSession(n, JETON, { autres: true }), "POST sessions/fermer", { autres: true }, {}],
-  ["exporter", (n) => A.exporter(n, JETON), "GET export", undefined, { cree_le: "2026-11-14", anciennete_depuis: "2026-11-14", vu_mois: "2026-11", banni_jusqu: null, banni_motif: null, salons_actifs: 1, sessions: [{ ajoutee: "2026-11", persistante: true, par_recup: true }], passkeys: [{ ajoutee: "2026-11", be: true, prf: false, cle_pub: S(77) }] }],
   ["supprimer", (n) => A.supprimer(n, JETON), "POST supprimer", {}, { salons_fermes: 2 }],
 ];
 const SANS_SESSION = new Set(["inscriptionDebut", "inscriptionFin", "connexionDebut", "connexionFin", "recup", "pseudoVerifier (étape)"]);
@@ -137,7 +136,7 @@ describe("réponses", () => {
       await expect(A.passkeys(net(() => ok(bad)).n, JETON)).rejects.toThrow("reponse_invalide");
   });
 
-  it("appareils, export et suppression décodés ; forme stricte", async () => {
+  it("appareils et suppression décodés ; forme stricte", async () => {
     const ss = await A.sessions(net(() => ok({ sessions: [{ sid: S(16, 7), ajoutee: "2026-11", etiquette: S(64, 8), courante: true, persistante: false, par_recup: true }, { sid: S(16, 9), ajoutee: "2026-10", etiquette: "", courante: false, persistante: true, par_recup: false }] })).n, JETON);
     expect(ss).toEqual([
       { sid: S(16, 7), ajoutee: "2026-11", etiquette: B(64, 8), courante: true, persistante: false, parRecup: true },
@@ -145,8 +144,6 @@ describe("réponses", () => {
     ]);
     for (const bad of [{ sessions: [{ sid: S(15), ajoutee: "2026-11", etiquette: "", courante: true, persistante: false, par_recup: false }] }, { sessions: [{ sid: S(16), ajoutee: "2026-11", etiquette: "", courante: true, persistante: false }] }, { sessions: "x" }])
       await expect(A.sessions(net(() => ok(bad)).n, JETON)).rejects.toThrow("reponse_invalide");
-    const x = await A.exporter(net(() => ok(CALLS.find((c) => c[0] === "exporter")![4])).n, JETON);
-    expect(x).toEqual({ creeLe: "2026-11-14", ancienneteDepuis: "2026-11-14", vuMois: "2026-11", banniJusqu: null, banniMotif: null, salonsActifs: 1, sessions: [{ ajoutee: "2026-11", persistante: true, parRecup: true }], passkeys: [{ ajoutee: "2026-11", be: true, prf: false, clePub: S(77) }] });
     expect(await A.supprimer(net(() => ok({ salons_fermes: 3 })).n, JETON)).toEqual({ salonsFermes: 3 });
     await expect(A.supprimer(net(() => ok({ salons_fermes: -1 })).n, JETON)).rejects.toThrow("reponse_invalide");
   });

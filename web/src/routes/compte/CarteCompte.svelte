@@ -1,26 +1,30 @@
 <script lang="ts">
   // Carte « Votre compte » (conception compte §11, §21.15.3 ; monté seulement avec
-  // __COMPTES__) : ancienneté (« Membre »), palier et limites (du
-  // serveur, GET /api/compte), abonnement, bannissement avec sa date et son motif. Les limites du
-  // palier confirmé (3 salons, 10 places) sont celles du serveur (conception §11), rappelées ici
-  // pour un compte récent, qui ne les reçoit pas encore.
+  // __COMPTES__) : ancienneté (« Membre »), palier et limites (du serveur, GET /api/compte),
+  // abonnement, bannissement avec sa date et son motif. Les limites du palier confirmé
+  // (3 salons, 10 places) sont celles du serveur (conception §11), rappelées ici pour un compte
+  // récent, qui ne les reçoit pas encore.
+  // Trois états : chargement (squelette), état reçu, ou erreur (`erreur`) avec « Réessayer ».
+  // L'erreur est dite DANS la carte : avant le 25 novembre, elle partait dans un bandeau en haut
+  // de page et la carte restait en squelette pour toujours (« comme en chargement »).
   import { account, type EtatServeur } from "../../account/session.svelte";
   import { followLink, href } from "../../app/router.svelte";
   import { getLang, t, type Key } from "../../i18n/i18n.svelte";
   import Banner from "../../ui/Banner.svelte";
+  import Button from "../../ui/Button.svelte";
   import { jourLong } from "./erreurs";
 
-  type Props = { etat: EtatServeur | null };
-  let { etat }: Props = $props();
+  type Props = { etat: EtatServeur | null; erreur?: string; onretry?: () => void };
+  let { etat, erreur = "", onretry }: Props = $props();
 
-  /** « 2026-11-14 » → « 1 » (toujours avec l'année). */
+  /** « 2026-11-14 » → « 14 novembre 2026 » (toujours avec l'année). */
   function jourAvecAnnee(iso: string): string {
     const d = new Date(`${iso}T00:00:00Z`);
     return Number.isNaN(d.getTime()) ? iso : new Intl.DateTimeFormat(getLang(), { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(d);
   }
 </script>
 
-<div class="carte" aria-busy={etat === null ? "true" : undefined}>
+<div class="carte" aria-busy={etat === null && !erreur ? "true" : undefined} data-carte-compte>
   <p class="titre">{t("account.card.title")}</p>
   {#if etat}
     <p>{t("account.card.since", { date: jourAvecAnnee(etat.creeLe) })}</p>
@@ -33,17 +37,21 @@
         {t("account.card.confirme", { salons: etat.limites.salons, places: etat.limites.places })}
       {/if}
     </p>
-    <p class="plan">
-      <span>{account.profil?.pass ? t("account.card.plus") : t("account.card.free")}</span>
-      <a class="lien" href={href("/offres")} onclick={(e) => followLink(e, "/offres")}>{t("account.offers")}</a>
-    </p>
     {#if etat.banniJusqu}
-      <Banner kind="warn">{t("account.banned", { date: jourLong(etat.banniJusqu), motif: t(`report.cat.${etat.banniMotif ?? 10}` as Key) })}</Banner>
+      <Banner kind="warn">{t("account.banned", { date: jourLong(etat.banniJusqu), motif: t(`report.cat.${etat.banniMotif ?? 10}` as Key), id: etat.banniId ?? "" })}</Banner>
     {/if}
+  {:else if erreur}
+    <p class="err" role="alert" data-carte-erreur>{erreur}</p>
+    {#if onretry}<div><Button variant="secondary" dense onpress={onretry}>{t("account.card.retry")}</Button></div>{/if}
   {:else}
     <p class="sq" aria-hidden="true"></p>
     <p class="sq court" aria-hidden="true"></p>
   {/if}
+  <!-- Abonnement : lu dans le profil (coffre chiffré), pas au serveur ; toujours montré. -->
+  <p class="plan">
+    <span>{account.profil?.pass ? t("account.card.plus") : t("account.card.free")}</span>
+    <a class="lien" href={href("/offres")} onclick={(e) => followLink(e, "/offres")}>{t("account.offers")}</a>
+  </p>
 </div>
 
 <style>
@@ -66,6 +74,10 @@
     color: var(--text-2);
     font-size: var(--fs-small);
     line-height: var(--lh-small);
+  }
+  .err {
+    color: var(--danger);
+    font-size: var(--fs-small);
   }
   .plan {
     display: flex;

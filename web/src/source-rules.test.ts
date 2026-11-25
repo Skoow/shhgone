@@ -46,7 +46,7 @@ const RE_DEMO_IMPORT = new RegExp(
   "g",
 );
 
-const UI_DIRS = ["routes", "ui", "flows", "viewers", "media", "captcha", "app", "history", "downloads"];
+const UI_DIRS = ["routes", "ui", "flows", "viewers", "media", "captcha", "app", "storage", "downloads"];
 const inUiDir = (rel: string) => UI_DIRS.includes(rel.split("/")[0]!);
 
 function offenders(
@@ -81,26 +81,28 @@ describe("règles de sources", () => {
     expect(pow).toMatch(/fetch\(src, \{ integrity, credentials: "same-origin", redirect: "error" \}\)/);
     expect(pow).not.toMatch(/\/api\/|XMLHttpRequest/);
   });
-  it("aucun stockage navigateur (hors historique local et retours, ci-dessous)", () =>
+  it("aucun stockage navigateur (hors exceptions écrites, ci-dessous)", () =>
     expect(
-      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "downloads/probe.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
+      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "storage/returns.ts" && r !== "storage/ancien-historique.ts" && r !== "downloads/live.svelte.ts" && r !== "downloads/probe.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
     ).toEqual([]));
-  // Spec §33, §33.1 : exception écrite, l'historique local chiffré des envois. Seul
-  // history/live.svelte.ts lit `indexedDB` (pour le passer à history/store.ts, qui chiffre) ;
-  // aucun localStorage ni cookie, même là ; et rien d'autre que history/ ne lit le stockage.
-  it("historique : indexedDB lu seulement par history/live.svelte.ts, jamais localStorage ni cookie", () => {
-    const live = files.find((f) => f.rel === "history/live.svelte.ts");
-    expect(live?.text).toMatch(/indexedDB/);
-    expect(live?.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
-    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("history/") && !r.startsWith("downloads/") && !r.startsWith("account/") && !r.startsWith("paiement/") && r !== "salon/preuve.ts")).toEqual([]);
+  // Spec §33 : historique local des liens retiré (D42-27). Plus de module history/ ; l'ancienne
+  // base n'est que supprimée (storage/ancien-historique.ts, deleteDatabase seulement, aucune
+  // lecture). Accès IndexedDB typés seulement dans les modules de stockage écrits.
+  it("ancien historique : aucun module history/, la base n'est que supprimée ; IDB* seulement dans les modules de stockage", () => {
+    expect(files.filter((f) => f.rel.startsWith("history/"))).toEqual([]);
+    const a = files.find((f) => f.rel === "storage/ancien-historique.ts")!.text;
+    expect(a).toMatch(/deleteDatabase\(ANCIEN_HISTORIQUE\)/);
+    expect(a).not.toMatch(/\.open\(|localStorage|sessionStorage|document\.cookie/);
+    expect(offenders(/shhdrop-history/, (r) => r !== "storage/ancien-historique.ts")).toEqual([]);
+    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("storage/") && !r.startsWith("downloads/") && !r.startsWith("account/") && !r.startsWith("paiement/") && r !== "salon/preuve.ts")).toEqual([]);
   });
   // D42-22 : exception écrite, l'octroi d'ouverture gardé chiffré pour revenir jusqu'à
-  // l'échéance (history/returns.ts, voisin de l'historique et même mécanisme : AES-GCM, clé non
-  // extractible, base IndexedDB à part). Il lit `indexedDB` lui-même (base à part, sans passer
-  // par l'état des écrans de l'historique) ; jamais localStorage, sessionStorage ni cookie ;
+  // l'échéance (storage/returns.ts, mécanisme de storage/idb.ts : AES-GCM, clé non
+  // extractible, base IndexedDB à part). Il lit `indexedDB` lui-même ; jamais localStorage,
+  // sessionStorage ni cookie ;
   // l'entrée n'a que l'étiquette, l'octroi et l'échéance (jamais K_lien ni mot de passe).
   it("retours : indexedDB seulement, entrée sans K_lien ni mot de passe", () => {
-    const r = files.find((f) => f.rel === "history/returns.ts")!;
+    const r = files.find((f) => f.rel === "storage/returns.ts")!;
     expect(r.text).toMatch(/indexedDB/);
     expect(r.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
     const type = r.text.match(/export type ReturnEntry = \{([\s\S]*?)\n\};/)![1]!;
@@ -207,16 +209,6 @@ describe("règles de sources", () => {
       expect(targets.filter((t) => !/^session\.svelte(?:\.ts|\.js)?$/.test(t!)), f.rel).toEqual([]);
       expect(f.text, f.rel).toMatch(/__COMPTES__/);
     }
-  });
-  // Conception compte §21.7, §21.8 : exception écrite, une entrée reçue ou de salon
-  // garde son lien (`link`, K_lien) ; un envoi jamais (cleanEntry, history/store.test.ts). Toujours
-  // aucun mot de passe, nom d'élément ni contenu : la liste des champs reste fermée. Seul : `label` d'un envoi porte le titre du partage (manifeste), pas un nom d'élément.
-  it("historique : liste fermée des champs de HistoryEntry (lien seulement pour un reçu ou un salon), aucun mot de passe ni nom", () => {
-    const store = files.find((f) => f.rel === "history/store.ts")!;
-    const type = store.text.match(/export type HistoryEntry = \{([\s\S]*?)\n\};/)![1]!;
-    const fields = [...type.matchAll(/^\s+(\w+):/gm)].map((m) => m[1]);
-    expect(fields).toEqual(["id", "sorte", "origine", "manage", "link", "label", "format", "createdAt", "sizeBytes", "itemsCount", "expiresAt", "maxOpens", "opensUsed", "opens", "state", "lastSeenAt", "endedAt", "destroyedHere"]);
-    expect(type).not.toMatch(/password|motDePasse|mdp|name|nom|text|content|items\b/i);
   });
   // Spec §41.4 : exception écrite, l'octroi d'ouverture de l'onglet (session/open-grant.ts),
   // et plus tard le salon (chat/session.ts, §39.13.3). Nulle part ailleurs.

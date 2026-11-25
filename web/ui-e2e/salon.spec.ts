@@ -83,13 +83,9 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   await expect(page).toHaveURL(/\/salon\/nouveau$/);
   // Compte récent : 4 places au plus (conception du compte §11) ; « Ouvert » les prend toutes.
   await expect(page.getByText("Ouvert, 4 au plus")).toBeVisible();
-  // Historique désactivé par défaut, même avec un compte : la créatrice l'active
-  // elle-même ici (la suite s'appuie sur le lien de gestion gardé : « Détruire le salon » après
-  // délogement). Sans cela, « Salon prêt » montre le lien de gestion d'emblée (appel.spec.ts).
-  const garder = page.getByRole("switch", { name: "Garder dans mon historique" });
-  await expect(garder).toHaveAttribute("aria-checked", "false");
-  await garder.click();
-  await expect(garder).toHaveAttribute("aria-checked", "true");
+  // Plus de « Garder dans mon historique » (historique des liens retiré, spec §33) : « Salon prêt »
+  // montre toujours le lien de gestion d'emblée.
+  await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveCount(0);
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
   await capture(page, "salon-pret");
@@ -100,7 +96,6 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   expect(lien).toMatch(new RegExp(`^${shh.origin.replace(/[.]/g, "\\.")}/salon#c[A-Za-z0-9_-]{43}$`));
   expect(mdp).toMatch(/^.{11}$/);
   expect(page.url()).not.toContain("#");
-  await bouton(page, "Afficher le lien de gestion").click();
   const gestion = (await page.locator(".cf").filter({ hasText: "Lien de gestion" }).locator(".val").textContent())!.trim();
   expect(gestion).toMatch(/\/salon#s[A-Za-z0-9_-]{43}$/);
   await bouton(page, "Entrer dans le salon").click();
@@ -396,7 +391,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(fil(pageC).locator("p.texte").getByText(t5, { exact: true })).toBeVisible({ timeout: 30_000 });
 
     // --- Exigence C-3 32 : la créatrice revient sans son lien de gestion (autre navigateur : ni
-    // historique ni preuve), entre comme simple membre, colle son lien de gestion DANS la
+    // preuve), entre comme simple membre, colle son lien de gestion DANS la
     // conversation : rien n'est envoyé, elle retrouve ses droits ; l'ancienne page est délogée.
     ctxE = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
     const pageE = await ctxE.newPage();
@@ -425,7 +420,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     // L'ancienne page de la créatrice est délogée ; la nouvelle a les droits (exclure C).
     await expect(titre(page, "Fin du salon")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Votre place de créateur a été reprise", { exact: false })).toBeVisible();
-    // Restes, point 3 : lien de gestion encore dans l'historique local de A → « Détruire le salon » proposé.
+    // Restes, point 3 : S_gestion encore en mémoire de l'onglet de A → « Détruire le salon » proposé.
     await expect(bouton(page, "Détruire le salon")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Pour détruire le salon, ouvrez votre lien de gestion", { exact: false })).toHaveCount(0);
     await capture(page, "salon-fin-deloge");

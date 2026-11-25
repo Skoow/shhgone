@@ -4,17 +4,14 @@
   import { inAppBrowser, isStandalone, isSupported } from "./app/env";
   import { guardFileDrop, reloadIfRestored } from "./app/lifecycle";
   import { scrubAddressBar } from "./app/link";
-  import { href, LINK_ROUTES, moveToLinkPage, navigate, PAGE_ROUTES, router } from "./app/router.svelte";
-  import { accountFlag } from "./app/account-flag.svelte";
+  import { href, LINK_ROUTES, moveToLinkPage, PAGE_ROUTES, router } from "./app/router.svelte";
   import { applySeo } from "./app/seo";
   import { setScreenTitle } from "./app/title";
   import { getLang } from "./i18n/i18n.svelte";
   import { watchKeyboard } from "./app/viewport";
   import { watchOpenGrant } from "./session/open-grant";
-  import { loadHistory } from "./history/live.svelte";
   import { loadDownloads } from "./downloads/live.svelte";
   import Downloads from "./routes/Downloads.svelte";
-  import History from "./routes/History.svelte";
   import NotFound from "./routes/NotFound.svelte";
   import Offert from "./routes/Offert.svelte";
   import SendFlow from "./routes/SendFlow.svelte";
@@ -26,7 +23,7 @@
   // Pages du compte : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Accueil, Connexion, Inscription, Parametres, Recuperation, Profil, connecte, ecouterAutresOnglets, rangerPassDansCompte, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
+  import { Compte, Connexion, Inscription, Recuperation, connecte, ecouterAutresOnglets, rangerPassDansCompte, restaurer, supprime, verifierAuRetour } from "./routes/compte/pages";
   // Écrans du salon : seulement si __SALONS__ (site avec compte, hors démo) ; sans lui,
   // le greffon shh-salons remplace ce module par pages.off.ts (aucun écran, aucun client).
   import { Salon, SalonNouveau } from "./routes/salon/pages";
@@ -46,9 +43,8 @@
   // passent par la garde de sortie du routeur).
   let locked = $state(false);
 
-  // Téléphone : barre d'onglets sur les écrans racine de l'expéditeur seulement (app/tabbar.ts).
-  // Accueil connecté : seulement avec __COMPTES__ et une session ouverte ;
-  // sans compte (et dans tout build public), l'accueil reste l'accueil actuel.
+  // Téléphone : barre d'onglets sur les écrans racine de l'expéditeur seulement (app/tabbar.ts),
+  // avec __COMPTES__ et une session ouverte seulement.
   const connected = $derived(__COMPTES__ && connecte());
   const tabs = $derived(tabBarVisible({ supported, route: router.current.name, sending, composing: chrome.composing, connected }));
 
@@ -59,9 +55,6 @@
     return () => document.documentElement.classList.remove("no-pull");
   });
 
-  // « Mes partages » dans l'en-tête et le menu seulement s'il y a des partages :
-  // lecture de l'historique de l'appareil, sans rien créer (live.svelte.ts, presence).
-  if (supported) void loadHistory().catch(() => undefined);
   // « Téléchargements » sans compte seulement si l'historique est activé : lecture
   // seule, rien n'est créé s'il n'a jamais été activé ici.
   if (supported) void loadDownloads().catch(() => undefined);
@@ -102,15 +95,13 @@
 
   // UI §9.2.2 : hors de l'accueil, un fichier déposé ne fait jamais naviguer l'onglet. Sur
   // l'accueil, Home reçoit le dépôt (voile pleine page), sauf pendant un envoi.
-  // Accueil connecté : pas de composeur, donc aucun dépôt reçu là (le fichier ne fait jamais naviguer).
-  $effect(() => guardFileDrop(window, () => supported && ((router.current.name === "home" && !connected) || router.current.name === "envoyer") && !sending));
+  $effect(() => guardFileDrop(window, () => supported && (router.current.name === "home" || router.current.name === "envoyer") && !sending));
 
   // Titre de l'onglet par route et par langue (scan UX B9) ; l'accueil (SendFlow) tient le sien.
   $effect(() => {
     void getLang();
     const name = router.current.name;
     if (!supported) setScreenTitle("unsupported");
-    else if (name === "home" && connected) setScreenTitle("inbox");
     else if (name !== "home" && name !== "envoyer") setScreenTitle(name);
     // Référencement : description, canonique et noindex par route (app/seo.ts).
     applySeo(supported ? name : "unsupported");
@@ -130,12 +121,6 @@
       if (document.visibilityState === "visible") void verifierAuRetour();
     });
   }
-  // « Se déconnecter » du menu : la coque n'importe rien du compte ; elle appelle ceci.
-  if (__COMPTES__)
-    accountFlag.logout = async () => {
-      await seDeconnecter();
-      navigate("/compte/connexion");
-    };
 </script>
 
 <svelte:window onhashchange={onHashChange} />
@@ -151,8 +136,6 @@
     <Unsupported />
   {:else if router.current.name === "notfound"}
     <NotFound />
-  {:else if router.current.name === "home" && connected}
-    <Accueil />
   {:else if router.current.name === "home" || router.current.name === "envoyer"}
     <!-- Accueil, puis composeur dès le premier élément (UI §9.1, §9.2) ; « /envoyer » : composeur
          même vide (retours DROP). Un seul SendFlow pour les deux : passer de l'un à l'autre garde
@@ -160,8 +143,6 @@
     <SendFlow sendPage={router.current.name === "envoyer"} onbusy={(b) => (sending = b)} onlock={(l) => (locked = l)} />
   {:else if LINK_ROUTES.has(router.current.name)}
     <!-- Ouverture rechargée sous « / » : la page part vers « /s » (onRoute), rien n'est affiché ici. -->
-  {:else if router.current.name === "envois"}
-    <History />
   {:else if router.current.name === "telechargements"}
     <Downloads />
   {:else if router.current.name === "inscription"}
@@ -169,13 +150,11 @@
   {:else if router.current.name === "recuperation"}
     <Recuperation />
   {:else if router.current.name === "compte" && (connected || (__COMPTES__ && supprime()))}
-    <!-- Paramètres et profil : avec une session ouverte seulement (et l'écran de fin
-         d'une suppression faite ici, alors que la session n'existe plus). -->
-    <Parametres />
-  {:else if router.current.name === "profil" && connected}
-    <Profil />
-  {:else if (router.current.name === "connexion" || router.current.name === "compte" || router.current.name === "profil")}
-    <!-- /compte et /compte/profil sans session : la connexion (conception §12.4) ; /compte/connexion
+    <!-- Compte (profil et paramètres réunis) : avec une session ouverte seulement (et l'écran de
+         fin d'une suppression faite ici, alors que la session n'existe plus). -->
+    <Compte />
+  {:else if router.current.name === "connexion" || router.current.name === "compte"}
+    <!-- /compte sans session : la connexion (conception §12.4) ; /compte/connexion
          avec session : la même page dit « connecté ». -->
     <Connexion />
   {:else if router.current.name === "salon"}

@@ -64,16 +64,11 @@ test.describe("fr-FR", () => {
     // Mot de passe masqué à l'arrivée ; « Copier » donne la vraie valeur, même masquée.
     await expect(pwCard(page).locator("[data-masked]")).toBeVisible();
     await expect(pwCard(page).locator("[data-reveal]")).toHaveAttribute("aria-pressed", "false");
-    // Lien de gestion : montré sans l'historique (seul moyen de suivre le partage), caché avec lui.
-    // Sans compte, l'historique est désactivé par défaut.
-    const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
-    await expect(keep).toHaveAttribute("aria-checked", "false");
+    // Lien de gestion : toujours montré, seul moyen de suivre ou supprimer le partage une fois la
+    // page fermée (historique des liens retiré, spec §33) ; plus d'interrupteur.
+    await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveCount(0);
     await expect(page.locator("[data-manage] .sr-only").first()).toHaveText(/#m[A-Za-z0-9_-]{43}$/);
-    await keep.click();
-    await expect(keep).toHaveAttribute("aria-checked", "true");
-    await expect(page.locator("[data-manage]")).toHaveCount(0);
-    await keep.click();
-    await expect(page.locator("[data-manage] .sr-only").first()).toHaveText(/#m[A-Za-z0-9_-]{43}$/);
+    await expect(page.locator("[data-manage]")).toContainText("une fois cette page fermée");
     // Plus d'avertissement « par un autre moyen ».
     await expect(page.locator(".ready").getByText("autre moyen", { exact: false })).toHaveCount(0);
 

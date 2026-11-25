@@ -29,7 +29,6 @@
   import DropOverlay from "../ui/DropOverlay.svelte";
   import { Camera, MessagesSquare, Mic, Upload } from "../ui/Icon";
   import Vessel from "../ui/Vessel.svelte";
-  import ActiveSharesStrip from "../ui/ActiveSharesStrip.svelte";
   import Faq from "./home/Faq.svelte";
   import Sections from "./home/Sections.svelte";
   import { reprendreSection } from "../ui/section";
@@ -162,8 +161,8 @@
   <section class="hero" aria-labelledby="hero-title">
     {#if compact}
       <!-- Page d'envoi : un titre pour les lecteurs
-           d'écran (« Votre envoi » est le titre visible) ; les trois assurances sont dans le cadre
-           de dépôt du composeur (ui/Assurances.svelte). -->
+           d'écran (« Votre envoi » est le titre visible). Les assurances (gratuit, sans compte,
+           effacement) ne sont dites qu'une fois, sous le héros de l'accueil (25 novembre). -->
       <h1 id="hero-title" tabindex="-1" class="sr-only">{t("send.h1")}</h1>
     {:else}
         <div class="pitch">
@@ -219,9 +218,6 @@
 
   <!-- Plus de bande d'engagements : la sécurité et la confidentialité sont dites
        dans leurs pages. -->
-
-  <!-- « Vos partages actifs » (spec §33.1, UI §9.6.1) : lecture locale seulement, rien sans partage actif. -->
-  {#if !compact}<div class="shares"><ActiveSharesStrip /></div>{/if}
 
   <!-- Le composeur (page d'envoi) seulement : plus de carte de dépôt « Glissez vos fichiers ici »
        sur l'accueil (doublon de « Choisir des fichiers » ; le dépôt sur toute la page
@@ -595,12 +591,6 @@
 
 
   /* ---------- Carte de dépôt : le composeur vide ---------- */
-  .shares {
-    min-width: 0;
-  }
-  .shares:empty {
-    display: none;
-  }
   .compose {
     position: relative;
     isolation: isolate;

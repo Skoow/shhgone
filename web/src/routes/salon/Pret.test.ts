@@ -12,10 +12,10 @@ import Pret from "./Pret.svelte";
 
 const GESTION = "https://x.example/salon#s" + "g".repeat(43);
 let app: Record<string, unknown> | null = null;
-function montrer(garde: boolean) {
+function montrer() {
   setLang("fr");
   vue.finMs = Date.now() + 3600_000;
-  vue.pret = { lien: "https://x.example/salon#c" + "c".repeat(43), mdp: "Abcdef-1234", gestion: GESTION, garde };
+  vue.pret = { lien: "https://x.example/salon#c" + "c".repeat(43), mdp: "Abcdef-1234", gestion: GESTION };
   app = mount(Pret as never, { target: document.body }) as Record<string, unknown>;
   flushSync();
 }
@@ -27,23 +27,13 @@ afterEach(() => {
 });
 
 describe("Salon prêt : lien de gestion", () => {
-  it("historique désactivé (par défaut) : lien de gestion montré d'emblée, avec l'explication et l'avertissement", () => {
-    montrer(false);
+  // Historique des liens retiré (25 novembre, spec §33) : le lien de gestion n'est gardé nulle
+  // part, il est toujours montré d'emblée.
+  it("lien de gestion montré d'emblée, avec l'explication et l'avertissement", () => {
+    montrer();
     const m = document.querySelector("[data-manage]")!;
     expect(m.textContent).toContain(GESTION);
     expect(m.textContent).toContain(fr["salon.ready.manage.keep"]);
     expect(m.textContent).toContain(fr["salon.manage.warn"]);
-    expect([...document.querySelectorAll("button")].some((b) => b.textContent?.includes(fr["salon.ready.manage.show"]))).toBe(false);
-  });
-
-  it("gardé dans l'historique : derrière « Afficher le lien de gestion »", () => {
-    montrer(true);
-    expect(document.querySelector("[data-manage]")).toBeNull();
-    expect(document.body.textContent).not.toContain(GESTION);
-    const b = [...document.querySelectorAll("button")].find((x) => x.textContent?.includes(fr["salon.ready.manage.show"]))!;
-    b.click();
-    flushSync();
-    expect(document.querySelector("[data-manage]")!.textContent).toContain(GESTION);
-    expect(document.querySelector("[data-manage]")!.textContent).not.toContain(fr["salon.ready.manage.keep"]);
   });
 });

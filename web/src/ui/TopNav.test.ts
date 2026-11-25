@@ -2,7 +2,7 @@
 // Barre du haut, ordinateur et tablette : menus déroulants en motif
 // « disclosure » (bouton aria-expanded, liste de liens ou boutons), clavier (Entrée, Échap,
 // flèches, Tab), fermeture au clic extérieur ; « Envoyer ▾ » ouvre les gestes du composeur.
-import { presence } from "../history/presence.svelte";
+import { accountFlag } from "../app/account-flag.svelte";
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chrome } from "../app/chrome.svelte";
@@ -30,8 +30,7 @@ afterEach(() => {
 });
 
 describe("TopNav", () => {
-  it("menus, Salon bientôt, Offres, Mes partages (s'il y a des partages) ; plus de bouton « Partager »", () => {
-    presence.any = true;
+  it("menus, Salon bientôt, Offres ; plus de « Mes partages » (historique des liens retiré) ni de bouton « Partager »", () => {
     show();
     const nav = document.querySelector("nav")!;
     expect(nav.getAttribute("aria-label")).toBe("Menu principal");
@@ -44,15 +43,10 @@ describe("TopNav", () => {
     expect(room.getAttribute("aria-disabled")).toBe("true");
     expect(room.textContent).toContain("bientôt");
     const links = [...document.querySelectorAll("a")].map((a) => [a.textContent!.trim(), a.getAttribute("href")]);
-    expect(links).toEqual(expect.arrayContaining([["Offres", "/offres"], ["Mes partages", "/envois"]]));
+    expect(links).toEqual(expect.arrayContaining([["Offres", "/offres"]]));
+    expect(links.map(([n]) => n)).not.toContain("Mes partages");
     const named = (n: string) => [...nav.querySelectorAll("a, button")].filter((e) => e.textContent!.trim() === n);
     expect(named("Partager")).toHaveLength(0);
-  });
-
-  it("sans partage sur l'appareil : pas de « Mes partages »", () => {
-    presence.any = false;
-    show();
-    expect([...document.querySelectorAll("a")].map((a) => a.textContent!.trim())).not.toContain("Mes partages");
   });
 
   it("Envoyer : quatre gestes, chacun avec icône, titre et une ligne", () => {
@@ -289,7 +283,7 @@ describe("TopNav au survol", () => {
     show();
     ptr(dd("Envoyer"), "pointerenter");
     wait(100);
-    navigate("/envois");
+    navigate("/telechargements");
     flushSync();
     expect(expanded("Envoyer")).toBe("false");
     ptr(dd("Sécurité"), "pointerenter");
@@ -323,20 +317,17 @@ describe("TopNav au survol", () => {
   });
 });
 
-// Conception compte §21.15.1 : connecté, « Mes partages » devient « Accueil » ;
-// sans compte, rien ne change.
+// 25 novembre : connecté, plus d'« Accueil » dans l'en-tête (le logo y mène) ni de « Mes partages ».
 describe("TopNav connecté", () => {
-  it("« Accueil » (vers /) à la place de « Mes partages » tant qu'un compte est ouvert", async () => {
-    const { setAccountPrefs } = await import("../history/live.svelte");
-    const links = () => [...document.querySelectorAll<HTMLAnchorElement>(".acts a")].map((a) => [a.textContent!.trim(), a.getAttribute("href")]);
-    presence.any = true;
-    show();
-    expect(links()[0]).toEqual(["Mes partages", "/envois"]);
-    setAccountPrefs({ keepReceived: true });
-    flushSync();
-    expect(links()[0]).toEqual(["Accueil", "/"]);
-    setAccountPrefs(null);
-    flushSync();
-    expect(links()[0]).toEqual(["Mes partages", "/envois"]);
+  it("ni « Accueil » ni « Mes partages », compte ouvert ou non", () => {
+    const noms = () => [...document.querySelectorAll<HTMLAnchorElement>(".acts a")].map((a) => a.textContent!.trim());
+    accountFlag.connected = true;
+    try {
+      show();
+      expect(noms()).not.toContain("Accueil");
+      expect(noms()).not.toContain("Mes partages");
+    } finally {
+      accountFlag.connected = false;
+    }
   });
 });

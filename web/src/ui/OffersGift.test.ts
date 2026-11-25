@@ -6,7 +6,7 @@
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { b64u } from "../engine/pure";
-import { fakeIndexedDB, type FakeIdb } from "../history/fake-idb.test-helper";
+import { fakeIndexedDB, type FakeIdb } from "../storage/fake-idb.test-helper";
 import { setLang } from "../i18n/i18n.svelte";
 import { garder, lirePasses, nouvelId } from "../paiement/pass";
 import OffersGift from "./OffersGift.svelte";

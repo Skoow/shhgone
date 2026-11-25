@@ -4,14 +4,12 @@
 export { default as Connexion } from "./Connexion.svelte";
 export { default as Inscription } from "./Inscription.svelte";
 export { default as Recuperation } from "./Recuperation.svelte";
-export { ecouterAutresOnglets, rangerPassDansCompte, restaurer, seDeconnecter, verifierAuRetour } from "../../account/session.svelte";
-export { default as Accueil } from "./Accueil.svelte";
-export { default as Parametres } from "./Parametres.svelte";
-export { default as Profil } from "./Profil.svelte";
+export { ecouterAutresOnglets, rangerPassDansCompte, restaurer, verifierAuRetour } from "../../account/session.svelte";
+export { default as Compte } from "./Compte.svelte";
 import { account } from "../../account/session.svelte";
 /** Session en cours d'ouverture (« Rester connecté » relu au démarrage) : attendre avant de conclure. */
 export const ouvertureEnCours = (): boolean => account.etat === "verrouille";
-/** Session ouverte sur cet appareil (accueil connecté, onglets du compte) ; lu dans un effet ou le gabarit. */
+/** Session ouverte sur cet appareil (page Compte, onglets) ; lu dans un effet ou le gabarit. */
 export const connecte = (): boolean => account.etat === "ouvert";
-/** Compte supprimé depuis cette page : l'écran de fin des paramètres reste affiché sans session. */
+/** Compte supprimé depuis cette page : l'écran de fin de la page Compte reste affiché sans session. */
 export const supprime = (): boolean => account.supprime;

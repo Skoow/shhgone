@@ -2,7 +2,7 @@
 // X-Shh-Pass seulement, adresses de redirection vérifiées) et pass gardés chiffrés sur l'appareil.
 import { describe, expect, it } from "vitest";
 import { b64u } from "../engine/pure";
-import { fakeIndexedDB } from "../history/fake-idb.test-helper";
+import { fakeIndexedDB } from "../storage/fake-idb.test-helper";
 import * as A from "./api";
 import { garder, lirePasses, nouvelId, oublier, PASS_DB, tirerPass, type PassGarde } from "./pass";
 

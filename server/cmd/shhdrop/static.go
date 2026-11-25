@@ -218,7 +218,7 @@ var appRoutes = map[string]bool{
 	"/contact":          true,
 	"/offres":           true,
 	"/envoyer":          true,
-	"/envois":           true,
+	"/envois":           true, // ancienne adresse (historique des liens retiré) : le client la remplace par « / »
 	"/telechargements":  true,
 	// Accès offert (conception du paiement, « Accès offerts ») : écran de l'application ; le pass
 	// suit « # », jamais envoyé au serveur.
@@ -283,7 +283,7 @@ var compteRoutes = map[string]bool{
 	"/compte/inscription":  true,
 	"/compte/connexion":    true,
 	"/compte/recuperation": true,
-	"/compte/profil":       true,
+	"/compte/profil":       true, // ancienne page Profil : le client la remplace par « /compte »
 }
 
 // staticName : chemin de l'URL → nom dans le dossier ; refuse les segments cachés.

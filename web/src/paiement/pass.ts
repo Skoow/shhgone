@@ -11,7 +11,7 @@
 //   l'appareil (TVA du pays, conception §9.3) ; il n'est jamais renvoyé au serveur. Rien d'autre :
 //   ni prix, ni adresse de page de paiement.
 // Apps (D42-20) : trousseau du système à la place, même contenu.
-import { idbBackend, type Backend } from "../history/store";
+import { idbBackend, type Backend } from "../storage/idb";
 import { b64u, unb64u, utf8 } from "../engine/pure";
 import type { Moyen, OffrePayante } from "./api";
 

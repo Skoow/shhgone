@@ -8,8 +8,8 @@
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createGone } from "../flows/gone.svelte";
-import { fakeIndexedDB } from "../history/fake-idb.test-helper";
-import { presence } from "../history/presence.svelte";
+import { fakeIndexedDB } from "../storage/fake-idb.test-helper";
+import { presence } from "./presence.svelte";
 import { probeDownloads } from "./probe";
 import { setLang } from "../i18n/i18n.svelte";
 import type { Opened } from "../index";

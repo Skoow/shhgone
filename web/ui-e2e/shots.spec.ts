@@ -119,8 +119,7 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   };
   const link = await read("Lien");
   const password = await read("Mot de passe");
-  // Lien de gestion : montré seulement sans historique, désactivé par défaut.
-  await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveAttribute("aria-checked", "false");
+  // Lien de gestion : toujours montré (historique des liens retiré).
   const manage = (await page.locator("[data-manage] .sr-only").first().textContent()) ?? "";
 
   const rc = await browser.newContext(ctxOpts);

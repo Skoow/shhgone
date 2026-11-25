@@ -9,9 +9,6 @@
   import { scrubAddressBar } from "../app/link";
   import { followLink, href, markReopen, shownPath } from "../app/router.svelte";
   import { createReceiver } from "../flows/receive.svelte";
-  import { summarizeOpened } from "../flows/received";
-  import { forgetReceived, keepReceivedDefault, loadHistory, recordReceived, shares } from "../history/live.svelte";
-  import Case from "./compte/Case.svelte";
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { PW_TRIES, isGeneratedPassword } from "../index";
@@ -52,21 +49,6 @@
       // « /s » n'est plus montré une fois le lien lu : l'adresse devient « / ».
       if (!scrubAddressBar(history, shownPath(location.pathname))) scrubAddressBar(history, href("/"));
     },
-    // Conception compte §21.7 : « Garder » (historique de l'appareil, chiffré) ; jamais le mot de passe.
-    keepDefault: keepReceivedDefault,
-    keepReceived: (k, o) => recordReceived({ ...k, ...summarizeOpened(o) }),
-    forgetReceived,
-  });
-
-  // Case « Garder » : cochée selon le réglage, une fois l'historique de l'appareil lu (lecture
-  // locale, rien n'est créé) ; un choix déjà fait dans la page n'est pas écrasé.
-  let keepTouched = false;
-  $effect(() => {
-    untrack(() =>
-      void loadHistory().then(() => {
-        if (!keepTouched) r.keep = keepReceivedDefault();
-      }),
-    );
   });
 
   // Démontage (autre route, nouveau lien collé) : un déverrouillage ou une lecture encore en
@@ -345,14 +327,6 @@
         {/if}
         <p class="trust"><ShieldCheck size={18} aria-hidden="true" /> <span>{t("open.trust")}</span></p>
       </div>
-      <details class="private" data-open-options>
-        <summary
-          ><span>{t("open.options")}{#if r.keep}<span class="on">{" · "}{t("open.options.kept")}</span>{/if}</span><ChevronDown size={18} aria-hidden="true" /></summary
-        >
-        <div class="opts">
-          <Case label={shares.account ? t("open.keep.account") : t("open.keep")} hint={t("open.keep.hint")} bind:checked={() => r.keep, (v) => ((keepTouched = true), (r.keep = v))} />
-        </div>
-      </details>
       <details class="private">
         <summary><span>{t("open.private")}</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <ul>
@@ -635,13 +609,6 @@
     flex: none;
     margin-block-end: 0;
     margin-inline-start: auto;
-  }
-  .private .on {
-    color: var(--text-2);
-    font-weight: 450;
-  }
-  .opts {
-    padding-block: var(--sp-2) 0;
   }
   .trust {
     margin: 0;

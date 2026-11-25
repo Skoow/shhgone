@@ -4,7 +4,7 @@
 import { t } from "../i18n/i18n.svelte";
 import type { Route } from "./router.svelte";
 
-export type TitleScreen = Route["name"] | "landing" | "ready" | "sealing" | "unsupported" | "offline" | "server" | "limit" | "maintenance" | "invalid" | "incomplete" | "gone" | "inbox";
+export type TitleScreen = Route["name"] | "landing" | "ready" | "sealing" | "unsupported" | "offline" | "server" | "limit" | "maintenance" | "invalid" | "incomplete" | "gone";
 const BRAND = "Shhgone";
 
 /**

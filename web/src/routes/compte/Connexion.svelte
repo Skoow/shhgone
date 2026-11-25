@@ -11,7 +11,7 @@
   // Sur ordinateur (décision du 25 novembre, conception §18) : le téléphone d'abord (QR du
   // navigateur, parcours « hybride »), puis « Utiliser une passkey de cet ordinateur » (« local »).
   import { tick, untrack } from "svelte";
-  import { account, annulerCle, cleRequise, estMobile, etatCompte, ouvrirAvecCle, passkeysDisponibles, preparerConnexion, seConnecter, seDeconnecter, type Parcours } from "../../account/session.svelte";
+  import { account, annulerCle, cleRequise, estMobile, etatCompte, ouvrirAvecCle, passkeysDisponibles, preparerConnexion, seConnecter, type Parcours } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
   import { t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
@@ -126,13 +126,6 @@
     preparer();
   }
 
-  async function deconnecter() {
-    await seDeconnecter();
-    banni = null;
-    vue = "form";
-    bandeau = { kind: "info", texte: t("account.loggedOut") };
-    preparer();
-  }
 </script>
 
 <Cadre forme="panneaux" titre={t("account.login.title")}>
@@ -147,7 +140,6 @@
     {/if}
     <div class="actions">
       <Button onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{t("account.continue")}</Button>
-      <Button variant="secondary" onpress={deconnecter}>{t("account.logout")}</Button>
     </div>
   {:else if vue === "cle"}
     <p class="note" data-repli>{t("account.fallback.body")}</p>

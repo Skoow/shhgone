@@ -1,7 +1,7 @@
 // Historique des téléchargements (conception compte §21.9, §21.15.5 ; R12). EXCEPTION ÉCRITE à
 // « aucun stockage navigateur » (UI §12.1, spec §33, source-rules.test.ts) : sur cet appareil
 // seulement, jamais envoyé au serveur ni au compte ; seul ce module tient la base IndexedDB
-// `shhdrop-telechargements` (même mécanisme que l'historique des envois, history/store.ts).
+// `shhdrop-telechargements` (même mécanisme que les autres bases chiffrées, storage/idb.ts).
 // - Chaque entrée est chiffrée AES-256-GCM (WebCrypto), clé créée NON EXTRACTIBLE et gardée
 //   dans la base ; nonce aléatoire de 96 bits à chaque écriture ; l'identifiant (tiré au
 //   hasard) est la donnée associée. Honnêtement : la clé est sur le même appareil ; ce
@@ -18,7 +18,7 @@
 // - Entrées retirées 30 jours après l'enregistrement.
 // Aucune requête réseau ici.
 import type { ItemSink } from "../flows/downloads.svelte";
-import { idbBackend, type Backend, type Rec } from "../history/store";
+import { idbBackend, type Backend, type Rec } from "../storage/idb";
 import type { Family, Format } from "../ui/formats";
 
 export const DOWNLOADS_DB = "shhdrop-telechargements";

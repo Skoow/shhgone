@@ -71,15 +71,15 @@ describe("forme des coffres (vecteurs)", () => {
 
 describe("contenu du coffre de profil", () => {
   it("aller-retour exact (photo comprise)", () => {
-    const p = profil({ photo: new Uint8Array([1, 2, 3, 250]), pass: "jeton-du-pass", reglages: { proposerProfil: false, garderRecus: false } });
+    const p = profil({ photo: new Uint8Array([1, 2, 3, 250]), pass: "jeton-du-pass", reglages: { proposerProfil: false } });
     expect(profilDeJson(profilEnJson(p))).toEqual(p);
   });
 
-  it("« garder_salons » retiré : un coffre ancien qui le porte se lit, et se réécrit sans lui", () => {
+  it("« garder_salons » et « garder_recus » retirés : un coffre ancien qui les porte se lit, et se réécrit sans eux", () => {
     const ancien = new TextEncoder().encode(JSON.stringify({ v: 1, pseudo: "Léa", photo: null, langue: "fr", reglages: { proposer_profil: true, garder_recus: false, garder_salons: true }, pass: null }));
     const p = profilDeJson(ancien);
-    expect(p.reglages).toEqual({ proposerProfil: true, garderRecus: false });
-    expect(JSON.parse(new TextDecoder().decode(profilEnJson(p))).reglages).toEqual({ proposer_profil: true, garder_recus: false });
+    expect(p.reglages).toEqual({ proposerProfil: true });
+    expect(JSON.parse(new TextDecoder().decode(profilEnJson(p))).reglages).toEqual({ proposer_profil: true });
   });
 
   it("une photo de 64 Ko tient dans le palier de 256 Kio", async () => {

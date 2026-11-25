@@ -5,8 +5,8 @@
 // la personne ne l'a pas activé, rien n'est créé ni écrit (ni base, ni clé, ni entrée) ; une
 // simple visite ou un fichier enregistré n'écrivent rien. Aucune requête réseau.
 import { getDemo } from "../app/demo-hooks";
-import { presence } from "../history/presence.svelte";
-import { memoryBackend, type Backend } from "../history/store";
+import { presence } from "./presence.svelte";
+import { memoryBackend, type Backend } from "../storage/idb";
 import { downloadsIdb, openDownloads, type DownloadEntry, type Downloads, type NewDownload } from "./store";
 
 export const downloads = $state({

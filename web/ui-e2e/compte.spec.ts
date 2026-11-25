@@ -124,7 +124,7 @@ async function parametres(page: Page, origin: string): Promise<void> {
     history.pushState(null, "", "/compte");
     dispatchEvent(new PopStateEvent("popstate"));
   });
-  await expect(titre(page, "Paramètres")).toBeVisible();
+  await expect(titre(page, "Compte")).toBeVisible();
   void origin;
 }
 

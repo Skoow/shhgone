@@ -53,15 +53,12 @@ test("finition : pages d'information, pied, menu, erreurs", async ({ page, shh, 
   await page.goto(`${shh.origin}/s#${KEY}`);
   await expect(page.locator("h1")).toBeVisible({ timeout: 20_000 });
   await shot(page, isMobile, "lien-invalide");
-  await page.goto(shh.origin + "/envois");
-  await expect(page.locator("h1")).toBeVisible();
-  await shot(page, isMobile, "historique-vide");
   await page.goto(shh.origin + "/telechargements");
   await expect(page.locator("h1")).toBeVisible();
   await shot(page, isMobile, "telechargements-vide");
 });
 
-test("finition : envoi, ouverture, contenu, suivi, historique", async ({ page, shh, isMobile, browser }) => {
+test("finition : envoi, ouverture, contenu, suivi", async ({ page, shh, isMobile, browser }) => {
   test.setTimeout(180_000);
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(shh.origin + "/envoyer");
@@ -83,10 +80,7 @@ test("finition : envoi, ouverture, contenu, suivi, historique", async ({ page, s
   await expect(readyHeading(page)).toBeVisible({ timeout: 120_000 });
   await page.unroute("**/api/**");
 
-  const sent = await sendShare(page, shh.origin + "/envoyer", { text: "Rendez-vous jeudi à 18 h.", files: [file("contrat.pdf")], keep: true, isMobile });
-  await page.goto(shh.origin + "/envois");
-  await expect(page.locator("h1")).toBeVisible();
-  await shot(page, isMobile, "historique");
+  const sent = await sendShare(page, shh.origin + "/envoyer", { text: "Rendez-vous jeudi à 18 h.", files: [file("contrat.pdf")], isMobile });
 
   const vp = isMobile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } };
   const { ctx: rc, page: r } = await freshPage(browser, { ...vp, locale: "fr-FR", reducedMotion: "reduce" });

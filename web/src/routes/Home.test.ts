@@ -130,7 +130,7 @@ describe("Home (UI §9.1)", () => {
     expect(h1.textContent).toBe("Nouveau partage");
     expect(h1.classList.contains("sr-only")).toBe(true);
     expect(h1.id).toBe("hero-title");
-    // Les trois assurances sont dans le cadre de dépôt du composeur (ui/Assurances.svelte).
+    // Assurances dites une seule fois, sous le héros de l'accueil (pas en mode compact ni dans le composeur).
     expect(document.querySelector("[data-assure]")).toBeNull();
     expect(document.querySelector("[data-demo]")).toBeNull();
     expect(document.querySelector("[data-pick]")).toBeNull();

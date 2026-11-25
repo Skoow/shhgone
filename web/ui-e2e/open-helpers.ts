@@ -32,12 +32,11 @@ export type Sent = { link: string; password: string; manage: string };
 /**
  * Envoi par l'interface (bureau : options dans la colonne ; téléphone : feuille « Options »).
  * `files` : chemins de ui-e2e/files ou fichiers en mémoire ; ordre d'ajout = ordre du composeur.
- * `keep` : active « Garder dans mon historique » (désactivé par défaut sans compte) et attend l'entrée réellement écrite.
  */
 export async function sendShare(
   page: Page,
   url: string,
-  o: { text?: string; files?: (string | { name: string; mimeType: string; buffer: Buffer })[]; opens?: number; download?: boolean; isMobile?: boolean; clean?: boolean; title?: string; keep?: boolean } = {},
+  o: { text?: string; files?: (string | { name: string; mimeType: string; buffer: Buffer })[]; opens?: number; download?: boolean; isMobile?: boolean; clean?: boolean; title?: string } = {},
 ): Promise<Sent> {
   await page.goto(url);
   if (o.text !== undefined) await addText(page, o.text);
@@ -80,20 +79,8 @@ export async function sendShare(
   await pw.locator("[data-reveal]").click();
   const password = await read(pw);
   await pw.locator("[data-reveal]").click();
-  // Lien de gestion : montré seulement sans historique. Historique coupé le temps
-  // de le lire, puis remis (l'entrée est gardée de nouveau, comme avant) ; `keep` l'active.
-  const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
-  await expect(keep.or(page.locator("[data-keep-unavailable]"))).toBeEnabled();
-  const wasOn = (await keep.count()) > 0 && (await keep.getAttribute("aria-checked")) === "true";
-  if (wasOn) await keep.click();
+  // Lien de gestion : toujours montré (historique des liens retiré, spec §33).
   const manage = await read(page.locator("[data-manage]"));
-  if (wasOn || o.keep) {
-    await keep.click();
-    await expect(keep).toHaveAttribute("aria-checked", "true");
-    // Entrée réellement réécrite (IndexedDB) avant de rendre la main : un onglet fermé aussitôt
-    // la perdait (CI, return.spec).
-    await expect(page.locator("[data-keep][data-kept]")).toHaveCount(1, { timeout: 10_000 });
-  }
   expect(link).toMatch(/#[A-Za-z0-9_-]{43}$/);
   return { link, password, manage };
 }

@@ -101,7 +101,7 @@ describe("textes publics et compte par passkey", () => {
       /7 jours/u,
       /30 jours/u,
       /13 mois/u,
-      /exporter vos données/u,
+      /la page Compte montre ce que nous gardons/u,
     ])
       expect(f).toMatch(re);
     // Le séquestre a disparu (conception §8) : plus rien ne dit que le service peut lire le profil.
@@ -131,22 +131,18 @@ describe("textes publics et compte par passkey", () => {
     expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
   });
 
-  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut avec ou sans compte, 7 jours, comment l'effacer", () => {
+  // 25 novembre : historique local des liens retiré (spec §33) ; le lien de gestion se garde à la main.
+  test("Confidentialité, « Sur votre appareil » : aucune liste des partages ni des liens reçus ; lien de gestion à garder soi-même", () => {
     for (const comptes of [false, true]) {
-      const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!.find((l) => l.startsWith("L'historique de vos envois"))!;
-      expect(fr).toMatch(/lien de gestion[^.]*jamais le lien de partage ni le mot de passe\./u);
-      expect(fr).toMatch(/Il est désactivé par défaut, avec ou sans compte : rien n'est gardé tant que vous n'activez pas vous-même « Garder dans mon historique » ; « Lien prêt » et « Salon prêt » vous montrent alors le lien de gestion/u);
-      expect(fr).toMatch(/7 jours après la fin/u);
-      expect(fr).toMatch(/« Effacer l'historique » dans « Mes partages » efface tout\./u);
-      const en = infoPage("confidentialite", "en", comptes).blocks.find((b) => b.h === "On your device")!.list!.find((l) => l.startsWith("The history of what you send"))!;
-      expect(en).toMatch(/management link[^.]*never the share link or the password\./u);
-      expect(en).toMatch(/It is off by default, with or without an account: nothing is kept until you turn on “Keep in my history” yourself; “Link ready” and “Room ready” then show you the management link/u);
-      expect(en).toMatch(/7 days after the share or room ends/u);
-      expect(en).toMatch(/“Clear history” in “My shares” erases it all\./u);
+      const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!;
+      expect(fr).toContain("Aucune liste de vos partages ni des liens reçus n'est gardée, sur l'appareil comme dans un compte. « Lien prêt » et « Salon prêt » vous montrent le lien de gestion : gardez-le vous-même, c'est le seul moyen de suivre ou de supprimer le partage plus tard.");
+      expect(fr.join(" ")).not.toMatch(/Mes partages|Garder dans mon historique|Garder ce partage/u);
+      const en = infoPage("confidentialite", "en", comptes).blocks.find((b) => b.h === "On your device")!.list!;
+      expect(en.join(" ")).toMatch(/No list of your shares or of the links you receive is kept/u);
+      expect(en.join(" ")).not.toMatch(/My shares|Keep in my history|Keep this share/u);
     }
-    // Les libellés cités sont ceux de l'interface.
-    expect([fr["ready.keep"], fr["hist.clear"], fr["hist.remove"], fr["hist.title"]]).toEqual(["Garder dans mon historique", "Effacer l'historique", "Retirer de la liste", "Mes partages"]);
-    expect([en["ready.keep"], en["hist.clear"], en["hist.remove"], en["hist.title"]]).toEqual(["Keep in my history", "Clear history", "Remove from list", "My shares"]);
+    expect(texte("confidentialite", "fr", true)).not.toMatch(/exporter vos données/u);
+    expect(texte("confidentialite", "en", true)).not.toMatch(/export your data/u);
   });
 
   test("Sécurité, détails techniques : taille exacte (à 4 Mio près pendant l'envoi, qui commence dès l'ajout ; palier seul au repos)", () => {

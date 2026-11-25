@@ -14,7 +14,7 @@
 // redemandée. Limite (faible) : le jeton et les clés passent par une chaîne JSON le temps du
 // chiffrement ; une chaîne JavaScript ne s'efface pas.
 // Apps (D42-20) : trousseau du système à la place, même contenu.
-import { idbBackend, type Backend } from "../history/store";
+import { idbBackend, type Backend } from "../storage/idb";
 import { b64u, unb64u, utf8 } from "../engine/pure";
 
 export const COMPTE_DB = "shhdrop-compte";

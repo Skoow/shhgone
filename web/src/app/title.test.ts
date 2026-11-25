@@ -29,7 +29,6 @@ describe("titre de l'onglet", () => {
     expect(routeTitle("connexion")).toBe("Se connecter · Shhgone");
     expect(routeTitle("recuperation")).toBe("Clé de récupération · Shhgone");
     expect(routeTitle("compte")).toBe("Compte · Shhgone");
-    expect(routeTitle("profil")).toBe("Profil · Shhgone");
     setLang("en");
     expect(routeTitle("inscription")).toBe("Create an account · Shhgone");
     expect(routeTitle("connexion")).toBe("Sign in · Shhgone");

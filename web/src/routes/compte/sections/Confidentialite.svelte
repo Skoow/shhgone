@@ -1,11 +1,10 @@
 <script lang="ts">
-  // Confidentialité (conception compte §21.5, §21.7, §21.9, §21.15.4 point 6 ; monté
-  // seulement avec __COMPTES__). Deux réglages du compte, écrits dans le coffre de profil :
-  // proposer pseudo et photo dans les salons, garder les liens ouverts (« Garder les salons que je
-  // rejoins », lu nulle part, retiré).
-  // Deux réglages de cet appareil : l'historique des téléchargements (downloads/, jamais envoyé) et
-  // « Rester connecté » (seulement coupé d'ici : la durée de la session est fixée par le serveur à
-  // la connexion).
+  // Confidentialité (conception compte §21.5, §21.9, §21.15.4 point 6 ; monté seulement avec
+  // __COMPTES__). Un réglage du compte, écrit dans le coffre de profil : proposer pseudo et photo
+  // dans les salons. Deux réglages de cet appareil : l'historique des téléchargements (downloads/,
+  // jamais envoyé) et « Rester connecté » (seulement coupé d'ici : la durée de la session est
+  // fixée par le serveur à la connexion). « Garder les liens que j'ouvre » retiré avec
+  // l'historique local des liens (25 novembre, spec §33).
   import { untrack } from "svelte";
   import { account, arreterResterConnecte, ecrireProfil, REGLAGES_DEFAUT, type Reglages } from "../../../account/session.svelte";
   import { downloads, loadDownloads, setDownloadsEnabled } from "../../../downloads/live.svelte";
@@ -34,8 +33,7 @@
 <Section id="sec-privacy" titre={t("account.section.privacy")}>
   <div class="sws">
     <Switch label={t("account.privacy.propose")} hint={t("account.privacy.propose.hint")} checked={r.proposerProfil} disabled={!account.profil} onchange={(v) => regler("proposerProfil", v)} />
-    <Switch label={t("account.privacy.links")} checked={r.garderRecus} disabled={!account.profil} onchange={(v) => regler("garderRecus", v)} />
-    <Switch label={t("account.privacy.downloads")} hint={t("downloads.keep.hint")} checked={downloads.enabled} onchange={(v) => void setDownloadsEnabled(v)} />
+    <Switch label={t("account.privacy.downloads")} hint={t("account.privacy.downloads.hint")} checked={downloads.enabled} onchange={(v) => void setDownloadsEnabled(v)} />
     <Switch label={t("account.privacy.stay")} checked={account.persistante} disabled={!account.persistante} reason="{uid}-stay" onchange={(v) => void (v ? undefined : arreterResterConnecte())} />
     {#if !account.persistante}<p id="{uid}-stay" class="note">{t("account.privacy.stay.off")}</p>{/if}
   </div>

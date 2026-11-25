@@ -6,7 +6,6 @@
   import { flushSync, tick, untrack } from "svelte";
   import { MediaQuery } from "svelte/reactivity";
   import { chrome, type AddGesture } from "../app/chrome.svelte";
-  import Assurances from "../ui/Assurances.svelte";
   import { MAX_ITEMS, NAME_MAX, TEXT_MAX, TITLE_MAX, dataSegmentsOf, generatePassword, type ElementStatus, type Item, type KeepTtl } from "../index";
   import type { Formule } from "../limits";
   import { blockKey, canClean, createComposer, type AddReport, type ComposeItem, type Source } from "../flows/compose.svelte";
@@ -756,7 +755,6 @@
       </div>
       {#if narrow && !filled}
         <!-- Page d'envoi vide, téléphone : « Ajouter » au centre (ouvre la feuille d'ajout). -->
-        <!-- Cadre de dépôt avec les trois assurances dessous. -->
         <div class="dz-box" data-dz-box>
           <button type="button" class="dropzone empty" aria-haspopup="dialog" onclick={() => (addOpen = true)}>
             <span class="dz-ic" aria-hidden="true"><Plus size={22} strokeWidth={2.2} /></span>
@@ -765,7 +763,6 @@
               <span class="dz-s">{t("add.big.sub")}</span>
             </span>
           </button>
-          <Assurances />
         </div>
         <div class="offers after" data-offers-after>{@render offers()}</div>
       {:else if !narrow}
@@ -787,11 +784,11 @@
         {#if filled}
           {@render zone()}
         {:else}
-          <!-- Liste vide : le cadre remplit la colonne, son contenu au centre, et les
-               trois assurances sous « Déposez des fichiers ». -->
+          <!-- Liste vide : le cadre remplit la colonne, son contenu au centre. Les assurances
+               (« Chiffré · Sans compte · S'autodétruit ») ne sont plus répétées ici : seulement sous
+               le héros de l'accueil (25 novembre). -->
           <div class={["dz-box fill", { spot: spot === "drop" }]} data-dz-box>
             {@render zone()}
-            <Assurances />
           </div>
         {/if}
       {/if}

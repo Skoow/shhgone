@@ -5,7 +5,7 @@
 // « Copier le lien et le mot de passe » ou « Envoyer vers une app » réussis) ; une copie refusée
 // ou un partage annulé ne comptent pas. Rien n'est stocké.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeIndexedDB } from "../history/fake-idb.test-helper";
+import { fakeIndexedDB } from "../storage/fake-idb.test-helper";
 import { NOTHING_COPIED, confirmLeave, noteCopy, secured, warnOnUnload } from "./ready-copies";
 
 describe("ready-copies : logique", () => {

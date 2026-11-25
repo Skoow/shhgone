@@ -1,8 +1,8 @@
 <script lang="ts">
-  // Barre d'onglets du téléphone (< 768 px), façon app : Envoyer, Mes partages, Téléchargements (conception compte §21.15.5). Plus d'onglet Réglages : langue, nettoyage et liens sont dans le pied de page.
+  // Barre d'onglets du téléphone (< 768 px), façon app, avec un compte ouvert seulement :
+  // « Nouveau » (le bouton « Nouveau partage » du bas), Téléchargements, Compte (25 novembre).
   // Visibilité décidée par app/tabbar.ts ; masquée sur ordinateur par la CSS seule.
-  // Libellés courts (tabs.*) : quatre onglets tiennent sur 320 px sans « … » (« Fichiers » pour
-  // Téléchargements, audit du 25 novembre).
+  // Libellés courts (tabs.*) : tiennent sur 320 px sans « … ».
   import { currentTab, tabPath, tabsFor, type TabId } from "../app/tabbar";
   import { accountFlag } from "../app/account-flag.svelte";
   import { followLink, href, router } from "../app/router.svelte";
@@ -10,11 +10,9 @@
   import { announce } from "./announce";
   import TabIcon from "./TabIcon.svelte";
 
-  // Connecté (conception compte §21.15.1) : Accueil, Envoyer, Téléchargements, Profil. Le compte
-  // ouvert est dit par l'historique (accountFlag, posé par la session) : aucun code du compte ici.
-  const connected = $derived(accountFlag.connected);
-  const tabs = $derived(tabsFor(connected));
-  const current = $derived(currentTab(router.current.name, connected));
+  // Le compte ouvert est dit par accountFlag (posé par la session) : aucun code du compte ici.
+  const tabs = $derived(tabsFor(accountFlag.connected));
+  const current = $derived(currentTab(router.current.name));
 
   function soon(id: TabId) {
     announce(t(`tabs.soon.${id}` as Key));
@@ -26,7 +24,7 @@
     {#each tabs as tab (tab.id)}
       <li>
         {#if !tab.soon}
-          {@const to = tabPath(tab.id, connected)}
+          {@const to = tabPath(tab.id)}
           <a class="tab" href={href(to)} aria-current={current === tab.id ? "page" : undefined} onclick={(e) => followLink(e, to)}>
             <TabIcon id={tab.id} /><span class="lb">{t(`tabs.${tab.id}` as Key)}</span>
           </a>

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { fakeIndexedDB } from "./fake-idb.test-helper";
 import { RETURNS_DB, openReturns } from "./returns";
-import { idbBackend, memoryBackend } from "./store";
+import { idbBackend, memoryBackend } from "./idb";
 
 const T0 = Date.UTC(2026, 10, 12, 9, 0);
 const TAG = "T".repeat(22);

@@ -1,8 +1,8 @@
 <script lang="ts">
   // Barre du haut, ordinateur et tablette : menus « Partager » et
   // « Sécurité » en motif disclosure (bouton aria-expanded qui montre une liste de liens ou de
-  // boutons, pas un role="menu"), « Salon » bientôt, « Offres » ; à droite « Mes partages » et
-  // « Partager ». Clavier : Entrée et Espace ouvrent, flèches haut et bas parcourent, Échap ferme
+  // boutons, pas un role="menu"), « Salon » bientôt, « Offres » ; à droite le compte
+  // (« Se connecter » ou « Mon compte »). Clavier : Entrée et Espace ouvrent, flèches haut et bas parcourent, Échap ferme
   // et rend le focus au bouton, Tab hors du menu le ferme ; un clic ailleurs le ferme aussi.
   // Souris (pointeur fin qui survole) : le survol ouvre après un court délai d'intention et
   // referme après un délai de grâce (pour glisser du bouton au panneau) ; d'un menu ouvert à
@@ -20,7 +20,6 @@
   import { ChevronDown, Compass, EyeOff, Flag, Server, ShieldCheck, Upload } from "./Icon";
   import { allerSection } from "./section";
   import { accountFlag } from "../app/account-flag.svelte";
-  import { presence } from "../history/presence.svelte";
 
   let { busy = false }: { busy?: boolean } = $props();
 
@@ -270,17 +269,10 @@
     </li>
   </ul>
   <div class="acts">
-    <!-- Connecté (conception compte §21.15.1) : « Mes partages » devient « Accueil » (la liste). -->
-    {#if accountFlag.connected}
-      <a class="btn ghost" href={href("/")} aria-current={here("/")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/"))} {...off}>{t("nav.home")}</a>
-    {:else if presence.any}
-      <!-- Seulement s'il y a des partages sur cet appareil. -->
-      <a class="btn ghost" href={href("/envois")} aria-current={here("/envois")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/envois"))} {...off}>{t("nav.shares")}</a>
-    {/if}
     {#if __COMPTES__}
       <!-- Compte : « Se connecter », ou « Mon compte » une fois connecté. -->
       {#if accountFlag.connected}
-        <a class="btn ghost" href={href("/compte/profil")} aria-current={here("/compte/profil")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte/profil"))} {...off}>{t("nav.menu.myAccount")}</a>
+        <a class="btn ghost" href={href("/compte")} aria-current={here("/compte")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte"))} {...off}>{t("nav.menu.myAccount")}</a>
       {:else}
         <a class="btn ghost" href={href("/compte/connexion")} aria-current={here("/compte/connexion")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte/connexion"))} {...off}>{t("account.login.title")}</a>
       {/if}
