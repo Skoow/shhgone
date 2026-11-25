@@ -259,7 +259,7 @@ describe("check-dist.mjs, production", () => {
     expect(run([site({ "index.html": `<!doctype html><html><head><script>1</script></head></html>` }, false)]).err).toContain("index.html : script en ligne");
   });
 
-  it("Argon2id hors du script principal (moteur WebAssembly depuis la, libsodium supprimé) : le moteur absent de index-*.js ; ses fichiers portent l'empreinte inscrite dans le script ; aucun orphelin", () => {
+  it("Argon2id hors du script principal (moteur WebAssembly, libsodium supprimé) : le moteur absent de index-*.js ; ses fichiers portent l'empreinte inscrite dans le script ; aucun orphelin", () => {
     const wasm = String.fromCharCode(0, 97, 115, 109, 1, 0, 0, 0);
     const kdf = "self.onmessage=1";
     const files = { "assets/engine-AbCd1234.wasm": wasm, "assets/engine-kdf-EfGh5678.js": kdf };

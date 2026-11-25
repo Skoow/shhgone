@@ -12,7 +12,7 @@
 //   lecture reprend à l'octet déjà écrit (`from`) ; elle n'est proposée que si le budget de
 //   lecture estimé le permet (read-meter.ts). Le client actuel relit l'élément depuis son début
 //   et jette ce qui est déjà écrit ; une reprise au segment demande une option du client
-//   (`saveItem(i, sink, { from })`), demandée à la.
+//   (`saveItem(i, sink, { from })`), pas encore faite.
 // - **Arrêt** : fichier partiel supprimé (abort), la ligne revient à son état de départ.
 // - **Partage disparu** (spec §41.8) : seul le fichier en cours de lecture continue ; ce qui
 //   attend, est en pause ou garde un partiel est arrêté (le serveur ne reprend pas une pause

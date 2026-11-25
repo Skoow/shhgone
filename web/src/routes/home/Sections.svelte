@@ -119,8 +119,8 @@
       </li>
     {/each}
   </ul>
-  <!-- Le lien en deux (remplace la de ne plus
-       le montrer ici) : l'adresse va au serveur ; tout ce qui suit le « # » reste dans le navigateur.
+  <!-- Le lien en deux (de nouveau montré ici) :
+       l'adresse va au serveur ; tout ce qui suit le « # » reste dans le navigateur.
        Exemple de la longueur réelle (43 caractères : la clé de 32 octets en base64url), jamais une
        vraie clé. -->
   <figure class="link rv" data-key-note {@attach reveal}>

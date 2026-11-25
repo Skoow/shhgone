@@ -1,4 +1,4 @@
-// Page « Vérifier cette version » (spec §28.) : en français et en anglais, liée
+// Page « Vérifier cette version » (spec §28.4) : en français et en anglais, liée
 // depuis le pied de page et la page Sécurité ; commandes à recopier avec l'identité exacte du
 // signataire ; limites honnêtes ; aucune empreinte affichée par la page elle-même ; aucune
 // ressource tierce (gardes de fixtures.ts : aucune requête hors de l'origine, aucune violation

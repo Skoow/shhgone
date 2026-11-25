@@ -250,8 +250,8 @@ const int = (x: unknown, min = 0): x is number => Number.isSafeInteger(x) && (x 
 /**
  * Entrée validée champ par champ, ou null. Tout champ inconnu (mot de passe, noms, contenu…) est
  * ignoré. Lien selon la sorte : envoi → lien de gestion seulement ; reçu → lien de partage
- * seulement ; salon → invitation « #c » seulement. Sans sorte ni origine (entrée d'avant le lot
- * 11) : envoi local.
+ * seulement ; salon → invitation « #c » seulement. Sans sorte ni origine (entrée plus
+ * ancienne) : envoi local.
  */
 export function cleanEntry(x: unknown): HistoryEntry | null {
   if (typeof x !== "object" || x === null) return null;

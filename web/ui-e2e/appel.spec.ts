@@ -201,7 +201,7 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
   await bouton(page, "Continuer").click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
-  // Historique désactivé par défaut, même avec un compte (B) : le lien de gestion est
+  // Historique désactivé par défaut, même avec un compte : le lien de gestion est
   // montré d'emblée, pour être gardé à la main.
   await expect(page.locator("[data-manage]")).toContainText("Il n'est pas gardé dans l'historique de cet appareil");
   await expect(bouton(page, "Afficher le lien de gestion")).toHaveCount(0);

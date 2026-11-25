@@ -3,8 +3,8 @@
 // (docs/conception/specs/2026-11-03-shhdrop-design.md : §2, §5.3, §7, §9, §18, §35, §36, §41.4,
 // §41.8, D41-28, D41-29). Règles : jamais « 100 % », aucune allégation d'audit ni de pays
 // d'hébergement, aucune identité d'éditeur ni d'hébergeur inventée (champs « à
-// compléter par »), aucune adresse e-mail. Chiffres lus dans les constantes.
-// « Vérifier cette version » (spec §28.) : comment n'importe qui vérifie que le site
+// compléter »), aucune adresse e-mail. Chiffres lus dans les constantes.
+// « Vérifier cette version » (spec §28.4) : comment n'importe qui vérifie que le site
 // servi est le build public signé ; la page n'affiche aucune empreinte calculée par elle-même (une
 // preuve qui se certifierait seule, §28.8 C7) et dit qu'elle ne peut pas prouver sa propre intégrité.
 // Compte par passkey (conception 2026-11-22-compte-passkey-design.md §8, §12) : les textes qui

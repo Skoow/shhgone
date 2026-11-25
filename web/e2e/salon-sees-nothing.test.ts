@@ -109,7 +109,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
   // Clés SFrame (exportées de l'état MLS) de chaque époque traversée, par client. Le moteur
   // n'expose ni la clé privée de signature ni la clé HPKE de la feuille (aucune API, même en
   // test) : elles ne sont donc pas cherchées ici ; seule la clé exportée de chaque époque l'est,
-  // comme témoin de l'état MLS. Limite du test, notée dans le rapport de la.
+  // comme témoin de l'état MLS. Limite connue de ce test.
   const sframes = new Map<string, { label: string; cle: Uint8Array }>();
   function releverSframe(moment: string) {
     for (const x of clients) {

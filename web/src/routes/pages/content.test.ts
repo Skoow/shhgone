@@ -126,7 +126,7 @@ describe("textes publics et compte par passkey", () => {
     expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
   });
 
-  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut avec ou sans compte (B), 7 jours, comment l'effacer", () => {
+  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut avec ou sans compte, 7 jours, comment l'effacer", () => {
     for (const comptes of [false, true]) {
       const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!.find((l) => l.startsWith("L'historique de vos envois"))!;
       expect(fr).toMatch(/lien de gestion[^.]*jamais le lien de partage ni le mot de passe\./u);

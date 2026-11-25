@@ -145,7 +145,7 @@ describe("format des entrées du coffre privé", () => {
     expect(deCoffre("recus", { id: "x".repeat(22), lien: "https://shh.test/#" + "a".repeat(43), cree: 1, expire: 2, taille: 1, elements: 1, format: "image", mot_de_passe: "x" }, T0)).not.toHaveProperty("mot_de_passe");
   });
 
-  // Nom du partage : `libelle` d'un envoi, seulement s'il y en a un ; entrée d'avant
+  // Nom du partage : `libelle` d'un envoi, seulement s'il y en a un ; entrée plus ancienne
   // (sans libellé) relue sans titre ; renommage : seul le libellé de l'entrée du même lien change.
   it("envoi : titre du partage dans le coffre (libelle), aller-retour, renommage", () => {
     const e = entree({ sorte: "envoi", label: "Contrat Dupont" });

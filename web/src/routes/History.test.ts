@@ -81,7 +81,7 @@ describe("Mes partages : historique des envois désactivé par défaut", () => {
     expect(document.querySelector("[data-history-empty] h2")!.textContent).toBe("Aucun partage pour l'instant");
     await live.setHistoryEnabled(false);
   });
-  it("avec un compte aussi (B) : « désactivé » tant que la personne ne l'active pas", async () => {
+  it("avec un compte aussi : « désactivé » tant que la personne ne l'active pas", async () => {
     await live.setHistoryEnabled(false);
     live.setAccountPrefs({ keepReceived: true });
     app = mount(History as never, { target: document.body }) as Record<string, unknown>;

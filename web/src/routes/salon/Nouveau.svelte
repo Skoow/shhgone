@@ -38,7 +38,7 @@
   });
   let detruire = $state(false);
   // « Garder dans mon historique » : le réglage de l'appareil (history/live.svelte.ts,
-  // keepSentDefault), désactivé par défaut même avec un compte (B) ; la
+  // keepSentDefault), désactivé par défaut même avec un compte ; la
   // personne l'active. Changé ici, il vaut aussi pour les envois suivants, comme sur « Lien prêt ».
   // Décochée : « Salon prêt » montre le lien de gestion d'emblée, pour qu'il soit gardé à la main.
   let garder = $state(false);

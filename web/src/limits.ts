@@ -38,13 +38,13 @@ export const PENDING_MAX = 2;
 /**
  * Formules payantes (spec §38.8.1, prix proposés de §38.8.2, TTC, en euros) : présentées par une
  * seule ligne discrète du composeur et une feuille « Bientôt disponible » ; rien n'est en
- * vente tant que les ne sont pas faites. Le nombre d'éléments n'en fait pas
+ * vente tant que le paiement n'est pas ouvert. Le nombre d'éléments n'en fait pas
  * partie : MAX_ITEMS vaut pour toutes (D41-17). Aucune n'apporte de sécurité de plus (§38.9.0).
- * Ouvertures et tailles : voir la ci-dessous.
+ * Ouvertures et tailles : voir la table ci-dessous.
  */
 export type PaidTier = "plus" | "pro";
 export const PAID: Readonly<Record<PaidTier, { bytes: number; opens: number; ttlDays: readonly number[]; shares: number; month: number; year: number }>> = {
-  // :, Plus jusqu'à 3 jours, Pro 7 jours ;
+  // Durées : Plus jusqu'à 3 jours, Pro 7 jours ;
   // ouvertures gratuit 5, Plus 10, Pro 20, et Pro 30 Go (50 avant).
   // shares : partages payants (jetons) par période de 30 jours, sans report (offres.go, JetonsPeriod).
   plus: { bytes: 10 * 1024 ** 3, opens: 10, ttlDays: [2, 3], shares: 30, month: 7, year: 70 },

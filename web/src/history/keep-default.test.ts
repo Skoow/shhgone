@@ -56,7 +56,7 @@ describe("keepSentDefault : historique des envois", () => {
     expect(live.shares.enabled).toBe(false);
     expect(live.keepSentDefault()).toBe(false);
   });
-  it("avec un compte aussi : désactivé par défaut (B) ; activé par la personne, activé", async () => {
+  it("avec un compte aussi : désactivé par défaut ; activé par la personne, activé", async () => {
     for (const keepReceived of [false, true]) {
       live.setAccountPrefs({ keepReceived });
       expect(live.keepSentDefault()).toBe(false);

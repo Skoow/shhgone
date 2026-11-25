@@ -82,7 +82,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   await expect(page).toHaveURL(/\/salon\/nouveau$/);
   // Compte récent : 4 places au plus (conception du compte §11) ; « Ouvert » les prend toutes.
   await expect(page.getByText("Ouvert, 4 au plus")).toBeVisible();
-  // Historique désactivé par défaut, même avec un compte (B) : la créatrice l'active
+  // Historique désactivé par défaut, même avec un compte : la créatrice l'active
   // elle-même ici (la suite s'appuie sur le lien de gestion gardé : « Détruire le salon » après
   // délogement). Sans cela, « Salon prêt » montre le lien de gestion d'emblée (appel.spec.ts).
   const garder = page.getByRole("switch", { name: "Garder dans mon historique" });

@@ -45,7 +45,7 @@ export function deCoffre(liste: Liste, v: EntreePrivee, now: number): HistoryEnt
     origine: "compte",
     manage: sorte === "envoi" ? v.gestion : sorte === "salon_cree" ? (v.gestion ?? "") : "",
     link: sorte === "envoi" ? "" : sorte === "recu" ? v.lien : v.invitation,
-    // Envoi : titre du partage, absent des entrées d'.
+    // Envoi : titre du partage, absent des entrées plus anciennes.
     label: sorte.startsWith("salon") ? v.libelle : sorte === "envoi" ? (v.libelle ?? "") : "",
     format: sorte === "recu" ? v.format : "",
     createdAt: cree,

@@ -2,7 +2,7 @@
   // Écran d'envoi (UI §9.1, §9.2, §9.3) : l'accueil tant que la liste est vide ; dès le premier
   // élément (Parcourir, Photo, Vidéo, Texte, Coller, dépôt), une transition de vue ouvre le
   // composeur dans le réceptacle : liste par catégories, jauge, options, « Chiffrer et envoyer ».
-  // Tout reste en mémoire (aucun stockage) ; l'envoi lui-même est la (`onsend`).
+  // Tout reste en mémoire (aucun stockage) ; l'envoi lui-même est fait par le parent (`onsend`).
   import { flushSync, tick, untrack } from "svelte";
   import { MediaQuery } from "svelte/reactivity";
   import { chrome, type AddGesture } from "../app/chrome.svelte";

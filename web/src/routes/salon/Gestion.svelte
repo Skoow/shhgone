@@ -1,6 +1,6 @@
 <script lang="ts">
   // Réglages du salon : règle d'effacement (tout participant, v3 §5), puis pour le
-  // créateur : places, renouvellement, nouvelle invitation (étapes (a) puis (d) à (h)), (le salon peut raccourcir : dit avant de confirmer, §14.7),
+  // créateur : places, renouvellement, nouvelle invitation (étapes (a) puis (d) à (h) ; le salon peut raccourcir : dit avant de confirmer, §14.7),
   // destruction ; pour un membre : destruction si le salon le permet ; pour tous : « Quitter »,
   // « Quitter et signaler » (spec §39.5).
   import { t, getLang } from "../../i18n/i18n.svelte";

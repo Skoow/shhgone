@@ -85,7 +85,7 @@ describe("Lien prêt : « Garder dans mon historique »", () => {
     expect(live.shares.enabled).toBe(false);
   });
 
-  it("avec un compte aussi (B) : désactivé par défaut, lien de gestion montré, rien n'est gardé", async () => {
+  it("avec un compte aussi : désactivé par défaut, lien de gestion montré, rien n'est gardé", async () => {
     live.setAccountPrefs({ keepReceived: true });
     await show();
     expect(sw().getAttribute("aria-checked")).toBe("false");

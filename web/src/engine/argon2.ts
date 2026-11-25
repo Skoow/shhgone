@@ -3,7 +3,7 @@
 // arrêté après : les 64 Mio ne restent pas dans la mémoire du moteur de la page, qui ne rétrécit
 // jamais. `start` crée ce Worker ; par défaut celui du moteur (engine.start : script lu avec son
 // empreinte, lancé depuis un Blob par la politique Trusted Types, source.verified.ts).
-// Repli, comme l'ancien Argon2id (libsodium, supprimé en) : si le Worker ne se crée pas
+// Repli, comme l'ancien Argon2id (libsodium, supprimé depuis) : si le Worker ne se crée pas
 // (navigateur sans Worker depuis un Blob, script refusé), ne démarre pas, ne peut pas recevoir le
 // calcul (DataCloneError : module ou tableau non clonable) ou ne répond pas dans le délai
 // WORKER_TIMEOUT_MS (il est alors arrêté), le calcul a lieu dans la page, avec le même moteur

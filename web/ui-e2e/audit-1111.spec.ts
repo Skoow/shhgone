@@ -1,4 +1,4 @@
-// Corrections de l', vérifiées dans le navigateur : garde du bouton Retour (I2), en-tête et pied pendant l'envoi.
+// Corrections de l'audit, vérifiées dans le navigateur : garde du bouton Retour (I2), en-tête et pied pendant l'envoi.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { freshPage, sendShare, settle, unlock, pwField, unlockButton } from "./open-helpers";

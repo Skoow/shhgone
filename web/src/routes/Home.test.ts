@@ -78,7 +78,7 @@ describe("Home (UI §9.1)", () => {
     expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);
     for (const c of [...document.querySelectorAll("[data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
 
-    // Le lien en deux (remplace la) : l'adresse au serveur,
+    // Le lien en deux : l'adresse au serveur,
     // la clé après le « # » dans le navigateur ; un exemple, jamais une vraie clé.
     expect(document.querySelector("[data-key-note] figcaption")!.textContent).toMatch(/^La clé du lien est après le «\s#\s»/);
     expect([...document.querySelectorAll("[data-offer]")].map((o) => o.getAttribute("data-offer"))).toEqual(["free", "plus", "pro"]);

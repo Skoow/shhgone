@@ -519,7 +519,7 @@ test("Trusted Types : une chaîne brute donnée à innerHTML ou à new Worker es
 });
 
 // Moteur WebAssembly (spec moteur §7) : chargement vérifié, éprouvé ici isolément (le site
-// l'utilise depuis la, test précédent) : la page d'essai ui-e2e/engine-page/ (construite par global-setup.ts avec
+// l'utilise aussi, test précédent) : la page d'essai ui-e2e/engine-page/ (construite par global-setup.ts avec
 // les greffons du site, jamais livrée) appelle loadEngine() et l'Argon2id du moteur, servie par le
 // vrai serveur Go (CSP et Trusted Types de production) ou comme par GitHub Pages (démo).
 const ENGINE_PAGE = fileURLToPath(new URL("./engine-page/dist", import.meta.url));

@@ -1,5 +1,5 @@
 // Interface du moteur pour le site (spec moteur §6) : mêmes noms, signatures et erreurs que
-// l'ancien moteur TypeScript (web/src/crypto/, web/src/transfer/link.ts, supprimés en).
+// l'ancien moteur TypeScript (web/src/crypto/, web/src/transfer/link.ts, supprimés depuis).
 // Changements de types inévitables (spec §6) : K_contenu, K_env, la graine R et la graine k d'un
 // élément sont des poignées opaques du moteur, jamais des octets en JavaScript.
 //

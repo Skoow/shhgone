@@ -149,7 +149,7 @@ export class ClientSalon {
    * Crée un salon (1 h, `max_members`), puis y entre comme créateur (siège 0). `secretGestion` :
    * `S_gestion` (lien de gestion), d'où viennent la clé de rôle du créateur et le jeton montré
    * au serveur. `sGestion` garde son nom pour les tests qui appellent les routes de gestion à
-   * la main, mais c'est **ce que le serveur reçoit** (`X-Shh-Manage`) :,
+   * la main, mais c'est **ce que le serveur reçoit** (`X-Shh-Manage`) :
    * `J_gestion` = `jetonGestion(S_gestion)`, jamais `S_gestion` (spec salon v3 §15.2).
    */
   /** `session` : jeton du compte (SHH_COMPTES=1), envoyé en X-Shh-Session sur POST /api/salons seulement. */

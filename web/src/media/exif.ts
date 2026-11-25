@@ -1,5 +1,5 @@
 // EXIF minimal (spec §35.2) : lecture de l'orientation (0x0112) de l'IFD0 et écriture d'un
-// TIFF qui ne contient qu'elle, s'il y en avait une, la vignette de l'IFD1 (keptTiff), ou d'un TIFF vide.
+// TIFF qui ne contient qu'elle (s'il y en avait une) et la vignette de l'IFD1 (keptTiff), ou d'un TIFF vide.
 //
 // Pourquoi garder l'orientation plutôt que tourner l'image : tourner demande de réencoder
 // (perte de qualité, nouveau code de compression) ; l'étiquette d'orientation ne dit rien de

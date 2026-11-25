@@ -24,7 +24,7 @@
       <CopyField label={t("salon.ready.password")} value={vue.pret.mdp} whole />
       <p class="note">{t("salon.ready.password.hint")}</p>
     </div>
-    <!-- Historique désactivé (par défaut, avec ou sans compte :, B) ou indisponible :
+    <!-- Historique désactivé (par défaut, avec ou sans compte) ou indisponible :
          le lien de gestion n'est gardé nulle part, il est montré d'emblée pour être gardé à la main.
          Gardé dans l'historique : derrière un bouton, comme avant. -->
     {#if gestion || !vue.pret.garde}

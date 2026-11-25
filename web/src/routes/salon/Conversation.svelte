@@ -146,7 +146,7 @@
     tropLong = null;
     erreur = "";
     texte = "";
-    if (S.intercepterLienGestion(x)) return; // 32 : jamais envoyé, même en .txt
+    if (S.intercepterLienGestion(x)) return; // lien de gestion : jamais envoyé, même en .txt
     void S.envoyerFichiers([new File([x], "message.txt", { type: "text/plain" })]);
   }
   /** Silencieux (v3 §14.4) : choix ouvert (toujours, 1 h, 8 h). */

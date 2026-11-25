@@ -43,7 +43,7 @@ export const INFO_PATHS: Readonly<Record<string, InfoRoute>> = {
   "/conditions": "conditions",
   "/mentions-legales": "mentions",
   "/signaler": "signaler",
-  // « Vérifier cette version » (spec §28.).
+  // « Vérifier cette version » (spec §28.4).
   "/verifier": "verifier",
 };
 

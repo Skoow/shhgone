@@ -443,7 +443,7 @@ export async function done(c: Ctx, token: string): Promise<void> {
 }
 
 /**
- * GET /api/shares/watch (spec §41.8, route de la, étape 7b) : requête tenue 25 s au
+ * GET /api/shares/watch (spec §41.8) : requête tenue 25 s au
  * plus par le serveur. 204 → "alive" ; 410 {"error":"gone"} → "gone" ; 404 (serveur sans la
  * route) → "stop" : la surveillance s'arrête pour de bon ; toute autre réponse ou erreur
  * (429, 5xx, réseau coupé) → "retry" : passagère, la boucle de surveillance réessaie
