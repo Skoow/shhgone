@@ -58,7 +58,8 @@
   }
 </script>
 
-<div class="cf">
+<!-- data-copied : retour « Copié » stylable par l'écran qui l'accueille (ticket de « Lien prêt »). -->
+<div class="cf" data-copied={copied ? "" : undefined}>
   <span id="{uid}-lbl" class="lbl">{label}</span>
   <div class="row">
     {#if manual}

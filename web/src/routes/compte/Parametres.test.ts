@@ -73,6 +73,14 @@ describe("paramètres", () => {
     expect(C.preparerReauth).toHaveBeenCalled(); // geste de confirmation sans requête avant
   });
 
+  it("pas de choix de langue : la langue suit le navigateur (detectLang)", async () => {
+    await monter(Parametres);
+    const titres = [...document.querySelectorAll("h2")].map((h) => h.textContent);
+    expect(titres).not.toContain("Langue");
+    expect(document.querySelector("#sec-lang")).toBeNull();
+    expect(texte()).not.toMatch(/Langue du site|English/);
+  });
+
   it("passkeys : libellé, mois, « liée à cet appareil », « ouvre vos données », « cette passkey »", async () => {
     await monter(Parametres);
     expect(texte()).toContain("iPhoneCette passkey");

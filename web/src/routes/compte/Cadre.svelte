@@ -3,9 +3,11 @@
   // l'arrivée), sous-titre, contenu. Trois formes :
   // - « panneaux » (connexion, inscription, récupération ; audit design, direction A) : deux
   //   panneaux sur toute la largeur de la fenêtre. À droite le formulaire (colonne de 30 rem) ; à
-  //   gauche la promesse et le schéma de ce que le serveur garde ou ne reçoit jamais (CLAUDE.md,
-  //   conception du compte §8 : mêmes mots). Téléphone : la scène devient une bande courte
-  //   au-dessus du formulaire. Dans le DOM, la scène vient APRÈS le formulaire (le titre, qui prend
+  //   gauche la promesse, un schéma sobre (appareil, chiffré, serveur) et trois points forts, sans
+  //   terme technique et sans rien promettre de faux (le serveur garde l'empreinte du pseudo, des
+  //   données chiffrées et quelques dates : jamais « rien n'est gardé »). Téléphone : la scène
+  //   devient une bande courte (promesse et points forts, sans le schéma) au-dessus du formulaire.
+  //   Dans le DOM, la scène vient APRÈS le formulaire (le titre, qui prend
   //   le focus, se lit en premier) ; seule la grille la place à gauche ou en haut.
   //   `etape` (1 à 4) : barre d'étapes de l'inscription (direction C) en tête du formulaire.
   // - « large » (paramètres) : pleine largeur de la colonne de contenu, titre à gauche.
@@ -14,7 +16,7 @@
   import { untrack, type Snippet } from "svelte";
   import { getDemo } from "../../app/demo-hooks";
   import { t } from "../../i18n/i18n.svelte";
-  import { KeyRound, Lock, Server } from "../../ui/Icon";
+  import { KeyRound, Lock, Server, UserX } from "../../ui/Icon";
 
   type Props = { titre: string; sous?: string; children: Snippet; forme?: "carte" | "panneaux" | "large"; etape?: 1 | 2 | 3 | 4 };
   let { titre, sous, children, forme = "carte", etape }: Props = $props();
@@ -53,7 +55,7 @@
     <aside class="scene" aria-labelledby="scene-promesse" data-scene>
       <p class="sur"><span class="pt" aria-hidden="true"></span>{t("account.scene.eyebrow")}</p>
       <p class="promesse" id="scene-promesse">{t("account.scene.promise")}</p>
-      <!-- Schéma : appareil (passkey), enveloppe chiffrée, serveur ; décor, dit par le texte dessous. -->
+      <!-- Schéma : appareil (passkey), chiffré, serveur ; décor, dit par les points forts dessous. -->
       <div class="flux" aria-hidden="true">
         <span class="noeud moi"><span class="ic"><KeyRound size={26} strokeWidth={1.6} /></span>{t("account.scene.device")}</span>
         <span class="fil"><b></b></span>
@@ -61,10 +63,11 @@
         <span class="fil"><b></b></span>
         <span class="noeud"><span class="ic"><Server size={26} strokeWidth={1.6} /></span>{t("account.scene.server")}</span>
       </div>
-      <dl class="registre">
-        <div><dt>{t("account.scene.keeps")}</dt><dd>{t("account.scene.keeps.list")}</dd></div>
-        <div><dt>{t("account.scene.never")}</dt><dd>{t("account.scene.never.list")}</dd></div>
-      </dl>
+      <ul class="points" data-points>
+        <li><span class="pic" aria-hidden="true"><UserX size={20} strokeWidth={1.8} /></span><span class="ptx"><strong>{t("account.scene.p1")}</strong><span class="pd">{t("account.scene.p1.d")}</span></span></li>
+        <li><span class="pic" aria-hidden="true"><Lock size={20} strokeWidth={1.8} /></span><span class="ptx"><strong>{t("account.scene.p2")}</strong><span class="pd">{t("account.scene.p2.d")}</span></span></li>
+        <li><span class="pic" aria-hidden="true"><KeyRound size={20} strokeWidth={1.8} /></span><span class="ptx"><strong>{t("account.scene.p3")}</strong><span class="pd">{t("account.scene.p3.d")}</span></span></li>
+      </ul>
     </aside>
   </div>
 {:else}
@@ -219,7 +222,7 @@
     color: var(--accent);
   }
 
-  /* Scène : promesse, schéma, registre. */
+  /* Scène : promesse, schéma, points forts. */
   .scene {
     grid-area: scene;
     position: relative;
@@ -359,32 +362,49 @@
       left: calc(50% - 13px);
     }
   }
-  .registre {
+  /* Trois points forts : pastille ronde (icône menthe), titre, une phrase. */
+  .points {
     display: grid;
-    gap: var(--sp-2);
+    gap: var(--sp-4);
     max-width: 34rem;
     margin: var(--sp-3) 0 0;
-    color: var(--text-2);
-    font-size: var(--fs-small);
+    padding: 0;
+    list-style: none;
   }
-  .registre div {
+  .points li {
     display: grid;
-    grid-template-columns: 4.5rem 1fr;
+    grid-template-columns: auto 1fr;
+    align-items: start;
     gap: var(--sp-4);
   }
-  .registre dt {
-    padding-top: 2px;
-    color: var(--text-3);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
+  .pic {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgb(95 227 181 / 0.1);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.3);
+    color: var(--accent);
   }
-  .registre dd {
-    margin: 0;
+  .ptx {
+    display: grid;
+    gap: 2px;
+    padding-top: 2px;
+  }
+  .ptx strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .pd {
+    color: var(--text-2);
+    font-size: var(--fs-small);
+    line-height: 1.5;
     text-wrap: pretty;
   }
 
-  /* Tablette et téléphone : la scène devient une bande courte (pastille et schéma) au-dessus du
-     formulaire ; la promesse et le registre restent lisibles en petit sous le schéma. */
+  /* Tablette et téléphone : la scène devient une bande courte au-dessus du formulaire : la
+     promesse et les trois points forts en une ligne chacun (sans phrase ni schéma). */
   @media (max-width: 899px) {
     .deux {
       grid-template-columns: minmax(0, 1fr);
@@ -419,8 +439,29 @@
     .fil {
       margin-top: -22px;
     }
-    .registre {
+    .flux,
+    .pd {
       display: none;
+    }
+    .points {
+      gap: var(--sp-2);
+      margin: 0;
+    }
+    .points li {
+      align-items: center;
+      gap: var(--sp-3);
+    }
+    .pic {
+      width: 32px;
+      height: 32px;
+    }
+    .pic :global(svg) {
+      width: 16px;
+      height: 16px;
+    }
+    .ptx {
+      padding: 0;
+      font-size: var(--fs-small);
     }
     .panneau {
       align-content: start;

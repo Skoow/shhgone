@@ -231,7 +231,8 @@
 
           <!-- Le ticket : lien, perforation, mot de passe (masqué à l'arrivée, œil pour l'afficher,
                copiable masqué). Rien entre les deux : la paire reste ensemble. -->
-          <div class="ticket" data-fan data-ticket>
+          <!-- Apparition propre au ticket (CSS, coupée en mouvement réduit), pas l'éventail data-fan. -->
+          <div class="ticket" data-ticket>
             <div class="cell lien" role="group" aria-label={t("ready.link.title")}><CopyField label={t("ready.link.label")} value={result.link} /></div>
             <div class="perfo" aria-hidden="true"></div>
             <div class="cell mdp" role="group" aria-label={t("ready.pw.title")}><CopyField label={t("ready.pw.title")} value={result.password} whole secret /></div>
@@ -261,6 +262,7 @@
         </div>
 
         <div class="droite" data-fan>
+          <h2 class="col-t">{t("ready.col.when")}</h2>
           <div class="facts" data-ready-facts>
             <!-- Nom du partage : texte de l'expéditeur, en texte brut, isolé (bdi). -->
             {#if result.title}<p class="name" data-ready-name><span class="sr-only">{t("ready.name")} </span><bdi>{result.title}</bdi></p>{/if}
@@ -274,6 +276,7 @@
           <!-- « Gérer ce partage » retiré : avec l'historique, le partage se
                suit et se supprime depuis « Mes partages ». Sans historique, le lien de gestion est le
                seul moyen de le suivre ou de le supprimer plus tard : il est alors montré ici. -->
+          <h2 class="col-t sep">{t("ready.col.manage")}</h2>
           <div class="keep" data-keep data-kept={keepId ? "" : undefined}>
             {#if keepReady && shares.status === "unavailable"}
               <p class="hint" data-keep-unavailable>{t("ready.keep.unavailable")}</p>
@@ -390,64 +393,219 @@
       gap: var(--sp-7);
     }
     .droite {
-      padding: var(--sp-5);
+      padding: var(--sp-5) var(--sp-5) var(--sp-4);
       border: 1px solid var(--hair-2);
       border-radius: var(--r-xl);
-      background: var(--vessel);
+      background:
+        radial-gradient(120% 60% at 100% 0%, rgb(95 227 181 / 0.06), transparent 60%),
+        var(--vessel);
       box-shadow: var(--edge-hi);
-    }
-    .droite .when {
-      font-size: var(--fs-h3);
     }
     .droite .facts {
       padding-top: 0;
       border-top: 0;
     }
   }
-  /* Le ticket : le lien en haut, une perforation (pointillé et deux encoches), le mot de passe
-     en bas sur fond nuit, bord menthe : la paire à donner ensemble. */
+
+  /* Colonne de droite : deux groupes titrés (l'échéance, puis le suivi et la suppression),
+     l'heure de fin en grand, la phrase en petit ; Terminé en bas, pleine largeur. */
+  .col-t {
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--fs-micro);
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .col-t.sep {
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--hair-2);
+  }
+  .droite {
+    gap: var(--sp-4);
+  }
+  .droite .facts {
+    gap: var(--sp-2);
+  }
+  .droite .when {
+    font-size: var(--fs-h3);
+    line-height: 1.3;
+  }
+  .droite .self {
+    font-size: var(--fs-small);
+    line-height: var(--lh-small, 1.45);
+  }
+  .droite .done :global(.btn) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* ---------- Le ticket ----------
+     Un objet : relief fin (filet clair en haut, ombre portée), bord menthe lumineux, deux parties
+     séparées par une perforation : vraies encoches découpées (masque, le fond passe au travers) et
+     rangée de trous ronds. En haut le lien (papier sombre), en bas le mot de passe (nuit). */
   .ticket {
+    --encoche: 13px;
+    --bord: rgb(95 227 181 / 0.32);
+    position: relative;
     display: grid;
     min-width: 0;
-    border-radius: var(--r-xl);
-    box-shadow: var(--edge-hi);
-    filter: drop-shadow(0 24px 32px rgb(0 0 0 / 0.45));
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.04)) drop-shadow(0 22px 30px rgb(0 0 0 / 0.5)) drop-shadow(0 0 22px rgb(95 227 181 / 0.08));
+    animation: ticket-arrive 640ms cubic-bezier(0.16, 1, 0.3, 1) 80ms backwards;
+  }
+  .ticket .cell {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
   }
   .ticket .lien {
-    padding: var(--sp-5) var(--sp-5) var(--sp-4);
-    border: 1px solid var(--hair-2);
-    border-bottom: 0;
+    padding: var(--sp-5) var(--sp-5) calc(var(--sp-5) + 2px);
     border-radius: var(--r-xl) var(--r-xl) 0 0;
-    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+    background:
+      radial-gradient(120% 90% at 0% 0%, rgb(255 255 255 / 0.06), transparent 55%),
+      linear-gradient(180deg, #232938, #1a1f2b);
+    box-shadow:
+      inset 0 1px 0 var(--bord),
+      inset 0 2px 0 rgb(255 255 255 / 0.06),
+      inset 1px 0 0 var(--bord),
+      inset -1px 0 0 var(--bord);
+    -webkit-mask:
+      radial-gradient(circle var(--encoche) at 0 100%, #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle var(--encoche) at 100% 100%, #0000 98%, #000) right / 51% 100% no-repeat;
+    mask:
+      radial-gradient(circle var(--encoche) at 0 100%, #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle var(--encoche) at 100% 100%, #0000 98%, #000) right / 51% 100% no-repeat;
   }
   .ticket .mdp {
-    padding: var(--sp-4) var(--sp-5) var(--sp-5);
-    border: 1px solid rgb(95 227 181 / 0.45);
-    border-top: 0;
+    padding: calc(var(--sp-5) + 2px) var(--sp-5) var(--sp-5);
     border-radius: 0 0 var(--r-xl) var(--r-xl);
-    background: linear-gradient(180deg, #0d1a17, var(--bg-deep));
+    background:
+      radial-gradient(90% 120% at 100% 100%, rgb(95 227 181 / 0.1), transparent 60%),
+      linear-gradient(180deg, #0f1c19, #080b0e);
+    box-shadow:
+      inset 1px 0 0 var(--bord),
+      inset -1px 0 0 var(--bord),
+      inset 0 -1px 0 var(--bord);
+    -webkit-mask:
+      radial-gradient(circle var(--encoche) at 0 0, #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle var(--encoche) at 100% 0, #0000 98%, #000) right / 51% 100% no-repeat;
+    mask:
+      radial-gradient(circle var(--encoche) at 0 0, #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle var(--encoche) at 100% 0, #0000 98%, #000) right / 51% 100% no-repeat;
   }
-  .perfo {
-    position: relative;
-    height: 0;
-    border-top: 2px dashed var(--line-strong);
-    margin-inline: 14px;
-  }
-  .perfo::before,
-  .perfo::after {
+  /* Reflet qui traverse le haut du ticket une fois, à l'arrivée. */
+  .ticket .lien::after {
     content: "";
     position: absolute;
-    top: -13px;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: var(--bg);
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.07) 50%, transparent 65%) -100% 0 / 200% 100% no-repeat;
+    animation: ticket-reflet 1.4s cubic-bezier(0.65, 0, 0.35, 1) 420ms both;
+    pointer-events: none;
+  }
+  /* Perforation : une rangée de trous ronds entre les deux encoches. */
+  .perfo {
+    position: relative;
+    z-index: 1;
+    height: 0;
+    margin-inline: calc(var(--encoche) + 6px);
   }
   .perfo::before {
-    left: -27px;
+    content: "";
+    position: absolute;
+    inset: -3px 0 auto;
+    height: 6px;
+    background: radial-gradient(circle at 3px 3px, rgb(0 0 0 / 0.75) 2.2px, rgb(255 255 255 / 0.08) 2.6px, transparent 3px) 0 0 / 11px 6px repeat-x;
   }
   .perfo::after {
-    right: -27px;
+    display: none;
+  }
+  @keyframes ticket-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(18px) rotate(-0.6deg) scale(0.98);
+    }
+  }
+  @keyframes ticket-reflet {
+    to {
+      background-position: 200% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticket,
+    .ticket .lien::after {
+      animation: none;
+    }
+  }
+
+  /* Valeurs dans le ticket : une seule boîte par valeur, « Copier » intégré à droite ; police
+     à chasse fixe, chiffres tabulaires, zéro barré. Copié : bord et bouton menthe (2 s). */
+  .ticket :global(.cf) {
+    gap: var(--sp-3);
+  }
+  .ticket :global(.cf .lbl) {
+    color: var(--text-3);
+    font-size: var(--fs-micro);
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .ticket :global(.cf .row) {
+    gap: 0;
+    padding: 4px;
+    border: 1px solid rgb(233 236 242 / 0.12);
+    border-radius: 14px;
+    background: rgb(0 0 0 / 0.28);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .ticket :global(.cf .val) {
+    border: 0;
+    background: transparent;
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings: "tnum", "zero";
+  }
+  .ticket .lien :global(.cf .val) {
+    font-size: 0.9375rem;
+    color: var(--text);
+  }
+  .ticket .mdp :global(.cf .val) {
+    font-size: 1.1875rem;
+    letter-spacing: 0.08em;
+    color: #f3fff9;
+  }
+  .ticket .mdp :global(.cf .val.masked) {
+    color: var(--text-2);
+  }
+  .ticket :global(.cf .row > .btn) {
+    flex: none;
+    min-height: 44px;
+    border-radius: 10px;
+  }
+  .ticket :global(.cf[data-copied] .row) {
+    border-color: rgb(95 227 181 / 0.6);
+    box-shadow:
+      inset 0 1px 2px rgb(0 0 0 / 0.35),
+      0 0 0 3px rgb(95 227 181 / 0.12);
+  }
+  .ticket :global(.cf[data-copied] .row > .btn) {
+    background: var(--accent-tint);
+    border-color: rgb(95 227 181 / 0.5);
+    color: var(--accent);
+  }
+  @media (forced-colors: active) {
+    .ticket .lien,
+    .ticket .mdp {
+      border: 1px solid CanvasText;
+      -webkit-mask: none;
+      mask: none;
+    }
+    .perfo::before {
+      border-top: 1px dashed CanvasText;
+      background: none;
+    }
   }
   .demo-zone {
     display: grid;

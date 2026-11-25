@@ -2,20 +2,18 @@
   // Paramètres (/compte ; conception compte §21.15.4).
   // Monté seulement avec __COMPTES__ et une session ouverte (App.svelte, pages.ts).
   // Sections dans l'ordre (conception du compte par passkey §3.5) : Profil (avec ancienneté et
-  // limites), Passkeys, Clé de récupération, Appareils, Confidentialité, Abonnement, Langue, Vos
-  // données ; puis « Se déconnecter » et « Supprimer le compte » (écran dédié, sans changer
+  // limites), Passkeys, Clé de récupération, Appareils, Confidentialité, Abonnement, Vos données ;
+  // pas de choix de langue : elle suit le navigateur (i18n.svelte.ts, detectLang) ; puis « Se déconnecter » et « Supprimer le compte » (écran dédié, sans changer
   // l'adresse de la page). Aucun pseudo dans le titre de l'onglet ni dans l'adresse de la page.
   import { untrack } from "svelte";
-  import { account, ecrireProfil, etatCompte, seDeconnecter, type EtatServeur } from "../../account/session.svelte";
+  import { account, etatCompte, seDeconnecter, type EtatServeur } from "../../account/session.svelte";
   import { followLink, href, navigate } from "../../app/router.svelte";
-  import { getLang, setLang, t } from "../../i18n/i18n.svelte";
-  import type { Lang } from "../../i18n/format";
+  import { t } from "../../i18n/i18n.svelte";
   import Avatar from "../../ui/Avatar.svelte";
   import Banner from "../../ui/Banner.svelte";
   import Button from "../../ui/Button.svelte";
   import { ChevronRight } from "../../ui/Icon";
   import { reducedMotion } from "../../ui/motion";
-  import Segmented from "../../ui/Segmented.svelte";
   import Cadre from "./Cadre.svelte";
   import CarteCompte from "./CarteCompte.svelte";
   import { erreur } from "./erreurs";
@@ -31,7 +29,6 @@
   let etat = $state.raw<EtatServeur | null>(null);
   let bandeau = $state("");
   let vue = $state<"liste" | "supprimer">("liste");
-  let langue = $state<Lang>(getLang());
 
   async function recharger(): Promise<void> {
     try {
@@ -42,16 +39,6 @@
     }
   }
   $effect(() => untrack(() => void recharger()));
-
-  // Langue : appliquée tout de suite, gardée dans le coffre de profil (§21.15.4 point 8).
-  $effect(() => {
-    const l = langue;
-    untrack(() => {
-      if (l === getLang()) return;
-      void setLang(l);
-      if (account.profil && account.profil.langue !== l) void ecrireProfil({ langue: l }).catch(() => undefined);
-    });
-  });
 
   async function deconnecter() {
     await seDeconnecter();
@@ -65,7 +52,6 @@
     ["sec-devices", "account.section.devices"],
     ["sec-privacy", "account.section.privacy"],
     ["sec-plan", "account.section.plan"],
-    ["sec-lang", "account.section.lang"],
     ["sec-data", "account.section.data"],
   ] as const;
   function aller(id: string) {
@@ -110,16 +96,6 @@
       <Appareils />
       <Confidentialite />
       <Abonnement />
-      <Section id="sec-lang" titre={t("account.section.lang")}>
-        <Segmented
-          label={t("account.lang.label")}
-          options={[
-            { value: "fr", label: "Français" },
-            { value: "en", label: "English" },
-          ]}
-          bind:value={langue}
-        />
-      </Section>
       <Donnees />
       <div class="fin">
         <Button variant="secondary" onpress={deconnecter}>{t("account.logout")}</Button>
