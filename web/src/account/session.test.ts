@@ -412,6 +412,107 @@ describe("passkeys du compte", () => {
   });
 });
 
+// Décision du 25 novembre (conception §18) : sur ordinateur, la passkey est demandée au téléphone
+// (QR du navigateur, indice « hybrid ») ; « Ajouter mon téléphone » est l'ajout de passkey standard.
+describe("parcours téléphone (QR) sur ordinateur", () => {
+  const indices = (o: { hints?: string[] } | undefined) => o?.hints;
+
+  it("création « hybride » : indice hybrid et cross-platform ; la passkey est dite sur le téléphone ; rien du parcours ni de la sortie PRF au serveur", async () => {
+    brancher(new FauxAuthentificateur({ prf: "creation", attachement: "cross-platform" }));
+    await C.preparerInscription(PREUVE);
+    expect(await C.creerPasskey("Lea", "fr", "hybride")).toBe("cle");
+    const o = auth.creations[0]!;
+    expect(indices(o as never)).toEqual(["hybrid"]);
+    expect(o.authenticatorSelection?.authenticatorAttachment).toBe("cross-platform");
+    expect(C.passkeyCreee()).toBe("telephone");
+    await C.terminerInscription(false);
+    expect(compte().passkeys[0]!.envs).toHaveLength(1);
+    const tout = srv.requetes.map((r) => r.brut).join("\n");
+    expect(tout).not.toMatch(/hybrid|cross-platform|authenticatorAttachment|hints/);
+    rienDePrf();
+  });
+
+  it("création par défaut (téléphone ou tablette) : options inchangées, sans indice ni attachement", async () => {
+    await C.preparerInscription(PREUVE);
+    await C.creerPasskey("Lea", "fr");
+    expect(indices(auth.creations[0] as never)).toBeUndefined();
+    expect(auth.creations[0]!.authenticatorSelection?.authenticatorAttachment).toBeUndefined();
+    expect(C.passkeyCreee()).toBe("ici");
+  });
+
+  it("« Garder le compte sur cet ordinateur » : indice client-device, aucun attachement imposé ; passkey dite ici même si le navigateur ne dit rien", async () => {
+    await C.preparerInscription(PREUVE);
+    await C.creerPasskey("Lea", "fr", "local");
+    expect(indices(auth.creations[0] as never)).toEqual(["client-device"]);
+    expect(auth.creations[0]!.authenticatorSelection?.authenticatorAttachment).toBeUndefined();
+    expect(C.passkeyCreee()).toBe("ici");
+  });
+
+  it("le navigateur prime sur le parcours demandé (choix fait dans sa feuille)", async () => {
+    brancher(new FauxAuthentificateur({ prf: "creation", attachement: "platform" }));
+    await C.preparerInscription(PREUVE);
+    await C.creerPasskey("Lea", "fr", "hybride");
+    expect(C.passkeyCreee()).toBe("ici");
+  });
+
+  it("PRF absent par le QR : compte utilisable (clé gardée sur l'ordinateur, aucune enveloppe), clé de récupération demandée une fois ailleurs", async () => {
+    brancher(new FauxAuthentificateur({ prf: "absent", attachement: "cross-platform" }));
+    const cle = await inscription();
+    expect(C.account.cleLocale).toBe(true);
+    expect(compte().passkeys[0]!.envs).toEqual([]);
+    // Le téléphone (autre appareil, sans clé locale) : la passkey connecte, la clé de récupération ouvre.
+    C._oublierMemoire();
+    idb = fakeIndexedDB();
+    expect(await C.seConnecter(false, "defaut")).toBe("cle_requise");
+    expect(await C.ouvrirAvecCle(cle)).toBe("sans_prf");
+    expect(C.account.etat).toBe("ouvert");
+    rienDePrf();
+  });
+
+  it("PRF annoncé seulement : le deuxième geste garde l'indice hybrid", async () => {
+    brancher(new FauxAuthentificateur({ prf: "annonce", attachement: "cross-platform" }));
+    await C.preparerInscription(PREUVE);
+    expect(await C.creerPasskey("Lea", "fr", "hybride")).toBe("second");
+    await C.deuxiemeGeste();
+    expect(indices(auth.assertions.at(-1) as never)).toEqual(["hybrid"]);
+  });
+
+  it("connexion : « hybride » sur ordinateur, « local » pour cet ordinateur, rien par défaut", async () => {
+    await inscription();
+    for (const [p, h] of [["hybride", ["hybrid"]], ["local", ["client-device"]], ["defaut", undefined]] as const) {
+      await C.seDeconnecter();
+      expect(await C.seConnecter(false, p)).toBe("ouvert");
+      expect(indices(auth.assertions.at(-1) as never)).toEqual(h);
+    }
+  });
+
+  it("« Ajouter mon téléphone » : ajout standard par le QR ; enveloppe posée si la sortie PRF revient, sinon « sans_prf » (la passkey est ajoutée et connecte)", async () => {
+    await inscription();
+    brancher(new FauxAuthentificateur({ prf: "creation", attachement: "cross-platform" })); // le téléphone : un autre authentificateur
+    expect(await C.preparerAjout()).toBe("pret");
+    expect(await C.ajouterPasskey("Téléphone", "hybride")).toBe("ajoutee");
+    expect(indices(auth.creations[0] as never)).toEqual(["hybrid"]);
+    expect(auth.creations[0]!.authenticatorSelection?.authenticatorAttachment).toBe("cross-platform");
+    expect(compte().passkeys).toHaveLength(2);
+    expect(compte().passkeys[1]!.envs).toHaveLength(1);
+    expect((await C.listePasskeys()).map((p) => p.nom)).toEqual(["Firefox · ordinateur", "Téléphone"]);
+    // Le téléphone ouvre ensuite les données avec sa propre sortie PRF.
+    await C.seDeconnecter();
+    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(C.account.cleLocale).toBe(false);
+    rienDePrf();
+  });
+
+  it("ajout par le QR sans sortie PRF : « sans_prf », passkey ajoutée sans enveloppe", async () => {
+    await inscription();
+    brancher(new FauxAuthentificateur({ prf: "absent", attachement: "cross-platform" }));
+    await C.preparerAjout();
+    expect(await C.ajouterPasskey("Téléphone", "hybride")).toBe("sans_prf");
+    expect(compte().passkeys).toHaveLength(2);
+    expect(compte().passkeys[1]!.envs).toEqual([]);
+  });
+});
+
 describe("pseudo d'un invité du salon", () => {
   it("sans session ni salon : pris par un compte → non ; réservé → non sans requête ; libre → oui ; le sien → oui", async () => {
     await inscription();

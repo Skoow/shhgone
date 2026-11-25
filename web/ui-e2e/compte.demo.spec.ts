@@ -34,6 +34,7 @@ async function inscrire(page: Page, url: string): Promise<string> {
   await page.getByRole("button", { name: "Simuler la passkey", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Votre clé de récupération" })).toBeVisible({ timeout: 30_000 });
   const cle = (await page.locator("[data-cle] .g").allTextContents()).join("-");
+  await page.getByRole("button", { name: "Copier", exact: true }).click(); // « Je l'ai notée » attend la clé copiée ou téléchargée
   await page.getByRole("button", { name: "Je l'ai notée", exact: true }).click();
   const label = (await page.locator("label").filter({ hasText: "Tapez le groupe" }).textContent())!;
   await page.getByLabel(label.trim(), { exact: true }).fill(cle.split("-")[Number(/n°\s*(\d)/u.exec(label)![1]) - 1]!);
@@ -61,7 +62,7 @@ test.describe("compte de la démo", () => {
     await expect(page.getByRole("banner").getByRole("link", { name: "Mon compte" })).toBeVisible();
     await deconnecter(page, demo.url);
     await aller(page, demo.url, "compte/connexion");
-    await page.getByRole("button", { name: "Se connecter avec une passkey", exact: true }).click();
+    await page.getByRole("button", { name: "Se connecter avec une passkey", exact: true }).or(page.getByRole("button", { name: "Se connecter avec mon téléphone", exact: true })).click();
     await expect(page.locator("[data-connecte]")).toBeVisible({ timeout: 30_000 });
     const garde = await page.evaluate(() => sessionStorage.getItem("shh.demo.compte") ?? "");
     expect(garde).toContain("leaderno"); // p_canon (squelette UTS #39 : « m » → « rn »), comme le vrai serveur le reçoit

@@ -5,9 +5,11 @@
   // « cette passkey » (celle de la session). Ajouter (3 actions : « Ajouter », « Créer la passkey »,
   // le geste), renommer, retirer (jamais la dernière). Ajout et retrait demandent une session
   // récente : sinon « Confirmer avec une passkey » d'abord. Chaque cérémonie est chargée avant le
-  // clic qui appelle le navigateur (Safari).
+  // clic qui appelle le navigateur (Safari). Sur ordinateur (décision du 25 novembre, conception
+  // §18) : « Ajouter mon téléphone » = le même ajout, demandé au téléphone par le QR du navigateur
+  // (parcours « hybride ») ; aucun transfert de clé.
   import { tick, untrack } from "svelte";
-  import { account, ajouterPasskey, confirmerParPasskey, deuxiemeGesteAjout, listePasskeys, nommerPasskey, preparerAjout, preparerReauth, retirerPasskey, type PasskeyVue } from "../../../account/session.svelte";
+  import { account, ajouterPasskey, confirmerParPasskey, estMobile, deuxiemeGesteAjout, listePasskeys, nommerPasskey, preparerAjout, preparerReauth, retirerPasskey, type Parcours, type PasskeyVue } from "../../../account/session.svelte";
   import { t } from "../../../i18n/i18n.svelte";
   import { announce } from "../../../ui/announce";
   import Banner from "../../../ui/Banner.svelte";
@@ -15,6 +17,7 @@
   import InlineConfirm from "../../../ui/InlineConfirm.svelte";
   import TextField from "../../../ui/TextField.svelte";
   import { annulee, codeDe, erreur, moisLong } from "../erreurs";
+  import IndiceQr from "../IndiceQr.svelte";
   import Section from "./Section.svelte";
 
   let liste = $state.raw<PasskeyVue[] | null>(null);
@@ -23,6 +26,11 @@
   /** Ajout : fermé, confirmation d'abord (session pas récente), prêt (cérémonie chargée), deuxième geste. */
   let ajout = $state<"ferme" | "recent" | "pret" | "second">("ferme");
   let nom = $state("");
+  const mobile = estMobile();
+  /** Où la passkey à ajouter est demandée : téléphone (QR) sur ordinateur, ou cet appareil. */
+  let cible = $state<Parcours>("defaut");
+  /** Dernier ajout sans sortie PRF : la passkey connecte mais n'ouvre pas encore les données. */
+  let sansPrf = $state(false);
   /** Retrait en attente d'une confirmation par passkey. */
   let aRetirer = $state<string | null>(null);
   let renomme = $state<string | null>(null);
@@ -55,8 +63,11 @@
     announce(global);
   }
 
-  async function ouvrirAjout() {
+  async function ouvrirAjout(c: Parcours = "defaut") {
     global = ok = "";
+    sansPrf = false;
+    cible = c;
+    nom = c === "hybride" ? t("account.phone.name") : "";
     try {
       ajout = (await preparerAjout()) === "pret" ? "pret" : "recent";
     } catch (e) {
@@ -93,7 +104,9 @@
   async function creer() {
     global = "";
     try {
-      if ((await ajouterPasskey(nom)) === "second") return void (ajout = "second");
+      const r = await ajouterPasskey(nom, cible);
+      if (r === "second") return void (ajout = "second");
+      sansPrf = r === "sans_prf";
     } catch (e) {
       montrer(e);
       if (!annulee(e) && codeDe(e) !== "passkeys_max") ajout = "ferme";
@@ -104,7 +117,7 @@
   }
   async function second() {
     try {
-      await deuxiemeGesteAjout();
+      sansPrf = !(await deuxiemeGesteAjout());
     } catch (e) {
       return montrer(e);
     }
@@ -113,7 +126,7 @@
   async function ajoutee() {
     ajout = "ferme";
     nom = "";
-    ok = t("account.passkeys.added");
+    ok = cible === "hybride" ? t("account.phone.added") : t("account.passkeys.added");
     announce(ok);
     await charger();
   }
@@ -193,9 +206,13 @@
       <Button variant="ghost" onpress={() => void ((ajout = "ferme"), (aRetirer = null), (global = ""))}>{t("common.cancel")}</Button>
     </div>
   {:else if ajout === "ferme"}
-    <div class="actions"><Button variant="secondary" onpress={ouvrirAjout}>{t("account.passkeys.add")}</Button></div>
+    <div class="actions">
+      {#if !mobile}<Button variant="secondary" onpress={() => ouvrirAjout("hybride")}>{t("account.phone.add")}</Button>{/if}
+      <Button variant={mobile ? "secondary" : "ghost"} onpress={() => ouvrirAjout(mobile ? "defaut" : "local")}>{mobile ? t("account.passkeys.add") : t("account.passkeys.add.here")}</Button>
+    </div>
   {:else if ajout === "pret"}
     <form class="form" novalidate onsubmit={(e) => e.preventDefault()}>
+      {#if cible === "hybride"}<IndiceQr texte={t("account.phone.how")} />{/if}
       <TextField label={t("account.passkeys.name")} hint={t("account.passkeys.name.hint")} maxlength={35} bind:value={nom} bind:el={elNom} />
       <div class="actions">
         <Button type="submit" onpress={creer}>{t("account.passkeys.create")}</Button>
@@ -207,6 +224,7 @@
     <div class="actions"><Button onpress={second}>{t("account.second.go")}</Button></div>
   {/if}
   {#if ok}<p class="ok" role="status">{ok}</p>{/if}
+  {#if ok && sansPrf}<p class="note" data-sans-prf>{cible === "hybride" ? t("account.phone.noprf") : t("account.passkeys.noprf")}</p>{/if}
   {#if global}<p class="err" role="alert">{global}</p>{/if}
 </Section>
 

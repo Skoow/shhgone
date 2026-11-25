@@ -11,8 +11,12 @@
   // 4. Un groupe de la clé à retaper, « Terminer » : inscription/fin ; le compte n'existe qu'ici.
   // Annuler la feuille de passkey n'affiche rien et ne crée rien. Page quittée après la création
   // de la passkey sans « Terminer » : le gestionnaire est prié de l'oublier (signalUnknownCredential).
+  // Sur ordinateur (décision du 25 novembre, conception §18) : la passkey est demandée sur le
+  // téléphone (QR du navigateur, parcours « hybride »), avec un repli discret « Garder le compte
+  // sur cet ordinateur » ; si elle est restée sur l'ordinateur, « Ajouter mon téléphone » est
+  // proposé à la fin (ajout de passkey standard, aucun transfert de clé). Téléphone : inchangé.
   import { tick, untrack } from "svelte";
-  import { abandonnerInscription, account, cleAffichee, creerPasskey, deuxiemeGeste, inscriptionPrete, passkeysDisponibles, preparerInscription, pseudoInviteRetenu, pseudoLibre, terminerInscription, verifierSaisie } from "../../account/session.svelte";
+  import { abandonnerInscription, account, ajouterPasskey, estMobile, cleAffichee, creerPasskey, deuxiemeGeste, deuxiemeGesteAjout, inscriptionPrete, passkeyCreee, passkeysDisponibles, preparerAjout, preparerInscription, pseudoInviteRetenu, pseudoLibre, terminerInscription, verifierSaisie, type Parcours } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
   import { getDemo } from "../../app/demo-hooks";
   import { getLang, t } from "../../i18n/i18n.svelte";
@@ -25,6 +29,7 @@
   import Case from "./Case.svelte";
   import NoteDemo from "./NoteDemo.svelte";
   import CleRecup from "./CleRecup.svelte";
+  import IndiceQr from "./IndiceQr.svelte";
   import { annulee, codeDe, erreur } from "./erreurs";
   import { obtenirPreuve } from "./preuve";
   import VerifCle from "./VerifCle.svelte";
@@ -32,6 +37,11 @@
   // Seul paramètre lu dans l'adresse : « ?suite=salon » (suite(), router.svelte.ts).
   const apres = suite(location.search);
   const dispo = passkeysDisponibles();
+  const mobile = estMobile();
+  /** Où est la passkey créée (lu sur l'appareil) : sert à proposer « Ajouter mon téléphone ». */
+  let ou = $state<"telephone" | "ici">("ici");
+  /** « Ajouter mon téléphone » après la création : non proposé, proposé, deuxième geste, fait (avec ou sans PRF). */
+  let tel = $state<"non" | "propose" | "second" | "ajoute" | "sans_prf">("non");
 
   let etape = $state<"saisie" | "second" | "cle" | "verif" | "fini" | "echec">("saisie");
   let pseudo = $state(pseudoInviteRetenu() ?? "");
@@ -43,6 +53,8 @@
   let pret = $state(false);
   let rester = $state(false);
   let gardee = $state(false);
+  /** Clé copiée ou téléchargée (CleRecup) : gardé ici, « Revoir la clé » ne le perd pas. */
+  let cleSauvee = $state(false);
   let texte = $state("");
   let orpheline = $state(false);
   let pseudoCree = $state("");
@@ -124,16 +136,22 @@
     elPseudo?.focus();
   }
 
-  // Le geste : aucune requête avant navigator.credentials.create.
-  async function creer() {
+  // Le geste : aucune requête avant navigator.credentials.create. Ordinateur : téléphone d'abord
+  // (« hybride ») ; « Garder le compte sur cet ordinateur » : « local ».
+  let enCreation = false;
+  async function creer(parcours: Parcours = mobile ? "defaut" : "hybride") {
+    if (enCreation) return;
     bandeau = "";
     if (libre === false) {
       errPseudo = t("account.pseudo.taken");
       return focusPseudo();
     }
+    enCreation = true;
     try {
-      const r = await creerPasskey(pseudo, getLang());
+      const r = await creerPasskey(pseudo, getLang(), parcours);
+      ou = mobile ? "ici" : passkeyCreee();
       texte = cleAffichee();
+      cleSauvee = false;
       pseudoCree = pseudo;
       etape = r === "second" ? "second" : "cle";
     } catch (e) {
@@ -145,6 +163,8 @@
       }
       bandeau = x.texte;
       announce(bandeau);
+    } finally {
+      enCreation = false;
     }
   }
 
@@ -175,6 +195,36 @@
     gardee = rester;
     etape = "fini";
     announce(t("account.created"));
+    // Passkey restée sur l'ordinateur : « Ajouter mon téléphone » (cérémonie chargée avant le clic ;
+    // la session neuve est récente pendant 5 min, sinon l'offre reste dans Paramètres → Passkeys).
+    if (!mobile && ou === "ici") tel = (await preparerAjout().catch(() => "echec")) === "pret" ? "propose" : "non";
+  }
+
+  // Geste « Ajouter mon téléphone » : aucune requête avant navigator.credentials.create.
+  async function ajouterTelephone() {
+    bandeau = "";
+    try {
+      const r = await ajouterPasskey(t("account.phone.name"), "hybride");
+      if (r === "second") return void (tel = "second");
+      tel = r === "ajoutee" ? "ajoute" : "sans_prf";
+    } catch (e) {
+      if (!annulee(e)) {
+        bandeau = erreur(e, "parametres").texte;
+        announce(bandeau);
+      }
+      tel = (await preparerAjout().catch(() => "echec")) === "pret" ? "propose" : "non";
+      return;
+    }
+    announce(t("account.phone.added"));
+  }
+  async function secondTelephone() {
+    try {
+      tel = (await deuxiemeGesteAjout()) ? "ajoute" : "sans_prf";
+    } catch (e) {
+      bandeau = erreur(e, "parametres").texte;
+      return;
+    }
+    announce(t("account.phone.added"));
   }
 
   function recommencer() {
@@ -191,7 +241,7 @@
   const titre = $derived(etape === "fini" ? t("account.created") : etape === "cle" ? t("account.key.title") : etape === "verif" ? t("account.verify.title") : t("account.signup.title"));
 </script>
 
-<Cadre forme="panneaux" {titre} etape={numero} sous={etape === "saisie" ? t("account.signup.sub") : undefined}>
+<Cadre forme="panneaux" {titre} etape={numero} sous={etape === "saisie" ? t("account.signup.sub") : undefined} sousRedit>
   {#if bandeau}<Banner kind="danger">{bandeau}</Banner>{/if}
 
   {#if !dispo}
@@ -202,11 +252,13 @@
       <!-- « Disponible » : la coche dans le champ, et ce texte pour les lecteurs d'écran seulement
            (région présente dès l'affichage, pour être annoncée). -->
       <p class="sr-only" role="status" data-dispo>{etatPseudo === "ok" ? t("account.pseudo.free") : ""}</p>
-      <Button type="submit" busy={!pret} disabled={!pret} onpress={creer}>{pret ? (getDemo()?.signupPasskey ?? t("account.signup.passkey")) : t("account.preparing")}</Button>
+      {#if !mobile}<IndiceQr texte={t("account.signup.phone.how")} />{/if}
+      <Button type="submit" busy={!pret} disabled={!pret} onpress={() => creer()}>{pret ? (getDemo()?.signupPasskey ?? (mobile ? t("account.signup.passkey") : t("account.signup.phone"))) : t("account.preparing")}</Button>
       <NoteDemo />
       <p class="legal" data-legal>
         {t("account.signup.legal.a")}<a class="lien-t" href={href("/conditions")} target="_blank" rel="noopener noreferrer">{t("account.signup.legal.link")}</a>{t("account.signup.legal.b")}
       </p>
+      {#if !mobile}<button type="button" class="discret" disabled={!pret} onclick={() => void creer("local")} data-ici>{t("account.signup.here")}</button>{/if}
     </form>
     <!-- Même forme que les autres chemins de « Se connecter » (séparateur « ou », bouton secondaire). -->
     <p class="ou" aria-hidden="true"><span>{t("account.login.or")}</span></p>
@@ -220,7 +272,7 @@
       <Button variant="ghost" onpress={() => void (etape = "cle")}>{t("account.second.skip")}</Button>
     </div>
   {:else if etape === "cle"}
-    <CleRecup {texte} avertissement={t("account.key.notyet")} onnotee={() => void (etape = "verif")} />
+    <CleRecup {texte} avertissement={t("account.key.notyet")} bind:sauvee={cleSauvee} onnotee={() => void (etape = "verif")} />
   {:else if etape === "verif"}
     <VerifCle {texte} bouton={t("account.verify.done")} onjuste={terminer} onrevoir={() => void (etape = "cle")}>
       <Case label={t("account.stay")} bind:checked={rester} />
@@ -230,14 +282,38 @@
     <div class="actions"><Button onpress={recommencer}>{t("account.restart")}</Button></div>
   {:else}
     <p class="note" data-session-note>{gardee ? t("account.created.session.gardee") : t("account.created.session.memoire")}</p>
-    {#if account.cleLocale}<p class="note" data-cle-locale>{t("account.localKey")}</p>{/if}
+    {#if account.cleLocale}<p class="note" data-cle-locale>{ou === "telephone" ? t("account.phone.noprf.created") : t("account.localKey")}</p>{/if}
+    {#if tel === "propose"}
+      <div class="tel" data-ajout-telephone>
+        <p class="note">{t("account.phone.offer")}</p>
+        <IndiceQr texte={t("account.phone.how")} />
+        <div class="actions"><Button onpress={ajouterTelephone}>{t("account.phone.add")}</Button></div>
+      </div>
+    {:else if tel === "second"}
+      <p class="note">{t("account.second.body")}</p>
+      <div class="actions"><Button onpress={secondTelephone}>{t("account.second.go")}</Button></div>
+    {:else if tel === "ajoute" || tel === "sans_prf"}
+      <p class="ok" role="status" data-telephone-ajoute>{t("account.phone.added")}</p>
+      {#if tel === "sans_prf"}<p class="note" data-telephone-sans-prf>{t("account.phone.noprf")}</p>{/if}
+    {/if}
     <div class="actions">
-      <Button onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{t("account.continue")}</Button>
+      <Button variant={tel === "propose" ? "secondary" : "primary"} onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{tel === "propose" ? t("account.phone.later") : t("account.continue")}</Button>
     </div>
   {/if}
 </Cadre>
 
 <style>
+  .tel {
+    display: grid;
+    gap: var(--sp-4);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--hair-2);
+  }
+  .ok {
+    margin: 0;
+    color: var(--accent);
+    font-weight: 560;
+  }
   .legal {
     margin: calc(-1 * var(--sp-2)) 0 0;
     color: var(--text-2);

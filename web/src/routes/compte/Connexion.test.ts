@@ -5,7 +5,7 @@
 // « Créez une passkey sur cet appareil » après la clé. Le module de compte est remplacé par un double.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../../i18n/i18n.svelte";
-import { bouton, cocher, demonter, erreurDe, monter, presser, saisir } from "./pages.test-helper";
+import { appareil, bouton, cocher, demonter, erreurDe, monter, presser, saisir } from "./pages.test-helper";
 
 const texte = () => document.body.textContent!.replace(/\s+/g, " ");
 const C = vi.hoisted(() => ({
@@ -29,6 +29,7 @@ const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: null, limites: 
 
 beforeEach(() => {
   setLang("fr");
+  appareil("telephone"); // téléphone : parcours inchangé ; ordinateur : tests « sur ordinateur » plus bas
   for (const f of Object.values(C)) f.mockReset();
   C.preparerConnexion.mockResolvedValue(undefined);
   C.passkeysDisponibles.mockReturnValue(true);
@@ -59,7 +60,7 @@ describe("connexion par passkey", () => {
     expect(texte()).not.toMatch(/Mot de passe|Adresse e-mail/);
     cocher("Rester connecté sur cet appareil");
     await presser("Se connecter avec une passkey");
-    expect(C.seConnecter).toHaveBeenCalledWith(true);
+    expect(C.seConnecter).toHaveBeenCalledWith(true, "defaut");
     expect(texte()).toContain("Vous êtes connecté sur cet appareil.");
   });
 
@@ -167,3 +168,23 @@ describe("récupération par la clé", () => {
     expect(bouton("Continuer")).toBeTruthy();
   });
 });
+
+// Décision du 25 novembre (conception §18) : sur ordinateur, le téléphone d'abord (QR), puis cet ordinateur.
+describe("connexion sur ordinateur", () => {
+  beforeEach(() => appareil("ordinateur"));
+
+  it("« Se connecter avec mon téléphone » (hybride), le QR expliqué ; « Utiliser une passkey de cet ordinateur » (local)", async () => {
+    await monter(Connexion);
+    expect(texte()).toContain("Scannez-le avec l'appareil photo du téléphone qui garde votre passkey");
+    expect(() => bouton("Se connecter avec une passkey")).toThrow();
+    await presser("Se connecter avec mon téléphone");
+    expect(C.seConnecter).toHaveBeenLastCalledWith(false, "hybride");
+    expect(C.preparerConnexion).toHaveBeenCalledTimes(1);
+    account.etat = "absent";
+    demonter();
+    await monter(Connexion);
+    await presser("Utiliser une passkey de cet ordinateur");
+    expect(C.seConnecter).toHaveBeenLastCalledWith(false, "local");
+  });
+});
+

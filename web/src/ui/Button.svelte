@@ -10,6 +10,11 @@
     /** Chargement imposé de l'extérieur (en plus de celui d'un `onpress` en cours). */
     busy?: boolean;
     disabled?: boolean;
+    /**
+     * Grisé mais focalisable et cliquable (aria-disabled, pas `disabled`) : `onpress` est quand même
+     * appelé, pour que l'écran dise pourquoi l'action attend (clé de récupération pas encore copiée).
+     */
+    softDisabled?: boolean;
     type?: "button" | "submit";
     /**
      * Appelé au plus une fois à la fois : le bouton se verrouille de façon synchrone, avant tout
@@ -32,6 +37,7 @@
     dense = false,
     busy = false,
     disabled = false,
+    softDisabled = false,
     type = "button",
     onpress,
     icon,
@@ -75,9 +81,9 @@
   {...rest}
   {type}
   {disabled}
-  class={["btn", variant, { dense }]}
+  class={["btn", variant, { dense, soft: softDisabled && !loading }]}
   aria-busy={loading ? "true" : undefined}
-  aria-disabled={loading ? "true" : undefined}
+  aria-disabled={loading || softDisabled ? "true" : undefined}
   onclick={click}
 >
   {#if loading}
@@ -207,6 +213,16 @@
   .btn[aria-disabled="true"] {
     cursor: progress;
   }
+  .btn.soft {
+    cursor: not-allowed;
+    background: var(--surface-2);
+    color: var(--text-disabled);
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .btn.soft::after {
+    display: none;
+  }
   .ic {
     display: inline-flex;
   }
@@ -279,8 +295,10 @@
     .btn {
       border-color: ButtonText;
     }
-    .btn:disabled {
+    .btn:disabled,
+    .btn.soft {
       border-color: GrayText;
+      color: GrayText;
     }
     .primary::after {
       display: none;

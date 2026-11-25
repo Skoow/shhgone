@@ -52,3 +52,29 @@ export async function ouvrirEtiquette(cle: CryptoKey, h: Uint8Array, e: Uint8Arr
     return null;
   }
 }
+
+// --- Téléphone ou ordinateur (décision du 25 novembre, conception du compte §18) -----------------
+
+/** Ce que lit estMobile (injecté par les tests ; par défaut, le navigateur). */
+export type Ecran = { matchMedia?: (q: string) => { matches: boolean }; userAgentData?: { mobile?: unknown } | undefined };
+
+const ecranDuNavigateur = (): Ecran => {
+  const g = globalThis as { matchMedia?: (q: string) => MediaQueryList; navigator?: { userAgentData?: { mobile?: unknown } } };
+  return { matchMedia: typeof g.matchMedia === "function" ? (q) => g.matchMedia!(q) : undefined, userAgentData: g.navigator?.userAgentData };
+};
+
+/**
+ * Vrai sur un téléphone ou une tablette : passkey de l'appareil (Face ID, empreinte). Faux sur un
+ * ordinateur : la passkey est d'abord proposée sur le téléphone (QR du navigateur). Sans reniflage
+ * de l'agent : `navigator.userAgentData.mobile` s'il vaut true (Chromium), sinon pointeur
+ * principal grossier (doigt), ce qui couvre Safari iOS et les tablettes. Dans le doute :
+ * ordinateur (le lien « cet ordinateur » reste offert, et la feuille du navigateur garde ses choix).
+ */
+export function estMobile(e: Ecran = ecranDuNavigateur()): boolean {
+  if (e.userAgentData?.mobile === true) return true;
+  try {
+    return typeof e.matchMedia === "function" && e.matchMedia("(pointer: coarse)").matches === true;
+  } catch {
+    return false;
+  }
+}

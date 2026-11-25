@@ -30,7 +30,7 @@ import { nomAppareil, ouvrirEtiquette, scellerEtiquette } from "./device";
 import { effacer, idbDuNavigateur, lire, lireCle, oublierSession, sauver, sauverCle } from "./persist";
 import { reparer, type Lien, type Resultat } from "./reparation";
 import * as recupCle from "./recup";
-import { creer, obtenir, optionsAssertion, optionsCreation, passkeysDisponibles, prfApresCreation, signalerInconnue, type Creation } from "./webauthn";
+import { creer, obtenir, optionsAssertion, optionsCreation, passkeysDisponibles, prfApresCreation, signalerInconnue, type Creation, type Parcours } from "./webauthn";
 import { b64u, unb64u } from "../engine/pure";
 import { entreePrf } from "../engine/index";
 import { loadSalonEngine, type SalonEngine } from "../salon/engine";
@@ -47,6 +47,8 @@ export { REGLAGES_DEFAUT } from "./vaults";
 export { CompteError, type Preuve, type EtatServeur } from "./api";
 export type { Progres } from "./suppression";
 export { passkeysDisponibles };
+export { estMobile } from "./device";
+export type { Parcours };
 
 type Bytes = Uint8Array<ArrayBuffer>;
 type PseudoMoteur = Pick<SalonEngine, "pseudoValide" | "cleUnicite" | "pseudoReserve">;
@@ -153,10 +155,10 @@ let ePrfCache: Uint8Array | null = null;
 let salonCharge: PseudoMoteur | null = null;
 
 /** Inscription en cours, passkey créée : rien n'existe encore côté serveur. */
-type Creee = { etape: string; h: Bytes; c: Creation; prf: Bytes | null; affiche: string; pCanon: string; profil: Profil; kCompte: Bytes; r: Bytes; texte: string };
+type Creee = { etape: string; h: Bytes; c: Creation; parcours: Parcours; prf: Bytes | null; affiche: string; pCanon: string; profil: Profil; kCompte: Bytes; r: Bytes; texte: string };
 let creee: Creee | null = null;
 /** Ajout de passkey en cours (deuxième geste attendu pour la sortie PRF). */
-let ajoutEnCours: { etape: string; c: Creation; nom: string } | null = null;
+let ajoutEnCours: { etape: string; c: Creation; nom: string; parcours: Parcours } | null = null;
 /** Connexion par passkey dont les données ne s'ouvrent pas ici : clé de récupération attendue. */
 let cleAttendue: { ouv: api.Ouverture; prf: Bytes | null; persistante: boolean } | null = null;
 /** Nouvelle clé de récupération montrée, pas encore enregistrée. */
@@ -365,28 +367,42 @@ export function inscriptionPrete(): boolean {
  * Geste « Créer avec une passkey » : navigator.credentials.create tout de suite (aucune requête
  * avant). « cle » : la clé de récupération est prête (cleAffichee) ; « second » : le gestionnaire
  * annonce PRF sans l'avoir rendu, un deuxième geste est nécessaire (deuxiemeGeste). Annulation :
- * Error("annule"), rien n'est créé.
+ * Error("annule"), rien n'est créé. `parcours` (§18) : « hybride » sur ordinateur (passkey sur le
+ * téléphone, QR), « local » (« cet ordinateur »), « defaut » sur téléphone ou tablette.
  */
-export async function creerPasskey(pseudo: string, langue: string): Promise<"cle" | "second"> {
+export async function creerPasskey(pseudo: string, langue: string, parcours: Parcours = "defaut"): Promise<"cle" | "second"> {
   const ins = inscription;
   if (!ins || !fraiche(ins) || !salonCharge) throw new Error("aucune_etape");
   const { affiche, pCanon } = pseudoCanonDe(salonCharge, pseudo);
   const user = ins.options.user as { id?: unknown } | undefined;
   const h = typeof user?.id === "string" ? unb64u(user.id) : new Uint8Array(0);
   if (h.length !== 16) throw new Error("reponse_invalide");
-  const c = await creer(optionsCreation(ins.options, affiche, ins.ePrf));
+  const c = await creer(optionsCreation(ins.options, affiche, ins.ePrf, parcours));
   const profil: Profil = { pseudo: affiche, photo: null, langue, reglages: { proposerProfil: true, garderRecus: true }, pass: null };
   const r = recupCle.nouvelleCle();
   creee?.kCompte.fill(0);
-  creee = { etape: ins.etape, h, c, prf: c.prf, affiche, pCanon, profil, kCompte: aleatoire32(), r, texte: await recupCle.affichage(r) };
+  creee = { etape: ins.etape, h, c, parcours, prf: c.prf, affiche, pCanon, profil, kCompte: aleatoire32(), r, texte: await recupCle.affichage(r) };
   return c.prf === null && c.prfAnnonce ? "second" : "cle";
+}
+
+/**
+ * Où est la passkey de l'inscription en cours (§18) : « telephone » (autre appareil, par QR),
+ * « ici » (cet appareil), d'après ce que dit le navigateur, sinon d'après le parcours demandé.
+ * Lu localement, jamais envoyé ; sert à proposer « Ajouter mon téléphone » après la création.
+ */
+export function passkeyCreee(): "telephone" | "ici" {
+  if (!creee) throw new Error("aucune_etape");
+  const a = creee.c.attachement;
+  if (a === "cross-platform") return "telephone";
+  if (a === "platform") return "ici";
+  return creee.parcours === "hybride" ? "telephone" : "ici";
 }
 
 /** Deuxième geste (§3.1, 2 bis) : la sortie PRF de la passkey créée ; faux si toujours absente. */
 export async function deuxiemeGeste(): Promise<boolean> {
   const c = creee;
   if (!c) throw new Error("aucune_etape");
-  c.prf = await prfApresCreation(c.c.rpId, c.c.credId, await ePrf());
+  c.prf = await prfApresCreation(c.c.rpId, c.c.credId, await ePrf(), c.parcours);
   return c.prf !== null;
 }
 
@@ -471,12 +487,13 @@ export async function preparerConnexion(): Promise<void> {
  * chargée d'avance ; sinon chargée maintenant, ce que Safari peut refuser). « ouvert » ; ou
  * « cle_requise » : la passkey a connecté le compte mais n'ouvre pas les données sur cet appareil
  * (pas de PRF, ou sortie PRF différente) et l'appareil n'en garde aucune clé : ouvrirAvecCle.
+ * `parcours` (§18) : « hybride » sur ordinateur (passkey du téléphone, QR), « local », « defaut ».
  */
-export async function seConnecter(persistante: boolean): Promise<"ouvert" | "cle_requise"> {
+export async function seConnecter(persistante: boolean, parcours: Parcours = "defaut"): Promise<"ouvert" | "cle_requise"> {
   let c = connexionPrete;
   connexionPrete = null;
   if (!fraiche(c)) c = { ...(await api.connexionDebut(deps.net)), recue: deps.maintenant() };
-  const a = await obtenir(optionsAssertion(c.options, await ePrf()));
+  const a = await obtenir(optionsAssertion(c.options, await ePrf(), parcours));
   const ouv = await api.connexionFin(deps.net, { etape: c.etape, credential: a.credential, persistante, etiquette: null });
   const parEnveloppe = a.prf ? await ouvrirEnveloppesPrf(a.prf, ouv.h, ouv.credId, ouv.enveloppes) : null;
   let kCompte: Bytes | null = parEnveloppe;
@@ -633,18 +650,22 @@ export async function preparerAjout(): Promise<"pret" | "recent"> {
 /**
  * Geste « Créer la passkey » (après preparerAjout) : « ajoutee », ou « second » (sortie PRF
  * annoncée mais pas rendue : finirAjout après un deuxième geste). Ajoutée sur cet appareil avec PRF :
- * elle ouvre les données ici (enveloppe téléversée).
+ * elle ouvre les données ici (enveloppe téléversée). « Ajouter mon téléphone » (§18) : parcours
+ * « hybride » (QR du navigateur) ; c'est le même ajout standard, aucun transfert de clé : la sortie
+ * PRF de la passkey du téléphone, si elle revient par le QR, sert à poser son enveloppe ; sinon la
+ * passkey est ajoutée sans enveloppe (repli §5.5 sur le téléphone) : « sans_prf ».
  */
-export async function ajouterPasskey(nom: string): Promise<"ajoutee" | "second"> {
-  const o = ouverteOuErreur();
+export async function ajouterPasskey(nom: string, parcours: Parcours = "defaut"): Promise<"ajoutee" | "sans_prf" | "second"> {
+  ouverteOuErreur();
   const p = ajoutPret;
   ajoutPret = null;
   if (!fraiche(p)) throw new Error("aucune_etape");
-  const c = await creer(optionsCreation(p.options, account.profil?.pseudo ?? "", await ePrf()));
-  ajoutEnCours = { etape: p.etape, c, nom };
+  const c = await creer(optionsCreation(p.options, account.profil?.pseudo ?? "", await ePrf(), parcours));
+  ajoutEnCours = { etape: p.etape, c, nom, parcours };
   if (c.prf === null && c.prfAnnonce) return "second";
+  const avec = c.prf !== null;
   await finirAjout(c.prf);
-  return "ajoutee";
+  return avec ? "ajoutee" : "sans_prf";
 }
 
 /** Fin de l'ajout ; `prf` : sortie obtenue (création ou deuxième geste), ou null. */
@@ -669,7 +690,7 @@ export async function deuxiemeGesteAjout(): Promise<boolean> {
   if (!a) throw new Error("aucune_etape");
   let prf: Bytes | null = null;
   try {
-    prf = await prfApresCreation(a.c.rpId, a.c.credId, await ePrf());
+    prf = await prfApresCreation(a.c.rpId, a.c.credId, await ePrf(), a.parcours);
   } catch (e) {
     if (!(e instanceof Error && e.message === "annule")) throw e;
   }

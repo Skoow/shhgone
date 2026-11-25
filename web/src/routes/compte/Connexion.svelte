@@ -8,8 +8,10 @@
   // (jamais de repli silencieux) ; l'enveloppe de la passkey est alors réparée.
   // Compte banni : la connexion reste permise (exporter, supprimer), avec la date, le motif et
   // l'identifiant B-… à donner pour un recours (§7.4).
+  // Sur ordinateur (décision du 25 novembre, conception §18) : le téléphone d'abord (QR du
+  // navigateur, parcours « hybride »), puis « Utiliser une passkey de cet ordinateur » (« local »).
   import { tick, untrack } from "svelte";
-  import { account, annulerCle, cleRequise, etatCompte, ouvrirAvecCle, passkeysDisponibles, preparerConnexion, seConnecter, seDeconnecter } from "../../account/session.svelte";
+  import { account, annulerCle, cleRequise, estMobile, etatCompte, ouvrirAvecCle, passkeysDisponibles, preparerConnexion, seConnecter, seDeconnecter, type Parcours } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
   import { t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
@@ -19,12 +21,14 @@
   import TextField from "../../ui/TextField.svelte";
   import Cadre from "./Cadre.svelte";
   import Case from "./Case.svelte";
+  import IndiceQr from "./IndiceQr.svelte";
   import NoteDemo from "./NoteDemo.svelte";
   import { annulee, erreur, jourLong } from "./erreurs";
 
   // Seul paramètre lu dans l'adresse : « ?suite=salon » (suite(), router.svelte.ts).
   const apres = suite(location.search);
   const dispo = passkeysDisponibles();
+  const mobile = estMobile();
 
   let vue = $state<"form" | "cle" | "connecte">(account.etat === "ouvert" ? "connecte" : "form");
   let rester = $state(false);
@@ -76,11 +80,12 @@
   }
 
   // Le geste : aucune requête avant navigator.credentials.get.
-  async function connecter() {
+  async function connecter(parcours: Parcours = mobile ? "defaut" : "hybride") {
+    if (envoi) return;
     bandeau = null;
     envoi = true;
     try {
-      const r = await seConnecter(rester);
+      const r = await seConnecter(rester, parcours);
       if (r === "cle_requise") {
         vue = "cle";
         announce(t("account.fallback.body"));
@@ -158,9 +163,11 @@
     <!-- « Rester connecté » sous le bouton ; les deux autres chemins
          en boutons secondaires, après un séparateur « ou ». -->
     <form novalidate class="connexion" onsubmit={(e) => e.preventDefault()}>
-      <Button type="submit" onpress={connecter}>{envoi ? t("account.verifying") : t("account.login.passkey")}</Button>
+      {#if !mobile}<IndiceQr texte={t("account.login.phone.how")} />{/if}
+      <Button type="submit" onpress={() => connecter()}>{envoi ? t("account.verifying") : mobile ? t("account.login.passkey") : t("account.login.phone")}</Button>
       <NoteDemo />
       <Case label={t("account.stay")} bind:checked={rester} />
+      {#if !mobile}<button type="button" class="discret" onclick={() => void connecter("local")} data-ici>{t("account.login.here")}</button>{/if}
     </form>
     <p class="ou" aria-hidden="true"><span>{t("account.login.or")}</span></p>
     <ul class="autres">

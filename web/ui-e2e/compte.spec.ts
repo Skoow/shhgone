@@ -93,12 +93,13 @@ async function inscrire(page: Page, origin: string, pseudo: string, rester = fal
   await expect(titre(page, "Créer un compte")).toBeVisible();
   await champ(page, "Pseudo").fill(pseudo);
   await expect(page.locator("[data-dispo]")).toHaveText("Disponible", { timeout: 30_000 }); // preuve anti-robot et cérémonie chargées
-  await bouton(page, "Créer avec une passkey").click();
+  await bouton(page, "Créer avec une passkey").or(bouton(page, "Garder le compte sur cet ordinateur")).click();
   await expect(titre(page, "Votre clé de récupération")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("[data-pas-encore]")).toHaveText("Le compte n'existe qu'après « Terminer ».");
   const cle = (await page.locator("[data-cle] .g").allTextContents()).join("-");
   expect(cle).toMatch(/^([0-9A-Z*~$=]{4}-){6}[0-9A-Z*~$=U]{3}$/);
-  await bouton(page, "Je l'ai notée").click();
+  await bouton(page, "Copier").click(); // « Je l\'ai notée » attend la clé copiée ou téléchargée
+  await bouton(page, "Je l\'ai notée").click();
   const label = (await page.locator("label").filter({ hasText: "Tapez le groupe" }).textContent())!;
   const k = Number(/n°\s*(\d)/u.exec(label)![1]);
   await page.getByLabel(label.trim(), { exact: true }).fill(cle.split("-")[k - 1]!.toLowerCase());
@@ -112,7 +113,7 @@ async function inscrire(page: Page, origin: string, pseudo: string, rester = fal
 async function connecter(page: Page, origin: string): Promise<"ouvert" | "cle"> {
   await page.goto(origin + "/compte/connexion");
   await expect(titre(page, "Se connecter")).toBeVisible();
-  await bouton(page, "Se connecter avec une passkey").click();
+  await bouton(page, "Se connecter avec une passkey").or(bouton(page, "Utiliser une passkey de cet ordinateur")).click();
   const cle = page.locator("[data-repli]");
   await expect(connecte(page).or(cle)).toBeVisible({ timeout: 30_000 });
   return (await cle.isVisible()) ? "cle" : "ouvert";
@@ -203,7 +204,8 @@ test("nouvel appareil par la clé de récupération : passkey créée ici, ancie
     // Nouvelle clé de récupération (proposée après usage, Q10).
     await bouton(p2, "Créer une nouvelle clé").click();
     const nouvelle = (await p2.locator("[data-cle] .g").allTextContents()).join("-");
-    await bouton(p2, "Je l'ai notée").click();
+    await bouton(p2, "Copier").click(); // « Je l\'ai notée » attend la clé copiée ou téléchargée
+    await bouton(p2, "Je l\'ai notée").click();
     const label = (await p2.locator("label").filter({ hasText: "Tapez le groupe" }).textContent())!;
     await p2.getByLabel(label.trim(), { exact: true }).fill(nouvelle.split("-")[Number(/n°\s*(\d)/u.exec(label)![1]) - 1]!);
     await bouton(p2, "Enregistrer la nouvelle clé").click();
@@ -218,7 +220,7 @@ test("nouvel appareil par la clé de récupération : passkey créée ici, ancie
     await ctx.close();
   }
   await page.goto(shh.origin + "/compte/connexion");
-  await bouton(page, "Se connecter avec une passkey").click();
+  await bouton(page, "Se connecter avec une passkey").or(bouton(page, "Utiliser une passkey de cet ordinateur")).click();
   await expect(page.getByText("Cette passkey n'est liée à aucun compte.")).toBeVisible({ timeout: 30_000 });
 });
 
@@ -278,10 +280,10 @@ test("suppression du compte par un geste de passkey ; ensuite la passkey ne conn
   await expect(titre(page, "Compte supprimé.")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("[data-passkey-gestionnaire]")).toContainText(`Supprimez aussi la passkey « ${pseudo} »`);
   await page.goto(shh.origin + "/compte/connexion");
-  await bouton(page, "Se connecter avec une passkey").click();
+  await bouton(page, "Se connecter avec une passkey").or(bouton(page, "Utiliser une passkey de cet ordinateur")).click();
   // signalUnknownCredential a pu faire oublier la passkey à l'authentificateur : soit aucune passkey,
   // soit « liée à aucun compte » ; dans les deux cas, rien ne s'ouvre.
-  await expect(page.getByText("Cette passkey n'est liée à aucun compte.").or(bouton(page, "Se connecter avec une passkey"))).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Cette passkey n'est liée à aucun compte.").or(bouton(page, "Se connecter avec une passkey").or(bouton(page, "Utiliser une passkey de cet ordinateur")))).toBeVisible({ timeout: 30_000 });
   await expect(connecte(page)).toHaveCount(0);
   for (const r of requetes) expect(r.body, r.url).not.toMatch(/"results"|hmacGetSecret/);
   expect(scanDir(dir, reperes)).toEqual([]);

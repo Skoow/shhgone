@@ -11,7 +11,8 @@
 export const MARK = "__SHH_DEMO__";
 
 type Bytes = Uint8Array<ArrayBuffer>;
-type PasskeySimulee = { id: string; userHandle: string; secret: string };
+/** `tel` : créée par le parcours « téléphone » (QR) : un autre authentificateur que celui de l'onglet. */
+type PasskeySimulee = { id: string; userHandle: string; secret: string; tel?: boolean };
 
 const b64u = (b: Uint8Array) => {
   let s = "";
@@ -45,14 +46,18 @@ export function passkeysSimulees(o: { restore?: PasskeySimulee[] | null; onChang
     credentials: {
       async create(opts: CredentialCreationOptions): Promise<Credential> {
         const pk = opts.publicKey!;
+        // Parcours « téléphone » (QR) demandé : la passkey simulée se dit « cross-platform » et vit
+        // sur un autre authentificateur (excludeCredentials ne vaut que pour le même).
+        const hybride = pk.authenticatorSelection?.authenticatorAttachment === "cross-platform" || ((pk as { hints?: string[] }).hints ?? []).includes("hybrid");
         const exclues = new Set((pk.excludeCredentials ?? []).map((d) => b64u(octets(d.id))));
-        if (liste.some((p) => exclues.has(p.id))) throw Object.assign(new Error("déjà enregistrée"), { name: "InvalidStateError" });
-        const p: PasskeySimulee = { id: b64u(crypto.getRandomValues(new Uint8Array(16))), userHandle: b64u(octets(pk.user.id)), secret: b64u(crypto.getRandomValues(new Uint8Array(32))) };
+        if (liste.some((p) => exclues.has(p.id) && (p.tel === true) === hybride)) throw Object.assign(new Error("déjà enregistrée"), { name: "InvalidStateError" });
+        const p: PasskeySimulee = { id: b64u(crypto.getRandomValues(new Uint8Array(16))), userHandle: b64u(octets(pk.user.id)), secret: b64u(crypto.getRandomValues(new Uint8Array(32))), ...(hybride ? { tel: true } : {}) };
         changer([...liste, p]);
         const e = entreePrf(pk.extensions);
         const ext = { credProps: { rk: true }, prf: { enabled: true, ...(e ? { results: { first: await sortie(p.secret, octets(e)) } } : {}) } };
         return {
           rawId: buf(unb64u(p.id)),
+          authenticatorAttachment: hybride ? "cross-platform" : "platform",
           response: { clientDataJSON: json({ type: "webauthn.create", challenge: b64u(octets(pk.challenge)) }), attestationObject: buf(new Uint8Array(1)) },
           getClientExtensionResults: () => ext,
         } as unknown as Credential;

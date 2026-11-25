@@ -55,3 +55,18 @@ export function erreurDe(label: string): string {
     .join(" ");
 }
 export const PREUVE = { altcha: "preuve", hp: "", shown_at: "t" };
+
+/** « Je l'ai notée » (CleRecup) : copie d'abord la clé si le bouton attend encore (grisé). */
+export async function noterCle(): Promise<void> {
+  if (bouton("Je l'ai notée").getAttribute("aria-disabled") === "true") await presser("Copier");
+  await presser("Je l'ai notée");
+}
+
+/**
+ * Sorte d'appareil vue par estMobile (account/device.ts) : pointeur grossier pour un téléphone,
+ * fin pour un ordinateur (décision du 25 novembre, conception du compte §18). Avant monter().
+ */
+export function appareil(sorte: "telephone" | "ordinateur"): void {
+  const coarse = sorte === "telephone";
+  (globalThis as { matchMedia?: unknown }).matchMedia = (q: string) => ({ matches: q === "(pointer: coarse)" ? coarse : false, media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false });
+}

@@ -1,7 +1,7 @@
 // Nom d'appareil d'une session (conception compte §8.5, §9.3) : calculé sur l'appareil, chiffré
 // par K_etiquette en 64 octets fixes ; le serveur ne le voit jamais en clair.
 import { describe, expect, it } from "vitest";
-import { ETIQUETTE_LEN, nomAppareil, ouvrirEtiquette, scellerEtiquette } from "./device";
+import { ETIQUETTE_LEN, estMobile, nomAppareil, ouvrirEtiquette, scellerEtiquette } from "./device";
 
 const key = () => crypto.subtle.importKey("raw", new Uint8Array(32).fill(9), "AES-GCM", false, ["encrypt", "decrypt"]);
 const H = new Uint8Array(16).fill(1);
@@ -13,6 +13,34 @@ describe("nom d'appareil", () => {
     expect(nomAppareil("Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36")).toBe("Chrome · téléphone");
     expect(nomAppareil("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36 Edg/140.0")).toBe("Edge · ordinateur");
     expect(nomAppareil("")).toBe("Navigateur · ordinateur");
+  });
+});
+
+// Décision du 25 novembre (conception §18) : téléphone ou tablette → passkey de l'appareil ;
+// ordinateur → téléphone d'abord. Sans reniflage de l'agent.
+describe("téléphone ou ordinateur", () => {
+  const mm = (coarse: boolean) => (q: string) => ({ matches: q === "(pointer: coarse)" && coarse });
+  it("userAgentData.mobile à true : mobile, quel que soit le pointeur", () => {
+    expect(estMobile({ userAgentData: { mobile: true }, matchMedia: mm(false) })).toBe(true);
+  });
+  it("pointeur principal grossier (Safari iOS, tablettes, Android tablette où mobile vaut false) : mobile", () => {
+    expect(estMobile({ matchMedia: mm(true) })).toBe(true);
+    expect(estMobile({ userAgentData: { mobile: false }, matchMedia: mm(true) })).toBe(true);
+  });
+  it("souris ou pavé tactile : ordinateur ; rien de connu, matchMedia qui jette, mobile non booléen : ordinateur", () => {
+    expect(estMobile({ userAgentData: { mobile: false }, matchMedia: mm(false) })).toBe(false);
+    expect(estMobile({})).toBe(false);
+    expect(estMobile({ userAgentData: { mobile: "true" }, matchMedia: mm(false) })).toBe(false);
+    expect(
+      estMobile({
+        matchMedia: () => {
+          throw new Error("x");
+        },
+      }),
+    ).toBe(false);
+  });
+  it("par défaut : lit le navigateur sans jeter (environnement de test : ordinateur)", () => {
+    expect(typeof estMobile()).toBe("boolean");
   });
 });
 

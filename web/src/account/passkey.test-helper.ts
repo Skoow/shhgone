@@ -33,6 +33,8 @@ export class FauxAuthentificateur {
   readonly sorties: Bytes[] = [];
   /** Options de création reçues (pseudo dans user.name). */
   readonly creations: PublicKeyCredentialCreationOptions[] = [];
+  /** Options d'assertion reçues (indices du parcours, §18). */
+  readonly assertions: PublicKeyCredentialRequestOptions[] = [];
   constructor(
     public o: {
       /** « creation » : sortie rendue dès create ; « annonce » : seulement prf.enabled ; « absent » : pas de PRF. */
@@ -40,6 +42,8 @@ export class FauxAuthentificateur {
       forme?: FormePrf;
       /** Le geste suivant est annulé (NotAllowedError). */
       annuler?: boolean;
+      /** PublicKeyCredential.authenticatorAttachment rendu à la création (absent : non rendu). */
+      attachement?: "platform" | "cross-platform";
     } = {},
   ) {}
 
@@ -104,6 +108,7 @@ export class FauxAuthentificateur {
           }
           return {
             rawId: buf(p.id),
+            ...(this.o.attachement ? { authenticatorAttachment: this.o.attachement } : {}),
             response: { clientDataJSON: buf(new TextEncoder().encode(JSON.stringify({ type: "webauthn.create", challenge: b64u(new Uint8Array(pk.challenge as ArrayBuffer)) }))), attestationObject: buf(rnd(80)) },
             getClientExtensionResults: () => ext,
           } as unknown as Credential;
@@ -111,6 +116,7 @@ export class FauxAuthentificateur {
         get: async (opts) => {
           this.#annule();
           const pk = opts.publicKey!;
+          this.assertions.push(pk);
           const permises = (pk.allowCredentials ?? []).map((d) => b64u(new Uint8Array(d.id as ArrayBuffer)));
           const p = [...this.passkeys].reverse().find((x) => permises.length === 0 || permises.includes(b64u(x.id)));
           if (!p) throw Object.assign(new Error("aucune"), { name: "NotAllowedError" });

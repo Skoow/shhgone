@@ -87,6 +87,29 @@ describe("options", () => {
     expect(optionsAssertion({ challenge: "AAAA", allowCredentials: [{ type: "public-key", id: "AQID" }] }, E).allowCredentials).toEqual([{ type: "public-key", id: new Uint8Array([1, 2, 3]) }]);
   });
 
+  // Décision du 25 novembre (§18) : sur ordinateur, téléphone d'abord (QR), « cet ordinateur » en repli.
+  it("parcours : « hybride » = hints hybrid (+ cross-platform à la création) ; « local » = hints client-device sans attachement ; défaut = rien", () => {
+    const h = (o: unknown) => (o as { hints?: string[] }).hints;
+    const hyb = optionsCreation(creation, "Lea", E, "hybride");
+    expect(h(hyb)).toEqual(["hybrid"]);
+    expect(hyb.authenticatorSelection).toEqual({ residentKey: "required", requireResidentKey: true, userVerification: "required", authenticatorAttachment: "cross-platform" });
+    const loc = optionsCreation(creation, "Lea", E, "local");
+    expect(h(loc)).toEqual(["client-device"]);
+    expect(loc.authenticatorSelection).toEqual({ residentKey: "required", requireResidentKey: true, userVerification: "required" });
+    const def = optionsCreation(creation, "Lea", E);
+    expect("hints" in def).toBe(false);
+    expect(def.authenticatorSelection).toEqual({ residentKey: "required", requireResidentKey: true, userVerification: "required" });
+    const a = { challenge: b64u(new Uint8Array(32)), rpId: "shh.test" };
+    expect(h(optionsAssertion(a, E, "hybride"))).toEqual(["hybrid"]);
+    expect(h(optionsAssertion(a, E, "local"))).toEqual(["client-device"]);
+    expect("hints" in optionsAssertion(a, E)).toBe(false);
+    // Le reste ne change pas avec le parcours (E_prf, vérification).
+    for (const p of ["hybride", "local", "defaut"] as const) {
+      expect((optionsAssertion(a, E, p).extensions as { prf: { eval: { first: Uint8Array } } }).prf.eval.first).toEqual(E);
+      expect((optionsCreation(creation, "Lea", E, p).extensions as { prf: { eval: { first: Uint8Array } } }).prf.eval.first).toEqual(E);
+    }
+  });
+
   it("options mal formées : options_invalides", () => {
     expect(() => optionsCreation({ ...creation, challenge: 5 }, "Lea", E)).toThrow("options_invalides");
     expect(() => optionsCreation({ ...creation, user: null }, "Lea", E)).toThrow("options_invalides");
@@ -106,6 +129,21 @@ describe("cérémonies (navigateur remplacé)", () => {
     expect(c.prf).toEqual(P);
     expect(c.prfAnnonce).toBe(true);
     expect(JSON.stringify(c.credential)).not.toContain(b64u(P));
+    expect(c.attachement).toBeNull();
+    configurerNavigateur(null);
+  });
+
+  it("create : authenticatorAttachment lu sur l'appareil (téléphone ou ici), jamais dans le JSON pour le serveur ; valeur inconnue : null", async () => {
+    const opts = optionsCreation({ rp: { id: "shh.test", name: "S" }, user: { id: "AAAA" }, challenge: "AAAA", pubKeyCredParams: [] }, "Lea", E, "hybride");
+    for (const [v, attendu] of [["cross-platform", "cross-platform"], ["platform", "platform"], ["autre", null], [42, null]] as const) {
+      const r = reponse({ prf: { enabled: true, results: { first: P.slice() } } });
+      (r as unknown as { authenticatorAttachment: unknown }).authenticatorAttachment = v;
+      brancher(async () => r);
+      const c = await creer(opts);
+      expect(c.attachement).toBe(attendu);
+      expect(JSON.stringify(c.credential)).not.toMatch(/platform|attachment/i);
+      expect(c.credential.clientExtensionResults).toEqual({ prf: { enabled: true } }); // liste blanche intacte
+    }
     configurerNavigateur(null);
   });
 
@@ -154,6 +192,9 @@ describe("cérémonies (navigateur remplacé)", () => {
     expect(vu!.rpId).toBe("shh.test");
     expect(vu!.allowCredentials).toEqual([{ type: "public-key", id: new Uint8Array([1, 2, 3]) }]);
     expect((vu!.challenge as Uint8Array).length).toBe(32);
+    expect("hints" in vu!).toBe(false);
+    await prfApresCreation("shh.test", new Uint8Array([1, 2, 3]), E, "hybride");
+    expect((vu as { hints?: string[] }).hints).toEqual(["hybrid"]); // passkey restée sur le téléphone : QR de nouveau
     configurerNavigateur(null);
   });
 

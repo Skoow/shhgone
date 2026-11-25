@@ -15,6 +15,14 @@
 //   octets, sinon « pas de PRF » (repli par la clé de récupération, §5.5). prf.enabled : vrai
 //   seulement s'il vaut exactement true.
 // - Annulation (NotAllowedError) : Error("annule"), que les écrans n'affichent pas.
+// - Parcours (décision du 25 novembre, conception §18) : « defaut » (téléphone ou tablette :
+//   passkey de l'appareil, options inchangées) ; « hybride » (ordinateur : passkey gardée sur le
+//   téléphone, QR du navigateur ; indice WebAuthn niveau 3 `hints: ["hybrid"]` et, à la création,
+//   `authenticatorAttachment: "cross-platform"` pour les navigateurs qui ignorent les indices, comme
+//   le recommande la norme) ; « local » (« cet ordinateur » : `hints: ["client-device"]`, sans
+//   imposer d'attachement, pour qu'un ordinateur sans passkey de plateforme garde ses autres choix).
+//   Les indices ne sont que des indices : le navigateur peut les ignorer, la cérémonie reste valable.
+//   Rien de cela ne part au serveur (il ne vérifie pas l'attachement).
 // - Aucun appel réseau ici : les options sont chargées AVANT le clic (Safari annule une cérémonie
 //   qui ne part pas du geste de l'utilisateur, conception §3).
 import { b64u, unb64u } from "../engine/pure";
@@ -91,6 +99,15 @@ export function sansSortiePrf(credential: Obj): Obj {
 
 // --- Options ----------------------------------------------------------------------------------
 
+/** Où la passkey est demandée (voir l'en-tête) ; « defaut » : options inchangées. */
+export type Parcours = "defaut" | "hybride" | "local";
+
+const INDICES: Record<Parcours, readonly string[] | null> = { defaut: null, hybride: ["hybrid"], local: ["client-device"] };
+const indices = (p: Parcours): { hints?: string[] } => {
+  const h = INDICES[p];
+  return h ? { hints: [...h] } : {};
+};
+
 const bytes = (v: unknown): Bytes => {
   if (typeof v !== "string") throw new Error("options_invalides");
   try {
@@ -102,7 +119,7 @@ const bytes = (v: unknown): Bytes => {
 const descripteurs = (l: unknown) => (Array.isArray(l) ? l.map((d: Obj) => ({ type: "public-key" as const, id: bytes(d.id) })) : undefined);
 
 /** Options de création (JSON du serveur) pour navigator.credentials.create ; nom affiché = pseudo. */
-export function optionsCreation(o: Obj, pseudo: string, ePrf: Uint8Array): PublicKeyCredentialCreationOptions {
+export function optionsCreation(o: Obj, pseudo: string, ePrf: Uint8Array, parcours: Parcours = "defaut"): PublicKeyCredentialCreationOptions {
   const rp = o.rp as Obj;
   const user = o.user as Obj;
   if (typeof rp !== "object" || rp === null || typeof user !== "object" || user === null || !Array.isArray(o.pubKeyCredParams)) throw new Error("options_invalides");
@@ -114,14 +131,15 @@ export function optionsCreation(o: Obj, pseudo: string, ePrf: Uint8Array): Publi
     pubKeyCredParams: (o.pubKeyCredParams as Obj[]).map((p) => ({ type: "public-key", alg: p.alg as number })),
     ...(typeof o.timeout === "number" ? { timeout: o.timeout } : {}),
     ...(exclure ? { excludeCredentials: exclure } : {}),
-    authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
+    authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required", ...(parcours === "hybride" ? { authenticatorAttachment: "cross-platform" as const } : {}) },
+    ...indices(parcours),
     attestation: "none",
     extensions: { credProps: true, prf: { eval: { first: ePrf as Bytes } } } as AuthenticationExtensionsClientInputs,
   };
 }
 
 /** Options d'assertion (JSON du serveur) pour navigator.credentials.get. */
-export function optionsAssertion(o: Obj, ePrf: Uint8Array): PublicKeyCredentialRequestOptions {
+export function optionsAssertion(o: Obj, ePrf: Uint8Array, parcours: Parcours = "defaut"): PublicKeyCredentialRequestOptions {
   const permises = descripteurs(o.allowCredentials);
   return {
     challenge: bytes(o.challenge),
@@ -129,6 +147,7 @@ export function optionsAssertion(o: Obj, ePrf: Uint8Array): PublicKeyCredentialR
     ...(typeof o.timeout === "number" ? { timeout: o.timeout } : {}),
     ...(permises && permises.length > 0 ? { allowCredentials: permises } : {}),
     userVerification: "required",
+    ...indices(parcours),
     extensions: { prf: { eval: { first: ePrf as Bytes } } } as AuthenticationExtensionsClientInputs,
   };
 }
@@ -143,7 +162,7 @@ function code(e: unknown): Error {
   return new Error("webauthn_echec");
 }
 
-type Reponse = { rawId: unknown; response: Obj & { getTransports?: unknown }; getClientExtensionResults?: () => unknown };
+type Reponse = { rawId: unknown; response: Obj & { getTransports?: unknown }; getClientExtensionResults?: () => unknown; authenticatorAttachment?: unknown };
 
 function lireReponse(c: Credential | null): { r: Reponse; id: Bytes; ext: unknown } {
   const r = c as unknown as Reponse | null;
@@ -173,6 +192,8 @@ export type Creation = {
   /** Le gestionnaire annonce PRF sans l'avoir rendu : un deuxième geste le donnera (§3.1, 2 bis). */
   prfAnnonce: boolean;
   rpId: string;
+  /** Où le navigateur dit avoir créé la passkey (PublicKeyCredential.authenticatorAttachment) : lu ici, jamais envoyé ; null si inconnu. */
+  attachement: "platform" | "cross-platform" | null;
 };
 
 /** navigator.credentials.create : appelé directement depuis le geste (aucune requête avant). */
@@ -193,7 +214,8 @@ export async function creer(options: PublicKeyCredentialCreationOptions): Promis
     response: { clientDataJSON: champ(r.response, "clientDataJSON"), attestationObject: champ(r.response, "attestationObject") },
     clientExtensionResults: extensionsPourServeur(ext),
   };
-  return { credential, credId: id, prf: sortiePrf(ext), prfAnnonce: prfAnnonce(ext), rpId: options.rp.id ?? "" };
+  const att = r.authenticatorAttachment;
+  return { credential, credId: id, prf: sortiePrf(ext), prfAnnonce: prfAnnonce(ext), rpId: options.rp.id ?? "", attachement: att === "platform" || att === "cross-platform" ? att : null };
 }
 
 export type Assertion = {
@@ -224,12 +246,13 @@ export async function obtenir(options: PublicKeyCredentialRequestOptions): Promi
  * Deuxième geste après une création sans sortie PRF (§3.1, 2 bis ; ajout d'une passkey) : une
  * assertion locale limitée à cette passkey, défi tiré ici (rien n'est envoyé au serveur).
  */
-export async function prfApresCreation(rpId: string, credId: Uint8Array, ePrf: Uint8Array): Promise<Bytes | null> {
+export async function prfApresCreation(rpId: string, credId: Uint8Array, ePrf: Uint8Array, parcours: Parcours = "defaut"): Promise<Bytes | null> {
   const a = await obtenir({
     challenge: crypto.getRandomValues(new Uint8Array(32)),
     rpId,
     allowCredentials: [{ type: "public-key", id: credId as Bytes }],
     userVerification: "required",
+    ...indices(parcours),
     extensions: { prf: { eval: { first: ePrf as Bytes } } } as AuthenticationExtensionsClientInputs,
   });
   return a.prf;

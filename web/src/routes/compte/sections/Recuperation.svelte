@@ -16,11 +16,14 @@
 
   let vue = $state<"ferme" | "cle" | "verif" | "recent" | "fini">("ferme");
   let texte = $state("");
+  /** Clé copiée ou téléchargée (CleRecup) : « Revoir la clé » ne le perd pas. */
+  let sauvee = $state(false);
   let global = $state("");
 
   async function commencer() {
     global = "";
     texte = await preparerNouvelleCle();
+    sauvee = false;
     vue = "cle";
     preparerReauth().catch(() => undefined);
   }
@@ -57,7 +60,7 @@
     {#if vue === "fini"}<p class="ok" role="status">{t("account.recovery.done")}</p>{/if}
     <div class="actions"><Button variant="secondary" onpress={commencer}>{t("account.recovery.new")}</Button></div>
   {:else if vue === "cle"}
-    <CleRecup {texte} avertissement={t("account.recovery.notyet")} onnotee={() => void (vue = "verif")} />
+    <CleRecup {texte} avertissement={t("account.recovery.notyet")} bind:sauvee onnotee={() => void (vue = "verif")} />
   {:else if vue === "verif"}
     <VerifCle {texte} bouton={t("account.recovery.save")} onjuste={enregistrer} onrevoir={() => void (vue = "cle")} />
   {:else}

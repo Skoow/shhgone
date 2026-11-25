@@ -5,8 +5,11 @@
   //   panneaux sur toute la largeur de la fenêtre. À droite le formulaire (colonne de 30 rem) ; à
   //   gauche la promesse, un schéma sobre (appareil, chiffré, serveur) et trois points forts, sans
   //   terme technique et sans rien promettre de faux (le serveur garde l'empreinte du pseudo, des
-  //   données chiffrées et quelques dates : jamais « rien n'est gardé »). Téléphone : la scène
-  //   devient une bande courte (promesse et points forts, sans le schéma) au-dessus du formulaire.
+  //   données chiffrées et quelques dates : jamais « rien n'est gardé »). Téléphone et tablette
+  //   (demande du 25 novembre) : le formulaire d'abord, centré et visible en entier dès l'arrivée ;
+  //   la scène passe dessous, réduite aux trois points forts (ni surtitre ni promesse, qui
+  //   redisent le premier point), et chaque idée n'est dite qu'une fois : un sous-titre qui redit
+  //   les points (`sousRedit`) n'y est pas montré.
   //   Dans le DOM, la scène vient APRÈS le formulaire (le titre, qui prend
   //   le focus, se lit en premier) ; seule la grille la place à gauche ou en haut.
   //   `etape` (1 à 4) : barre d'étapes de l'inscription (direction C) en tête du formulaire.
@@ -19,8 +22,16 @@
   import { t } from "../../i18n/i18n.svelte";
   import { KeyRound, Lock, Server, UserX } from "../../ui/Icon";
 
-  type Props = { titre: string; sous?: string; children: Snippet; forme?: "carte" | "panneaux" | "large"; etape?: 1 | 2 | 3 | 4 };
-  let { titre, sous, children, forme = "carte", etape }: Props = $props();
+  type Props = {
+    titre: string;
+    sous?: string;
+    /** Panneaux : le sous-titre redit les points forts de la scène ; caché quand la scène est juste dessous (téléphone). */
+    sousRedit?: boolean;
+    children: Snippet;
+    forme?: "carte" | "panneaux" | "large";
+    etape?: 1 | 2 | 3 | 4;
+  };
+  let { titre, sous, sousRedit = false, children, forme = "carte", etape }: Props = $props();
   let h1: HTMLHeadingElement | undefined = $state();
   $effect(() => {
     if (h1) untrack(() => h1?.focus({ preventScroll: true }));
@@ -31,7 +42,7 @@
 {#snippet tete(bandeau: boolean)}
   <div class={["tete", { "titre-bandeau": bandeau }]}>
     <h1 id="compte-titre" class="titre" tabindex="-1" data-large-title bind:this={h1}>{titre}</h1>
-    {#if sous}<p class="sous">{sous}</p>{/if}
+    {#if sous}<p class={["sous", { redit: sousRedit }]}>{sous}</p>{/if}
   </div>
 {/snippet}
 
@@ -403,19 +414,26 @@
     text-wrap: pretty;
   }
 
-  /* Tablette et téléphone : la scène devient une bande courte au-dessus du formulaire : la
-     promesse et les trois points forts en une ligne chacun (sans phrase ni schéma). */
+  /* Tablette et téléphone : le formulaire d'abord, centré dans la hauteur de l'écran sous
+     l'en-tête (bouton principal visible dès l'arrivée) ; la scène passe dessous : les trois
+     points forts en une ligne chacun (ni surtitre, ni promesse, ni phrase, ni schéma). */
   @media (max-width: 899px) {
     .deux {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-areas: "scene" "panneau";
+      grid-template-areas: "panneau" "scene";
       min-height: 0;
       margin-block-end: 0;
     }
     .scene {
       align-content: start;
       gap: var(--sp-3);
-      padding: var(--sp-5) var(--sp-4) var(--sp-5);
+      padding: var(--sp-5) var(--sp-4) var(--sp-6);
+      box-shadow: inset 0 1px 0 var(--hair);
+    }
+    .sur,
+    .promesse,
+    .panneau .sous.redit {
+      display: none;
     }
     .promesse {
       max-width: 22ch;
@@ -464,9 +482,10 @@
       font-size: var(--fs-small);
     }
     .panneau {
-      align-content: start;
-      padding: var(--sp-5) var(--sp-4) var(--sp-7);
-      box-shadow: inset 0 1px 0 var(--hair);
+      align-content: center;
+      min-height: calc(100dvh - 64px);
+      padding: var(--sp-5) var(--sp-4) var(--sp-6);
+      box-shadow: none;
     }
     .panneau .titre {
       font-size: 1.75rem;
@@ -617,6 +636,35 @@
   .cadre :global(.note) {
     margin: 0;
     color: var(--text-2);
+  }
+  /* Choix de repli discret (sur ordinateur : « Garder le compte sur cet ordinateur ») : texte
+     souligné, centré, cible de 44 px. */
+  .cadre :global(button.discret) {
+    justify-self: center;
+    min-height: 44px;
+    padding: 0 var(--sp-2);
+    border: 0;
+    background: none;
+    color: var(--text-2);
+    font: inherit;
+    font-size: var(--fs-small);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  .cadre :global(button.discret:hover) {
+    color: var(--accent);
+  }
+  .cadre :global(button.discret:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .cadre :global(button.discret:disabled) {
+    opacity: 0.5;
+    cursor: default;
   }
   .cadre :global(.actions) {
     display: flex;

@@ -7,7 +7,7 @@
 // est remplacé par un double.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../../i18n/i18n.svelte";
-import { bouton, demonter, monter, presser, saisir } from "./pages.test-helper";
+import { appareil, noterCle, bouton, demonter, monter, presser, saisir } from "./pages.test-helper";
 
 const texte = () => document.body.textContent!.replace(/\s+/g, " ");
 const CLE = "AB12-CD34-EF56-GH78-JK90-MN12-PQ3";
@@ -40,6 +40,7 @@ const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", l
 
 beforeEach(() => {
   setLang("fr");
+  appareil("telephone"); // téléphone : parcours inchangé ; ordinateur : tests « sur ordinateur » plus bas
   for (const f of Object.values(C)) f.mockReset();
   C.etatCompte.mockResolvedValue(ETAT);
   C.listePasskeys.mockResolvedValue([PK(), PK({ id: "BAUG", nom: null, synchronisable: false, ouvre: false, courante: false })]);
@@ -106,7 +107,7 @@ describe("paramètres", () => {
     expect(C.confirmerParPasskey).toHaveBeenCalled();
     saisir("Nom de la passkey", "YubiKey");
     await presser("Créer la passkey");
-    expect(C.ajouterPasskey).toHaveBeenCalledWith("YubiKey");
+    expect(C.ajouterPasskey).toHaveBeenCalledWith("YubiKey", "defaut");
     expect(texte()).toContain("Passkey ajoutée.");
   });
 
@@ -130,7 +131,7 @@ describe("paramètres", () => {
     await presser("Créer une nouvelle clé");
     expect([...document.querySelectorAll("[data-cle] .g")].map((g) => g.textContent)).toEqual(CLE.split("-"));
     expect(texte()).toContain("L'ancienne clé sert encore");
-    await presser("Je l'ai notée");
+    await noterCle();
     saisir("Tapez le groupe n° 1 de la clé", "ab12");
     await presser("Enregistrer la nouvelle clé");
     expect(C.enregistrerNouvelleCle).toHaveBeenCalled();
@@ -175,3 +176,30 @@ describe("suppression du compte", () => {
     expect(document.querySelector("[role=alert]")).toBeNull();
   });
 });
+
+// Décision du 25 novembre (conception §18) : « Ajouter mon téléphone » = l'ajout de passkey
+// standard, demandé au téléphone par le QR du navigateur.
+describe("passkeys sur ordinateur", () => {
+  beforeEach(() => appareil("ordinateur"));
+
+  it("« Ajouter mon téléphone » : nom proposé « Téléphone », QR expliqué, parcours hybride ; sans PRF : message honnête", async () => {
+    C.ajouterPasskey.mockResolvedValue("sans_prf");
+    await monter(Parametres);
+    await presser("Ajouter mon téléphone");
+    expect(texte()).toContain("Scannez-le avec l'appareil photo de votre téléphone, puis confirmez sur le téléphone.");
+    await presser("Créer la passkey");
+    expect(C.ajouterPasskey).toHaveBeenCalledWith("Téléphone", "hybride");
+    expect(texte()).toContain("Téléphone ajouté.");
+    expect(texte()).toContain("Votre téléphone n'a pas transmis de quoi ouvrir vos données.");
+  });
+
+  it("« Ajouter une passkey sur cet ordinateur » : parcours local, nom vide (nom d'appareil par défaut)", async () => {
+    await monter(Parametres);
+    await presser("Ajouter une passkey sur cet ordinateur");
+    expect(texte()).not.toContain("Scannez-le");
+    await presser("Créer la passkey");
+    expect(C.ajouterPasskey).toHaveBeenCalledWith("", "local");
+    expect(texte()).toContain("Passkey ajoutée.");
+  });
+});
+

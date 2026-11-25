@@ -6,7 +6,7 @@
 // n'affiche rien. Le module de compte est remplacé par un double.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../../i18n/i18n.svelte";
-import { attendre, bouton, champ, demonter, erreurDe, monter, presser, saisir, PREUVE } from "./pages.test-helper";
+import { appareil, noterCle, attendre, bouton, champ, demonter, erreurDe, monter, presser, saisir, PREUVE } from "./pages.test-helper";
 /** Texte de la page, espaces insécables comprises ramenées à une espace (les textes FR en ont). */
 const texte = () => document.body.textContent!.replace(/\s+/g, " ");
 const LG = "Tapez le groupe n°\u00a02 de la clé";
@@ -24,6 +24,10 @@ const C = vi.hoisted(() => ({
   verifierSaisie: vi.fn(),
   passkeysDisponibles: vi.fn(),
   groupeAVerifier: vi.fn(),
+  passkeyCreee: vi.fn(),
+  preparerAjout: vi.fn(),
+  ajouterPasskey: vi.fn(),
+  deuxiemeGesteAjout: vi.fn(),
 }));
 vi.mock("../../account/session.svelte", async (orig) => ({ ...(await orig<object>()), ...C }));
 vi.mock("./preuve", () => ({ obtenirPreuve: async () => PREUVE }));
@@ -32,6 +36,7 @@ const { default: Inscription } = await import("./Inscription.svelte");
 
 beforeEach(() => {
   setLang("fr");
+  appareil("telephone"); // téléphone : parcours inchangé ; ordinateur : tests « sur ordinateur » plus bas
   for (const f of Object.values(C)) f.mockReset();
   C.preparerInscription.mockResolvedValue(undefined);
   C.inscriptionPrete.mockReturnValue(true);
@@ -43,16 +48,19 @@ beforeEach(() => {
   C.verifierSaisie.mockResolvedValue({});
   C.passkeysDisponibles.mockReturnValue(true);
   C.groupeAVerifier.mockReturnValue(2);
+  C.passkeyCreee.mockReturnValue("ici");
+  C.preparerAjout.mockResolvedValue("pret");
+  C.ajouterPasskey.mockResolvedValue("ajoutee");
 });
 afterEach(() => {
   demonter();
   account.cleLocale = false;
 });
 
-async function jusquALaCle() {
+async function jusquALaCle(nom = "Créer avec une passkey") {
   await monter(Inscription);
   saisir("Pseudo", "Lea");
-  await presser("Créer avec une passkey");
+  await presser(nom);
 }
 
 describe("inscription par passkey", () => {
@@ -127,7 +135,7 @@ describe("inscription par passkey", () => {
 
   it("le clic appelle creerPasskey sans autre requête ; clé, vérification d'un groupe, « Terminer »", async () => {
     await jusquALaCle();
-    expect(C.creerPasskey).toHaveBeenCalledWith("Lea", "fr");
+    expect(C.creerPasskey).toHaveBeenCalledWith("Lea", "fr", "defaut");
     expect(C.preparerInscription).toHaveBeenCalledTimes(1);
     expect(texte()).toContain("Votre clé de récupération");
     expect(texte()).toContain("Nous ne pouvons pas la retrouver");
@@ -135,6 +143,19 @@ describe("inscription par passkey", () => {
     expect([...document.querySelectorAll("[data-cle] .g")].map((g) => g.textContent)).toEqual(CLE.split("-"));
     expect(bouton("Copier")).toBeTruthy();
     expect(bouton("Télécharger (.txt)")).toBeTruthy();
+    // Demande du 25 novembre : « Je l'ai notée » grisé (aria-disabled, focalisable) tant que la clé
+    // n'a été ni copiée ni téléchargée ; cliqué quand même : la raison (role=status), focus sur « Copier ».
+    const note = bouton("Je l'ai notée");
+    expect(note.getAttribute("aria-disabled")).toBe("true");
+    expect(note.disabled).toBe(false);
+    expect(document.querySelector("[data-rappel]")!.getAttribute("role")).toBe("status");
+    await presser("Je l'ai notée");
+    expect(document.querySelector("#compte-titre")!.textContent).toBe("Votre clé de récupération"); // on reste sur la clé
+    expect(document.querySelector("[data-rappel]")!.textContent).toBe("Copiez ou téléchargez d'abord votre clé : sans elle, le compte peut être perdu.");
+    expect(document.activeElement).toBe(bouton("Copier"));
+    await presser("Télécharger (.txt)");
+    expect(bouton("Je l'ai notée").getAttribute("aria-disabled")).toBeNull();
+    expect(document.querySelector("[data-rappel]")!.textContent).toBe("");
     await presser("Je l'ai notée");
     expect(texte()).toContain("Vérification");
     saisir(LG, "cd35");
@@ -143,6 +164,7 @@ describe("inscription par passkey", () => {
     expect(C.terminerInscription).not.toHaveBeenCalled();
     await presser("Revoir la clé");
     expect(texte()).toContain("Votre clé de récupération");
+    expect(bouton("Je l'ai notée").getAttribute("aria-disabled")).toBeNull(); // déjà téléchargée : reste active
     await presser("Je l'ai notée");
     saisir(LG, "cd34");
     await presser("Terminer");
@@ -172,7 +194,7 @@ describe("inscription par passkey", () => {
     C.terminerInscription.mockRejectedValue(new CompteError(404, "not_found"));
     C.abandonnerInscription.mockResolvedValue(false);
     await jusquALaCle();
-    await presser("Je l'ai notée");
+    await noterCle();
     saisir(LG, "CD34");
     await presser("Terminer");
     expect(C.abandonnerInscription).toHaveBeenCalled();
@@ -194,5 +216,70 @@ describe("inscription par passkey", () => {
     await monter(Inscription);
     expect(texte()).toContain("Ce navigateur ne gère pas les passkeys. Tout Shhgone marche sans compte");
     expect(C.preparerInscription).not.toHaveBeenCalled();
+  });
+});
+
+// Décision du 25 novembre (conception §18) : sur ordinateur, la passkey est demandée au téléphone
+// (QR du navigateur) ; « Garder le compte sur cet ordinateur » en repli discret ; si la passkey est
+// restée sur l'ordinateur, « Ajouter mon téléphone » est proposé à la fin.
+describe("inscription sur ordinateur", () => {
+  beforeEach(() => appareil("ordinateur"));
+
+  async function terminer() {
+    await noterCle();
+    saisir(LG, "CD34");
+    await presser("Terminer");
+  }
+
+  it("écran : « Créer avec mon téléphone » (parcours hybride), le QR expliqué, repli « Garder le compte sur cet ordinateur » (local)", async () => {
+    await monter(Inscription);
+    expect(texte()).toContain("Scannez-le avec l'appareil photo de votre téléphone. La passkey reste sur le téléphone et marche ensuite sur le téléphone et sur cet ordinateur (par QR).");
+    expect(() => bouton("Créer avec une passkey")).toThrow();
+    saisir("Pseudo", "Lea");
+    await presser("Créer avec mon téléphone");
+    expect(C.creerPasskey).toHaveBeenLastCalledWith("Lea", "fr", "hybride");
+    expect(C.preparerInscription).toHaveBeenCalledTimes(1); // aucune requête de plus avant la cérémonie
+  });
+
+  it("« Garder le compte sur cet ordinateur » : parcours local ; à la fin, « Ajouter mon téléphone » (ajout standard par le QR)", async () => {
+    await monter(Inscription);
+    saisir("Pseudo", "Lea");
+    await presser("Garder le compte sur cet ordinateur");
+    expect(C.creerPasskey).toHaveBeenLastCalledWith("Lea", "fr", "local");
+    await terminer();
+    expect(texte()).toContain("Compte créé.");
+    expect(C.preparerAjout).toHaveBeenCalledTimes(1);
+    expect(texte()).toContain("Votre passkey est gardée sur cet ordinateur.");
+    expect(bouton("Plus tard")).toBeTruthy();
+    await presser("Ajouter mon téléphone");
+    expect(C.ajouterPasskey).toHaveBeenCalledWith("Téléphone", "hybride");
+    expect(texte()).toContain("Téléphone ajouté.");
+    expect(bouton("Continuer")).toBeTruthy();
+  });
+
+  it("téléphone ajouté sans sortie PRF : message honnête (clé de récupération une fois sur le téléphone)", async () => {
+    C.ajouterPasskey.mockResolvedValue("sans_prf");
+    await jusquALaCle("Garder le compte sur cet ordinateur");
+    await terminer();
+    await presser("Ajouter mon téléphone");
+    expect(texte()).toContain("Votre téléphone n'a pas transmis de quoi ouvrir vos données. Sur le téléphone, votre clé de récupération sera demandée une fois");
+  });
+
+  it("passkey créée sur le téléphone : aucune offre ; sans PRF, le message dit où la clé sert", async () => {
+    C.passkeyCreee.mockReturnValue("telephone");
+    C.terminerInscription.mockImplementation(async () => void (account.cleLocale = true));
+    await jusquALaCle("Créer avec mon téléphone");
+    await terminer();
+    expect(C.preparerAjout).not.toHaveBeenCalled();
+    expect(() => bouton("Ajouter mon téléphone")).toThrow();
+    expect(texte()).toContain("Sur cet ordinateur, elles s'ouvrent grâce à une clé gardée ici. Sur le téléphone, votre clé de récupération sera demandée une fois.");
+  });
+
+  it("session plus récente à la fin : pas d'offre (elle reste dans Paramètres → Passkeys)", async () => {
+    C.preparerAjout.mockResolvedValue("recent");
+    await jusquALaCle("Garder le compte sur cet ordinateur");
+    await terminer();
+    expect(() => bouton("Ajouter mon téléphone")).toThrow();
+    expect(bouton("Continuer")).toBeTruthy();
   });
 });
