@@ -52,15 +52,24 @@ describe("Salon, sans session : vitrine et bloc d'action", () => {
     const vt = v.textContent!;
     for (const nom of ["Camille", "Noé", "Inès"]) expect(vt).toContain(nom);
     expect(new Set([...v.querySelectorAll(".msg")].map((m) => [...m.classList].find((c) => /^c\d$/.test(c)))).size).toBeGreaterThanOrEqual(4);
+    // Photos de profil : images locales du dépôt (aucun service externe), pas d'initiales.
     expect(v.querySelectorAll(".membres .pastille")).toHaveLength(4);
-    expect(v.querySelector(".pastille svg")).not.toBeNull();
+    const photos = [...v.querySelectorAll<HTMLImageElement>(".membres .pastille img")];
+    expect(photos).toHaveLength(4);
+    for (const i of photos) expect(i.getAttribute("src")).not.toMatch(/^(https?:)?\/\//);
+    // Présence : pastille verte (en ligne) ou rouge (hors ligne), toujours dite en texte.
+    expect(v.querySelectorAll(".membres .point.hors")).toHaveLength(1);
+    expect(v.querySelectorAll(".membres .point.en")).toHaveLength(3);
+    expect(vt).toContain(fr["salon.room.seen.min"].replace("{n}", "12"));
     expect(vt).toContain(fr["salon.vitrine.m1"]);
     expect(v.querySelectorAll(".vocal .onde i").length).toBeGreaterThan(10);
     for (const k of ["salon.vitrine.photo", "salon.vitrine.pdf", "salon.vitrine.zip"] as const) expect(vt).toContain(fr[k]);
     expect(v.querySelector("[data-ecrit]")!.textContent).toContain("Noé écrit…");
-    expect(v.querySelector("[data-appels]")!.textContent).toContain(fr["salon.vitrine.appels"]);
-    expect(v.querySelector(".etat")!.textContent!.replace(/\s+/g, " ")).toMatch(/^4 en ligne · 2 places libres · s'efface dans 15 min$/);
-    expect(v.querySelector("[data-fin]")!.textContent).toBe(fr["salon.fin.alerte.other"].replace("{n}", "15"));
+    expect(v.querySelector("[data-appels] .badge")!.textContent).toBe(fr["salon.appel.badge"]);
+    // L'échéance n'est dite qu'à un endroit : l'en-tête (pas de bandeau « se ferme dans » en plus).
+    expect(v.querySelector(".etat")!.textContent!.replace(/\s+/g, " ")).toMatch(/^3 en ligne · 2 places libres · s'efface dans 15 min$/);
+    expect(v.querySelector("[data-fin]")).toBeNull();
+    expect(vt).not.toContain(fr["salon.fin.alerte.other"].replace("{n}", "15"));
 
     const ins = document.querySelector<HTMLAnchorElement>("a[data-inscription]")!;
     const cnx = document.querySelector<HTMLAnchorElement>("a[data-connexion]")!;
@@ -68,7 +77,7 @@ describe("Salon, sans session : vitrine et bloc d'action", () => {
     expect(ins.getAttribute("href")).toBe("/compte/inscription?suite=salon");
     expect(cnx.textContent).toBe("J'ai déjà un compte");
     expect(cnx.getAttribute("href")).toBe("/compte/connexion?suite=salon");
-    expect(texte()).toContain(fr["salon.vitrine.join"]);
+    for (const k of ["salon.vitrine.join.titre", "salon.vitrine.join.badge", "salon.vitrine.join.texte"] as const) expect(texte()).toContain(fr[k]);
     for (const k of ["salon.vitrine.p1", "salon.vitrine.p2", "salon.vitrine.p3", "salon.vitrine.p4"] as const) expect(texte()).toContain(fr[k]);
 
     // Aucune requête, aucun moteur, aucun formulaire de création.
@@ -86,7 +95,7 @@ describe("Salon, sans session : vitrine et bloc d'action", () => {
     expect(document.querySelector("[data-vitrine]")!.getAttribute("aria-label")).toBe(en["salon.vitrine.label"]);
     expect(document.querySelector("a[data-connexion]")!.textContent).toBe(en["salon.vitrine.login"]);
     expect(texte()).toContain(en["salon.room.typing.un"].replace("{nom}", "Noé"));
-    expect(texte()).toContain(en["salon.vitrine.join"]);
+    for (const k of ["salon.vitrine.join.titre", "salon.vitrine.join.badge", "salon.vitrine.join.texte"] as const) expect(texte()).toContain(en[k]);
   });
 });
 

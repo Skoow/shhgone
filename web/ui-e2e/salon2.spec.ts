@@ -4,13 +4,15 @@
 // La créatrice sur ordinateur (1440 × 900), l'invité sur téléphone (390 × 844). Captures
 // test-results/captures/salon2-*.png. Chromium seulement (passkey : authentificateur virtuel).
 import { randomBytes } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Browser, Page } from "@playwright/test";
 import { siteComptes } from "./comptes-site";
 import { axe, expect, test as base } from "./fixtures";
 
 const CAPTURES = fileURLToPath(new URL("../test-results/captures", import.meta.url));
+const FICHIERS = fileURLToPath(new URL("./files", import.meta.url));
 
 const test = base.extend<object, { site: string }>({
   site: [async ({}, use) => use(await siteComptes()), { scope: "worker", timeout: 360_000 }],
@@ -73,7 +75,36 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
   const bv = (await ecranVitrine.boundingBox())!;
   expect(bv.y).toBeGreaterThanOrEqual(64 + 48);
   expect(bv.y + bv.height).toBeLessThanOrEqual(900 - 48);
-  await photo(page, "salon2-vitrine-pc");
+  // Photos de profil (images du site, même origine, jamais d'initiales), présence (Inès hors ligne,
+  // pastille rouge, « vu il y a 12 min »), badge « Plus · Pro » sur les appels, échéance dite une fois.
+  const photosVitrine = ecranVitrine.locator(".membres .pastille img");
+  await expect(photosVitrine).toHaveCount(4);
+  for (const src of await photosVitrine.evaluateAll((l) => l.map((i) => (i as HTMLImageElement).src))) expect(new URL(src).origin).toBe(shh.origin);
+  expect(await photosVitrine.evaluateAll((l) => l.every((i) => (i as HTMLImageElement).complete && (i as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  await expect(ecranVitrine.locator(".membres li").filter({ hasText: "Inès" }).locator(".point.hors")).toHaveCount(1);
+  await expect(ecranVitrine.locator(".membres li").filter({ hasText: "Inès" })).toContainText("vu il y a 12\u202fmin");
+  await expect(ecranVitrine.locator("[data-appels] .badge")).toHaveText("Plus · Pro");
+  await expect(ecranVitrine.getByText(/se ferme dans/)).toHaveCount(0);
+  // Heure puis coches, dans mes bulles.
+  expect(await ecranVitrine.locator(".msg.moi .meta > *").evaluateAll((l) => l.map((e) => e.tagName.toLowerCase()))).toEqual(["time", "span"]);
+  // Photo : nom et taille sur une ligne sous la vignette.
+  const legende = ecranVitrine.locator(".photo .legende");
+  expect((await legende.boundingBox())!.height).toBeLessThan(20);
+  await expect(page.locator("[data-rejoindre]")).toContainText("Rejoindre sans compte");
+  await photo(page, "salon3-vitrine-pc");
+  await page.locator("[data-rejoindre]").screenshot({ path: `${CAPTURES}/salon3-rejoindre-pc.png` });
+  await ecranVitrine.locator(".tete").screenshot({ path: `${CAPTURES}/salon3-vitrine-appels-pc.png` });
+  {
+    const ctxV = await (browser as Browser).newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, locale: "fr-FR", timezoneId: "Europe/Paris" });
+    const pv = await ctxV.newPage();
+    await pv.goto(shh.origin + "/salon/nouveau");
+    await expect(pv.locator("[data-vitrine] .membres .pastille img")).toHaveCount(4);
+    expect(await pv.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await photo(pv, "salon3-vitrine-tel");
+    await pv.locator("[data-rejoindre]").scrollIntoViewIfNeeded();
+    await photo(pv, "salon3-rejoindre-tel");
+    await ctxV.close();
+  }
 
   await inscrire(page, shh.origin, pseudoA);
   await bouton(page, "Continuer").click();
@@ -94,6 +125,9 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
     await bouton(pageB, "Continuer").click();
     await expect(titre(pageB, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
     await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoB);
+    // Photo pour ce salon (v3 §7.2) : ré-encodée sur l'appareil, envoyée chiffrée.
+    await pageB.locator('input[type="file"][accept="image/*"]').setInputFiles(join(FICHIERS, "foret-brume.jpg"));
+    await expect(pageB.locator('img[src^="blob:"]').first()).toBeVisible({ timeout: 30_000 });
     await bouton(pageB, "Entrer dans le salon").click();
     await expect(fil(pageB)).toBeVisible();
 
@@ -113,12 +147,19 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
     expect(await droite(page, t2)).toBe(false);
     expect(await droite(pageB, t2)).toBe(true);
     expect(await droite(pageB, t1)).toBe(false);
-    // Coches dans la bulle, avant l'heure, sur mes messages seulement : « Vu » quand B l'a vu.
+    // Coches dans la bulle, après l'heure, sur mes messages seulement : « Vu » quand B l'a vu.
     await expect(bulle(page, t1).locator(".coche")).toHaveText("Vu", { timeout: 30_000 });
     await expect(bulle(page, t1).locator(".coche.vu svg path")).toHaveCount(2);
     await expect(bulle(page, t2).locator(".coche")).toHaveCount(0);
     const ordre = await bulle(page, t1).locator(".meta > *").evaluateAll((els) => els.map((e) => e.className.split(" ")[0] || e.tagName.toLowerCase()));
-    expect(ordre.at(-1)).toBe("time");
+    expect(ordre).toEqual(["time", "coche"]);
+    // Lu : deux coches bleues (envoyé : une grise, reçu : deux grises).
+    expect(await bulle(page, t1).locator(".coche.vu").evaluate((e) => getComputedStyle(e).color)).toBe("rgb(108, 182, 255)");
+    // Présence : la photo de B (déchiffrée, adresse blob:) et sa pastille verte, chez A ; « en ligne » en texte.
+    const presB = page.locator("[data-presents] li").filter({ hasText: pseudoB });
+    await expect(presB.locator("img")).toHaveAttribute("src", /^blob:/, { timeout: 30_000 });
+    await expect(presB.locator(".point.en")).toHaveCount(1);
+    await expect(presB).toContainText("en ligne");
     // Modifié : mention avant l'heure.
     await bulle(pageB, t2).getByRole("button", { name: "Actions du message" }).click();
     await bulle(pageB, t2).getByRole("button", { name: "Modifier" }).click();
@@ -126,6 +167,7 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
     await saisie(pageB).fill(t2b);
     await zone(pageB).getByRole("button", { name: "Envoyer", exact: true }).click();
     await expect(bulle(page, t2b).locator(".modifie")).toHaveText("modifié", { timeout: 30_000 });
+    expect(await bulle(page, t2b).locator(".meta > *").evaluateAll((els) => els.map((e) => e.className.split(" ")[0] || e.tagName.toLowerCase()))).toEqual(["modifie", "time"]);
     // Décompte de l'effacement (règle par défaut : 5 min après lecture) : en haut de la bulle.
     await expect(bulle(page, t2b).locator("[data-decompte]")).toBeVisible({ timeout: 30_000 });
     await expect(bulle(page, t2b).locator("[data-decompte]")).toContainText(/\d (min|s)/);
@@ -138,6 +180,26 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
     await bulle(page, t2b).scrollIntoViewIfNeeded();
     await bulle(page, t2b).screenshot({ path: `${CAPTURES}/salon2-ephemere-accuses-pc.png` });
     expect(await axe(page)).toEqual([]);
+
+    // Message image : la vignette, puis une ligne discrète « nom coupé · taille » et « Enregistrer ».
+    const nomImage = `photo-du-lac-gele-au-petit-matin-${r}.jpg`;
+    await zone(page).locator('input[type="file"]').first().setInputFiles([{ name: nomImage, mimeType: "image/jpeg", buffer: readFileSync(join(FICHIERS, "lac-gele.jpg")) }]);
+    for (const p of [page, pageB]) {
+      const li = fil(p).locator("li.msg").filter({ has: p.locator("img.img") }).last();
+      await expect(li.locator("img.img")).toBeVisible({ timeout: 60_000 });
+      const lg = li.locator(".legende");
+      await expect(lg).toContainText(/\d(,\d)?\s?(Ko|Mo)/);
+      await expect(lg.getByRole("button", { name: "Enregistrer" })).toBeVisible();
+      const [bi, bl] = [(await li.locator("img.img").boundingBox())!, (await lg.boundingBox())!];
+      expect(bl.height).toBeLessThan(50);
+      expect(bl.width).toBeLessThanOrEqual(bi.width + 1);
+      expect(await lg.locator(".nom").evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true); // nom long coupé
+      await expect(lg.locator(".nom")).toHaveAttribute("title", nomImage);
+      expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(p.viewportSize()!.width);
+    }
+    await photo(page, "salon3-image-pc");
+    await photo(pageB, "salon3-image-tel");
+
 
     // Message retiré : « Message retiré » tient sur une ligne (la bulle ne se resserre plus).
     const t5 = `Je retire ceci ${r}`;
@@ -184,10 +246,42 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
     const t4 = `Ce message part dans une minute ${r}`;
     await envoyer(pageB, t4);
     await expect(bulle(page, t4)).toBeVisible({ timeout: 30_000 });
+    // Lu chez A (« vu » après 1 s à l'écran) : la photo au-dessus a pu grandir après le défilement.
+    await bulle(page, t4).scrollIntoViewIfNeeded();
     await expect(bulle(page, t4).locator("[data-decompte]")).toBeVisible({ timeout: 30_000 });
     await photo(pageB, "salon2-ephemere-tel");
     await expect(bulle(page, t4)).toHaveCount(0, { timeout: 120_000 });
     await expect(bulle(pageB, t4)).toHaveCount(0, { timeout: 120_000 });
+
+    // Hors ligne : C entre puis ferme son onglet ; chez A et B, pastille rouge et dernière connexion.
+    {
+      const ctxC = await (browser as Browser).newContext({ locale: "fr-FR", timezoneId: "Europe/Paris" });
+      const pageC = await ctxC.newPage();
+      const pseudoC = `Ines${r.slice(0, 2)}`;
+      await pageC.goto(lien);
+      await champ(pageC, "Mot de passe du salon").fill(mdp);
+      await bouton(pageC, "Continuer").click();
+      await expect(titre(pageC, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
+      await champ(pageC, "Pseudonyme pour ce salon").fill(pseudoC);
+      await bouton(pageC, "Entrer dans le salon").click();
+      await expect(fil(pageC)).toBeVisible();
+      const presC = page.locator("[data-presents] li").filter({ hasText: pseudoC });
+      await expect(presC.locator(".point.en")).toHaveCount(1, { timeout: 30_000 });
+      await ctxC.close();
+      for (const p of [page, pageB]) {
+        const pc = p.locator("[data-presents] li").filter({ hasText: pseudoC });
+        await expect(pc.locator(".point.hors")).toHaveCount(1, { timeout: 60_000 });
+        await expect(pc).toContainText(/vu à l'instant|vu il y a 1\u202fmin/);
+        // Sans photo annoncée : l'initiale sur sa couleur (avatar par défaut, v3 §7.2).
+        await expect(pc.locator(".ini")).toHaveText("I");
+      }
+      // En ligne d'abord : B avant C chez A.
+      await expect(page.locator("[data-presents] li").first()).toContainText(pseudoB);
+      for (const p of [page, pageB]) await p.evaluate(() => window.scrollTo(0, 0));
+      await photo(page, "salon3-presence-pc");
+      await photo(pageB, "salon3-presence-tel");
+      expect(await axe(page)).toEqual([]);
+    }
 
     // Fin : la créatrice détruit le salon ; chez l'invité, « Cette conversation est terminée » et l'heure.
     await params.click();

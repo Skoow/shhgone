@@ -8,15 +8,28 @@
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatBytes, formatClock, formatDuration } from "../../i18n/format";
   import { FileArchive, FileText, Folder, Mic, Paperclip, Pause, Phone, SlidersHorizontal, Video } from "../../ui/Icon";
+  // Photos de profil : portraits illustrés, fictifs, fichiers du dépôt (assets/ à empreinte,
+  // même origine) ; aucun service externe, aucune personne réelle.
+  import photoCamille from "../../assets/salon/avatar-camille.svg";
+  import photoNoe from "../../assets/salon/avatar-noe.svg";
+  import photoInes from "../../assets/salon/avatar-ines.svg";
+  import photoVous from "../../assets/salon/avatar-vous.svg";
 
   const lang = $derived(getLang());
   // Heures d'exemple : un soir, à la minute ; seules les heures sont montrées.
   const h = (m: number) => formatClock(new Date(2026, 10, 25, 21, m).getTime(), lang);
   // Participants d'exemple (pseudos) ; leur couleur de siège est la classe c0 à c3 (vrai salon : c0 à c9).
+  // Inès est hors ligne depuis 12 min (pastille rouge et « vu il y a 12 min », comme le vrai salon).
   const CAMILLE = { nom: "Camille" };
   const NOE = { nom: "Noé" };
   const INES = { nom: "Inès" };
   const vous = $derived(t("salon.room.you"));
+  const membres = $derived([
+    { c: "c1", nom: CAMILLE.nom, photo: photoCamille, en: true },
+    { c: "c2", nom: NOE.nom, photo: photoNoe, en: true },
+    { c: "c3", nom: INES.nom, photo: photoInes, en: false },
+    { c: "c0", nom: vous, photo: photoVous, en: true },
+  ]);
   // Hauteurs de l'onde du vocal (fixes : aucune donnée réelle).
   const ONDE = [30, 55, 80, 45, 95, 70, 40, 85, 60, 35, 75, 100, 65, 45, 80, 55, 30, 70, 90, 50, 35, 60, 80, 40, 25, 55, 70, 35];
 </script>
@@ -29,17 +42,16 @@
       <div class="titre">
         <p class="h">{t("title.salon")}</p>
         <p class="etat">
-          <span>{t("salon.room.online", { n: 4 })}</span> · <span>{t("salon.room.free", { n: 2 })}</span> ·
+          <span>{t("salon.room.online", { n: 3 })}</span> · <span>{t("salon.room.free", { n: 2 })}</span> ·
           <span>{t("salon.room.expires", { duree: formatDuration(15 * 60, lang) })}</span>
         </p>
       </div>
       <div class="boutons">
+        <!-- Appels : réservés à Plus et Pro, dit par le badge posé sur les deux boutons. -->
         <span class="appels" data-appels>
-          <span class="duo">
-            <span class="ib"><Phone size={20} /></span>
-            <span class="ib"><Video size={20} /></span>
-          </span>
-          <span class="reserve">{t("salon.vitrine.appels")}</span>
+          <span class="ib"><Phone size={20} /></span>
+          <span class="ib"><Video size={20} /></span>
+          <span class="badge">{t("salon.appel.badge")}</span>
         </span>
         <span class="bt"><Folder size={20} /><span class="lib">{t("salon.files.title")}</span></span>
         <span class="bt"><SlidersHorizontal size={20} /><span class="lib">{t("salon.params.court")}</span></span>
@@ -74,7 +86,7 @@
                 <p class="fic"><span class="nom">{t("salon.vitrine.pdf")}</span><span class="taille">{formatBytes(184 * 1024, lang)}</span></p>
                 <span class="enr">{t("salon.piece.enregistrer")}</span>
               </div>
-              <p class="meta"><span class="coche vu"><svg class="tic" viewBox="0 0 18 12" width="18" height="12" focusable="false"><path d="M1 6.6l2.9 2.9L10.5 2.9" /><path d="M7.6 9.2l.3.3L14.5 2.9" /></svg></span><time>{h(2)}</time></p>
+              <p class="meta"><time>{h(2)}</time><span class="coche vu"><svg class="tic" viewBox="0 0 18 12" width="18" height="12" focusable="false"><path d="M1 6.6l2.9 2.9L10.5 2.9" /><path d="M7.6 9.2l.3.3L14.5 2.9" /></svg></span></p>
             </div>
           </li>
           <li class="msg c2">
@@ -112,7 +124,7 @@
                   <path d="M0 99 Q30 95 60 99 T120 99 T180 99 T240 99" stroke="#d8f3f5" stroke-opacity="0.3" fill="none" />
                   <path d="M0 116 Q60 103 130 110 T240 106 V132 H0 Z" fill="#d9c3a0" />
                 </svg>
-                <p class="fic"><span class="nom">{t("salon.vitrine.photo")}</span><span class="taille">{formatBytes(2.4 * 1024 * 1024, lang)}</span></p>
+                <p class="legende"><span class="nom">{t("salon.vitrine.photo")}</span><span class="sep">·</span><span class="taille">{formatBytes(2.4 * 1024 * 1024, lang)}</span></p>
               </div>
               <p class="meta"><time>{h(4)}</time></p>
             </div>
@@ -128,7 +140,6 @@
         <p class="ecrit" data-ecrit><span>{t("salon.room.typing.un", { nom: NOE.nom })}</span><span class="points"><i></i><i></i><i></i></span></p>
 
         <div class="saisie">
-          <p class="fin-proche" data-fin>{t("salon.fin.alerte", { n: 15 })}</p>
           <div class="ligne">
             <span class="emo">☺</span>
             <span class="emo"><Paperclip size={20} /></span>
@@ -139,29 +150,15 @@
         </div>
       </div>
 
-      <!-- Membres (Membres.svelte) : pastille (photo dessinée ou initiale), point « en ligne ». -->
+      <!-- Membres (Membres.svelte) : photo de profil, pastille verte (en ligne) ou rouge (hors
+           ligne), état en texte (« en ligne », « vu il y a 12 min »). -->
       <ul class="membres">
-        <li class="c1">
-          <span class="pastille">
-            <svg viewBox="0 0 40 40" width="100%" height="100%" focusable="false">
-              <defs>
-                <linearGradient id="vitrine-ciel" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#7cc4ff" />
-                  <stop offset="1" stop-color="#b79cff" />
-                </linearGradient>
-              </defs>
-              <rect width="40" height="40" fill="url(#vitrine-ciel)" />
-              <circle cx="27" cy="14" r="6" fill="#f2c46d" />
-              <path d="M0 30 L12 18 L20 25 L27 19 L40 31 V40 H0 Z" fill="#1d2b3a" />
-              <path d="M0 34 L10 27 L18 32 L28 26 L40 34 V40 H0 Z" fill="#12202c" />
-            </svg>
-            <span class="point"></span>
-          </span>
-          <span class="qui"><span class="nm">{CAMILLE.nom}</span><span class="vu">{t("salon.room.seen.online")}</span></span>
-        </li>
-        <li class="c2"><span class="pastille">N<span class="point"></span></span><span class="qui"><span class="nm">{NOE.nom}</span><span class="vu">{t("salon.room.seen.online")}</span></span></li>
-        <li class="c3"><span class="pastille">I<span class="point"></span></span><span class="qui"><span class="nm">{INES.nom}</span><span class="vu">{t("salon.room.seen.online")}</span></span></li>
-        <li class="c0"><span class="pastille">{[...vous][0]?.toLocaleUpperCase()}<span class="point"></span></span><span class="qui"><span class="nm">{vous}</span><span class="vu">{t("salon.room.seen.online")}</span></span></li>
+        {#each membres as m (m.c)}
+          <li class={[m.c, { absent: !m.en }]}>
+            <span class="pastille"><img src={m.photo} alt="" width="32" height="32" /><span class={["point", m.en ? "en" : "hors"]}></span></span>
+            <span class="qui"><span class="nm">{m.nom}</span><span class="vu">{m.en ? t("salon.room.seen.online") : t("salon.room.seen.min", { n: 12 })}</span></span>
+          </li>
+        {/each}
       </ul>
     </div>
   </div>
@@ -261,19 +258,30 @@
     align-items: flex-start;
     gap: var(--sp-2);
   }
+  /* Appels (Conversation.svelte, .appels) : les deux boutons, filet doré, et le badge
+     « Plus · Pro » posé sur leur coin. */
   .appels {
-    display: grid;
-    justify-items: center;
-    gap: 2px;
-  }
-  .duo {
+    position: relative;
     display: flex;
     gap: var(--sp-2);
   }
-  .reserve {
-    color: var(--text-2);
-    font-size: 0.75rem;
-    line-height: 1.2;
+  .appels .ib {
+    border-color: rgb(242 196 109 / 0.38);
+    background: rgb(242 196 109 / 0.06);
+  }
+  .badge {
+    position: absolute;
+    top: -9px;
+    inset-inline-end: -8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #f7d68f, #e8b14a);
+    box-shadow: 0 0 0 2px var(--bg);
+    color: #1c1405;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.01em;
     white-space: nowrap;
   }
   .ib,
@@ -320,7 +328,7 @@
   }
   @media (min-width: 1100px) {
     .corps {
-      grid-template-columns: minmax(0, 1fr) 132px;
+      grid-template-columns: minmax(0, 1fr) 156px;
       grid-template-rows: minmax(0, 1fr);
     }
   }
@@ -370,30 +378,40 @@
       display: block;
     }
   }
+  /* Photo de profil ronde, liseré de la couleur du participant ; pastille verte (en ligne) ou
+     rouge (hors ligne), le texte à côté le dit aussi (jamais la couleur seule). */
   .pastille {
     position: relative;
-    display: inline-grid;
-    place-items: center;
+    flex: none;
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: var(--pc);
-    color: var(--on-fmt, #0b0d12);
-    font-weight: 700;
-    font-size: 0.875rem;
+    box-shadow: 0 0 0 1.5px var(--pc);
   }
-  .pastille svg {
+  .pastille img {
+    display: block;
+    width: 100%;
+    height: 100%;
     border-radius: 50%;
   }
   .point {
     position: absolute;
-    right: -1px;
-    bottom: -1px;
-    width: 10px;
-    height: 10px;
+    right: -2px;
+    bottom: -2px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
-    background: var(--accent);
     box-shadow: 0 0 0 2px var(--bg);
+  }
+  .point.en {
+    background: var(--accent);
+  }
+  .point.hors {
+    background: #ff5f5f;
+  }
+  .absent .pastille img {
+    filter: saturate(0.55);
+    opacity: 0.8;
   }
 
   /* ---------- Fil (Conversation.svelte, .fil, .msg, .bulle) ---------- */
@@ -461,7 +479,7 @@
     display: inline-flex;
   }
   .coche.vu {
-    color: var(--accent);
+    color: #6cb6ff; /* lu : deux coches bleues, comme le vrai salon */
   }
   .tic {
     display: block;
@@ -491,6 +509,31 @@
     flex-wrap: wrap;
     gap: 0 var(--sp-2);
     margin: 0;
+  }
+  /* Photo (Piece.svelte, .legende) : une ligne discrète sous la vignette, nom coupé puis taille. */
+  .legende {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 0;
+    min-width: 100%;
+    margin: 0;
+    color: var(--text-2);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+  .legende .nom {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+  }
+  .legende .sep,
+  .legende .taille {
+    flex: none;
+    color: var(--text-3);
+    font-size: inherit;
   }
   .nom {
     font-weight: 560;
@@ -652,15 +695,6 @@
     gap: var(--sp-2);
     padding: var(--sp-2) 0 var(--sp-3);
     border-top: 1px solid var(--line);
-  }
-  .fin-proche {
-    margin: 0;
-    padding: var(--sp-2) var(--sp-3);
-    border-radius: 10px;
-    background: var(--warn-tint);
-    color: var(--warn);
-    font-weight: 600;
-    font-size: 0.875rem;
   }
   .ligne {
     display: flex;

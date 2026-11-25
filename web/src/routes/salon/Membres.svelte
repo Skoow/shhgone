@@ -2,26 +2,27 @@
   // Participants (spec §39.5, v3 §14.1) : couleur, pseudonyme (jamais la couleur seule), « vous »,
   // créateur, en ligne ou dernière connexion (heure de cet appareil, à la minute), puis « Quitter
   // le salon ». Codes de vérification, exclusion (créateur) et réglages :.
+  import { onMount } from "svelte";
   import { t, getLang } from "../../i18n/i18n.svelte";
-  import { formatClock } from "../../i18n/format";
   import * as S from "../../salon/salon.svelte";
   import Gestion from "./Gestion.svelte";
+  import Avatar from "./Avatar.svelte";
   import InlineConfirm from "../../ui/InlineConfirm.svelte";
+  import { texteVu } from "./presence";
 
   const vue = S.vue;
   const conv = S.conversation()!;
   const lang = $derived(getLang());
+  // « vu il y a 12 min » avance tout seul : relu toutes les 20 s.
+  let maintenant = $state(Date.now());
+  onMount(() => {
+    const id = setInterval(() => (maintenant = Date.now()), 20_000);
+    return () => clearInterval(id);
+  });
   // Lignes recalculées à chaque changement du fil (conversation.ts n'est pas réactif lui-même).
   const lignes = $derived.by(() => {
     void vue.rev;
-    void lang;
-    return [...conv.presents].sort((a, b) => a - b).map((s) => ({ s, nom: nom(s), couleur: conv.couleur(s), enLigne: conv.presence.get(s)?.enLigne === true, vu: vu(s), avatar: conv.avatars.get(s) ? (S.masques.has(s) ? null : (S.pieces.urls[`avatar:${s}`] ?? null)) : null, aAvatar: !!conv.avatars.get(s), code: S.code(s), verifie: S.verifie(s) }));
-  });
-
-  // Avatars annoncés : relus du serveur et déchiffrés une fois (pièce de 64 Ko au plus, JPEG).
-  $effect(() => {
-    void vue.rev;
-    for (const s of conv.presents) if (conv.avatars.get(s)) void S.avatarDe(s);
+    return [...conv.presents].sort((a, b) => a - b).map((s) => ({ s, nom: nom(s), couleur: conv.couleur(s), enLigne: conv.presence.get(s)?.enLigne === true, vu: texteVu(conv.presence.get(s), maintenant, lang), aAvatar: !!conv.avatars.get(s), code: S.code(s), verifie: S.verifie(s) }));
   });
 
   // Exclusion (spec §39.5, v3) : réservée au créateur, jamais sur lui-même.
@@ -35,26 +36,12 @@
     const n = conv.nom(s);
     return n.pseudo ?? t("salon.room.participant", { n: n.numero });
   }
-  function vu(s: number): string {
-    const p = conv.presence.get(s);
-    if (p?.enLigne) return t("salon.room.seen.online");
-    if (!p || p.derniereMin === 0) return t("salon.room.seen.offline");
-    const ms = p.derniereMin * 60_000;
-    const d = new Date(ms);
-    const auj = new Date();
-    const hier = new Date(auj.getFullYear(), auj.getMonth(), auj.getDate() - 1);
-    const heure = formatClock(ms, lang);
-    if (d.toDateString() === auj.toDateString()) return t("salon.room.seen.today", { heure });
-    if (d.toDateString() === hier.toDateString()) return t("salon.room.seen.yesterday", { heure });
-    const date = new Intl.DateTimeFormat(lang, { day: "numeric", month: "short" }).format(d);
-    return t("salon.room.seen.date", { date, heure });
-  }
 </script>
 
 <ul class="membres">
   {#each lignes as l (l.s)}
     <li class={`c${l.couleur}`}>
-      <span class="pastille" aria-hidden="true">{#if l.avatar}<img src={l.avatar} alt="" />{:else}{[...l.nom][0]?.toLocaleUpperCase() ?? ""}{/if}{#if l.enLigne}<span class="point"></span>{/if}</span>
+      <Avatar siege={l.s} nom={l.nom} taille={40} enLigne={l.enLigne} />
       <span class="qui">
         <span class="nom"><bdi>{l.nom}</bdi>{#if l.s === conv.moi}{" "}({t("salon.room.you")}){/if}{#if l.s === conv.createurSiege}{" · "}{t("salon.room.creator")}{/if}</span>
         <span class="vu">{l.vu}</span>
@@ -124,18 +111,6 @@
   .c7 { --pc: var(--p7); }
   .c8 { --pc: var(--p8); }
   .c9 { --pc: var(--p9); }
-  .pastille {
-    position: relative;
-    display: inline-grid;
-    place-items: center;
-    flex: none;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--pc);
-    color: var(--on-fmt);
-    font-weight: 700;
-  }
   /* Zones tactiles de 44 px. */
   .code summary {
     min-height: 44px;
@@ -161,12 +136,6 @@
     color: var(--text-2);
     font-size: 0.875rem;
   }
-  .pastille img {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    object-fit: cover;
-  }
   .masquer {
     justify-self: start;
     min-height: 44px;
@@ -181,16 +150,6 @@
   }
   .masquer[aria-pressed="true"] {
     color: var(--accent);
-  }
-  .point {
-    position: absolute;
-    right: -1px;
-    bottom: -1px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid var(--bg);
   }
   .qui {
     display: grid;

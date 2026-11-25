@@ -26,3 +26,20 @@ export function typeAffichage(sorte: PieceInfo["sorte"], mime: string): string |
   if (sorte === "video") return safeBlobType("video", m);
   return null;
 }
+
+/**
+ * Dernière connexion d'un participant hors ligne (v3 §14.1), dite « vu il y a 12 min » :
+ * `derniereMin` est l'heure que le serveur joint déjà à `0x07` et à l'accueil `0x0D` (minutes
+ * Unix, arrondies à la minute inférieure ; 0 = inconnue). Rien d'autre n'est lu ni envoyé.
+ * Moins d'une minute (ou horloge de l'appareil en retard) : « à l'instant » ; moins d'une heure :
+ * minutes ; moins de 24 h : heures ; au-delà : null (l'écran dit le jour et l'heure, §14.1).
+ */
+export type VuIlYa = { k: "instant" } | { k: "min"; n: number } | { k: "h"; n: number };
+export function vuIlYa(derniereMin: number, maintenantMs: number): VuIlYa | null {
+  if (!(derniereMin > 0)) return null;
+  const min = Math.floor((maintenantMs - derniereMin * 60_000) / 60_000);
+  if (min < 1) return { k: "instant" };
+  if (min < 60) return { k: "min", n: min };
+  if (min < 24 * 60) return { k: "h", n: Math.floor(min / 60) };
+  return null;
+}

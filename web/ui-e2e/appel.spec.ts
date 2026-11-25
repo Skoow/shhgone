@@ -227,6 +227,15 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
         if (new URL(q.url()).pathname === "/api/salons/appel") demandes.push({ qui, jeton: /^PrivateToken token=[A-Za-z0-9_-]{472}$/.test(q.headers()["authorization"] ?? "") });
       });
 
+    // --- Badge « Plus · Pro » sur les boutons d'appel, sans pass sur l'appareil (B, C), pas chez A ---
+    for (const p of [b.page, c.page]) {
+      await expect(p.locator("[data-appels] .badge")).toHaveText("Plus · Pro");
+      await expect(bouton(p, "Appel audio")).toHaveAccessibleDescription("Réservé aux offres Plus et Pro.");
+    }
+    await expect(page.locator("[data-appels] .badge")).toHaveCount(0, { timeout: 30_000 });
+    await expect(bouton(page, "Appel vidéo")).toHaveAccessibleDescription("");
+    await capture(b.page, "appel-badge");
+
     // --- B, sans offre, touche « Appel audio » : l'explication, sans micro ni requête ---------------
     await bouton(b.page, "Appel audio").click();
     const reserve = b.page.locator("[data-appel-reserve]");

@@ -16,6 +16,8 @@
   const erreur = $derived(S.pieces.erreurs[b.cle]);
   const lang = $derived(getLang());
   const auto = $derived((p.sorte === "image" || p.sorte === "vocal") && p.taille <= AFFICHE_MAX);
+  // Photo ou vidéo affichée : nom et taille en une ligne discrète sous la vignette, « Enregistrer » au bout.
+  const media = $derived(!!url && (p.sorte === "image" || p.sorte === "video"));
   let nom = $derived.by(() => {
     try {
       return S.moteur()?.nettoyerNom(p.nom) || t("salon.piece.sans.nom");
@@ -34,7 +36,7 @@
   });
 </script>
 
-<div class="piece">
+<div class={["piece", { media }]}>
   {#if url && p.sorte === "image"}
     <img src={url} alt={nom} class="img" onload={() => S.estVu(b) && S.accuserPiece(b, "piece_ouverte")} />
   {:else if url && p.sorte === "vocal"}
@@ -50,10 +52,19 @@
     <!-- svelte-ignore a11y_media_has_caption -->
     <video src={url} controls preload="metadata" class="img" onplay={() => S.accuserPiece(b, "piece_ouverte")}></video>
   {/if}
-  <p class="fic">
-    <bdi class="nom">{nom}</bdi>
-    <span class="taille">{formatBytes(p.taille, lang)}{#if p.dureeMs} · {formatDuration(p.dureeMs / 1000, lang, { precise: true })}{/if}</span>
-  </p>
+  {#if media}
+    <div class="legende">
+      <p class="lg"><bdi class="nom" title={nom}>{nom}</bdi><span class="sep" aria-hidden="true">·</span><span class="taille">{formatBytes(p.taille, lang)}{#if p.dureeMs} · {formatDuration(p.dureeMs / 1000, lang, { precise: true })}{/if}</span></p>
+      {#if p.ref || b.moi}
+        <Button variant="ghost" dense busy={S.pieces.lecture[b.cle] === true} onpress={() => S.enregistrerPiece(b)}>{t("salon.piece.enregistrer")}</Button>
+      {/if}
+    </div>
+  {:else}
+    <p class="fic">
+      <bdi class="nom">{nom}</bdi>
+      <span class="taille">{formatBytes(p.taille, lang)}{#if p.dureeMs} · {formatDuration(p.dureeMs / 1000, lang, { precise: true })}{/if}</span>
+    </p>
+  {/if}
   {#if b.moi && (b.ouverts.length > 0 || b.telecharges.length > 0)}
     <!-- Accusés de nos pièces (v3 §14.2) : « Ouvert », « Téléchargé » (dans un groupe : par N / M). -->
     <p class="accuses">
@@ -65,14 +76,16 @@
     <progress max="1" value={p.progres} aria-label={t("salon.piece.envoi", { nom })}></progress>
   {/if}
   {#if erreur}<p class="err" role="status">{t(`salon.piece.err.${erreur === "indisponible" || erreur === "sortie" || erreur === "relu" || erreur === "apercu" ? erreur : "lecture"}`)}</p>{/if}
-  <div class="acts">
-    {#if p.sorte === "video" && !url && p.ref}
-      <Button variant="secondary" dense busy={S.pieces.lecture[b.cle] === true} onpress={() => S.afficherPiece(b)}>{t("salon.piece.lire")}</Button>
-    {/if}
-    {#if p.ref || b.moi}
-      <Button variant="ghost" dense busy={S.pieces.lecture[b.cle] === true} onpress={() => S.enregistrerPiece(b)}>{t("salon.piece.enregistrer")}</Button>
-    {/if}
-  </div>
+  {#if !media}
+    <div class="acts">
+      {#if p.sorte === "video" && !url && p.ref}
+        <Button variant="secondary" dense busy={S.pieces.lecture[b.cle] === true} onpress={() => S.afficherPiece(b)}>{t("salon.piece.lire")}</Button>
+      {/if}
+      {#if p.ref || b.moi}
+        <Button variant="ghost" dense busy={S.pieces.lecture[b.cle] === true} onpress={() => S.enregistrerPiece(b)}>{t("salon.piece.enregistrer")}</Button>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -145,5 +158,47 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-1);
+  }
+  /* Photo ou vidéo : la vignette donne la largeur ; la ligne du dessous (nom coupé · taille,
+     « Enregistrer ») n'élargit pas la bulle (largeur 0, au moins celle de la vignette). */
+  .media .img {
+    min-width: min(200px, 100%);
+    object-fit: contain;
+  }
+  .legende {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: 0;
+    min-width: 100%;
+  }
+  .lg {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    color: var(--text-2);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+  .lg .nom {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+  }
+  .lg .sep,
+  .lg .taille {
+    flex: none;
+    color: var(--text-3);
+    font-size: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+  .legende :global(.btn) {
+    flex: none;
+    margin-inline-end: -8px;
   }
 </style>

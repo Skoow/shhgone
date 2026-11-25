@@ -569,11 +569,16 @@ function surEvenement(x: Session, ev: EvClient): void {
       break;
     case "depart":
       conv.depart(ev.siege);
+      // Place rendue : sa photo et son masquage ne passent jamais à qui la reprendra.
+      oublierAvatar(ev.siege);
+      masques.delete(ev.siege);
       x.appel?.parti(ev.siege);
       break;
     case "exclusion":
       if (ev.siege !== undefined) {
         conv.depart(ev.siege, true);
+        oublierAvatar(ev.siege);
+        masques.delete(ev.siege);
         // Exclu : sa connexion d'appel est coupée aussitôt.
         x.appel?.parti(ev.siege);
       }
@@ -1176,21 +1181,55 @@ export async function choisirAvatar(photo: Uint8Array | null): Promise<void> {
   if (vue.monPseudo) envoyerProfil(x);
 }
 
-/** Avatar d'un siège (profil) : adresse blob: (image/jpeg seulement), ou null. */
 /** Octets d'une photo de profil, au plus (v3 §7.2). */
 const AVATAR_MAX = 65536;
 
+/**
+ * Clé de l'adresse blob: de la photo annoncée par un siège : liée à la pièce annoncée (`piece`),
+ * pas au siège seul. Une place redonnée à quelqu'un d'autre, ou une photo changée, ne montre
+ * donc jamais l'ancienne photo ; null sans photo annoncée.
+ */
+function cleAvatar(siege: number): string | null {
+  const ref = s?.conv?.avatars.get(siege);
+  return ref ? `avatar:${siege}:${b64u(ref.piece as Uint8Array<ArrayBuffer>)}` : null;
+}
+/** Photos en cours de lecture (une lecture à la fois par photo annoncée). */
+const avatarsEnLecture = new Set<string>();
+/** Lecture d'une photo échouée (heure) : pas de nouvel essai avant une minute (l'écran relit à chaque changement). */
+const avatarsEchoues = new Map<string, number>();
+
+/** Photo de profil d'un siège (profil chiffré, v3 §7.2) : adresse blob: (image/jpeg), ou null (initiale). */
+export function avatarUrl(siege: number): string | null {
+  const cle = cleAvatar(siege);
+  return cle && !masques.has(siege) ? (pieces.urls[cle] ?? null) : null;
+}
+
+/** Lit et déchiffre une fois la photo annoncée par un siège (pièce de 64 Ko au plus, JPEG). */
 export async function avatarDe(siege: number): Promise<void> {
   const x = s;
-  const cle = `avatar:${siege}`;
+  const cle = cleAvatar(siege);
   const ref = x?.conv?.avatars.get(siege);
-  if (!x?.client || !ref || pieces.urls[cle]) return;
+  if (!x?.client || !ref || !cle || pieces.urls[cle] || avatarsEnLecture.has(cle)) return;
+  if (Date.now() - (avatarsEchoues.get(cle) ?? -Infinity) < 60_000) return;
+  avatarsEnLecture.add(cle);
   try {
     const blob = await lirePiece(net(), x.client.jeton, ref, AVATAR_MAX);
-    if (s === x && blob.size <= AVATAR_MAX && (await previewable(blob)) && s === x) pieces.urls[cle] = URL.createObjectURL(new Blob([blob], { type: "image/jpeg" }));
+    // Encore la photo annoncée par ce siège (ni départ, ni nouvelle photo pendant la lecture).
+    if (s === x && blob.size <= AVATAR_MAX && (await previewable(blob)) && s === x && cleAvatar(siege) === cle) {
+      oublierAvatar(siege);
+      pieces.urls[cle] = URL.createObjectURL(new Blob([blob], { type: "image/jpeg" }));
+    }
   } catch {
     // avatar indisponible : l'initiale reste
+    avatarsEchoues.set(cle, Date.now());
+  } finally {
+    avatarsEnLecture.delete(cle);
   }
+}
+
+/** Oublie les photos lues d'un siège (adresses blob: révoquées) : départ, exclusion, nouvelle photo. */
+function oublierAvatar(siege: number): void {
+  for (const k of Object.keys(pieces.urls)) if (k.startsWith(`avatar:${siege}:`)) liberer(k);
 }
 
 export function reagir(b: Bulle, emoji: string): void {

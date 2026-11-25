@@ -21,7 +21,7 @@
   import { untrack } from "svelte";
   import { keepSentDefault, loadHistory, setHistoryEnabled } from "../../history/live.svelte";
   import Vitrine from "./Vitrine.svelte";
-  import { Hourglass, Lock, Phone, UserX } from "../../ui/Icon";
+  import { Hourglass, Link2, Lock, Phone, UserX } from "../../ui/Icon";
 
   const connecte = $derived(__COMPTES__ && account.etat === "ouvert");
   // Sans session : le titre prend le focus à l'arrivée, comme celui de Cadre.svelte.
@@ -131,7 +131,14 @@
           <a class="b-entrer principal" data-inscription href={href("/compte/inscription?suite=salon")} onclick={(e) => followLink(e, "/compte/inscription?suite=salon")}>{t("account.signup.title")}</a>
           <a class="lien" data-connexion href={href("/compte/connexion?suite=salon")} onclick={(e) => followLink(e, "/compte/connexion?suite=salon")}>{t("salon.vitrine.login")}</a>
         </div>
-        <p class="note rejoindre" data-rejoindre>{t("salon.vitrine.join")}</p>
+        <!-- Rejoindre sans compte (D42-26 (2)) : carte à part, « sans compte » mis en avant. -->
+        <aside class="rejoindre" data-rejoindre aria-labelledby="salon-rejoindre-t">
+          <span class="ricone" aria-hidden="true"><Link2 size={20} strokeWidth={1.8} /></span>
+          <div class="rtx">
+            <p class="rtitre"><span id="salon-rejoindre-t">{t("salon.vitrine.join.titre")}</span> <span class="sans">{t("salon.vitrine.join.badge")}</span></p>
+            <p class="rd">{t("salon.vitrine.join.texte")}</p>
+          </div>
+        </aside>
       </div>
     </section>
     <Vitrine />
@@ -270,9 +277,65 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  /* Rejoindre : à part, par l'espace seulement. */
+  /* Rejoindre : carte à part, sous les actions ; icône de lien, « sans compte » en pastille menthe. */
   .rejoindre {
-    padding-top: var(--sp-3);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: var(--sp-3);
+    margin-top: var(--sp-2);
+    padding: var(--sp-4);
+    border-radius: 16px;
+    background: linear-gradient(160deg, rgb(95 227 181 / 0.07), rgb(95 227 181 / 0.015) 60%), var(--bg);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.16);
+  }
+  .ricone {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgb(95 227 181 / 0.12);
+    color: var(--accent);
+  }
+  .rtx {
+    display: grid;
+    gap: var(--sp-1);
+    min-width: 0;
+  }
+  .rtitre {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-2);
+    margin: 0;
+    color: var(--text);
+    font-weight: 600;
+  }
+  .sans {
+    padding: 1px 9px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--fs-micro, 0.75rem);
+    font-weight: 650;
+    line-height: 1.25rem;
+    white-space: nowrap;
+  }
+  .rd {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--fs-small);
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+  @media (forced-colors: active) {
+    .rejoindre {
+      border: 1px solid CanvasText;
+    }
+    .sans {
+      border: 1px solid CanvasText;
+    }
   }
   /* Tablette et téléphone : la vitrine passe au-dessus, le bloc d'action dessous. */
   @media (max-width: 899px) {

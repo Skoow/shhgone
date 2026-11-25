@@ -22,6 +22,8 @@
   import Fichiers from "./Fichiers.svelte";
   import Appel from "./Appel.svelte";
   import Panneau from "./Panneau.svelte";
+  import Avatar from "./Avatar.svelte";
+  import { texteVu } from "./presence";
   import IconButton from "../../ui/IconButton.svelte";
   import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
   import { Clock, Ellipsis, Folder, Hourglass, Mic, Paperclip, Phone, SlidersHorizontal, TriangleAlert, Video, Volume, VolumeX, X } from "../../ui/Icon";
@@ -66,6 +68,14 @@
   const libres = $derived((void vue.rev, Math.max(0, vue.places - conv.presents.size)));
   const reste = $derived(Math.max(0, (vue.finMs - maintenant) / 1000));
   const etatAppel = $derived((void vue.rev, S.appel()?.etat ?? "aucun"));
+  // Présence des autres participants (v3 §14.1, d'après 0x07 et 0x0D seulement) : en ligne d'abord.
+  const autres = $derived.by(() => {
+    void vue.rev;
+    return [...conv.presents]
+      .filter((s) => s !== conv.moi)
+      .map((s) => ({ s, nom: nom(s), couleur: conv.couleur(s), enLigne: conv.presence.get(s)?.enLigne === true }))
+      .sort((a, b) => Number(b.enLigne) - Number(a.enLigne) || a.s - b.s);
+  });
   // Fin proche : compte à rebours visible à la seconde pendant la dernière minute ; l'alerte des
   // minutes reste affichée ici pendant un appel (le fil, lui, peut être hors de vue). Le lecteur
   // d'écran n'entend que les alertes et, à la fin, 30 s et 10 s.
@@ -550,8 +560,14 @@
     </div>
     <div class="boutons">
       {#if vue.appels && etatAppel === "aucun"}
-        <IconButton label={t("salon.appel.audio")} variant="secondary" onpress={() => void S.lancerAppel(false)}><Phone size={20} /></IconButton>
-        <IconButton label={t("salon.appel.video")} variant="secondary" onpress={() => void S.lancerAppel(true)}><Video size={20} /></IconButton>
+        <!-- Lancer un appel : réservé à Plus et Pro. Sans pass sur cet appareil, le badge le dit
+             d'emblée (et la description des boutons, pour les lecteurs d'écran) ; rejoindre un
+             appel en cours reste ouvert à tous. -->
+        <span class={["appels", { reserve: !vue.offreAppel }]} data-appels>
+          <IconButton label={t("salon.appel.audio")} aria-describedby={vue.offreAppel ? undefined : "appels-reserve"} variant="secondary" onpress={() => void S.lancerAppel(false)}><Phone size={20} /></IconButton>
+          <IconButton label={t("salon.appel.video")} aria-describedby={vue.offreAppel ? undefined : "appels-reserve"} variant="secondary" onpress={() => void S.lancerAppel(true)}><Video size={20} /></IconButton>
+          {#if !vue.offreAppel}<span class="badge" aria-hidden="true">{t("salon.appel.badge")}</span><span class="sr-only" id="appels-reserve">{t("salon.appel.reserve")}</span>{/if}
+        </span>
       {/if}
       <!-- Sur téléphone, boutons à icône de 44 px sur une ligne (le
            libellé reste le nom accessible) ; ailleurs, icône et libellé. -->
@@ -565,6 +581,17 @@
       <button type="button" class="bt" aria-label={t("salon.params")} aria-haspopup="dialog" aria-expanded={params} aria-controls="salon-params" onclick={() => (params = !params)}><SlidersHorizontal size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.params.court")}</span></button>
     </div>
   </header>
+  {#if autres.length > 0}
+    <!-- Les autres participants : photo, pastille verte ou rouge, et l'état en texte. -->
+    <ul class="presents" aria-label={t("salon.room.presents")} data-presents>
+      {#each autres as m (m.s)}
+        <li class={[`c${m.couleur}`, { hors: !m.enLigne }]}>
+          <Avatar siege={m.s} nom={m.nom} taille={30} enLigne={m.enLigne} />
+          <span class="pq"><bdi class="pn">{m.nom}</bdi><span class="pv">{texteVu(conv.presence.get(m.s), maintenant, lang)}</span></span>
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   <div class="corps">
     <section class="col" aria-label={t("salon.room.label")} ondragover={(e) => e.dataTransfer?.types.includes("Files") && e.preventDefault()} ondrop={deposer}>
@@ -632,9 +659,10 @@
                 {/if}
                 {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>
                   {#if e.echec === "trop_grand" && !e.piece && e.texte}<Button variant="secondary" dense onpress={() => enFichier(e.texte)}>{t("salon.room.toolong.txt")}</Button>{/if}{/if}
-                <!-- Bas de la bulle, à droite : « modifié », accusés (nos messages), heure. -->
+                <!-- Bas de la bulle, à droite : « modifié », heure, puis accusés (nos messages). -->
                 <p class="meta">
                   {#if e.modifie && !e.retire}<span class="modifie">{t("salon.room.edited")}</span>{/if}
+                  <time>{formatClock(e.heureMs, lang)}</time>
                   {#if e.moi}
                     {@const c = conv.coche(e)}
                     <span class={["coche", c, { partiel: vuPartiel(e) }]}>
@@ -649,7 +677,6 @@
                       <span class={c === "echec" ? "" : "sr-only"}>{coche(e)}</span>
                     </span>
                   {/if}
-                  <time>{formatClock(e.heureMs, lang)}</time>
                 </p>
                 {#if e.reactions.length > 0}
                   <ul class="reactions">
@@ -871,6 +898,80 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
     justify-content: flex-end;
+  }
+  /* Appels réservés à Plus et Pro : filet doré et badge « Plus · Pro » posé sur le coin. */
+  .appels {
+    position: relative;
+    display: flex;
+    gap: var(--sp-2);
+  }
+  .appels.reserve :global(.ib) {
+    border-color: rgb(242 196 109 / 0.38);
+    background: rgb(242 196 109 / 0.06);
+  }
+  .badge {
+    position: absolute;
+    top: -9px;
+    inset-inline-end: -8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #f7d68f, #e8b14a);
+    box-shadow: 0 0 0 2px var(--bg);
+    color: #1c1405;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  @media (forced-colors: active) {
+    .badge {
+      border: 1px solid CanvasText;
+    }
+  }
+  /* Présence : une ligne sous l'en-tête ; elle défile sur elle-même quand il y a du monde. */
+  .presents {
+    display: flex;
+    gap: var(--sp-2) var(--sp-4);
+    margin: 0;
+    padding: var(--sp-2) 2px;
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .presents::-webkit-scrollbar {
+    display: none;
+  }
+  .presents li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex: none;
+    min-width: 0;
+    padding-block: 2px;
+  }
+  .pq {
+    display: grid;
+    min-width: 0;
+    line-height: 1.15;
+  }
+  .pn {
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .pv {
+    color: var(--text-2);
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+  .presents .hors .pn {
+    color: var(--text-2);
   }
   .confirmer {
     display: grid;
@@ -1264,8 +1365,9 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+  /* Lu : deux coches bleues (≥ 7:1 sur la bulle) ; envoyé et reçu : gris. */
   .coche.vu {
-    color: var(--accent);
+    color: #6cb6ff;
   }
   .coche.echec {
     color: var(--danger);
