@@ -876,6 +876,21 @@ async function ecrireTout(o: Ouverte, ps: ((p: CoffrePrive) => CoffrePrive)[]): 
   await memoriser(o);
 }
 
+/**
+ * Pass de l'appareil absents du coffre privé (accès offert rangé alors qu'une session est
+ * ouverte : /offres/offert) : écrits tout de suite, comme à l'ouverture d'une session
+ * (synchroniser). true : session ouverte, ils y sont ; false : aucune session (ils partiront à la
+ * prochaine connexion). Erreur du coffre : rendue à l'appelant.
+ */
+export async function rangerPassDansCompte(): Promise<boolean> {
+  const o = ouverte;
+  const idb = deps.idb();
+  if (!o || !idb) return false;
+  const patch = await synchroniserPass(idb, o.prive.valeur);
+  if (patch && ouverte === o) await ecrireTout(o, [patch]);
+  return ouverte === o;
+}
+
 // --- Rechargement, déconnexion ----------------------------------------------------------------
 
 /** Au démarrage : rouvre une session gardée (« Rester connecté ») ; sinon rien. Session échue : oubliée. */

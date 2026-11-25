@@ -29,7 +29,8 @@
       if (!vivant) return;
       // Commande en attente (retour de paiement), sinon l'abonnement le plus récent (arrêt du
       // renouvellement à tout moment, lien de la page Offres), sinon le pass le plus récent.
-      const cible = tous.find((x) => x.enAttente) ?? tous.find((x) => x.renouvelle) ?? tous[0] ?? null;
+      // Un pass payé avant un accès offert (rangé par /offres/offert) : cette page parle de paiement.
+      const cible = tous.find((x) => x.enAttente) ?? tous.find((x) => x.renouvelle) ?? tous.find((x) => x.moyen !== "offert") ?? tous[0] ?? null;
       g = cible;
       if (cible === null || idb === null) return;
       let essais = 0;
@@ -75,11 +76,13 @@
   async function noteDeVente(): Promise<void> {
     noteErr = false;
     const o = await lireOffre();
-    if (!g || !e?.fin || !o?.tva) {
+    const x = g;
+    // Accès offert : rien n'a été vendu, aucune note.
+    if (!x || x.moyen === "offert" || !e?.fin || !o?.tva) {
       noteErr = true;
       return;
     }
-    telechargerNote({ id: g.id, offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, pays: g.pays, cree: g.cree, fin: e.fin, tva: o.tva, maintenant: Date.now() });
+    telechargerNote({ id: x.id, offre: x.offre, jours: x.jours, renouvelle: x.renouvelle, moyen: x.moyen, pays: x.pays, cree: x.cree, fin: e.fin, tva: o.tva, maintenant: Date.now() });
   }
 
   async function oublierCommande(): Promise<void> {
@@ -109,7 +112,7 @@
     {/if}
     {#if arret === "ok"}<p class="body" data-stopped>{t("offers.ret.stopped")}</p>{/if}
     {#if arret === "erreur"}<p class="err" role="alert">{t("offers.ret.stop.err")}</p>{/if}
-    {#if g && e.fin}
+    {#if g && e.fin && g.moyen !== "offert"}
       <button type="button" class="act" onclick={noteDeVente} data-note>{t("offers.ret.note")}</button>
       <p class="body">{t("offers.ret.note.hint")}</p>
       {#if noteErr}<p class="err" role="alert">{t("offers.ret.note.err")}</p>{/if}

@@ -306,8 +306,11 @@ func TestAppRoutesMatchClientRouter(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := map[string]bool{"/": true}
-	for _, m := range regexp.MustCompile(`if \(p === "(/[a-z-]+)"\) return \{ name: "[a-z]+" \}`).FindAllStringSubmatch(string(src), -1) {
-		got[m[1]] = true
+	for _, m := range regexp.MustCompile(`if \(p === "(/[a-z-]+(?:/[a-z-]+)?)"\) return \{ name: "[a-z]+" \}`).FindAllStringSubmatch(string(src), -1) {
+		// Servi par son propre fichier (pages séparées, « /offres/retour ») : pas une route de l'application.
+		if _, ok := pageFiles[m[1]]; !ok || strings.Count(m[1], "/") == 1 {
+			got[m[1]] = true
+		}
 	}
 	// Pages d'information : table INFO_PATHS ("/chemin": "route").
 	// Lue dans son seul bloc : la table COMPTE_PATHS a la même forme de ligne.

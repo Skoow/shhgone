@@ -220,6 +220,9 @@ var appRoutes = map[string]bool{
 	"/envoyer":          true,
 	"/envois":           true,
 	"/telechargements":  true,
+	// Accès offert (conception du paiement, « Accès offerts ») : écran de l'application ; le pass
+	// suit « # », jamais envoyé au serveur.
+	"/offres/offert": true,
 }
 
 // compteRoutes : pages du compte (table COMPTE_PATHS de web/src/app/router.svelte.ts),

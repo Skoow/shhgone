@@ -43,7 +43,7 @@ Chiffres lus dans un seul endroit par couche : `web/src/limits.ts` (`PAID`) pour
 - **Durées exactes** : un « mois » est une période de **30 jours**, un « an » de **365 jours**, comptés en jours UTC à partir du jour du paiement confirmé (§5.4). Un renouvellement payé avant la fin s'ajoute à la fin en cours (jamais de jour perdu).
 - **Fin** : sans renouvellement, le pass s'arrête ; rien n'est prélevé. Avec renouvellement, un paiement refusé arrête simplement le pass à sa fin (aucune relance, aucun e-mail de notre part ; le prestataire peut en envoyer selon ses réglages, à couper chez lui, §13).
 - **Résiliation** : bouton « Arrêter le renouvellement » sur la page Offres (pass gardé sur l'appareil) → le serveur demande au prestataire d'arrêter le renouvellement à la fin de la période payée (Stripe `cancel_at_period_end`, PayPal `cancel`). Aucune identité demandée : le pass suffit (§5.6).
-- **Aucune promotion, aucun code promo, aucun essai gratuit, aucun prix barré** (§38.1).
+- **Aucune promotion, aucun code promo, aucun essai gratuit, aucun prix barré** (§38.1). Cela vise l'offre publique : un **accès offert** (§5.8) n'est ni vendu, ni annoncé, ni demandable ; l'exploitant le donne de la main à la main à quelques personnes qu'il connaît.
 
 ## 2. Parcours
 
@@ -146,6 +146,9 @@ refs(r BLOB(32) PK = SHA-256(« shhdrop/v2/paiement/ref » ‖ 0x00 ‖ fourniss
 passes += emis_jour, emis_n            -- émissions du jour par pass (borne S9)
 cles_jetons(jour, offre, sk BLOB PKCS#8) PK(jour, offre) WITHOUT ROWID
 depenses(h BLOB(32) PK = SHA-256(jeton), jour) WITHOUT ROWID
+-- schéma 3 (accès offerts, §5.8) ; une base du schéma 1 ou 2 est migrée à l'ouverture, en une
+-- transaction (version posée avec elle) :
+passes += offert INTEGER (0/1)          -- 1 : accès offert par l'exploitant, sans commande
 ```
 
 - Fichier `SHH_DATA_DIR/paiements.db`, 0600, mêmes PRAGMA que `shares.db` (`secure_delete`, WAL), une connexion. **Sauvegardé chaque jour avec `comptes.db`** (perdre la base = perdre les pass payés) : fait (tâche 9, `deploy/sauvegarder.sh`, `deploy/README.md` §12.4, §13.3), dans son propre fichier chiffré, **sans les clés privées des jetons** (retirées de la copie, `VACUUM` compris) ; à la restauration, aucune clé n'est remise et tout jeton émis avant ne passe plus.
@@ -184,6 +187,19 @@ Dans une transaction : `fin_jour` = max(`fin_jour`, aujourd'hui) + 30 ou 365 jou
 - Commande « en attente » ou « non aboutie » : effacée 7 jours après sa création (une page hébergée expire au plus en 24 h ; une confirmation crypto ou un webhook réessayé peut arriver plusieurs jours après : 7 jours laissent la marge, sans quoi un paiement réel resterait sans pass).
 - Commande payée ou révoquée : gardée jusqu'à `garde_jour` = fin du pass + 180 jours (délai des litiges : PayPal 180 jours, cartes jusqu'à 120 jours), puis effacée avec ses références.
 - Pass : effacé 31 jours après `fin_jour` (après la fin de validité des jetons émis, §7) ou 31 jours après sa révocation.
+
+### 5.8 Accès offerts (ajouté le 25 novembre, demande du propriétaire)
+
+Un accès Pro sans paiement, pour quelques personnes que l'exploitant connaît (« compte illimité », sans payer). Le serveur ne relie toujours aucun pass à un compte : on ne marque pas un compte, on crée un **pass offert**.
+
+- **Création** : tableau de bord, onglet Paiement, carte « Accès offerts » (`POST /api/paiement/offrir { duree }`, même jeton que les autres actions, second appui de confirmation). Durées : 1 mois (30 jours), 1 an (365 jours) ou « sans fin » = **10 ans** (3 650 jours, borne fixe : le schéma n'a pas de fin infinie et un pass sans fin ne serait jamais purgé). Le serveur tire `P` (32 octets, `crypto/rand`), insère la ligne `passes` (offre Pro, `debut_jour` = aujourd'hui, `fin_jour`, réserve pleine, `offert` = 1), et rend **une seule fois** le lien `SHH_ORIGIN/offres/offert#<P en base64url>` (réponse `no-store`, encodée dans un tampon effacé ensuite). `P` n'est jamais écrit sur disque ni journalisé (test : aucun octet de `P` dans `paiements.db`, `-wal`, `-shm`). Aucune commande, aucun prestataire, aucun nom, aucune note.
+- **Liste** (`GET /api/paiement/offerts`) : identifiant court (6 premiers caractères hexadécimaux de `Q`, que l'exploitant note lui-même avec le nom de la personne, hors du serveur), jour de création, fin, jetons restants de la période, état (actif, révoqué, échu). L'identifiant complet de révocation est `Q` en hexadécimal : jamais `P`.
+- **Révocation** (`POST /api/paiement/offerts/revoquer { id }`) : comme §5.5 (`revoque` = 1, réserve vidée, `fin_jour` ramenée à aujourd'hui) ; effet immédiat sur l'émission ; les jetons déjà émis meurent au plus tard le surlendemain (§7). Seulement sur une ligne `offert` = 1 : un pass payé ne se révoque pas par là.
+- **« Illimité » en pratique** : limites Pro (30 Go par partage, plafond technique du serveur ; 7 jours ; 20 ouvertures ; appels), **réserve de 1 000 jetons par période de 30 jours** (`JetonsOffert`, au lieu de 100) et **100 émissions par jour** (`EmisParJourOffert`, au lieu de 20 : à 20 par jour, la réserve mensuelle ne pouvait pas dépasser 600). Contrepartie : un lien d'accès offert qui fuit permet au plus 100 partages payants par jour jusqu'à sa révocation ; ensuite plus rien n'est émis, mais les jetons déjà émis la veille et le jour même (200 au plus) restent dépensables jusqu'à la fin de validité de leur clé (§7). Mêmes clés d'émission que Pro : à la dépense, rien ne distingue un jeton d'accès offert d'un jeton payé.
+- **État** : `POST /api/paiement/etat` répond comme pour un pass Pro payé sans commande (`payee`, `pro`, fin, droits Pro, `renouvelle` faux) : rien ne dit « offert » dans l'API, rien à résilier, aucune note de vente.
+- **Site** (`/offres/offert`, écran de l'application, `noindex`, hors du plan du site) : lit le fragment à l'initialisation puis l'efface de l'adresse (`history.replaceState`), vérifie l'état, range le pass sur l'appareil comme un pass payé avec l'origine `"offert"` (champ `moyen` de l'enregistrement, §6.1), puis dans le **coffre privé** du compte (§6.2) : tout de suite si une session est ouverte (« Ajouté à votre compte : retrouvé sur tous vos appareils »), sinon « Se connecter » / « Créer un compte », et le pass part au coffre à l'ouverture de la session (chemin existant). Un appareil neuf connecté au compte le reçoit du coffre et voit Pro sans repasser par le lien. Erreurs dites : lien invalide ou inconnu, accès arrêté (révoqué), terminé, serveur muet (réessayer).
+- **Agrégats** : comptés à part (`acces_offerts`), jamais avec les pass payés (`pass_pro`, `pass_revoques`).
+- **Apps (D42-20)** : même lien (lien universel plus tard), même en-tête ; la valeur `"offert"` du champ `moyen` d'une entrée `pass` du coffre privé est à accepter telle quelle (le site d'avant l'ignore sans la perdre).
 
 ## 6. Où vit le pass
 

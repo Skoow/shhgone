@@ -142,6 +142,9 @@ describe("navigate", () => {
       expect(otherEntry("/")).toBe(true);
       expect(match("/securite.html", "")).toEqual({ name: "securite" });
       expect(match("/offres.html", "")).toEqual({ name: "offres" });
+      // Accès offert : écran de l'application (le compte y est ouvert), le pass après « # ».
+      expect(match("/offres/offert", "#" + "A".repeat(43))).toEqual({ name: "offert" });
+      expect(otherEntry("/offres/offert")).toBe(true);
     } finally {
       setEntry("app");
       assign.mockRestore();

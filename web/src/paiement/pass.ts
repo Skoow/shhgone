@@ -18,13 +18,22 @@ import type { Moyen, OffrePayante } from "./api";
 export const PASS_DB = "shhdrop-pass";
 const AAD = "shhdrop-pass/v1/";
 
+/**
+ * Origine d'un pass : moyen de paiement, ou « offert » (accès offert par l'exploitant depuis le
+ * tableau de bord, sans paiement ni note de vente : conception du paiement, « Accès offerts »).
+ * Même valeur dans le coffre privé du compte (account/pass.ts) ; les apps la liront telle quelle.
+ */
+export type OriginePass = Moyen | "offert";
+export const ORIGINES_PASS: readonly OriginePass[] = ["carte", "paypal", "crypto", "offert"];
+
 export type PassGarde = {
   id: string;
   pass: Uint8Array<ArrayBuffer>;
   offre: OffrePayante;
+  /** Période commandée ; sans objet pour un accès offert (365 : sa vraie fin est lue chez le serveur). */
   jours: 30 | 365;
   renouvelle: boolean;
-  moyen: Moyen;
+  moyen: OriginePass;
   /** Commande pas encore confirmée par le serveur (page de retour). */
   enAttente: boolean;
   /** Date de la commande (millisecondes), pour trier ; jamais envoyée. */
@@ -90,13 +99,13 @@ export async function lirePasses(idb: IDBFactory): Promise<PassGarde[]> {
           (o.offre !== "plus" && o.offre !== "pro") ||
           (o.jours !== 30 && o.jours !== 365) ||
           typeof o.renouvelle !== "boolean" ||
-          (o.moyen !== "carte" && o.moyen !== "paypal" && o.moyen !== "crypto") ||
+          !(ORIGINES_PASS as readonly unknown[]).includes(o.moyen) ||
           typeof o.en_attente !== "boolean" ||
           !Number.isSafeInteger(o.cree)
         )
           continue;
         const pays = paysDe(o.pays);
-        out.push({ id, pass, offre: o.offre, jours: o.jours, renouvelle: o.renouvelle, moyen: o.moyen, enAttente: o.en_attente, cree: o.cree as number, ...(pays ? { pays } : {}) });
+        out.push({ id, pass, offre: o.offre, jours: o.jours, renouvelle: o.renouvelle, moyen: o.moyen as OriginePass, enAttente: o.en_attente, cree: o.cree as number, ...(pays ? { pays } : {}) });
       } catch {
         // enregistrement abîmé : ignoré
       }

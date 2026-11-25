@@ -17,6 +17,10 @@ describe("pass dans le coffre privé", () => {
     expect(passDeEntree({ ...passEnEntree(b), pays: "de" })).toEqual({ ...b, pays: undefined });
     expect(passDeEntree({ ...passEnEntree(a), offre: "max" })).toBeNull();
     expect(passDeEntree({ ...passEnEntree(a), p: "court" })).toBeNull();
+    // Accès offert : origine « offert », relue telle quelle ; une origine inconnue est ignorée.
+    const o = g({ offre: "pro", moyen: "offert" });
+    expect(passDeEntree(passEnEntree(o))).toEqual(o);
+    expect(passDeEntree({ ...passEnEntree(o), moyen: "cadeau" })).toBeNull();
   });
 
   it("coffre sans pass : même JSON qu'avant ; avec pass : relu à l'identique ; la fusion de l'historique les garde", () => {

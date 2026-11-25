@@ -75,7 +75,7 @@ const COMPTE_PATHS: Readonly<Record<string, CompteRoute>> = {
 
 export type Route = {
   /** envoyer : page d'envoi (composeur, même vide), où mène « Commencer » (retours DROP). */
-  name: "home" | "envoyer" | "envois" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | CompteRoute | SalonRoute | "notfound";
+  name: "home" | "envoyer" | "envois" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | "offert" | CompteRoute | SalonRoute | "notfound";
 };
 
 /**
@@ -123,6 +123,10 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
   // Retour de la page hébergée du prestataire de paiement (conception du paiement §2) : la page
   // des Offres, qui affiche l'état du paiement ; aucune donnée dans l'adresse.
   if (p === "/offres/retour") return { name: "offres" };
+  // Accès offert par l'exploitant (conception du paiement, « Accès offerts ») : écran de
+  // l'application (le compte y est ouvert) qui range le pass qui suit « # », lu puis effacé de
+  // l'adresse (ui/OffersGift.svelte).
+  if (p === "/offres/offert") return { name: "offert" };
   if (p === "/envoyer") return { name: "envoyer" };
   // Tableau de bord « Vos envois » (spec §33, §33.1) : historique local, aucun secret dans l'adresse.
   if (p === "/envois") return { name: "envois" };

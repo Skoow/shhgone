@@ -16,6 +16,7 @@
   import Downloads from "./routes/Downloads.svelte";
   import History from "./routes/History.svelte";
   import NotFound from "./routes/NotFound.svelte";
+  import Offert from "./routes/Offert.svelte";
   import SendFlow from "./routes/SendFlow.svelte";
   import Unsupported from "./routes/Unsupported.svelte";
   import PageRedirect from "./pages/PageRedirect.svelte";
@@ -25,7 +26,7 @@
   // Pages du compte : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Accueil, Connexion, Inscription, Parametres, Recuperation, Profil, connecte, ecouterAutresOnglets, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
+  import { Accueil, Connexion, Inscription, Parametres, Recuperation, Profil, connecte, ecouterAutresOnglets, rangerPassDansCompte, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
   // Écrans du salon : seulement si __SALONS__ (site avec compte, hors démo) ; sans lui,
   // le greffon shh-salons remplace ce module par pages.off.ts (aucun écran, aucun client).
   import { Salon, SalonNouveau } from "./routes/salon/pages";
@@ -85,8 +86,9 @@
       moveToLinkPage(location);
       return;
     }
-    // Salon : la page lit elle-même le « #c… » (invitation) puis le retire de la barre.
-    if (router.current.name === "salon") return;
+    // Salon : la page lit elle-même le « #c… » (invitation) puis le retire de la barre ; de même
+    // l'accès offert (« #<pass> », ui/OffersGift.svelte, lu et retiré dès son initialisation).
+    if (router.current.name === "salon" || router.current.name === "offert") return;
     if (location.hash !== "" && !inApp()) scrubHere();
   }
   $effect(() => {
@@ -180,6 +182,8 @@
     <Salon />
   {:else if router.current.name === "salonnouveau"}
     <SalonNouveau />
+  {:else if router.current.name === "offert"}
+    <Offert compte={__COMPTES__ ? { connecte, ranger: rangerPassDansCompte } : undefined} />
   {:else if PAGE_ROUTES.has(router.current.name)}
     <!-- Pages d'information : leur propre fichier HTML (pages séparées). Le serveur
          le sert déjà à cette adresse ; si ce script arrive quand même ici (ancien serveur), il

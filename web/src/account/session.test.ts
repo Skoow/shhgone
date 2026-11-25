@@ -14,6 +14,8 @@ import { ouvrirEtiquette } from "./device";
 import { configurerNavigateur } from "./webauthn";
 import { FauxAuthentificateur, fauxServeur } from "./passkey.test-helper";
 import * as C from "./session.svelte";
+import { garder, lirePasses, nouvelId, tirerPass } from "../paiement/pass";
+import { formulesDisponibles } from "../paiement/jetons";
 
 const PREUVE = { altcha: "preuve", hp: "", shown_at: "t" };
 const UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
@@ -659,6 +661,76 @@ describe("session et déconnexion", () => {
     }
     expect(tentatives).toBe(3);
     expect(vues.every((i) => i.keepalive === true)).toBe(true);
+  });
+});
+
+// Accès offert (conception du paiement, « Accès offerts ») : le compte doit détenir le pass, pour
+// qu'aucun appareil n'ait à repasser par le lien.
+describe("pass d'un accès offert et compte", () => {
+  const offert = () => ({ id: nouvelId(), pass: tirerPass(), offre: "pro" as const, jours: 365 as const, renouvelle: false, moyen: "offert" as const, enAttente: false, cree: 7 });
+  const memes = (a: Uint8Array, b: Uint8Array) => Buffer.from(a).equals(Buffer.from(b));
+  const dansCoffre = (p: Uint8Array) => (C.account.prive?.pass ?? []).some((e) => typeof e.p === "string" && memes(unb64u(e.p), p));
+
+  it("session ouverte : rangerPassDansCompte écrit tout de suite le pass de l'appareil dans le coffre privé (chiffré au serveur)", async () => {
+    await inscription();
+    const g = offert();
+    await garder(idb, g);
+    const gen = compte().coffres.prive.gen;
+    expect(dansCoffre(g.pass)).toBe(false);
+    expect(await C.rangerPassDansCompte()).toBe(true);
+    expect(dansCoffre(g.pass)).toBe(true);
+    expect(compte().coffres.prive.gen).toBe(gen + 1);
+    // Le serveur ne reçoit qu'un coffre chiffré : ni le pass, ni son encodage.
+    const tout = srv.requetes.map((r) => r.brut).join("\n");
+    expect(tout).not.toContain(b64u(g.pass));
+    // Déjà rangé : rien de plus à écrire.
+    expect(await C.rangerPassDansCompte()).toBe(true);
+    expect(compte().coffres.prive.gen).toBe(gen + 1);
+  });
+
+  it("sans session : rien ; à la création du compte, puis à une connexion, le pass de l'appareil part tout seul dans le coffre", async () => {
+    const g = offert();
+    await garder(idb, g);
+    expect(await C.rangerPassDansCompte()).toBe(false);
+    await inscription();
+    expect(dansCoffre(g.pass)).toBe(true);
+    // Un second pass rangé sans session (déconnecté), puis connexion : ajouté lui aussi.
+    recharger();
+    const g2 = offert();
+    await garder(idb, g2);
+    await C.preparerConnexion();
+    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(dansCoffre(g.pass) && dansCoffre(g2.pass)).toBe(true);
+  });
+
+  it("appareil neuf : la connexion range le pass du coffre sur l'appareil, et Pro est disponible sans autre geste", async () => {
+    const g = offert();
+    await garder(idb, g);
+    await inscription();
+    expect(dansCoffre(g.pass)).toBe(true);
+    // Autre appareil : stockage vide, même passkey (synchronisée).
+    recharger();
+    idb = fakeIndexedDB();
+    expect(await lirePasses(idb)).toHaveLength(0);
+    await C.preparerConnexion();
+    expect(await C.seConnecter(false)).toBe("ouvert");
+    const l = await lirePasses(idb);
+    expect(l).toHaveLength(1);
+    expect(memes(l[0]!.pass, g.pass)).toBe(true);
+    expect(l[0]).toMatchObject({ offre: "pro", moyen: "offert", enAttente: false });
+    // Le serveur du paiement dit ce pass Pro valable : la formule est proposée.
+    const fin = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const vus: string[] = [];
+    const net = {
+      origin: "https://shh.test",
+      fetch: (async (u: string, init: RequestInit) => {
+        vus.push(u);
+        expect((init.headers as Record<string, string>)["X-Shh-Pass"]).toBe(b64u(g.pass));
+        return new Response(JSON.stringify({ v: 1, etat: "payee", offre: "pro", fin, renouvelle: false, droits: ["partage_pro"] }), { status: 200 });
+      }) as unknown as typeof fetch,
+    };
+    expect(await formulesDisponibles(idb, net)).toEqual(["pro"]);
+    expect(vus).toEqual(["https://shh.test/api/paiement/etat"]);
   });
 });
 

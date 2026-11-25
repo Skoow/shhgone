@@ -16,4 +16,6 @@ export const Accueil = absente;
 export const Parametres = absente;
 export const Profil = absente;
 export const connecte = (): boolean => false;
+export const ouvertureEnCours = (): boolean => false;
+export const rangerPassDansCompte = async (): Promise<boolean> => false;
 export const supprime = (): boolean => false;
