@@ -228,7 +228,9 @@ Si, à la création, la passkey n'a pas PRF : rien ne change pour la personne (e
 | Compteur de signatures | **ni lu ni gardé** (les passkeys synchronisées rendent 0 ; le garder daterait chaque connexion) : valeur stockée passée à 0 à chaque vérification, avertissement de clonage ignoré |
 | Drapeaux | `UV` exigé ; `BE` (passkey synchronisable) **gardé** : go-webauthn refuse une connexion dont `BE` diffère de l'enregistrement, et l'écran en a besoin (« liée à cet appareil ») ; `BS` (sauvegardée maintenant) ni gardé ni montré |
 
-### 6.3 Ce que garde le disque (`comptes.db`, schéma 3 ; mêmes règles qu'aujourd'hui : BLOB et INTEGER seulement, dates au jour ou au mois, `secure_delete`, `WITHOUT ROWID`)
+### 6.3 Ce que garde le disque (`comptes.db`, schéma 4 ; mêmes règles qu'aujourd'hui : BLOB et INTEGER seulement, dates au jour ou au mois, `secure_delete`, `WITHOUT ROWID`)
+
+Schéma 4 : la table `passkeys` garde aussi `sign_count` (compteur de signatures WebAuthn). Un compteur qui ne progresse pas alors que la passkey en tient un est refusé comme une signature fausse ; une passkey synchronisée (compteur 0) n'est pas concernée.
 
 | Table | Colonnes | Pourquoi |
 |---|---|---|
