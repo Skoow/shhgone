@@ -10,8 +10,13 @@
 // Compte par passkey (conception 2026-11-22-compte-passkey-design.md §8, §12) : les textes qui
 // DÉCRIVENT le compte ne s'ajoutent qu'avec __COMPTES__ (COMPTE_FR, COMPTE_EN) : le site public
 // n'annonce pas une fonction absente. Les phrases communes restent vraies dans les deux cas.
+// 25 novembre (décision du propriétaire) : mentions légales simples, éditeur anonyme gardé, aucun
+// champ d'identité à compléter sur le site ; hébergement en France chez OVH dit (Mentions,
+// Confidentialité), ce qui remplace la règle B3 ; conditions de vente des offres Plus et Pro et
+// confidentialité complétées selon le code. Ce qui manque avant la vente réelle :
+// docs/juridique/avant-la-vente.md. Tous ces textes sont à relire par l'avocat.
 import { BUILD_ID } from "../../app/build";
-import { CONTENT_MAX, MAX_ITEMS, MAX_OPENS, PW_TRIES, TTL_MAX_HOURS } from "../../limits";
+import { CONTENT_MAX, MAX_ITEMS, MAX_OPENS, PAID, PW_TRIES, TTL_MAX_HOURS } from "../../limits";
 import { formatBytes, type Lang } from "../../i18n/format";
 
 export type InfoName = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler" | "verifier";
@@ -67,6 +72,14 @@ function inserer(blocks: Block[], apres: string, ajout: Block): Block[] {
 }
 function remplacer(blocks: Block[], h: string, nouveau: Block): Block[] {
   return blocks.map((b) => (b.h === h ? nouveau : b));
+}
+
+/** Jetons par période de 30 jours (server/internal/paiement/offres.go, JetonsPeriod ; test). */
+export const PLUS_JETONS = 30;
+export const PRO_JETONS = 100;
+/** « 2 ou 3 », « 2, 3 ou 7 ». */
+function jours(d: readonly number[], ou: string): string {
+  return d.length < 2 ? d.join("") : `${d.slice(0, -1).join(", ")} ${ou} ${d[d.length - 1]}`;
 }
 
 type V = { size: string; n: number; h: number; tries: number; opens: number };
@@ -204,6 +217,33 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Limite : chaque jeton porte le jour de sa clé. Un partage payant ne se cache donc que parmi les pass de la même offre qui ont pris des jetons ce jour-là ou la veille.",
           "Limite : l'heure. Après chaque partage payant, tant que le site reste ouvert, votre appareil refait sa petite réserve de jetons à une heure tirée au hasard. Mais sans jeton en réserve (premier partage payant, ou après un ou deux jours sans), les jetons sont demandés au moment même du partage ; de même, l'appareil demande l'état du pass au plus une fois par jour (et après un paiement ou un refus), à l'ouverture de l'accueil ou de la page d'envoi. Avec peu d'acheteurs, notre serveur pourrait alors rapprocher par l'heure un partage payant fait juste après de votre pass ; de même pour un appel lancé juste après (et donc pour le salon où il a lieu).",
           "Limite : la même clé pour tous. Un serveur malveillant pourrait donner une clé par personne et reconnaître ainsi ses jetons. Pour le gêner, notre serveur annonce ses clés sept jours à l'avance ; votre appareil garde celles qu'il a vues et refuse, avec un avertissement, une clé différente pour un jour déjà annoncé. Mais un serveur qui donnerait à votre appareil ses propres clés dès le premier contact ne serait pas détecté par cet appareil seul : il faudrait comparer avec une autre source, par exemple entre le site et les futures apps.",
+          // service.go (gardeAttente, gardeLitiges, gardePass), jetons.go (depenses), sauvegarder.sh.
+          "Durées : une commande non payée est effacée après 7 jours ; une commande payée est gardée jusqu'à 180 jours après la fin de l'offre (délai des contestations de paiement), puis effacée ; le code du pass, 31 jours après la fin de l'offre. Un jeton dépensé n'est gardé que deux jours, sous forme de code à sens unique, pour qu'il ne serve qu'une fois. Cette base est sauvegardée chaque jour, chiffrée, chez un autre hébergeur ; chaque copie est effacée après 7 jours.",
+          "Stripe, PayPal et NOWPayments sont responsables de leurs propres traitements (paiement, lutte contre la fraude, obligations légales), selon leurs politiques de confidentialité ; ils peuvent transférer des données hors de l'Union européenne. Les factures et la comptabilité sont tenues à partir de leurs relevés, hors de notre serveur, et gardées 10 ans comme la loi l'exige.",
+        ],
+      },
+      {
+        // Conception des appels §5, §6, §7 : relais TURN sur notre machine (deploy/shhcheck/turn.go).
+        id: "appels",
+        h: "Appels audio et vidéo",
+        list: [
+          "Le son et l'image sont chiffrés de bout en bout entre les participants (DTLS-SRTP) : notre relais les transmet sans pouvoir les lire.",
+          "Ils passent toujours par notre relais : les autres participants ne voient pas votre adresse IP. Le relais, lui, la voit pendant l'appel, avec le volume et les horaires, en mémoire seulement ; rien n'est écrit sur disque.",
+          "Pour joindre le relais, votre appareil reçoit un identifiant temporaire (6 heures au plus) qui ne désigne ni le salon, ni la personne.",
+        ],
+      },
+      {
+        id: "contact",
+        h: "Si vous nous écrivez",
+        p: [
+          "Votre message et votre adresse e-mail arrivent dans notre messagerie, hébergée par OVH. Nous les gardons le temps de traiter votre demande, puis nous les effaçons, sauf obligation légale (par exemple une demande d'une autorité). Les alertes techniques que notre serveur nous envoie ne contiennent aucune donnée d'utilisateur.",
+        ],
+      },
+      {
+        id: "hebergement",
+        h: "Hébergement",
+        p: [
+          "Le site et ses données sont hébergés en France, sur un serveur dédié loué à OVH. Seules les bases des comptes et des paiements sont sauvegardées, chiffrées, chez un autre hébergeur ; jamais les partages ni les salons.",
         ],
       },
       {
@@ -217,6 +257,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         h: "Vos droits",
         p: [
           "Nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits ou poser une question, utilisez le contact des mentions légales. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
+          "Le responsable de ces traitements est l'éditeur de Shhgone (voir les mentions légales). Vous pouvez aussi adresser une réclamation à la CNIL (cnil.fr).",
         ],
       },
       {
@@ -235,7 +276,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
   }),
   conditions: (v) => ({
     title: "Conditions d'utilisation",
-    lede: "Les règles d'usage de Shhgone. Mise à jour le 20 novembre 2026.",
+    lede: "Les règles d'usage de Shhgone, et les conditions de vente des offres Plus et Pro. Mise à jour le 25 novembre 2026.",
     blocks: [
       {
         h: "Objet",
@@ -249,6 +290,25 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Vos contenus sont chiffrés dans votre navigateur avant de partir : nous ne pouvons ni les lire, ni les retrouver, ni les rendre.",
           `Un partage s'efface à son échéance (${v.h} h au plus en gratuit), après le nombre d'ouvertures choisi (${v.opens} au plus), ou après ${v.tries} mots de passe faux. Limites en gratuit : ${v.n} éléments et ${v.size} par partage.`,
           "Shhgone n'est pas un service de sauvegarde : gardez vos originaux. Un lien ou un mot de passe perdu ne peut pas être retrouvé, pas même par nous.",
+        ],
+      },
+      {
+        // Conditions de vente (conception du paiement §1, §2, §5, §9.4). Chiffres lus dans PAID
+        // (web/src/limits.ts) et offres.go (jetons) ; à relire par l'avocat.
+        id: "vente",
+        h: "Offres payantes : conditions de vente",
+        p: ["Quand elles sont proposées, les offres Plus et Pro s'achètent sur la page Offres. Elles ajoutent de la place, de la durée et des ouvertures, et permettent de lancer des appels audio et vidéo dans un salon ; aucune n'ajoute de sécurité."],
+        list: [
+          `Prix TTC : Plus ${PAID.plus.month}\u00a0€ par mois ou ${PAID.plus.year}\u00a0€ par an ; Pro ${PAID.pro.month}\u00a0€ par mois ou ${PAID.pro.year}\u00a0€ par an. Le même prix TTC dans tous les pays. Vente aux personnes qui résident dans l'Union européenne seulement.`,
+          `Contenu : Plus, jusqu'à ${formatBytes(PAID.plus.bytes, "fr")} par partage, ${jours(PAID.plus.ttlDays, "ou")} jours et ${PAID.plus.opens} ouvertures ; Pro, jusqu'à ${formatBytes(PAID.pro.bytes, "fr")}, ${jours(PAID.pro.ttlDays, "ou")} jours et ${PAID.pro.opens} ouvertures. Chaque partage payant, et chaque salon où l'on ouvre les appels, utilise un jeton : ${PLUS_JETONS} (Plus) ou ${PRO_JETONS} (Pro) par période de 30 jours, sans report.`,
+          "Durée : un mois compte 30 jours, un an 365 jours, à partir du jour où le prestataire confirme le paiement.",
+          "Renouvellement : par carte ou PayPal, le mensuel se renouvelle chaque mois ; l'annuel est, au choix, un paiement unique ou un renouvellement chaque année (jamais choisi pour vous). En cryptomonnaie, c'est toujours un paiement unique, sans renouvellement. « Arrêter le renouvellement », sur l'appareil qui garde l'offre, l'arrête en un geste, sans frais : l'offre va jusqu'à la fin de la période payée, et rien n'est plus prélevé.",
+          "Paiement : sur la page du prestataire choisi (Stripe, PayPal ou NOWPayments). L'offre est active quand il nous confirme le paiement.",
+          "Droit de rétractation : vous avez en principe 14 jours pour vous rétracter. Comme l'offre sert dès le paiement, la page Offres vous demande, avant de payer, de demander l'accès immédiat et de renoncer à ce droit pour la période commencée (case non cochée d'avance) ; sans elle, le paiement ne commence pas.",
+          "Un remboursement total ou une contestation du paiement arrête l'offre.",
+          "Votre offre est un pass tiré au hasard par votre appareil : nous ne savons pas qui l'a acheté. Sans compte, elle ne vit que sur cet appareil : effacer les données du site la perd, et nous ne pouvons pas la retrouver.",
+          "Facture : Stripe l'envoie à l'adresse donnée lors du paiement ; pour PayPal et les cryptomonnaies, demandez-la au contact des mentions légales, avec le numéro de commande donné par le prestataire. Après le paiement, « Télécharger la note de vente » donne aussi un récapitulatif, fait sur votre appareil.",
+          "Vous bénéficiez de la garantie légale de conformité des contenus et services numériques (Code de la consommation, articles L224-25-12 et suivants). Pour toute réclamation, écrivez au contact des mentions légales.",
         ],
       },
       {
@@ -330,7 +390,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       },
       {
         h: "Hébergeur",
-        list: ["OVH SAS", "2 rue Kellermann, 59100 Roubaix, France", "Téléphone : +33 9 72 10 10 07"],
+        list: ["OVH SAS", "2 rue Kellermann, 59100 Roubaix, France", "Téléphone : +33 9 72 10 10 07", "Serveur dédié en France (Strasbourg). Le nom de domaine, ses DNS et la messagerie sont aussi chez OVH SAS."],
       },
       {
         h: "Contact et contenus illicites",
@@ -578,6 +638,31 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Limit: each token carries the day of its key. A paid share therefore only hides among the passes of the same plan that took tokens that day or the day before.",
           "Limit: timing. After each paid share, while the site stays open, your device refills its small reserve of tokens at a randomly drawn time. But with no token in reserve (first paid share, or after one or two days without one), tokens are requested at the very moment of the share; likewise, the device asks for the pass's status at most once a day (and after a payment or a refusal), when the home page or the send page opens. With few buyers, our server could then link a paid share made right after to your pass by its timing; the same goes for a call started right after (and so for the room where it takes place).",
           "Limit: the same key for everyone. A malicious server could give one key per person and so recognise their tokens. To hinder this, our server announces its keys seven days ahead; your device keeps the ones it has seen and refuses, with a warning, a different key for a day already announced. But a server that gave your device its own keys from the very first contact would not be detected by that device alone: that would take a comparison with another source, for example between the site and the future apps.",
+          "Retention: an unpaid order is erased after 7 days; a paid order is kept until 180 days after the plan ends (the time limit for payment disputes), then erased; the pass code, 31 days after the plan ends. A spent token is kept for only two days, as a one-way code, so that it can be used only once. This database is backed up every day, encrypted, with another host; each copy is erased after 7 days.",
+          "Stripe, PayPal and NOWPayments are responsible for their own processing (payment, fraud prevention, legal obligations), under their privacy policies; they may transfer data outside the European Union. Invoices and accounts are kept from their statements, outside our server, for 10 years as the law requires.",
+        ],
+      },
+      {
+        id: "appels",
+        h: "Audio and video calls",
+        list: [
+          "Sound and picture are end-to-end encrypted between participants (DTLS-SRTP): our relay passes them on without being able to read them.",
+          "They always go through our relay: the other participants do not see your IP address. The relay itself sees it during the call, with the volume and timing, in memory only; nothing is written to disk.",
+          "To reach the relay, your device gets a temporary identifier (6 hours at most) that names neither the room nor the person.",
+        ],
+      },
+      {
+        id: "contact",
+        h: "If you write to us",
+        p: [
+          "Your message and your email address arrive in our mailbox, hosted by OVH. We keep them while we handle your request, then erase them, unless the law requires otherwise (for example a request from an authority). The technical alerts our server sends us contain no user data.",
+        ],
+      },
+      {
+        id: "hebergement",
+        h: "Hosting",
+        p: [
+          "The site and its data are hosted in France, on a dedicated server rented from OVH. Only the accounts and payments databases are backed up, encrypted, with another host; never shares or rooms.",
         ],
       },
       {
@@ -591,6 +676,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "Your rights",
         p: [
           "We keep nothing that could identify you or find your shares from your identity. To exercise your rights or ask a question, use the contact in the legal notice. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
+          "The controller of this processing is Shhgone's publisher (see the legal notice). You can also complain to the CNIL (cnil.fr).",
         ],
       },
       {
@@ -609,7 +695,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
   }),
   conditions: (v) => ({
     title: "Terms of use",
-    lede: "The rules for using Shhgone. Updated on 20 November 2026.",
+    lede: "The rules for using Shhgone, and the terms of sale of the Plus and Pro plans. Updated on 25 November 2026.",
     blocks: [
       {
         h: "Purpose",
@@ -623,6 +709,23 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Your content is encrypted in your browser before it leaves: we can neither read it, find it, nor give it back.",
           `A share erases itself when it expires (${v.h} h at most on the free plan), after the chosen number of opens (${v.opens} at most), or after ${v.tries} wrong passwords. Free limits: ${v.n} items and ${v.size} per share.`,
           "Shhgone is not a backup service: keep your originals. A lost link or password cannot be recovered, not even by us.",
+        ],
+      },
+      {
+        id: "vente",
+        h: "Paid plans: terms of sale",
+        p: ["When they are offered, the Plus and Pro plans are bought on the Plans page. They add space, duration and opens, and let you start audio and video calls in a room; neither adds security."],
+        list: [
+          `Prices including VAT: Plus €${PAID.plus.month} a month or €${PAID.plus.year} a year; Pro €${PAID.pro.month} a month or €${PAID.pro.year} a year. The same price including VAT in every country. Sold only to people who live in the European Union.`,
+          `What you get: Plus, up to ${formatBytes(PAID.plus.bytes, "en")} per share, ${jours(PAID.plus.ttlDays, "or")} days and ${PAID.plus.opens} opens; Pro, up to ${formatBytes(PAID.pro.bytes, "en")}, ${jours(PAID.pro.ttlDays, "or")} days and ${PAID.pro.opens} opens. Each paid share, and each room where calls are opened, uses one token: ${PLUS_JETONS} (Plus) or ${PRO_JETONS} (Pro) per 30-day period, not carried over.`,
+          "Length: a month is 30 days, a year 365 days, from the day the provider confirms the payment.",
+          "Renewal: by card or PayPal, the monthly plan renews every month; the yearly plan is, as you choose, a one-off payment or a yearly renewal (never chosen for you). In cryptocurrency, it is always a one-off payment, with no renewal. “Stop renewal”, on the device that holds the plan, stops it in one step, at no cost: the plan runs until the end of the paid period, and nothing more is charged.",
+          "Payment: on the page of the provider you choose (Stripe, PayPal or NOWPayments). The plan is active once the provider confirms the payment to us.",
+          "Right of withdrawal: you normally have 14 days to withdraw. Because the plan works as soon as you pay, the Plans page asks you, before paying, to request immediate access and to waive this right for the period started (a box that is not ticked in advance); without it, payment does not start.",
+          "A full refund or a payment dispute stops the plan.",
+          "Your plan is a pass drawn at random by your device: we do not know who bought it. Without an account, it lives only on that device: clearing the site's data loses it, and we cannot find it again.",
+          "Invoice: Stripe sends it to the address given when paying; for PayPal and cryptocurrencies, ask the contact in the legal notice, quoting the order number given by the provider. After payment, “Download the sales receipt” also gives a summary, made on your device.",
+          "You benefit from the legal guarantee of conformity for digital content and services (French Consumer Code, articles L224-25-12 onwards). For any complaint, write to the contact in the legal notice.",
         ],
       },
       {
@@ -700,7 +803,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Contact: contact@shhgone.com (in French or English).",
         ],
       },
-      { h: "Host", list: ["OVH SAS", "2 rue Kellermann, 59100 Roubaix, France", "Phone: +33 9 72 10 10 07"] },
+      { h: "Host", list: ["OVH SAS", "2 rue Kellermann, 59100 Roubaix, France", "Phone: +33 9 72 10 10 07", "Dedicated server in France (Strasbourg). The domain name, its DNS and the mailbox are also with OVH SAS."] },
       {
         h: "Contact and illegal content",
         p: [
@@ -843,6 +946,7 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         p: [
           "Sans compte, nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits, utilisez le contact des mentions légales. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
           "Avec un compte : vous pouvez exporter vos données (le fichier est fait sur votre appareil), corriger votre pseudo et votre photo, et supprimer votre compte à tout moment depuis ses paramètres. Pour un recours contre un bannissement, écrivez-nous en donnant l'identifiant montré à la connexion (contact des mentions légales).",
+          "Le responsable de ces traitements est l'éditeur de Shhgone (voir les mentions légales). Vous pouvez aussi adresser une réclamation à la CNIL (cnil.fr).",
         ],
       },
     ),
@@ -905,6 +1009,7 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         p: [
           "Without an account, we keep nothing that could identify you or find your shares from your identity. To exercise your rights, use the contact in the legal notice. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
           "With an account: you can export your data (the file is made on your device), correct your nickname and photo, and delete your account at any time from its settings. To appeal against a ban, write to us quoting the identifier shown at sign-in (contact in the legal notice).",
+          "The controller of this processing is Shhgone's publisher (see the legal notice). You can also complain to the CNIL (cnil.fr).",
         ],
       },
     ),

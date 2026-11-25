@@ -275,3 +275,88 @@ describe("page Vérifier cette version", () => {
     for (const lang of ["fr", "en"] as const) expect(infoPage("securite", lang).blocks.find((b) => b.id === "limites")?.link?.path).toBe("/verifier");
   });
 });
+
+// Pages juridiques du 25 novembre (décision du propriétaire : mentions simples, éditeur anonyme,
+// aucun champ d'identité à compléter sur le site ; conditions de vente et confidentialité
+// complétées selon ce que fait le site). Chiffres comparés au code (limits.ts, offres.go,
+// service.go).
+describe("pages juridiques : conditions de vente, confidentialité, mentions", () => {
+  const offres = readFileSync(fileURLToPath(new URL("../../../../server/internal/paiement/offres.go", import.meta.url)), "utf8");
+  const service = readFileSync(fileURLToPath(new URL("../../../../server/internal/paiement/service.go", import.meta.url)), "utf8");
+  const bloc = (name: "conditions" | "confidentialite" | "mentions", lang: "fr" | "en", id: string, comptes = true) => {
+    const b = infoPage(name, lang, comptes).blocks.find((x) => x.id === id);
+    return b ? [b.h, ...(b.p ?? []), ...(b.list ?? [])].join("\n") : "";
+  };
+
+  test("conditions de vente : prix TTC, jetons et durées lus dans le code, rétractation, renouvellement", () => {
+    expect(offres).toMatch(/Nom: "plus"[^\n]*Mois: 700, An: 7000, JetonsPeriod: 30,/u);
+    expect(offres).toMatch(/Nom: "pro"[^\n]*Mois: 2000, An: 20000, JetonsPeriod: 100,/u);
+    for (const comptes of [false, true]) {
+      const f = bloc("conditions", "fr", "vente", comptes);
+      for (const re of [
+        /Plus 7 € par mois ou 70 € par an ; Pro 20 € par mois ou 200 € par an/u,
+        /2 ou 3 jours et 10 ouvertures/u,
+        /2, 3 ou 7 jours et 20 ouvertures/u,
+        /30 \(Plus\) ou 100 \(Pro\) par période de 30 jours/u,
+        /un mois compte 30 jours, un an 365 jours/u,
+        /14 jours pour vous rétracter/u,
+        /case non cochée d'avance/u,
+        /jamais choisi pour vous/u,
+        /« Arrêter le renouvellement »/u,
+        /Union européenne seulement/u,
+        /L224-25-12/u,
+      ])
+        expect(f).toMatch(re);
+      const e = bloc("conditions", "en", "vente", comptes);
+      for (const re of [
+        /Plus €7 a month or €70 a year; Pro €20 a month or €200 a year/u,
+        /2 or 3 days and 10 opens/u,
+        /2, 3 or 7 days and 20 opens/u,
+        /30 \(Plus\) or 100 \(Pro\) per 30-day period/u,
+        /14 days to withdraw/u,
+        /“Stop renewal”/u,
+        /“Download the sales receipt”/u,
+      ])
+        expect(e).toMatch(re);
+    }
+    // Libellés cités : ceux de l'interface.
+    expect([fr["offers.ret.stop"], fr["offers.ret.note"], fr["offers.title"]]).toEqual(["Arrêter le renouvellement", "Télécharger la note de vente", "Offres"]);
+    expect([en["offers.ret.stop"], en["offers.ret.note"], en["offers.title"]]).toEqual(["Stop renewal", "Download the sales receipt", "Plans"]);
+  });
+
+  test("Conditions : aucune coordonnée ni nom d'hébergeur (ui-e2e/pages.spec.ts), aucune case à compléter", () => {
+    for (const lang of ["fr", "en"] as const)
+      for (const comptes of [false, true]) expect(texte("conditions", lang, comptes)).not.toMatch(/@|SAS|SARL|OVH|Hetzner|Scaleway|COMPLÉTER|TO BE COMPLETED/u);
+  });
+
+  test("Confidentialité : durées du paiement lues dans service.go, appels par le relais, contact, hébergement, CNIL", () => {
+    expect(service).toMatch(/gardeAttente = 7 \* jourS/u);
+    expect(service).toMatch(/gardeLitiges = 180 \* jourS/u);
+    expect(service).toMatch(/gardePass {4}= 31 \* jourS/u);
+    for (const comptes of [false, true]) {
+      expect(bloc("confidentialite", "fr", "paiement", comptes)).toMatch(/non payée est effacée après 7 jours[^.]*180 jours après la fin de l'offre[^.]*31 jours après la fin/u);
+      expect(bloc("confidentialite", "fr", "paiement", comptes)).toMatch(/responsables de leurs propres traitements/u);
+      expect(bloc("confidentialite", "fr", "appels", comptes)).toMatch(/chiffrés de bout en bout[^.]*DTLS-SRTP/u);
+      expect(bloc("confidentialite", "fr", "appels", comptes)).toMatch(/en mémoire seulement ; rien n'est écrit sur disque/u);
+      expect(bloc("confidentialite", "fr", "contact", comptes)).toMatch(/hébergée par OVH/u);
+      expect(bloc("confidentialite", "fr", "hebergement", comptes)).toMatch(/en France/u);
+      expect(bloc("confidentialite", "en", "appels", comptes)).toMatch(/end-to-end encrypted[^.]*DTLS-SRTP/u);
+      expect(bloc("confidentialite", "en", "paiement", comptes)).toMatch(/180 days after the plan ends/u);
+      for (const lang of ["fr", "en"] as const) {
+        expect(texte("confidentialite", lang, comptes)).toMatch(/cnil\.fr/u);
+        expect(texte("confidentialite", lang, comptes)).not.toContain("@");
+      }
+    }
+  });
+
+  test("Mentions légales : éditeur anonyme gardé (décision du propriétaire), hébergeur OVH en France, bandeau gardé jusqu'à l'avis de l'avocat", () => {
+    for (const lang of ["fr", "en"] as const) {
+      expect(infoPage("mentions", lang).draft).toBe(true);
+      const t = texte("mentions", lang, true);
+      expect(t).toMatch(/article 1-1, II/u);
+      expect(t).toContain("contact@shhgone.com");
+      expect(t).toMatch(/OVH SAS[\s\S]*Strasbourg/u);
+      expect(t).not.toMatch(/COMPLÉTER|TO BE COMPLETED|SIREN/u);
+    }
+  });
+});
