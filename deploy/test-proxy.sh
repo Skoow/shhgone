@@ -4,7 +4,8 @@
 # Ce qui est prouvé (spec §28.7, §30, §36) :
 #   1. « caddy validate » et « caddy fmt --diff » sur deploy/Caddyfile ;
 #   2. X-Shh-Client-IP envoyé par le client est REMPLACÉ par l'adresse du pair TCP, et rien
-#      d'autre ne porte l'adresse ni ne décrit le navigateur vers le serveur ;
+#      d'autre ne porte l'adresse ni ne décrit le navigateur vers le serveur (des Sec-Fetch-*, seul
+#      Sec-Fetch-Site passe : il dit seulement si la requête vient d'un autre site) ;
 #   3. /api fonctionne à travers Caddy avec SHH_BEHIND_PROXY=1, et la limite de débit ne se
 #      contourne pas en changeant l'en-tête ;
 #   4. les en-têtes du serveur Go arrivent une seule fois, les octets ne changent pas ; aucune
@@ -208,7 +209,8 @@ hostile=(-H "X-Shh-Client-IP: $spoof" -H "X-Shh-Client-IP: 203.0.113.5" -H "X-Fo
 	-H "X-Forwarded-Host: evil.example" -H "X-Forwarded-Proto: http" -H "Forwarded: for=$spoof"
 	-H "X-Real-IP: $spoof" -H "Via: 1.1 $spoof" -H "User-Agent: UA-REPERE" -H "Referer: https://ref.example/REPERE"
 	-H "Accept-Language: fr-REPERE" -H "Cookie: c=REPERE" -H 'Sec-CH-UA: "REPERE"' -H "Sec-CH-UA-Platform: REPERE"
-	-H "Sec-Fetch-Site: REPERE" -H "DNT: 1" -H "Priority: u=1" -H "Accept-Encoding: br, gzip"
+	-H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: REPERE" -H "Sec-Fetch-Dest: REPERE" -H "Sec-Fetch-User: REPERE"
+	-H "Sec-Fetch-Storage-Access: REPERE" -H "DNT: 1" -H "Priority: u=1" -H "Accept-Encoding: br, gzip"
 	-H "Origin: https://$name")
 for proto in --http1.1 --http2; do
 	out=$cli/echo$proto.txt
@@ -220,8 +222,10 @@ for proto in --http1.1 --http2; do
 		bash -c "! grep -qE '198\.51\.100\.77|203\.0\.113\.5' '$out'"
 	check "$proto écho : ni X-Forwarded-*, Forwarded, X-Real-IP, Via" \
 		bash -c "! grep -qiE '^(X-Forwarded-[a-z]+|Forwarded|X-Real-Ip|Via):' '$out'"
-	check "$proto écho : ni User-Agent du client, Referer, Accept-Language, Cookie, Sec-CH-UA*, Sec-Fetch-*, DNT, Priority" \
-		bash -c "! grep -qiE 'REPERE|^(Referer|Accept-Language|Cookie|Sec-Ch-Ua[a-z-]*|Sec-Fetch-[a-z-]+|Dnt|Priority):' '$out'"
+	check "$proto écho : ni User-Agent du client, Referer, Accept-Language, Cookie, Sec-CH-UA*, Sec-Fetch-* (hors Site), DNT, Priority" \
+		bash -c "! grep -qiE 'REPERE|^(Referer|Accept-Language|Cookie|Sec-Ch-Ua[a-z-]*|Sec-Fetch-(Mode|Dest|User|Storage-Access)|Dnt|Priority):' '$out'"
+	check "$proto écho : Sec-Fetch-Site transmis tel quel, seul des Sec-Fetch-* (refus intersite du serveur)" \
+		bash -c "grep -qixF 'Sec-Fetch-Site: [cross-site]' '$out' && test \"\$(grep -ciE '^Sec-Fetch-' '$out')\" = 1"
 	check "$proto écho : Accept-Encoding transmis tel quel" grep -qixF "Accept-Encoding: [br, gzip]" "$out"
 	check "$proto écho : Origin transmis tel quel (WebSocket du salon, §36 S2)" grep -qixF "Origin: [https://$name]" "$out"
 done
