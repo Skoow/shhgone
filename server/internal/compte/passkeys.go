@@ -84,7 +84,7 @@ func (s *Service) ReauthDebut(ip netip.Addr, c Courante) ([32]byte, json.RawMess
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	jeton, err := s.nouvelleEtapeLocked(&etape{sorte: etapeReauth, h: c.H, defi: sd}, now)
+	jeton, err := s.nouvelleEtapeLocked(&etape{sorte: etapeReauth, h: c.H, defi: sd, bloc: s.blocIP(ip)}, now)
 	return jeton, opts, err
 }
 
@@ -152,7 +152,7 @@ func (s *Service) PasskeysDebut(c Courante) ([32]byte, json.RawMessage, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	jeton, err := s.nouvelleEtapeLocked(&etape{sorte: etapeAjout, h: c.H, defi: sd}, now)
+	jeton, err := s.nouvelleEtapeLocked(&etape{sorte: etapeAjout, h: c.H, defi: sd, bloc: blocCompte(c.H)}, now)
 	return jeton, opts, err
 }
 

@@ -355,3 +355,30 @@ func TestAucuneAdresseGardee(t *testing.T) {
 		}
 	}
 }
+
+// connexion/debut par /48 : un /48 découpé en /64 ne multiplie plus la limite (chaque étape
+// prend une place de la table globale des étapes WebAuthn).
+func TestConnexionDebutPar48(t *testing.T) {
+	now := t0
+	l := newLim(&now)
+	n := 0
+	for i := 0; n < ConnexionsDebutPer48Minute; i++ {
+		a := ip(fmt.Sprintf("2001:db8:7:%x::1", i))
+		for j := 0; j < ConnexionsDebutParMinute && n < ConnexionsDebutPer48Minute; j++ {
+			if !l.AllowConnexionDebut(a) {
+				t.Fatalf("connexion/debut %d du /48 refusé", n+1)
+			}
+			n++
+		}
+	}
+	if l.AllowConnexionDebut(ip("2001:db8:7:ffff::1")) {
+		t.Fatal("connexion/debut au-delà du plafond du /48 accepté")
+	}
+	if !l.AllowConnexionDebut(ip("2001:db8:8::1")) {
+		t.Fatal("autre /48 refusé")
+	}
+	now = t0.Add(time.Minute)
+	if !l.AllowConnexionDebut(ip("2001:db8:7:ffff::1")) {
+		t.Fatal("plafond du /48 non oublié à la minute")
+	}
+}

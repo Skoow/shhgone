@@ -16,6 +16,7 @@ type voidBody struct {
 func decodeBody(body string) (voidBody, error) {
 	var v voidBody
 	r := httptest.NewRequest("POST", "/", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
 	err := readJSON(httptest.NewRecorder(), r, &v)
 	return v, err
 }
@@ -78,7 +79,9 @@ func TestReadJSONNull(t *testing.T) {
 		Opt *struct{ A int } `json:"opt"`
 	}
 	lire := func(body string, v any) error {
-		return readJSON(httptest.NewRecorder(), httptest.NewRequest("POST", "/", strings.NewReader(body)), v)
+		r := httptest.NewRequest("POST", "/", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		return readJSON(httptest.NewRecorder(), r, v)
 	}
 	tests := []struct {
 		name string
@@ -119,6 +122,7 @@ func TestReadJSONSansPointeur(t *testing.T) {
 	var nul *voidBody
 	for nom, v := range map[string]any{"valeur": voidBody{}, "nil": nil, "pointeur nul": nul, "entier": 3} {
 		r := httptest.NewRequest("POST", "/", strings.NewReader(`{}`))
+		r.Header.Set("Content-Type", "application/json")
 		func() {
 			defer func() {
 				if p := recover(); p != nil {

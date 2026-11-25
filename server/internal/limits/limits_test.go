@@ -1337,3 +1337,22 @@ func TestAllowPseudoInvite(t *testing.T) {
 		t.Fatal("pas remis à zéro à l'heure")
 	}
 }
+
+// Webhooks de paiement : leur propre plafond, plus large que les requêtes ordinaires, et
+// séparé (une rafale de webhooks ne prend rien aux requêtes de la même adresse).
+func TestWebhooks(t *testing.T) {
+	now := t0
+	l := newLim(&now)
+	a := ip("198.51.100.7")
+	allowN(t, "webhook", WebhooksPerMin, func() bool { return l.AllowWebhook(a) })
+	if !l.AllowRequest(a) {
+		t.Fatal("les webhooks ont pris sur les requêtes")
+	}
+	if WebhooksPerMin <= RequestsPerMin || WebhooksPer48Min < WebhooksPerMin {
+		t.Fatal("plafond des webhooks pas plus large")
+	}
+	now = t0.Add(time.Minute)
+	if !l.AllowWebhook(a) {
+		t.Fatal("plafond des webhooks non oublié à la minute")
+	}
+}

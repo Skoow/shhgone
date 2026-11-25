@@ -431,10 +431,24 @@ func (s *server) guard(next http.Handler) http.Handler {
 			writeErr(w, http.StatusInternalServerError, "internal")
 			return
 		}
+		webhook := isWebhook(r)
+		// Requête d'un autre site (Sec-Fetch-Site posé par le navigateur, jamais par un
+		// script) : refusée avant le limiteur, pour qu'un site tiers ne puisse pas faire
+		// consommer les quotas d'une adresse partagée par des POST « simples » (sans
+		// préflight). Sans l'en-tête (apps, curl, Caddy qui le retire) : rien ne change ; le
+		// type de contenu exigé des corps JSON (jsonType) couvre alors ce cas. Webhooks : appelés
+		// par les prestataires, pas par un navigateur.
+		if !webhook && crossSite(r) {
+			writeErr(w, http.StatusForbidden, "cross_site")
+			return
+		}
 		allowed := false
-		if s.validSegmentToken(r) {
+		switch {
+		case webhook:
+			allowed = s.lim.AllowWebhook(ip)
+		case s.validSegmentToken(r):
 			allowed = s.lim.AllowSegment(ip)
-		} else {
+		default:
 			allowed = s.lim.AllowRequest(ip)
 		}
 		if !allowed {
@@ -446,6 +460,32 @@ func (s *server) guard(next http.Handler) http.Handler {
 		r.Header.Del("X-Shh-Client-IP") // plus aucune lecture en aval
 		next.ServeHTTP(w, withIP(r, ip))
 	})
+}
+
+// isWebhook : webhook de paiement (POST /api/paiement/webhook/{nom}), limité à part
+// (AllowWebhook), sans contrôle de Sec-Fetch-Site.
+func isWebhook(r *http.Request) bool {
+	return r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/paiement/webhook/")
+}
+
+// crossSite : au moins un en-tête Sec-Fetch-Site vaut « cross-site ».
+func crossSite(r *http.Request) bool {
+	for _, v := range r.Header.Values("Sec-Fetch-Site") {
+		if strings.EqualFold(strings.TrimSpace(v), "cross-site") {
+			return true
+		}
+	}
+	return false
+}
+
+// jsonType : Content-Type exactement « application/json » (un seul en-tête). Un formulaire ou
+// un fetch « no-cors » d'un autre site ne peut envoyer que text/plain,
+// application/x-www-form-urlencoded ou multipart/form-data sans préflight CORS (que ce serveur
+// n'accorde jamais) : exiger ce type sur toute route à corps JSON lui ferme ces routes, même
+// sans Sec-Fetch-Site. Le site et les apps envoient ce type.
+func jsonType(r *http.Request) bool {
+	v := r.Header.Values("Content-Type")
+	return len(v) == 1 && v[0] == "application/json"
 }
 
 // validSegmentToken : requête de segment (PUT avec jeton d'envoi, GET avec jeton de
@@ -683,6 +723,9 @@ func readJSONMax(w http.ResponseWriter, r *http.Request, v any, max int64) error
 	// erreur interne (500 sans détail), jamais une panique.
 	if t := reflect.TypeOf(v); t == nil || t.Kind() != reflect.Pointer || reflect.ValueOf(v).IsNil() {
 		return errInterne
+	}
+	if !jsonType(r) {
+		return errBadRequest
 	}
 	// Échéance de lecture du corps : un corps de quelques Kio envoyé au goutte-à-goutte
 	// tenait sinon sa connexion jusqu'à ReadTimeout (300 s). Sans connexion réelle (tests

@@ -23,6 +23,7 @@ func TestGrosCorpsBornes(t *testing.T) {
 	lire := e.srv.lireGros
 	req := func(body string, ip string) *http.Request {
 		r := httptest.NewRequest("POST", "/api/compte/inscription/fin", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
 		return r.WithContext(context.WithValue(r.Context(), ctxIP{}, netip.MustParseAddr(ip)))
 	}
 	var v struct {
@@ -90,6 +91,7 @@ func TestLireGrosCorpsInterdit(t *testing.T) {
 		}
 	}()
 	r := httptest.NewRequest("POST", "/", strings.NewReader(`{}`))
+	r.Header.Set("Content-Type", "application/json")
 	var v struct{}
 	_ = lire(httptest.NewRecorder(), r, &v, maxJSON+1)
 }

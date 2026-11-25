@@ -90,6 +90,9 @@ var allowedMaps = map[string]string{
 	"limits/limits.go:insc64":    "conception du compte par passkey §7.2 comptes créés du jour par connexion (3), minuit UTC",
 	"limits/limits.go:insc48":    "conception du compte par passkey §7.2 comptes créés du jour par /48 (10), minuit UTC",
 	"limits/limits.go:inscD64":   "conception du compte par passkey §7.2 inscription/debut de l'heure par connexion (20)",
+	"limits/limits.go:cnx48":     "connexion/debut de la minute par /48 (180)",
+	"limits/limits.go:wh64":      "webhooks de paiement de la minute par connexion (600)",
+	"limits/limits.go:wh48":      "webhooks de paiement de la minute par /48 (6 000)",
 	"limits/limits.go:cnx64":     "conception du compte par passkey §7.2 connexion/debut de la minute par connexion (60)",
 	"limits/limits.go:echec64":   "conception du compte par passkey §7.2 échecs de connexion par passkey de l'heure par connexion (20)",
 	"limits/limits.go:echec48":   "conception du compte par passkey §7.2 échecs de connexion par passkey de l'heure par /48 (60)",
@@ -98,9 +101,10 @@ var allowedMaps = map[string]string{
 	"limits/limits.go:coffreCpt": "conception du compte §8.8, §21.6.2 écritures des coffres de l'heure par compte (60) et ajouts de passkey (10, conception du compte par passkey §7.2), HMAC du jour de h",
 	"limits/limits.go:pseudoCpt": "conception du compte §21.5 vérifications de pseudo de l'heure (30), HMAC du jour de h ou de l'étape",
 	// Compte (conception du compte par passkey §6.2) : mémoire seulement, perdue au redémarrage.
-	"compte/defis.go:m":      "conception du compte par passkey §6.2 cérémonies WebAuthn en cours (défi, rp.id, passkeys permises, h tiré, empreinte du pseudo réservé), clé SHA-256 du jeton d'étape, usage unique, 5 min, 20 000 au plus ; aucune sortie PRF ni clé",
-	"compte/sessions.go:m":   "conception du compte §8.3 dernier usage et « session récente » d'une session, clé t_v (SHA-256 du jeton), oublié 2 h sans usage",
-	"compte/service.go:refs": "conception du compte §21.6.2 salons du compte (GET salons) : ref aléatoire de 16 octets → h et identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants (et finis depuis moins de 10 min) de chaque compte ; perdue au redémarrage",
+	"compte/defis.go:parBloc": "part équitable des étapes WebAuthn : un entier par bloc, clé HMAC du jour du /48 (jamais le préfixe en clair) ou compte d'un ajout de passkey, retiré avec la dernière étape du bloc",
+	"compte/defis.go:m":       "conception du compte par passkey §6.2 cérémonies WebAuthn en cours (défi, rp.id, passkeys permises, h tiré, empreinte du pseudo réservé), clé SHA-256 du jeton d'étape, usage unique, 5 min, 20 000 au plus ; aucune sortie PRF ni clé",
+	"compte/sessions.go:m":    "conception du compte §8.3 dernier usage et « session récente » d'une session, clé t_v (SHA-256 du jeton), oublié 2 h sans usage",
+	"compte/service.go:refs":  "conception du compte §21.6.2 salons du compte (GET salons) : ref aléatoire de 16 octets → h et identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants (et finis depuis moins de 10 min) de chaque compte ; perdue au redémarrage",
 	// Tableau de bord des comptes.
 	"adminui/comptes.go:m": "conception du compte §21.14.3 salons signalés en cours (tableau de bord) : ref aléatoire de 16 octets → identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants signalés ; perdue au redémarrage",
 }

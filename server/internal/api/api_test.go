@@ -132,8 +132,16 @@ func (e *env) do(r req) *httptest.ResponseRecorder {
 	if r.remote != "" {
 		hr.RemoteAddr = r.remote
 	}
+	// Corps : application/json, comme le site (exigé des routes à corps JSON, jsonType) ; les
+	// segments l'ignorent. Un en-tête donné par le test l'emporte (vide : retiré).
+	if r.body != nil {
+		hr.Header.Set("Content-Type", "application/json")
+	}
 	for k, v := range r.hdr {
 		hr.Header.Set(k, v)
+	}
+	if hr.Header.Get("Content-Type") == "" {
+		hr.Header.Del("Content-Type")
 	}
 	w := httptest.NewRecorder()
 	e.h.ServeHTTP(w, hr)

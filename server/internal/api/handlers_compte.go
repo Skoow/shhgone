@@ -149,6 +149,9 @@ func (s *server) lireGros(w http.ResponseWriter, r *http.Request, v any, max int
 }
 
 func lireCorps(w http.ResponseWriter, r *http.Request, v any, max int64) error {
+	if !jsonType(r) { // avant toute lecture (readJSONMax le revérifie)
+		return errBadRequest
+	}
 	rc := http.NewResponseController(w)
 	if err := rc.SetReadDeadline(time.Now().Add(jsonReadTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		return errBadRequest

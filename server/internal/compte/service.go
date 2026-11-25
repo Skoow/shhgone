@@ -90,6 +90,7 @@ func NewService(c Config) (*Service, error) {
 		fermerSalons: c.FermerSalons, salonsActifs: c.SalonsActifs, salonsVivants: c.SalonsVivants,
 		detruireSalon: c.DetruireSalon, refs: map[[16]byte]refSalon{}}
 	s.et.m = map[[32]byte]*etape{}
+	s.et.parBloc = map[string]int{}
 	s.act.m, s.act.debut = map[[32]byte]activite{}, c.Now()
 	return s, nil
 }

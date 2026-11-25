@@ -87,6 +87,9 @@ func appel(t *testing.T, addr, method, path string, hdr map[string]string, body 
 	if err != nil {
 		t.Fatal(err)
 	}
+	if body != nil {
+		r.Header.Set("Content-Type", "application/json") // comme le site (corps JSON exigés ainsi)
+	}
 	for k, v := range hdr {
 		r.Header.Set(k, v)
 	}

@@ -17,8 +17,11 @@ const (
 	InscriptionsPer48 = 10
 	// InscriptionsDebutParHeure : inscription/debut par heure et par connexion (§7.2).
 	InscriptionsDebutParHeure = 20
-	// ConnexionsDebutParMinute : connexion/debut (défi sans preuve) par minute et par connexion.
-	ConnexionsDebutParMinute = 60
+	// ConnexionsDebutParMinute : connexion/debut (défi sans preuve) par minute et par connexion ;
+	// ConnexionsDebutPer48Minute : par bloc /48 (sans lui, un /48 découpé en /64 multipliait la
+	// limite par 65 536).
+	ConnexionsDebutParMinute   = 60
+	ConnexionsDebutPer48Minute = 180
 	// Échecs de connexion par passkey par heure, par connexion et par /48 (puis 429).
 	EchecsConnexionPer64 = 20
 	EchecsConnexionPer48 = 60
@@ -92,13 +95,13 @@ func (l *Limiter) NoterCompte(ip netip.Addr) {
 	l.insc48[k48]++
 }
 
-// AllowConnexionDebut : connexion/debut, 60 par minute par connexion, comptée à l'appel.
+// AllowConnexionDebut : connexion/debut, 60 par minute par connexion et 180 par /48, comptée à
+// l'appel.
 func (l *Limiter) AllowConnexionDebut(ip netip.Addr) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
-	k64, _ := l.keyLocked(ip)
-	return allowUnLocked(l.cnx64, k64, ConnexionsDebutParMinute)
+	return l.allowPairLocked(ip, l.cnx64, l.cnx48, ConnexionsDebutParMinute, ConnexionsDebutPer48Minute)
 }
 
 // AllowEchecConnexion : la connexion ip (et son /48) n'a pas encore 20 (60) échecs de

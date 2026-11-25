@@ -28,7 +28,7 @@ func TestCorpsJSONGoutteAGoutteCoupe(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer cn.Close()
-		fmt.Fprintf(cn, "POST /api/shares/unlock HTTP/1.1\r\nHost: x\r\nContent-Length: 4000\r\nX-Shh-Access: %s\r\n\r\n{", enc.EncodeToString(rnd(32)))
+		fmt.Fprintf(cn, "POST /api/shares/unlock HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 4000\r\nX-Shh-Access: %s\r\n\r\n{", enc.EncodeToString(rnd(32)))
 		conns = append(conns, cn)
 	}
 	// Goutte-à-goutte : un octet toutes les 200 ms, bien en dessous de tout débit utile.
@@ -78,7 +78,7 @@ func TestCorpsJSONEnDeuxMorceaux(t *testing.T) {
 	}
 	defer cn.Close()
 	body := `{"proof":"` + enc.EncodeToString(rnd(32)) + `"}`
-	fmt.Fprintf(cn, "POST /api/shares/unlock HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\nX-Shh-Access: %s\r\n\r\n%s",
+	fmt.Fprintf(cn, "POST /api/shares/unlock HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: %d\r\nX-Shh-Access: %s\r\n\r\n%s",
 		len(body), enc.EncodeToString(rnd(32)), body[:5])
 	time.Sleep(500 * time.Millisecond)
 	cn.Write([]byte(body[5:]))

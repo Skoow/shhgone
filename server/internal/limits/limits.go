@@ -40,6 +40,10 @@ const (
 	// RequestsPer48Min : requêtes par minute et par bloc /48 (un /56 résidentiel donne 256
 	// /64 ; sans ce plafond la limite par connexion ne bornait rien).
 	RequestsPer48Min = 600
+	// WebhooksPerMin, WebhooksPer48Min : webhooks de paiement par minute, par connexion et par
+	// /48 (AllowWebhook), 10 fois les requêtes ordinaires.
+	WebhooksPerMin   = 600
+	WebhooksPer48Min = 6000
 	// SegmentsPerMin : requêtes de segments à jeton valide par minute et par connexion,
 	// compteur à part ; valeur par défaut, réglable (SetSegmentsPerMin, SHH_SEGMENTS_PER_MIN).
 	// 1 500 segments de 4 Mio par minute ≈ 840 Mbit/s par expéditeur (600 plafonnait un envoi
@@ -173,8 +177,10 @@ type Limiter struct {
 	insc64, insc48                              map[string]int
 	inscD64, echec64, echec48, recup64, recup48 map[string]int
 	coffreCpt, pseudoCpt                        map[string]int
-	cnx64                                       map[string]int
-	bannirHeure                                 int // global, aucune clé
+	cnx64, cnx48                                map[string]int
+	// wh64, wh48 : webhooks de paiement de la minute (AllowWebhook), à part des requêtes.
+	wh64, wh48  map[string]int
+	bannirHeure int // global, aucune clé
 	// bytes64Max, bytes48Max : octets utiles par jour (BytesPer64, BytesPer48), ramenés à
 	// StorageMax / FairShare par SetStorage (part équitable du stockage).
 	bytes64Max, bytes48Max int64
@@ -368,7 +374,8 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.frame64 = map[string]int{}
 		l.frame48 = map[string]int{}
 		l.ppw64, l.ppw48 = map[string]int{}, map[string]int{}
-		l.cnx64 = map[string]int{}
+		l.cnx64, l.cnx48 = map[string]int{}, map[string]int{}
+		l.wh64, l.wh48 = map[string]int{}, map[string]int{}
 	}
 }
 
@@ -699,6 +706,18 @@ func (l *Limiter) AllowRequest(ip netip.Addr) bool {
 	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
 	return l.allowPairLocked(ip, l.req, l.req48, RequestsPerMin, RequestsPer48Min)
+}
+
+// AllowWebhook : webhook de paiement (POST /api/paiement/webhook/*), WebhooksPerMin par minute
+// et par connexion, WebhooksPer48Min par /48, à la place de AllowRequest : une rafale d'un
+// prestataire (qui envoie depuis peu d'adresses) ne reçoit plus de 429 de la limite des
+// requêtes. Le corps reste borné (corpsWebhook) et la signature vérifiée. Un refus n'est
+// compté nulle part.
+func (l *Limiter) AllowWebhook(ip netip.Addr) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.rotateLocked(l.now())
+	return l.allowPairLocked(ip, l.wh64, l.wh48, WebhooksPerMin, WebhooksPer48Min)
 }
 
 // AllowSegment : SegmentsPerMin requêtes de segments par minute (fenêtre fixe, réglable) et

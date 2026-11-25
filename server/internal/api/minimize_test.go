@@ -38,6 +38,11 @@ var compteHeaders = []string{"X-Shh-Session"}
 var paiementHeaders = []string{"X-Shh-Pass", "Stripe-Signature", "Paypal-Auth-Algo", "Paypal-Cert-Url", "Paypal-Transmission-Id",
 	"Paypal-Transmission-Sig", "Paypal-Transmission-Time", "X-Nowpayments-Sig"}
 
+// gardeHeaders : origine de la requête et type du corps, lus seulement dans api.go (guard,
+// crossSite, jsonType) pour refuser les requêtes d'un autre site ; seulement comparés à une
+// valeur fixe, jamais gardés, journalisés ni recopiés (§36 S2 à amender en conséquence).
+var gardeHeaders = []string{"Sec-Fetch-Site", "Content-Type"}
+
 // headerAllowed : en-tête name lisible dans le fichier path (readHeaders partout,
 // salonHeaders dans handlers_salon*.go seulement, compteHeaders dans handlers_compte.go
 // seulement).
@@ -45,7 +50,8 @@ func headerAllowed(path, name string) bool {
 	return slices.Contains(readHeaders, name) ||
 		slices.Contains(salonHeaders, name) && strings.HasPrefix(filepath.Base(path), "handlers_salon") ||
 		slices.Contains(compteHeaders, name) && filepath.Base(path) == "handlers_compte.go" ||
-		slices.Contains(paiementHeaders, name) && filepath.Base(path) == "handlers_paiement.go"
+		slices.Contains(paiementHeaders, name) && filepath.Base(path) == "handlers_paiement.go" ||
+		slices.Contains(gardeHeaders, name) && filepath.Base(path) == "api.go" && strings.HasSuffix(filepath.ToSlash(path), "internal/api/api.go")
 }
 
 // wsHeaders : poignée de main du WebSocket du salon (spec §39.3.1 « Origine »), lus seulement

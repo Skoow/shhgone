@@ -48,7 +48,7 @@ func (s *Service) InscriptionDebut(ip netip.Addr) ([32]byte, json.RawMessage, er
 	if s.plafondJourLocked(now) {
 		return [32]byte{}, nil, ErrBusy
 	}
-	jeton, err := s.nouvelleEtapeLocked(&etape{sorte: etapeInscription, h: h, defi: sd}, now)
+	jeton, err := s.nouvelleEtapeLocked(&etape{sorte: etapeInscription, h: h, defi: sd, bloc: s.blocIP(ip)}, now)
 	if err != nil {
 		return [32]byte{}, nil, err
 	}
@@ -162,7 +162,7 @@ func (s *Service) ConnexionDebut(ip netip.Addr) ([32]byte, json.RawMessage, erro
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	jeton, err := s.nouvelleEtapeLocked(&etape{sorte: etapeConnexion, defi: sd}, now)
+	jeton, err := s.nouvelleEtapeLocked(&etape{sorte: etapeConnexion, defi: sd, bloc: s.blocIP(ip)}, now)
 	if err != nil {
 		return [32]byte{}, nil, err
 	}
