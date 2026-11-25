@@ -45,7 +45,7 @@ type banc struct {
 	now time.Time
 }
 
-func nouveauBanc(t *testing.T) *banc {
+func nouveauBanc(t testing.TB) *banc {
 	t.Helper()
 	db, err := OuvrirBase(filepath.Join(t.TempDir(), "paiements.db"))
 	if err != nil {
@@ -72,7 +72,7 @@ func passN(n byte) Pass {
 var plusMois = Formule{Plus, JoursMois, true, Carte}
 
 // commander : commande créée, rend son identifiant (vu par le faux prestataire).
-func (b *banc) commander(t *testing.T, p Pass, f Formule) Commande {
+func (b *banc) commander(t testing.TB, p Pass, f Formule) Commande {
 	t.Helper()
 	u, err := b.s.Commander(context.Background(), p, f, "FR", true)
 	if err != nil || u != b.f.url {
@@ -81,7 +81,7 @@ func (b *banc) commander(t *testing.T, p Pass, f Formule) Commande {
 	return b.f.vu[len(b.f.vu)-1].Commande
 }
 
-func (b *banc) webhook(t *testing.T, evs ...Evenement) error {
+func (b *banc) webhook(t testing.TB, evs ...Evenement) error {
 	t.Helper()
 	b.f.evs = evs
 	return b.s.Webhook(context.Background(), b.f, nil, nil)

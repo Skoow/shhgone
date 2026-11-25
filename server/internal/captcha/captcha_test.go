@@ -28,7 +28,7 @@ func newCap(now *time.Time) *Captcha {
 }
 
 // solve trouve le nombre par force brute, comme le ferait le widget.
-func solve(t *testing.T, ch altcha.Challenge) int64 {
+func solve(t testing.TB, ch altcha.Challenge) int64 {
 	t.Helper()
 	for n := int64(0); n <= ch.MaxNumber; n++ {
 		h := sha256.Sum256([]byte(ch.Salt + strconv.FormatInt(n, 10)))

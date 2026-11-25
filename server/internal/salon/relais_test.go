@@ -31,7 +31,7 @@ const (
 )
 
 // membreDe : Membre du jeton reçu à l'entrée.
-func (b *banc) membreDe(t *testing.T, e Entree) Membre {
+func (b *banc) membreDe(t testing.TB, e Entree) Membre {
 	t.Helper()
 	mb, err := b.m.Membre(e.Jeton[:])
 	if err != nil {
@@ -41,7 +41,7 @@ func (b *banc) membreDe(t *testing.T, e Entree) Membre {
 }
 
 // entrerMembre : entrée puis Membre.
-func (b *banc) entrerMembre(t *testing.T, c cles, createur bool) (Entree, Membre) {
+func (b *banc) entrerMembre(t testing.TB, c cles, createur bool) (Entree, Membre) {
 	t.Helper()
 	e := b.entrer(t, c, createur)
 	return e, b.membreDe(t, e)
@@ -764,11 +764,10 @@ func TestPlafondTramesParSalon(t *testing.T) {
 	}
 }
 
-// Plafond GLOBAL des trames rangées en
-// mémoire, calé sur GOMEMLIMIT et partagé par tous les salons. Au-delà, 0x0C même si chaque
-// salon reste sous son plafond propre (sinon 200 salons pleins feraient tuer le processus
-// faute de mémoire) ; les volatiles passent ; un renouvellement, qui vide l'index d'un salon,
-// rend ses places au compte global.
+// Plafond GLOBAL des trames rangées en mémoire, calé sur GOMEMLIMIT et partagé par tous les salons.
+// Au-delà, 0x0C même si chaque salon reste sous son plafond propre (sinon 200 salons pleins
+// feraient tuer le processus faute de mémoire) ; les volatiles passent ; un renouvellement, qui
+// vide l'index d'un salon, rend ses places au compte global.
 func TestPlafondTramesGlobal(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	b.m.cfg.SalonFramesTotal = 5 // plafond global

@@ -67,7 +67,7 @@ func TestJetonsVecteursCommuns(t *testing.T) {
 }
 
 // client : côté appareil, avec circl (le moteur fait la même chose, vecteurs ci-dessus).
-func client(t *testing.T, spki []byte, emetteur string) (req []byte, finir func(sig []byte) []byte) {
+func client(t testing.TB, spki []byte, emetteur string) (req []byte, finir func(sig []byte) []byte) {
 	t.Helper()
 	k, err := x509.ParsePKCS1PublicKey(spki[len(spkiPrefixe):])
 	if err != nil {
@@ -93,7 +93,7 @@ func client(t *testing.T, spki []byte, emetteur string) (req []byte, finir func(
 	}
 }
 
-func bancJetons(t *testing.T) (*banc, *Jetons) {
+func bancJetons(t testing.TB) (*banc, *Jetons) {
 	b := nouveauBanc(t)
 	var err error
 	b.s, err = NewService(Config{DB: b.db, Now: func() time.Time { return b.now }, Origine: "https://shhgone.test", Regime: OSS,
@@ -122,7 +122,7 @@ func autreCle(t *testing.T, j *Jetons, spki []byte) []byte {
 	return nil
 }
 
-func clePour(t *testing.T, j *Jetons, o Offre, decalage int64) []byte {
+func clePour(t testing.TB, j *Jetons, o Offre, decalage int64) []byte {
 	cles, err := j.Cles()
 	if err != nil || len(cles) != 2*(JoursAvance+1) {
 		t.Fatal(err, len(cles))

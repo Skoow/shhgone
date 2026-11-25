@@ -46,7 +46,7 @@ type banc struct {
 }
 
 // nouveauBanc : base temporaire (shares.db), horloge figée au 12 novembre 2026, 10:07:30.
-func nouveauBanc(t *testing.T, max int) *banc {
+func nouveauBanc(t testing.TB, max int) *banc {
 	t.Helper()
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "shares.db"))
@@ -98,7 +98,7 @@ func reqValide(c cles) CreerReq {
 }
 
 // creer : salon valide de max membres.
-func (b *banc) creer(t *testing.T, max int) cles {
+func (b *banc) creer(t testing.TB, max int) cles {
 	t.Helper()
 	c := nouvellesCles()
 	r := reqValide(c)
@@ -121,7 +121,7 @@ func (b *banc) etat(t *testing.T, c cles) *salon {
 	return b.m.salons[id]
 }
 
-func (b *banc) entrer(t *testing.T, c cles, createur bool) Entree {
+func (b *banc) entrer(t testing.TB, c cles, createur bool) Entree {
 	t.Helper()
 	var g []byte
 	if createur {
