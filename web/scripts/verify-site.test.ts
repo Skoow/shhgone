@@ -1,7 +1,7 @@
 // verify-site.mjs (spec §28.4) : le site servi est-il exactement celui du manifeste ?
 // Les essais passent par un vrai serveur node:http sur 127.0.0.1, qui sert un dossier temporaire
 // comme le serveur Go (server/cmd/shhdrop/static.go) : variantes .br/.gz selon Accept-Encoding,
-// repli monopage en 404 avec les octets de index.html.
+// repli monopage en 404 avec les octets de app.html (index.html si le build n'en a pas).
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -80,7 +80,8 @@ async function serve(dir: string, opts: ServeOpts = {}): Promise<{ origin: strin
       }
       res.writeHead(200).end(readFileSync(join(dir, name)));
     } else if (!name.split("/").pop()!.includes(".")) {
-      res.writeHead(opts.fallbackStatus ?? 404, { "Content-Type": "text/html; charset=utf-8" }).end(readFileSync(join(dir, "index.html")));
+      const page = existsSync(join(dir, "app.html")) ? "app.html" : "index.html";
+      res.writeHead(opts.fallbackStatus ?? 404, { "Content-Type": "text/html; charset=utf-8" }).end(readFileSync(join(dir, page)));
     } else {
       res.writeHead(404).end("introuvable");
     }
@@ -93,6 +94,28 @@ async function serve(dir: string, opts: ServeOpts = {}): Promise<{ origin: strin
 const manifest = (dir: string): ReleaseManifest => manifestOf(dir, META);
 /** Requêtes vues pour un chemin : liste des Accept-Encoding. */
 const encodingsFor = (seen: Seen[], url: string) => seen.filter((s) => s.url === url).map((s) => s.headers["accept-encoding"]);
+
+describe("verifySite : page de l'application (app.html)", () => {
+  const APP_HTML = "<!doctype html><title>Shhdrop</title><div id=app></div>";
+  it("chemin inconnu comparé à app.html quand le manifeste la liste", async () => {
+    const d = tree({ "app.html": APP_HTML });
+    const { origin } = await serve(d);
+    expect(await verifySite(origin, manifest(d))).toEqual([]);
+  });
+  it("chemin inconnu qui rend index.html alors que app.html est listée : écart", async () => {
+    const d = tree({ "app.html": APP_HTML });
+    const m = manifest(d);
+    rmSync(join(d, "app.html"));
+    const { origin } = await serve(d, {
+      hook: (req, res) => {
+        if (req.url !== "/app.html") return false;
+        res.writeHead(200).end(APP_HTML);
+        return true;
+      },
+    });
+    expect((await verifySite(origin, m))[0]).toMatch(/^\/s\/x \(repli monopage\) : .*différente/);
+  });
+});
 
 describe("verifySite : site conforme", () => {
   it("aucun problème ; chaque fichier demandé sans cache, variantes par le chemin de base", async () => {

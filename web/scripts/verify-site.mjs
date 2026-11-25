@@ -18,9 +18,10 @@
 //      exécuter autre chose que le fichier vérifié en clair). L'adresse propre `x.br` répond
 //      aussi sur le serveur Go, mais aucune page ne la demande : elle n'est pas contrôlée.
 //      node:http et node:https sont utilisés directement : fetch décompresse sans le dire ;
-//   3. repli monopage : `/index.html`, `/`, `/s/x` et `/x` rendent les octets de index.html, en
-//      clair et dans chaque encodage listé pour index.html. Le serveur Go répond 404 à un chemin
-//      inconnu (`/s/x`, `/x`) avec le corps de index.html (pas de « soft 404 », static.go) :
+//   3. repli monopage : `/index.html` et `/` rendent les octets de index.html ; `/s/x` et `/x`
+//      ceux de app.html s'il est listé (sinon index.html), en clair et dans chaque encodage
+//      listé. Le serveur Go répond 404 à un chemin inconnu (`/s/x`, `/x`) avec le corps de cette
+//      page (pas de « soft 404 », static.go) :
 //      200 et 404 sont donc acceptés pour ces deux chemins, à octets identiques ; `/` et
 //      `/index.html` doivent répondre 200.
 //
@@ -40,8 +41,8 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const FALLBACKS = [
   { path: "/index.html", strict: true },
   { path: "/", strict: true },
-  { path: "/s/x", strict: false },
-  { path: "/x", strict: false },
+  { path: "/s/x", strict: false, app: true },
+  { path: "/x", strict: false, app: true },
 ];
 /** Extension de variante → jeton d'Accept-Encoding et de Content-Encoding. */
 const TOKENS = { br: "br", gz: "gzip" };
@@ -189,7 +190,7 @@ async function checkVariant(ctx, entry, base, token) {
   return null;
 }
 
-/** Repli monopage : mêmes octets que index.html (ou que sa variante si le serveur encode). */
+/** Repli monopage : mêmes octets que la page attendue (ou que sa variante si le serveur encode). */
 async function checkFallback(ctx, fallback, index, token, variant) {
   const r = await get(ctx, fallback.path, token ?? "identity", Math.max(index.size, variant?.size ?? 0) + 1);
   const bad = statusProblem(r.status, !fallback.strict);
@@ -228,17 +229,20 @@ export async function verifySite(origin, manifest, opts = {}) {
       }
       if (problem) return [`${entry.path} : ${problem}`];
     }
-    const index = byPath.get("index.html");
-    const encodings = [[null, null]];
-    for (const [ext, token] of Object.entries(TOKENS)) {
-      const variant = byPath.get(`index.html.${ext}`);
-      if (variant) encodings.push([token, variant]);
-    }
     for (const fallback of FALLBACKS) {
+      // Chemin inconnu : le serveur rend app.html (page de l'application sans l'accueil écrit
+      // au build), ou index.html si le build n'en a pas.
+      const name = fallback.app && byPath.has("app.html") ? "app.html" : "index.html";
+      const page = byPath.get(name);
+      const encodings = [[null, null]];
+      for (const [ext, token] of Object.entries(TOKENS)) {
+        const variant = byPath.get(`${name}.${ext}`);
+        if (variant) encodings.push([token, variant]);
+      }
       for (const [token, variant] of encodings) {
         let problem;
         try {
-          problem = await checkFallback(ctx, fallback, index, token, variant);
+          problem = await checkFallback(ctx, fallback, page, token, variant);
         } catch (e) {
           problem = e.message;
         }
