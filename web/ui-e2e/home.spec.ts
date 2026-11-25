@@ -119,13 +119,13 @@ test.describe("fr-FR", () => {
     // long (« s'autodétruit », question de la FAQ) débordait de 14 px dans la marge sans créer de
     // défilement ; dans WebKit, aux métriques un peu plus larges, il en créait un.
     // Le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi. Les sections en
-    // bande (.soft, .slab, .fondu) débordent exprès par leur décor (halo d'un bord à l'autre de l'écran,
+    // bande (.fondu) débordent exprès par leur décor (halo d'un bord à l'autre de l'écran,
     // coupé par #app) : leur contenu, lui, est vérifié. Les dessins SVG (mis à
     // l'échelle, sans texte de page) et la copie décorative du titre (.words, ses points qui partent
     // vers la droite, coupés par le titre) n'entrent pas dans cette mesure.
     const overflow = await page.evaluate(() =>
       [document.querySelector(".home")!, ...document.querySelectorAll(".home > *, .home section *")]
-        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".soft, .slab, .fondu, .home"))
+        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".fondu, .home"))
         .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0)
         .map((e) => `${e.tagName}.${(e as HTMLElement).className} ${e.scrollWidth} > ${e.clientWidth}`),
     );

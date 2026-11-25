@@ -324,72 +324,6 @@ html.kbd-open .dock {
   }
 }
 
-/* Sections de l'accueil (couleurs uniformisées, transitions
-   douces, sections rectangulaires d'un bord à l'autre). `.soft` : section sombre posée sur le fond de la page, une
-   lueur menthe très légère en haut, sans bord. `.slab` : plaque en relief, plus bas. */
-.soft,
-.slab {
-  position: relative;
-  isolation: isolate;
-}
-.soft::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset-block: 0;
-  left: 50%;
-  width: 100cqw;
-  translate: -50% 0;
-  pointer-events: none;
-  background: radial-gradient(50% 260px at 50% 0, rgb(95 227 181 / 0.06), transparent 75%);
-}
-/* Plaque en relief (« relief, matière, pictos ») : un peu plus claire que la
-   page, rectangulaire, d'un bord à l'autre de la fenêtre (aucun bord arrondi qui
-   laisse voir le fond) ; filet clair en haut, ombre portée dessous ; une matière par plaque (.dots
-   trame de points, .pictos papier peint maison, .fine trame fine). */
-.slab::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset-block: 0;
-  left: 50%;
-  width: 100cqw;
-  translate: -50% 0;
-  background:
-    var(--tex, none),
-    radial-gradient(70% 320px at 50% 0, rgb(95 227 181 / 0.07), transparent 75%),
-    linear-gradient(180deg, #151922, #0f1218);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.07),
-    inset 0 -1px 0 rgb(0 0 0 / 0.6),
-    0 30px 60px -30px rgb(0 0 0 / 0.9);
-  pointer-events: none;
-}
-.slab.dots {
-  --tex: radial-gradient(circle, rgb(233 236 242 / 0.06) 1.2px, transparent 1.8px) 0 0 / 12px 12px;
-}
-.slab.fine {
-  --tex: radial-gradient(circle, rgb(233 236 242 / 0.05) 0.9px, transparent 1.4px) 0 0 / 7px 7px;
-}
-/* Pictos : papier peint maison (assets/motif.svg, fichier statique, jamais en ligne), à très
-   faible contraste, sous une couche de la couleur de la plaque. */
-.slab.pictos {
-  --tex: linear-gradient(180deg, rgb(17 20 27 / 0.95), rgb(15 18 24 / 0.965)), url(../assets/motif.svg) 0 0 / 180px 180px repeat;
-}
-@media (forced-colors: active) {
-  .soft::before {
-    display: none;
-  }
-  .slab::before {
-    border: 1px solid CanvasText;
-  }
-}
-@media (prefers-contrast: more) {
-  .slab::before {
-    background: #0f1218;
-  }
-}
-
 /* Sections de l'accueil, lot 2 : `.fondu`, fond qui part du fond de la page et y revient (aucun
    bord), avec la lueur propre à la section (--lueur, --lueur-x, --lueur-y) et la trame de points du
    logo, très discrète, au milieu. `.fondu-biais` : coupure oblique douce (--pente : environ 3° sur
@@ -470,55 +404,6 @@ html.kbd-open .dock {
 @media (prefers-contrast: more) {
   .fondu::before {
     background: #0f1218;
-  }
-}
-
-/* En-tête des pages d'information et des offres (InfoPage, Offres) : titre et sous-titre dans
-   le bandeau (.titre-bandeau, ci-dessous), sur toute la largeur du contenu. Téléphone et
-   tablette : centrés. Grand écran (1100 px et plus) : alignés à gauche. */
-.page-card {
-  display: grid;
-  justify-items: center;
-  gap: var(--sp-4);
-  margin-block: var(--sp-3) var(--sp-2);
-  text-align: center;
-}
-.page-card > h1 {
-  margin: 0;
-  max-width: 20ch;
-  font-size: clamp(2.25rem, 1.3rem + 3.6vw, 4.25rem);
-  line-height: 1.02;
-  font-weight: 700;
-  font-stretch: var(--wd-display, 112%);
-  letter-spacing: -0.035em;
-  overflow-wrap: break-word;
-  min-width: 0;
-  text-wrap: balance;
-}
-.page-card > h1:focus {
-  outline: none;
-}
-.page-card > p {
-  margin: 0;
-  max-width: 58ch;
-  color: #b5c0da;
-  font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
-  line-height: 1.6;
-  text-wrap: pretty;
-}
-@media (min-width: 1100px) {
-  .page-card {
-    justify-items: start;
-    gap: var(--sp-5);
-    margin-block: var(--sp-6) var(--sp-3);
-    text-align: start;
-  }
-  .page-card > h1 {
-    max-width: 22ch;
-    font-size: clamp(3.5rem, 1.5rem + 3vw, 5rem);
-  }
-  .page-card > p {
-    max-width: 62ch;
   }
 }
 
