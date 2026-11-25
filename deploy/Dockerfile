@@ -62,7 +62,7 @@ COPY --from=engine /out/salon/pkg /salon/pkg
 COPY --from=engine /out/paiement/pkg /paiement/pkg
 
 # --- Site -------------------------------------------------------------------------------
-FROM node:26.13.0-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS web
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS web
 ENV TZ=UTC LANG=C.UTF-8 NPM_CONFIG_UPDATE_NOTIFIER=false NPM_CONFIG_FUND=false NPM_CONFIG_AUDIT=false
 # Hash court du commit construit, 7 à 40 chiffres hexadécimaux minuscules : sans lui, l'image
 # s'arrête ici (vite.config.ts, buildId, refuse aussi un build sans identifiant).
