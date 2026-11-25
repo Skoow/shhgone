@@ -22,6 +22,15 @@ func membreActuelLocked(s *salon, mb Membre, now time.Time) error {
 	return nil
 }
 
+// finAppelsLocked : fermeture effective des appels, jamais après la fin du salon (un
+// renouvellement peut la rapprocher : conception des appels §5). Sous s.mu.
+func finAppelsLocked(s *salon) time.Time {
+	if s.expires.Before(s.appelsJusqua) {
+		return s.expires
+	}
+	return s.appelsJusqua
+}
+
 // AppelsOuverts : temps restant avant la fermeture des appels du salon de mb (au moins une
 // seconde), ou faux s'ils sont fermés. Erreur si mb n'est plus membre (comme Membre).
 func (m *Manager) AppelsOuverts(mb Membre) (time.Duration, bool, error) {
@@ -35,7 +44,7 @@ func (m *Manager) AppelsOuverts(mb Membre) (time.Duration, bool, error) {
 	if err := membreActuelLocked(s, mb, now); err != nil {
 		return 0, false, err
 	}
-	reste := s.appelsJusqua.Sub(now)
+	reste := finAppelsLocked(s).Sub(now)
 	if reste < time.Second {
 		return 0, false, nil
 	}
@@ -58,7 +67,7 @@ func (m *Manager) OuvrirAppels(mb Membre) (reste time.Duration, deja bool, err e
 	if err := membreActuelLocked(s, mb, now); err != nil {
 		return 0, false, err
 	}
-	if r := s.appelsJusqua.Sub(now); r >= time.Second {
+	if r := finAppelsLocked(s).Sub(now); r >= time.Second {
 		return r, true, nil
 	}
 	s.appelsJusqua = s.expires

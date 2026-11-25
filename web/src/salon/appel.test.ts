@@ -110,7 +110,6 @@ class Monde {
   /** Sièges sans offre Plus ou Pro alors que les appels du salon sont fermés (24 novembre). */
   sansOffre = new Set<number>();
   refuseFace = new Set<string>();
-  refuseEcran = false;
   moteurOccupe = false;
   /** Sièges dont plus rien ne sort (onglet fermé sans prévenir). */
   muets = new Set<number>();
@@ -138,10 +137,6 @@ class Monde {
         const f = new FauxFlux([...(o.audio ? [piste("audio")] : []), ...(o.video ? [piste("video", o.face)] : [])]);
         this.locaux.set(siege, [...(this.locaux.get(siege) ?? []), f]);
         return f as unknown as MediaStream;
-      },
-      ecran: async () => {
-        if (this.refuseEcran) throw new Error("NotAllowedError");
-        return new FauxFlux([piste("video", "ecran")]) as unknown as MediaStream;
       },
       pair: (c) => {
         const pc = new FauxPC(c);
@@ -364,74 +359,6 @@ describe("appareils (ajouts du 21 novembre)", () => {
     a.quitter();
     expect(pistes.every((p) => p.onended === null)).toBe(true);
     expect(a.erreur).toBe(null);
-  });
-});
-
-describe("partage d'écran (21 novembre)", () => {
-  async function deux(video: boolean) {
-    const w = new Monde();
-    const a = w.membre(0);
-    const b = w.membre(1);
-    await a.rejoindre(video);
-    await b.rejoindre(false);
-    await w.avancer(5_000);
-    return { w, a, b };
-  }
-  const envoyee = (w: Monde) => w.pc(0).transceivers[1]?.sender.track as Piste | null;
-
-  it("l'écran remplace la caméra pour les autres, puis la caméra revient ; les autres voient une image", async () => {
-    const { w, a, b } = await deux(true);
-    const cam = envoyee(w);
-    expect(a.ecranPossible).toBe(true);
-    await a.partagerEcran();
-    await w.avancer(2_000);
-    expect(a.ecran).toBe(true);
-    expect(envoyee(w)?.face).toBe("ecran");
-    expect(a.fluxEcran).not.toBeNull();
-    // Caméra éteinte pendant le partage : l'écran reste envoyé.
-    await a.basculerCamera();
-    expect(envoyee(w)?.face).toBe("ecran");
-    await a.basculerCamera();
-    a.arreterEcran();
-    await w.avancer(2_000);
-    expect(a.ecran).toBe(false);
-    expect(envoyee(w)?.kind).toBe("video");
-    expect(envoyee(w)?.face).toBe("user");
-    expect(envoyee(w)).not.toBe(cam); // caméra rallumée entre-temps : nouvelle piste
-    expect(b.participants[0]?.video).toBe(true);
-  });
-
-  it("sans caméra : les autres voient l'image pendant le partage, plus rien après", async () => {
-    const { w, a, b } = await deux(false);
-    await a.partagerEcran();
-    await w.avancer(2_000);
-    expect(b.participants[0]?.video).toBe(true);
-    a.arreterEcran();
-    await w.avancer(2_000);
-    expect(envoyee(w)).toBeNull();
-    expect(b.participants[0]?.video).toBe(false);
-  });
-
-  it("refusé dans le sélecteur : rien ne change ; arrêté par le navigateur : la caméra revient", async () => {
-    const { w, a } = await deux(true);
-    const cam = envoyee(w);
-    w.refuseEcran = true;
-    await a.partagerEcran();
-    expect([a.ecran, envoyee(w)]).toEqual([false, cam]);
-    w.refuseEcran = false;
-    await a.partagerEcran();
-    const ecran = envoyee(w)!;
-    ecran.onended?.();
-    expect([a.ecran, envoyee(w)]).toEqual([false, cam]);
-  });
-
-  it("raccrocher pendant le partage : l'écran est arrêté aussi", async () => {
-    const { w, a } = await deux(false);
-    await a.partagerEcran();
-    const ecran = envoyee(w)!;
-    a.quitter();
-    expect(ecran.arretee).toBe(true);
-    expect(a.ecran).toBe(false);
   });
 });
 

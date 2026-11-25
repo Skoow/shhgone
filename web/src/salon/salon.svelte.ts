@@ -12,7 +12,7 @@ import { ClientSalon, type EvClient, type Fin } from "./client";
 import { Conversation, type Bulle, type PieceInfo } from "./conversation";
 import { Appel } from "./appel";
 import { offresAppel, relaisReserve } from "./appel-offre";
-import { AFFICHE_MAX, PIECE_MAX, causeLecture, envoyerPiece, lirePiece } from "./pieces";
+import { AFFICHE_MAX, PIECE_MAX, causeLecture, envoyerPiece, lectureDefinitive, lirePiece } from "./pieces";
 import { IMAGES_SURES, typeAffichage } from "./affichage";
 import { previewable } from "../media/dimensions";
 import { stripMetadata } from "../media/strip";
@@ -73,6 +73,8 @@ export const vue = $state({
   dansLeGroupe: false,
   /** Envoi retenu par le moteur depuis cet instant (exigence 23), ou null. */
   attenteDepuis: null as number | null,
+  /** Limite de trames du serveur (0x0B) : heure où l'envoi en attente repart (affichage seulement). */
+  ralentiJusqua: null as number | null,
   fin: null as Fin | null,
   membresPeuventDetruire: false,
   /** Créateur délogé : « Reprendre la main ici » est proposé (le lien lui-même n'est pas dans cet état : reprendreLaMain). */
@@ -207,7 +209,7 @@ export function oublier(): void {
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, reprise: false, appels: false, offreAppel: false, appelReserve: false, gestionCollee: null, detruireFin: null });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, ralentiJusqua: null, createur: false, reprise: false, appels: false, offreAppel: false, appelReserve: false, gestionCollee: null, detruireFin: null });
   lienReprise = null;
   oublierGestionCollee();
 }
@@ -501,10 +503,6 @@ function nouvelAppel(x: Session, c: ClientSalon): Appel {
         video: o.video ? { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 }, facingMode: o.face } : false,
       }),
     pair: (cfg) => new RTCPeerConnection(cfg),
-    // Partage d'écran (21 novembre) : seulement où le navigateur le permet (pas Safari sur iPhone).
-    ...(typeof navigator.mediaDevices?.getDisplayMedia === "function"
-      ? { ecran: () => navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { max: 15 }, width: { max: 1280 }, height: { max: 720 } }, audio: false }) }
-      : {}),
     flux: () => new MediaStream(),
     alea: () => crypto.getRandomValues(new Uint8Array(16)),
     maintenant: () => Date.now(),
@@ -595,6 +593,9 @@ function surEvenement(x: Session, ev: EvClient): void {
       break;
     case "attente":
       vue.attenteDepuis = ev.depuisMs;
+      break;
+    case "ralenti":
+      vue.ralentiJusqua = Date.now() + ev.secondes * 1000;
       break;
     case "connexion":
       vue.connexion = ev.etat;
@@ -881,7 +882,12 @@ export const fichiersOuverts = new SvelteSet<string>();
 export const masques = new SvelteSet<number>();
 /** Adresses blob: des pièces affichées (clé de la bulle → URL), révoquées à l'effacement. */
 export const pieces = $state({ urls: {} as Record<string, string>, erreurs: {} as Record<string, string>, aConfirmer: [] as File[], avertissement: "" });
-/** Nos fichiers d'origine (clé de bulle) : affichés et enregistrés sans les relire du serveur. */
+/**
+ * Pièces déjà en clair en mémoire (clé de bulle) : nos fichiers d'origine et les pièces affichées
+ * (image, vocal, vidéo). « Enregistrer » et « Télécharger (N) » s'en servent sans relire le
+ * serveur, ce qui ménage le budget de lecture du membre (2 lectures complètes par pièce : 429
+ * budget au-delà, définitif). Oubliées avec l'adresse blob: (`liberer`).
+ */
 const originaux = new Map<string, Blob>();
 let pieceLocale = 0;
 let fileDesEnvois: Promise<void> = Promise.resolve();
@@ -991,7 +997,7 @@ export async function afficherPiece(b: Bulle): Promise<void> {
   if (!x?.client || !p?.ref || pieces.urls[b.cle]) return;
   const mime = typeAffichage(p.sorte, p.mime);
   if (!mime || p.taille > (p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX)) return;
-  if (pieces.erreurs[b.cle] === "sortie") return; // plafond de sortie : définitif, aucun nouvel essai
+  if (lectureDefinitive(pieces.erreurs[b.cle])) return; // plafond de sortie ou budget de lecture : aucun nouvel essai
   try {
     const blob = await lirePiece(net(), x.client.jeton, p.ref, p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX);
     if (s !== x) return;
@@ -1001,6 +1007,7 @@ export async function afficherPiece(b: Bulle): Promise<void> {
       return;
     }
     if (s !== x) return;
+    originaux.set(b.cle, blob);
     pieces.urls[b.cle] = URL.createObjectURL(new Blob([blob], { type: mime }));
   } catch (e) {
     pieces.erreurs[b.cle] = causeLecture(e);
@@ -1012,7 +1019,7 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
   const x = s;
   const p = b.piece;
   if (!x?.client || !p) return;
-  if (pieces.erreurs[b.cle] === "sortie" && !originaux.has(b.cle)) return; // plafond de sortie : aucun nouvel essai
+  if (lectureDefinitive(pieces.erreurs[b.cle]) && !originaux.has(b.cle)) return; // refus définitif : aucun nouvel essai
   try {
     const blob = originaux.get(b.cle) ?? (p.ref ? await lirePiece(net(), x.client.jeton, p.ref) : null);
     if (!blob) return;
@@ -1037,7 +1044,7 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
  * zipName). 200 Mio au plus (l'archive est assemblée en mémoire). Chaque fichier envoie son
  * accusé « Téléchargé ». Rend null, ou le code d'erreur.
  */
-export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "lecture" | "indisponible" | "sortie" | null> {
+export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "lecture" | "indisponible" | "sortie" | "relu" | null> {
   const x = s;
   if (!x?.client || bs.length === 0) return "lecture";
   const choisies = bs.filter((b) => b.piece && !b.retire && (b.piece.ref || originaux.has(b.cle)));
@@ -1049,8 +1056,9 @@ export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "le
     abort: async () => void (parts.length = 0),
   });
   const pris = new Set<string>();
-  // Plafond de sortie déjà atteint pour une pièce choisie : aucun nouvel essai.
-  if (choisies.some((b) => pieces.erreurs[b.cle] === "sortie" && !originaux.has(b.cle))) return "sortie";
+  // Refus définitif déjà reçu pour une pièce choisie : aucun nouvel essai.
+  const refusee = choisies.find((b) => lectureDefinitive(pieces.erreurs[b.cle]) && !originaux.has(b.cle));
+  if (refusee) return pieces.erreurs[refusee.cle] as "sortie" | "relu";
   let courante: Bulle | undefined;
   try {
     for (const b of choisies) {
@@ -1072,7 +1080,7 @@ export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "le
   } catch (e) {
     await z.abort().catch(() => undefined);
     const c = causeLecture(e);
-    if (c === "sortie" && courante) pieces.erreurs[courante.cle] = "sortie";
+    if (lectureDefinitive(c) && courante) pieces.erreurs[courante.cle] = c;
     return c;
   }
   const url = URL.createObjectURL(new Blob(parts, { type: "application/zip" }));

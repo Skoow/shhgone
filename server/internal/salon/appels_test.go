@@ -101,3 +101,29 @@ func TestAppelsDerniereSeconde(t *testing.T) {
 		t.Fatalf("réouverture : %v %v", deja, err)
 	}
 }
+
+// Renouvellement qui raccourcit le salon (places-durée, révision du 13 novembre) : les appels
+// ouverts avant ne donnent jamais d'identifiants au-delà de la nouvelle fin du salon
+// (conception des appels §5 : « jamais au-delà de la fermeture des appels du salon, donc de sa fin »).
+func TestAppelsBornesParLaFinDuSalon(t *testing.T) {
+	b := nouveauBanc(t, 200)
+	c := b.creer(t, 4)
+	e := b.entrer(t, c, false)
+	mb, err := b.m.Membre(e.Jeton[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := b.m.OuvrirAppels(mb); err != nil {
+		t.Fatal(err)
+	}
+	s := b.etat(t, c)
+	nouvelle := b.h.Now().Add(time.Hour)
+	sous(s, func() { s.expires = nouvelle }) // comme un renouvellement pour 1 h
+	r, ok, err := b.m.AppelsOuverts(mb)
+	if err != nil || !ok || r != time.Hour {
+		t.Fatalf("après raccourcissement : %v %v %v", r, ok, err)
+	}
+	if r, deja, err := b.m.OuvrirAppels(mb); err != nil || !deja || r != time.Hour {
+		t.Fatalf("seconde ouverture : %v %v %v", r, deja, err)
+	}
+}

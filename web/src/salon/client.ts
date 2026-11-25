@@ -74,6 +74,8 @@ export type EvClient =
   | { k: "accepte"; local: number; id: Uint8Array; seq: number }
   | { k: "echec"; local: number; code: string }
   | { k: "attente"; depuisMs: number | null }
+  /** Limite de trames du serveur (0x0B) : l'envoi en attente repart tout seul dans `secondes` + 1 s. */
+  | { k: "ralenti"; secondes: number }
   | { k: "nouvelleEntree"; siege: number }
   /** Salon renouvelé (0x10) : tout ce qui est de rang ≤ `depart` est effacé, le groupe est recréé. */
   | { k: "renouvellement"; depart: number }
@@ -1033,6 +1035,7 @@ export class ClientSalon {
     f.relance?.();
     // Mêmes octets après le délai (relecture Task 16 du plan C-2) ; le 0x0B ne désigne pas la
     // trame refusée : c'est la seule en vol.
+    this.#emettre({ k: "ralenti", secondes: secondes + 1 });
     f.relance = this.#deps.horloge.plus_tard((secondes + 1) * 1000, () => {
       f.relance = undefined;
       if (this.#enVol !== f) return;

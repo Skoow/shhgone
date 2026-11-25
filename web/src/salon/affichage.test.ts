@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { typeAffichage } from "./affichage";
+import { ralentiRestant, typeAffichage } from "./affichage";
+
+describe("salon : limite de trames (0x0B)", () => {
+  it("secondes restantes arrondies au-dessus, au moins 1 ; rien avant ni après", () => {
+    expect(ralentiRestant(null, 1_000)).toBeNull();
+    expect(ralentiRestant(5_000, 5_000)).toBeNull();
+    expect(ralentiRestant(5_000, 6_000)).toBeNull();
+    expect(ralentiRestant(5_000, 4_999)).toBe(1);
+    expect(ralentiRestant(5_000, 0)).toBe(5);
+    expect(ralentiRestant(5_000, 100)).toBe(5);
+  });
+});
 
 describe("salon : type du Blob affiché (audit du 20 novembre)", () => {
   it("jamais le type annoncé s'il n'est pas dans la table sûre", () => {

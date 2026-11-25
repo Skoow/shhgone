@@ -69,12 +69,14 @@ Défense en profondeur sur les adresses IP : tout candidat qui n'est pas « rela
 
 Apps natives : les mêmes comportements existent dans les API du système (niveau audio, choix de caméra, écran allumé) ; rien à changer au protocole.
 
+**Partage d'écran : retiré le 25 novembre.** Un bouton « Partager l'écran » (`getDisplayMedia`) avait été codé sans figurer dans cette conception, et l'en-tête `Permissions-Policy` du site refuse `display-capture` (audit F3 : un script injecté ne doit pas pouvoir capturer l'écran) : le bouton ne pouvait qu'échouer. Le rouvrir demanderait une décision du propriétaire, puis `display-capture=(self)` et cette section.
+
 Débit : vidéo 640 × 360, 24 images par seconde, 500 kbit/s au plus vers chaque participant. File d'envoi de la signalisation cadencée sous la limite du serveur pour les trames volatiles.
 
 ## 5. Serveur (`server/internal/api/handlers_salon_appel.go`)
 
 - `POST /api/salons/appel` (en-tête `X-Shh-Membre`, corps `{}`, et facultatif `Authorization: PrivateToken token=<jeton>`) → `{urls, username, credential, ttl_s}`. Route absente sans relais configuré **ou sans paiement** (§5.1).
-- Identifiants temporaires TURN (« REST ») : nom = `<échéance>:<16 octets aléatoires>`, mot de passe = `base64(HMAC-SHA1(secret, nom))`. Le nom ne désigne ni salon, ni siège, ni compte. Valables 6 heures au plus, **jamais au-delà de la fermeture des appels du salon** (donc de sa fin). 20 demandes par heure et par membre (comptées avant toute dépense de jeton).
+- Identifiants temporaires TURN (« REST ») : nom = `<échéance>:<16 octets aléatoires>`, mot de passe = `base64(HMAC-SHA1(secret, nom))`. Le nom ne désigne ni salon, ni siège, ni compte. Valables 6 heures au plus, **jamais au-delà de la fermeture des appels du salon** (donc de sa fin ; un renouvellement qui raccourcit le salon raccourcit aussi les identifiants donnés ensuite, `finAppelsLocked`, corrigé le 25 novembre). 20 demandes par heure et par membre (comptées avant toute dépense de jeton).
 - `rejoindre` répond `calls: true` quand le relais **et** les jetons anonymes (paiement ouvert) sont configurés : le site n'affiche les boutons que dans ce cas.
 
 ### 5.1 Appels réservés aux offres Plus et Pro (décision du propriétaire, 24 novembre)

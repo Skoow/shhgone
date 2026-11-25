@@ -22,7 +22,6 @@ export { default as Share2 } from "./icons/Share2.svelte";
 export { default as QrCode } from "./icons/QrCode.svelte";
 export { default as RefreshCw } from "./icons/RefreshCw.svelte";
 export { default as SwitchCamera } from "./icons/SwitchCamera.svelte";
-export { default as ScreenShare } from "./icons/ScreenShare.svelte";
 export { default as Eye } from "./icons/Eye.svelte";
 export { default as EyeOff } from "./icons/EyeOff.svelte";
 export { default as Clock } from "./icons/Clock.svelte";
