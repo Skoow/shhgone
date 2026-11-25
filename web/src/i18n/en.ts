@@ -1240,7 +1240,7 @@ export const en = {
   "account.scene.envelope": "Encrypted envelope",
   "account.scene.server": "Shhgone",
   "account.scene.keeps": "keeps",
-  "account.scene.keeps.list": "the public keys of the passkeys, the encrypted envelopes (at most 4\u00a0per passkey) and the v_r fingerprint",
+  "account.scene.keeps.list": "your data, encrypted on your device (unreadable to it), the public keys of the passkeys, the encrypted envelopes (at most 4\u00a0per passkey), the v_r fingerprint and dates to the day",
   "account.scene.never": "never",
   "account.scene.never.list": "a passkey's PRF output, the recovery key or the account key",
   "account.steps": "Steps",

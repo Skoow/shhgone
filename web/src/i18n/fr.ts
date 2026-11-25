@@ -1245,7 +1245,7 @@ export const fr = {
   "account.scene.server": "Shhgone",
   // Mot pour mot : CLAUDE.md et conception du compte §8 (« il ne garde que… », « ne reçoit jamais… »).
   "account.scene.keeps": "garde",
-  "account.scene.keeps.list": "les clés publiques des passkeys, les enveloppes chiffrées (4\u202fau plus par passkey) et l'empreinte v_r",
+  "account.scene.keeps.list": "vos données chiffrées sur votre appareil (illisibles pour lui), les clés publiques des passkeys, les enveloppes chiffrées (4\u202fau plus par passkey), l'empreinte v_r et des dates au jour près",
   "account.scene.never": "jamais",
   "account.scene.never.list": "la sortie PRF d'une passkey, la clé de récupération ni la clé du compte",
   "account.steps": "Étapes",
