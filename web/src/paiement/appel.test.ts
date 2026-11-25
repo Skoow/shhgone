@@ -41,6 +41,15 @@ describe("offresAppel : lu sur l'appareil seulement", () => {
     await garderEtat(idb, id, { ...etat, droits: ["partage_plus"] });
     expect(await offresAppel(idb, MAINTENANT)).toEqual([]);
   });
+
+  it("commande en attente sur l'appareil, déjà dite payée par le serveur (état gardé) : compte", async () => {
+    const idb = fakeIndexedDB();
+    const id = await pass(idb, { enAttente: true });
+    await garderEtat(idb, id, { etat: "attente", offre: "plus", fin: null, renouvelle: false, droits: [], jour: "2026-11-24" });
+    expect(await offresAppel(idb, MAINTENANT)).toEqual([]);
+    await garderEtat(idb, id, { etat: "payee", offre: "plus", fin: "2026-12-20", renouvelle: true, droits: ["partage_plus", "appel_audio", "appel_video"], jour: "2026-11-24" });
+    expect(await offresAppel(idb, MAINTENANT)).toEqual(["plus"]);
+  });
 });
 
 describe("jetonAppel", () => {

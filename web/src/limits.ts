@@ -41,11 +41,12 @@ export const PENDING_MAX = 2;
  * Ouvertures et tailles : voir la décision du 17 novembre ci-dessous.
  */
 export type PaidTier = "plus" | "pro";
-export const PAID: Readonly<Record<PaidTier, { bytes: number; opens: number; ttlDays: readonly number[]; month: number; year: number }>> = {
+export const PAID: Readonly<Record<PaidTier, { bytes: number; opens: number; ttlDays: readonly number[]; shares: number; month: number; year: number }>> = {
   // Décisions du propriétaire : 16 novembre, Plus jusqu'à 3 jours, Pro 7 jours ; 17 novembre,
   // ouvertures gratuit 5, Plus 10, Pro 20, et Pro 30 Go (50 avant).
-  plus: { bytes: 10 * 1024 ** 3, opens: 10, ttlDays: [2, 3], month: 7, year: 70 },
-  pro: { bytes: 30 * 1024 ** 3, opens: 20, ttlDays: [2, 3, 7], month: 20, year: 200 },
+  // shares : partages payants (jetons) par période de 30 jours, sans report (offres.go, JetonsPeriod).
+  plus: { bytes: 10 * 1024 ** 3, opens: 10, ttlDays: [2, 3], shares: 30, month: 7, year: 70 },
+  pro: { bytes: 30 * 1024 ** 3, opens: 20, ttlDays: [2, 3, 7], shares: 100, month: 20, year: 200 },
 };
 
 /**

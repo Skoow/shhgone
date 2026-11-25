@@ -80,6 +80,13 @@ func setupPaiement(cfg config.Config) (*paiements, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := paiement.MarquerMode(db, p.Essai); err != nil {
+		db.Close()
+		if errors.Is(err, paiement.ErrBaseEssai) || errors.Is(err, paiement.ErrBaseReelle) {
+			return nil, shown(err.Error())
+		}
+		return nil, err
+	}
 	// Émetteur des jetons anonymes : l'hôte public du site (SHH_ORIGIN sans schéma ni port).
 	emetteur := strings.TrimPrefix(strings.TrimPrefix(cfg.Origin, "https://"), "http://")
 	if h, _, err := net.SplitHostPort(emetteur); err == nil {

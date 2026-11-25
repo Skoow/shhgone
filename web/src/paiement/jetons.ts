@@ -23,6 +23,7 @@ import { b64u } from "../engine/pure";
 import { jetonFinaliser, jetonPreparer } from "./moteur";
 import { emettre, lireCles, lireEtat, netParDefaut, type CleJetons, type Net, type OffrePayante } from "./api";
 import {
+  garder,
   garderCleVue,
   garderEtat,
   garderJeton,
@@ -79,6 +80,14 @@ export async function formulesDisponibles(idb: IDBFactory, n: Net = netParDefaut
         e = { ...lu, jour: auj };
         await garderEtat(idb, g.id, e).catch(() => undefined);
       }
+    }
+    if (e?.etat === "payee" && g.enAttente) {
+      // Paiement confirmé alors que la page de retour a été fermée avant (crypto, webhook
+      // tardif) : la commande n'est plus en attente, sans quoi ni jeton (reapprovisionner), ni
+      // appel, ni rangement dans le compte ne la prendraient (revue du 25 novembre). garder()
+      // oublie l'état gardé : il est rangé de nouveau.
+      await garder(idb, { ...g, enAttente: false }).catch(() => undefined);
+      await garderEtat(idb, g.id, e).catch(() => undefined);
     }
     if (e?.etat === "payee" && e.offre !== null && e.fin !== null && e.fin > auj) out.add(e.offre);
   }

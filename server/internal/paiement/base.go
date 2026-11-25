@@ -116,6 +116,49 @@ ALTER TABLE passes ADD COLUMN emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emi
 	return db, nil
 }
 
+// Mode de paiements.db (PRAGMA application_id, en-tête du fichier, gardé par VACUUM et donc par
+// la sauvegarde) : une base n'est ouverte que dans le mode où elle a été créée. Sans cela, les
+// pass « payés » en bac à sable avec des cartes de test (SHH_PAIEMENT_ESSAI=1, préproduction)
+// resteraient valables une fois les clés de production posées (revue du 25 novembre).
+const (
+	idReel  = 0x53485031 // « SHP1 »
+	idEssai = 0x53485445 // « SHTE »
+)
+
+// ErrBaseEssai, ErrBaseReelle : paiements.db créée dans l'autre mode ; messages fixes, sans valeur.
+var (
+	ErrBaseEssai = errors.New("paiements.db vient du mode essai (SHH_PAIEMENT_ESSAI=1 : pass payés avec des " +
+		"moyens de test) : refus de l'ouvrir en production ; serveur arrêté, déplacer data/paiements.db, -wal et -shm " +
+		"hors du volume avant de passer au réel (deploy/README.md §13.5)")
+	ErrBaseReelle = errors.New("paiements.db vient du mode réel (pass réellement payés) : refus de l'ouvrir en " +
+		"essai (SHH_PAIEMENT_ESSAI=1) ; ne jamais l'effacer, remettre SHH_PAIEMENT_ESSAI à 0")
+)
+
+// MarquerMode : base neuve (ou d'avant ce marquage, application_id 0) marquée du mode courant ;
+// base de l'autre mode refusée (ErrBaseEssai, ErrBaseReelle).
+func MarquerMode(db *sql.DB, essai bool) error {
+	var id int64
+	if err := db.QueryRow(`PRAGMA application_id`).Scan(&id); err != nil {
+		return fmt.Errorf("lecture du mode de paiements.db : %w", err)
+	}
+	voulu := int64(idReel)
+	if essai {
+		voulu = idEssai
+	}
+	switch id {
+	case voulu:
+		return nil
+	case 0:
+		_, err := db.Exec(fmt.Sprintf(`PRAGMA application_id=%d`, voulu))
+		return err
+	case idEssai:
+		return ErrBaseEssai
+	case idReel:
+		return ErrBaseReelle
+	}
+	return fmt.Errorf("paiements.db : application_id inconnu (%d) : refus d'ouvrir", id)
+}
+
 func serrer(chemin string) error {
 	for _, f := range []string{chemin, chemin + "-wal", chemin + "-shm"} {
 		if err := os.Chmod(f, 0o600); err != nil && !errors.Is(err, os.ErrNotExist) {

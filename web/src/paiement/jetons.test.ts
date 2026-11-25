@@ -68,6 +68,17 @@ describe("portefeuille de jetons", () => {
     expect(appels).toEqual([]);
   });
 
+  it("commande restée « en attente » sur l'appareil (page de retour fermée tôt), payée chez le serveur : rangée comme payée, état gardé", async () => {
+    const idb = fakeIndexedDB();
+    await garder(idb, { id: nouvelId(), pass: tirerPass(), offre: "plus", jours: 30, renouvelle: true, moyen: "crypto", enAttente: true, cree: 1 });
+    const { n, appels } = serveur();
+    expect(await formulesDisponibles(idb, n, MAINTENANT)).toEqual(["plus"]);
+    expect((await lirePasses(idb)).map((g) => g.enAttente)).toEqual([false]);
+    // L'état reste gardé pour la journée : aucune nouvelle demande.
+    expect(await formulesDisponibles(idb, n, MAINTENANT)).toEqual(["plus"]);
+    expect(appels.filter((a) => a.endsWith("/etat"))).toHaveLength(1);
+  });
+
   it("pass payé : Plus disponible ; révoqué : rien", async () => {
     const idb = fakeIndexedDB();
     await avecPass(idb);

@@ -88,6 +88,34 @@ func TestSetupPaiementRefus(t *testing.T) {
 	}
 }
 
+// TestSetupPaiementModeBase : une paiements.db créée en essai (préproduction) fait refuser le
+// démarrage en production, message dit à l'exploitant (revue du 25 novembre).
+func TestSetupPaiementModeBase(t *testing.T) {
+	cfg := cfgPaiement(t)
+	p, err := setupPaiement(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.db.Close()
+	sec := t.TempDir()
+	cfg.Pay.Essai = false
+	cfg.Pay.StripeCleFile = secretTest(t, sec, "s", "sk_live_cle")
+	p, err = setupPaiement(cfg)
+	if err == nil {
+		p.db.Close()
+		t.Fatal("base d'essai ouverte en production")
+	}
+	if msg := publicMessage(err); !strings.Contains(msg, "mode essai") {
+		t.Errorf("message %q", msg)
+	}
+	cfg.Pay.Essai = true
+	cfg.Pay.StripeCleFile = secretTest(t, sec, "t", "sk_test_cle")
+	if p, err = setupPaiement(cfg); err != nil {
+		t.Fatal("retour en essai :", err)
+	}
+	p.db.Close()
+}
+
 // TestRetourOffresServi : /offres/retour sert la page des Offres (aucune donnée dans l'adresse).
 func TestRetourOffresServi(t *testing.T) {
 	dir := t.TempDir()

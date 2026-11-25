@@ -27,11 +27,11 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   const sum = co.locator("[data-summary]");
   const go = sum.locator("[data-pay]");
   const pourquoi = sum.locator("[data-wait]");
-  // PayPal non configuré sur ce serveur : refus dit.
-  await co.locator('[data-means="paypal"]').click();
-  await expect(go).toBeDisabled();
-  await expect(pourquoi).toHaveText("Ce moyen de paiement n'est pas encore proposé.");
-  await co.locator('[data-means="card"]').click();
+  // Seuls les moyens de CE serveur sont montrés (revue du 25 novembre, conception §9.1) : PayPal
+  // n'y est pas configuré, et la crypto n'est pas proposée sous SHH_TVA=oss.
+  await expect(co.locator('[data-means="card"]')).toHaveCount(1);
+  await expect(co.locator('[data-means="paypal"]')).toHaveCount(0);
+  await expect(co.locator('[data-means="crypto"]')).toHaveCount(0);
   // Annuel par carte : paiement unique ou renouvellement, jamais présélectionné.
   await expect(co.locator("[data-renew] input:checked")).toHaveCount(0);
   await expect(pourquoi).toHaveText("Choisissez paiement unique ou renouvellement automatique.");
@@ -141,7 +141,7 @@ test("Retour : reçu, puis arrêt du renouvellement ; en attente ; sans commande
   await page.goto(shh.origin + "/offres/retour");
   await expect(page.locator('[data-return="attente"]')).toContainText("Paiement en attente");
   await expect(page.locator('[data-return="payee"]')).toContainText("Plus est enregistré sur cet appareil jusqu'au 19 décembre 2026.", { timeout: 15_000 });
-  await expect(page.locator('[data-return="payee"]')).toContainText("Les partages Plus et Pro ne sont pas encore ouverts");
+  await expect(page.locator('[data-return="payee"]')).toContainText("Pour vous en servir, choisissez Plus dans les options d'un nouvel envoi");
   expect(etats.every((x) => PASS.test(x))).toBe(true);
   expect(new Set(etats).size).toBe(1);
   // Note de vente, faite sur l'appareil (S4) : seul GET /api/paiement (régime de TVA du vrai
