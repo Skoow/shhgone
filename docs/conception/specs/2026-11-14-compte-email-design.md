@@ -825,6 +825,8 @@ Règles communes de §12 inchangées (étiquettes, `autocomplete`, `LiveRegion`,
 
 #### 21.15.1 Accueil connecté (`/`, avec session ; sinon l'accueil actuel)
 
+> **25 novembre (D42-27)** : remplacé, sur le site, par la page Compte réunie et le retrait de l'historique des liens (conception du compte par passkey §20).
+
 - **Téléphone (< 768 px)** : en-tête compact collé (verre au défilement) : avatar rond 36 px (photo ou initiale sur `--surface-3`, bouton vers le profil, `aria-label` « Profil ») à gauche, titre « Accueil » (`--fs-h2`), `IconButton` `search` à droite. Sous lui, **puces de filtre** `Segmented` défilables : « Tout », « Salons », « Reçus », « Envoyés » (`role="radiogroup"`). Puis la **liste** (`<ul>`), une ligne de 72 px par entrée :
   - à gauche, **pastille de 48 px** : salon → cercle `--surface-2` avec `messages-square` couleur ciel (#7CC4FF) ; partage reçu → `FormatIcon` de la sorte dominante ; partage envoyé → `FormatIcon` avec la petite flèche `arrow-up` ; autour, l'anneau de temps `TimeRim` (temps restant sur la durée) ;
   - au centre, deux lignes : titre (libellé local, `<bdi>`, une ligne, troncature en fin : « Salon · rejoint le 14 nov. », « Partage reçu · 6 éléments · 142 Mo », « Votre partage · 3 éléments ») ; sous-titre `--text-2` : « S'efface dans 4 h 12 » (`Countdown`) ou « Expiré » (`StateChip`) ou « Détruit » ;
@@ -844,6 +846,8 @@ Champs inchangés, plus : vérification du pseudo pendant la saisie (après 400 
 
 #### 21.15.3 Profil (`/compte/profil`)
 
+> **25 novembre (D42-27)** : remplacé, sur le site, par la page Compte réunie et le retrait de l'historique des liens (conception du compte par passkey §20).
+
 `AppShell`, colonne de 28 rem.
 - **Avatar** 96 px centré (photo ou initiale), boutons « Changer la photo » (`secondary`, ouvre `AvatarPicker` : recadrage carré, aperçu, ré-encodage 256 × 256, ≤ 64 Ko, sans métadonnées) et « Retirer » (`ghost`).
 - **Pseudo** : `TextField` avec vérification (« Disponible » / « Déjà pris ») et bouton « Enregistrer » ; indice : « Unique sur Shhgone. Proposé quand vous entrez dans un salon ; vous pouvez en changer pour chaque salon. » ; erreur `limit` : « Vous pourrez changer de pseudo demain. »
@@ -852,6 +856,8 @@ Champs inchangés, plus : vérification du pseudo pendant la saisie (après 400 
 - Bouton « Paramètres » (`secondary`, `chevron-right`).
 
 #### 21.15.4 Paramètres (`/compte`, remplace §12.4)
+
+> **25 novembre (D42-27)** : remplacé, sur le site, par la page Compte réunie et le retrait de l'historique des liens (conception du compte par passkey §20).
 
 Liste de sections (`<section aria-labelledby>`, titres `--fs-h3`), chaque réglage sur une ligne de 56 px (libellé, valeur ou `Switch`, `chevron-right` pour une sous-page) :
 1. **Profil** → `/compte/profil`.

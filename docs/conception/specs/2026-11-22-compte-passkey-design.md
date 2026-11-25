@@ -114,7 +114,7 @@ Sans passkey **ni** clé : compte **irrécupérable** (aucun e-mail, aucun séqu
 ### 3.6 Suppression du compte et export
 
 - **Supprimer** : écran de §21.12 inchangé (ce qui est supprimé, ce qui reste), case « Effacer aussi les données de cet appareil », **geste de passkey** à la place du mot de passe (session récente), `InlineConfirm`. Après : `signalUnknownCredential` pour chaque passkey du compte, puis « Compte supprimé. Supprimez aussi la passkey « {pseudo} » de votre gestionnaire si elle y est encore. »
-- **Exporter** : inchangé (§21.15.4, point 10), sans adresse ni double authentification ; s'ajoutent les passkeys (mois d'ajout, liée ou synchronisable, avec ou sans PRF ; jamais de clé publique utile à l'utilisateur, mais incluse en base64url pour la portabilité).
+- **Exporter** : **retiré le 25 novembre** (D42-27, §20). La route `GET export` reste au serveur, sans client (signalé : droit d'accès et de portabilité, avis d'un juriste).
 
 ---
 
@@ -174,7 +174,7 @@ Aucune construction maison. HKDF-SHA-256 du moteur Rust (RustCrypto `hkdf`, `sha
 ### 5.2 Création (côté appareil)
 
 1. `create` (§6.2) → si `prf.results.first` présent : `P` ; sinon si `prf.enabled` : `get` sur cette seule passkey (geste 2 bis) → `P` ; sinon : passkey sans PRF (§5.5).
-2. Tirer `K_compte`, `R`. Calculer `Env_i` (si `P`), `A_r`, `v_r`, `Env_r`, `B_profil` (pseudo, langue ; photo vide), `B_prive` (historique local si la personne l'accepte, sinon vide).
+2. Tirer `K_compte`, `R`. Calculer `Env_i` (si `P`), `A_r`, `v_r`, `Env_r`, `B_profil` (pseudo, langue ; photo vide), `B_prive` (vide ; listes de l'historique retirées, §19).
 3. Écrans 3 et 4, puis `inscription/fin`. Effacer `P`, `R`, `A_r`, `KEK_*` de la mémoire au mieux (§18.4).
 
 ### 5.3 Connexion
@@ -498,3 +498,14 @@ Ordre : P1 → S1 → S2 → W1 → W2 → T1 → D1, chaque lot avec ses tests 
 **Autres demandes du même jour (écrans du compte).**
 - *Téléphone, pages en panneaux* (`Cadre.svelte`) : le formulaire d'abord, centré dans la hauteur de l'écran sous l'en-tête, bouton principal visible dès l'arrivée (390 × 844 et 360 × 740) ; la scène passe dessous, réduite aux trois points forts ; le surtitre, la promesse et le sous-titre de l'inscription, qui redisaient ces points, ne sont pas montrés sur téléphone.
 - *Clé de récupération* (§3.1, écran 3 ; aussi pour une nouvelle clé, §3.5) : « Je l'ai notée » reste grisé (`aria-disabled`, focalisable) tant que ni « Copier » ni « Télécharger » n'a servi ; cliqué quand même, « Copiez ou téléchargez d'abord votre clé : sans elle, le compte peut être perdu. » (`role=status`) et le focus va sur « Copier ». **Signalement (faible, simplicité)** : qui recopie la clé à la main doit quand même cliquer « Copier » (un clic de plus) ; « Revoir la clé » ne fait pas perdre l'état.
+
+## 20. Page Compte réunie, historique des liens retiré (décision du propriétaire, 25 novembre ; D42-27)
+
+Remplace, pour le site, les écrans de la conception compte §21.15.1 (accueil connecté), §21.15.3 (Profil) et §21.15.4 (Paramètres), et §21.7 (listes du coffre privé).
+
+- **Une page `/compte`** (titre « Compte » ; `web/src/routes/compte/Compte.svelte`) ; `/compte/profil` y mène (adresse remplacée). Sections, dans l'ordre : **Profil** (photo, pseudo et « Enregistrer », carte « Votre compte » : ancienneté, palier, abonnement et « Voir les offres », bannissement ; note de confidentialité), **Passkeys**, **Clé de récupération**, **Appareils**, **Confidentialité** (« Proposer mon pseudo et ma photo dans les salons », « Historique des téléchargements sur cet appareil », « Rester connecté sur cet appareil »), **Vos données** (13 mois sans connexion ; « Effacer les données de cet appareil »), puis **« Se déconnecter »** (seul endroit du site) et « Supprimer le compte ». Plus de section « Abonnement » à part (dite dans la carte), plus de bouton « Paramètres » ni de lien « Voir et modifier le profil ».
+- **Carte « Votre compte »** : chargement (squelette), état, ou **erreur dans la carte avec « Réessayer »** ; une requête `GET /api/compte` sans réponse échoue au bout de 15 s. Avant, l'erreur partait dans un bandeau en haut de page et la carte restait en squelette (« comme en chargement »). Le bannissement montre aussi son identifiant (`{id}`, oublié jusque-là).
+- **Retirés** : accueil connecté (liste salons, reçus, envois ; bouton flottant « Nouveau » et sa feuille), « Garder les liens que j'ouvre » (`garder_recus` ignoré à la lecture, plus écrit), synchronisation des listes (`account/sync.ts`), destruction des partages connus à la suppression du compte, « Exporter mes données ». Les quatre listes du coffre privé restent dans son format, vides ; un coffre qui en porte encore est vidé à l'ouverture de session.
+- **Navigation** : en-tête (ordinateur) « Mon compte » → `/compte`, plus d'« Accueil » ni de « Mes partages » ; menu du téléphone : plus de « Nouveau partage » ni d'« Accueil », une seule entrée de compte « Mon compte » ; barre d'onglets (connecté seulement) : « Nouveau » (page d'envoi : c'est le bouton « Nouveau partage » du bas), « Fichiers » (Téléchargements), « Compte ».
+- **« Se déconnecter »** : retiré aussi de l'état « déjà connecté » de la page de connexion (`Connexion.svelte`) ; il ne reste que sur la page Compte.
+

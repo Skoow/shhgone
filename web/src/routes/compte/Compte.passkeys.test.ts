@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Page Compte, sections Passkeys, Clé de récupération et suppression (conception du compte par passkey §3.4 à §3.6, §19) :
+// Page Compte, sections Passkeys, Clé de récupération et suppression (conception du compte par passkey §3.4 à §3.6, §19, §20) :
 // sections (plus d'adresse, de mot de passe ni de double authentification), « Passkeys » (libellé,
 // mois, « liée à cet appareil », « ouvre vos données », « cette passkey », ajout, renommage,
 // retrait jamais de la dernière, confirmation par passkey si la session n'est plus récente),
