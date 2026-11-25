@@ -103,8 +103,11 @@ check "secrets : /run/secrets en lecture seule, hors de /data, jamais créé par
 	j '[.services.shhdrop.volumes[] | select(.target == "/run/secrets")] | length == 1 and .[0].read_only == true and .[0].bind.create_host_path == false and (.[0].source | endswith("/secrets"))' "$S"
 check "secrets : chemins seulement (…_FILE sous /run/secrets)" \
 	j '.services.shhdrop.environment.SHH_COMPTES_CLE_FILE == "/run/secrets/shh_comptes_cle"' "$S"
+# Exceptions : …_SHA256 (empreinte d'un jeton, jamais le jeton : tableau de bord, README §4) ;
+# SHH_PREPROD_JETON (jeton de la barrière de préproduction, donné à Caddy seul par deploy.sh depuis
+# /etc/shhdrop/preprod-jeton, vide hors préproduction ; risque faible assumé, README §15).
 check "aucune variable de secret en valeur (mot de passe, clé, jeton) : des chemins …_FILE seulement" \
-	j '[.services[] | .environment // {} | keys[] | select(test("PASSWORD|MDP|SECRET|TOKEN|CLE|KEY") and (endswith("_FILE") | not))] == []' "$S"
+	j '[.services[] | .environment // {} | keys[] | select(test("PASSWORD|MDP|SECRET|TOKEN|CLE|KEY|JETON") and (endswith("_FILE") or endswith("_SHA256") or . == "SHH_PREPROD_JETON" | not))] == []' "$S"
 
 # Appels (README §14) : relais TURN de notre image, profil « appels », réseau de la machine
 # (adresse publique) mais sans aucun accès au réseau interne du serveur ni au disque.
@@ -129,7 +132,7 @@ check "tous les profils : seuls les relais sont sur « sortie »" \
 	j '[.services | to_entries[] | select(.value.networks.sortie != null) | .key] == ["relais-nowpayments","relais-paypal","relais-stripe"]' "$T"
 check "tous les profils : aucun port publié" j '[.services[] | .ports // [] | length] | add == 0' "$T"
 check "tous les profils : aucune variable de secret en valeur" \
-	j '[.services[] | .environment // {} | keys[] | select(test("PASSWORD|MDP|SECRET|TOKEN|CLE|KEY|IPN|WEBHOOK_FILE") and (endswith("_FILE") | not))] == []' "$T"
+	j '[.services[] | .environment // {} | keys[] | select(test("PASSWORD|MDP|SECRET|TOKEN|CLE|KEY|JETON|IPN|WEBHOOK_FILE") and (endswith("_FILE") or endswith("_SHA256") or . == "SHH_PREPROD_JETON" | not))] == []' "$T"
 # shellcheck disable=SC2016 # filtre jq
 check "caddy : non root (65532), aucune capacité, no-new-privileges, lecture seule (D9, 22 novembre)" \
 	j '.services.caddy | .user == "65532:65532" and .cap_drop == ["ALL"] and (.cap_add // [] | length) == 0 and (.security_opt | index("no-new-privileges:true")) != null and .read_only == true' "$T"

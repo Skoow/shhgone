@@ -244,24 +244,38 @@ printf 'FROM node:1@sha256:%s\nFROM node:2@sha256:%s\n' "$(printf 'b%.0s' {1..64
 image_node "$work/Dockerfile2" >/dev/null 2>&1 && ko "image_node : deux images acceptées"
 : >"$FAUX_JOURNAL"
 verifier_site_servi "$work/docker" "$node_img" /r/web/scripts/verify-site.mjs /c/release.json exemple.test /ca.pem || ko "verify-site : échec inattendu"
-grep -qx -- "run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true --log-driver none --user 65532:65532 --add-host exemple.test:127.0.0.1 -v /r/web/scripts/verify-site.mjs:/v/verify-site.mjs:ro -v /c/release.json:/v/release.json:ro -v /ca.pem:/v/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/v/ca.pem --entrypoint node $node_img /v/verify-site.mjs https://exemple.test /v/release.json" "$FAUX_JOURNAL" ||
+grep -qx -- "run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true --log-driver none --user 65532:65532 --add-host exemple.test:127.0.0.1 -v /r/web/scripts/verify-site.mjs:/v/verify-site.mjs:ro -v /c/release.json:/v/release.json:ro -v /ca.pem:/v/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/v/ca.pem -e SHH_PREPROD_JETON --entrypoint node $node_img /v/verify-site.mjs https://exemple.test /v/release.json" "$FAUX_JOURNAL" ||
 	ko "verify-site : appel $(cat "$FAUX_JOURNAL")"
 FAUX_RUN=1 verifier_site_servi "$work/docker" "$node_img" /s /j exemple.test /ca && ko "verify-site : échec non rendu"
 
-# 12. deploy.sh : la provenance est vérifiée avant tout démarrage, sans option pour la sauter, et
-#     verify-site fait partie du contrôle (donc du retour arrière).
+# 12. deploy.sh : la provenance est vérifiée avant tout démarrage (mettre_en_service, commun.sh),
+#     sans option pour la sauter, et verify-site fait partie du contrôle (donc du retour arrière).
+#     Réglages de deploy/.env, contrôle et démarrage : deploy/commun.sh, partagé avec preprod.sh.
 d=$here/deploy.sh
+com=$here/commun.sh
 ligne() { grep -n -m1 -- "$1" "$d" | cut -d: -f1; }
+lignec() { grep -n -m1 -- "$1" "$com" | cut -d: -f1; }
 p=$(ligne 'verifier_provenance "$cosign"')
-u=$(ligne 'dc "$new" up -d --remove-orphans')
+u=$(ligne 'mettre_en_service "$new" "$new_v" "$new_c" "$mode"')
 [ -n "$p" ] && [ -n "$u" ] && [ "$p" -lt "$u" ] || ko "deploy.sh : verifier_provenance absent ou après le démarrage"
+if [ "$(cat "$d" "$com" "$here/preprod.sh" | grep -c 'dc "$new" up -d --remove-orphans')" != 1 ] ||
+	! grep -q 'dc "$new" up -d --remove-orphans' "$com"; then
+	ko "commun.sh : démarrage ailleurs que dans mettre_en_service"
+fi
+grep -q '^\. \./commun\.sh$' "$d" || ko "deploy.sh : commun.sh non chargé"
 grep -q 'controle_cosign "$cosign" "$COSIGN_SHA256"' "$d" || ko "deploy.sh : cosign non contrôlé par son empreinte"
-grep -q 'verifier_site_servi docker' "$d" || ko "deploy.sh : verify-site absent du contrôle"
-grep -qiE -- '--(no|skip|sans)-?(verif|provenance)|SHH_(SKIP|SANS)_|PROVENANCE=0' "$d" && ko "deploy.sh : option pour sauter la vérification"
-grep -qE '^\. \./provenance\.sh' "$d" || ko "deploy.sh : provenance.sh non chargé"
-e=$(ligne '^\. \./\.env')
-l=$(ligne '^\. \./provenance\.sh')
-[ -n "$e" ] && [ -n "$l" ] && [ "$e" -lt "$l" ] || ko "deploy.sh : provenance.sh chargé avant deploy/.env (constantes remplaçables)"
+grep -q 'verifier_site_servi docker' "$com" || ko "commun.sh : verify-site absent du contrôle"
+grep -qiE -- '--(no|skip|sans)-?(verif|provenance)|SHH_(SKIP|SANS)_|PROVENANCE=0' "$d" "$com" "$here/preprod.sh" && ko "deploy.sh : option pour sauter la vérification"
+grep -qE '^\. \./provenance\.sh' "$com" || ko "commun.sh : provenance.sh non chargé"
+e=$(lignec '^\. \./\.env')
+l=$(lignec '^\. \./provenance\.sh')
+[ -n "$e" ] && [ -n "$l" ] && [ "$e" -lt "$l" ] || ko "commun.sh : provenance.sh chargé avant deploy/.env (constantes remplaçables)"
+# preprod.sh n'emploie ni cosign ni l'image de la Release, et deploy.sh n'installe jamais une
+# image de préproduction.
+grep -qE 'cosign|verifier_image|docker pull' "$here/preprod.sh" && ko "preprod.sh : chemin de la Release mêlé à la préproduction"
+if ! grep -q 'preprod:\*)$' "$d" || ! grep -q 'deploy/preprod.sh \${1#preprod:}' "$d"; then
+	ko "deploy.sh : une image de préproduction n'est pas renvoyée à preprod.sh"
+fi
 
 # 13. Image : dépôt imposé, empreinte, image.json (forme exacte).
 [ "$PROVENANCE_IMAGE" = ghcr.io/skoow/shhgone ] || ko "PROVENANCE_IMAGE : $PROVENANCE_IMAGE"
@@ -482,12 +496,12 @@ ii=$(ligne 'docker image inspect "$SHH_IMAGE_REPO@$new"')
 cc=$(ligne 'controle_cosign "$cosign" "$COSIGN_SHA256"')
 [ -n "$vi" ] && [ -n "$pu" ] && [ -n "$ii" ] && [ -n "$cc" ] && [ "$cc" -lt "$vi" ] && [ "$vi" -lt "$pu" ] && [ "$vi" -lt "$ii" ] && [ "$vi" -lt "$p" ] ||
 	ko "deploy.sh : verifier_image absent ou après le téléchargement de l'image"
-[ "$(grep -c 'docker pull' "$d")" = 1 ] || ko "deploy.sh : autre docker pull"
-grep -qx 'SHH_IMAGE_REPO=${SHH_IMAGE_REPO:-$PROVENANCE_IMAGE}' "$d" || ko "deploy.sh : SHH_IMAGE_REPO sans défaut ghcr.io/skoow/shhgone"
-di=$(ligne '^depot_image_valide "$SHH_IMAGE_REPO" || exit 1$')
-[ -n "$di" ] && [ "$l" -lt "$di" ] && [ "$di" -lt "$vi" ] || ko "deploy.sh : SHH_IMAGE_REPO non contrôlé"
-grep -q 'SHH_IMAGE_REPO:?' "$d" && ko "deploy.sh : SHH_IMAGE_REPO encore exigé dans deploy/.env"
-grep -qiE -- '--(no|skip|sans)-?(verif|image|sign)|SHH_(SKIP|SANS)_|IMAGE_NON_SIGNEE' "$d" && ko "deploy.sh : option pour sauter la vérification de l'image"
+[ "$(cat "$d" "$com" "$here/preprod.sh" | grep -c 'docker pull')" = 1 ] || ko "deploy.sh : autre docker pull"
+grep -qx 'SHH_IMAGE_REPO=${SHH_IMAGE_REPO:-$PROVENANCE_IMAGE}' "$com" || ko "commun.sh : SHH_IMAGE_REPO sans défaut ghcr.io/skoow/shhgone"
+di=$(lignec '^depot_image_valide "$SHH_IMAGE_REPO" || exit 1$')
+[ -n "$di" ] && [ "$l" -lt "$di" ] || ko "commun.sh : SHH_IMAGE_REPO non contrôlé"
+grep -q 'SHH_IMAGE_REPO:?' "$d" "$com" && ko "deploy.sh : SHH_IMAGE_REPO encore exigé dans deploy/.env"
+grep -qiE -- '--(no|skip|sans)-?(verif|image|sign)|SHH_(SKIP|SANS)_|IMAGE_NON_SIGNEE' "$d" "$com" && ko "deploy.sh : option pour sauter la vérification de l'image"
 
 # 18. release.yml : image construite deux fois par construire-image.sh, publiée sur ghcr.io par
 #     le seul job qui en a le droit, signée, image.json signé et publié.

@@ -2,6 +2,8 @@ import type { ReleaseManifest } from "./release-manifest.mjs";
 export type VerifyOpts = {
   /** Durée maximale de chaque requête, en millisecondes (défaut : 15 000). */
   timeoutMs?: number;
+  /** En-têtes ajoutés à chaque requête (préproduction : X-Shh-Preprod, deploy/README.md §15). */
+  headers?: Record<string, string>;
 };
 /** Raison du refus de l'origine, ou null si elle est acceptée. */
 export declare function checkOrigin(origin: string): string | null;

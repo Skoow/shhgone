@@ -364,9 +364,9 @@ describe("refus avant toute requête", () => {
 
 describe("ligne de commande", () => {
   // spawn asynchrone : le serveur d'essai vit dans ce processus (spawnSync le bloquerait).
-  const run = (args: string[]) =>
+  const run = (args: string[], env: Record<string, string> = {}) =>
     new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve) => {
-      const p = spawn(process.execPath, [SCRIPT, ...args]);
+      const p = spawn(process.execPath, [SCRIPT, ...args], { env: { ...process.env, SHH_PREPROD_JETON: "", ...env } });
       let stdout = "";
       let stderr = "";
       p.stdout.on("data", (b) => (stdout += b));
@@ -386,6 +386,29 @@ describe("ligne de commande", () => {
     expect(r.stderr).toBe("");
     expect(r.status).toBe(0);
     expect(r.stdout).toMatch(/^verify-site : .* conforme à shhdrop-web 1\.2\.3 \(0123abc\), 9 fichiers\n$/);
+  });
+
+  it("préproduction : SHH_PREPROD_JETON envoyé en X-Shh-Preprod à chaque requête ; absent sans lui", async () => {
+    const d = tree();
+    const jeton = "a".repeat(64);
+    const avec = await serve(d);
+    const r = await run([avec.origin, saved(manifest(d))], { SHH_PREPROD_JETON: jeton });
+    expect(r.status).toBe(0);
+    expect(avec.seen.length).toBeGreaterThan(10);
+    expect(avec.seen.every((s) => s.headers["x-shh-preprod"] === jeton)).toBe(true);
+    const sans = await serve(d);
+    expect((await run([sans.origin, saved(manifest(d))])).status).toBe(0);
+    expect(sans.seen.some((s) => "x-shh-preprod" in s.headers)).toBe(false);
+  });
+
+  it.each(["court", "A".repeat(64), "a".repeat(65)])("préproduction : SHH_PREPROD_JETON hors format → sortie 2, aucune requête (%s)", async (jeton) => {
+    const d = tree();
+    const { origin, seen } = await serve(d);
+    const r = await run([origin, saved(manifest(d))], { SHH_PREPROD_JETON: jeton });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/SHH_PREPROD_JETON hors format/);
+    expect(r.stderr).not.toContain(jeton);
+    expect(seen).toEqual([]);
   });
 
   it("écart : sortie 1, une ligne qui nomme le chemin", async () => {

@@ -18,7 +18,8 @@
 #      mise à niveau WebSocket ; un WebSocket de /api/salons/ws, ouvert depuis l'adresse repère
 #      du client (couverte par la section 6), reste ouvert SALON_GARDE secondes (75 par défaut,
 #      au-delà de « idle 1m ») avec les pings du serveur, puis répond encore ; une origine
-#      étrangère ou absente reçoit 403 à travers Caddy (deploy/shhcheck/salonws_test.go, go test).
+#      étrangère ou absente reçoit 403 à travers Caddy (deploy/shhcheck/salonws_test.go, go test) ;
+#   8. barrière de préproduction (SHH_PREPROD=1) : deploy/test-preprod.sh, lancé à la fin.
 #
 # Ce qui n'est PAS prouvé ici : Docker (pilote de journal, réseau), journald, le vrai
 # certificat Let's Encrypt, un envoi complet de partage à travers Caddy (voir README), un
@@ -418,6 +419,15 @@ check "sortie standard de Caddy : vide" test ! -s "$srv/caddy-a.stdout"
 check "sortie d'erreur de Caddy : vide" test ! -s "$srv/caddy-a.stderr"
 [ -s "$srv/caddy-a.stderr" ] && { echo "sortie d'erreur de Caddy :"; cat "$srv/caddy-a.stderr"; }
 [ -n "$hits_txt$hits_raw" ] && printf 'fichiers en cause :\n%s\n' "$hits_txt$hits_raw"
+
+# --- 8. Barrière de préproduction (README §15) : banc à part, même Caddy ------------------------
+echo "--- barrière de préproduction (deploy/test-preprod.sh) :"
+if CADDY=$caddy PORT_BASE=$((base + 60)) "$here/test-preprod.sh" >"$cli/preprod.txt" 2>&1; then
+	ok "barrière de préproduction ($(grep -c '^ok' "$cli/preprod.txt") contrôles)"
+else
+	ko "barrière de préproduction"
+	grep -v '^ok' "$cli/preprod.txt" | sed 's/^/    /'
+fi
 
 echo
 if [ "$fails" -eq 0 ]; then

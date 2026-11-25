@@ -8,6 +8,8 @@ Caddy (TLS) devant le serveur Go, dans Docker. Références : spécification §8
 | `Dockerfile` | image du serveur : binaire Go statique + site, sur `scratch`, compte 65532 |
 | `compose.yaml` | les deux conteneurs (plus les relais du paiement et des appels, §13 et §14), en lecture seule, sans capacité, sans journal |
 | `deploy.sh` | installe une version par empreinte, après vérification de sa provenance (§3), contrôle, revient en arrière ; commandes d'administration |
+| `commun.sh` | partie commune de `deploy.sh` et `preprod.sh` : réglages, verrous, contrôles de la machine, démarrage, contrôle de santé, retour arrière |
+| `preprod.sh`, `maintenance.html`, `test-preprod.sh` | préproduction (§15) : version de développement construite sur le serveur, derrière la barrière du `Caddyfile` ; page servie au public ; banc d'essai de la barrière (lancé par `test-proxy.sh`) |
 | `provenance.sh`, `test-provenance.sh` | vérification de l'image (signée, liée au manifeste par `image.json`) et de la provenance du site (manifeste signé par cosign, spec §28.7), chargée par `deploy.sh` ; son banc d'essai, sans réseau (§3) |
 | `construire-image.sh` | build reproductible de l'image (`ghcr.io/skoow/shhgone`), lancé par `release.yml` sur deux machines et par qui veut refaire l'image (§3.2) |
 | `verrous.sh`, `test-verrous.sh` | verrous de mise en ligne V1 à V3 (commits signés par une clé autorisée, aucune histoire réécrite, commit confirmé par le propriétaire), chargés par `deploy.sh` ; leur banc d'essai, avec un dépôt et des clés SSH temporaires (§3.5) |
@@ -63,7 +65,7 @@ Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plu
 - **pas de mémoire d'échange** : `swapoff -a`, ligne retirée de `/etc/fstab` (`deploy.sh` refuse d'installer sinon) ;
 - **Caddy non root** (D9, 22 novembre) : dans `/etc/sysctl.d/60-shhdrop.conf`, `net.ipv4.ip_unprivileged_port_start=80`, puis `sysctl --system` (`deploy.sh` refuse d'installer sinon). Caddy tourne sous le compte 65532 sans aucune capacité et peut quand même écouter sur 80 et 443. Contrepartie : sur la machine elle-même, n'importe quel compte pourrait prendre 80 ou 443 pendant un redémarrage de Caddy ; la machine ne fait tourner que `sshd`, Docker, Caddy et le serveur (les conteneurs ont leur propre réseau), donc aucun compte ordinaire. Installation déjà faite : `chown -R 65532:65532 /srv/shhdrop/caddy` ;
 - **vidages mémoire coupés** : `kernel.core_pattern=|/bin/false` dans `/etc/sysctl.d/`, en plus de la limite posée sur les conteneurs. **Ubuntu : apport réécrit cette valeur à chaque démarrage**, après `/etc/sysctl.d/` (constaté le 25 novembre sur Ubuntu 26.04) : `systemctl mask apport.service apport-autoreport.path apport-autoreport.service apport-forward.socket`, `enabled=0` dans `/etc/default/apport`, puis `sysctl --system`. Vérifier après un redémarrage : `sysctl kernel.core_pattern` doit afficher `|/bin/false` (`deploy.sh` refuse sinon) ;
-- **Docker sans journal sur le disque par défaut** : `/etc/docker/daemon.json` contient `{ "log-driver": "none" }`, puis `systemctl restart docker` (`compose.yaml` le coupe déjà pour nos conteneurs ; ceci couvre tout conteneur lancé à la main ; `deploy.sh` refuse sinon). `docker-buildx-plugin` n'est utile que pour refaire l'image (`deploy/construire-image.sh`, §3.2) : `deploy.sh` ne construit rien ; `docker-ce-rootless-extras` peut être retiré ;
+- **Docker sans journal sur le disque par défaut** : `/etc/docker/daemon.json` contient `{ "log-driver": "none" }`, puis `systemctl restart docker` (`compose.yaml` le coupe déjà pour nos conteneurs ; ceci couvre tout conteneur lancé à la main ; `deploy.sh` refuse sinon). `docker-buildx-plugin` sert à refaire l'image (`deploy/construire-image.sh`, §3.2) et à la préproduction (`preprod.sh` construit l'image, §15) : `deploy.sh` ne construit rien ; `docker-ce-rootless-extras` peut être retiré ;
 - **journaux de la machine sans adresse IP sur le disque, et une heure au plus en mémoire** (inventaire des adresses IP du 22 novembre). `deploy.sh` **refuse d'installer** tant qu'un de ces réglages manque, et dit lequel et quoi faire (`journaux.sh`, banc d'essai `test-journaux.sh`) :
   - **pas de syslog** : sur Ubuntu, `rsyslog` est installé et actif par défaut ; il recopie le journal dans `/var/log/auth.log` (adresse de chaque connexion SSH, réussie ou non), `kern.log`, `ufw.log` et `syslog`, **sur le disque**, même avec journald en mémoire. `apt purge rsyslog` (ou `syslog-ng`), puis `rm -f /var/log/auth.log* /var/log/syslog* /var/log/kern.log* /var/log/ufw.log* /var/log/messages*`. Ce qui a déjà été écrit peut rester dans les blocs libérés du disque système (non chiffré) : faire ces réglages avant d'ouvrir SSH au public, ou réinstaller la machine si le doute compte ;
   - **journald en mémoire, une heure au plus** : fichier `/etc/systemd/journald.conf.d/60-shhdrop.conf` :
@@ -344,7 +346,7 @@ Le lien signalé ne se donne **jamais** en argument (il irait dans l'historique 
 ### Surveillance (22 novembre)
 
 - **Sonde externe** (`.github/workflows/sonde.yml`) : toutes les 15 min, GitHub vérifie que l'accueil répond en HTTPS et que le certificat a encore au moins 14 jours (Caddy n'écrit aucun journal : un renouvellement raté ne se verrait pas autrement). Un échec : e-mail de GitHub. À activer après la mise en ligne : variable du dépôt `SHH_SONDE_HOTE` (ex. `shhgone.com`).
-- **Code servi** (`.github/workflows/verifier-site.yml`, 24 novembre ; spec §28.7) : toutes les heures, GitHub prend les trois dernières Releases `web-v<x.y.z>`, vérifie la signature de chaque manifeste (cosign épinglé, identité exacte de §3.2), puis lance `web/scripts/verify-site.mjs` contre `https://$SHH_SONDE_HOTE` : chaque fichier, ses variantes compressées et le repli monopage doivent être ceux de l'une d'elles (la plus récente, ou l'une des deux d'avant, pour le temps d'une mise en ligne ou d'un retour arrière). Un écart, une signature refusée ou une erreur réseau : échec, donc e-mail de GitHub (jamais « vert » sur une erreur). Inactive, comme la sonde, tant que `SHH_SONDE_HOTE` n'est pas posée, et sans Release. Limites : il ne voit que ce que le serveur lui sert (un serveur compromis peut piéger une seule victime, selon son adresse ou son navigateur) ; un retour à une des deux versions d'avant passe sans alerte (le journal dit laquelle est servie) ; les en-têtes ne sont pas contrôlés.
+- **Code servi** (`.github/workflows/verifier-site.yml`, 24 novembre ; spec §28.7) : toutes les heures, GitHub prend les trois dernières Releases `web-v<x.y.z>`, vérifie la signature de chaque manifeste (cosign épinglé, identité exacte de §3.2), puis lance `web/scripts/verify-site.mjs` contre `https://$SHH_SONDE_HOTE` : chaque fichier, ses variantes compressées et le repli monopage doivent être ceux de l'une d'elles (la plus récente, ou l'une des deux d'avant, pour le temps d'une mise en ligne ou d'un retour arrière). Un écart, une signature refusée ou une erreur réseau : échec, donc e-mail de GitHub (jamais « vert » sur une erreur). Inactive, comme la sonde, tant que `SHH_SONDE_HOTE` n'est pas posée, et sans Release. Limites : il ne voit que ce que le serveur lui sert (un serveur compromis peut piéger une seule victime, selon son adresse ou son navigateur) ; un retour à une des deux versions d'avant passe sans alerte (le journal dit laquelle est servie) ; les en-têtes ne sont pas contrôlés. **Préproduction (§15)** : tant que le site rend exactement la page de maintenance (503, marqueur `X-Shhdrop-Etat: maintenance`, corps de `deploy/maintenance.html`), ce job conclut « préproduction, rien à vérifier » sans échouer, et la sonde accepte ce 503 ; tout autre écart reste une erreur. **Trou assumé, à retirer à l'ouverture** (§15.5, risque PP3).
 - **Alerte de la machine** (`deploy/alerte.sh`, minuteur `systemd/shhdrop-alerte.timer`, toutes les 15 min ; banc d'essai `deploy/test-alerte.sh`, en CI) : e-mail à `SHH_ALERTE_A` (dans `deploy/.env`, par exemple `contact@shhgone.com`) pour prévenir **avant** que le problème n'arrive. Chaque sujet revient au plus une fois par période : 1 h pour l'urgent, 1 jour ou 7 jours pour ce qui se prévoit.
   - **URGENT** : machine redémarrée (accès possible : vérifier avant de déverrouiller) ; volume chiffré verrouillé ; certificat inconnu dans les journaux publics ; serveur muet ; 5 signalements dans l'heure ; conteneur malade ; disque (données ou système) ou inodes à 90 % ; mémoire disponible sous 10 % ; certificat TLS à moins de 7 jours ; domaine ou location du serveur à moins de 7 jours de l'échéance ; nom de domaine qui ne pointe plus vers la machine (détournement, expiration) ; aucune sauvegarde réussie depuis 26 h ; disque qui annonce une panne (`smartctl`, paquet `smartmontools`).
   - **À prévoir** : disque à 75 %, ou plein dans moins de 14 jours au rythme du jour ; certificat à moins de 21 jours (Caddy renouvelle à 30 : le renouvellement échoue) ; domaine ou location à moins de 45 jours ; échéance du domaine illisible ; mises à jour de sécurité du système en attente ; redémarrage demandé ; commits de retard sur GitHub (correctif à déployer) ; horloge non synchronisée ; unité systemd en échec ; charge trop haute.
@@ -443,6 +445,7 @@ Le site reste hors service tant que le volume n'est pas déverrouillé (les cont
 cryptsetup open /dev/sdb shhdrop
 mount -o noatime,nodev,nosuid,noexec /dev/mapper/shhdrop /srv/shhdrop
 deploy/deploy.sh "$(cat deploy/.release)"   # provenance et verrous revérifiés (§3.4, §3.5)
+# Préproduction (deploy/.release commence par « preprod: ») : deploy/preprod.sh "$(cat deploy/.release.commit)" (§15)
 ```
 
 ## 6. Plan d'incident (§15.5)
@@ -516,8 +519,9 @@ docker run --rm --network host --log-driver none -v /etc/ssl/certs/ca-certificat
 ## 8. Tester le kit
 
 ```sh
-CADDY=/chemin/vers/caddy deploy/test-proxy.sh     # Caddy 2.10 ou plus, curl 7.83 ou plus, Go, web/dist construit (≈ 2 min 30 : WebSocket gardé 75 s)
-make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux, de l'image et de la provenance (Node exigé) et des verrous (git, ssh-keygen), go vet et tests de shhcheck
+CADDY=/chemin/vers/caddy deploy/test-proxy.sh     # Caddy 2.10 ou plus, curl 7.83 ou plus, Go, python3, web/dist construit (≈ 2 min 30 : WebSocket gardé 75 s) ; lance aussi test-preprod.sh (barrière, §15)
+CADDY=/chemin/vers/caddy deploy/test-preprod.sh   # barrière de préproduction seule (≈ 10 s)
+make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux, de l'image et de la provenance (Node exigé) et des verrous (git, ssh-keygen ; partie préproduction de preprod.sh en root seulement : sudo deploy/test-verrous.sh), go vet et tests de shhcheck
 SHH_IMAGE=shhdrop:ci make test-sortie             # sorties : configuration, puis réseau réel (démon Docker ; code 3 sans démon)
 sudo make test-restauration                       # sauvegarde et restauration d'un compte de test, en mémoire (≈ 45 s)
 ```
@@ -785,12 +789,14 @@ But : payer « pour de faux » sur `https://shhgone.com` (barrière d'accès de 
 
 **Les secrets ne passent jamais par le chat, le dépôt ni `deploy/.env`** : le propriétaire les tape lui-même sur le serveur, dans un fichier par secret (commande du §13.2 : `umask 077`, coller, Ctrl-D, puis `chown 65532:65532` et `chmod 0400` ; compte 65532 parce que c'est lui qui fait tourner le serveur et doit les lire). `deploy/.env` ne reçoit que des réglages publics (identifiants PayPal, régime de TVA).
 
-**1. Interrupteurs** (dans `deploy/compose.yaml`, commité, jamais dans `deploy/.env`) : le jour où les secrets d'au moins un prestataire sont en place, et seulement alors (sans secret, `deploy.sh` refuse d'installer) :
+**1. Interrupteurs** : le jour où les secrets d'au moins un prestataire sont en place, et seulement alors (sans secret, `deploy.sh` refuse d'installer). **En préproduction** (`SHH_PREPROD=1`, §15), sans commit, dans `deploy/.env` (refusés sans la barrière ; `compose.yaml` garde les valeurs de production, `"0"`) :
 
-```yaml
-      SHH_PAIEMENT: "1"
-      SHH_PAIEMENT_ESSAI: "1"
+```sh
+SHH_PREPROD_PAIEMENT=1
+SHH_PREPROD_PAIEMENT_ESSAI=1
 ```
+
+puis `deploy/preprod.sh <commit>` (ou `deploy.sh` avec la Release). Hors préproduction, ils se règlent dans `compose.yaml` (commité) : `SHH_PAIEMENT: "${SHH_PAIEMENT_SERVI:-1}"` (le chiffre après `:-` est la valeur ; `SHH_PAIEMENT_SERVI` est posée par `deploy.sh` seulement). **`SHH_PAIEMENT_ESSAI=1` sans `SHH_PREPROD=1` est refusé par `deploy.sh`** (en essai, toute carte de test « paie »).
 
 **2. `deploy/.env`** :
 
@@ -819,11 +825,11 @@ But : payer « pour de faux » sur `https://shhgone.com` (barrière d'accès de 
   - Adresse IPN : rien à déclarer, le serveur la donne à chaque facture (`https://shhgone.com/api/paiement/webhook/nowpayments`) ; si le tableau de bord en demande une par défaut, mettre la même.
   - Le bac à sable ne transfère aucune monnaie : suivre sa documentation pour simuler un paiement « finished » (ou partiel, ou expiré). Un paiement partiel reste « en attente » (jamais crédité, §8 de la conception).
 
-**4. Webhooks et barrière de la préproduction** : les trois adresses `https://shhgone.com/api/paiement/webhook/{stripe,paypal,nowpayments}` doivent **passer la barrière d'accès** (les prestataires n'ont pas le mot de passe) ; tout le reste, `/offres/retour` compris, reste derrière (le navigateur de l'essayeur l'a déjà ouverte). Sans cette exception, les webhooks reçoivent 401 et aucun paiement ne s'active (la page reste « Paiement en attente »).
+**4. Webhooks et barrière de la préproduction** : les trois adresses `https://shhgone.com/api/paiement/webhook/{stripe,paypal,nowpayments}` passent la barrière (POST, chemins exacts, `Caddyfile`, prouvé par `test-preprod.sh`) : les prestataires n'ont pas le témoin ; leur signature est vérifiée par le serveur. Tout le reste, `/offres/retour` compris, reste derrière : le témoin de la préproduction (SameSite=Lax) est envoyé au retour depuis Stripe ou PayPal (navigation de premier niveau). Sans cette exception, les webhooks recevraient la page de maintenance (503) et aucun paiement ne s'activerait.
 
-**5. Contrôles** après `deploy.sh` : `curl -s https://shhgone.com/api/paiement` (avec l'identifiant de la barrière) rend `"moyens":["carte",…]` ; un webhook mal signé est refusé (`curl -s -o /dev/null -w '%{http_code}' -X POST https://shhgone.com/api/paiement/webhook/stripe -d '{}'` : **400**, pas 401 ni 404) ; puis, sur la page Offres : payer, revenir sur « Paiement reçu », faire un envoi Plus ou Pro (Options), arrêter le renouvellement (lien « Une offre est gardée sur cet appareil » de la page Offres), rembourser depuis le tableau de bord → « Offre arrêtée ». Le tableau de bord de chaque prestataire montre l'état de livraison de chaque webhook (code de réponse de notre serveur).
+**5. Contrôles** après `deploy.sh` : `curl -s -H "X-Shh-Preprod: $(cat /etc/shhdrop/preprod-jeton)" https://shhgone.com/api/paiement` (sur le serveur, en root ; jeton de la barrière, §15) rend `"moyens":["carte",…]` ; un webhook mal signé est refusé (`curl -s -o /dev/null -w '%{http_code}' -X POST https://shhgone.com/api/paiement/webhook/stripe -d '{}'` : **400**, ni 503 ni 404) ; puis, sur la page Offres : payer, revenir sur « Paiement reçu », faire un envoi Plus ou Pro (Options), arrêter le renouvellement (lien « Une offre est gardée sur cet appareil » de la page Offres), rembourser depuis le tableau de bord → « Offre arrêtée ». Le tableau de bord de chaque prestataire montre l'état de livraison de chaque webhook (code de réponse de notre serveur).
 
-**Attention, essai ouvert au public** : en essai, n'importe quelle carte de test « paie ». Ne jamais retirer la barrière d'accès tant que `SHH_PAIEMENT_ESSAI: "1"`.
+**Attention, essai ouvert au public** : en essai, n'importe quelle carte de test « paie ». Ne jamais retirer la barrière d'accès tant que l'essai est actif : `deploy.sh` et `preprod.sh` refusent `SHH_PAIEMENT_ESSAI=1` sans `SHH_PREPROD=1`.
 
 ### 13.5 Passer du test au réel
 
@@ -853,3 +859,95 @@ Réglages facultatifs, dans `deploy/.env` :
 - `SHH_TURN_IP` : adresse IPv4 publique, si la machine est derrière un routeur (l'adresse détectée serait privée : le relais refuse alors de démarrer et le dit). Rediriger alors 3478 et 49160 à 49999 vers la machine ;
 - `SHH_TURN_ALLOCATIONS` (60) et `SHH_TURN_KBPS` (2 500) : allocations simultanées et débit par allocation. Un appel vidéo à 6 en prend 30 à environ 500 kbit/s ; les valeurs par défaut plafonnent le relais à environ 150 Mbit/s ;
 - `SHH_APPELS=0` : coupe les appels (relais arrêté, aucune route ni bouton d'appel).
+
+## 15. Préproduction : site fermé au public, version de développement
+
+Le serveur de production tourne **avant l'ouverture** sur `https://shhgone.com`, mais **le public ne voit qu'une page « en cours de maintenance »**. Le propriétaire, lui, a le vrai site, pour essayer ce qui ne marche que sur le vrai domaine : passkeys (identifiant `shhgone.com`), retours et webhooks de Stripe, PayPal et NOWPayments (§13.4), appels. Et il installe une version de développement en quelques minutes, sans attendre une Release signée.
+
+| Élément | Où |
+|---|---|
+| barrière | `Caddyfile`, snippets `barriere-0` (production : rien) et `barriere-1` (préproduction), choisis par `SHH_PREPROD` |
+| page servie au public | `maintenance.html` (HTML et CSS en ligne, aucun script ni ressource externe), montée dans Caddy |
+| jeton d'accès | `/etc/shhdrop/preprod-jeton` : 64 chiffres hexadécimaux, root 0600, **jamais dans git, dans `deploy/.env` ni dans un message** |
+| version de développement | `preprod.sh <commit>` ; partie commune avec `deploy.sh` : `commun.sh` |
+| essais | `test-preprod.sh` (barrière, lancé par `test-proxy.sh`), `test-verrous.sh` §14 (`preprod.sh`, jeton, réglages), `test-provenance.sh` §12 et §17 |
+
+### 15.1 Ce que fait la barrière (`SHH_PREPROD=1`)
+
+- **Public** : toute requête reçoit `maintenance.html`, statut **503**, `Retry-After: 3600`, `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store`, le marqueur **`X-Shhdrop-Etat: maintenance`**, et les en-têtes de sécurité du site (HSTS, CSP sans aucun script, feuille de style autorisée par son empreinte, etc.). Rien n'est relayé au serveur Go.
+- **Propriétaire** : il ouvre **une fois par appareil et par navigateur** le lien `https://shhgone.com/acces/<jeton>`. Caddy pose le témoin `__Host-shh_preprod=<jeton>` (`Secure`, `HttpOnly`, `SameSite=Lax`, 30 jours) et redirige vers `/`. `Lax` et non `Strict` : le retour depuis Stripe ou PayPal est une navigation venue d'un autre site, où un témoin `Strict` ne serait pas envoyé. Un faux lien rend la page de maintenance, sans témoin. Le témoin est envoyé avec toute requête de même origine qui porte des témoins, même avec son propre `Authorization` (envoi de segments, `Bearer` ; appels, `PrivateToken`) et à l'ouverture du WebSocket du salon. (Une barrière `basic_auth` ne marcherait pas : le navigateur n'ajoute pas ses identifiants à une requête qui a déjà un `Authorization`.)
+- **Passent sans témoin, et rien d'autre** :
+  1. les **webhooks** des prestataires : `POST /api/paiement/webhook/stripe`, `…/paypal`, `…/nowpayments`, chemins exacts (les prestataires n'ont pas le témoin ; leur signature est vérifiée par le serveur) ;
+  2. le **défi ACME** de Let's Encrypt : traité par Caddy lui-même avant la barrière (port 80, ou TLS-ALPN sur 443), sans exemption à écrire ;
+  3. les requêtes **qui ne sont pas des navigations et que le navigateur dit venir d'une page de cette origine** (`Sec-Fetch-Site: same-origin`, hors `Sec-Fetch-Mode: navigate`). **Pourquoi** : le site envoie une partie de ses appels (API du salon et du paiement, WebAssembly, preuve anti-robot) avec `credentials: "omit"`, donc **sans aucun témoin** (choix de confidentialité du site, à ne pas changer pour la préproduction). Sans cette exception, ces appels recevraient la page de maintenance et le site ne marcherait pas. Un navigateur n'envoie `same-origin` que depuis une page déjà ouverte sur `shhgone.com`, donc derrière le témoin. **Limite : risque PP1 ci-dessous** ;
+  4. les **contrôles automatiques** de `deploy.sh` et `preprod.sh` : en-tête `X-Shh-Preprod: <jeton>` (lu depuis un descripteur, jamais sur la ligne de commande ; `verify-site.mjs` le reçoit par l'environnement, `SHH_PREPROD_JETON`). `alerte.sh` ne passe pas par Caddy (certificat TLS et `deploy.sh health`, dans le conteneur) : rien à changer. La sonde externe et `verifier-site.yml` acceptent la page de maintenance (risque PP3).
+- **Aucun cache navigateur** : `Cache-Control: no-store` sur toutes les réponses, fichiers à empreinte de `/assets/` compris ; chaque version se voit au prochain chargement. Le site n'a pas de service worker (spec Q-C1) : rien d'autre ne peut garder une ancienne version. Sans `SHH_PREPROD`, les en-têtes de cache de production sont inchangés (prouvé par `test-preprod.sh`).
+- Ni le jeton, ni le témoin n'atteignent le serveur Go (`Cookie` et `X-Shh-Preprod` retirés vers l'amont) ; aucun journal de Caddy (global `log … discard`, aucun journal d'accès : le jeton n'est écrit nulle part ; `test-preprod.sh` le cherche dans les sorties de Caddy). Le tableau de bord (§4) reste sur son écouteur interne `172.30.53.2:9191` : Caddy ne relaie que vers `:8080`, barrière ou pas.
+- **Ce qui marche derrière la barrière** (même origine, `https://shhgone.com`) : passkeys WebAuthn (le témoin ne change ni l'origine ni l'identifiant), `fetch` du site (témoin, ou exception 3), WebSocket du salon (témoin envoyé à l'ouverture ; **Safari non essayé** : à vérifier sur l'iPhone), appels (relais TURN, hors HTTP), retours de paiement. Prouvé avec un client HTTP (`test-preprod.sh`), **pas avec un vrai navigateur** : liste à faire à la main au §15.4.
+
+**Échec fermé** : `SHH_PREPROD` hors de `0` et `1` est refusé (par `deploy.sh` et par Caddy) ; avec `SHH_PREPROD=1`, sans jeton bien réglé (absent, lien, autre propriétaire, droits plus larges que 0600, contenu hors format), `deploy.sh` et `preprod.sh` refusent de démarrer ; un jeton vide dans Caddy ne laisse rien passer ; après le démarrage, le contrôle de santé exige que `/` et `/api/captcha` rendent la page de maintenance à qui n'a pas le jeton, sinon retour arrière.
+
+### 15.2 Commandes du propriétaire, dans l'ordre
+
+Sur le serveur, en root, dans `/opt/shhdrop`, la machine prête (§1, §2, §3.5 ; paquet `docker-buildx-plugin` installé : `preprod.sh` construit l'image) :
+
+```sh
+# 1. Jeton (une fois) : tiré SUR LE SERVEUR, jamais copié ailleurs.
+install -d -o root -g root -m 0755 /etc/shhdrop
+(umask 077 && openssl rand -hex 32 >/etc/shhdrop/preprod-jeton)
+chown root:root /etc/shhdrop/preprod-jeton && chmod 0600 /etc/shhdrop/preprod-jeton
+
+# 2. Réglages : ajouter la ligne SHH_PREPROD=1 à deploy/.env (et, pour l'essai du paiement,
+#    §13.4 : SHH_PREPROD_PAIEMENT=1 et SHH_PREPROD_PAIEMENT_ESSAI=1).
+editor deploy/.env
+
+# 3. Une version de développement : le commit complet (40 chiffres), donné par la conversation
+#    de développement (V3), jamais copié depuis GitHub. git fetch seulement, jamais git pull.
+git fetch origin
+deploy/preprod.sh <commit>
+
+# 4. Le lien d'accès, à ouvrir sur chaque appareil (ne le coller dans aucun message) :
+echo "https://shhgone.com/acces/$(cat /etc/shhdrop/preprod-jeton)"
+```
+
+**Sur chaque appareil** : ouvrir ce lien une fois. PC : dans chaque navigateur utilisé. iPhone : dans Safari, **pas en navigation privée** (le témoin y est oublié à la fermeture). On arrive sur l'accueil du vrai site ; le témoin dure 30 jours (rouvrir le lien ensuite). Pour faire passer le lien à l'iPhone sans le confier à un service tiers : le taper, ou l'afficher dans une session SSH ouverte depuis l'iPhone (Termius, Blink : §4). **Le lien reste dans l'historique du navigateur**, synchronisé par iCloud ou Chrome si la synchronisation est active : après l'avoir ouvert, effacer cette entrée de l'historique.
+
+**Changer le jeton** (lien diffusé par erreur, appareil perdu, ou par précaution) : refaire l'étape 1 (le fichier est remplacé), puis `deploy/preprod.sh "$(cat deploy/.release.commit)"` (ou `deploy/deploy.sh "$(cat deploy/.release)"` si une Release est en service) : Caddy est recréé avec le nouveau jeton, tous les témoins existants deviennent inutiles ; rouvrir le nouveau lien sur chaque appareil.
+
+**Versions suivantes** : `git fetch origin && deploy/preprod.sh <nouveau commit>`. Réinstaller la même (après un redémarrage, §5) : `deploy/preprod.sh "$(cat deploy/.release.commit)"`. `deploy/deploy.sh status` dit « PRÉPRODUCTION ». Place disque : les images `shhdrop-preprod:<commit>` et le cache de construction s'accumulent ; de temps en temps, `docker image ls shhdrop-preprod`, `docker rmi` des anciennes (jamais celle en service ni la précédente), `docker builder prune`.
+
+### 15.3 `preprod.sh` : ce qui est vérifié, et ce qui ne l'est pas
+
+Vérifié, sans option pour le sauter : `SHH_PREPROD=1` (sinon refus) ; **verrous V1, V2 et V3** de `verrous.sh`, comme `deploy.sh` (commit complet en argument ; signé par une clé de `/etc/shhdrop/signataires-autorises`, et chaque commit depuis le commit installé aussi ; descendant du commit installé ; la copie est avancée par `git merge --ff-only`, puis le `preprod.sh` du commit vérifié est relancé) ; les contrôles de la machine (`preflight`, journaux compris) ; après le démarrage, le contrôle de santé de `deploy.sh` (barrière comprise ; `verify-site.mjs` contre un manifeste calculé du `/site` de l'image construite, `deploy/.preprod/<commit>/release.json`) ; retour à la version d'avant s'il échoue. L'image est construite par le Docker du serveur depuis la copie du dépôt au commit vérifié (`docker build`, mêmes arguments que `release.yml`, contexte limité par `.dockerignore` : ni `deploy/.env` ni secret), étiquetée `shhdrop-preprod:<commit>`. `/etc/shhdrop/commit-installe` avance comme avec `deploy.sh` : la Release d'ouverture devra être posée sur un commit **descendant** du dernier commit installé en préproduction (V2).
+
+Hôtes de plus pendant `preprod.sh` (construction) : registres npm, crates.io, proxy Go et Docker Hub (images de base du `Dockerfile`).
+
+**Pas vérifié (compromis assumé, sans utilisateurs ni données réelles)** : aucune signature Sigstore, aucun build de `release.yml`, aucune comparaison avec un build public (risque PP2).
+
+`deploy.sh` (Release signée) reste utilisable pendant la préproduction, avec la barrière si `SHH_PREPROD=1`. Il n'installe jamais une image de préproduction : `deploy.sh preprod:…` et un `rollback` vers elle renvoient à `preprod.sh`.
+
+### 15.4 À essayer à la main au premier passage
+
+Sur le PC et sur l'iPhone, après le lien d'accès : l'accueil dans une fenêtre privée (sans le témoin) rend la page de maintenance ; création et ouverture d'un partage (envoi par segments) ; création d'un compte par passkey, connexion, déconnexion ; un salon ouvert sur deux appareils (WebSocket, **Safari surtout**) ; un appel ; un paiement d'essai complet (§13.4 : retour sur « Paiement reçu », webhook livré d'après le tableau de bord du prestataire). Tout échec : le noter et ne pas ouvrir.
+
+### 15.5 Ouverture au public (jour J)
+
+1. Avoir fait la liste du §9 (démarches légales) et, si le paiement s'ouvre, le §13.5 (passage au réel, base d'essai écartée).
+2. Poser la Release `web-v1.0.0` (§3.2) sur un commit de `main` **descendant du dernier commit installé en préproduction**, qui retire aussi de `verifier-site.yml` et de `sonde.yml` leur branche « préproduction » (marquée « À retirer à l'ouverture »).
+3. Sur le serveur : retirer de `deploy/.env` les lignes `SHH_PREPROD`, `SHH_PREPROD_PAIEMENT` et `SHH_PREPROD_PAIEMENT_ESSAI` (sans la barrière, `deploy.sh` refuse ces deux dernières, et l'essai du paiement).
+4. `git fetch origin && deploy/deploy.sh sha256:<empreinte> 1.0.0 <commit>` (§3.2) : Caddy est recréé sans barrière ; le contrôle de santé vérifie le site servi contre la Release signée.
+5. Supprimer le jeton : `shred -u /etc/shhdrop/preprod-jeton`. Les témoins restés dans les navigateurs ne servent plus à rien ; les effacer des appareils (données du site) par propreté.
+6. Après vérification de l'ouverture : `docker rmi $(docker image ls -q shhdrop-preprod)`, `rm -rf deploy/.preprod`, `docker builder prune`.
+7. Depuis un autre réseau : `curl -sI https://shhgone.com/` rend 200, sans `X-Shhdrop-Etat`.
+
+### 15.6 Risques et limites (à relire avant l'ouverture)
+
+| # | Gravité | Endroit | Problème | Correction |
+|---|---|---|---|---|
+| PP1 | Moyenne | `Caddyfile`, exception 3 | `Sec-Fetch-Site` s'écrit à la main : un client qui n'est pas un navigateur (curl, script) joint l'API et les fichiers du site sans le témoin. Le public « navigateur » ne voit que la maintenance ; un curieux technique peut créer des partages, des salons, des comptes (aux limites habituelles : anti-robot, quotas par adresse) et, paiement d'essai ouvert, des pass d'essai | Préproduction courte ; `deploy.sh admin freeze` si un abus se voit (tableau de bord) ; correction forte possible, non faite : en préproduction seulement, envoyer le témoin avec les appels du site (`credentials: "same-origin"`, code du site à changer et à revoir) puis retirer l'exception 3 |
+| PP2 | Élevée tant qu'elle dure | `preprod.sh` (spec §28.8, C8) | Image construite sur le serveur, sans signature ni build public : sa provenance n'est pas prouvée | Barrière exigée ; verrous V1 à V3 gardés ; ouverture seulement par `deploy.sh` et une Release signée (§15.5) |
+| PP3 | Faible | `verifier-site.yml`, `sonde.yml` | Tant qu'ils voient exactement la page de maintenance (503, marqueur, corps de `maintenance.html`), ils concluent « préproduction, rien à vérifier » : un serveur compromis qui leur servirait cette page passerait inaperçu | Branches à retirer à l'ouverture (§15.5, étape 2) |
+| PP4 | Faible | Caddy | Comparaison du jeton pas en temps constant | Jeton de 256 bits : une mesure de temps à travers le réseau ne le retrouve pas |
+| PP5 | Faible | lien d'accès | Le jeton est dans l'adresse : historique du navigateur et sa synchronisation | Effacer l'entrée de l'historique ; changer le jeton au moindre doute (§15.2) |
+| PP6 | Faible | `docker inspect` du conteneur Caddy | Le jeton est dans l'environnement du conteneur (lisible par root, comme le fichier) | Accepté : root a déjà tout ; jeton supprimé à l'ouverture |
+| PP7 | Faible | `SHH_PREPROD_PAIEMENT*` | Réglage du paiement sans commit relu | Seulement avec la barrière, refusé sinon ; essai du paiement refusé sans barrière |

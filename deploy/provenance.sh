@@ -232,12 +232,15 @@ image_node() {
 # verify-site.mjs (copie du dépôt, pas du site) contre https://<domaine>, résolu en 127.0.0.1 :
 # chaque fichier du manifeste, ses variantes compressées et le repli monopage, à travers Caddy
 # (spec §28.7). Node vient de l'image épinglée du Dockerfile : rien à installer sur la machine.
+# Préproduction (README §15) : SHH_PREPROD_JETON, s'il est dans l'environnement, est transmis par
+# nom (« -e NOM » : la valeur ne passe pas sur la ligne de commande) ; verify-site.mjs l'envoie
+# alors en en-tête X-Shh-Preprod pour passer la barrière de Caddy. Vide ou absent : rien.
 verifier_site_servi() {
 	local docker=$1 node=$2 script=$3 json=$4 domaine=$5 ca=$6
 	"$docker" run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true \
 		--log-driver none --user 65532:65532 --add-host "$domaine:127.0.0.1" \
 		-v "$script:/v/verify-site.mjs:ro" -v "$json:/v/release.json:ro" -v "$ca:/v/ca.pem:ro" \
-		-e NODE_EXTRA_CA_CERTS=/v/ca.pem --entrypoint node "$node" \
+		-e NODE_EXTRA_CA_CERTS=/v/ca.pem -e SHH_PREPROD_JETON --entrypoint node "$node" \
 		/v/verify-site.mjs "https://$domaine" /v/release.json
 }
 

@@ -306,3 +306,35 @@ resume_changements() {
 		printf '%s\n' "$stat"
 	fi
 }
+
+# --- Préproduction (README §15) -----------------------------------------------------------------
+# Jeton de préproduction : 64 chiffres hexadécimaux tirés sur le serveur, accepté par Caddy à la
+# place d'un mot de passe : en-tête X-Shh-Preprod (contrôles de deploy.sh et preprod.sh) ou
+# témoin posé par le lien /acces/<jeton> (navigateurs du propriétaire). Hors de la copie du
+# dépôt, jamais dans deploy/.env ni dans git ; lu par root seulement (deploy.sh, preprod.sh), donné
+# à Caddy par son environnement. En lecture seule, comme les constantes ci-dessus (fichier chargé
+# après deploy/.env).
+# shellcheck disable=SC2034 # lue par commun.sh
+readonly PREPROD_JETON_FICHIER=/etc/shhdrop/preprod-jeton
+
+# lire_jeton_preprod <fichier> <uid> : écrit le jeton. Le fichier est ordinaire (pas un lien), à
+# <uid>, droits 0600 ou 0400 ; son dossier à <uid>, ni groupe ni autres en écriture ; contenu :
+# 64 chiffres hexadécimaux en minuscules et une fin de ligne, rien d'autre.
+lire_jeton_preprod() {
+	local f=$1 uid=$2 d j
+	d=$(dirname -- "$f")
+	if [ ! -e "$f" ] && [ ! -L "$f" ]; then
+		echo "$f absent : (umask 077 && openssl rand -hex 32 >$f) (README §15)" >&2
+		return 1
+	fi
+	if [ ! -d "$d" ] || ! droits_surs "$d" "$uid" 022 || [ -L "$f" ] || [ ! -f "$f" ] || ! droits_surs "$f" "$uid" 7177; then
+		echo "$f mal réglé : fichier ordinaire à root, chmod 0600 $f (README §15)" >&2
+		return 1
+	fi
+	j=$(cat -- "$f")
+	if ! [[ $j =~ ^[0-9a-f]{64}$ ]] || [ "$(stat -c %s -- "$f")" != 65 ]; then
+		echo "$f : contenu illisible (64 chiffres hexadécimaux attendus : openssl rand -hex 32)" >&2
+		return 1
+	fi
+	printf '%s' "$j"
+}

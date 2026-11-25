@@ -390,37 +390,59 @@ grep -q "sujet" "$work/esc.out" || ko "résumé : sujet nettoyé absent"
 resume_changements "$d" "$sign" "" "$c2" | grep -q "première installation" || ko "résumé : première installation"
 
 # 12. deploy.sh : verrous avant tout démarrage, V3 avant le démarrage, commit installé écrit après
-#     le contrôle seulement, aucune option pour sauter, forme à deux arguments refusée.
+#     le contrôle seulement, aucune option pour sauter, forme à deux arguments refusée. Démarrage,
+#     contrôle et verrous() : deploy/commun.sh (partagé avec preprod.sh).
 dsh=$here/deploy.sh
+com=$here/commun.sh
+pps=$here/preprod.sh
 ligne() { grep -n -m1 -- "$1" "$dsh" | cut -d: -f1; }
+lignec() { grep -n -m1 -- "$1" "$com" | cut -d: -f1; }
+lignep() { grep -n -m1 -- "$1" "$pps" | cut -d: -f1; }
 vr=$(ligne '^	verrous "$new_c" "$mode"$')
 pf=$(ligne '^	preflight$')
 pv=$(ligne 'verifier_provenance "$cosign"')
 an=$(ligne 'controle_commit_annonce "$here/.provenance/$new_v/release.json" "$new_c"')
-up=$(ligne 'dc "$new" up -d --remove-orphans')
-ck=$(ligne 'if check "$new" "$new_v"; then')
-ec=$(ligne 'ecrire_commit_installe "$VERROUS_COMMIT_INSTALLE" "$new_c"')
-for x in vr pf pv an up ck ec; do [ -n "${!x}" ] || ko "deploy.sh : ligne $x introuvable"; done
-if [ -n "$vr$pf$pv$an$up$ck$ec" ]; then
+ms=$(ligne '^	mettre_en_service "$new" "$new_v" "$new_c" "$mode"$')
+up=$(lignec 'dc "$new" up -d --remove-orphans')
+ck=$(lignec 'if check "$new" "$new_v"; then')
+ec=$(lignec 'ecrire_commit_installe "$VERROUS_COMMIT_INSTALLE" "$new_c"')
+for x in vr pf pv an ms up ck ec; do [ -n "${!x}" ] || ko "deploy.sh/commun.sh : ligne $x introuvable"; done
+if [ -n "$vr$pf$pv$an$ms$up$ck$ec" ]; then
 	[ "$vr" -lt "$pf" ] && [ "$vr" -lt "$pv" ] || ko "deploy.sh : verrous après preflight ou la provenance"
-	[ "$pv" -lt "$an" ] && [ "$an" -lt "$up" ] || ko "deploy.sh : V3 absent entre la provenance et le démarrage"
-	[ "$ck" -lt "$ec" ] || ko "deploy.sh : commit installé écrit avant le contrôle"
+	[ "$pv" -lt "$an" ] && [ "$an" -lt "$ms" ] || ko "deploy.sh : V3 absent entre la provenance et le démarrage"
+	[ "$up" -lt "$ck" ] && [ "$ck" -lt "$ec" ] || ko "commun.sh : commit installé écrit avant le contrôle"
 fi
-grep -q 'controle_signataires "$VERROUS_SIGNATAIRES" 0 ' "$dsh" || ko "deploy.sh : signataires non contrôlés (root)"
-grep -q 'lire_commit_installe "$VERROUS_COMMIT_INSTALLE" 0)' "$dsh" || ko "deploy.sh : commit installé non contrôlé (root)"
+grep -q 'controle_signataires "$VERROUS_SIGNATAIRES" 0 ' "$com" || ko "commun.sh : signataires non contrôlés (root)"
+grep -q 'lire_commit_installe "$VERROUS_COMMIT_INSTALLE" 0)' "$com" || ko "commun.sh : commit installé non contrôlé (root)"
 grep -q 'install_version "$1" "$2" "$3" suite$' "$dsh" || ko "deploy.sh : forme à trois arguments absente"
 grep -qE 'install_version "\$1" "\$2"$|\[ \$# -eq 2 \]' "$dsh" && ko "deploy.sh : forme sans commit acceptée"
 grep -q 'install_version "$prev" "$prev_v" "$prev_c" retour$' "$dsh" || ko "deploy.sh : retour arrière hors verrous"
 grep -q 'install_version "$1" "$cur_v" "$cur_c" retour$' "$dsh" || ko "deploy.sh : réinstallation hors verrous"
-grep -qiE -- '--(no|skip|sans)-?(verrou|sign|commit)|SHH_(SKIP|SANS)_(VERROU|SIGN|COMMIT)|VERROUS=0' "$dsh" "$here/verrous.sh" &&
+grep -qiE -- '--(no|skip|sans)-?(verrou|sign|commit)|SHH_(SKIP|SANS)_(VERROU|SIGN|COMMIT)|VERROUS=0' "$dsh" "$com" "$pps" "$here/verrous.sh" &&
 	ko "deploy.sh : option pour sauter les verrous"
-grep -q '^depot=$(cd "$here/.." && pwd)$' "$dsh" || ko "deploy.sh : la copie vérifiée n'est pas celle du script"
-av=$(ligne 'avancer_copie "$depot"')
-ex=$(ligne 'exec "$here/deploy.sh" "${args\[@\]}"')
-[ -n "$av" ] && [ -n "$ex" ] && [ "$av" -lt "$ex" ] || ko "deploy.sh : relance du deploy.sh vérifié absente"
-e=$(ligne '^\. \./\.env')
-l=$(ligne '^\. \./verrous\.sh')
-[ -n "$e" ] && [ -n "$l" ] && [ "$e" -lt "$l" ] || ko "deploy.sh : verrous.sh chargé avant deploy/.env (constantes remplaçables)"
+grep -q '^depot=$(cd "$here/.." && pwd)$' "$com" || ko "commun.sh : la copie vérifiée n'est pas celle du script"
+av=$(lignec 'avancer_copie "$depot"')
+ex=$(lignec '"$here/$relance" "${args\[@\]}"')
+[ -n "$av" ] && [ -n "$ex" ] && [ "$av" -lt "$ex" ] || ko "commun.sh : relance du script vérifié absente"
+grep -qx 'relance=deploy.sh' "$dsh" || ko "deploy.sh : ne se relance pas lui-même"
+grep -qx 'relance=preprod.sh' "$pps" || ko "preprod.sh : ne se relance pas lui-même"
+e=$(lignec '^\. \./\.env')
+l=$(lignec '^\. \./verrous\.sh')
+[ -n "$e" ] && [ -n "$l" ] && [ "$e" -lt "$l" ] || ko "commun.sh : verrous.sh chargé avant deploy/.env (constantes remplaçables)"
+# preprod.sh : barrière exigée, commit complet, verrous (suite) avant le contrôle de la machine, la
+# construction et le démarrage ; commit installé écrit par mettre_en_service (après le contrôle).
+p1=$(lignep '^\[ "$preprod" = 1 \] ||$')
+p2=$(lignep '^commit_valide "$c" ||$')
+p3=$(lignep '^verrous "$c" suite$')
+p4=$(lignep '^preflight$')
+p5=$(lignep 'docker build -f Dockerfile')
+p6=$(lignep '^mettre_en_service "$etat" preprod "$c" suite$')
+for x in p1 p2 p3 p4 p5 p6; do [ -n "${!x}" ] || ko "preprod.sh : ligne $x introuvable"; done
+if [ -n "$p1$p2$p3$p4$p5$p6" ]; then
+	[ "$p1" -lt "$p3" ] && [ "$p2" -lt "$p3" ] && [ "$p3" -lt "$p4" ] && [ "$p4" -lt "$p5" ] && [ "$p5" -lt "$p6" ] ||
+		ko "preprod.sh : ordre barrière, commit, verrous, machine, construction, démarrage"
+fi
+[ "$(grep -c '^verrous ' "$pps")" = 1 ] || ko "preprod.sh : verrous appelés autrement qu'en « suite »"
 (VERROUS_SIGNATAIRES=/tmp/x) 2>/dev/null && ko "VERROUS_SIGNATAIRES modifiable"
 (VERROUS_COMMIT_INSTALLE=/tmp/x) 2>/dev/null && ko "VERROUS_COMMIT_INSTALLE modifiable"
 [ "$VERROUS_SIGNATAIRES" = /etc/shhdrop/signataires-autorises ] || ko "VERROUS_SIGNATAIRES : $VERROUS_SIGNATAIRES"
@@ -433,6 +455,156 @@ cle=$(grep -m1 -E '^shhgone-dev namespaces="git" ssh-ed25519 [A-Za-z0-9+/=]+$' "
 	ko "README : la clé shhgone-dev n'a pas l'empreinte $CLE_DEV_EMPREINTE"
 grep -qF "$CLE_DEV_EMPREINTE" "$here/README.md" || ko "README : empreinte de la clé absente"
 grep -qF 'deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>' "$here/README.md" || ko "README : commande d'installation sans commit"
+
+# 14. Préproduction (README §15) : jeton, réglages de deploy/.env, et preprod.sh lancé pour de vrai
+#     dans une copie d'essai (refus avant tout démarrage).
+[ "$PREPROD_JETON_FICHIER" = /etc/shhdrop/preprod-jeton ] || ko "PREPROD_JETON_FICHIER : $PREPROD_JETON_FICHIER"
+(PREPROD_JETON_FICHIER=/tmp/x) 2>/dev/null && ko "PREPROD_JETON_FICHIER modifiable"
+jt=$(printf 'b%063d' 0 | tr 0 5)
+jd=$work/jeton
+mkdir -m 0755 "$jd"
+(umask 077 && printf '%s\n' "$jt" >"$jd/j")
+[ "$(lire_jeton_preprod "$jd/j" "$moi")" = "$jt" ] || ko "jeton : bon fichier refusé"
+chmod 0400 "$jd/j"
+[ "$(lire_jeton_preprod "$jd/j" "$moi" 2>/dev/null)" = "$jt" ] || ko "jeton : 0400 refusé"
+chmod 0640 "$jd/j"
+lire_jeton_preprod "$jd/j" "$moi" >/dev/null 2>&1 && ko "jeton : lisible par le groupe accepté"
+chmod 0604 "$jd/j"
+lire_jeton_preprod "$jd/j" "$moi" >/dev/null 2>&1 && ko "jeton : lisible par tous accepté"
+chmod 0600 "$jd/j"
+lire_jeton_preprod "$jd/j" "$((moi + 1))" >/dev/null 2>&1 && ko "jeton : autre propriétaire accepté"
+lire_jeton_preprod "$jd/absent" "$moi" >/dev/null 2>&1 && ko "jeton : fichier absent accepté"
+ln -s j "$jd/lien"
+lire_jeton_preprod "$jd/lien" "$moi" >/dev/null 2>&1 && ko "jeton : lien accepté"
+for faux in "${jt%?}" "${jt^^}" "${jt}0" "" "$jt $jt"; do
+	(umask 077 && printf '%s\n' "$faux" >"$jd/f")
+	lire_jeton_preprod "$jd/f" "$moi" >/dev/null 2>&1 && ko "jeton : contenu « ${faux:0:10}… » accepté"
+done
+(umask 077 && printf '%s' "$jt" >"$jd/f")
+lire_jeton_preprod "$jd/f" "$moi" >/dev/null 2>&1 && ko "jeton : sans fin de ligne accepté (65 octets exigés)"
+chmod 0777 "$jd"
+lire_jeton_preprod "$jd/j" "$moi" >/dev/null 2>&1 && ko "jeton : dossier modifiable par tous accepté"
+chmod 0755 "$jd"
+
+# Copie d'essai du dossier deploy/ (scripts, compose.yaml, Caddyfile, page de maintenance),
+# dans un dépôt git aux commits signés : deploy.sh et preprod.sh y tournent pour de vrai.
+pp=$work/pp
+mkdir -p "$pp/deploy"
+cp -- "$here"/{deploy,commun,preprod,verrous,provenance,journaux}.sh "$here"/{compose.yaml,Caddyfile,maintenance.html} "$pp/deploy/"
+git init -q -b main "$pp"
+git -C "$pp" add -A
+git -C "$pp" "${ident[@]}" -c gpg.format=ssh -c "user.signingkey=$work/k-dev" commit -q -S -m "copie d'essai"
+pb0=$(git -C "$pp" rev-parse HEAD)
+pp_signe() { # <clé ou -> <message>
+	echo "$2" >>"$pp/x.txt"
+	git -C "$pp" add x.txt
+	if [ "$1" = - ]; then
+		git -C "$pp" "${ident[@]}" commit -q --no-gpg-sign -m "$2"
+	else
+		git -C "$pp" "${ident[@]}" -c gpg.format=ssh -c "user.signingkey=$work/k-$1" commit -q -S -m "$2"
+	fi
+	git -C "$pp" rev-parse HEAD
+}
+pb1=$(pp_signe dev un)
+pu=$(pp_signe - "non signé")
+git -C "$pp" checkout -q -b autre "$pb0"
+px=$(pp_signe dev "à côté")
+git -C "$pp" checkout -q -b bon "$pb1"
+pb2=$(pp_signe dev deux)
+git -C "$pp" checkout -q main
+git -C "$pp" reset -q --hard "$pb1"
+base_env="SHH_DOMAIN=shhgone.com
+SHH_DATA_ROOT=$work/pas-un-volume"
+# lance_pp <nom> <script> <contenu de .env> <arguments…> : code, sorties dans $work/pp-<nom>.*
+lance_pp() {
+	local nom=$1 script=$2 code=0
+	printf '%s\n' "$3" >"$pp/deploy/.env"
+	shift 3
+	env -u SHH_PREPROD -u SHH_PREPROD_JETON "$pp/deploy/$script" "$@" >"$work/pp-$nom.out" 2>"$work/pp-$nom.err" || code=$?
+	echo "$code" >"$work/pp-$nom.code"
+}
+refuse_pp() { # <nom> <motif sur la sortie d'erreur>
+	[ "$(cat "$work/pp-$1.code")" != 0 ] || ko "pp-$1 : accepté"
+	grep -q -- "$2" "$work/pp-$1.err" || ko "pp-$1 : message attendu « $2 », obtenu : $(cat "$work/pp-$1.err" "$work/pp-$1.out")"
+}
+lance_pp sans-barriere preprod.sh "$base_env" "$pb2"
+refuse_pp sans-barriere "SHH_PREPROD=1 exigé"
+lance_pp barriere-0 preprod.sh "$base_env
+SHH_PREPROD=0" "$pb2"
+refuse_pp barriere-0 "SHH_PREPROD=1 exigé"
+lance_pp barriere-oui deploy.sh "$base_env
+SHH_PREPROD=oui" status
+refuse_pp barriere-oui "SHH_PREPROD doit valoir 0 ou 1"
+lance_pp jeton-env deploy.sh "$base_env
+SHH_PREPROD_JETON=$jt" status
+refuse_pp jeton-env "SHH_PREPROD_JETON n'a rien à y faire"
+lance_pp paiement-hors deploy.sh "$base_env
+SHH_PREPROD_PAIEMENT=1" status
+refuse_pp paiement-hors "SHH_PREPROD_PAIEMENT ne sert qu'en préproduction"
+lance_pp servi deploy.sh "$base_env
+SHH_PAIEMENT_SERVI=1" status
+refuse_pp servi "SHH_PAIEMENT_SERVI est posée par deploy.sh seulement"
+sed -i 's/SHH_PAIEMENT_ESSAI: "${SHH_PAIEMENT_ESSAI_SERVI:-0}"/SHH_PAIEMENT_ESSAI: "${SHH_PAIEMENT_ESSAI_SERVI:-1}"/' "$pp/deploy/compose.yaml"
+lance_pp essai-public deploy.sh "$base_env" status
+refuse_pp essai-public "SHH_PAIEMENT_ESSAI=1 (bacs à sable"
+git -C "$pp" checkout -q -- deploy/compose.yaml
+if [ ! -e "$PREPROD_JETON_FICHIER" ]; then
+	lance_pp sans-jeton deploy.sh "$base_env
+SHH_PREPROD=1" status
+	refuse_pp sans-jeton "jeton de préproduction illisible"
+	lance_pp sans-jeton-pp preprod.sh "$base_env
+SHH_PREPROD=1" "$pb2"
+	refuse_pp sans-jeton-pp "jeton de préproduction illisible"
+fi
+
+# preprod.sh et /etc/shhdrop : root et un espace de montage à part (unshare), /etc recouvert par
+# une couche en mémoire (overlay) : rien n'est écrit dans le vrai /etc. Sinon, sauté (dit).
+if [ "$moi" = 0 ] && command -v unshare >/dev/null 2>&1 && mkdir -p "$work/ov-u" "$work/ov-w" &&
+	unshare -m sh -c "mount -t overlay overlay -o lowerdir=/etc,upperdir=$work/ov-u,workdir=$work/ov-w /etc" 2>/dev/null; then
+	rm -rf "$work/ov-u" "$work/ov-w"
+	mkdir -p "$work/ov-u" "$work/ov-w"
+	cat >"$work/ns.sh" <<'EOF'
+set -eu
+mount -t overlay overlay -o "lowerdir=/etc,upperdir=$W/ov-u,workdir=$W/ov-w" /etc
+rm -rf /etc/shhdrop
+install -d -o root -g root -m 0755 /etc/shhdrop
+install -o root -g root -m 0644 "$SIGN" /etc/shhdrop/signataires-autorises
+printf '%s\n' "$INSTALLE" >/etc/shhdrop/commit-installe
+chmod 0644 /etc/shhdrop/commit-installe
+(umask 077 && printf '%s\n' "$JETON" >/etc/shhdrop/preprod-jeton)
+for cas in $CAS; do
+	nom=${cas%%=*} c=${cas#*=} code=0
+	git -C "$PP" reset -q --hard "$INSTALLE"
+	env -u SHH_PREPROD_JETON SHH_PREPROD=1 "$PP/deploy/preprod.sh" "$c" >"$W/ns-$nom.out" 2>"$W/ns-$nom.err" || code=$?
+	echo "$code" >"$W/ns-$nom.code"
+	git -C "$PP" rev-parse HEAD >"$W/ns-$nom.head"
+done
+EOF
+	printf '%s\n' "$base_env" "SHH_PREPROD=1" >"$pp/deploy/.env"
+	W=$work SIGN=$sign INSTALLE=$pb1 JETON=$jt PP=$pp \
+		CAS="abrege=${pb2:0:12} nonsigne=$pu acote=$px inconnu=$(printf '%040d' 7) bon=$pb2" \
+		unshare -m sh "$work/ns.sh" || ko "préproduction (espace de montage) : banc interrompu"
+	ns_refuse() { # <cas> <motif sur la sortie d'erreur>
+		[ "$(cat "$work/ns-$1.code" 2>/dev/null)" != 0 ] || ko "preprod.sh $1 : accepté"
+		grep -q -- "$2" "$work/ns-$1.err" 2>/dev/null || ko "preprod.sh $1 : message attendu « $2 », obtenu : $(cat "$work/ns-$1.err" "$work/ns-$1.out" 2>/dev/null)"
+		[ "$1" = bon ] || [ "$(cat "$work/ns-$1.head" 2>/dev/null)" = "$pb1" ] || ko "preprod.sh $1 : copie du dépôt déplacée"
+	}
+	ns_refuse abrege "commit refusé : « ${pb2:0:12} »"
+	ns_refuse nonsigne "V1 : le commit $pu n'est pas signé"
+	ns_refuse acote "V2 : histoire réécrite"
+	ns_refuse inconnu "absent de la copie du dépôt"
+	# Bon commit : verrous passés, copie avancée, preprod.sh du commit vérifié relancé, puis arrêt
+	# au contrôle de la machine (pas de volume chiffré ici) : rien n'est construit ni démarré.
+	ns_refuse bon "n'est pas un point de montage"
+	grep -q "relance du preprod.sh de ce commit" "$work/ns-bon.out" || ko "preprod.sh bon : pas de relance ($(cat "$work/ns-bon.out"))"
+	[ "$(cat "$work/ns-bon.head")" = "$pb2" ] || ko "preprod.sh bon : copie non avancée"
+	grep -q "descendant de $pb1" "$work/ns-bon.out" || ko "preprod.sh bon : verrous non dits"
+	[ ! -e "$work/ov-u/shhdrop/../shhdrop/commit-installe.tmp" ] || ko "preprod.sh bon : commit installé écrit"
+	grep -qx "$pb1" "$work/ov-u/shhdrop/commit-installe" || ko "preprod.sh bon : commit installé changé avant toute installation"
+	grep -rqF "$jt" "$work"/ns-*.out "$work"/ns-*.err && ko "preprod.sh : jeton affiché"
+else
+	echo "test-verrous : preprod.sh sous verrous non essayé (root et unshare avec overlay exigés : sudo deploy/test-verrous.sh)" >&2
+fi
 
 if [ "$echec" = 0 ]; then
 	echo "test-verrous : tous les essais passent"

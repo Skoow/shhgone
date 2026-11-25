@@ -23,8 +23,14 @@ jobs:
         env:
           HOTE: ${{ vars.SHH_SONDE_HOTE }}
         run: |
-          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$HOTE/")
+          code=$(curl -sS -D "$RUNNER_TEMP/h" -o /dev/null -w '%{http_code}' --max-time 20 "https://$HOTE/")
           echo "accueil : $code"
+          # Préproduction (deploy/README.md §15) : 503 avec le marqueur de la page de maintenance
+          # = site en marche derrière la barrière. À retirer à l'ouverture.
+          if [ "$code" = 503 ] && tr -d '\r' <"$RUNNER_TEMP/h" | grep -qix 'x-shhdrop-etat: maintenance'; then
+            echo "préproduction : page de maintenance servie"
+            exit 0
+          fi
           [ "$code" = 200 ]
       - name: Le certificat n'est pas près de sa fin (36 h pour un certificat de 6 jours, 14 jours sinon)
         env:

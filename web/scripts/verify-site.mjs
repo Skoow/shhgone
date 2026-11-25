@@ -27,6 +27,7 @@
 // Limites : le repli empêche d'énumérer des fichiers en plus (spec §28.8, C5) ; un serveur qui
 // ne piège que certaines victimes passe inaperçu (§28.7) ; les en-têtes (CSP…) ne sont pas
 // contrôlés ici. Aucun proxy n'est utilisé (les variables HTTPS_PROXY sont ignorées).
+// Préproduction : SHH_PREPROD_JETON (environnement) ajoute l'en-tête X-Shh-Preprod à chaque requête.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import http from "node:http";
@@ -120,7 +121,7 @@ function get(ctx, path, acceptEncoding, cap) {
       path,
       method: "GET",
       agent: ctx.agent,
-      headers: { "Accept-Encoding": acceptEncoding, "Cache-Control": "no-cache" },
+      headers: { ...ctx.headers, "Accept-Encoding": acceptEncoding, "Cache-Control": "no-cache" },
     });
     const timer = setTimeout(() => finish(reject, new Error(`délai dépassé (${ctx.timeoutMs} ms)`)), ctx.timeoutMs);
     req.on("error", network);
@@ -208,7 +209,7 @@ export async function verifySite(origin, manifest, opts = {}) {
   const url = new URL(origin);
   const lib = url.protocol === "https:" ? https : http;
   const agent = new lib.Agent({ keepAlive: true, maxSockets: 1 });
-  const ctx = { url, lib, agent, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS };
+  const ctx = { url, lib, agent, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, headers: opts.headers ?? {} };
   const byPath = new Map(manifest.files.map((f) => [f.path, f]));
   /** Base et jeton d'une variante précompressée ; null pour un fichier en clair. */
   const variantOf = (entry) => {
@@ -267,7 +268,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.error(`verify-site : ${args[1]} illisible (${e.code ?? "JSON invalide"})`);
     process.exit(1);
   }
-  const problems = await verifySite(args[0], manifest);
+  // Préproduction (deploy/README.md §15) : le jeton de la barrière de Caddy, donné par
+  // l'environnement (jamais en argument : il serait visible dans la liste des processus), est
+  // envoyé en en-tête X-Shh-Preprod. Il n'ôte aucun contrôle. Vide ou absent : rien.
+  const jeton = process.env.SHH_PREPROD_JETON ?? "";
+  if (jeton !== "" && !/^[0-9a-f]{64}$/.test(jeton)) {
+    console.error("verify-site : SHH_PREPROD_JETON hors format (64 chiffres hexadécimaux attendus)");
+    process.exit(2);
+  }
+  const problems = await verifySite(args[0], manifest, jeton ? { headers: { "X-Shh-Preprod": jeton } } : {});
   if (problems.length > 0) {
     for (const p of problems) console.error(`verify-site : ${p}`);
     process.exit(1);

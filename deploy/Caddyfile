@@ -90,6 +90,86 @@
 	}
 }
 
+# Préproduction (README §15) : barrière choisie par SHH_PREPROD (posée par deploy.sh
+# et preprod.sh : « 0 » ou « 1 » ; toute autre valeur fait refuser la configuration à Caddy, faute
+# de snippet de ce nom). barriere-0 : production, rien de changé. barriere-1 : le public ne voit
+# que deploy/maintenance.html (503). Jeton : 64 chiffres hexadécimaux (256 bits), fichier root
+# 0600 /etc/shhdrop/preprod-jeton, jamais dans git ni dans deploy/.env. Passent seulement :
+#   - /acces/<jeton> : pose le témoin __Host-shh_preprod=<jeton> (30 jours) et redirige vers / ;
+#     le propriétaire ouvre ce lien une fois par appareil ;
+#   - une requête qui porte le jeton : témoin __Host-shh_preprod (navigations du propriétaire,
+#     WebSocket), ou en-tête X-Shh-Preprod (contrôles de deploy.sh et preprod.sh) ;
+#   - les webhooks des prestataires de paiement (POST, trois chemins exacts) : ils arrivent sans
+#     témoin, leur signature est vérifiée par le serveur Go ;
+#   - une requête qui n'est pas une navigation et que le navigateur dit venir d'une page de cette
+#     origine (Sec-Fetch-Site: same-origin, hors Sec-Fetch-Mode: navigate) : le site envoie ses
+#     appels (API du salon et du paiement, WebAssembly, preuve anti-robot) avec
+#     credentials: "omit", donc SANS témoin ; sans cette exception, il ne marcherait pas.
+#     LIMITE : un client qui n'est pas un navigateur peut écrire cet en-tête et joindre l'API
+#     (README §15, risque PP1).
+# Le défi ACME (port 80, ou TLS-ALPN) est traité par Caddy avant ces blocs : aucune exemption.
+# Comparaisons de chaînes de Caddy, pas en temps constant : acceptable avec 256 bits (README §15).
+# Ni le jeton, ni le témoin n'atteignent le serveur Go (Cookie et X-Shh-Preprod retirés plus
+# bas) ; aucun journal (global, ci-dessus).
+(barriere-0) {
+}
+
+(entetes_preprod) {
+	header {
+		Content-Security-Policy "default-src 'none'; style-src 'sha256-Bpuq1l8Fe18wgWqa4Xc9+n3T4Hk/a9Da0z13ZBP1UIo='; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		Referrer-Policy no-referrer
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Permissions-Policy "microphone=(), camera=(), publickey-credentials-create=(), publickey-credentials-get=(), geolocation=(), display-capture=(), clipboard-read=(), usb=(), serial=(), hid=(), payment=(), gyroscope=(), accelerometer=(), magnetometer=(), midi=(), xr-spatial-tracking=(), browsing-topics=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy same-origin
+		Cross-Origin-Resource-Policy same-origin
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Robots-Tag "noindex, nofollow"
+	}
+}
+
+(barriere-1) {
+	# Aucun cache navigateur en préproduction : chaque
+	# version se voit tout de suite, fichiers à empreinte de /assets/ compris. Posé après la
+	# réponse (« > ») : remplace le Cache-Control du serveur Go. Le site n'a pas de service worker.
+	header >Cache-Control no-store
+	header X-Shhdrop-Etat preprod
+
+	# Chemin exact (le filtre « path » de Caddy ignore la casse) ; jeton de la bonne forme exigé
+	# (jeton vide : rien ne passe).
+	@preprod_acces expression `{http.request.uri.path} == "/acces/{$SHH_PREPROD_JETON}" && "{$SHH_PREPROD_JETON}".matches("^[0-9a-f]{64}$")`
+	@preprod_maintenance {
+		not expression `{http.request.uri.path} == "/acces/{$SHH_PREPROD_JETON}" && "{$SHH_PREPROD_JETON}".matches("^[0-9a-f]{64}$")`
+		not expression `({http.request.header.X-Shh-Preprod} == "{$SHH_PREPROD_JETON}" || {http.request.cookie.__Host-shh_preprod} == "{$SHH_PREPROD_JETON}") && "{$SHH_PREPROD_JETON}".matches("^[0-9a-f]{64}$")`
+		not {
+			method POST
+			path_regexp ^/api/paiement/webhook/(stripe|paypal|nowpayments)$
+		}
+		not {
+			header Sec-Fetch-Site same-origin
+			not header Sec-Fetch-Mode navigate
+		}
+	}
+	handle @preprod_maintenance {
+		import entetes_preprod
+		header {
+			Content-Type "text/html; charset=utf-8"
+			Retry-After 3600
+			X-Shhdrop-Etat maintenance
+		}
+		respond "{file.{$SHH_MAINTENANCE:/etc/caddy/maintenance.html}}" 503
+	}
+	handle @preprod_acces {
+		import entetes_preprod
+		# 30 jours ; Lax et non Strict : envoyé aussi au retour d'une page de paiement (navigation
+		# de premier niveau venue d'un autre site). HttpOnly : aucun script ne le lit.
+		header Set-Cookie "__Host-shh_preprod={$SHH_PREPROD_JETON}; Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=Lax"
+		# « * » : sans lui, « / » serait lu comme un filtre de chemin et la requête irait au
+		# serveur Go (test-preprod.sh le vérifie).
+		redir * / 303
+	}
+}
+
 # Port 80 : redirection vers HTTPS, et défi ACME (traité par Caddy avant ce bloc). Écrit
 # en toutes lettres pour que les délais et protocoles ci-dessus s'y appliquent aussi (la
 # redirection automatique de Caddy crée un serveur à part, avec ses réglages par défaut).
@@ -137,6 +217,9 @@ www.{$SHH_DOMAIN} {
 		header -Server
 	}
 
+	# Barrière de préproduction (plus haut) : vide en production.
+	import barriere-{$SHH_PREPROD:0}
+
 	reverse_proxy {$SHH_UPSTREAM:127.0.0.1:8080} {
 		# LIGNE CRITIQUE (audit de sécurité F3) : REMPLACE toute valeur envoyée par le
 		# client, une ou plusieurs, par l'adresse du pair TCP. Jamais « +X-Shh-Client-IP ».
@@ -157,6 +240,8 @@ www.{$SHH_DOMAIN} {
 		header_up -Referer
 		header_up -Accept-Language
 		header_up -Cookie
+		# Jeton de préproduction (contrôles de deploy.sh) : reste à Caddy.
+		header_up -X-Shh-Preprod
 		header_up -Sec-CH-UA*
 		header_up -Sec-Fetch-*
 		header_up -DNT

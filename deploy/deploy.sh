@@ -52,6 +52,11 @@
 # script, celui du commit installé, vérifie le nouveau commit, avance la copie (git merge
 # --ff-only), puis relance le deploy.sh de ce commit vérifié, qui refait toutes les vérifications.
 #
+# Préproduction (README §15) : SHH_PREPROD=1 dans deploy/.env met la barrière du Caddyfile, avec
+# ce script comme avec deploy/preprod.sh (version de développement construite sur le serveur,
+# sans signature). Ce script n'installe jamais une image de préproduction. Partie commune aux
+# deux : deploy/commun.sh.
+#
 # Limites, dites aussi dans le README :
 #   - le retour arrière ne concerne que l'image ; Caddyfile et compose.yaml viennent de la
 #     copie du dépôt, au commit installé (pour les ramener en arrière : un nouveau commit signé,
@@ -62,340 +67,19 @@ set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cd "$here"
-# shellcheck source=deploy/journaux.sh
-. ./journaux.sh
-
-die() {
-	printf 'erreur: %s\n' "$1" >&2
-	exit "${2:-1}"
-}
 usage() {
 	printf 'usage: deploy.sh sha256:<empreinte> [<x.y.z> <commit>] | rollback | status | admin <commande> | health | diagnose\n' >&2
 	exit 2
 }
-
 [ $# -ge 1 ] || usage
-# Arguments gardés pour relancer le deploy.sh du commit vérifié (verrous, plus bas).
+# Arguments gardés pour relancer le deploy.sh du commit vérifié (verrous, commun.sh).
 args=("$@")
-[ -f .env ] || die "deploy/.env absent (copier deploy/env.example et l'adapter)"
-set -a
-# shellcheck disable=SC1091 # fichier propre à chaque serveur
-. ./.env
-set +a
-: "${SHH_DOMAIN:?SHH_DOMAIN manquant dans deploy/.env}"
-: "${SHH_DATA_ROOT:?SHH_DATA_ROOT manquant dans deploy/.env}"
-# Après deploy/.env : ses constantes (dépôt, identité, image, cosign épinglé) sont en lecture
-# seule et l'emportent sur toute variable du même nom venue de deploy/.env.
-# shellcheck source=deploy/provenance.sh
-. ./provenance.sh
-# Image : ghcr.io/skoow/shhgone seulement (publiée et signée par release.yml, README §3.2) ;
-# SHH_IMAGE_REPO, s'il reste dans deploy/.env, doit valoir exactement cela.
-SHH_IMAGE_REPO=${SHH_IMAGE_REPO:-$PROVENANCE_IMAGE}
-depot_image_valide "$SHH_IMAGE_REPO" || exit 1
-# shellcheck source=deploy/verrous.sh
-. ./verrous.sh
-# Copie du dépôt vérifiée par les verrous : celle de ce script (ses Caddyfile, compose.yaml et
-# verify-site.mjs sont ceux qu'utilise l'installation), jamais une autre.
-depot=$(cd "$here/.." && pwd)
-# Autorités pour le contrôle TLS. Changé seulement par les essais (autorité interne de Caddy).
-ca=${SHH_CHECK_CA:-/etc/ssl/certs/ca-certificates.crt}
-
-SHH_CADDYFILE_SHA256=$(sha256sum Caddyfile | cut -d' ' -f1)
-export SHH_CADDYFILE_SHA256
-
-cur=$(cat .release 2>/dev/null || true)
-prev=$(cat .release.prev 2>/dev/null || true)
-cur_v=$(cat .release.version 2>/dev/null || true)
-prev_v=$(cat .release.prev.version 2>/dev/null || true)
-cur_c=$(cat .release.commit 2>/dev/null || true)
-prev_c=$(cat .release.prev.commit 2>/dev/null || true)
-valid() { [[ $1 =~ ^sha256:[0-9a-f]{64}$ ]]; }
-
-# Compte par passkey (README §12) : activé seulement par compose.yaml (SHH_COMPTES: "1", fichier
-# relu et commité), jamais par deploy/.env. Aucun relais : le compte n'a aucune sortie.
-[ "$(grep -cE '^ +SHH_COMPTES:' compose.yaml)" = 1 ] ||
-	die "compose.yaml : une seule ligne SHH_COMPTES attendue"
-comptes=$(sed -nE 's/^ +SHH_COMPTES: "([01])"$/\1/p' compose.yaml)
-[ "$comptes" = 0 ] || [ "$comptes" = 1 ] || die "compose.yaml : SHH_COMPTES doit valoir \"0\" ou \"1\""
-# Compte par e-mail, retiré le 22 novembre : une variable d'envoi d'e-mails restée dans
-# deploy/.env désigne un secret qui traîne ou une installation ancienne ; jamais ignorée.
-for v in $(compgen -v); do
-	case $v in
-	SHH_SMTP_* | SHH_MAIL_FROM) die "deploy/.env : $v ne sert plus (compte par e-mail retiré le 22 novembre, compte par passkey) : l'ôter (README §12)" ;;
-	esac
-done
-# rp.id des passkeys = hôte de SHH_ORIGIN (https://SHH_DOMAIN) : définitif, le changer rend
-# toutes les passkeys inutilisables (conception du compte par passkey R1, Q7 : shhgone.com).
-if [ "$comptes" = 1 ] && [ "$SHH_DOMAIN" != shhgone.com ]; then
-	die "compte activé : SHH_DOMAIN doit valoir shhgone.com (identifiant des passkeys, définitif ; README §12)"
-fi
-profils=
-secrets=$SHH_DATA_ROOT/secrets
-
-# Paiement (README §13 ; conception du paiement §10, S1) : interrupteurs dans compose.yaml
-# seulement. Un prestataire est configuré quand ses fichiers de secrets sont là ; ce script pose
-# alors ses chemins (…_FILE) et démarre son relais, vers l'hôte de son API (production ou bac à
-# sable). Tout ce qui vient de deploy/.env pour ces chemins et ces hôtes est remplacé ici.
-une_ligne() { # une_ligne <variable> : valeur "0" ou "1" de l'unique ligne de compose.yaml
-	[ "$(grep -cE "^ +$1:" compose.yaml)" = 1 ] || die "compose.yaml : une seule ligne $1 attendue"
-	local v
-	v=$(sed -nE "s/^ +$1: \"([01])\"\$/\\1/p" compose.yaml)
-	[ "$v" = 0 ] || [ "$v" = 1 ] || die "compose.yaml : $1 doit valoir \"0\" ou \"1\""
-	printf '%s' "$v"
-}
-paiement=$(une_ligne SHH_PAIEMENT)
-essai=$(une_ligne SHH_PAIEMENT_ESSAI)
-SHH_HOTE_STRIPE=api.stripe.com
-SHH_HOTE_PAYPAL=api-m.paypal.com
-SHH_HOTE_NOWPAYMENTS=api.nowpayments.io
-if [ "$essai" = 1 ]; then
-	SHH_HOTE_PAYPAL=api-m.sandbox.paypal.com
-	SHH_HOTE_NOWPAYMENTS=api-sandbox.nowpayments.io
-fi
-export SHH_HOTE_STRIPE SHH_HOTE_PAYPAL SHH_HOTE_NOWPAYMENTS
-# present <fichier de secrets/> : là (lien symbolique compris : refusé ensuite par preflight).
-present() { [ -e "$secrets/$1" ] || [ -L "$secrets/$1" ]; }
-avec_stripe=0 avec_paypal=0 avec_nowpayments=0
-if [ "$paiement" = 1 ]; then
-	if present shh_stripe_cle || present shh_stripe_webhook; then avec_stripe=1; fi
-	if present shh_paypal_secret; then avec_paypal=1; fi
-	if present shh_nowpayments_cle || present shh_nowpayments_ipn; then avec_nowpayments=1; fi
-fi
-SHH_STRIPE_CLE_FILE="" SHH_STRIPE_WEBHOOK_FILE="" SHH_PAYPAL_SECRET_FILE="" SHH_NOWPAYMENTS_CLE_FILE="" SHH_NOWPAYMENTS_IPN_FILE=""
-if [ "$avec_stripe" = 1 ]; then
-	profils=${profils:+$profils,}paiement-stripe
-	SHH_STRIPE_CLE_FILE=/run/secrets/shh_stripe_cle SHH_STRIPE_WEBHOOK_FILE=/run/secrets/shh_stripe_webhook
-fi
-if [ "$avec_paypal" = 1 ]; then
-	profils=${profils:+$profils,}paiement-paypal
-	SHH_PAYPAL_SECRET_FILE=/run/secrets/shh_paypal_secret
-else
-	# Sans son secret, PayPal n'est pas configuré : ses réglages de deploy/.env sont ignorés
-	# (sinon le serveur refuserait de démarrer : « vont ensemble »).
-	SHH_PAYPAL_CLIENT_ID="" SHH_PAYPAL_WEBHOOK_ID="" SHH_PAYPAL_PLANS=""
-fi
-if [ "$avec_nowpayments" = 1 ]; then
-	profils=${profils:+$profils,}paiement-nowpayments
-	SHH_NOWPAYMENTS_CLE_FILE=/run/secrets/shh_nowpayments_cle SHH_NOWPAYMENTS_IPN_FILE=/run/secrets/shh_nowpayments_ipn
-fi
-export SHH_STRIPE_CLE_FILE SHH_STRIPE_WEBHOOK_FILE SHH_PAYPAL_SECRET_FILE SHH_NOWPAYMENTS_CLE_FILE SHH_NOWPAYMENTS_IPN_FILE
-export SHH_PAYPAL_CLIENT_ID SHH_PAYPAL_WEBHOOK_ID SHH_PAYPAL_PLANS
-
-# Appels audio et vidéo (README §14) : ACTIVÉS par défaut, sans rien à installer. Le relais
-# TURN est dans notre image (profil « appels ») ; son secret, partagé avec le serveur, est tiré
-# ici à la première installation et gardé sur le volume chiffré. SHH_APPELS=0 dans deploy/.env :
-# coupés (relais arrêté, aucune route ni bouton d'appel).
-appels=${SHH_APPELS:-1}
-[ "$appels" = 0 ] || [ "$appels" = 1 ] || die "SHH_APPELS doit valoir 0 ou 1 (deploy/.env)"
-SHH_TURN_URLS="" SHH_TURN_SECRET_FILE=""
-if [ "$appels" = 1 ]; then
-	profils=${profils:+$profils,}appels
-	SHH_TURN_URLS="turn:$SHH_DOMAIN:3478?transport=udp,turn:$SHH_DOMAIN:3478?transport=tcp"
-	SHH_TURN_SECRET_FILE=/run/secrets/shh_turn_secret
-fi
-export SHH_TURN_URLS SHH_TURN_SECRET_FILE
-
-# secret_turn : crée le secret du relais s'il manque (48 caractères hexadécimaux, compte 65532,
-# 0400), sans jamais l'afficher ; un secret présent est gardé tel quel.
-secret_turn() {
-	local f=$secrets/shh_turn_secret
-	[ "$appels" = 1 ] || return 0
-	if [ ! -e "$f" ] && [ ! -L "$f" ]; then
-		(umask 077 && od -An -N24 -tx1 /dev/urandom | tr -d ' \n' >"$f.tmp" && printf '\n' >>"$f.tmp")
-		chown 65532:65532 "$f.tmp" && chmod 0400 "$f.tmp" && mv "$f.tmp" "$f"
-		echo "appels : secret du relais créé ($f)"
-	fi
-	[ -f "$f" ] && [ ! -L "$f" ] && [ "$(stat -c '%u %a' "$f")" = "65532 400" ] ||
-		die "$f mal réglé : fichier du compte 65532, droits 0400 (README §14)"
-}
-
-# ports_turn : ports du relais ouverts dans le pare-feu de la machine. ufw actif : les règles
-# manquantes sont ajoutées (et dites) ; autre pare-feu : un avertissement avec les ports.
-ports_turn() {
-	[ "$appels" = 1 ] || return 0
-	local r
-	if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
-		for r in 3478/udp 3478/tcp 49160:49999/udp; do
-			if ! ufw status 2>/dev/null | grep -qE "^${r}[[:space:]]+ALLOW"; then
-				ufw allow "$r" >/dev/null && echo "appels : pare-feu ouvert pour $r (relais TURN)"
-			fi
-		done
-	else
-		echo "appels : si un pare-feu filtre la machine, ouvrir 3478 (UDP et TCP) et 49160 à 49999 (UDP) pour le relais (README §14)."
-	fi
-}
-
-# dc <empreinte> <arguments de docker compose…>
-# « -f compose.yaml » explicite : sans lui, docker compose fusionne de lui-même un
-# compose.override.yaml posé à côté et suit COMPOSE_FILE (deploy/.env), qui pourraient changer
-# l'environnement du serveur sans rien dire (audit adverse du 13 novembre, stockage, H1). Un
-# seul fichier fait foi : celui de la copie du dépôt.
-# Même raison pour COMPOSE_PROFILES : posé ici, d'après compose.yaml seulement (une valeur venue
-# de deploy/.env démarrerait un relais, compte ou paiement désactivé).
-dc() {
-	local digest=$1
-	shift
-	COMPOSE_PROFILES="$profils" SHH_IMAGE="$SHH_IMAGE_REPO@$digest" docker compose -f compose.yaml "$@"
-}
-need_current() { valid "$cur" || die "aucune version installée (deploy/.release absent)"; }
-
-# Contrôles de la machine, bloquants (spec §15.1, §22 ; audits de confidentialité P5, P6).
-preflight() {
-	local opts src
-	docker compose version >/dev/null 2>&1 || die "docker compose introuvable"
-	mountpoint -q "$SHH_DATA_ROOT" ||
-		die "$SHH_DATA_ROOT n'est pas un point de montage : volume chiffré non déverrouillé ?"
-	opts=$(findmnt -no OPTIONS -T "$SHH_DATA_ROOT")
-	[[ ",$opts," == *,noatime,* ]] ||
-		die "$SHH_DATA_ROOT n'est pas monté avec noatime (options : $opts)"
-	[ -d "$SHH_DATA_ROOT/data" ] && [ -d "$SHH_DATA_ROOT/caddy" ] ||
-		die "$SHH_DATA_ROOT doit contenir data/ et caddy/ (compte 65532) : voir le README"
-	# Caddy non root (D9, 22 novembre) : son dossier lui appartient, et la machine laisse un
-	# compte ordinaire écouter sur 80 et 443.
-	[ "$(stat -c '%u:%g %a' "$SHH_DATA_ROOT/caddy")" = "65532:65532 700" ] ||
-		die "$SHH_DATA_ROOT/caddy doit appartenir à 65532:65532, mode 0700 (Caddy non root) : chown -R 65532:65532 $SHH_DATA_ROOT/caddy && chmod 0700 $SHH_DATA_ROOT/caddy"
-	port=$(sysctl -n net.ipv4.ip_unprivileged_port_start 2>/dev/null || echo 1024)
-	[ "$port" -le 80 ] ||
-		die "net.ipv4.ip_unprivileged_port_start vaut $port : le poser à 80 (README §1, Caddy non root)"
-	[ "$(wc -l </proc/swaps)" -le 1 ] ||
-		die "mémoire d'échange active (swapon --show) : la désactiver (spec §22)"
-	# Secrets du compte (README §12) : dossier exigé même compte désactivé (monté dans le
-	# conteneur, jamais créé par Docker).
-	[ -d "$secrets" ] && [ ! -L "$secrets" ] && [ "$(stat -c '%u:%g %a' "$secrets")" = "0:65532 750" ] ||
-		die "$secrets absent ou mal réglé : install -d -o root -g 65532 -m 0750 $secrets (README §12)"
-	if [ "$comptes" = 1 ]; then
-		grep -qE '^ +SHH_SALONS: "1"$' compose.yaml || die "SHH_COMPTES=1 exige SHH_SALONS: \"1\" dans compose.yaml"
-		[ -f "$secrets/shh_comptes_cle" ] && [ ! -L "$secrets/shh_comptes_cle" ] &&
-			[ "$(stat -c '%u %a' "$secrets/shh_comptes_cle")" = "65532 400" ] ||
-			die "$secrets/shh_comptes_cle absent ou mal réglé : fichier du compte 65532, droits 0400 (README §12)"
-		[ "$(stat -c %s "$secrets/shh_comptes_cle")" = 32 ] ||
-			die "$secrets/shh_comptes_cle : 32 octets attendus (README §12)"
-	fi
-	# Ancien mot de passe SMTP (compte par e-mail, retiré) : un secret qui ne sert plus ne reste pas.
-	if [ -e "$secrets/shh_smtp_mdp" ] || [ -L "$secrets/shh_smtp_mdp" ]; then
-		die "$secrets/shh_smtp_mdp ne sert plus (compte par e-mail retiré le 22 novembre) : l'effacer (shred -u), puis révoquer ce mot de passe chez le fournisseur (README §12)"
-	fi
-	if [ "$paiement" = 1 ]; then
-		[ -n "${SHH_TVA:-}" ] || die "paiement activé : SHH_TVA manque dans deploy/.env (franchise, france ou oss, README §13)"
-		[ $((avec_stripe + avec_paypal + avec_nowpayments)) -ge 1 ] ||
-			die "paiement activé : aucun prestataire (fichiers shh_stripe_…, shh_paypal_secret ou shh_nowpayments_… dans $secrets, README §13)"
-		local attendus=()
-		if [ "$avec_stripe" = 1 ]; then attendus+=(shh_stripe_cle shh_stripe_webhook); fi
-		if [ "$avec_paypal" = 1 ]; then
-			attendus+=(shh_paypal_secret)
-			[ -n "${SHH_PAYPAL_CLIENT_ID:-}" ] && [ -n "${SHH_PAYPAL_WEBHOOK_ID:-}" ] && [ -n "${SHH_PAYPAL_PLANS:-}" ] ||
-				die "PayPal : SHH_PAYPAL_CLIENT_ID, SHH_PAYPAL_WEBHOOK_ID et SHH_PAYPAL_PLANS manquent dans deploy/.env (README §13)"
-		fi
-		if [ "$avec_nowpayments" = 1 ]; then attendus+=(shh_nowpayments_cle shh_nowpayments_ipn); fi
-		for f in "${attendus[@]}"; do
-			[ -f "$secrets/$f" ] && [ ! -L "$secrets/$f" ] && [ "$(stat -c '%u %a' "$secrets/$f")" = "65532 400" ] ||
-				die "$secrets/$f absent ou mal réglé : fichier du compte 65532, droits 0400 (README §13)"
-		done
-	fi
-	# Journaux de la machine (README §1 ; inventaire des adresses IP du 22 novembre, journaux.sh) :
-	# aucun syslog ni ancien journal sur le disque, journald en mémoire une heure au plus, sshd
-	# silencieux, ufw sans journal, suivi des connexions ramené à 30 min, registres des connexions
-	# (wtmp, btmp, lastlog, wtmpdb, lastlog2) vers /dev/null, minuteur de purge du journal. Bloquant.
-	local sshd_t=absent pbs
-	if command -v sshd >/dev/null 2>&1 || [ -x /usr/sbin/sshd ]; then
-		sshd_t=$(PATH=$PATH:/usr/sbin sshd -T 2>/dev/null) || sshd_t=
-	fi
-	pbs=$(controle_journaux "" "$sshd_t") ||
-		die "journaux de la machine (adresses IP), à corriger avant d'installer (README §1) :
-$pbs"
-	# Simple avertissement : la détection ne connaît que dm-crypt (LUKS), pas d'autre montage.
-	src=$(findmnt -no SOURCE -T "$SHH_DATA_ROOT")
-	if ! lsblk -s -n -o TYPE "$src" 2>/dev/null | grep -qx crypt; then
-		printf 'AVERTISSEMENT : %s (%s) ne semble pas être sur un volume LUKS (spec §22).\n' "$SHH_DATA_ROOT" "$src" >&2
-	fi
-}
-
-# Contrôle de santé d'une version en service : check <empreinte> <x.y.z>. Rend 0 si tout passe.
-check() {
-	local i code node manifeste=$here/.provenance/$2/release.json
-	# 1. Le conteneur du serveur se dit en bonne santé (/healthz local, via shhcheck).
-	dc "$1" up -d --wait --wait-timeout 120 >/dev/null 2>&1 || {
-		echo "contrôle : conteneurs pas en bonne santé (attente : 120 s au plus)" >&2
-		return 1
-	}
-	# 2. De bout en bout à travers Caddy, sans dépendre du DNS : /api ne répond 200 que si
-	#    Caddy pose X-Shh-Client-IP et que le serveur lui fait confiance. Jusqu'à 2 min :
-	#    à la première installation, Caddy doit d'abord obtenir son certificat.
-	code=000
-	for i in $(seq 1 40); do
-		code=$(curl -sS --noproxy '*' --max-time 10 --cacert "$ca" --resolve "$SHH_DOMAIN:443:127.0.0.1" \
-			-o /dev/null -w '%{http_code}' "https://$SHH_DOMAIN/api/captcha" 2>/dev/null) || true
-		[ "$code" = 200 ] && break
-		sleep 3
-	done
-	[ "$code" = 200 ] || {
-		echo "contrôle : https://$SHH_DOMAIN/api/captcha répond $code après $i essais (attendu : 200)" >&2
-		return 1
-	}
-	# 3. La page d'accueil arrive avec les en-têtes du serveur Go.
-	curl -sS --noproxy '*' --max-time 10 --cacert "$ca" --resolve "$SHH_DOMAIN:443:127.0.0.1" \
-		-o /dev/null -D - "https://$SHH_DOMAIN/" | grep -qi '^strict-transport-security:' || {
-		echo "contrôle : page d'accueil sans Strict-Transport-Security" >&2
-		return 1
-	}
-	# 4. Test bloquant de la spec §30 : échange de clés hybride X25519MLKEM768.
-	docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true \
-		--log-driver none -v "$ca:/ca.pem:ro" -e SSL_CERT_FILE=/ca.pem --entrypoint /shhcheck \
-		"$SHH_IMAGE_REPO@$1" tls 127.0.0.1:443 "$SHH_DOMAIN" || {
-		echo "contrôle : pas d'échange de clés X25519MLKEM768 en TLS 1.3" >&2
-		return 1
-	}
-	# 5. Appels : le relais TURN répond sur la machine (requête STUN « Binding » en UDP, sans
-	#    identifiants). Simple avertissement : sans lui, les appels échouent, le reste marche.
-	if [ "$appels" = 1 ]; then
-		docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true \
-			--log-driver none --entrypoint /shhcheck "$SHH_IMAGE_REPO@$1" stun 127.0.0.1:3478 ||
-			echo "AVERTISSEMENT : le relais des appels ne répond pas sur 127.0.0.1:3478 (README §14) : les appels ne marcheront pas." >&2
-	fi
-	# 6. Le site servi à travers Caddy est celui du manifeste signé (spec §28.7) : chaque fichier,
-	#    ses variantes compressées et le repli monopage (web/scripts/verify-site.mjs de la copie du
-	#    dépôt, lancé par le Node épinglé du Dockerfile).
-	if ! version_valide "$2" || [ ! -f "$manifeste" ]; then
-		echo "contrôle : aucun manifeste vérifié pour la version « $2 » (installée avant la vérification de provenance ?)" >&2
-		return 1
-	fi
-	node=$(image_node Dockerfile) || return 1
-	verifier_site_servi docker "$node" "$here/../web/scripts/verify-site.mjs" "$manifeste" "$SHH_DOMAIN" "$ca" || {
-		echo "contrôle : le site servi par https://$SHH_DOMAIN n'est pas celui du manifeste signé web-v$2" >&2
-		return 1
-	}
-}
-
-# verrous <commit> <suite|retour> : V1 et V2 (deploy/verrous.sh, README §3.5), puis la copie du
-# dépôt au bon commit. suite : nouveau commit ; si la copie n'y est pas encore, elle y est
-# avancée, puis le deploy.sh de ce commit (vérifié) est relancé avec les mêmes arguments et refait
-# tout. retour : retour arrière ou réinstallation ; la copie doit être sur le commit installé
-# (ou sur un descendant qui passe V1 et V2).
-verrous() {
-	local c=$1 mode=$2 installe
-	if ! command -v git >/dev/null 2>&1 || ! command -v ssh-keygen >/dev/null 2>&1; then
-		die "git et ssh-keygen exigés par les verrous (paquets git et openssh-client, README §3.5)"
-	fi
-	controle_signataires "$VERROUS_SIGNATAIRES" 0 || die "installation refusée : signataires autorisés (V1, README §3.5)"
-	installe=$(lire_commit_installe "$VERROUS_COMMIT_INSTALLE" 0) || die "installation refusée : commit installé illisible (V2, README §3.5)"
-	verifier_commit "$depot" "$VERROUS_SIGNATAIRES" "$installe" "$c" "$mode" ||
-		die "installation refusée : commit $c non vérifié (README §3.5)"
-	if [ "$mode" = retour ]; then
-		copie_verifiee "$depot" "$VERROUS_SIGNATAIRES" "$installe" ||
-			die "refusé : la copie du dépôt doit être sur le commit installé $installe (ou un descendant vérifié), sans modification (README §3.5)"
-		return 0
-	fi
-	if ! copie_au_commit "$depot" "$VERROUS_SIGNATAIRES" "$c" 2>/dev/null; then
-		avancer_copie "$depot" "$VERROUS_SIGNATAIRES" "$installe" "$c" ||
-			die "installation refusée : copie du dépôt à remettre sur le commit installé (README §3.5)"
-		echo "copie du dépôt avancée au commit $c (signé, vérifié) : relance du deploy.sh de ce commit"
-		# Toute la commande « case » en cours a été lue avant de s'exécuter : rien de plus n'est
-		# lu de l'ancien fichier. Le verrou est rendu, le nouveau script le reprend.
-		exec 9>&-
-		exec "$here/deploy.sh" "${args[@]}"
-	fi
-	resume_changements "$depot" "$VERROUS_SIGNATAIRES" "$installe" "$c"
-}
+# shellcheck disable=SC2034 # lue par commun.sh (verrous)
+relance=deploy.sh
+# Réglages de deploy/.env, verrous, contrôles de la machine, démarrage et contrôle de santé :
+# partie commune avec preprod.sh (README §15).
+# shellcheck source=deploy/commun.sh
+. ./commun.sh
 
 # install_version <empreinte> <x.y.z> <commit> <suite|retour>
 install_version() {
@@ -428,49 +112,7 @@ install_version() {
 	controle_commit_annonce "$here/.provenance/$new_v/release.json" "$new_c" ||
 		die "installation refusée : commit non confirmé (V3, README §3.5)"
 
-	echo "installation de $new"
-	dc "$new" up -d --remove-orphans || true # l'échec éventuel est constaté par check
-	# Relais des prestataires absents ou paiement désactivé : ceux d'une activation précédente ne
-	# doivent pas rester (un service hors profil n'est pas un « orphelin » pour --remove-orphans ;
-	# l'ancien relais SMTP, retiré de compose.yaml, l'est).
-	if [ "$avec_stripe" = 0 ]; then dc "$new" rm -sf relais-stripe >/dev/null 2>&1 || true; fi
-	if [ "$avec_paypal" = 0 ]; then dc "$new" rm -sf relais-paypal >/dev/null 2>&1 || true; fi
-	if [ "$avec_nowpayments" = 0 ]; then dc "$new" rm -sf relais-nowpayments >/dev/null 2>&1 || true; fi
-	if [ "$appels" = 0 ]; then dc "$new" rm -sf relais-turn >/dev/null 2>&1 || true; fi
-	if check "$new" "$new_v"; then
-		if [ "$new" != "$cur" ]; then
-			if valid "$cur"; then
-				printf '%s\n' "$cur" >.release.prev
-				printf '%s\n' "$cur_v" >.release.prev.version
-				if commit_valide "$cur_c"; then printf '%s\n' "$cur_c" >.release.prev.commit; else rm -f .release.prev.commit; fi
-			fi
-			printf '%s\n' "$new" >.release.tmp && mv .release.tmp .release
-		fi
-		printf '%s\n' "$new_v" >.release.version.tmp && mv .release.version.tmp .release.version
-		printf '%s\n' "$new_c" >.release.commit.tmp && mv .release.commit.tmp .release.commit
-		# V2 : le commit installé n'avance qu'après une installation réussie, et jamais en arrière
-		# (un retour arrière ou une réinstallation le laisse tel quel).
-		if [ "$mode" = suite ]; then
-			ecrire_commit_installe "$VERROUS_COMMIT_INSTALLE" "$new_c" ||
-				die "en service, mais $VERROUS_COMMIT_INSTALLE n'a pas pu être écrit : le corriger avant la prochaine installation (README §3.5)"
-		fi
-		echo "en service : $new (web-v$new_v, commit $new_c)"
-		return 0
-	fi
-
-	if valid "$cur" && [ "$cur" != "$new" ]; then
-		echo "ÉCHEC du contrôle : retour à $cur" >&2
-		dc "$cur" up -d --remove-orphans || true
-		if check "$cur" "$cur_v"; then
-			echo "retour arrière fait : $cur est en service" >&2
-		else
-			echo "ATTENTION : le retour arrière échoue aussi au contrôle. Site à vérifier à la main." >&2
-		fi
-	else
-		echo "ÉCHEC du contrôle, et aucune autre version à remettre : pile arrêtée." >&2
-		dc "$new" down || true
-	fi
-	exit 1
+	mettre_en_service "$new" "$new_v" "$new_c" "$mode"
 }
 
 case $1 in
@@ -488,8 +130,15 @@ sha256:*)
 		usage
 	fi
 	;;
+preprod:*)
+	# Image de préproduction (construite sur le serveur, sans signature) : jamais par ce script.
+	die "$1 : version de préproduction, à réinstaller par deploy/preprod.sh ${1#preprod:} (README §15)" 2
+	;;
 rollback)
 	[ $# -eq 1 ] || usage
+	if [[ $prev == preprod:* ]]; then
+		die "la version précédente est une version de préproduction : deploy/preprod.sh ${prev#preprod:} (README §15)"
+	fi
 	valid "$prev" || die "aucune version précédente (deploy/.release.prev absent)"
 	version_valide "$prev_v" ||
 		die "version de la précédente inconnue (installée avant la vérification de provenance) : retour arrière impossible"
@@ -502,7 +151,8 @@ status)
 	echo "en service : ${cur:-aucune}${cur_v:+ (web-v$cur_v)}${cur_c:+, commit $cur_c}"
 	echo "précédente : ${prev:-aucune}${prev_v:+ (web-v$prev_v)}${prev_c:+, commit $prev_c}"
 	echo "commit installé (V2) : $(cat "$VERROUS_COMMIT_INSTALLE" 2>/dev/null || echo aucun)"
-	if valid "$cur"; then dc "$cur" ps -a; fi
+	if [ "$preprod" = 1 ]; then echo "PRÉPRODUCTION (SHH_PREPROD=1) : le public ne voit que la page de maintenance (README §15)"; fi
+	if etat_valide "$cur"; then dc "$cur" ps -a; fi
 	;;
 admin)
 	# Dans le conteneur en marche : même dossier de données, même compte. L'entrée standard

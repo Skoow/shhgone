@@ -119,15 +119,24 @@ services:
       SHH_COMPTES_MAX: ${SHH_COMPTES_MAX:-}
       SHH_COMPTES_JOUR: ${SHH_COMPTES_JOUR:-}
       SHH_COMPTES_CLE_FILE: /run/secrets/shh_comptes_cle
+      # Tableau de bord d'administration (README §4) : vides, il n'existe pas. Écouteur à part
+      # (172.30.53.2:9191, réseau interne, aucun port publié, joint par tunnel SSH) ; Caddy ne
+      # relaie que vers :8080, barrière de préproduction comprise. Empreinte du jeton seulement.
+      SHH_ADMIN_LISTEN: ${SHH_ADMIN_LISTEN:-}
+      SHH_ADMIN_TOKEN_SHA256: ${SHH_ADMIN_TOKEN_SHA256:-}
       # Paiement des offres Plus et Pro (conception du paiement, docs/superpowers/specs/
       # 2026-11-19-paiement-design.md) : DÉSACTIVÉ tant que le propriétaire n'a pas fourni ce
       # que liste son §13 (comptes des prestataires, régime de TVA, mentions des notes de
       # vente). Activé ("1") : deploy.sh démarre le relais de chaque prestataire dont les
       # secrets sont dans secrets/ (README §13) et refuse d'installer sans SHH_TVA ni secrets
-      # bien réglés. Comme SHH_COMPTES : seulement ici (fichier relu, commité), jamais dans .env.
-      SHH_PAIEMENT: "0"
+      # bien réglés. Comme SHH_COMPTES : la valeur de production est ici (le chiffre après « :- »,
+      # fichier relu, commité), jamais dans .env. SHH_PAIEMENT_SERVI et SHH_PAIEMENT_ESSAI_SERVI
+      # sont posées par deploy.sh : cette valeur, sauf en préproduction (SHH_PREPROD=1), où
+      # SHH_PREPROD_PAIEMENT et SHH_PREPROD_PAIEMENT_ESSAI de deploy/.env la remplacent (README §15).
+      SHH_PAIEMENT: "${SHH_PAIEMENT_SERVI:-0}"
       # "1" : bacs à sable des prestataires (clés d'essai) ; choisit aussi l'hôte des relais.
-      SHH_PAIEMENT_ESSAI: "0"
+      # Refusé par deploy.sh sans la barrière de préproduction (toute carte de test « paie »).
+      SHH_PAIEMENT_ESSAI: "${SHH_PAIEMENT_ESSAI_SERVI:-0}"
       SHH_TVA: ${SHH_TVA:-}
       SHH_STRIPE_TAXE: ${SHH_STRIPE_TAXE:-}
       # Chemins et identifiants posés par deploy.sh d'après les fichiers de secrets/ (vides :
@@ -354,12 +363,18 @@ services:
     environment:
       SHH_DOMAIN: ${SHH_DOMAIN:?SHH_DOMAIN manquant (nom du site)}
       SHH_UPSTREAM: 172.30.53.2:8080
-    # Empreinte du Caddyfile, calculée par deploy.sh : si le fichier change, le conteneur
-    # est recréé (l'API d'administration est coupée, donc pas de « caddy reload »).
+      # Barrière de préproduction (Caddyfile, README §15) : posées par deploy.sh et preprod.sh
+      # (SHH_PREPROD de deploy/.env ; jeton lu dans /etc/shhdrop/preprod-jeton). « 0 » : aucune.
+      SHH_PREPROD: "${SHH_PREPROD:-0}"
+      SHH_PREPROD_JETON: ${SHH_PREPROD_JETON:-}
+    # Empreinte du Caddyfile et de la page de maintenance, calculée par deploy.sh : si l'un change,
+    # le conteneur est recréé (l'API d'administration est coupée, donc pas de « caddy reload »).
     labels:
       app.shhdrop.caddyfile: ${SHH_CADDYFILE_SHA256:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Page servie au public en préproduction (lue par Caddy à chaque requête).
+      - ./maintenance.html:/etc/caddy/maintenance.html:ro
       # Clés et certificats TLS, compte ACME : sur le volume chiffré eux aussi.
       - type: bind
         source: ${SHH_DATA_ROOT:?SHH_DATA_ROOT manquant}/caddy

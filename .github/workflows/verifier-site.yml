@@ -10,7 +10,8 @@
 # Inactive tant que la variable du dépôt SHH_SONDE_HOTE (celle de sonde.yml, ex. shhgone.com)
 # n'est pas posée. Limites : ce job ne voit que ce que le serveur LUI sert ; un serveur compromis
 # qui ne piège que certaines victimes (adresse IP, navigateur) passe inaperçu ; les en-têtes
-# (CSP…) ne sont pas contrôlés.
+# (CSP…) ne sont pas contrôlés. Préproduction (deploy/README.md §15) : la page de maintenance
+# exacte vaut succès, sans rien vérifier d'autre (trou à retirer à l'ouverture).
 name: verifier-site
 
 on:
@@ -48,6 +49,16 @@ jobs:
         run: |
           . deploy/provenance.sh
           [[ $HOTE =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || { echo "SHH_SONDE_HOTE hors format : $HOTE" >&2; exit 1; }
+          # Préproduction (deploy/README.md §15) : le public ne reçoit que la page de maintenance,
+          # 503, marqueur X-Shhdrop-Etat: maintenance, corps = deploy/maintenance.html de ce dépôt
+          # (Caddy en retire le dernier saut de ligne). Exactement elle : rien à vérifier, succès.
+          # Tout autre écart reste une erreur. TROU ASSUMÉ, à retirer à l'ouverture (README §15).
+          code=$(curl -sS --proto '=https' --max-time 30 -D "$RUNNER_TEMP/h" -o "$RUNNER_TEMP/b" -w '%{http_code}' "https://$HOTE/") || code=000
+          if [ "$code" = 503 ] && tr -d '\r' <"$RUNNER_TEMP/h" | grep -qix 'x-shhdrop-etat: maintenance' &&
+            cmp -s "$RUNNER_TEMP/b" <(head -c -1 deploy/maintenance.html); then
+            echo "::notice::https://$HOTE est en préproduction (page de maintenance) : rien à vérifier"
+            exit 0
+          fi
           # Les trois dernières Releases publiées (ordre de création), étiquettes web-v<x.y.z> seulement.
           gh release list --repo "$GITHUB_REPOSITORY" --limit 50 --exclude-drafts --exclude-pre-releases \
             --json tagName --jq '.[].tagName' > "$RUNNER_TEMP/etiquettes"
