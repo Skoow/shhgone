@@ -245,8 +245,10 @@ describe("règles de sources", () => {
     expect(offenders(/["']X-Shh-Manage["']\s*:/, (r) => r.startsWith("salon/") && r !== "salon/api.ts")).toEqual([]);
     expect(offenders(/X-Shh-Manage/, (r) => r.startsWith("routes/salon/"))).toEqual([]);
   });
-  it("sessionStorage seulement dans session/open-grant.ts (et chat/session.ts)", () =>
-    expect(offenders(/sessionStorage/, (r) => r !== "session/open-grant.ts" && r !== "chat/session.ts")).toEqual([]));
+  // ui/section.ts : identifiant de section de l'accueil (lettres, chiffres, tirets), le temps
+  // d'un rechargement ; rien de secret.
+  it("sessionStorage seulement dans session/open-grant.ts, chat/session.ts et ui/section.ts", () =>
+    expect(offenders(/sessionStorage/, (r) => r !== "session/open-grant.ts" && r !== "chat/session.ts" && r !== "ui/section.ts")).toEqual([]));
   it("pas de console.log", () => expect(offenders(/console\.log/)).toEqual([]));
   // Exception démo (UI §14.3) : le faux serveur de la démo garde son état (ce que garderait le
   // vrai serveur : empreintes, segments chiffrés) en IndexedDB, rangé par onglet (identifiant
