@@ -108,9 +108,10 @@
     --p8: #e0a8f0;
     --p9: #d9c3a0;
   }
+  /* Pastille alignée sur le nom (la fiche peut être haute : code, « Exclure »). */
   li {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--sp-3);
   }
   .c0 { --pc: var(--p0); }
@@ -193,7 +194,13 @@
   }
   .qui {
     display: grid;
+    justify-items: start;
     min-width: 0;
+  }
+  /* « Exclure » : action qui retire quelqu'un, en corail, alignée sur le texte de la fiche. */
+  .qui :global(.btn.ghost) {
+    margin-inline-start: -14px;
+    color: var(--danger);
   }
   .nom {
     font-weight: 600;

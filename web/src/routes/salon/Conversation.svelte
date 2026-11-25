@@ -824,9 +824,14 @@
     padding-block: var(--sp-2) var(--sp-3);
     border-bottom: 1px solid var(--line);
   }
+  /* Titre à l'échelle des en-têtes d'écran, en version compacte (l'écran est un outil). */
   .tete h1 {
     margin: 0;
-    font-size: var(--fs-title, 1.25rem);
+    font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+    font-weight: 700;
+    font-stretch: var(--wd-display, 112%);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
   }
   .tete h1:focus {
     outline: none;
@@ -1032,12 +1037,14 @@
     justify-self: end;
     flex-direction: row-reverse;
   }
+  /* Bulle : surface et filet, sans barre de couleur sur le côté (la couleur de la personne reste
+     sur son nom) ; le coin du bas, du côté de l'auteur, est resserré. */
   .bulle {
     min-width: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: 14px;
+    border-radius: 16px 16px 16px 6px;
     background: var(--surface-1);
-    border-inline-start: 3px solid var(--pc, var(--line));
+    box-shadow: inset 0 0 0 1px var(--hair);
     overflow-wrap: anywhere;
   }
   .barre-sel {
@@ -1072,9 +1079,9 @@
     outline-offset: 2px;
   }
   .moi .bulle {
-    background: var(--surface-2);
-    border-inline-start: 0;
-    border-inline-end: 3px solid var(--accent);
+    border-radius: 16px 16px 6px 16px;
+    background: var(--accent-tint);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.14);
   }
   .c0 { --pc: var(--p0); }
   .c1 { --pc: var(--p1); }

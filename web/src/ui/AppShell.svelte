@@ -402,6 +402,8 @@
       radial-gradient(50% 90% at 88% 100%, rgb(95 227 181 / 0.04), transparent 70%),
       linear-gradient(to bottom, rgb(255 255 255 / 0.025), rgb(7 8 12 / 0.55))
       var(--bg);
+    /* Bord haut net (filet neutre) : le pied commence par une ligne voulue, pas par une bande floue. */
+    box-shadow: inset 0 1px 0 var(--hair);
   }
   /* Papier peint maison : petits pictos Shhgone répétés (cadenas, clé, fichier,
      onde, points de la Trame), fichier statique mis en cache (CSP : ni data: ni style inline),

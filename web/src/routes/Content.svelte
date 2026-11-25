@@ -603,14 +603,17 @@
     display: grid;
     gap: var(--sp-1);
   }
+  /* Titre à l'échelle des en-têtes d'écran (ui/PageHeader.svelte), un cran plus petit : il suit
+     la carte de l'échéance. */
   .title {
     margin: 0;
     min-width: 0;
     overflow-wrap: anywhere;
-    font-size: var(--fs-h2);
-    font-weight: var(--fw-h2);
-    font-stretch: var(--wd-h2);
-    line-height: var(--lh-h2);
+    font-size: clamp(1.75rem, 1.4rem + 1.4vw, 2.5rem);
+    font-weight: 700;
+    font-stretch: var(--wd-display, 112%);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
   }
   .tt {
     display: flex;
@@ -653,6 +656,14 @@
     color: var(--text-2);
     font-size: var(--fs-small);
     max-width: 65ch;
+  }
+  /* Icône de la note : taille fixe, alignée sur la première ligne. */
+  .notice :global(svg) {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    color: var(--text-3);
   }
   /* Groupe (retours LIGHT) : aucun contenant ni bandeau ; un en-tête discret, puis les lignes
      séparées par un seul filet fin. L'espace entre les groupes suffit à les délimiter. */
