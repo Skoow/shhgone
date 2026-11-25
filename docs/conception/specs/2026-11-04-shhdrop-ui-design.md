@@ -518,6 +518,8 @@ Aucun audit, aucun pays d'hébergement, aucun badge (benchmark B3) ; jamais « 1
 
 ### 9.3 Options
 
+> **Mot de passe (D42-27)** : interrupteur « Protéger par un mot de passe », **désactivé par défaut**, après les ouvertures. Désactivé : aide « Sans mot de passe, quiconque a le lien peut ouvrir ; activez le mot de passe pour plus de sûreté. » (aussi dans la colonne de l'envoi sur ordinateur). Activé : le mot de passe généré (spec §31, 11 caractères) avec « Copier », « Générer un autre » et « Envoyez-le par un autre moyen que le lien. Les deux dans la même messagerie, c'est comme ne pas en mettre. » ; montré de nouveau sur « Lien prêt ». Aucune saisie (D41-15).
+
 > plus aucun choix payant verrouillé (2, 3 et 7 jours, « Démarrer à la première ouverture », « Jusqu'à 50 ») ; voir §9.3.1. Plus de sous-option coffre (spec §27).
 
 > **Révision 8 (spec D41-15 et D41-16)** : le mot de passe est **toujours généré** (10 caractères, « Générer un autre » et « Copier » dans le champ) ; « Écrire mon propre mot de passe », le champ saisi, `PasswordChecklist` et les raisons de refus sont **supprimés**, au composeur comme dans la feuille Options du téléphone. Sous la Durée : 2, 3 et 7 jours **verrouillés** (cadenas, bord en tirets, badge « Plus ») et « Démarrer à la première ouverture » (verrouillé, badge « Plus ») ; sous les Ouvertures : « Jusqu'à 50 » (verrouillé, badge « Plus »). Nom accessible = texte visible ; description « Avec Plus, bientôt disponible. ». Un appui ouvre la feuille « Shhdrop Plus » (ce que Plus ajoute, prix prévu de spec §38.8.2, « Bientôt disponible. », « Compris ») et ne change aucune option. Sous « Votre envoi » : « Gratuit : 2 Go · 24 h max ».
@@ -641,6 +643,8 @@ L'écran remplace le composeur (masqué, intact). La capsule (§7.3) est en haut
 
 ### 9.5 Lien prêt
 
+> **Sans mot de passe (D42-27)** : le ticket ne garde que le lien (ni perforation ni carte « Mot de passe »), la phrase « Le lien marche déjà. Gardez-le : il ne sera plus affiché après. Sans mot de passe, quiconque a ce lien peut ouvrir le partage. », « Copier le lien », « Partager » (lien seul, feuille « Partager le lien »), QR du lien seul ; les garde-fous de sortie ne demandent que la copie du lien. Avec mot de passe : comme ci-dessous.
+
 Affiché seulement quand la promesse de `createShare` est résolue (spec §5.1). Focus sur le titre « Lien prêt ». Annonce : « Partage créé. »
 
 Ordre (révisé le 7 novembre, scan UX « Lien prêt ») : avertissement en tête, puis les deux secrets, la gestion repliée, la suppression en secondaire, et « Terminé » comme action principale.
@@ -685,6 +689,8 @@ Refonte « application » de la gestion. **Pas d'empreinte d'appareil** (refusé
 **9.6.6 Mouvement et accessibilité.** Cartes décalées de 40 ms à l'arrivée (12 au plus), dissolution de la carte à la destruction (§7.4), `prefers-reduced-motion` : aucune entrée animée. La liste est un `<ul>` ; chaque carte un `<li>` avec `aria-labelledby` (état + création) ; changements d'état annoncés poliment (`LiveRegion`) ; `forced-colors` : mot d'état souligné ; zones tactiles ≥ 44 px ; 390 px sans défilement horizontal.
 
 ### 9.7 Ouverture (`/s/:id`)
+
+> **Partage sans mot de passe (D42-27, spec §29.2, §32)** : lien `s#l…`. Même écran (compte à rebours, ouvertures restantes, coût d'ouverture), **sans champ** : la phrase « Ce partage n'a pas de mot de passe : le lien suffit. Rien n'est ouvert avant que vous appuyiez sur « Ouvrir ». » et le bouton principal « **Ouvrir** » (« Ouverture… » pendant l'appel). **Jamais d'ouverture au chargement** : seul le geste appelle `unlock` et consomme une ouverture. Rechargement : « Rouvrir », sans champ. Un lien `s#<43>` (ancien ou protégé) : écran ci-dessous, inchangé.
 
 1. `parseLink(location.href)` ; `#` absent ou invalide → §9.11 « Lien incomplet » ; sinon `replaceState` (sauf navigateur intégré, S4).
 2. `fetchMeta` (squelette) → `NotFoundError` ou `Error("lien_invalide")` : §9.11 « Lien invalide ». `Error("reseau")` : « Connexion impossible. Vérifiez votre réseau et réessayez. » + Réessayer. `LimitError` : « Trop de demandes rapprochées. Réessayez dans {durée}. »
