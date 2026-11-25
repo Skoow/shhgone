@@ -8,7 +8,8 @@ Caddy (TLS) devant le serveur Go, dans Docker. Références : spécification §8
 | `Dockerfile` | image du serveur : binaire Go statique + site, sur `scratch`, compte 65532 |
 | `compose.yaml` | les deux conteneurs (plus les relais du paiement et des appels, §13 et §14), en lecture seule, sans capacité, sans journal |
 | `deploy.sh` | installe une version par empreinte, après vérification de sa provenance (§3), contrôle, revient en arrière ; commandes d'administration |
-| `provenance.sh`, `test-provenance.sh` | vérification de provenance du site (manifeste signé par cosign, spec §28.7), chargée par `deploy.sh` ; son banc d'essai, sans réseau (§3) |
+| `provenance.sh`, `test-provenance.sh` | vérification de l'image (signée, liée au manifeste par `image.json`) et de la provenance du site (manifeste signé par cosign, spec §28.7), chargée par `deploy.sh` ; son banc d'essai, sans réseau (§3) |
+| `construire-image.sh` | build reproductible de l'image (`ghcr.io/skoow/shhgone`), lancé par `release.yml` sur deux machines et par qui veut refaire l'image (§3.2) |
 | `verrous.sh`, `test-verrous.sh` | verrous de mise en ligne V1 à V3 (commits signés par une clé autorisée, aucune histoire réécrite, commit confirmé par le propriétaire), chargés par `deploy.sh` ; leur banc d'essai, avec un dépôt et des clés SSH temporaires (§3.5) |
 | `shhcheck/` | petit programme Go : santé du conteneur, test TLS hybride, relais de sortie du paiement (§13), contrôle d'un hôte joignable en TLS (`joindre`), relais TURN (§14) ; `salonws_test.go` et `compte_test.go` : essais de banc (tests seulement, hors du binaire) |
 | `test-proxy.sh` | test du proxy : le Caddyfile devant le vrai serveur (salon activé), sur la boucle locale |
@@ -62,7 +63,7 @@ Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plu
 - **pas de mémoire d'échange** : `swapoff -a`, ligne retirée de `/etc/fstab` (`deploy.sh` refuse d'installer sinon) ;
 - **Caddy non root** (D9, 22 novembre) : dans `/etc/sysctl.d/60-shhdrop.conf`, `net.ipv4.ip_unprivileged_port_start=80`, puis `sysctl --system` (`deploy.sh` refuse d'installer sinon). Caddy tourne sous le compte 65532 sans aucune capacité et peut quand même écouter sur 80 et 443. Contrepartie : sur la machine elle-même, n'importe quel compte pourrait prendre 80 ou 443 pendant un redémarrage de Caddy ; la machine ne fait tourner que `sshd`, Docker, Caddy et le serveur (les conteneurs ont leur propre réseau), donc aucun compte ordinaire. Installation déjà faite : `chown -R 65532:65532 /srv/shhdrop/caddy` ;
 - **vidages mémoire coupés** : `kernel.core_pattern=|/bin/false` dans `/etc/sysctl.d/`, en plus de la limite posée sur les conteneurs. **Ubuntu : apport réécrit cette valeur à chaque démarrage**, après `/etc/sysctl.d/` (constaté le 25 novembre sur Ubuntu 26.04) : `systemctl mask apport.service apport-autoreport.path apport-autoreport.service apport-forward.socket`, `enabled=0` dans `/etc/default/apport`, puis `sysctl --system`. Vérifier après un redémarrage : `sysctl kernel.core_pattern` doit afficher `|/bin/false` (`deploy.sh` refuse sinon) ;
-- **Docker sans journal sur le disque par défaut** : `/etc/docker/daemon.json` contient `{ "log-driver": "none" }`, puis `systemctl restart docker` (`compose.yaml` le coupe déjà pour nos conteneurs ; ceci couvre tout conteneur lancé à la main ; `deploy.sh` refuse sinon). Garder `docker-buildx-plugin` : `docker build` (donc `deploy.sh`) s'en sert ; `docker-ce-rootless-extras` peut être retiré ;
+- **Docker sans journal sur le disque par défaut** : `/etc/docker/daemon.json` contient `{ "log-driver": "none" }`, puis `systemctl restart docker` (`compose.yaml` le coupe déjà pour nos conteneurs ; ceci couvre tout conteneur lancé à la main ; `deploy.sh` refuse sinon). `docker-buildx-plugin` n'est utile que pour refaire l'image (`deploy/construire-image.sh`, §3.2) : `deploy.sh` ne construit rien ; `docker-ce-rootless-extras` peut être retiré ;
 - **journaux de la machine sans adresse IP sur le disque, et une heure au plus en mémoire** (inventaire des adresses IP du 22 novembre). `deploy.sh` **refuse d'installer** tant qu'un de ces réglages manque, et dit lequel et quoi faire (`journaux.sh`, banc d'essai `test-journaux.sh`) :
   - **pas de syslog** : sur Ubuntu, `rsyslog` est installé et actif par défaut ; il recopie le journal dans `/var/log/auth.log` (adresse de chaque connexion SSH, réussie ou non), `kern.log`, `ufw.log` et `syslog`, **sur le disque**, même avec journald en mémoire. `apt purge rsyslog` (ou `syslog-ng`), puis `rm -f /var/log/auth.log* /var/log/syslog* /var/log/kern.log* /var/log/ufw.log* /var/log/messages*`. Ce qui a déjà été écrit peut rester dans les blocs libérés du disque système (non chiffré) : faire ces réglages avant d'ouvrir SSH au public, ou réinstaller la machine si le doute compte ;
   - **journald en mémoire, une heure au plus** : fichier `/etc/systemd/journald.conf.d/60-shhdrop.conf` :
@@ -119,13 +120,18 @@ install -d -o 65532 -g 65532 -m 0700 /srv/shhdrop/data
 install -d -o 65532 -g 65532 -m 0700 /srv/shhdrop/caddy
 install -d -o root -g 65532 -m 0750 /srv/shhdrop/secrets
 
+# Copie du dépôt : /opt/shhdrop, à root, clone public en https sans identifiant.
+git clone https://github.com/Skoow/shhgone.git /opt/shhdrop
+chown -R root:root /opt/shhdrop && chmod 0755 /opt/shhdrop
+cd /opt/shhdrop
+
 # Réglages, cosign (§3.2), signataires autorisés (§3.5), puis installation d'une version
-# (empreinte de l'image, numéro de sa Release signée et commit confirmé, voir §3).
+# (empreinte de l'image, numéro de sa Release signée et commit confirmé : procédure exacte au §3.2).
 cp deploy/env.example deploy/.env && editor deploy/.env
 deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>
 ```
 
-La copie du dépôt (par exemple `/opt/shhdrop`) est un clone public en https, sans identifiant : **le serveur ne détient jamais d'accès en écriture à GitHub** (ni jeton, ni clé de déploiement, ni assistant d'identifiants). Elle appartient à root et n'est modifiable que par lui (`chown -R root:root /opt/shhdrop`) : `deploy.sh` tourne en root depuis elle, et ses verrous lancent git sans `safe.directory`, donc refusent une copie d'un autre compte.
+La copie du dépôt est **`/opt/shhdrop`** : un clone public en https, **sans identifiant** (ni jeton, ni clé de déploiement, ni assistant d'identifiants) ; **le serveur ne détient jamais d'accès en écriture à GitHub**. Elle appartient à root et n'est modifiable que par lui (`chown -R root:root /opt/shhdrop`) : `deploy.sh` tourne en root depuis elle, et ses verrous lancent git sans `safe.directory`, donc refusent une copie d'un autre compte. Elle n'est mise à jour **que par `git fetch origin`**, jamais par `git pull` (§3.5) : `deploy.sh` l'avance lui-même au commit vérifié.
 
 Ne pas inscrire le volume dans `/etc/fstab` ni `/etc/crypttab` avec une clé : il se déverrouille à la main (§5).
 
@@ -139,24 +145,50 @@ Une version publique est une **étiquette `web-v<x.y.z>`** posée par le propri�
 
 1. relance toute la CI sur ce commit (tests, `repro` sur deux machines, `repro-docker` : le site de l'image = celui des builds de la CI) ; exige que le commit soit dans `main` ;
 2. reconstruit le site (`SHH_SITE_COMPTES=1`, comme l'image), vérifie qu'il est identique aux builds du job `repro`, et écrit `release.json` (version, commit, chemin, taille et SHA-256 de chaque fichier, `web/scripts/release-manifest.mjs`), `SHA256SUMS` et `dist.tar.gz` (archive déterministe) ;
-3. dans un job à part, qui ne lance aucun code npm, signe `release.json` **sans clé** (`cosign sign-blob`, jeton OIDC de GitHub Actions, certificat Fulcio, inscription dans le journal public Rekor), revérifie sa signature avec l'identité exacte qu'utilise `deploy.sh`, et publie la Release GitHub : `release.json`, `release.json.sigstore.json` (le bundle), `SHA256SUMS`, `dist.tar.gz`.
+3. construit **l'image du serveur** deux fois, sur deux machines (job `image`, `deploy/construire-image.sh`, §3.2), sans aucun droit d'écriture ;
+4. dans un job à part, qui ne lance aucun code npm (`publier-image`, seul à avoir `packages: write`) : exige la même empreinte des deux builds, vérifie que le `/site` de l'image est `release.json` octet pour octet et que ses deux binaires sont là, la pousse telle quelle sur **`ghcr.io/skoow/shhgone`** (étiquette `web-v<x.y.z>`, empreinte inchangée), vérifie qu'elle se lit **sans identifiant** (paquet public, §3.2), puis la signe **sans clé** (`cosign sign`, même identité que le manifeste) et revérifie cette signature comme `deploy.sh` ;
+5. dans un dernier job, sans code npm non plus (`signer`) : écrit `image.json` (version, commit, `ghcr.io/skoow/shhgone@sha256:…`, SHA-256 de `release.json` : ce fichier lie l'image au site), signe `release.json` et `image.json` **sans clé** (`cosign sign-blob`, jeton OIDC de GitHub Actions, certificat Fulcio, inscription dans le journal public Rekor), revérifie les trois signatures avec l'identité exacte qu'utilise `deploy.sh`, et publie la Release GitHub : `release.json`, `release.json.sigstore.json` (le bundle), `image.json`, `image.json.sigstore.json`, `SHA256SUMS`, `dist.tar.gz` ; ses notes donnent l'empreinte de l'image et la commande `deploy.sh`.
 
-Aucun secret : la signature vient de l'identité du workflow (`id-token: write` dans ce seul job). Ce que la signature prouve : « construit par `release.yml` de `Skoow/shhgone`, depuis ce commit public ». Ce qu'elle ne prouve pas : que ce code est sain. Un compte GitHub volé peut signer une version piégée : elle sera publique et inscrite dans Rekor (détectable, pas empêché).
+Aucun secret : les signatures viennent de l'identité du workflow (`id-token: write` dans ces deux jobs seulement), la publication de l'image du `GITHUB_TOKEN` (`packages: write` dans `publier-image` seulement). Ce que les signatures prouvent : « site **et** image (binaires du serveur et de `shhcheck` compris) construits par `release.yml` de `Skoow/shhgone`, depuis ce commit public ». Ce qu'elles ne prouvent pas : que ce code est sain. Un compte GitHub volé peut signer une version piégée : elle sera publique et inscrite dans Rekor (détectable, pas empêché ; c'est le rôle des verrous du §3.5).
 
 Le manifeste n'est **pas** commité dans le dépôt avant l'étiquette, contrairement à la première rédaction de la spec §28.2 : le numéro de version du site est le commit lui-même (`SHH_BUILD_ID`), un commit ne peut donc pas contenir le manifeste de son propre build (spec §28.2, corrigée le 24 novembre). Pour prouver « build local = build CI », reconstruire le site de ce commit (§3.3) et comparer à `release.json` de la Release.
 
-### 3.2 Construire l'image, puis l'installer
+### 3.2 L'image : construite, publiée et signée par GitHub, puis installée
 
-L'image est construite ailleurs que sur le serveur, depuis le commit de l'étiquette, puis publiée dans le registre choisi (`SHH_IMAGE_REPO`) :
+**Décision du propriétaire du 25 novembre** : l'image n'est plus construite à la main. `release.yml` la construit (§3.1), la publie sur **`ghcr.io/skoow/shhgone`** (seul dépôt accepté par `deploy.sh` : `SHH_IMAGE_REPO` vaut cela par défaut, et toute autre valeur dans `deploy/.env` fait refuser l'installation) et la signe. Le serveur la télécharge **sans identifiant** : le paquet doit être public.
+
+**Build reproductible de l'image** (`deploy/construire-image.sh`, le même script en CI et pour qui veut refaire l'image) : `SHH_BUILD_ID` = les 7 premiers chiffres du commit (le numéro affiché par le site ; c'est lui qui rend le `/site` de l'image identique aux builds de la CI, donc au manifeste), `SOURCE_DATE_EPOCH` = date du commit, dates des fichiers réécrites (`rewrite-timestamp`), BuildKit **v0.34.2 épinglé par empreinte** (constructeur `docker-container` recréé à chaque fois), une seule plateforme (`linux/amd64`), aucune attestation (`--provenance=false --sbom=false` : elles portent l'heure du build), archive OCI poussée telle quelle par `crane` (empreinte inchangée). `release.yml` exige la même empreinte de deux builds sur deux machines. Essayé le 25 novembre sur le commit `41748bc` : deux builds sans cache, dans deux dossiers différents, à des heures différentes, ont donné la même archive, octet pour octet (le build de la CI, lui, n'est prouvé qu'à la première Release). Pour refaire l'image soi-même et comparer à celle de la Release (Docker avec buildx, linux/amd64, arbre propre) :
 
 ```sh
 git checkout web-v<x.y.z>
-c=$(git rev-parse --short=7 HEAD)
-docker build -f deploy/Dockerfile --build-arg SHH_BUILD_ID="$c" -t <registre>/shhdrop:"$c" . && docker push <registre>/shhdrop:"$c"
-# « digest: sha256:… » affiché par push : c'est l'empreinte à donner à deploy.sh.
+deploy/construire-image.sh /tmp/image     # écrit /tmp/image/image.tar et /tmp/image/empreinte
+cat /tmp/image/empreinte                  # doit être l'empreinte des notes de la Release (et d'image.json)
 ```
 
-`SHH_BUILD_ID` est obligatoire (le build s'arrête sans lui) : c'est le numéro de version affiché par le site, et il doit être celui du commit pour que le site de l'image soit, octet pour octet, celui des builds de la CI (job `repro-docker`, spec §28), donc celui du manifeste signé. Construire depuis un arbre propre (`git status` vide) : des modifications non commitées entreraient dans l'image, et `deploy.sh` la refuserait.
+**Visibilité du paquet (une fois, après la première publication).** Sur un compte personnel, GitHub crée tout nouveau paquet **privé**. `release.yml` le détecte : l'étape « Image lisible sans identifiant (paquet public) » du job `publier-image` échoue, **avant toute signature**, avec un message qui le dit. Le propriétaire, connecté à GitHub :
+
+1. ouvrir `https://github.com/users/Skoow/packages/container/shhgone/settings` (ou : photo du profil en haut à droite, **Your profile**, onglet **Packages**, paquet **shhgone**, puis **Package settings** en bas de la colonne de droite) ;
+2. dans **Danger Zone**, cliquer **Change visibility**, choisir **Public**, taper `shhgone` pour confirmer, puis **I understand the consequences, change package visibility** ;
+3. sur la même page, **Manage Actions access** : `Skoow/shhgone` doit y être, avec le rôle **Write** (posé seul quand `release.yml` crée le paquet ; sinon **Add Repository**, `shhgone`, rôle **Write**) ;
+4. revenir à l'exécution de `release.yml` (onglet **Actions**), **Re-run jobs**, puis **Re-run failed jobs** : l'image est repoussée (même empreinte), lue sans identifiant, signée, et la Release est publiée.
+
+Vérifier ensuite, depuis n'importe quel poste sans être connecté : `docker pull ghcr.io/skoow/shhgone@sha256:<empreinte>` doit réussir. Un paquet public ne peut plus redevenir privé ; il ne contient que ce que le dépôt public permet déjà de reconstruire (aucun secret : l'image n'en a aucun).
+
+**Première mise en ligne** (dans l'ordre ; le serveur est prêt : §1, §2, §3.5) :
+
+1. `main` est vert (onglet **Actions**, workflow `ci`, dernier commit de `main`), et la conversation de développement a donné le **commit complet** à publier (40 chiffres hexadécimaux) : c'est le commit de `main` que l'on étiquette.
+2. Poser l'étiquette depuis le poste du propriétaire : `git fetch origin && git tag web-v1.0.0 <commit> && git push origin web-v1.0.0`.
+3. Attendre la fin de `release.yml` (onglet **Actions**, exécution « release » de `web-v1.0.0` ; CI entière, deux builds de l'image, environ une heure). Au premier passage, s'il échoue sur « Image lisible sans identifiant » : rendre le paquet public (ci-dessus), puis **Re-run failed jobs**.
+4. Ouvrir la Release `web-v1.0.0` (`https://github.com/Skoow/shhgone/releases/tag/web-v1.0.0`) : ses notes donnent l'**empreinte** de l'image (`sha256:…`, 64 chiffres hexadécimaux) et le **commit**. Le commit doit être, chiffre pour chiffre, celui que donne la conversation de développement (verrou V3, §3.5 : c'est cette comparaison qui compte, pas la copie depuis GitHub) ; s'il diffère, ne rien installer.
+5. Sur le serveur, en root, dans `/opt/shhdrop` (§2), avec `git fetch` seulement, **jamais `git pull`** (§3.5) :
+
+```sh
+cd /opt/shhdrop
+git fetch origin
+deploy/deploy.sh sha256:<empreinte> 1.0.0 <commit>
+```
+
+Pour les versions suivantes, la même suite, avec `web-v<x.y.z>` et `<x.y.z>`.
 
 **cosign sur le serveur** (une fois, puis à chaque montée de version ; version et empreinte épinglées, les mêmes que `deploy/provenance.sh`, qui refuse tout autre binaire) : cosign **v3.1.4** (publiée le 20 octobre 2026 ; empreinte relevée le 24 novembre 2026 dans `cosign_checksums.txt` de la Release et recalculée sur le binaire téléchargé). La v3.1.5, publiée le 24 novembre, est trop récente (règle des 7 jours, spec §24) : à réexaminer.
 
@@ -166,27 +198,39 @@ echo "424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa  /tmp/cos
 install -m 0755 -o root -g root /tmp/cosign /usr/local/bin/cosign && rm /tmp/cosign
 ```
 
-cosign lit la racine de confiance de Sigstore (TUF) sur `tuf-repo-cdn.sigstore.dev` et la garde dans `~/.sigstore` ; le serveur doit aussi joindre `github.com` (téléchargement du manifeste) et Docker Hub (image Node épinglée du contrôle). Un pare-feu sortant doit les laisser passer pendant `deploy.sh`.
+**Hôtes que le serveur doit joindre pendant `deploy.sh`** (HTTPS, port 443, en sortie ; un pare-feu sortant doit les laisser passer, rien d'autre n'est demandé) :
 
-Sur le serveur (jamais `git pull` : voir §3.5) :
+| Hôte | Pour quoi |
+|---|---|
+| `github.com` | `git fetch` de la copie du dépôt ; téléchargement de `release.json`, `image.json` et de leurs bundles (Release) |
+| `release-assets.githubusercontent.com`, `objects.githubusercontent.com` | fichiers de la Release (GitHub y redirige les téléchargements) |
+| `ghcr.io` | l'image et sa signature (`cosign verify`, `docker pull`, sans identifiant) |
+| `pkg-containers.githubusercontent.com` | couches de l'image (ghcr.io y redirige les téléchargements) |
+| `tuf-repo-cdn.sigstore.dev` | racine de confiance de Sigstore (TUF), lue par cosign et gardée dans `/root/.sigstore` |
+| `rekor.sigstore.dev` | journal de transparence, si cosign doit y lire une inscription que le bundle ou la signature n'emporte pas |
+| `registry-1.docker.io`, `auth.docker.io`, `production.cloudflare.docker.com` | images épinglées de `compose.yaml` (Caddy) et du contrôle (Node du `Dockerfile`) |
+
+Ni Fulcio (`fulcio.sigstore.dev`) ni aucun accès en écriture : le serveur ne signe rien et ne publie rien. Les deux hôtes de Sigstore ne sont pas encore essayés depuis le serveur (première mise en ligne). Après la mise en ligne, le site lui-même ne fait aucune connexion sortante, sauf celles des relais du paiement (§13).
+
+Commandes courantes, sur le serveur (jamais `git pull` : voir §3.5) :
 
 ```sh
 git fetch origin                                       # télécharge les commits, ne change aucun fichier
-deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>   # verrous (§3.5), provenance, installe, contrôle, revient en arrière si le contrôle échoue
+deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>   # verrous (§3.5), image et provenance, installe, contrôle, revient en arrière si le contrôle échoue
 deploy/deploy.sh status                                # version, commit en service et précédents, commit installé, conteneurs
-deploy/deploy.sh rollback                              # réinstalle la version précédente (provenance et verrous revérifiés)
+deploy/deploy.sh rollback                              # réinstalle la version précédente (image, provenance et verrous revérifiés)
 ```
 
-`<commit>` : le commit complet (40 chiffres hexadécimaux) de l'étiquette `web-v<x.y.z>`, donné par la conversation de développement, **jamais copié depuis GitHub** (§3.5, V3).
+`<commit>` : le commit complet (40 chiffres hexadécimaux) de l'étiquette `web-v<x.y.z>`, donné par la conversation de développement ; celui des notes de la Release doit lui être identique, mais c'est celui de la conversation qui compte (§3.5, V3). `<empreinte>` : celle des notes de la Release ; une empreinte fausse est refusée (elle doit être celle d'`image.json`, signé).
 
-**Vérification de provenance** (spec §28.7 ; `deploy/provenance.sh`), avant que rien ne démarre, sans option, variable ni commande pour la sauter (spec §28.8, C2) :
+**Vérification de l'image et de la provenance** (spec §28.7 ; `deploy/provenance.sh`), sans option, variable ni commande pour la sauter (spec §28.8, C2) :
 
 1. le binaire `cosign` a l'empreinte épinglée ;
-2. `release.json` et son bundle sont téléchargés depuis la Release `web-v<x.y.z>` (https seulement, 4 Mio au plus ; gardés dans `deploy/.provenance/<x.y.z>/` une fois vérifiés, mais revérifiés à chaque installation) ;
-3. `cosign verify-blob` avec l'émetteur `https://token.actions.githubusercontent.com` et l'identité **exacte** `https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v<x.y.z>` (jamais d'expression ouverte, jamais `--insecure-ignore-tlog`) ;
-4. le dossier `/site` de l'image (copié sans la lancer) doit redonner `release.json` **octet pour octet** : mêmes fichiers, ni plus ni moins, mêmes tailles, mêmes empreintes, même version. Le manifeste est recalculé en shell (`manifeste_de`, identique à `release-manifest.mjs`, prouvé par le banc d'essai et par `release.yml`) : aucun analyseur JSON ne lit un fichier reçu.
+2. **avant tout téléchargement de l'image** (`verifier_image`) : `release.json`, `image.json` et leurs bundles sont téléchargés depuis la Release `web-v<x.y.z>` (https seulement, 4 Mio au plus ; gardés dans `deploy/.provenance/<x.y.z>/` une fois vérifiés, mais revérifiés à chaque installation) ; `cosign verify-blob` de chacun avec l'émetteur `https://token.actions.githubusercontent.com` et l'identité **exacte** `https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v<x.y.z>` (jamais d'expression ouverte, jamais `--insecure-ignore-tlog`) ; `image.json` doit être, octet pour octet, celui que `deploy.sh` recalcule de la version, du commit de `release.json`, de **l'empreinte donnée en argument** et du SHA-256 de `release.json` (une autre empreinte est refusée, en nommant celle qui est signée) ; enfin `cosign verify ghcr.io/skoow/shhgone@<empreinte>` avec la même identité exacte et le même émetteur (signature de l'image dans le registre) ;
+3. seulement alors `docker pull ghcr.io/skoow/shhgone@<empreinte>` (par empreinte : Docker vérifie le contenu) ;
+4. avant tout démarrage, le dossier `/site` de l'image (copié sans la lancer) doit redonner `release.json` **octet pour octet** : mêmes fichiers, ni plus ni moins, mêmes tailles, mêmes empreintes, même version. Le manifeste est recalculé en shell (`manifeste_de`, identique à `release-manifest.mjs`, prouvé par le banc d'essai et par `release.yml`) : aucun analyseur JSON ne lit un fichier reçu.
 
-Un refus arrête tout (`installation refusée`) : le site en service n'est pas touché.
+Un refus arrête tout (`installation refusée`) : le site en service n'est pas touché. Une Release publiée avant le 25 novembre n'a pas d'`image.json` : elle ne peut pas être installée (aucune ne l'a été).
 
 ### 3.3 Vérifier soi-même un site en ligne
 
@@ -200,6 +244,15 @@ cosign verify-blob release.json --bundle release.json.sigstore.json \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity "https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v$v"
 node web/scripts/verify-site.mjs https://shhgone.com release.json
+# L'image du serveur (empreinte : ligne « image » d'image.json, signé comme release.json) :
+curl -fsSLO https://github.com/Skoow/shhgone/releases/download/web-v$v/image.json
+curl -fsSLO https://github.com/Skoow/shhgone/releases/download/web-v$v/image.json.sigstore.json
+cosign verify-blob image.json --bundle image.json.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity "https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v$v"
+cosign verify "$(sed -n 's/^  "image": "\(.*\)",$/\1/p' image.json)" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity "https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v$v"
 ```
 
 Pour prouver en plus « build local = build CI » : se placer sur l'étiquette (`git checkout web-v$v`), puis `cd web && npm ci --ignore-scripts && SHH_SITE_COMPTES=1 SHH_BUILD_ID=$(git rev-parse --short=7 HEAD) SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npm run build`, et `node scripts/release-manifest.mjs dist --name shhdrop-web --version $v --commit $(git rev-parse HEAD) --out /tmp/rel && cmp /tmp/rel/release.json ../release.json`. La page `/verifier` du site dit la même chose, en clair.
@@ -213,7 +266,7 @@ Contrôle fait par `deploy.sh` après le démarrage, sans option pour le sauter 
 - **chaque redémarrage du serveur efface les envois en cours et les partages en cours de lecture** (les jetons ne survivent pas, §36 S12). Relancer `deploy.sh` avec la même empreinte ne redémarre rien ;
 - le retour arrière ne concerne que l'image : `Caddyfile`, `compose.yaml` et `deploy.sh` restent ceux du commit installé (§3.5). Pour les ramener en arrière : un nouveau commit signé qui les rétablit, une nouvelle Release, puis `deploy.sh` (une copie modifiée à la main, `git checkout <commit> -- deploy/` par exemple, est refusée par les verrous) ;
 - une version installée avant la vérification de provenance n'a pas de numéro (`deploy/.release.version` absent), et une version installée avant les verrous n'a pas de commit (`deploy/.release.commit` absent) : `rollback` vers elle est refusé, et le contrôle d'un retour arrière automatique vers une version sans numéro échoue (le site reste alors à vérifier à la main) ;
-- `deploy/deploy.sh "$(cat deploy/.release)"` (après un redémarrage, §5) réinstalle l'image en service avec sa version et son commit déjà vérifiés (`deploy/.release.version`, `deploy/.release.commit`) : la provenance et les verrous sont revérifiés (§3.5), ce qui demande Sigstore (et `github.com` si le manifeste n'est pas déjà gardé dans `deploy/.provenance/`) ;
+- `deploy/deploy.sh "$(cat deploy/.release)"` (après un redémarrage, §5) réinstalle l'image en service avec sa version et son commit déjà vérifiés (`deploy/.release.version`, `deploy/.release.commit`) : la provenance et les verrous sont revérifiés (§3.5), ce qui demande Sigstore et `ghcr.io` (et `github.com` si les manifestes ne sont pas déjà gardés dans `deploy/.provenance/`) ;
 - si le serveur refuse de démarrer, son message n'est écrit nulle part (aucun journal). Pour le lire : `deploy/deploy.sh diagnose`.
 
 ### 3.5 Verrous de mise en ligne (25 novembre)
@@ -272,7 +325,7 @@ deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>
 - Les verrous prouvent qui a signé, pas que le code est sain.
 - Le premier `deploy.sh` sous verrous, et la copie du dépôt à ce moment-là, sont à vérifier à la main (ci-dessus) ; ensuite, chaque `deploy.sh` qui tourne est celui d'un commit vérifié, tant que personne ne fait `git pull` ni ne modifie la copie à la main.
 - Qui est root sur le serveur peut tout changer (fichiers de `/etc/shhdrop`, copie du dépôt) : les verrous protègent contre GitHub, pas contre le serveur.
-- Les binaires de l'image (serveur, `shhcheck`) ne sont toujours pas reconstruits ni comparés (§9) : les verrous portent sur le commit du manifeste, et l'image doit être construite depuis ce commit (§3.2).
+- Les verrous portent sur le commit du manifeste ; l'image est liée à ce manifeste par `image.json` et construite par `release.yml` depuis ce même commit (deux builds, même empreinte, §3.2) : ses binaires (serveur, `shhcheck`) sont donc couverts aussi.
 - git identifie les objets par SHA-1 (avec détection des collisions connues) : une signature couvre l'empreinte SHA-1 de l'arbre et des parents.
 
 ## 4. Commandes d'administration (§15.3)
@@ -423,14 +476,14 @@ Si le test 4 ne peut pas être fait avec OpenSSL (version trop ancienne), le mê
 
 ```sh
 docker run --rm --network host --log-driver none -v /etc/ssl/certs/ca-certificates.crt:/ca.pem:ro -e SSL_CERT_FILE=/ca.pem \
-  --entrypoint /shhcheck "$SHH_IMAGE_REPO@$(cat deploy/.release)" tls 127.0.0.1:443 $D    # « TLS 1.3, X25519MLKEM768 »
+  --entrypoint /shhcheck "ghcr.io/skoow/shhgone@$(cat deploy/.release)" tls 127.0.0.1:443 $D    # « TLS 1.3, X25519MLKEM768 »
 ```
 
 ## 8. Tester le kit
 
 ```sh
 CADDY=/chemin/vers/caddy deploy/test-proxy.sh     # Caddy 2.10 ou plus, curl 7.83 ou plus, Go, web/dist construit (≈ 2 min 30 : WebSocket gardé 75 s)
-make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux, de la provenance (Node exigé) et des verrous (git, ssh-keygen), go vet et tests de shhcheck
+make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux, de l'image et de la provenance (Node exigé) et des verrous (git, ssh-keygen), go vet et tests de shhcheck
 SHH_IMAGE=shhdrop:ci make test-sortie             # sorties : configuration, puis réseau réel (démon Docker ; code 3 sans démon)
 sudo make test-restauration                       # sauvegarde et restauration d'un compte de test, en mémoire (≈ 45 s)
 ```
@@ -450,7 +503,7 @@ Un job rouge = une faille connue : GitHub envoie un e-mail d'échec au propriét
 ## 9. Ce que ce kit ne fait pas
 
 - **Démarches légales (§17)** : avis d'un juriste sur la conservation des données d'identification (LCEN, décret 2021-1362, en conflit avec « aucune adresse IP enregistrée »), point de contact DSA, déclaration ANSSI, mentions légales, CGU. Rien n'ouvre au public avant.
-- **Provenance du code (§28.7)** : ~~ni `release.yml`, ni signature~~ **24 novembre** : `release.yml` signe le manifeste du site (cosign sans clé), `deploy.sh` refuse une image dont le site n'est pas celui d'un manifeste signé et vérifie le site servi à travers Caddy (§3), une surveillance horaire compare le site en ligne aux derniers manifestes signés (`.github/workflows/verifier-site.yml`, §4). **25 novembre** : verrous de mise en ligne V1 à V3 (§3.5 : commits signés par une clé autorisée, aucune histoire réécrite, commit confirmé par le propriétaire). **Reste** : (0) V4, la clé du propriétaire (la clé de développement est partagée par l'environnement Claude Code, §3.5) ; (1) les **binaires** de l'image (serveur, `shhcheck`) ne sont ni signés ni comparés à un build public (le serveur ne voit que du chiffré : cette preuve servirait l'exploitation, spec §28.7) ; l'image n'est pas construite par la CI et aucun registre n'est choisi ; (2) la première étiquette `web-v<x.y.z>` et la protection des étiquettes `web-v*` (règle du dépôt, création réservée au propriétaire) sont à faire par le propriétaire ; (3) la vérification ne protège pas une victime ciblée par un serveur compromis (spec §28.8) ; (4) `verify-site.mjs` ne contrôle pas les en-têtes (CSP…) ; (5) la démo (GitHub Pages) n'est pas signée (Q-C3).
+- **Provenance du code (§28.7)** : ~~ni `release.yml`, ni signature~~ **24 novembre** : `release.yml` signe le manifeste du site (cosign sans clé), `deploy.sh` refuse une image dont le site n'est pas celui d'un manifeste signé et vérifie le site servi à travers Caddy (§3), une surveillance horaire compare le site en ligne aux derniers manifestes signés (`.github/workflows/verifier-site.yml`, §4). **25 novembre** : verrous de mise en ligne V1 à V3 (§3.5 : commits signés par une clé autorisée, aucune histoire réécrite, commit confirmé par le propriétaire). **25 novembre, image** : ~~les binaires de l'image ne sont ni signés ni comparés à un build public ; aucun registre choisi~~ l'image est construite par `release.yml` sur deux machines (même empreinte exigée, `deploy/construire-image.sh`), publiée sur `ghcr.io/skoow/shhgone`, signée sans clé, liée au manifeste par `image.json` signé ; `deploy.sh` vérifie tout cela avant de la télécharger (§3.2). **Reste** : (0) V4, la clé du propriétaire (la clé de développement est partagée par l'environnement Claude Code, §3.5) ; (1) la reproductibilité de l'image sur les machines de GitHub, la signature de l'image sur ghcr.io et sa vérification sans identifiant ne seront prouvées qu'à la première Release ; (2) la première étiquette `web-v<x.y.z>` et la protection des étiquettes `web-v*` (règle du dépôt, création réservée au propriétaire) sont à faire par le propriétaire ; (3) la vérification ne protège pas une victime ciblée par un serveur compromis (spec §28.8) ; (4) `verify-site.mjs` ne contrôle pas les en-têtes (CSP…) ; (5) la démo (GitHub Pages) n'est pas signée (Q-C3).
 - ~~**Surveillance (§15.2)** : ni sonde externe, ni script horaire d'alerte.~~ **22 novembre** : sonde externe et alerte de la machine en place (§4, « Surveillance »).
 - **Déverrouillage (§22)** : pas de `deploy/unlock.sh` ; les trois commandes du §5 en tiennent lieu. Pas d'alerte « redémarrage nécessaire ».
 - **Dates et tailles des fichiers** (audit adverse du 13 novembre, stockage, F4). Les dates de contenu et d'accès sont au 1er janvier 1970 ; la date de changement d'inode (`ctime`) de tous les fichiers est ramenée, une fois par minute, à l'heure de ce passage. Restent lisibles par qui lit le disque déverrouillé : la **date de création** (`btime`, sur ext4) de chaque fichier de partage, de pièce et de conversation, qu'aucun appel système ne permet de changer, donc l'heure de création de chaque partage vivant et du premier message de chaque salon ; pendant une minute au plus, le `ctime` d'un fichier qui vient d'être écrit ; la taille d'une conversation, par paliers de 64 messages (plus le nombre exact) ; l'ordre de création (numéros d'inode). Le dossier de données lui-même, `frozen`, `kill/`, `kill.key`, `shares.db`, `shares.db-wal` et `shares.db-shm` ont, depuis la 3ᵉ campagne de l'audit adverse (stockage, F5), leurs dates de contenu et d'accès remises à l'epoch à chaque passage du janitor (une fois par minute) et leur `ctime` ramené à l'heure de ce passage : l'heure du dernier gel, dégel, destruction par l'administrateur ou écriture en base ne se lit plus qu'à la minute près ; un gel et un dégel remettent aussi les dates aussitôt. Restent : la **date de création de `frozen`**, qui donne l'heure du gel en cours tant qu'il dure, et celle de `kill/`, créé au premier passage du serveur (heure du démarrage, sans rapport avec une destruction). Seuls le volume chiffré et l'absence d'instantanés les protègent.
@@ -573,7 +626,7 @@ Elle ne se change pas non plus (conception §5.2). Donc, dès sa création :
 1. Créer le secret du §12.2 et en faire la copie hors ligne.
 2. Dans `deploy/.env`, mettre `SHH_DOMAIN=shhgone.com` et ne laisser aucune variable `SHH_SMTP_*` ni `SHH_MAIL_FROM` (modèle dans `env.example`). On peut y régler aussi `SHH_COMPTES_JOUR`, le plafond d'inscriptions par jour pour tout le site (500 par défaut).
 3. Dans `compose.yaml`, poser `SHH_SALONS: "1"` et `SHH_COMPTES: "1"` (fichier relu et commité, comme pour le salon).
-4. Lancer `deploy/deploy.sh sha256:<empreinte> <x.y.z>` : le secret est contrôlé.
+4. Lancer `deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>` (§3.2) : le secret est contrôlé.
 5. Installer la sauvegarde du §12.4 **le même jour**, puis essayer une restauration (§12.5).
 
 Désactiver : poser `SHH_COMPTES: "0"`, puis lancer `deploy.sh`. `comptes.db` reste intacte sur le volume.

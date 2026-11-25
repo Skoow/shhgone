@@ -15,11 +15,11 @@
 # Rust : la version de engine/rust-toolchain.toml (relevée le 11 novembre 2026).
 #
 # Reproductibilité (spec §28.1, §28.7) : -trimpath, -buildvcs=false, identifiant de build
-# vide, CGO coupé (modernc.org/sqlite est en Go pur), npm ci sur le verrou. Pour une image
-# identique au bit près, il faut encore fixer les dates des fichiers :
-#   docker buildx build --build-arg SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) \
-#     --output type=image,rewrite-timestamp=true …
-# Non vérifié : aucun test ne compare encore deux builds de l'image.
+# vide, CGO coupé (modernc.org/sqlite est en Go pur), npm ci sur le verrou. L'image publiée
+# (ghcr.io/skoow/shhgone) est construite par deploy/construire-image.sh, qui fixe aussi les
+# dates des fichiers (SOURCE_DATE_EPOCH, rewrite-timestamp), BuildKit épinglé et aucune
+# attestation : release.yml la construit sur deux machines et exige la même empreinte
+# (deploy/README.md §3.2).
 
 # --- Moteur WebAssembly -----------------------------------------------------------------
 # Mêmes commandes et mêmes options que web/scripts/build-engine.mjs (qui ne tourne pas ici :
@@ -123,6 +123,8 @@ RUN mkdir -m 0700 /out/data
 # copiés de l'étape server (paquet ca-certificates de l'image golang épinglée ci-dessus), au
 # chemin que lit crypto/x509 sous Linux.
 FROM scratch
+# Relie le paquet ghcr.io/skoow/shhgone à son dépôt (page du paquet sur GitHub).
+LABEL org.opencontainers.image.source=https://github.com/Skoow/shhgone
 COPY --from=server /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=server /out/shhdrop /out/shhcheck /
 COPY --from=web /src/web/dist /site

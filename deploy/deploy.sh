@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Mise en ligne de Shhdrop (spec §15.3, D3, §28.7) : installe une version précise, désignée par
-# l'empreinte de son image et le numéro de sa Release signée, vérifie que le site de l'image est
-# celui du manifeste signé, contrôle la santé, et revient à la version précédente si le
-# contrôle échoue. Lancé à la main, sur le serveur, depuis une copie du dépôt.
+# l'empreinte de son image (ghcr.io/skoow/shhgone, publiée et signée par release.yml) et le
+# numéro de sa Release signée, vérifie que l'image et son site sont ceux de la Release signée,
+# contrôle la santé, et revient à la version précédente si le contrôle échoue. Lancé à la main,
+# sur le serveur, depuis une copie du dépôt (/opt/shhdrop, README §2).
 #
 #   deploy/deploy.sh sha256:<64 chiffres hexadécimaux> <x.y.z> <commit de 40 chiffres hexadécimaux>
-#                                                         installe cette image, dont le site doit
-#                                                         être celui de la Release web-v<x.y.z>,
+#                                                         installe cette image, qui doit être
+#                                                         celle de la Release web-v<x.y.z>,
 #                                                         construite depuis ce commit (confirmé
 #                                                         par le propriétaire, verrous V1 à V3)
 #   deploy/deploy.sh sha256:<empreinte en service>        la réinstalle (après un redémarrage),
@@ -34,10 +35,12 @@
 # deploy/.provenance/<x.y.z>/ ; dernier commit installé (verrou V2) dans
 # /etc/shhdrop/commit-installe.
 #
-# Provenance (spec §28.7 ; deploy/provenance.sh, README §3) : avant tout démarrage, cosign
-# (binaire contrôlé par son empreinte épinglée) vérifie que release.json de la Release
-# web-v<x.y.z> est signé par release.yml de ce dépôt sur cette étiquette exactement ; puis le
-# /site de l'image doit être ce manifeste, octet pour octet, ni plus ni moins. Après le
+# Provenance (spec §28.7 ; deploy/provenance.sh, README §3) : avant tout téléchargement de
+# l'image, cosign (binaire contrôlé par son empreinte épinglée) vérifie que release.json et
+# image.json de la Release web-v<x.y.z> sont signés par release.yml de ce dépôt sur cette
+# étiquette exactement, qu'image.json nomme ghcr.io/skoow/shhgone@<empreinte donnée> avec ce
+# manifeste, et que l'image est signée dans le registre par la même identité ; puis, avant tout
+# démarrage, le /site de l'image doit être ce manifeste, octet pour octet, ni plus ni moins. Après le
 # démarrage, le contrôle de santé lance verify-site.mjs à travers Caddy (le retour arrière suit
 # un écart). Aucune option, variable ni commande ne saute ces vérifications (spec §28.8, C2).
 #
@@ -53,8 +56,8 @@
 #   - le retour arrière ne concerne que l'image ; Caddyfile et compose.yaml viennent de la
 #     copie du dépôt, au commit installé (pour les ramener en arrière : un nouveau commit signé,
 #     une nouvelle Release, puis ce script ; README §3.4) ;
-#   - seuls les fichiers du site sont prouvés : les binaires de l'image (serveur, shhcheck) ne
-#     sont pas signés (README §9).
+#   - la signature prouve « construit par release.yml depuis ce commit », pas que le code est
+#     sain (README §3.1).
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -81,11 +84,14 @@ set -a
 set +a
 : "${SHH_DOMAIN:?SHH_DOMAIN manquant dans deploy/.env}"
 : "${SHH_DATA_ROOT:?SHH_DATA_ROOT manquant dans deploy/.env}"
-: "${SHH_IMAGE_REPO:?SHH_IMAGE_REPO manquant dans deploy/.env}"
-# Après deploy/.env : ses constantes (dépôt, identité, cosign épinglé) sont en lecture seule et
-# l'emportent sur toute variable du même nom venue de deploy/.env.
+# Après deploy/.env : ses constantes (dépôt, identité, image, cosign épinglé) sont en lecture
+# seule et l'emportent sur toute variable du même nom venue de deploy/.env.
 # shellcheck source=deploy/provenance.sh
 . ./provenance.sh
+# Image : ghcr.io/skoow/shhgone seulement (publiée et signée par release.yml, README §3.2) ;
+# SHH_IMAGE_REPO, s'il reste dans deploy/.env, doit valoir exactement cela.
+SHH_IMAGE_REPO=${SHH_IMAGE_REPO:-$PROVENANCE_IMAGE}
+depot_image_valide "$SHH_IMAGE_REPO" || exit 1
 # shellcheck source=deploy/verrous.sh
 . ./verrous.sh
 # Copie du dépôt vérifiée par les verrous : celle de ce script (ses Caddyfile, compose.yaml et
@@ -407,6 +413,11 @@ install_version() {
 	controle_cosign "$cosign" "$COSIGN_SHA256" || exit 1
 	secret_turn
 	ports_turn
+	# Image (README §3.2), avant tout téléchargement : image.json et release.json signés par
+	# release.yml sur web-v<x.y.z>, image.json lie cette empreinte au manifeste, et l'image est
+	# signée dans le registre par la même identité.
+	verifier_image "$cosign" curl "$new" "$new_v" "$here/.provenance" ||
+		die "installation refusée : $new n'est pas l'image signée de la Release web-v$new_v (README §3.2)"
 	# Image absente : téléchargée par empreinte (le contenu est donc vérifié par Docker).
 	docker image inspect "$SHH_IMAGE_REPO@$new" >/dev/null 2>&1 || docker pull "$SHH_IMAGE_REPO@$new"
 	# Provenance (spec §28.7), avant tout démarrage : rien de l'image ne tourne tant que son site

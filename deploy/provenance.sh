@@ -11,15 +11,23 @@
 # commandes ; il n'existe AUCUNE option, variable ou commande pour sauter la vérification
 # (spec §28.8, C2).
 #
-# Ce que la vérification prouve : le site de l'image a été construit par release.yml, depuis
-# le commit public nommé dans le manifeste (journal public Rekor). Ce qu'elle ne prouve pas :
-# que ce code est sain, ni que les deux binaires de l'image (serveur, shhcheck) viennent de ce
-# commit (non signés : README §9).
+# L'image elle-même (décision du propriétaire du 25 novembre) : construite par release.yml sur
+# la même étiquette (deux builds sur deux machines, même empreinte exigée), publiée sur
+# ghcr.io/skoow/shhgone et signée sans clé par la même identité ; son empreinte est liée au
+# manifeste par image.json, signé lui aussi, que deploy.sh exige égal, octet pour octet, à celui
+# qu'il recalcule de l'empreinte donnée (verifier_image, avant tout téléchargement de l'image).
+#
+# Ce que la vérification prouve : l'image (binaires du serveur et de shhcheck compris) et son
+# site ont été construits par release.yml, depuis le commit public nommé dans le manifeste
+# (journal public Rekor). Ce qu'elle ne prouve pas : que ce code est sain.
 
 # Dépôt public et identité exacte du signataire. Le nom du dépôt est celui que GitHub inscrit
 # dans le certificat (remote du dépôt, 24 novembre : Skoow/shhgone).
 readonly PROVENANCE_DEPOT=Skoow/shhgone
 readonly PROVENANCE_EMETTEUR=https://token.actions.githubusercontent.com
+# Seul dépôt d'images accepté (en minuscules, comme l'exige le registre), public : le serveur le
+# lit sans identifiant.
+readonly PROVENANCE_IMAGE=ghcr.io/skoow/shhgone
 # cosign épinglé (README §3) : v3.1.4, publiée le 20 octobre 2026 ; empreinte du binaire
 # cosign-linux-amd64 relevée le 24 novembre 2026 dans cosign_checksums.txt de la Release et
 # recalculée sur le binaire téléchargé (identiques). À chaque montée de version : changer les
@@ -231,4 +239,140 @@ verifier_site_servi() {
 		-v "$script:/v/verify-site.mjs:ro" -v "$json:/v/release.json:ro" -v "$ca:/v/ca.pem:ro" \
 		-e NODE_EXTRA_CA_CERTS=/v/ca.pem --entrypoint node "$node" \
 		/v/verify-site.mjs "https://$domaine" /v/release.json
+}
+
+# empreinte_valide <sha256:…> : forme d'une empreinte d'image (64 chiffres hexadécimaux).
+empreinte_valide() {
+	[[ $1 =~ ^sha256:[0-9a-f]{64}$ ]]
+}
+
+# depot_image_valide <dépôt> : le dépôt d'images est exactement PROVENANCE_IMAGE (deploy/.env ne
+# peut pas en désigner un autre). Écrit le problème et rend 1 sinon.
+depot_image_valide() {
+	[ "$1" = "$PROVENANCE_IMAGE" ] || {
+		echo "SHH_IMAGE_REPO=« $1 » refusé : seule l'image signée $PROVENANCE_IMAGE est acceptée (ôter SHH_IMAGE_REPO de deploy/.env, README §3.2)" >&2
+		return 1
+	}
+}
+
+# description_image <x.y.z> <commit> <sha256:…> <SHA-256 de release.json> : écrit image.json, qui
+# lie l'image au manifeste du site. Même fonction dans release.yml, qui le signe, et dans
+# deploy.sh, qui le recalcule et compare octet pour octet : aucun analyseur JSON ne lit le
+# fichier reçu.
+description_image() {
+	printf '{\n  "schema": 1,\n  "name": "shhdrop-image",\n  "version": "%s",\n  "commit": "%s",\n  "image": "%s@%s",\n  "release.json": "%s"\n}\n' \
+		"$1" "$2" "$PROVENANCE_IMAGE" "$3" "$4"
+}
+
+# controle_description_image <image.json> <release.json> <x.y.z> <sha256:…> : image.json est
+# exactement celui de cette image, de cette version, du commit et des octets de ce release.json.
+controle_description_image() {
+	local json=$1 manifeste=$2 version=$3 digest=$4 commit attendu ligne
+	commit=$(commit_du_manifeste "$manifeste") || return 1
+	attendu=$(mktemp)
+	description_image "$version" "$commit" "$digest" "$(sha256sum -- "$manifeste" | cut -d' ' -f1)" >"$attendu"
+	if cmp -s -- "$attendu" "$json"; then
+		rm -f -- "$attendu"
+		return 0
+	fi
+	rm -f -- "$attendu"
+	# Pour le message seulement : l'empreinte signée, si la ligne 6 a exactement la forme attendue.
+	ligne=$(sed -n '6p' -- "$json")
+	if [[ $ligne =~ ^\ \ \"image\":\ \"[a-z0-9./-]+@(sha256:[0-9a-f]{64})\",$ ]] && [ "${BASH_REMATCH[1]}" != "$digest" ]; then
+		echo "image refusée : la Release web-v$version a signé l'image ${BASH_REMATCH[1]}, pas $digest" >&2
+	else
+		echo "image.json de la Release web-v$version ne correspond pas à $PROVENANCE_IMAGE@$digest, au commit $commit et à ce release.json" >&2
+	fi
+	return 1
+}
+
+# verifier_signature_image <cosign> <x.y.z> <sha256:…> : signature sans clé de l'image, lue dans
+# le registre, identité et émetteur exacts, journal de transparence exigé.
+verifier_signature_image() {
+	local cosign=$1 version=$2 digest=$3
+	"$cosign" verify "$PROVENANCE_IMAGE@$digest" \
+		--certificate-oidc-issuer "$PROVENANCE_EMETTEUR" \
+		--certificate-identity "$(identite_release "$version")" >/dev/null || {
+		echo "signature refusée : $PROVENANCE_IMAGE@$digest n'est pas signée par release.yml sur l'étiquette web-v$version de $PROVENANCE_DEPOT" >&2
+		return 1
+	}
+}
+
+# verifier_image <cosign> <curl> <sha256:…> <x.y.z> <cache> : AVANT tout téléchargement de
+# l'image (deploy.sh),
+#   1. release.json, image.json et leurs bundles de la Release web-v<x.y.z> (téléchargés une fois
+#      dans <cache>/<x.y.z>/, mis en cache seulement une fois vérifiés, revérifiés à chaque appel) ;
+#   2. signatures de release.json et d'image.json : release.yml, étiquette web-v<x.y.z> exactement ;
+#   3. image.json lie cette empreinte, cette version, le commit et les octets de release.json ;
+#   4. signature de l'image elle-même dans le registre (cosign verify), même identité.
+# Rend 0 seulement si tout passe ; écrit chaque refus sur la sortie d'erreur.
+verifier_image() {
+	local cosign=$1 curl=$2 digest=$3 version=$4 cache=$5 dir tmp src f ok=0
+	local fichiers=(release.json release.json.sigstore.json image.json image.json.sigstore.json)
+	version_valide "$version" || {
+		echo "version refusée : « $version » (x.y.z attendu, étiquette web-v<x.y.z>)" >&2
+		return 1
+	}
+	empreinte_valide "$digest" || {
+		echo "empreinte refusée : « $digest » (sha256:<64 chiffres hexadécimaux>)" >&2
+		return 1
+	}
+	dir=$cache/$version
+	tmp=$(mktemp -d)
+	src=$dir
+	for f in "${fichiers[@]}"; do
+		[ -f "$dir/$f" ] || src=$tmp
+	done
+	if [ "$src" = "$tmp" ]; then
+		for f in "${fichiers[@]}"; do
+			telecharger "$curl" "$(url_release "$version" "$f")" "$tmp/$f" || {
+				rm -rf -- "$tmp"
+				return 1
+			}
+		done
+	fi
+	if verifier_signature "$cosign" "$version" "$src/release.json" "$src/release.json.sigstore.json" &&
+		verifier_signature "$cosign" "$version" "$src/image.json" "$src/image.json.sigstore.json" &&
+		controle_description_image "$src/image.json" "$src/release.json" "$version" "$digest" &&
+		verifier_signature_image "$cosign" "$version" "$digest"; then
+		ok=1
+		if [ "$src" = "$tmp" ]; then
+			mkdir -p -- "$dir"
+			for f in "${fichiers[@]}"; do cp -- "$tmp/$f" "$dir/$f"; done
+		fi
+	fi
+	rm -rf -- "$tmp"
+	[ "$ok" = 1 ] || {
+		echo "image refusée : $PROVENANCE_IMAGE@$digest n'est pas téléchargée" >&2
+		return 1
+	}
+	echo "image : $PROVENANCE_IMAGE@$digest signée par release.yml (web-v$version) et liée à son manifeste signé"
+}
+
+# empreinte_oci <image.tar> : écrit l'empreinte (sha256:…) de la seule image d'une archive OCI
+# (deploy/construire-image.sh, release.yml) : index.json ne nomme qu'un manifeste, d'image (pas
+# d'attestation ni d'autre plateforme), et ce manifeste a bien cette empreinte.
+empreinte_oci() {
+	local tar=$1 tmp d n
+	tmp=$(mktemp -d)
+	if ! tar -xf "$tar" -C "$tmp" index.json 2>/dev/null; then
+		echo "$tar : index.json absent" >&2
+		rm -rf -- "$tmp"
+		return 1
+	fi
+	n=$(grep -oE '"digest": *"sha256:[0-9a-f]{64}"' "$tmp/index.json" | wc -l)
+	d=$(grep -oE '"digest": *"sha256:[0-9a-f]{64}"' "$tmp/index.json" | head -n 1 | grep -oE 'sha256:[0-9a-f]{64}' || true)
+	if [ "$n" != 1 ] || ! grep -qE '"mediaType": *"application/vnd\.oci\.image\.manifest\.v1\+json", *"digest": *"'"$d"'"' "$tmp/index.json"; then
+		echo "$tar : un seul manifeste d'image attendu dans index.json (attestation ou autre plateforme ?)" >&2
+		rm -rf -- "$tmp"
+		return 1
+	fi
+	if ! tar -xf "$tar" -C "$tmp" "blobs/sha256/${d#sha256:}" 2>/dev/null ||
+		[ "$(sha256sum -- "$tmp/blobs/sha256/${d#sha256:}" | cut -d' ' -f1)" != "${d#sha256:}" ]; then
+		echo "$tar : manifeste $d absent ou altéré" >&2
+		rm -rf -- "$tmp"
+		return 1
+	fi
+	rm -rf -- "$tmp"
+	printf '%s\n' "$d"
 }
