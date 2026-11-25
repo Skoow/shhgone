@@ -76,7 +76,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
 
   // --- Créatrice : compte (pseudo choisi à l'inscription), création, salon prêt ----------------------
   await inscrire(page, shh.origin, pseudoA);
-  await bouton(page, "Continuer").click();
+  await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
   await expect(titre(page, "Créer un salon")).toBeVisible();
   await capture(page, "salon-nouveau");
   expect(await axe(page)).toEqual([]);
@@ -141,10 +141,10 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(titre(pageB, "Salon de discussion")).toBeVisible();
     expect(pageB.url()).toBe(shh.origin + "/salon"); // « # » retiré de la barre
     await champ(pageB, "Mot de passe du salon").fill("mauvais-mdp");
-    await bouton(pageB, "Continuer").click();
+    await bouton(pageB, "Continuer").or(bouton(pageB, "Plus tard")).click();
     await expect(pageB.getByText(/Mot de passe incorrect\. Essais restants/)).toBeVisible({ timeout: 30_000 });
     await champ(pageB, "Mot de passe du salon").fill(mdp);
-    await bouton(pageB, "Continuer").click();
+    await bouton(pageB, "Continuer").or(bouton(pageB, "Plus tard")).click();
     await expect(titre(pageB, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
     // Un seul libellé pour la photo.
     await expect(pageB.getByText("Photo pour ce salon", { exact: false })).toHaveCount(1);
@@ -345,7 +345,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await pageB.reload();
     await pageB.goto(lien);
     await champ(pageB, "Mot de passe du salon").fill(mdp);
-    await bouton(pageB, "Continuer").click();
+    await bouton(pageB, "Continuer").or(bouton(pageB, "Plus tard")).click();
     await expect(fil(pageB)).toBeVisible({ timeout: 60_000 });
     await expect(titre(pageB, "Un salon qui s'efface")).toHaveCount(0); // pas d'explication ni de pseudonyme à redonner
     const t4 = `Après rechargement ${r}`;
@@ -382,7 +382,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     const pseudoC = `Ines${r.slice(0, 3)}`;
     await pageC.goto(lien2);
     await champ(pageC, "Mot de passe du salon").fill(mdp2);
-    await bouton(pageC, "Continuer").click();
+    await bouton(pageC, "Continuer").or(bouton(pageC, "Plus tard")).click();
     await expect(titre(pageC, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
     await champ(pageC, "Pseudonyme pour ce salon").fill(pseudoC);
     await bouton(pageC, "Entrer dans le salon").click();
@@ -403,7 +403,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     const pseudoE = `Lea${r.slice(4, 8)}x`;
     await pageE.goto(lien2);
     await champ(pageE, "Mot de passe du salon").fill(mdp2);
-    await bouton(pageE, "Continuer").click();
+    await bouton(pageE, "Continuer").or(bouton(pageE, "Plus tard")).click();
     await expect(titre(pageE, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
     await champ(pageE, "Pseudonyme pour ce salon").fill(pseudoE);
     await bouton(pageE, "Entrer dans le salon").click();

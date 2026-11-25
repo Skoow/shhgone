@@ -15,7 +15,7 @@
 //   octets, sinon « pas de PRF » (repli par la clé de récupération, §5.5). prf.enabled : vrai
 //   seulement s'il vaut exactement true.
 // - Annulation (NotAllowedError) : Error("annule"), que les écrans n'affichent pas.
-// - Parcours (décision du 25 novembre, conception §18) : « defaut » (téléphone ou tablette :
+// - Parcours (décision du 25 novembre, conception §19) : « defaut » (téléphone ou tablette :
 //   passkey de l'appareil, options inchangées) ; « hybride » (ordinateur : passkey gardée sur le
 //   téléphone, QR du navigateur ; indice WebAuthn niveau 3 `hints: ["hybrid"]` et, à la création,
 //   `authenticatorAttachment: "cross-platform"` pour les navigateurs qui ignorent les indices, comme

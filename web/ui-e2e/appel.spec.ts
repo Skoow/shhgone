@@ -182,7 +182,7 @@ async function inviter(browser: Browser, use: object, lien: string, mdp: string,
   page.on("console", (m) => /Refused to|Content Security Policy/.test(m.text()) && erreurs.push(m.text()));
   await page.goto(lien);
   await champ(page, "Mot de passe du salon").fill(mdp);
-  await bouton(page, "Continuer").click();
+  await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
   await expect(titre(page, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
   await champ(page, "Pseudonyme pour ce salon").fill(pseudo);
   await bouton(page, "Entrer dans le salon").click();
@@ -199,7 +199,7 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
   // survit pas aux pages chargées par passPaye.)
   await passPaye(page, shh);
   await inscrire(page, shh.origin, `Lea${r.slice(0, 4)}`);
-  await bouton(page, "Continuer").click();
+  await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
   // Historique désactivé par défaut, même avec un compte : le lien de gestion est

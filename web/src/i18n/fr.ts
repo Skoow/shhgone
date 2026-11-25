@@ -1766,7 +1766,7 @@ export const fr = {
   "account.passkeys.max": "Ce compte a déjà 10 passkeys : retirez-en une d'abord.",
   "account.passkeys.deja": "Cette passkey est déjà enregistrée pour ce compte.",
   "account.passkeys.add": "Ajouter une passkey",
-  // Sur ordinateur : passkey sur le téléphone par QR (décision du 25 novembre, conception compte §18).
+  // Sur ordinateur : passkey sur le téléphone par QR (décision du 25 novembre, conception compte §19).
   "account.signup.phone": "Créer avec mon téléphone",
   "account.signup.phone.how": "Votre navigateur va afficher un QR code. Scannez-le avec l'appareil photo de votre téléphone. La passkey reste sur le téléphone et marche ensuite sur le téléphone et sur cet ordinateur (par QR).",
   "account.signup.here": "Garder le compte sur cet ordinateur",

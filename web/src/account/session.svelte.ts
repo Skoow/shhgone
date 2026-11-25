@@ -367,7 +367,7 @@ export function inscriptionPrete(): boolean {
  * Geste « Créer avec une passkey » : navigator.credentials.create tout de suite (aucune requête
  * avant). « cle » : la clé de récupération est prête (cleAffichee) ; « second » : le gestionnaire
  * annonce PRF sans l'avoir rendu, un deuxième geste est nécessaire (deuxiemeGeste). Annulation :
- * Error("annule"), rien n'est créé. `parcours` (§18) : « hybride » sur ordinateur (passkey sur le
+ * Error("annule"), rien n'est créé. `parcours` (§19) : « hybride » sur ordinateur (passkey sur le
  * téléphone, QR), « local » (« cet ordinateur »), « defaut » sur téléphone ou tablette.
  */
 export async function creerPasskey(pseudo: string, langue: string, parcours: Parcours = "defaut"): Promise<"cle" | "second"> {
@@ -386,7 +386,7 @@ export async function creerPasskey(pseudo: string, langue: string, parcours: Par
 }
 
 /**
- * Où est la passkey de l'inscription en cours (§18) : « telephone » (autre appareil, par QR),
+ * Où est la passkey de l'inscription en cours (§19) : « telephone » (autre appareil, par QR),
  * « ici » (cet appareil), d'après ce que dit le navigateur, sinon d'après le parcours demandé.
  * Lu localement, jamais envoyé ; sert à proposer « Ajouter mon téléphone » après la création.
  */
@@ -487,7 +487,7 @@ export async function preparerConnexion(): Promise<void> {
  * chargée d'avance ; sinon chargée maintenant, ce que Safari peut refuser). « ouvert » ; ou
  * « cle_requise » : la passkey a connecté le compte mais n'ouvre pas les données sur cet appareil
  * (pas de PRF, ou sortie PRF différente) et l'appareil n'en garde aucune clé : ouvrirAvecCle.
- * `parcours` (§18) : « hybride » sur ordinateur (passkey du téléphone, QR), « local », « defaut ».
+ * `parcours` (§19) : « hybride » sur ordinateur (passkey du téléphone, QR), « local », « defaut ».
  */
 export async function seConnecter(persistante: boolean, parcours: Parcours = "defaut"): Promise<"ouvert" | "cle_requise"> {
   let c = connexionPrete;

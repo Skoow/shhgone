@@ -64,7 +64,7 @@ export async function noterCle(): Promise<void> {
 
 /**
  * Sorte d'appareil vue par estMobile (account/device.ts) : pointeur grossier pour un téléphone,
- * fin pour un ordinateur (décision du 25 novembre, conception du compte §18). Avant monter().
+ * fin pour un ordinateur (décision du 25 novembre, conception du compte §19). Avant monter().
  */
 export function appareil(sorte: "telephone" | "ordinateur"): void {
   const coarse = sorte === "telephone";

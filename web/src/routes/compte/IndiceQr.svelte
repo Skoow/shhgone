@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Sur ordinateur (décision du 25 novembre, conception du compte §18) : ce qui va se passer quand
+  // Sur ordinateur (décision du 25 novembre, conception du compte §19) : ce qui va se passer quand
   // le navigateur montre son QR « utiliser un téléphone ». Texte seul ; l'icône est un décor.
   import { QrCode } from "../../ui/Icon";
 

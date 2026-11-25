@@ -53,7 +53,7 @@ export async function ouvrirEtiquette(cle: CryptoKey, h: Uint8Array, e: Uint8Arr
   }
 }
 
-// --- Téléphone ou ordinateur (décision du 25 novembre, conception du compte §18) -----------------
+// --- Téléphone ou ordinateur (décision du 25 novembre, conception du compte §19) -----------------
 
 /** Ce que lit estMobile (injecté par les tests ; par défaut, le navigateur). */
 export type Ecran = { matchMedia?: (q: string) => { matches: boolean }; userAgentData?: { mobile?: unknown } | undefined };

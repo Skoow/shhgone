@@ -108,7 +108,7 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
   }
 
   await inscrire(page, shh.origin, pseudoA);
-  await bouton(page, "Continuer").click();
+  await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
   const lien = (await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
@@ -123,7 +123,7 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
   try {
     await pageB.goto(lien);
     await champ(pageB, "Mot de passe du salon").fill(mdp);
-    await bouton(pageB, "Continuer").click();
+    await bouton(pageB, "Continuer").or(bouton(pageB, "Plus tard")).click();
     await expect(titre(pageB, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
     await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoB);
     // Photo pour ce salon (v3 §7.2) : ré-encodée sur l'appareil, envoyée chiffrée.
@@ -261,7 +261,7 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
       const pseudoC = `Ines${r.slice(0, 2)}`;
       await pageC.goto(lien);
       await champ(pageC, "Mot de passe du salon").fill(mdp);
-      await bouton(pageC, "Continuer").click();
+      await bouton(pageC, "Continuer").or(bouton(pageC, "Plus tard")).click();
       await expect(titre(pageC, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
       await champ(pageC, "Pseudonyme pour ce salon").fill(pseudoC);
       await bouton(pageC, "Entrer dans le salon").click();
