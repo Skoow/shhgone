@@ -27,6 +27,11 @@
   import ActiveSharesStrip from "../ui/ActiveSharesStrip.svelte";
   import Faq from "./home/Faq.svelte";
   import Sections from "./home/Sections.svelte";
+  import { reprendreSection } from "../ui/section";
+  import { onMount } from "svelte";
+
+  // Section demandée depuis une autre page (rechargement complet) : ui/section.ts.
+  onMount(reprendreSection);
 
   type Props = {
     /** Vrai dès qu'un élément est ajouté : le titre se replie (UI §9.1), le reste de l'accueil part. */

@@ -5,16 +5,16 @@
   // « Partager ». Clavier : Entrée et Espace ouvrent, flèches haut et bas parcourent, Échap ferme
   // et rend le focus au bouton, Tab hors du menu le ferme ; un clic ailleurs le ferme aussi.
   // Téléphone (< 768 px) : rien de tout ça, la barre d'onglets du bas tient la navigation.
-  import { flushSync, tick, type Component } from "svelte";
+  import { flushSync, type Component } from "svelte";
   import { chrome, goToSend, type AddGesture } from "../app/chrome.svelte";
-  import { currentPath, followLink, href, navigate, router } from "../app/router.svelte";
+  import { currentPath, followLink, href, router } from "../app/router.svelte";
   import { formatBytes } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { CONTENT_MAX } from "../limits";
   import { announce } from "./announce";
   import AddIcon from "./AddIcon.svelte";
   import { ChevronDown, Compass, EyeOff, Flag, Server, ShieldCheck, Upload } from "./Icon";
-  import { reducedMotion } from "./motion";
+  import { allerSection } from "./section";
   import { accountFlag } from "../app/account-flag.svelte";
   import { presence } from "../history/presence.svelte";
 
@@ -110,20 +110,10 @@
       goToSend(g);
     }
   }
-  /** Section de l'accueil, sans « # » dans l'adresse (le « # » est réservé aux clés). */
-  async function section(id: string, faq = false) {
+  /** Section de l'accueil (ui/section.ts). */
+  function section(id: string, faq = false) {
     close();
-    if (router.current.name !== "home") {
-      navigate("/");
-      await tick();
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
-    }
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (faq && el instanceof HTMLDetailsElement) el.open = true;
-    el.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
-    const target = faq ? el.querySelector<HTMLElement>("summary") : el.querySelector<HTMLElement>("h2");
-    target?.focus({ preventScroll: true });
+    return allerSection(id, faq);
   }
 
   type Item = { id: string; icon: Component<{ size?: number; strokeWidth?: number }> | null; add?: "media" | "voice" | "note"; tint: string; title: string; desc: string; run?: () => void; path?: string };
