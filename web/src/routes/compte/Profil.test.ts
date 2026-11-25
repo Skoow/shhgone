@@ -99,9 +99,8 @@ describe("Profil", () => {
     expect(C.ecrireProfil).not.toHaveBeenCalled();
   });
 
-  it("pseudo : « Disponible » puis enregistré ; « Déjà pris » ; 3 fois par an : « Vous pourrez changer de pseudo le … »", async () => {
+  it("pseudo libre : « Disponible » puis enregistré", async () => {
     await monter(Profil);
-    const champ = () => document.querySelector('input[autocomplete="nickname"]') as HTMLInputElement;
     saisir("Pseudo", "LeaB");
     await apres400();
     expect(C.pseudoLibre).toHaveBeenCalledWith("LeaB");
@@ -109,11 +108,19 @@ describe("Profil", () => {
     await presser("Enregistrer");
     expect(C.changerPseudo).toHaveBeenCalledWith("LeaB");
     expect(texte()).toContain("Pseudo enregistré.");
+  });
+
+  it("pseudo pris : « Déjà pris »", async () => {
     C.pseudoLibre.mockResolvedValue(false);
+    await monter(Profil);
     saisir("Pseudo", "Max");
     await apres400();
     expect(erreurDe("Pseudo")).toBe("Déjà pris");
-    C.pseudoLibre.mockResolvedValue(true);
+  });
+
+  it("3 fois par an : « Vous pourrez changer de pseudo le … » ; pris entre-temps : « Déjà pris », saisie gardée", async () => {
+    await monter(Profil);
+    const champ = () => document.querySelector('input[autocomplete="nickname"]') as HTMLInputElement;
     saisir("Pseudo", "Maxime");
     await apres400();
     C.changerPseudo.mockRejectedValueOnce(new CompteError(429, "limit", { retryAfterS: 122 * 86400 }));
