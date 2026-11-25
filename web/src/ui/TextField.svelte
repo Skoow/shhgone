@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from "svelte/elements";
+  import { Check, X } from "./Icon";
 
   type Props = Omit<HTMLInputAttributes, "value" | "class" | "id" | "aria-describedby" | "aria-invalid"> & {
     label: string;
@@ -10,8 +11,12 @@
     /** Étiquette lue par les lecteurs d'écran seulement (le contexte visuel la remplace). */
     labelHidden?: boolean;
     el?: HTMLInputElement | undefined;
+    /** Petite icône dans le champ, à droite : vérification en cours (rond qui tourne), valeur
+     *  acceptée (coche verte) ou refusée (croix rouge). Décorative : la raison passe par `error`
+     *  et par la région annoncée de l'écran. */
+    status?: "verif" | "ok" | "ko";
   };
-  let { label, value = $bindable(""), hint, error, labelHidden = false, el = $bindable(), ...rest }: Props = $props();
+  let { label, value = $bindable(""), hint, error, labelHidden = false, el = $bindable(), status, ...rest }: Props = $props();
 
   const uid = $props.id();
   const describedBy = $derived([hint ? `${uid}-hint` : "", error ? `${uid}-err` : ""].filter(Boolean).join(" ") || undefined);
@@ -19,15 +24,22 @@
 
 <div class="field">
   <label for={uid} class={{ "sr-only": labelHidden }}>{label}</label>
-  <input
-    bind:this={el}
-    bind:value
-    {...rest}
-    id={uid}
-    class={["input", { invalid: !!error }]}
-    aria-invalid={error ? "true" : undefined}
-    aria-describedby={describedBy}
-  />
+  <div class="box">
+    <input
+      bind:this={el}
+      bind:value
+      {...rest}
+      id={uid}
+      class={["input", { invalid: !!error, "with-st": !!status }]}
+      aria-invalid={error ? "true" : undefined}
+      aria-describedby={describedBy}
+    />
+    {#if status}
+      <span class="st {status}" aria-hidden="true" data-field-status={status}>
+        {#if status === "verif"}<span class="spin"></span>{:else if status === "ok"}<Check size={18} strokeWidth={2.4} />{:else}<X size={18} strokeWidth={2.4} />{/if}
+      </span>
+    {/if}
+  </div>
   {#if hint}<p id="{uid}-hint" class="hint">{hint}</p>{/if}
   {#if error}<p id="{uid}-err" class="err" role="alert">{error}</p>{/if}
 </div>
@@ -53,6 +65,50 @@
     color: var(--text);
     font: inherit;
     font-size: max(1rem, 16px); /* jamais sous 16 px : iOS zoomerait au focus */
+  }
+  .box {
+    position: relative;
+    display: grid;
+  }
+  /* Place réservée à droite pour l'icône d'état. */
+  .input.with-st {
+    padding-inline-end: 44px;
+  }
+  .st {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 14px;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+  }
+  .st.ok {
+    color: var(--accent);
+  }
+  .st.ko {
+    color: var(--danger);
+  }
+  .st.verif {
+    color: var(--text-3);
+  }
+  .spin {
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: tf-spin 0.8s linear infinite;
+  }
+  @keyframes tf-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  /* Mouvement réduit : le rond reste immobile. */
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation: none;
+    }
   }
   .input::placeholder {
     color: var(--text-3);

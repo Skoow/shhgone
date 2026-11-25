@@ -101,12 +101,13 @@
     outline-offset: 2px;
     border-radius: 4px;
   }
-  /* Lien dans une phrase (« conditions d'utilisation ») : blanc et souligné ;
+  /* Lien dans une phrase (« conditions d'utilisation ») : blanc et souligné, pas en gras ;
      hauteur de la ligne, pas de cible de 44 px qui décale le texte. */
   .cadre :global(a.lien-t) {
     position: relative;
     display: inline;
     min-height: 0;
+    font-weight: inherit;
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
@@ -119,6 +120,64 @@
     inset: 50% 0 auto;
     height: 44px;
     transform: translateY(-50%);
+  }
+  /* Autres chemins (connexion : clé de récupération, création ; inscription : « J'ai déjà un
+     compte ») : séparateur « ou » (deux filets et le mot au milieu), puis des liens en forme de
+     bouton secondaire, pleine largeur, icône menthe à gauche, texte centré. */
+  .cadre :global(.ou) {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--fs-small);
+  }
+  .cadre :global(.ou::before),
+  .cadre :global(.ou::after) {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--hair-2);
+  }
+  .cadre :global(.autres) {
+    display: grid;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .cadre :global(.autre) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-height: 48px;
+    padding: 0 20px;
+    border: 1px solid var(--hair-2);
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.045);
+    box-shadow: var(--edge-hi);
+    color: var(--text);
+    font-size: 0.9375rem;
+    font-weight: 560;
+    text-decoration: none;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out);
+  }
+  .cadre :global(.autre svg) {
+    color: var(--accent);
+  }
+  @media (hover: hover) {
+    .cadre :global(.autre:hover) {
+      background: rgb(255 255 255 / 0.08);
+      border-color: rgb(233 236 242 / 0.2);
+    }
+  }
+  .cadre :global(.autre:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .cadre :global(.note) {
     margin: 0;
@@ -141,6 +200,9 @@
   @media (forced-colors: active) {
     .cadre {
       border: 1px solid CanvasText;
+    }
+    .cadre :global(.autre) {
+      border-color: ButtonText;
     }
   }
 </style>

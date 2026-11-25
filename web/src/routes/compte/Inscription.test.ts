@@ -62,6 +62,12 @@ describe("inscription par passkey", () => {
     expect(texte()).toContain("Sans e-mail ni mot de passe. Votre téléphone ou votre ordinateur vous reconnaît.");
     expect(texte()).toContain("En créant un compte, vous confirmez avoir au moins 15");
     expect(texte()).toContain("J'ai déjà un compte");
+    // Même forme que les autres chemins de « Se connecter » : séparateur « ou », bouton secondaire avec icône.
+    const deja = document.querySelector<HTMLAnchorElement>("a.autre[data-have]")!;
+    expect(deja.textContent!.trim()).toBe("J'ai déjà un compte");
+    expect(deja.getAttribute("href")).toMatch(/\/compte\/connexion$/);
+    expect(deja.querySelector("svg[aria-hidden='true']")).toBeTruthy();
+    expect(document.querySelector(".ou")).toBeTruthy();
     expect(C.preparerInscription).toHaveBeenCalledWith(PREUVE);
     expect(champ("Pseudo")).toBeTruthy();
     expect(bouton("Créer avec une passkey").disabled).toBe(false);
@@ -70,20 +76,50 @@ describe("inscription par passkey", () => {
 
   it("pseudo vérifié pendant la saisie : « Disponible » / « Déjà pris » ; pris : refus avant la feuille", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    const etat = () => document.querySelector("[data-field-status]")?.getAttribute("data-field-status") ?? null;
     try {
       await monter(Inscription);
+      expect(etat()).toBeNull();
       saisir("Pseudo", "Lea");
+      // Anti-rebond : rond qui tourne, aucune requête avant 500 ms.
+      expect(etat()).toBe("verif");
+      expect(C.pseudoLibre).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(600);
       await attendre();
-      expect(texte()).toContain("Disponible");
+      expect(C.pseudoLibre).toHaveBeenCalledTimes(1);
+      // Disponible : coche dans le champ, texte pour les lecteurs d'écran seulement.
+      expect(etat()).toBe("ok");
+      expect(document.querySelector("[data-dispo]")!.textContent).toBe("Disponible");
+      expect(document.querySelector("[data-dispo]")!.classList.contains("sr-only")).toBe(true);
+      expect(document.querySelector("[data-dispo]")!.getAttribute("role")).toBe("status");
+      expect(champ("Pseudo").getAttribute("aria-invalid")).toBeNull();
       C.pseudoLibre.mockResolvedValue(false);
       saisir("Pseudo", "Zoe");
       await vi.advanceTimersByTimeAsync(600);
       await attendre();
-      expect(texte()).toContain("Déjà pris");
+      // Pris : croix dans le champ, raison visible et reliée au champ.
+      expect(etat()).toBe("ko");
+      expect(document.querySelector("[data-dispo]")!.textContent).toBe("");
+      expect(erreurDe("Pseudo")).toBe("Déjà pris");
       await presser("Créer avec une passkey");
       expect(C.creerPasskey).not.toHaveBeenCalled();
       expect(erreurDe("Pseudo")).toBe("Déjà pris");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("pseudo invalide : croix dans le champ, raison visible, aucune requête de disponibilité", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      C.verifierSaisie.mockResolvedValue({ pseudo: "pseudo_caracteres" });
+      await monter(Inscription);
+      saisir("Pseudo", "Léa !");
+      await vi.advanceTimersByTimeAsync(600);
+      await attendre();
+      expect(document.querySelector("[data-field-status]")!.getAttribute("data-field-status")).toBe("ko");
+      expect(erreurDe("Pseudo")).not.toBe("");
+      expect(C.pseudoLibre).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

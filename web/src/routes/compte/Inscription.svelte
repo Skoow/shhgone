@@ -1,7 +1,8 @@
 <script lang="ts">
   // Inscription (/compte/inscription ; conception du compte par passkey §3.1, §5.2). Page montée
   // seulement si __COMPTES__ (App.svelte).
-  // 1. Pseudo (vérifié pendant la saisie : « Disponible » / « Déjà pris », réservé à l'étape) ;
+  // 1. Pseudo (vérifié pendant la saisie : icône dans le champ, rond, coche ou croix ; la raison
+  //    d'un refus sous le champ ; réservé à l'étape) ;
   //    la preuve anti-robot et inscription/debut partent dès l'ouverture : le clic sur « Créer
   //    avec une passkey » appelle navigator.credentials.create sans aucune requête avant (Safari).
   //    La création vaut acceptation des conditions (phrase sous le bouton).
@@ -18,6 +19,7 @@
   import { announce } from "../../ui/announce";
   import Banner from "../../ui/Banner.svelte";
   import Button from "../../ui/Button.svelte";
+  import { User } from "../../ui/Icon";
   import TextField from "../../ui/TextField.svelte";
   import Cadre from "./Cadre.svelte";
   import Case from "./Case.svelte";
@@ -34,6 +36,8 @@
   let pseudo = $state(pseudoInviteRetenu() ?? "");
   let errPseudo = $state("");
   let libre = $state<boolean | null>(null);
+  // Vérification en cours (de la frappe à la réponse) : rond qui tourne dans le champ.
+  let verif = $state(false);
   let bandeau = $state("");
   let pret = $state(false);
   let rester = $state(false);
@@ -81,18 +85,23 @@
   let attente: ReturnType<typeof setTimeout> | undefined;
   async function verifierPseudo(v: string) {
     libre = null;
-    const r = await verifierSaisie({ pseudo: v });
-    if (v !== pseudo) return;
-    if (r.pseudo) {
-      errPseudo = erreur(new Error(r.pseudo), "inscription").texte;
-      return;
-    }
-    if (!inscriptionPrete()) return;
+    verif = true;
     try {
-      const l = await pseudoLibre(v);
-      if (v === pseudo) libre = l;
-    } catch {
-      // vérification indisponible (réseau) : redite au clic par le serveur
+      const r = await verifierSaisie({ pseudo: v });
+      if (v !== pseudo) return;
+      if (r.pseudo) {
+        errPseudo = erreur(new Error(r.pseudo), "inscription").texte;
+        return;
+      }
+      if (!inscriptionPrete()) return;
+      try {
+        const l = await pseudoLibre(v);
+        if (v === pseudo) libre = l;
+      } catch {
+        // vérification indisponible (réseau) : redite au clic par le serveur
+      }
+    } finally {
+      if (v === pseudo) verif = false;
     }
   }
   function tape() {
@@ -100,8 +109,13 @@
     libre = null;
     clearTimeout(attente);
     const v = pseudo;
-    if (v.trim() !== "") attente = setTimeout(() => void verifierPseudo(v), 500);
+    verif = v.trim() !== "";
+    if (verif) attente = setTimeout(() => void verifierPseudo(v), 500);
   }
+  // Pseudo refusé (invalide ou déjà pris) : la raison sous le champ, reliée à lui (aria-invalid,
+  // aria-describedby, annoncée) ; l'icône dans le champ ne fait que la montrer.
+  const errAffichee = $derived(errPseudo || (libre === false ? t("account.pseudo.taken") : ""));
+  const etatPseudo = $derived(errAffichee ? "ko" : verif ? "verif" : libre === true ? "ok" : undefined);
   $effect(() => () => clearTimeout(attente));
 
   async function focusPseudo() {
@@ -180,15 +194,19 @@
     <p class="note" data-sans-passkey>{t("account.nopasskey")}</p>
   {:else if etape === "saisie"}
     <form novalidate onsubmit={(e) => e.preventDefault()}>
-      <TextField label={t("account.pseudo")} hint={t("account.pseudo.hint")} autocomplete="username" autocapitalize="off" spellcheck="false" maxlength={64} error={errPseudo || undefined} bind:value={pseudo} bind:el={elPseudo} oninput={tape} />
-      {#if libre !== null && !errPseudo}<p class="dispo" class:pris={!libre} role="status" data-dispo>{libre ? t("account.pseudo.free") : t("account.pseudo.taken")}</p>{/if}
+      <TextField label={t("account.pseudo")} hint={t("account.pseudo.hint")} autocomplete="username" autocapitalize="off" spellcheck="false" maxlength={64} error={errAffichee || undefined} status={etatPseudo} bind:value={pseudo} bind:el={elPseudo} oninput={tape} />
+      <!-- « Disponible » : la coche dans le champ, et ce texte pour les lecteurs d'écran seulement
+           (région présente dès l'affichage, pour être annoncée). -->
+      <p class="sr-only" role="status" data-dispo>{etatPseudo === "ok" ? t("account.pseudo.free") : ""}</p>
       <Button type="submit" busy={!pret} disabled={!pret} onpress={creer}>{pret ? (getDemo()?.signupPasskey ?? t("account.signup.passkey")) : t("account.preparing")}</Button>
       <p class="legal" data-legal>
         {t("account.signup.legal.a")}<a class="lien-t" href={href("/conditions")} target="_blank" rel="noopener noreferrer">{t("account.signup.legal.link")}</a>{t("account.signup.legal.b")}
       </p>
     </form>
-    <ul class="liens">
-      <li><a href={href(versConnexion)} onclick={(e) => followLink(e, versConnexion)}>{t("account.signup.have")}</a></li>
+    <!-- Même forme que les autres chemins de « Se connecter » (séparateur « ou », bouton secondaire). -->
+    <p class="ou" aria-hidden="true"><span>{t("account.login.or")}</span></p>
+    <ul class="autres">
+      <li><a class="autre" href={href(versConnexion)} onclick={(e) => followLink(e, versConnexion)} data-have><User size={18} strokeWidth={2} aria-hidden="true" />{t("account.signup.have")}</a></li>
     </ul>
   {:else if etape === "second"}
     <p class="note">{t("account.second.body")}</p>
@@ -215,14 +233,6 @@
 </Cadre>
 
 <style>
-  .dispo {
-    margin: calc(-1 * var(--sp-3)) 0 0;
-    color: var(--accent);
-    font-size: var(--fs-small);
-  }
-  .dispo.pris {
-    color: var(--warn);
-  }
   .legal {
     margin: calc(-1 * var(--sp-2)) 0 0;
     color: var(--text-2);

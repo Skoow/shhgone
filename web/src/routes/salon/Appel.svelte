@@ -182,9 +182,9 @@
     justify-content: flex-start;
     color: var(--text);
   }
+  /* Lien dans une phrase : souligné, pas en gras. */
   .reserve a {
     color: inherit;
-    font-weight: 600;
     text-decoration: underline;
   }
   .actions {
