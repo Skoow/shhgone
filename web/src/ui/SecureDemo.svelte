@@ -63,7 +63,8 @@
   }
   $effect(() => {
     if (!root || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => (onscreen = e!.isIntersecting));
+    // Démarre un peu avant d'entrer dans l'écran : l'animation tourne déjà quand on arrive devant.
+    const io = new IntersectionObserver(([e]) => (onscreen = e!.isIntersecting), { rootMargin: "0px 0px 20% 0px" });
     io.observe(root);
     return () => io.disconnect();
   });

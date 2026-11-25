@@ -26,7 +26,7 @@ export function reveal(node: Element): (() => void) | void {
       node.classList.add("in");
       io.disconnect();
     },
-    { rootMargin: "0px 0px -8% 0px" },
+    { rootMargin: "0px 0px 10% 0px" },
   );
   io.observe(node);
   return () => io.disconnect();

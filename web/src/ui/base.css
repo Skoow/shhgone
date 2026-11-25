@@ -280,25 +280,25 @@ html.kbd-open .dock {
     .rv {
       animation: rv-in linear both;
       animation-timeline: view();
-      animation-range: entry 0% entry 70%;
+      animation-range: entry 0% entry 25%;
     }
   }
   .rv-wait {
     transition:
-      opacity 640ms var(--ease-out),
-      transform 720ms var(--ease-settle);
+      opacity 380ms var(--ease-out),
+      transform 440ms var(--ease-settle);
     /* Cartes d'une même rangée : légèrement décalées (--i). */
     transition-delay: var(--i, 0ms);
   }
   .rv-wait:not(.in) {
     opacity: 0;
-    transform: translateY(28px);
+    transform: translateY(16px);
   }
 }
 @keyframes rv-in {
   from {
     opacity: 0;
-    transform: translateY(28px);
+    transform: translateY(16px);
   }
 }
 

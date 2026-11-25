@@ -28,7 +28,7 @@
   let hidden = $state(document.hidden);
   $effect(() => {
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => (onscreen = e!.isIntersecting));
+    const io = new IntersectionObserver(([e]) => (onscreen = e!.isIntersecting), { rootMargin: "0px 0px 20% 0px" });
     io.observe(el);
     return () => io.disconnect();
   });
