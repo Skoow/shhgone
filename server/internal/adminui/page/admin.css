@@ -123,7 +123,7 @@ select, input[type=date] {
 .etat-ok { color: var(--ok); }
 .fiche { background: var(--surface-2); border-radius: 10px; padding: .75rem .875rem; margin-top: .5rem; max-width: 46rem; }
 .fiche .tete { font-weight: 600; margin: 0 0 .5rem; overflow-wrap: anywhere; }
-.fiche .faits dd { white-space: normal; }
+.fiche .faits dd { white-space: normal; max-width: 28rem; }
 .rangee > button { margin-top: 0; }
 .etat-echu { color: var(--text-2); }
 @media (max-width: 30rem) {
