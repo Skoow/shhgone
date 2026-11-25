@@ -1,7 +1,7 @@
 <script lang="ts">
-  // Offres (page à part, pages séparées) : refaite :
-  // une seule présentation (plus de cartes de prix puis d'un tableau qui redisait la même chose),
-  // choix de la facturation et de l'offre, récapitulatif (ui/OffersCheckout.svelte).
+  // Offres (page à part, pages séparées) : rythme, cartes courtes (prix, ligne-clé) et comparatif
+  // aligné qui porte seul le détail, panneau de paiement à droite, questions
+  // (ui/OffersCheckout.svelte, lot 2 de l'audit de design).
   // Retour du prestataire de paiement (/offres/retour, conception du paiement §2 point 5) : même
   // page, l'état du paiement à la place du choix des offres (rendu au navigateur seulement).
   import { t } from "../i18n/i18n.svelte";

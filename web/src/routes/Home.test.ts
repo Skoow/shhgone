@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
-import { PAID } from "../limits";
+import { CONTENT_MAX, MAX_OPENS, PAID, PW_TRIES, TTL_HOURS, TTL_MAX_HOURS } from "../limits";
+import { PASSWORD_LEN } from "../engine/pure";
+import { formatBytes, formatDuration } from "../i18n/format";
 import { createRawSnippet, flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../i18n/i18n.svelte";
@@ -25,6 +27,32 @@ afterEach(() => {
 });
 
 describe("Home (UI §9.1)", () => {
+  it("lot 2 : chiffres clés et vie d'un lien lus dans limits.ts, aucun nom d'algorithme ; lien en deux, ce que voit le serveur ; vérification", () => {
+    show();
+    const n = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
+    const stats = [...document.querySelectorAll(".stats li")].map((l) => n(l.querySelector(".sv")!.textContent));
+    expect(stats).toEqual([formatBytes(CONTENT_MAX, "fr"), formatDuration(TTL_MAX_HOURS * 3600, "fr"), String(MAX_OPENS), "0", String(PASSWORD_LEN)].map(n));
+    expect(document.querySelector(".stats")!.closest("section")!.getAttribute("aria-label")).toBe("En chiffres");
+    expect(document.body.textContent).not.toMatch(/AES|GCM|ne voit rien/u);
+    const rules = n(document.querySelector(".life .rules")!.textContent);
+    for (const h of TTL_HOURS) expect(rules).toContain(n(formatDuration(h * 3600, "fr")));
+    expect(rules).toContain(`à ${MAX_OPENS}.`);
+    expect(rules).toContain(`après ${PW_TRIES} mots de passe faux`);
+    // Après la dernière ouverture, le contenu reste jusqu'à l'échéance (pages « Confidentialité ») :
+    // jamais « effacé après l'ouverture ».
+    expect(rules).toContain("Le contenu chiffré reste jusqu'à l'échéance");
+    expect(document.querySelector(".life .track")!.getAttribute("aria-hidden")).toBe("true");
+    expect([...document.querySelectorAll(".sees .sv-col li")].map((l) => l.textContent)).toEqual([
+      "des données chiffrées", "leur taille approximative", "l'heure des échanges", "votre adresse IP, le temps de la connexion",
+      "le contenu", "les noms des fichiers", "le mot de passe", "la clé",
+    ]);
+    const links = [...document.querySelectorAll(".tcards a")];
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["https://github.com/Skoow/shhgone", "/verifier"]);
+    expect(links[0]!.getAttribute("rel")).toBe("noopener noreferrer");
+    // Mini-schémas de « Comment ça marche » : animés en CSS seulement, aucun SMIL.
+    expect(document.querySelectorAll("#comment animate, #comment animateTransform")).toHaveLength(0);
+  });
+
   it("accueil : sur-titre, titre, phrase, deux boutons, méta, infographie, composeur, sections", () => {
     show();
     const h1 = document.querySelector("h1")!;
@@ -61,6 +89,8 @@ describe("Home (UI §9.1)", () => {
       "Comment ça marche",
       "Ce qui se passe quand vous partagez", // section de l'infographie
       "Ce qui reste hors de notre portée",
+      "La vie d'un lien",
+      "Vous n'avez pas à nous croire sur parole.",
       "Offres",
       "Vos questions",
     ]);

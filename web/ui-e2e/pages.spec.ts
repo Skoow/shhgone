@@ -69,7 +69,7 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   }
 });
 
-test("Offres (refaite) : une seule présentation, facturation, choix de l'offre, récapitulatif ; rien n'est demandé ni prélevé ; capture", async ({ page, shh, isMobile }) => {
+test("Offres : facturation, cartes et comparatif, choix de l'offre, récapitulatif ; rien n'est demandé ni prélevé ; capture", async ({ page, shh, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
   const lectures: string[] = [];
   page.on("request", (r) => {
@@ -85,10 +85,11 @@ test("Offres (refaite) : une seule présentation, facturation, choix de l'offre,
   expect((await ferme.boundingBox())!.y).toBeLessThan((await co.locator('[data-tier="free"]').boundingBox())!.y);
   for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-soon]`)).toHaveText("Bient\u00f4t");
   // Appels : inclus dans Plus et Pro, réservés à ces offres ; plus de « bientôt ».
-  for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus$/);
-  await expect(co.locator('[data-tier="free"] [data-calls]')).toHaveText(/^Appels audio et vidéo\s+Non inclus$/);
+  for (const x of ["plus", "pro"]) await expect(co.locator(`td[data-calls="${x}"]`)).toHaveText("Inclus");
+  await expect(co.locator('td[data-calls="free"]')).toHaveText("Non inclus");
+  await expect(co.locator("td[data-calls]").first().locator("xpath=..").locator("th")).toHaveText("Appels audio et vidéo");
   expect(lectures).toEqual([shh.origin + "/api/paiement"]);
-  // Trois offres, une seule fois chacune (plus de tableau qui redisait les cartes).
+  // Trois offres, une carte chacune ; le détail est dans le comparatif aligné, pas dans les cartes.
   await expect(co.locator("[data-tier]")).toHaveCount(3);
   await expect(page.locator("[data-offers], [data-prices]")).toHaveCount(0);
   for (const [x, size] of [["free", "2 Go"], ["plus", "10 Go"], ["pro", "30 Go"]] as const) expect(norm(await co.locator(`[data-tier="${x}"]`).innerText())).toContain(size);

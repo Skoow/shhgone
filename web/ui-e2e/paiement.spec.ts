@@ -20,8 +20,9 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   const co = page.locator("[data-checkout]");
   // Appels des salons : Plus et Pro « Inclus », réservés à ces offres, sans
   // « bientôt » ; Gratuit « Non inclus ».
-  for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus$/);
-  await expect(co.locator('[data-tier="free"] [data-calls]')).toHaveText(/^Appels audio et vidéo\s+Non inclus$/);
+  for (const x of ["plus", "pro"]) await expect(co.locator(`td[data-calls="${x}"]`)).toHaveText("Inclus");
+  await expect(co.locator('td[data-calls="free"]')).toHaveText("Non inclus");
+  await expect(co.locator("td[data-calls]").first().locator("xpath=..").locator("th")).toHaveText("Appels audio et vidéo");
   await co.locator('[data-tier="pro"] .big').click();
   await co.locator("[data-billing]").getByText("Annuel").click();
   const sum = co.locator("[data-summary]");

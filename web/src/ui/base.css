@@ -390,6 +390,89 @@ html.kbd-open .dock {
   }
 }
 
+/* Sections de l'accueil, lot 2 : `.fondu`, fond qui part du fond de la page et y revient (aucun
+   bord), avec la lueur propre à la section (--lueur, --lueur-x, --lueur-y) et la trame de points du
+   logo, très discrète, au milieu. `.fondu-biais` : coupure oblique douce (--pente : environ 3° sur
+   ordinateur, moins de 2° sur téléphone), le fond ne revient pas au noir le long du biais mais reste
+   d'une teinte à peine plus claire (fondu continu) ; `.fondu-biais-inv` : pente dans l'autre sens.
+   `.filet` : filet lumineux d'un pixel en haut de la section (le long de la pente en biais). Décor
+   seul, jamais animé. */
+.fondu {
+  --pente: 3cqw;
+  position: relative;
+  isolation: isolate;
+}
+@media (min-width: 1024px) {
+  .fondu {
+    --pente: 5cqw;
+  }
+}
+.fondu::before,
+.fondu.filet::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  width: 100cqw;
+  translate: -50% 0;
+  pointer-events: none;
+}
+.fondu::before {
+  inset-block: 0;
+  background:
+    radial-gradient(circle, rgb(233 236 242 / 0.045) 1px, transparent 1.6px) 0 0 / 14px 14px,
+    radial-gradient(48% 340px at var(--lueur-x, 50%) var(--lueur-y, 35%), var(--lueur, rgb(95 227 181 / 0.06)), transparent 75%),
+    #0f131b;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+}
+.fondu-biais::before {
+  background:
+    radial-gradient(circle, rgb(233 236 242 / 0.045) 1px, transparent 1.6px) 0 0 / 14px 14px,
+    radial-gradient(48% 340px at var(--lueur-x, 50%) var(--lueur-y, 35%), var(--lueur, rgb(95 227 181 / 0.06)), transparent 75%),
+    linear-gradient(180deg, #0e1219, #11151e 30%, #11151e 70%, #0e1219);
+  -webkit-mask-image: none;
+  mask-image: none;
+  clip-path: polygon(0 var(--pente), 100% 0, 100% calc(100% - var(--pente)), 0 100%);
+}
+.fondu-biais-inv::before {
+  clip-path: polygon(0 0, 100% var(--pente), 100% 100%, 0 calc(100% - var(--pente)));
+}
+.fondu.filet::after {
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(95 227 181 / 0.35) 30%, rgb(141 178 255 / 0.3) 70%, transparent);
+}
+/* Le long de la pente : tourné de atan(pente / largeur), depuis le coin bas de la pente. */
+.fondu-biais.filet::after {
+  top: var(--pente);
+  transform-origin: 0 0;
+  rotate: -1.72deg;
+}
+.fondu-biais-inv.filet::after {
+  top: 0;
+  rotate: 1.72deg;
+}
+@media (min-width: 1024px) {
+  .fondu-biais.filet::after {
+    rotate: -2.86deg;
+  }
+  .fondu-biais-inv.filet::after {
+    rotate: 2.86deg;
+  }
+}
+@media (forced-colors: active) {
+  .fondu::before,
+  .fondu.filet::after {
+    display: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .fondu::before {
+    background: #0f1218;
+  }
+}
+
 /* En-tête des pages d'information et des offres (InfoPage, Offres) : titre et sous-titre dans
    le bandeau (.titre-bandeau, ci-dessous), sur toute la largeur du contenu. Téléphone et
    tablette : centrés. Grand écran (1100 px et plus) : alignés à gauche. */

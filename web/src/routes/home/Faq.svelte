@@ -9,10 +9,12 @@
   const qs = ["server", "lost", "back", "scan", "copy"] as const;
 </script>
 
-<!-- Fond bleu nuit et trame à gauche (maquette « La trame ») ; titre à gauche,
-     questions à droite sur ordinateur. -->
-<section class="faq slab fine" aria-labelledby="faq-title">
-  <h2 id="faq-title" class="rv" {@attach reveal}>{t("home.faq.title")}</h2>
+<!-- Fond raccordé (.fondu, ui/base.css) ; titre à gauche (collant), questions
+     à droite sur ordinateur. -->
+<section class="faq fondu filet" id="faq" aria-labelledby="faq-title">
+  <div class="fh rv" {@attach reveal}>
+    <h2 id="faq-title">{t("home.faq.title")}</h2>
+  </div>
   <div class="qa">
     {#each qs as k (k)}
       <!-- « Ce que voit le serveur » (menu Sécurité de la barre du haut) ouvre la première question. -->
@@ -26,27 +28,38 @@
 
 <style>
   .faq {
+    --lueur: rgb(141 178 255 / 0.06);
+    --lueur-x: 20%;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-6);
-    padding-block: 112px 120px;
+    padding-block: 104px 120px;
+    scroll-margin-top: 72px;
+  }
+  .fh {
+    display: grid;
+    align-content: start;
+    gap: var(--sp-3);
+    min-width: 0;
   }
   details {
     scroll-margin-top: 96px;
   }
-  /* Titre centré au-dessus des questions. */
+  /* Ordinateur : titre à gauche, questions à droite. */
   @media (min-width: 1024px) {
     .faq {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      column-gap: clamp(40px, 5vw, 88px);
       padding-block: 136px 144px;
     }
-  }
-  .qa {
-    width: min(100%, 52rem);
-    margin-inline: auto;
+    .fh {
+      align-self: start;
+      position: sticky;
+      top: 96px;
+    }
   }
   h2 {
     margin: 0;
-    text-align: center;
     text-wrap: balance;
     min-width: 0;
     overflow-wrap: break-word;

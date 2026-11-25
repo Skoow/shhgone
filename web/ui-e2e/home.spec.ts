@@ -119,13 +119,13 @@ test.describe("fr-FR", () => {
     // long (« s'autodétruit », question de la FAQ) débordait de 14 px dans la marge sans créer de
     // défilement ; dans WebKit, aux métriques un peu plus larges, il en créait un.
     // Le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi. Les sections en
-    // bande (.soft, .slab) débordent exprès par leur décor (halo d'un bord à l'autre de l'écran,
+    // bande (.soft, .slab, .fondu) débordent exprès par leur décor (halo d'un bord à l'autre de l'écran,
     // coupé par #app) : leur contenu, lui, est vérifié. Les dessins SVG (mis à
     // l'échelle, sans texte de page) et la copie décorative du titre (.words, ses points qui partent
     // vers la droite, coupés par le titre) n'entrent pas dans cette mesure.
     const overflow = await page.evaluate(() =>
       [document.querySelector(".home")!, ...document.querySelectorAll(".home > *, .home section *")]
-        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".soft, .slab, .home"))
+        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".soft, .slab, .fondu, .home"))
         .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0)
         .map((e) => `${e.tagName}.${(e as HTMLElement).className} ${e.scrollWidth} > ${e.clientWidth}`),
     );
@@ -149,9 +149,31 @@ test.describe("fr-FR", () => {
     const names = await page.evaluate(() => (window as unknown as { __anims: string[] }).__anims);
     expect(names.filter((n) => /(rise-only|rise-in|vault-in|word-in|letter-fade)$/.test(n))).toEqual([]);
     const infinite = await page.evaluate(() =>
-      document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations === Infinity).every((a) => ((a.effect as KeyframeEffect).target as Element).closest("[data-ambient], [data-demo]") !== null),
+      document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations === Infinity).every((a) => ((a.effect as KeyframeEffect).target as Element).closest("[data-ambient], [data-demo], [data-boucle]") !== null),
     );
     expect(infinite).toBe(true);
+  });
+
+  test("/#faq : la page défile jusqu'aux questions", async ({ page, shh }) => {
+    await page.goto(shh.origin + "/#faq");
+    await expect(page.locator("section#faq")).toBeInViewport();
+    await expect(page.locator("#faq-title")).toBeInViewport();
+  });
+
+  test("lot 2 : les mini-schémas (frise, vie d'un lien) ne tournent que près de l'écran", async ({ page, shh }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(shh.origin + "/");
+    const etat = (sel: string) =>
+      page.evaluate((sel) => [...new Set(document.querySelector(sel)!.getAnimations({ subtree: true }).filter((a) => a.effect?.getComputedTiming().iterations === Infinity).map((a) => a.playState))].join(), sel);
+    await page.locator("section.life").evaluate((e) => e.scrollIntoView({ block: "center" }));
+    await expect.poll(() => etat("section.life")).toBe("running");
+    await page.locator("footer[data-foot]").evaluate((e) => e.scrollIntoView({ block: "end" }));
+    await expect.poll(() => etat("section.life")).toBe("paused");
+    await expect.poll(() => etat("section.how")).toBe("paused");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(shh.origin + "/");
+    await page.locator("section.how").evaluate((e) => e.scrollIntoView({ block: "center" }));
+    await expect.poll(() => etat("section.how")).toBe("");
   });
 
   test("K8 : le titre a pour nom la phrase entière ; la copie animée est cachée", async ({ page, shh }) => {

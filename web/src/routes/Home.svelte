@@ -1,4 +1,9 @@
 <script module lang="ts">
+  // Ancre de section dans l'adresse (« /#faq », « /#comment ») : lue au chargement du module,
+  // avant que l'application ne retire tout « # » de la barre (App.svelte, le « # » est réservé aux
+  // clés) ; l'accueil y défile une fois monté. Liste fermée : aucun autre fragment n'est lu.
+  const ANCRES = ["faq", "comment"] as const;
+  const ancre = typeof location === "undefined" ? null : (ANCRES.find((a) => location.hash === `#${a}`) ?? null);
   // Plus d'entrée animée : l'accueil est écrit au build et affiché avant le
   // script (référencement) ; le titre s'affiche d'emblée dans son état final.
 
@@ -32,6 +37,10 @@
 
   // Section demandée depuis une autre page (rechargement complet) : ui/section.ts.
   onMount(reprendreSection);
+  onMount(() => {
+    if (ancre === null) return;
+    requestAnimationFrame(() => document.getElementById(ancre)?.scrollIntoView({ block: "start" }));
+  });
 
   type Props = {
     /** Vrai dès qu'un élément est ajouté : le titre se replie (UI §9.1), le reste de l'accueil part. */
