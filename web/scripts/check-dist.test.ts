@@ -260,7 +260,7 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(site({ ...base, "pdf-frame.html": sansCors }, false), false).join("\n")).toContain('pdf-frame.html : crossorigin="anonymous" absent');
     const d = site(base, false);
     rmSync(join(d, "pdf-frame.html"));
-    expect(checkDist(d, false)).toEqual(["pdf-frame.html : absent"]);
+    expect(checkDist(d, false)).toEqual([]); // pages d'essai sans cadre PDF
   });
 
   it("SRI (spec §28.3) : échoue si un script ou une feuille de style n'a pas d'empreinte, ou une fausse ; passe avec la bonne", () => {

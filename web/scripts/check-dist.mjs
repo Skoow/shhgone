@@ -150,10 +150,9 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   // Cadre PDF isolé (UI §13), qui reçoit le PDF déchiffré : mêmes empreintes (chemins relatifs),
   // et crossorigin sur chaque balise : son origine est opaque, une empreinte sans CORS serait
   // refusée par le navigateur (le serveur pose Access-Control-Allow-Origin: * sur ses deux
-  // fichiers, static_paths.go).
+  // fichiers, static_paths.go). Contrôlé s'il est là (les pages d'essai de ui-e2e n'en ont pas).
   const frame = byRel.get("pdf-frame.html")?.toString("utf8");
-  if (frame === undefined) problems.push("pdf-frame.html : absent");
-  else {
+  if (frame !== undefined) {
     problems.push(...checkSri("pdf-frame.html", frame, (rel) => byRel.get(rel) ?? null, "/"));
     const tags = [...frame.matchAll(/<(?:script\b[^>]*\ssrc=|link\b[^>]*\srel="stylesheet")[^>]*>/g)].map((m) => m[0]);
     if (tags.length !== 2) problems.push(`pdf-frame.html : ${tags.length} balises de script ou de style (2 attendues)`);
