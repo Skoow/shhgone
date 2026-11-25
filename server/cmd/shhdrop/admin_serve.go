@@ -97,7 +97,9 @@ func adminConfig(cfg config.Config, d adminDeps) adminui.Config {
 		}
 	}
 	if d.pai != nil {
-		c.Paiement = &adminui.Paiement{Agregats: d.pai.Agregats, Suspendre: d.pai.Suspendre}
+		// Accès offerts : pass Pro créés ici, lien vers SHH_ORIGIN (obligatoire avec SHH_PAIEMENT=1).
+		c.Paiement = &adminui.Paiement{Agregats: d.pai.Agregats, Suspendre: d.pai.Suspendre,
+			Offrir: d.pai.Offrir, Offerts: d.pai.AccesOfferts, RevoquerOffert: d.pai.RevoquerOffert, Origine: cfg.Origin}
 	}
 	return c
 }

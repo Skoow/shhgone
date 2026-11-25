@@ -92,12 +92,14 @@ type Agregats struct {
 	PayPal          AgregatsPrestataire `json:"paypal"`
 	NOWPayments     AgregatsPrestataire `json:"nowpayments"`
 	RevocationsMain int64               `json:"revocations_a_la_main"`
-	// Lus à l'instant dans paiements.db : pass valables (payés, non révoqués, non échus) par
-	// offre ; pass révoqués encore gardés ; commandes en attente de paiement (gardées 7 jours) ;
-	// abonnements payés qui se renouvellent ; anomalies gardées pour les litiges.
+	// Lus à l'instant dans paiements.db : pass payés valables (non révoqués, non échus) par
+	// offre ; pass payés révoqués encore gardés ; accès offerts valables (comptés à part : ni
+	// vendus ni payés) ; commandes en attente de paiement (gardées 7 jours) ; abonnements payés
+	// qui se renouvellent ; anomalies gardées pour les litiges.
 	PassPlus       int `json:"pass_plus"`
 	PassPro        int `json:"pass_pro"`
 	PassRevoques   int `json:"pass_revoques"`
+	AccesOfferts   int `json:"acces_offerts"`
 	EnAttente      int `json:"commandes_en_attente"`
 	Renouvellement int `json:"abonnements_renouveles"`
 	AnomaliesBase  int `json:"anomalies_gardees"`
@@ -126,9 +128,10 @@ func (s *Service) Agregats() (Agregats, error) {
 	a := Agregats{Suspendu: s.suspendu.Load(), Stripe: s.prestataire(Carte), PayPal: s.prestataire(PayPal),
 		NOWPayments: s.prestataire(Crypto), RevocationsMain: s.cpt.par[0].revocations.Load(),
 		Recentes: s.nRecentes(now), RecentesMax: maxEnAttente, JetonsActif: s.jetons != nil}
-	if err := s.db.QueryRow(`SELECT coalesce(sum(revoque=0 AND fin_jour>?1 AND offre=1), 0),
-		coalesce(sum(revoque=0 AND fin_jour>?1 AND offre=2), 0), coalesce(sum(revoque=1), 0) FROM passes`, auj).Scan(
-		&a.PassPlus, &a.PassPro, &a.PassRevoques); err != nil {
+	if err := s.db.QueryRow(`SELECT coalesce(sum(offert=0 AND revoque=0 AND fin_jour>?1 AND offre=1), 0),
+		coalesce(sum(offert=0 AND revoque=0 AND fin_jour>?1 AND offre=2), 0), coalesce(sum(offert=0 AND revoque=1), 0),
+		coalesce(sum(offert=1 AND revoque=0 AND fin_jour>?1), 0) FROM passes`, auj).Scan(
+		&a.PassPlus, &a.PassPro, &a.PassRevoques, &a.AccesOfferts); err != nil {
 		return Agregats{}, err
 	}
 	if err := s.db.QueryRow(`SELECT coalesce(sum(etat=?1), 0), coalesce(sum(etat=?2 AND renouvelle=1), 0),

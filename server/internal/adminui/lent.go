@@ -71,10 +71,13 @@ func (a *admin) ralentirEtat(st State) State {
 }
 
 // ralentirPaiement : tous les agrégats du paiement sont lents (pass, commandes, jetons, compteurs
-// par prestataire), sauf ce qui décrit la configuration et l'état des ventes, lu à l'instant.
+// par prestataire), sauf ce qui décrit la configuration et l'état des ventes, et les accès offerts,
+// lus à l'instant.
 func (a *admin) ralentirPaiement(frais paiement.Agregats) paiement.Agregats {
 	ag := a.lents.paiement.lire(a.now(), frais)
 	ag.Suspendu, ag.JetonsActif, ag.RecentesMax = frais.Suspendu, frais.JetonsActif, frais.RecentesMax
+	// Accès offerts : ne changent que par l'exploitant (ni vente ni achat à dater), lus à l'instant.
+	ag.AccesOfferts = frais.AccesOfferts
 	for _, p := range [][2]*paiement.AgregatsPrestataire{{&ag.Stripe, &frais.Stripe}, {&ag.PayPal, &frais.PayPal},
 		{&ag.NOWPayments, &frais.NOWPayments}} {
 		p[0].Configure, p[0].Vendable = p[1].Configure, p[1].Vendable

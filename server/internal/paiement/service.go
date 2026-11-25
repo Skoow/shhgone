@@ -699,9 +699,9 @@ func (s *Service) Prendre(p Pass, n int) (int, Offre, error) {
 	defer tx.Rollback()
 	var offre Offre
 	var fin, recharge int64
-	var jetons, rev int
-	err = tx.QueryRow(`SELECT offre, fin_jour, jetons, recharge_jour, revoque FROM passes WHERE q=?`, q[:]).
-		Scan(&offre, &fin, &jetons, &recharge, &rev)
+	var jetons, rev, offert int
+	err = tx.QueryRow(`SELECT offre, fin_jour, jetons, recharge_jour, revoque, offert FROM passes WHERE q=?`, q[:]).
+		Scan(&offre, &fin, &jetons, &recharge, &rev, &offert)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, 0, nil
 	}
@@ -713,7 +713,7 @@ func (s *Service) Prendre(p Pass, n int) (int, Offre, error) {
 		return 0, offre, nil
 	}
 	for recharge <= auj {
-		jetons, recharge = offre.Detail().JetonsPeriod, recharge+periodeJetons
+		jetons, recharge = reserve(offre, offert == 1), recharge+periodeJetons
 	}
 	pris := min(n, jetons)
 	if _, err := tx.Exec(`UPDATE passes SET jetons=?, recharge_jour=? WHERE q=?`, jetons-pris, recharge, q[:]); err != nil {

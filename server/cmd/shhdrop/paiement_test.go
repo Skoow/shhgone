@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -121,7 +123,8 @@ func TestSetupPaiementModeBase(t *testing.T) {
 	p.db.Close()
 }
 
-// TestRetourOffresServi : /offres/retour sert la page des Offres (aucune donnée dans l'adresse).
+// TestRetourOffresServi : /offres/retour sert la page des Offres (aucune donnée dans l'adresse) ;
+// /offres/offert, l'application en 200 (le pass d'un accès offert suit « # »).
 func TestRetourOffresServi(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "index.html"), []byte("<!doctype html>index"), 0o644)
@@ -138,6 +141,11 @@ func TestRetourOffresServi(t *testing.T) {
 		}
 	}
 	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/offres/offert", nil))
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "index") {
+		t.Errorf("/offres/offert : %d %q", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/offres/autre", nil))
 	if w.Code != 404 {
 		t.Error("/offres/autre :", w.Code)
@@ -235,6 +243,76 @@ func TestAdminPaiementAgregats(t *testing.T) {
 		t.Fatal("rétablir", c)
 	}
 	if _, body := appel("GET", "/api/paiement"); !strings.Contains(body, `"ventes_suspendues":false`) {
+		t.Fatal(body)
+	}
+}
+
+// TestAdminAccesOffert : de bout en bout par le tableau de bord, paiement activé : le lien rendu
+// pointe vers SHH_ORIGIN/offres/offert#P, P donne l'état Pro payé, la liste ne montre que
+// l'empreinte, paiements.db ne contient jamais P, et la révocation coupe l'accès.
+func TestAdminAccesOffert(t *testing.T) {
+	cfg := cfgPaiement(t)
+	p, err := setupPaiement(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.db.Close()
+	cfg.AdminTokenHash = sha256.Sum256([]byte(jetonAdmin))
+	h := adminui.New(adminConfig(cfg, adminDeps{pai: p.svc}))
+	appel := func(method, path, corps string) (int, http.Header, string) {
+		r := httptest.NewRequest(method, path, strings.NewReader(corps))
+		r.RemoteAddr, r.Host = "127.0.0.1:4000", "localhost:9191"
+		r.Header.Set("Authorization", "Bearer "+jetonAdmin)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code, w.Header(), w.Body.String()
+	}
+	code, hd, body := appel("POST", "/api/paiement/offrir", `{"duree":"sans_fin"}`)
+	if code != 200 || hd.Get("Cache-Control") != "no-store" {
+		t.Fatal(code, hd, body)
+	}
+	var v struct {
+		Lien  string               `json:"lien"`
+		Acces paiement.AccesOffert `json:"acces"`
+	}
+	json.Unmarshal([]byte(body), &v)
+	b64, ok := strings.CutPrefix(v.Lien, "https://shhgone.test/offres/offert#")
+	if !ok {
+		t.Fatal(v.Lien)
+	}
+	pass, err := paiement.PassDe(b64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := p.svc.EtatDe(pass)
+	if err != nil || e.Etat != "payee" || e.Offre != paiement.Pro {
+		t.Fatalf("%+v %v", e, err)
+	}
+	q := pass.Empreinte()
+	if v.Acces.ID != hex.EncodeToString(q[:]) {
+		t.Fatal(v.Acces)
+	}
+	_, _, liste := appel("GET", "/api/paiement/offerts", "")
+	if strings.Contains(liste, b64) || strings.Contains(liste, hex.EncodeToString(pass[:])) || !strings.Contains(liste, v.Acces.ID) {
+		t.Fatal(liste)
+	}
+	fichiers, _ := filepath.Glob(filepath.Join(cfg.DataDir, "paiements.db*"))
+	if len(fichiers) == 0 {
+		t.Fatal("aucun fichier de base")
+	}
+	for _, f := range fichiers {
+		c, _ := os.ReadFile(f)
+		if bytes.Contains(c, pass[:]) || bytes.Contains(c, []byte(b64)) {
+			t.Fatal("P écrit dans", f)
+		}
+	}
+	if code, _, body := appel("POST", "/api/paiement/offerts/revoquer", `{"id":"`+v.Acces.ID+`"}`); code != 200 || body != `{"revoque":true}` {
+		t.Fatal(code, body)
+	}
+	if e, _ := p.svc.EtatDe(pass); e.Etat != "revoquee" {
+		t.Fatalf("%+v", e)
+	}
+	if _, _, body := appel("GET", "/api/paiement", ""); !strings.Contains(body, `"acces_offerts":0`) {
 		t.Fatal(body)
 	}
 }

@@ -56,6 +56,14 @@ func EmisParJour(o Offre) int {
 	return 10
 }
 
+// emisParJour : borne du jour d'un pass (accès offert : EmisParJourOffert).
+func emisParJour(o Offre, offert bool) int {
+	if offert {
+		return EmisParJourOffert
+	}
+	return EmisParJour(o)
+}
+
 // spkiPrefixe : début de la clé publique SPKI d'une clé RSA de 2 048 bits (exposant 65 537)
 // avec l'OID RSASSA-PSS, SHA-384, MGF1-SHA-384 et un sel de 48 octets (RFC 9578 §6.5), tel que
 // l'écrit blind-rsa-signatures (vecteurs) ; suivi de RSAPublicKey (PKCS #1, 270 octets).
@@ -233,7 +241,7 @@ func (j *Jetons) Emettre(s *Service, p Pass, requetes [][]byte) ([][]byte, Offre
 			return nil, 0, errJeton
 		}
 	}
-	n, err := s.prendreDuJour(p, len(requetes), EmisParJour(offre))
+	n, err := s.prendreDuJour(p, len(requetes))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -325,8 +333,9 @@ func (s *Service) offreDuPass(p Pass) (Offre, error) {
 	return o, err
 }
 
-// prendreDuJour : Prendre, tout ou rien, borné aussi par maxJour émissions par jour.
-func (s *Service) prendreDuJour(p Pass, n, maxJour int) (int, error) {
+// prendreDuJour : Prendre, tout ou rien, borné aussi par les émissions du jour du pass
+// (emisParJour).
+func (s *Service) prendreDuJour(p Pass, n int) (int, error) {
 	q := p.Empreinte()
 	auj := jourDe(s.now())
 	tx, err := s.db.Begin()
@@ -336,9 +345,9 @@ func (s *Service) prendreDuJour(p Pass, n, maxJour int) (int, error) {
 	defer tx.Rollback()
 	var offre Offre
 	var fin, recharge, emisJour int64
-	var jetons, rev, emisN int
-	err = tx.QueryRow(`SELECT offre, fin_jour, jetons, recharge_jour, revoque, emis_jour, emis_n FROM passes WHERE q=?`, q[:]).
-		Scan(&offre, &fin, &jetons, &recharge, &rev, &emisJour, &emisN)
+	var jetons, rev, emisN, offert int
+	err = tx.QueryRow(`SELECT offre, fin_jour, jetons, recharge_jour, revoque, emis_jour, emis_n, offert FROM passes WHERE q=?`, q[:]).
+		Scan(&offre, &fin, &jetons, &recharge, &rev, &emisJour, &emisN, &offert)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
@@ -349,12 +358,12 @@ func (s *Service) prendreDuJour(p Pass, n, maxJour int) (int, error) {
 		return 0, nil
 	}
 	for recharge <= auj {
-		jetons, recharge = offre.Detail().JetonsPeriod, recharge+periodeJetons
+		jetons, recharge = reserve(offre, offert == 1), recharge+periodeJetons
 	}
 	if emisJour != auj {
 		emisJour, emisN = auj, 0
 	}
-	if jetons < n || emisN+n > maxJour {
+	if jetons < n || emisN+n > emisParJour(offre, offert == 1) {
 		return 0, nil
 	}
 	if _, err := tx.Exec(`UPDATE passes SET jetons=?, recharge_jour=?, emis_jour=?, emis_n=? WHERE q=?`,

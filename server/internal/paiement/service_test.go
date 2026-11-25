@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -495,7 +496,7 @@ func TestSchemaPaiements(t *testing.T) {
 	want := "cles_jetons.jour cles_jetons.offre cles_jetons.sk " +
 		"commandes.id commandes.q commandes.offre commandes.jours commandes.renouvelle commandes.moyen commandes.etat " +
 		"commandes.abonnement commandes.cree_jour commandes.garde_jour depenses.h depenses.jour passes.q passes.offre passes.debut_jour passes.fin_jour " +
-		"passes.jetons passes.recharge_jour passes.revoque passes.emis_jour passes.emis_n refs.r refs.commande refs.jour"
+		"passes.jetons passes.recharge_jour passes.revoque passes.emis_jour passes.emis_n passes.offert refs.r refs.commande refs.jour"
 	if strings.Join(got, " ") != want {
 		t.Fatalf("schéma :\n%s\nattendu :\n%s", strings.Join(got, " "), want)
 	}
@@ -532,36 +533,98 @@ func TestNewServiceRefus(t *testing.T) {
 	}
 }
 
-// TestMigrationV1 : une base de la version 1 (sans jetons) est migrée à l'ouverture, ses pass
-// gardés.
-func TestMigrationV1(t *testing.T) {
+// schemaV2 : schéma de la version 2 (avant les accès offerts), reconstitué depuis l'actuel.
+func schemaV2(t *testing.T) string {
+	t.Helper()
+	v2 := strings.Replace(schemaPaiements, `,
+  offert INTEGER NOT NULL DEFAULT 0 CHECK(offert IN (0,1))) WITHOUT ROWID;`, ") WITHOUT ROWID;", 1)
+	if strings.Contains(v2, "offert") {
+		t.Fatal("schéma v2 mal reconstitué")
+	}
+	return v2
+}
+
+// baseAncienne : base écrite dans un schéma d'avant, avec un pass, à la version v.
+func baseAncienne(t *testing.T, schema string, ligne string, v int) string {
+	t.Helper()
 	chemin := filepath.Join(t.TempDir(), "p.db")
 	db, err := sql.Open("sqlite", "file:"+chemin)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db.Close()
+	if _, err := db.Exec(schema); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ligne, make([]byte, 32)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(fmt.Sprintf(`PRAGMA user_version=%d`, v)); err != nil {
+		t.Fatal(err)
+	}
+	return chemin
+}
+
+// TestMigrationV1 : une base de la version 1 (sans jetons ni accès offerts) est migrée à
+// l'ouverture jusqu'à la version actuelle, ses pass gardés (payés, jamais offerts).
+func TestMigrationV1(t *testing.T) {
 	v1 := strings.NewReplacer(`,
   emis_jour INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_jour)='integer' AND emis_jour >= 0 AND emis_jour % 86400 = 0),
-  emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)) WITHOUT ROWID;`, ") WITHOUT ROWID;").Replace(schemaPaiements)
+  emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)) WITHOUT ROWID;`, ") WITHOUT ROWID;").Replace(schemaV2(t))
 	if strings.Contains(v1, "emis_n") {
 		t.Fatal("schéma v1 mal reconstitué")
 	}
-	if _, err := db.Exec(v1); err != nil {
-		t.Fatal(err)
-	}
-	db.Exec(`INSERT INTO passes VALUES(?,1,0,86400,30,0,0)`, make([]byte, 32))
-	db.Exec(`PRAGMA user_version=1`)
-	db.Close()
-	db, err = OuvrirBase(chemin)
+	chemin := baseAncienne(t, v1, `INSERT INTO passes VALUES(?,1,0,86400,30,0,0)`, 1)
+	db, err := OuvrirBase(chemin)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	var n, emis int
-	db.QueryRow(`SELECT count(*), sum(emis_n) FROM passes`).Scan(&n, &emis)
+	var n, emis, offert int
+	db.QueryRow(`SELECT count(*), sum(emis_n), sum(offert) FROM passes`).Scan(&n, &emis, &offert)
 	var v int
 	db.QueryRow(`PRAGMA user_version`).Scan(&v)
-	if n != 1 || emis != 0 || v != 2 {
-		t.Fatal(n, emis, v)
+	if n != 1 || emis != 0 || offert != 0 || v != VersionBase {
+		t.Fatal(n, emis, offert, v)
 	}
+}
+
+// TestMigrationV2 : une base de la version 2 reçoit la colonne offert (0 pour ses pass), puis
+// refuse une valeur hors de 0 et 1 ; les colonnes obtenues sont celles d'une base neuve.
+func TestMigrationV2(t *testing.T) {
+	chemin := baseAncienne(t, schemaV2(t), `INSERT INTO passes VALUES(?,2,0,86400,100,0,0,0,0)`, 2)
+	db, err := OuvrirBase(chemin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var v, n, offert int
+	db.QueryRow(`PRAGMA user_version`).Scan(&v)
+	db.QueryRow(`SELECT count(*), sum(offert) FROM passes`).Scan(&n, &offert)
+	if v != VersionBase || n != 1 || offert != 0 {
+		t.Fatal(v, n, offert)
+	}
+	if _, err := db.Exec(`UPDATE passes SET offert=2`); err == nil {
+		t.Error("offert=2 accepté après migration")
+	}
+	colonnes := func(d *sql.DB) string {
+		var s string
+		d.QueryRow(`SELECT group_concat(name || ':' || type || ':' || "notnull" || ':' || coalesce(dflt_value, ''), ' ') FROM pragma_table_info('passes')`).Scan(&s)
+		return s
+	}
+	neuve, err := OuvrirBase(filepath.Join(t.TempDir(), "n.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer neuve.Close()
+	if a, b := colonnes(db), colonnes(neuve); a != b || a == "" {
+		t.Fatalf("colonnes migrées %q, neuves %q", a, b)
+	}
+	// Rouverte : rien à refaire, toujours lisible.
+	db.Close()
+	db2, err := OuvrirBase(chemin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db2.Close()
 }

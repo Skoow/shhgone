@@ -54,6 +54,29 @@ var details = [3]Detail{
 		Droits: []string{"partage_pro", "appel_audio", "appel_video"}},
 }
 
+// Accès offerts par l'exploitant (offerts.go) : formule Pro, sans commande. « Illimité » en
+// pratique : mêmes limites de partage et d'appel que Pro (30 Go, plafond technique du serveur),
+// mais une réserve de jetons et des émissions du jour relevées. Les jetons sont signés par la
+// même clé du jour que ceux des pass Pro payés : rien ne distingue, au partage ou au salon, un
+// jeton d'accès offert d'un jeton payé.
+const (
+	// JetonsOffert : jetons par période de 30 jours (Pro payé : 100), recharge normale.
+	JetonsOffert = 1000
+	// EmisParJourOffert : jetons émis au plus par jour UTC (Pro payé : 20, qui ne laisserait
+	// que 600 jetons par période). Borne aussi ce qui survit à une révocation : les jetons émis
+	// la veille et le jour même (2 × 100 au plus) restent dépensables tant que leur clé vaut
+	// (jetons.go).
+	EmisParJourOffert = 100
+)
+
+// reserve : jetons d'une période pour un pass de l'offre o (offert : accès offert).
+func reserve(o Offre, offert bool) int {
+	if offert {
+		return JetonsOffert
+	}
+	return details[o].JetonsPeriod
+}
+
 // Bientot : droits prévus dans le format mais pas encore disponibles (conception §11) : jamais
 // vendus ni promis ; rendus à part par l'API pour que l'écran dise « bientôt ». Vide : les
 // appels (appel_audio, appel_video) sont un vrai droit, vérifié par

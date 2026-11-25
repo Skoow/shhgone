@@ -214,6 +214,7 @@ function afficherPaiement(a) {
   chiffre(p, 'Pass Plus valables', a.pass_plus);
   chiffre(p, 'Pass Pro valables', a.pass_pro);
   chiffre(p, 'Pass révoqués gardés', a.pass_revoques);
+  chiffre(p, 'Accès offerts valables (à part)', a.acces_offerts);
   chiffre(p, 'Abonnements qui se renouvellent', a.abonnements_renouveles);
   const c = $('commandes');
   vider(c);
@@ -277,6 +278,7 @@ function fermer(message) {
   jeton = '';
   echecs = 0;
   if (minuterie) { clearInterval(minuterie); minuterie = 0; }
+  oublierLienOffert();
   $('tableau').hidden = true;
   $('perdu').hidden = true;
   $('entree').hidden = false;
@@ -359,6 +361,7 @@ $('entree').addEventListener('submit', async (ev) => {
     minuterie = setInterval(relire, 5000);
     chargerSignales();
     if (comptesActifs) chargerBannis();
+    if (paiementActif) chargerOfferts();
   } else {
     fermer('Refusé : jeton faux, ou serveur injoignable.');
     $('jeton').focus();
@@ -478,7 +481,7 @@ function sections(s) {
   }
   $('carte-signales').hidden = !salonsActifs;
   paiementActif = !!s.paiement_actif;
-  for (const id of ['onglet-paiement', 'paiement', 'carte-pass', 'carte-jetons', 'carte-prestataires', 'action-ventes']) {
+  for (const id of ['onglet-paiement', 'paiement', 'carte-pass', 'carte-jetons', 'carte-prestataires', 'action-ventes', 'carte-offerts']) {
     $(id).hidden = !paiementActif;
   }
 }
@@ -774,3 +777,95 @@ function afficherComptes(a) {
   chiffre(u, 'Récupérations par la clé', a.recuperations);
   chiffre(u, 'Suppressions de compte', a.suppressions);
 }
+
+// ----- Accès offerts (conception du paiement, « Accès offerts ») -----
+// Le lien (qui porte le pass après « # ») n'est montré qu'une fois : gardé dans le seul champ
+// de la page, jamais dans une variable, effacé par « Transmis », par une nouvelle création et à
+// la fermeture de la session. La liste ne reçoit que des empreintes.
+
+const ETATS_OFFERT = { actif: ['actif', 'etat-ok'], revoque: ['révoqué', 'etat-actif'], echu: ['échu', 'etat-echu'] };
+
+function oublierLienOffert() {
+  $('offert-champ').value = '';
+  $('offert-court').textContent = '';
+  $('offert-lien').hidden = true;
+}
+
+function ligneOffert(o) {
+  const li = el('li');
+  const tete = el('p', undefined, 'tete');
+  const [etat, classe] = ETATS_OFFERT[o.etat] || [o.etat, ''];
+  tete.append(el('span', o.court, 'code'), document.createTextNode(' · '), el('span', etat, classe));
+  li.append(tete);
+  // Révoqué : la fin a été ramenée au jour de la révocation (ligne purgée 31 jours après).
+  const suite = o.etat === 'actif'
+    ? ' · valable jusqu’au ' + dateFr(veille(o.fin)) + ' · ' + nombre.format(o.jetons) + ' jeton(s) restant(s) sur cette période'
+    : o.etat === 'echu' ? ' · terminé le ' + dateFr(veille(o.fin)) : ' · plus aucun jeton émis';
+  li.append(el('p', 'Créé le ' + dateFr(o.cree) + suite, 'meta'));
+  if (o.etat === 'actif') {
+    const outils = el('div', undefined, 'outils');
+    const rev = el('button', 'Révoquer', 'detruire');
+    rev.type = 'button';
+    confirmer(rev, 'révoquer ' + o.court + ' (sans retour)', async () => {
+      const r = await envoyer('POST', '/api/paiement/offerts/revoquer', { id: o.id });
+      if (!r) return;
+      const res = $('offerts-resultat');
+      if (r.ok && r.json && r.json.revoque) res.textContent = 'Accès ' + o.court + ' révoqué : plus aucun jeton émis. Les jetons déjà reçus meurent au plus tard après-demain.';
+      else if (r.ok) res.textContent = 'Introuvable ou déjà révoqué : rien n’a changé.';
+      else res.textContent = 'Échec : le serveur n’a pas confirmé. Relire la liste.';
+      chargerOfferts();
+      relire();
+    });
+    outils.append(rev);
+    li.append(outils);
+  }
+  return li;
+}
+
+// veille : dernier jour valable (la fin est exclue), AAAA-MM-JJ.
+function veille(d) {
+  const [a, m, j] = d.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1, j) - 86400000).toISOString().slice(0, 10);
+}
+
+async function chargerOfferts() {
+  if (!paiementActif) return;
+  const r = await envoyer('GET', '/api/paiement/offerts');
+  if (!r) return;
+  const ul = $('offerts');
+  vider(ul);
+  if (!r.ok || !r.json || !Array.isArray(r.json.offerts)) { $('offerts-resultat').textContent = 'Liste illisible : réessayer.'; return; }
+  if (r.json.offerts.length === 0) ul.append(el('li', 'Aucun accès offert.', 'vide'));
+  for (const o of r.json.offerts) ul.append(ligneOffert(o));
+}
+
+$('offerts-actualiser').addEventListener('click', () => chargerOfferts());
+$('offert-oublier').addEventListener('click', () => { oublierLienOffert(); $('offerts-resultat').textContent = 'Lien effacé de la page.'; });
+$('offert-copier').addEventListener('click', async () => {
+  const v = $('offert-champ').value;
+  if (!v) return;
+  try {
+    await navigator.clipboard.writeText(v);
+    $('offerts-resultat').textContent = 'Lien copié. Pensez à vider le presse-papiers après l’avoir transmis.';
+  } catch {
+    $('offert-champ').select();
+    $('offerts-resultat').textContent = 'Copie refusée par le navigateur : le lien est sélectionné, le copier à la main.';
+  }
+});
+
+confirmer($('offrir-bouton'), 'offrir un accès Pro', async () => {
+  oublierLienOffert();
+  const duree = $('offrir-duree').value;
+  const r = await envoyer('POST', '/api/paiement/offrir', { duree });
+  if (!r) return;
+  const res = $('offerts-resultat');
+  if (r.ok && r.json && typeof r.json.lien === 'string' && r.json.acces) {
+    $('offert-champ').value = r.json.lien;
+    $('offert-court').textContent = r.json.acces.court;
+    $('offert-lien').hidden = false;
+    res.textContent = 'Accès ' + r.json.acces.court + ' créé, valable jusqu’au ' + dateFr(veille(r.json.acces.fin)) + '.';
+    r.json.lien = '';
+  } else res.textContent = 'Échec : aucun accès créé (ou le serveur n’a pas confirmé : relire la liste).';
+  chargerOfferts();
+});
+$('offrir').addEventListener('submit', (ev) => { ev.preventDefault(); $('offrir-bouton').click(); });

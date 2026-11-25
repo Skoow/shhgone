@@ -169,6 +169,38 @@
     <p class="note" id="revocations-main"></p>
   </section>
 
+  <section class="carte large" aria-labelledby="t-offerts" id="carte-offerts" hidden>
+    <div class="entete">
+      <h3 class="titre" id="t-offerts">Accès offerts</h3>
+      <button class="discret" type="button" id="offerts-actualiser">Actualiser</button>
+    </div>
+    <p class="note">Un accès Pro sans paiement, pour une personne que vous connaissez : partages Pro (30 Go, 7 jours, 20 ouvertures), appels, et 1 000 jetons par période de 30 jours (100 par jour au plus). Le serveur ne garde que l’empreinte du pass : aucun nom, aucune note. Notez vous-même qui a quel identifiant.</p>
+    <form id="offrir" autocomplete="off">
+      <div class="rangee">
+        <div>
+          <label for="offrir-duree">Durée</label>
+          <select id="offrir-duree">
+            <option value="mois">1 mois (30 jours)</option>
+            <option value="an" selected>1 an (365 jours)</option>
+            <option value="sans_fin">Sans fin (10 ans)</option>
+          </select>
+        </div>
+      </div>
+      <button class="agir" type="submit" id="offrir-bouton">Offrir un accès</button>
+    </form>
+    <div id="offert-lien" class="apres" hidden>
+      <p class="bandeau-local" role="alert">Ce lien donne l’accès à qui le possède : transmettez-le par un canal privé. Il ne sera plus affiché.</p>
+      <label for="offert-champ">Lien à transmettre (identifiant <span class="code" id="offert-court"></span>)</label>
+      <input id="offert-champ" type="text" readonly autocomplete="off" spellcheck="false">
+      <div class="outils">
+        <button class="discret" type="button" id="offert-copier">Copier</button>
+        <button class="attention" type="button" id="offert-oublier">Transmis : effacer de la page</button>
+      </div>
+    </div>
+    <p class="resultat" id="offerts-resultat" role="status"></p>
+    <ul class="liste" id="offerts"></ul>
+  </section>
+
   <h2 class="groupe" id="usage">Usage</h2>
   <section class="carte large" aria-labelledby="t-usage">
     <h3 class="titre" id="t-usage">Usage depuis le démarrage</h3>

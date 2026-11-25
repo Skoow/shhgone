@@ -14,7 +14,8 @@ import (
 // multiple de 86 400), jamais d'heure. Aucun montant, aucun pays, aucune donnée personnelle.
 //
 // passes : q (empreinte du pass) ; offre ; début et fin ; jetons restants de la période ; jour
-// de la prochaine recharge ; révoqué.
+// de la prochaine recharge ; révoqué ; jour et nombre des émissions de jetons ; offert (accès
+// offert par l'exploitant, sans commande ni prestataire : offerts.go).
 // commandes : id (aléatoire, donné au prestataire) ; q ; formule ; état ; identifiant
 // d'abonnement du prestataire (seul texte, gardé en octets parce qu'il sert à résilier) ;
 // jours de création et de fin de garde.
@@ -30,7 +31,8 @@ CREATE TABLE IF NOT EXISTS passes(
   recharge_jour INTEGER NOT NULL CHECK(typeof(recharge_jour)='integer' AND recharge_jour >= 0 AND recharge_jour % 86400 = 0),
   revoque INTEGER NOT NULL CHECK(revoque IN (0,1)),
   emis_jour INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_jour)='integer' AND emis_jour >= 0 AND emis_jour % 86400 = 0),
-  emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)) WITHOUT ROWID;
+  emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0),
+  offert INTEGER NOT NULL DEFAULT 0 CHECK(offert IN (0,1))) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS commandes(
   id BLOB PRIMARY KEY CHECK(typeof(id)='blob' AND length(id)=16),
   q BLOB NOT NULL CHECK(typeof(q)='blob' AND length(q)=32),
@@ -59,9 +61,10 @@ CREATE TABLE IF NOT EXISTS depenses(
   jour INTEGER NOT NULL CHECK(typeof(jour)='integer' AND jour >= 0 AND jour % 86400 = 0)) WITHOUT ROWID`
 
 // VersionBase : version du schéma de paiements.db (PRAGMA user_version). 2 : jetons anonymes
-// (clés d'émission du jour, jetons dépensés, émissions du jour par pass) ; une base de la
-// version 1 est migrée à l'ouverture.
-const VersionBase = 2
+// (clés d'émission du jour, jetons dépensés, émissions du jour par pass) ; 3 : accès offerts
+// (colonne passes.offert). Une base d'une version plus ancienne est migrée à l'ouverture, une
+// version après l'autre, dans une seule transaction.
+const VersionBase = 3
 
 // ErrBasePlusRecente : paiements.db écrite par une version plus récente ; message fixe.
 var ErrBasePlusRecente = errors.New("paiements.db créée par une version plus récente de Shhgone : refus d'ouvrir " +
@@ -93,10 +96,8 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 		db.Close()
 		return nil, ErrBasePlusRecente
 	}
-	if v == 1 {
-		// Version 1 → 2 : colonnes d'émission des jetons (valeur 0 : rien émis).
-		if _, err := db.Exec(`ALTER TABLE passes ADD COLUMN emis_jour INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_jour)='integer' AND emis_jour >= 0 AND emis_jour % 86400 = 0);
-ALTER TABLE passes ADD COLUMN emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)`); err != nil {
+	if v >= 1 && v < VersionBase {
+		if err := migrer(db, v); err != nil {
 			db.Close()
 			return nil, fmt.Errorf("migration de paiements.db : %w", err)
 		}
@@ -114,6 +115,34 @@ ALTER TABLE passes ADD COLUMN emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emi
 		return nil, err
 	}
 	return db, nil
+}
+
+// migrations : de la version i+1 à la version i+2 (indice 0 : 1 → 2).
+var migrations = []string{
+	// 1 → 2 : colonnes d'émission des jetons (valeur 0 : rien émis).
+	`ALTER TABLE passes ADD COLUMN emis_jour INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_jour)='integer' AND emis_jour >= 0 AND emis_jour % 86400 = 0);
+ALTER TABLE passes ADD COLUMN emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)`,
+	// 2 → 3 : accès offerts (valeur 0 : tous les pass d'avant sont payés).
+	`ALTER TABLE passes ADD COLUMN offert INTEGER NOT NULL DEFAULT 0 CHECK(offert IN (0,1))`,
+}
+
+// migrer : de la version v à VersionBase, tout ou rien (la version est posée dans la même
+// transaction : une migration coupée en route laisse la base dans sa version d'avant).
+func migrer(db *sql.DB, v int) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for ; v < VersionBase; v++ {
+		if _, err := tx.Exec(migrations[v-1]); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version=%d`, VersionBase)); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Mode de paiements.db (PRAGMA application_id, en-tête du fichier, gardé par VACUUM et donc par
