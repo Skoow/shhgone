@@ -95,8 +95,6 @@
         { label: t("shell.privacy"), path: "/confidentialite" },
         // « Open source sur GitHub » ; la licence (AGPL-3.0) est dite sur GitHub, plus dans le pied.
         { label: t("foot.source"), url: SOURCE_URL },
-        // « Vérifier cette version » (spec §28.4) : liée depuis le pied de page et la page Sécurité.
-        { label: t("foot.verify"), path: "/verifier" },
         { label: t("foot.report"), path: "/signaler", report: true },
       ],
     },
@@ -106,6 +104,7 @@
       links: [
         { label: t("foot.terms"), path: "/conditions" },
         { label: t("foot.notice"), path: "/mentions-legales" },
+        { label: t("foot.contact"), path: "/contact" },
       ],
     },
   ]);
@@ -218,7 +217,17 @@
       <!-- Retours UI9 : le nom en bas à gauche, « © 2026 » à côté (plus de mention « aucune publicité »). -->
       <p class="sig"><span class="wm" translate="no">Shhgone</span><span>{t("foot.copy")}</span></p>
       {#if demo}<p class="host" data-demo-host>{demo.hostNote}</p>{/if}
-      <p class="num" data-build>{t("foot.version", { v: BUILD_ID })}</p>
+      <!-- « Version xxxxxxx » mène à la section « Vérifier cette version » de la page Sécurité
+           (spec §28.4 ; adresse « /verifier », ouverte à cette section). -->
+      <!-- Nom accessible : le texte visible d'abord (« Version xxxxxxx »), puis où mène le lien. -->
+      <a
+        class="num"
+        data-build
+        href={href("/verifier")}
+        aria-label="{t('foot.version', { v: BUILD_ID })}, {t('foot.verify')}"
+        {...off}
+        onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/verifier"))}>{t("foot.version", { v: BUILD_ID })}</a
+      >
     </div>
   </div>
 </footer>
@@ -552,6 +561,27 @@
   .base p {
     margin: 0;
   }
+  /* Lien discret : sa ligne garde sa hauteur ; cible d'appui de 44 px par une zone invisible. */
+  .base .num {
+    position: relative;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  .base .num::after {
+    content: "";
+    position: absolute;
+    inset: -16px -4px;
+  }
+  .base .num:hover,
+  .base .num:focus-visible {
+    color: var(--text-2);
+  }
+  .base .num:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .base .host {
     color: var(--text-2);
   }
@@ -617,6 +647,11 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: var(--sp-4);
+    }
+    /* Liste de longueur impaire : son dernier lien prend toute la ligne, centré, au lieu de
+       laisser une case vide avant le groupe suivant (les groupes s'enchaînent à pas égal). */
+    .col li:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
     }
     .fl,
     .off {

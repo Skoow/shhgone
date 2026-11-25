@@ -35,7 +35,7 @@ export function tabPath(id: TabId, connected: boolean): string {
   return "/envois";
 }
 
-const ROOTS: ReadonlySet<Route["name"]> = new Set(["home", "envois", "telechargements", "securite", "confidentialite", "conditions", "mentions", "signaler", "verifier", "offres", "notfound"]);
+const ROOTS: ReadonlySet<Route["name"]> = new Set(["home", "envois", "telechargements", "securite", "confidentialite", "conditions", "mentions", "signaler", "verifier", "contact", "offres", "notfound"]);
 /** Connecté : le profil et les paramètres sont aussi des écrans racine. */
 const ROOTS_CONNECTED: ReadonlySet<Route["name"]> = new Set([...ROOTS, "profil", "compte"]);
 

@@ -7,6 +7,8 @@ import { axe, captureOf, expect, test } from "./fixtures";
 test.use({ locale: "fr-FR" });
 const SHOTS = fileURLToPath(new URL("../test-results/captures/UI5/", import.meta.url));
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
+/** Captures de la page Contact, de la section « Vérifier cette version » et du pied de page. */
+const CAPTURES = fileURLToPath(new URL("../test-results/captures/", import.meta.url));
 
 test("Sécurité : chiffrement, ce que voit le serveur, limites (historique, onglet, PDF et archives, caméra) ; jamais « 100 % » ; capture", async ({ page, shh, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
@@ -62,10 +64,106 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   await expect(page.getByRole("heading", { level: 1, name: "Conditions d'utilisation" })).toBeVisible();
   await expect(page.locator("main")).toContainText("la moitié de ses ouvertures permises");
   await expect(page.locator("main")).not.toContainText("compléter par le propriétaire");
+  // Aucune adresse e-mail hors des pages Contact et Mentions légales (la commande de vérification
+  // de Sécurité cite « release.yml@refs/… », qui n'en est pas une).
   for (const p of ["/securite", "/confidentialite", "/signaler", "/conditions"]) {
     await page.goto(shh.origin + p);
     await expect(page.locator("[data-draft]")).toHaveCount(0);
-    expect(await page.locator("main").innerText()).not.toContain("@");
+    expect(await page.locator("main").innerText()).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+    await expect(page.locator('main a[href^="mailto:"]')).toHaveCount(0);
+  }
+  // Les pages qui renvoyaient au « contact des mentions légales » mènent à la page Contact.
+  for (const p of ["/confidentialite", "/signaler", "/mentions-legales"]) {
+    await page.goto(shh.origin + p);
+    await expect(page.locator('main a[href="/contact"]').first()).toBeVisible();
+    await expect(page.locator("main")).not.toContainText("contact des mentions légales");
+  }
+});
+
+test("Contact : adresse en lien mailto, « Copier l'adresse », pour quoi écrire, ce qu'il ne faut jamais envoyer ; sans adresse postale ni délai ; pied de page ; captures", async ({ page, shh, isMobile, context, browserName }) => {
+  if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
+  if (browserName === "chromium") await context.grantPermissions(["clipboard-write"], { origin: shh.origin });
+  await page.goto(shh.origin + "/contact");
+  await expect(page.getByRole("heading", { level: 1, name: "Contact" })).toBeVisible();
+  await expect(page).toHaveTitle(/^Contact · Shhgone$/);
+  const main = page.locator("main");
+  for (const h of ["Notre adresse", "Pour quoi nous écrire", "Ce qu'il ne faut jamais nous envoyer", "Ce que devient votre message"])
+    await expect(page.getByRole("heading", { level: 2, name: h })).toBeVisible();
+  const mail = page.locator("[data-mail]");
+  const addr = mail.getByRole("link", { name: "contact@shhgone.com" });
+  await expect(addr).toHaveAttribute("href", "mailto:contact@shhgone.com");
+  // Un lien mailto n'ouvre pas de nouvel onglet et ne charge rien.
+  await expect(addr).not.toHaveAttribute("target");
+  await expect(main).toContainText("En français ou en anglais");
+  await expect(main).toContainText("Le lien complet d'un partage avec son mot de passe");
+  await expect(main.getByRole("link", { name: "Signaler un abus" })).toHaveAttribute("href", "/signaler");
+  const text = await main.innerText();
+  expect(text).not.toMatch(/\b\d{5}\b|rue |cedex|délai|sous \d|\d+\s?(h|heures?|jours?)\b/i);
+  // Une seule adresse, celle de contact.
+  expect(text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g)).toEqual(["contact@shhgone.com"]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await axe(page)).toEqual([]);
+  await page.screenshot({ path: `${CAPTURES}contact-${w(isMobile)}.png`, fullPage: true });
+  // « Copier l'adresse » : copiée (le bouton le dit), ou, sans presse-papiers, l'adresse est
+  // sélectionnée pour une copie à la main.
+  const copy = mail.getByRole("button", { name: "Copier l'adresse" });
+  await copy.click();
+  if (browserName === "chromium") {
+    await expect(mail.getByRole("button", { name: "Adresse copiée" })).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText().catch(() => "refusé"))).toMatch(/^(contact@shhgone\.com|refusé)$/);
+  } else {
+    await expect
+      .poll(async () => (await mail.getByRole("button", { name: "Adresse copiée" }).count()) > 0 || (await page.evaluate(() => getSelection()?.toString())) === "contact@shhgone.com")
+      .toBe(true);
+  }
+  // Pied de page : « Contact » dans la colonne « Légal ».
+  const foot = page.locator("footer[data-foot]");
+  const legal = foot.getByRole("list", { name: "Légal" });
+  await expect(legal.getByRole("link", { name: "Contact", exact: true })).toHaveAttribute("href", "/contact");
+  await expect(legal.getByRole("link", { name: "Contact", exact: true })).toHaveAttribute("aria-current", "page");
+  // Version anglaise.
+  await page.goto(shh.origin + "/en/contact");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { level: 1, name: "Contact" })).toBeVisible();
+  await expect(page.locator("[data-mail]").getByRole("button", { name: "Copy the address" })).toBeVisible();
+  await expect(page.locator("main")).toContainText("In French or English");
+  expect(await axe(page)).toEqual([]);
+  await page.screenshot({ path: `${CAPTURES}contact-en-${w(isMobile)}.png`, fullPage: true });
+});
+
+test("pied de page : colonnes équilibrées (ordinateur), groupes enchaînés sans case vide (téléphone, 390 et 360) ; captures", async ({ page, shh, isMobile }) => {
+  for (const width of isMobile ? [390, 360] : [1440]) {
+    await page.setViewportSize({ width, height: isMobile ? 844 : 900 });
+    await page.goto(shh.origin + "/contact");
+    const foot = page.locator("footer[data-foot]");
+    await foot.scrollIntoViewIfNeeded();
+    const lists = foot.getByRole("list");
+    // Confiance : Sécurité, Confidentialité, Open source, Signaler ; Légal : Conditions, Mentions, Contact.
+    await expect(foot.getByRole("list", { name: "Confiance" }).getByRole("listitem")).toHaveCount(4);
+    await expect(foot.getByRole("list", { name: "Légal" }).getByRole("listitem")).toHaveCount(3);
+    const rows = await lists.evaluateAll((uls) =>
+      uls.flatMap((ul) => [...ul.querySelectorAll("li")].map((li) => {
+        const r = li.getBoundingClientRect();
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right) };
+      })),
+    );
+    if (isMobile) {
+      // Téléphone : les lignes se suivent à pas égal, sans trou entre les groupes.
+      const tops = [...new Set(rows.map((r) => r.top))].sort((a, b) => a - b);
+      const steps = tops.slice(1).map((t, i) => t - tops[i]!);
+      expect(Math.max(...steps) - Math.min(...steps), `${width} : ${steps.join(", ")}`).toBeLessThanOrEqual(1);
+      // Le lien seul sur sa ligne (Contact) est centré.
+      const last = rows.at(-1)!;
+      const fb = (await foot.locator(".cols").boundingBox())!;
+      expect(Math.abs((last.left + last.right) / 2 - (fb.x + fb.width / 2))).toBeLessThanOrEqual(2);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    } else {
+      // Ordinateur : deux colonnes titrées, de hauteur proche (4 et 3 liens).
+      const cols = await foot.locator(".col").evaluateAll((c) => c.map((e) => e.getBoundingClientRect().height));
+      expect(cols).toHaveLength(2);
+      expect(Math.abs(cols[0]! - cols[1]!)).toBeLessThanOrEqual(48);
+    }
+    await captureOf(foot, { path: `${CAPTURES}contact-pied-${width}.png` });
   }
 });
 

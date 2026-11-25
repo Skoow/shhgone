@@ -1,5 +1,5 @@
 // Référencement (retours CLEAN2) : seules les pages publiques sont indexées (accueil, sécurité,
-// confidentialité, offres, conditions, mentions légales), avec une description et une adresse
+// confidentialité, offres, conditions, mentions légales, contact), avec une description et une adresse
 // canonique ; tout le reste (page d'envoi, partage ouvert, gestion, page introuvable,
 // signalement) porte « noindex ». La démo (GitHub Pages) n'est jamais indexée : pas de doublon
 // du vrai site. Rien ici ne lit ni n'écrit le fragment (« # » = clés) : l'adresse canonique
@@ -16,6 +16,7 @@ export const INDEXED: Readonly<Partial<Record<Route["name"], string>>> = {
   offres: "/offres",
   conditions: "/conditions",
   mentions: "/mentions-legales",
+  contact: "/contact",
 };
 
 function meta(doc: Document, name: string): HTMLMetaElement {

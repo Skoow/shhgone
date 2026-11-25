@@ -1,11 +1,12 @@
 // Pages d'information : Sécurité, Confidentialité, Conditions
-// d'utilisation, Mentions légales, Signaler un abus. Textes relus sur la spécification
+// d'utilisation, Mentions légales, Signaler un abus, Contact. Textes relus sur la spécification
 // (docs/conception/specs/2026-11-03-shhdrop-design.md : §2, §5.3, §7, §9, §18, §35, §36, §41.4,
 // §41.8, D41-28, D41-29). Règles : jamais « 100 % », aucune allégation d'audit ni de pays
 // d'hébergement, aucune identité d'éditeur ni d'hébergeur inventée (champs « à
-// compléter »), aucune adresse e-mail. Chiffres lus dans les constantes.
-// « Vérifier cette version » (spec §28.4) : comment n'importe qui vérifie que le site
-// servi est le build public signé ; la page n'affiche aucune empreinte calculée par elle-même (une
+// compléter »), aucune adresse e-mail hors des pages Contact et Mentions légales (CONTACT_EMAIL).
+// Chiffres lus dans les constantes.
+// « Vérifier cette version » (spec §28.4), section de la page Sécurité (l'adresse « /verifier » y
+// mène) : comment n'importe qui vérifie que le site servi est le build public signé ; elle n'affiche aucune empreinte calculée par elle-même (une
 // preuve qui se certifierait seule, §28.8 C7) et dit qu'elle ne peut pas prouver sa propre intégrité.
 // Compte par passkey (conception 2026-11-22-compte-passkey-design.md §8, §12) : les textes qui
 // DÉCRIVENT le compte ne s'ajoutent qu'avec __COMPTES__ (COMPTE_FR, COMPTE_EN) : le site public
@@ -19,12 +20,27 @@ import { BUILD_ID } from "../../app/build";
 import { CONTENT_MAX, MAX_ITEMS, MAX_OPENS, PAID, PW_TRIES, TTL_MAX_HOURS } from "../../limits";
 import { formatBytes, type Lang } from "../../i18n/format";
 
-export type InfoName = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler" | "verifier";
+export type InfoName = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler" | "contact";
+/** Partie d'une section, sous un titre de niveau 3 (section « Vérifier cette version » de la page Sécurité). */
+export type Sub = { id: string; h: string; p?: string[]; list?: string[]; code?: string[]; after?: string[] };
 /**
- * Section : paragraphes, liste, puis (page « Vérifier ») des lignes de commande à recopier,
- * affichées telles quelles, et des paragraphes après elles ; `link` : lien vers une autre page du site.
+ * Section : paragraphes, liste, puis des lignes de commande à recopier, affichées telles quelles,
+ * et des paragraphes après elles ; `sub` : parties sous un titre de niveau 3 ; `mail` : l'adresse
+ * de contact, avec « Copier l'adresse » (page Contact seulement) ; `link` : lien vers une autre
+ * page du site, ou, avec `section`, vers une section de la même page (sans « # » : le « # » est
+ * réservé aux clés).
  */
-export type Block = { id?: string; h: string; p?: string[]; list?: string[]; code?: string[]; after?: string[]; link?: { label: string; path: string } };
+export type Block = {
+  id?: string;
+  h: string;
+  p?: string[];
+  list?: string[];
+  code?: string[];
+  after?: string[];
+  sub?: Sub[];
+  mail?: true;
+  link?: { label: string; path: string; section?: string };
+};
 /** Section repliée en bas de page (Sécurité : détails techniques pour les experts, liens publics). */
 export type Tech = { h: string; p?: string[]; list?: string[]; links: { label: string; url: string }[] };
 export type InfoPage = { title: string; lede: string; draft?: boolean; blocks: Block[]; tech?: Tech };
@@ -37,6 +53,11 @@ export const RELEASES_URL = "https://github.com/Skoow/shhgone/releases";
 export const VERIFY_DOC_URL = "https://github.com/Skoow/shhgone/blob/main/deploy/README.md";
 /** Journal public de transparence de Sigstore (Rekor), consultable par tous. */
 export const REKOR_URL = "https://search.sigstore.dev/";
+/**
+ * Adresse de contact (mentions légales, point de contact unique du règlement européen sur les
+ * services numériques). Écrite seulement sur les pages Contact et Mentions légales (test).
+ */
+export const CONTACT_EMAIL = "contact@shhgone.com";
 
 /**
  * Commandes de vérification (deploy/README.md §3.3) : identité exacte du signataire, jamais une
@@ -81,6 +102,150 @@ export const PRO_JETONS = 100;
 function jours(d: readonly number[], ou: string): string {
   return d.length < 2 ? d.join("") : `${d.slice(0, -1).join(", ")} ${ou} ${d[d.length - 1]}`;
 }
+
+/**
+ * « Vérifier cette version » (spec §28.4), section de la page Sécurité (ancienne page « /verifier », qui y mène
+ * encore) : comment n'importe qui vérifie que le site servi est le build public signé. Ses détails
+ * techniques et ses liens s'ajoutent à ceux de la page.
+ */
+const VERIFIER_FR: { block: Block; tech: string[]; links: Tech["links"] } = {
+  block: {
+    id: "verifier",
+    h: "Vérifier cette version",
+    p: ["Vous n'avez pas à nous croire sur parole : n'importe qui peut vérifier que les fichiers servis par ce site sont exactement ceux construits depuis notre code public."],
+    sub: [
+      {
+        id: "pourquoi",
+        h: "Pourquoi vérifier",
+        p: [
+          "Vos fichiers sont chiffrés dans votre navigateur, par le code que ce site vous envoie. Si ce code était modifié, par exemple sur un serveur piraté, il pourrait voler les clés. Le chiffrement ne vaut donc que ce que vaut le code servi.",
+        ],
+      },
+      {
+        id: "preuve",
+        h: "Comment c'est prouvé",
+        list: [
+          "Le code du site est public, et le site se reconstruit à l'identique depuis ce code : deux constructions, sur deux machines différentes, donnent les mêmes octets.",
+          "Pour chaque version, GitHub reconstruit le site et publie la liste de tous ses fichiers, avec la taille et l'empreinte de chacun : le manifeste (release.json).",
+          "Ce manifeste est signé par Sigstore, un service public de signature, sans clé secrète que nous pourrions perdre ou nous faire voler : la signature dit qu'il vient de notre procédure de publication sur GitHub, à partir d'un commit précis du code public. Elle est inscrite dans un journal public que tout le monde peut consulter.",
+          "Notre serveur refuse d'installer une version dont les fichiers ne sont pas exactement ceux d'un manifeste signé. Et toutes les heures, un contrôle automatique, hors de notre serveur, compare le site en ligne au manifeste signé et nous alerte au moindre écart.",
+        ],
+      },
+      {
+        id: "version",
+        h: "La version de ce site",
+        p: [
+          `Ce site annonce la version ${BUILD_ID} : ce sont les premiers caractères du commit depuis lequel il a été construit. Sur la page des versions publiées (lien dans les détails techniques, en bas de cette page), cherchez la version « web-v… » dont le commit commence ainsi : son numéro (par exemple 1.0.0) est celui à vérifier.`,
+        ],
+      },
+      {
+        id: "commandes",
+        h: "Vérifier vous-même",
+        p: [
+          "Sur un ordinateur, avec cosign (l'outil de Sigstore), Node.js et git. Le code du vérificateur se télécharge depuis GitHub, jamais depuis ce site. Remplacez 1.0.0 par le numéro de la version :",
+        ],
+        code: verifyCommands("1.0.0"),
+        after: [
+          "La commande cosign prouve que le manifeste vient de notre publication : elle doit répondre « Verified OK ». Le vérificateur télécharge ensuite chaque fichier du site et compare sa taille et son empreinte au manifeste : il doit répondre « conforme ». Toute autre réponse est un écart : écrivez-nous (page Contact).",
+        ],
+      },
+      {
+        id: "verif-limites",
+        h: "Ce que la vérification ne prouve pas",
+        list: [
+          "Cette page ne peut pas prouver sa propre intégrité : un serveur piégé pourrait la modifier aussi. Vérifiez avec un outil qui ne vient pas de ce site.",
+          "Un serveur compromis pourrait servir un code piégé à une seule personne, choisie selon son adresse ou son navigateur, et le bon code à tous les autres, contrôle automatique compris. La vérification ne protège vraiment que la personne qui la fait elle-même, avant d'utiliser le site.",
+          "La signature prouve d'où vient le code, pas qu'il est sans défaut : c'est la relecture du code public qui peut le dire.",
+          "Les réglages de sécurité envoyés avec les pages (les en-têtes du serveur) ne sont pas vérifiés : seul le contenu des fichiers l'est.",
+          "Les futures applications iOS et Android embarqueront ce code, signé par les magasins d'applications : il ne viendra plus de notre serveur à chaque visite. Ce sera la protection la plus forte contre ce risque.",
+        ],
+      },
+    ],
+  },
+  tech: [
+    "Manifeste : release.json (schéma 1) donne la version, le commit, et pour chaque fichier servi, variantes .br et .gz comprises, son chemin, sa taille et son SHA-256 ; écrit par web/scripts/release-manifest.mjs, publié avec SHA256SUMS et dist.tar.gz.",
+    "Signature : cosign sign-blob, sans clé, par le workflow release.yml sur une étiquette web-v<x.y.z> (identité OIDC de GitHub Actions, certificat Fulcio, journal Rekor). Vérifiez toujours avec l'identité exacte, jamais avec une expression ouverte, et jamais sans le journal de transparence.",
+    "Vérificateur : web/scripts/verify-site.mjs, sans dépendance. Il refuse les redirections, vérifie les variantes compressées et le repli monopage, et ne répond jamais « conforme » après une erreur réseau.",
+    "Limite post-quantique : les signatures de Sigstore sont en ECDSA P-256 ; elles seront remplacées quand Sigstore proposera une signature post-quantique.",
+  ],
+  links: [
+    { label: "Versions publiées et manifestes signés (GitHub)", url: RELEASES_URL },
+    { label: "Mode d'emploi détaillé (§3.3)", url: VERIFY_DOC_URL },
+    { label: "Journal public de Sigstore", url: REKOR_URL },
+  ],
+};
+
+/**
+ * « Verify this version » (spec §28.4), section de la page Sécurité (ancienne page « /verifier », qui y mène
+ * encore) : comment n'importe qui vérifie que le site servi est le build public signé. Ses détails
+ * techniques et ses liens s'ajoutent à ceux de la page.
+ */
+const VERIFIER_EN: { block: Block; tech: string[]; links: Tech["links"] } = {
+  block: {
+    id: "verifier",
+    h: "Verify this version",
+    p: ["You don't have to take our word for it: anyone can check that the files this site serves are exactly the ones built from our public code."],
+    sub: [
+      {
+        id: "pourquoi",
+        h: "Why verify",
+        p: [
+          "Your files are encrypted in your browser, by the code this site sends you. If that code were modified, for example on a hacked server, it could steal the keys. Encryption is only as good as the code that is served.",
+        ],
+      },
+      {
+        id: "preuve",
+        h: "How it is proven",
+        list: [
+          "The site's code is public, and the site can be rebuilt identically from it: two builds, on two different machines, give the same bytes.",
+          "For every version, GitHub rebuilds the site and publishes the list of all its files, with the size and fingerprint of each: the manifest (release.json).",
+          "This manifest is signed by Sigstore, a public signing service, without any secret key we could lose or have stolen: the signature says it comes from our publishing process on GitHub, built from a precise commit of the public code. It is recorded in a public log that anyone can search.",
+          "Our server refuses to install a version whose files are not exactly those of a signed manifest. And every hour, an automatic check, outside our server, compares the live site with the signed manifest and alerts us at the slightest difference.",
+        ],
+      },
+      {
+        id: "version",
+        h: "The version of this site",
+        p: [
+          `This site announces version ${BUILD_ID}: the first characters of the commit it was built from. On the page of published versions (link in the technical details, at the bottom of this page), look for the "web-v…" version whose commit starts this way: its number (for example 1.0.0) is the one to verify.`,
+        ],
+      },
+      {
+        id: "commandes",
+        h: "Verify it yourself",
+        p: [
+          "On a computer, with cosign (the Sigstore tool), Node.js and git. The verifier's code is downloaded from GitHub, never from this site. Replace 1.0.0 with the version number:",
+        ],
+        code: verifyCommands("1.0.0"),
+        after: [
+          "The cosign command proves that the manifest comes from our publishing process: it must answer \"Verified OK\". The verifier then downloads every file of the site and compares its size and fingerprint with the manifest: it must answer \"conforme\" (matches). Any other answer is a difference: write to us (Contact page).",
+        ],
+      },
+      {
+        id: "verif-limites",
+        h: "What verification does not prove",
+        list: [
+          "This page cannot prove its own integrity: a tampered server could change it too. Verify with a tool that does not come from this site.",
+          "A compromised server could serve tampered code to a single person, chosen by their address or browser, and the right code to everyone else, the automatic check included. Verification only truly protects the person who runs it themselves, before using the site.",
+          "The signature proves where the code comes from, not that it is flawless: only reviewing the public code can tell.",
+          "The security settings sent with the pages (the server's headers) are not verified: only the content of the files is.",
+          "The future iOS and Android apps will embed this code, signed by the app stores: it will no longer come from our server on every visit. That will be the strongest protection against this risk.",
+        ],
+      },
+    ],
+  },
+  tech: [
+    "Manifest: release.json (schema 1) gives the version, the commit, and for every served file, .br and .gz variants included, its path, size and SHA-256; written by web/scripts/release-manifest.mjs, published with SHA256SUMS and dist.tar.gz.",
+    "Signature: cosign sign-blob, keyless, by the release.yml workflow on a web-v<x.y.z> tag (GitHub Actions OIDC identity, Fulcio certificate, Rekor log). Always verify with the exact identity, never an open expression, and never without the transparency log.",
+    "Verifier: web/scripts/verify-site.mjs, with no dependency. It refuses redirects, checks compressed variants and the single-page fallback, and never answers \"conforme\" after a network error.",
+    "Post-quantum limit: Sigstore signatures use ECDSA P-256; they will be replaced when Sigstore offers a post-quantum signature.",
+  ],
+  links: [
+    { label: "Published versions and signed manifests (GitHub)", url: RELEASES_URL },
+    { label: "Detailed instructions (§3.3)", url: VERIFY_DOC_URL },
+    { label: "Sigstore public log", url: REKOR_URL },
+  ],
+};
 
 type V = { size: string; n: number; h: number; tries: number; opens: number };
 
@@ -136,7 +301,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Vous protéger d'un site piégé : si notre serveur ou notre code était compromis, le site servi pourrait voler les clés. C'est pour cela que le code est public et que le site se reconstruit à l'identique depuis ce code.",
           "Cacher votre adresse IP au serveur et à l'hébergeur pendant la connexion.",
         ],
-        link: { label: "Vérifier que ce site sert bien le code public", path: "/verifier" },
+        link: { label: "Vérifier que ce site sert bien le code public", path: "/verifier", section: "verifier" },
       },
       {
         id: "qr",
@@ -153,6 +318,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Le site ne peut utiliser la caméra et le micro que pour ses propres enregistrements, après votre accord, et jamais à l'intérieur d'un autre site. Les autres fonctions sensibles du navigateur lui sont fermées.",
         ],
       },
+      VERIFIER_FR.block,
     ],
     tech: {
       h: "Détails techniques (pour les experts)",
@@ -162,10 +328,12 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         `Ouverture : le serveur vérifie une preuve dérivée de la clé et du mot de passe, sans recevoir ni l'une ni l'autre ; ${v.tries} preuves fausses détruisent le partage.`,
         "Taille : l'envoi chiffré commence dès qu'un fichier est ajouté, avant « Chiffrer et envoyer ». Pendant l'envoi, le serveur voit la taille à 4 Mio près, car le contenu part en morceaux chiffrés de 4 Mio. Une fois l'envoi fini, le contenu chiffré occupe un palier de taille fixe : le serveur ne connaît plus que ce palier.",
         "Navigateur : en-têtes stricts (Content-Security-Policy, Permissions-Policy) ; aucun script, police ni traceur d'un autre site.",
+        ...VERIFIER_FR.tech,
       ],
       links: [
         { label: "Code source public (GitHub)", url: SOURCE_URL },
         { label: "Spécification publique", url: SPEC_URL },
+        ...VERIFIER_FR.links,
       ],
     },
   }),
@@ -256,14 +424,15 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Vos droits",
         p: [
-          "Nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits ou poser une question, utilisez le contact des mentions légales. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
+          "Nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits ou poser une question, écrivez-nous (page Contact). Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
           "Le responsable de ces traitements est l'éditeur de Shhgone (voir les mentions légales). Vous pouvez aussi adresser une réclamation à la CNIL (cnil.fr).",
         ],
+        link: { label: "Page Contact", path: "/contact" },
       },
       {
         h: "Demandes des autorités",
         p: [
-          "Nous répondons aux demandes légales des autorités, qui s'adressent au contact des mentions légales. Voici ce que nous pouvons leur donner, et ce que nous ne pouvons pas donner, parce que nous ne l'avons pas.",
+          "Nous répondons aux demandes légales des autorités, qui nous écrivent à l'adresse de la page Contact. Voici ce que nous pouvons leur donner, et ce que nous ne pouvons pas donner, parce que nous ne l'avons pas.",
         ],
         list: [
           "Le contenu d'un partage ou d'un salon : jamais, il est chiffré sur votre appareil et nous n'avons pas la clé.",
@@ -307,8 +476,8 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Droit de rétractation : vous avez en principe 14 jours pour vous rétracter. Comme l'offre sert dès le paiement, la page Offres vous demande, avant de payer, de demander l'accès immédiat et de renoncer à ce droit pour la période commencée (case non cochée d'avance) ; sans elle, le paiement ne commence pas.",
           "Un remboursement total ou une contestation du paiement arrête l'offre.",
           "Votre offre est un pass tiré au hasard par votre appareil : nous ne savons pas qui l'a acheté. Sans compte, elle ne vit que sur cet appareil : effacer les données du site la perd, et nous ne pouvons pas la retrouver.",
-          "Facture : Stripe l'envoie à l'adresse donnée lors du paiement ; pour PayPal et les cryptomonnaies, demandez-la au contact des mentions légales, avec le numéro de commande donné par le prestataire. Après le paiement, « Télécharger la note de vente » donne aussi un récapitulatif, fait sur votre appareil.",
-          "Vous bénéficiez de la garantie légale de conformité des contenus et services numériques (Code de la consommation, articles L224-25-12 et suivants). Pour toute réclamation, écrivez au contact des mentions légales.",
+          "Facture : Stripe l'envoie à l'adresse donnée lors du paiement ; pour PayPal et les cryptomonnaies, demandez-la à l'adresse de la page Contact, avec le numéro de commande donné par le prestataire. Après le paiement, « Télécharger la note de vente » donne aussi un récapitulatif, fait sur votre appareil.",
+          "Vous bénéficiez de la garantie légale de conformité des contenus et services numériques (Code de la consommation, articles L224-25-12 et suivants). Pour toute réclamation, écrivez à l'adresse de la page Contact.",
         ],
       },
       {
@@ -339,7 +508,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         h: "Modération",
         p: [
           "Nous ne lisons pas les partages ni les salons (ils sont chiffrés sur votre appareil) et n'utilisons aucun outil automatique de modération. Les seules mesures possibles sont la suppression d'un partage ou d'un salon : par les signalements des personnes qui l'ont ouvert (règle ci-dessus), ou par l'éditeur, en personne, après un signalement écrit qui joint le lien, ou sur demande d'une autorité.",
-          "Toute décision peut être contestée en écrivant au contact des mentions légales : elle est réexaminée par une personne.",
+          "Toute décision peut être contestée en écrivant à l'adresse de la page Contact : elle est réexaminée par une personne.",
         ],
       },
       {
@@ -371,7 +540,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Droit applicable",
         p: [
-          "Ces conditions sont soumises au droit français. En cas de litige, une solution amiable est d'abord recherchée par le contact des mentions légales ; à défaut, les tribunaux français sont compétents, sous réserve des règles qui protègent le consommateur.",
+          "Ces conditions sont soumises au droit français. En cas de litige, une solution amiable est d'abord recherchée en nous écrivant (page Contact) ; à défaut, les tribunaux français sont compétents, sous réserve des règles qui protègent le consommateur.",
         ],
       },
     ],
@@ -398,6 +567,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Point de contact unique pour les autorités et pour les utilisateurs (règlement européen sur les services numériques, articles 11 et 12), y compris pour les demandes de retrait des autorités : contact@shhgone.com, en français ou en anglais. Chaque message est lu par une personne, jamais par un robot seul.",
           "Pour signaler un contenu illicite : depuis le partage (« Signaler ce partage »), ou par écrit à contact@shhgone.com (voir « Signaler un abus » pour ce qu'il faut joindre) ; vous pouvez aussi le signaler aux autorités (en France : PHAROS, internet-signalement.gouv.fr).",
         ],
+        link: { label: "Page Contact", path: "/contact" },
       },
       {
         h: "Données personnelles",
@@ -425,85 +595,59 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         h: "Ce que nous recevons",
         p: [
           "Le signalement ne contient que la catégorie choisie (par exemple « Arnaque ») et la preuve que vous avez ouvert le partage : ni le contenu, ni qui vous êtes. Nous ne pouvons pas lire le partage. Nous comptons, en mémoire seulement, les signalements par catégorie depuis le dernier démarrage du serveur et leur nombre dans l'heure, pour repérer un abus massif ; rien n'est écrit sur disque.",
-          `Sans le lien et le mot de passe, rien ne peut être fait sur le partage : il s'effacera seul à son échéance (${v.h} h au plus en gratuit). Pour un contenu illégal, vous pouvez aussi écrire au contact des mentions légales en joignant le lien.`,
+          `Sans le lien et le mot de passe, rien ne peut être fait sur le partage : il s'effacera seul à son échéance (${v.h} h au plus en gratuit). Pour un contenu illégal, vous pouvez aussi écrire à l'adresse de la page Contact en joignant le lien.`,
         ],
       },
       {
         h: "Par écrit",
         list: [
-          "Écrivez au contact des mentions légales en joignant : le lien complet du partage (avec ce qui suit le « # ») et son mot de passe si vous l'avez, sans lequel personne ne peut voir le contenu ; ce qui vous paraît illégal, et pourquoi ; votre nom et votre adresse e-mail (facultatifs pour un contenu d'abus sexuel sur mineur) ; une phrase qui confirme que vous signalez de bonne foi et que ces informations sont exactes.",
+          "Écrivez à l'adresse de la page Contact en joignant : le lien complet du partage (avec ce qui suit le « # ») et son mot de passe si vous l'avez, sans lequel personne ne peut voir le contenu ; ce qui vous paraît illégal, et pourquoi ; votre nom et votre adresse e-mail (facultatifs pour un contenu d'abus sexuel sur mineur) ; une phrase qui confirme que vous signalez de bonne foi et que ces informations sont exactes.",
           "Nous accusons réception, une personne examine le partage (jamais un robot seul), puis nous vous répondons avec notre décision et les recours possibles.",
           "Un contenu manifestement illégal est détruit tout de suite : plus aucune ouverture, téléchargements en cours coupés. Si la vie ou la sécurité de quelqu'un est menacée, nous prévenons les autorités.",
         ],
+        link: { label: "Page Contact", path: "/contact" },
       },
     ],
   }),
-  verifier: () => ({
-    title: "Vérifier cette version",
-    lede: "Vous n'avez pas à nous croire sur parole : n'importe qui peut vérifier que les fichiers servis par ce site sont exactement ceux construits depuis notre code public.",
+  contact: () => ({
+    title: "Contact",
+    lede: "Une question, un contenu à signaler, une demande légale ou une faille de sécurité\u202f: écrivez-nous.",
     blocks: [
       {
+        id: "adresse",
+        h: "Notre adresse",
+        mail: true,
+        p: ["En français ou en anglais. Chaque message est lu par une personne, jamais par un robot seul."],
+      },
+      {
         id: "pourquoi",
-        h: "Pourquoi vérifier",
-        p: [
-          "Vos fichiers sont chiffrés dans votre navigateur, par le code que ce site vous envoie. Si ce code était modifié, par exemple sur un serveur piraté, il pourrait voler les clés. Le chiffrement ne vaut donc que ce que vaut le code servi.",
-        ],
-      },
-      {
-        id: "preuve",
-        h: "Comment c'est prouvé",
+        h: "Pour quoi nous écrire",
         list: [
-          "Le code du site est public, et le site se reconstruit à l'identique depuis ce code : deux constructions, sur deux machines différentes, donnent les mêmes octets.",
-          "Pour chaque version, GitHub reconstruit le site et publie la liste de tous ses fichiers, avec la taille et l'empreinte de chacun : le manifeste (release.json).",
-          "Ce manifeste est signé par Sigstore, un service public de signature, sans clé secrète que nous pourrions perdre ou nous faire voler : la signature dit qu'il vient de notre procédure de publication sur GitHub, à partir d'un commit précis du code public. Elle est inscrite dans un journal public que tout le monde peut consulter.",
-          "Notre serveur refuse d'installer une version dont les fichiers ne sont pas exactement ceux d'un manifeste signé. Et toutes les heures, un contrôle automatique, hors de notre serveur, compare le site en ligne au manifeste signé et nous alerte au moindre écart.",
+          "Une question ou de l'aide pour utiliser Shhgone.",
+          "Un contenu illégal\u202f: le plus simple est de le signaler depuis le partage. Pour un signalement par écrit, la page «\u00a0Signaler un abus\u00a0» dit ce qu'il faut joindre.",
+          "Les autorités et les demandes légales, y compris les demandes de retrait\u202f: cette adresse est notre point de contact unique (règlement européen sur les services numériques, articles 11 et 12).",
+          "L'exercice de vos droits sur vos données personnelles (RGPD)\u202f: accès, rectification, effacement, opposition. Vous pouvez aussi saisir la CNIL (cnil.fr).",
+          "La sécurité\u202f: une faille ou un comportement anormal du site. Dites ce que vous avez vu et comment le reproduire.",
         ],
+        link: { label: "Signaler un abus", path: "/signaler" },
       },
       {
-        id: "version",
-        h: "La version de ce site",
+        id: "jamais",
+        h: "Ce qu'il ne faut jamais nous envoyer",
         p: [
-          `Ce site annonce la version ${BUILD_ID} : ce sont les premiers caractères du commit depuis lequel il a été construit. Sur la page des versions publiées (lien en bas), cherchez la version « web-v… » dont le commit commence ainsi : son numéro (par exemple 1.0.0) est celui à vérifier.`,
+          "Le lien complet d'un partage avec son mot de passe\u202f: qui a les deux peut ouvrir le partage. Seule exception, un signalement d'abus par écrit, où ils nous sont nécessaires pour voir le contenu, comme le dit la page «\u00a0Signaler un abus\u00a0».",
+          "Nous ne vous demanderons jamais un mot de passe.",
         ],
       },
       {
-        id: "commandes",
-        h: "Vérifier vous-même",
+        id: "message",
+        h: "Ce que devient votre message",
         p: [
-          "Sur un ordinateur, avec cosign (l'outil de Sigstore), Node.js et git. Le code du vérificateur se télécharge depuis GitHub, jamais depuis ce site. Remplacez 1.0.0 par le numéro de la version :",
+          "Votre message et votre adresse e-mail arrivent dans notre messagerie, hébergée par OVH. Nous les gardons le temps de traiter votre demande, puis nous les effaçons, sauf obligation légale.",
         ],
-        code: verifyCommands("1.0.0"),
-        after: [
-          "La commande cosign prouve que le manifeste vient de notre publication : elle doit répondre « Verified OK ». Le vérificateur télécharge ensuite chaque fichier du site et compare sa taille et son empreinte au manifeste : il doit répondre « conforme ». Toute autre réponse est un écart : écrivez-nous (l'adresse est dans les mentions légales).",
-        ],
-      },
-      {
-        id: "limites",
-        h: "Ce que la vérification ne prouve pas",
-        list: [
-          "Cette page ne peut pas prouver sa propre intégrité : un serveur piégé pourrait la modifier aussi. Vérifiez avec un outil qui ne vient pas de ce site.",
-          "Un serveur compromis pourrait servir un code piégé à une seule personne, choisie selon son adresse ou son navigateur, et le bon code à tous les autres, contrôle automatique compris. La vérification ne protège vraiment que la personne qui la fait elle-même, avant d'utiliser le site.",
-          "La signature prouve d'où vient le code, pas qu'il est sans défaut : c'est la relecture du code public qui peut le dire.",
-          "Les réglages de sécurité envoyés avec les pages (les en-têtes du serveur) ne sont pas vérifiés : seul le contenu des fichiers l'est.",
-          "Les futures applications iOS et Android embarqueront ce code, signé par les magasins d'applications : il ne viendra plus de notre serveur à chaque visite. Ce sera la protection la plus forte contre ce risque.",
-        ],
+        link: { label: "Confidentialité", path: "/confidentialite" },
       },
     ],
-    tech: {
-      h: "Détails techniques (pour les experts)",
-      list: [
-        "Manifeste : release.json (schéma 1) donne la version, le commit, et pour chaque fichier servi, variantes .br et .gz comprises, son chemin, sa taille et son SHA-256 ; écrit par web/scripts/release-manifest.mjs, publié avec SHA256SUMS et dist.tar.gz.",
-        "Signature : cosign sign-blob, sans clé, par le workflow release.yml sur une étiquette web-v<x.y.z> (identité OIDC de GitHub Actions, certificat Fulcio, journal Rekor). Vérifiez toujours avec l'identité exacte, jamais avec une expression ouverte, et jamais sans le journal de transparence.",
-        "Vérificateur : web/scripts/verify-site.mjs, sans dépendance. Il refuse les redirections, vérifie les variantes compressées et le repli monopage, et ne répond jamais « conforme » après une erreur réseau.",
-        "Limite post-quantique : les signatures de Sigstore sont en ECDSA P-256 ; elles seront remplacées quand Sigstore proposera une signature post-quantique.",
-      ],
-      links: [
-        { label: "Versions publiées et manifestes signés (GitHub)", url: RELEASES_URL },
-        { label: "Mode d'emploi détaillé (§3.3)", url: VERIFY_DOC_URL },
-        { label: "Journal public de Sigstore", url: REKOR_URL },
-        { label: "Code source public (GitHub)", url: SOURCE_URL },
-      ],
-    },
   }),
 };
 
@@ -559,7 +703,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Protect you from a tampered site: if our server or code were compromised, the site could steal keys. That is why the code is public and the site can be rebuilt identically from it.",
           "Hide your IP address from the server and the host while you are connected.",
         ],
-        link: { label: "Check that this site serves the public code", path: "/verifier" },
+        link: { label: "Check that this site serves the public code", path: "/verifier", section: "verifier" },
       },
       {
         id: "qr",
@@ -576,6 +720,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "The site can only use the camera and microphone for its own recordings, after you agree, and never inside another site. The browser's other sensitive features are closed to it.",
         ],
       },
+      VERIFIER_EN.block,
     ],
     tech: {
       h: "Technical details (for experts)",
@@ -585,10 +730,12 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         `Opening: the server checks a proof derived from the key and the password, without receiving either; ${v.tries} wrong proofs destroy the share.`,
         "Size: the encrypted upload starts as soon as a file is added, before “Encrypt and send”. During the upload, the server sees the size to within 4 MiB, because the content goes up in encrypted 4 MiB pieces. Once the upload is done, the encrypted content fills a fixed size tier: the server then knows only that tier.",
         "Browser: strict headers (Content-Security-Policy, Permissions-Policy); no script, font or tracker from another site.",
+        ...VERIFIER_EN.tech,
       ],
       links: [
         { label: "Public source code (GitHub)", url: SOURCE_URL },
         { label: "Public specification", url: SPEC_URL },
+        ...VERIFIER_EN.links,
       ],
     },
   }),
@@ -675,14 +822,15 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Your rights",
         p: [
-          "We keep nothing that could identify you or find your shares from your identity. To exercise your rights or ask a question, use the contact in the legal notice. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
+          "We keep nothing that could identify you or find your shares from your identity. To exercise your rights or ask a question, write to us (Contact page). A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
           "The controller of this processing is Shhgone's publisher (see the legal notice). You can also complain to the CNIL (cnil.fr).",
         ],
+        link: { label: "Contact page", path: "/contact" },
       },
       {
         h: "Requests from authorities",
         p: [
-          "We answer lawful requests from authorities, sent to the contact in the legal notice. Here is what we can give them, and what we cannot give, because we do not have it.",
+          "We answer lawful requests from authorities, sent to the address on the Contact page. Here is what we can give them, and what we cannot give, because we do not have it.",
         ],
         list: [
           "The content of a share or a room: never, it is encrypted on your device and we do not have the key.",
@@ -724,8 +872,8 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Right of withdrawal: you normally have 14 days to withdraw. Because the plan works as soon as you pay, the Plans page asks you, before paying, to request immediate access and to waive this right for the period started (a box that is not ticked in advance); without it, payment does not start.",
           "A full refund or a payment dispute stops the plan.",
           "Your plan is a pass drawn at random by your device: we do not know who bought it. Without an account, it lives only on that device: clearing the site's data loses it, and we cannot find it again.",
-          "Invoice: Stripe sends it to the address given when paying; for PayPal and cryptocurrencies, ask the contact in the legal notice, quoting the order number given by the provider. After payment, “Download the sales receipt” also gives a summary, made on your device.",
-          "You benefit from the legal guarantee of conformity for digital content and services (French Consumer Code, articles L224-25-12 onwards). For any complaint, write to the contact in the legal notice.",
+          "Invoice: Stripe sends it to the address given when paying; for PayPal and cryptocurrencies, ask us at the address on the Contact page, quoting the order number given by the provider. After payment, “Download the sales receipt” also gives a summary, made on your device.",
+          "You benefit from the legal guarantee of conformity for digital content and services (French Consumer Code, articles L224-25-12 onwards). For any complaint, write to the address on the Contact page.",
         ],
       },
       {
@@ -756,7 +904,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "Moderation",
         p: [
           "We do not read shares or rooms (they are encrypted on your device) and use no automated moderation tool. The only possible measures are deleting a share or a room: through reports from the people who opened it (rule above), or by the publisher, in person, after a written report that includes the link, or at the request of an authority.",
-          "Any decision can be challenged by writing to the contact in the legal notice: a person reviews it again.",
+          "Any decision can be challenged by writing to the address on the Contact page: a person reviews it again.",
         ],
       },
       {
@@ -786,7 +934,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Governing law",
         p: [
-          "These terms are governed by French law. In case of a dispute, an amicable solution is sought first through the contact in the legal notice; failing that, the French courts have jurisdiction, subject to the rules that protect consumers.",
+          "These terms are governed by French law. In case of a dispute, an amicable solution is sought first by writing to us (Contact page); failing that, the French courts have jurisdiction, subject to the rules that protect consumers.",
         ],
       },
     ],
@@ -810,6 +958,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Single point of contact for authorities and users (EU Digital Services Act, articles 11 and 12), including removal requests from authorities: contact@shhgone.com, in French or English. Every message is read by a person, never by a bot alone.",
           "To report illegal content: from the share (“Report this share”), or in writing to contact@shhgone.com (see “Report abuse” for what to include); you can also report it to the authorities (in France: PHAROS, internet-signalement.gouv.fr).",
         ],
+        link: { label: "Contact page", path: "/contact" },
       },
       {
         h: "Personal data",
@@ -834,85 +983,59 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "What we receive",
         p: [
           "A report holds only the category you chose (for example “Scam”) and the proof that you opened the share: neither the content nor who you are. We cannot read the share. We count, in memory only, reports per category since the server last started and their number per hour, to spot mass abuse; nothing is written to disk.",
-          `Without the link and the password, nothing can be done to the share: it erases itself when it expires (${v.h} h at most on the free plan). For illegal content, you can also write to the contact in the legal notice with the link.`,
+          `Without the link and the password, nothing can be done to the share: it erases itself when it expires (${v.h} h at most on the free plan). For illegal content, you can also write to the address on the Contact page with the link.`,
         ],
       },
       {
         h: "In writing",
         list: [
-          "Write to the contact in the legal notice with: the full link of the share (including what follows the “#”) and its password if you have it, without which no one can see the content; what seems illegal to you, and why; your name and email address (optional for child sexual abuse material); a sentence confirming that you report in good faith and that this information is accurate.",
+          "Write to the address on the Contact page with: the full link of the share (including what follows the “#”) and its password if you have it, without which no one can see the content; what seems illegal to you, and why; your name and email address (optional for child sexual abuse material); a sentence confirming that you report in good faith and that this information is accurate.",
           "We acknowledge receipt, a person reviews the share (never a bot alone), then we reply with our decision and the possible remedies.",
           "Manifestly illegal content is destroyed at once: no open remains possible, downloads in progress are cut. If someone's life or safety is threatened, we alert the authorities.",
         ],
+        link: { label: "Contact page", path: "/contact" },
       },
     ],
   }),
-  verifier: () => ({
-    title: "Verify this version",
-    lede: "You don't have to take our word for it: anyone can check that the files this site serves are exactly the ones built from our public code.",
+  contact: () => ({
+    title: "Contact",
+    lede: "A question, content to report, a legal request or a security flaw: write to us.",
     blocks: [
       {
+        id: "adresse",
+        h: "Our address",
+        mail: true,
+        p: ["In French or English. Every message is read by a person, never by a bot alone."],
+      },
+      {
         id: "pourquoi",
-        h: "Why verify",
-        p: [
-          "Your files are encrypted in your browser, by the code this site sends you. If that code were modified, for example on a hacked server, it could steal the keys. Encryption is only as good as the code that is served.",
-        ],
-      },
-      {
-        id: "preuve",
-        h: "How it is proven",
+        h: "What to write to us about",
         list: [
-          "The site's code is public, and the site can be rebuilt identically from it: two builds, on two different machines, give the same bytes.",
-          "For every version, GitHub rebuilds the site and publishes the list of all its files, with the size and fingerprint of each: the manifest (release.json).",
-          "This manifest is signed by Sigstore, a public signing service, without any secret key we could lose or have stolen: the signature says it comes from our publishing process on GitHub, built from a precise commit of the public code. It is recorded in a public log that anyone can search.",
-          "Our server refuses to install a version whose files are not exactly those of a signed manifest. And every hour, an automatic check, outside our server, compares the live site with the signed manifest and alerts us at the slightest difference.",
+          "A question, or help using Shhgone.",
+          "Illegal content: the simplest way is to report it from the share. To report it in writing, the “Report abuse” page says what to include.",
+          "Authorities and legal requests, including removal requests: this address is our single point of contact (EU Digital Services Act, articles 11 and 12).",
+          "Exercising your rights over your personal data (GDPR): access, rectification, erasure, objection. You can also complain to the CNIL (cnil.fr).",
+          "Security: a flaw or unusual behaviour of the site. Tell us what you saw and how to reproduce it.",
         ],
+        link: { label: "Report abuse", path: "/signaler" },
       },
       {
-        id: "version",
-        h: "The version of this site",
+        id: "jamais",
+        h: "What you should never send us",
         p: [
-          `This site announces version ${BUILD_ID}: the first characters of the commit it was built from. On the page of published versions (link below), look for the "web-v…" version whose commit starts this way: its number (for example 1.0.0) is the one to verify.`,
+          "The full link of a share together with its password: whoever has both can open the share. The only exception is a written abuse report, where we need them to see the content, as the “Report abuse” page says.",
+          "We will never ask you for a password.",
         ],
       },
       {
-        id: "commandes",
-        h: "Verify it yourself",
+        id: "message",
+        h: "What happens to your message",
         p: [
-          "On a computer, with cosign (the Sigstore tool), Node.js and git. The verifier's code is downloaded from GitHub, never from this site. Replace 1.0.0 with the version number:",
+          "Your message and your email address arrive in our mailbox, hosted by OVH. We keep them while we handle your request, then erase them, unless the law requires otherwise.",
         ],
-        code: verifyCommands("1.0.0"),
-        after: [
-          "The cosign command proves that the manifest comes from our publishing process: it must answer \"Verified OK\". The verifier then downloads every file of the site and compares its size and fingerprint with the manifest: it must answer \"conforme\" (matches). Any other answer is a difference: write to us (the address is in the legal notice).",
-        ],
-      },
-      {
-        id: "limites",
-        h: "What verification does not prove",
-        list: [
-          "This page cannot prove its own integrity: a tampered server could change it too. Verify with a tool that does not come from this site.",
-          "A compromised server could serve tampered code to a single person, chosen by their address or browser, and the right code to everyone else, the automatic check included. Verification only truly protects the person who runs it themselves, before using the site.",
-          "The signature proves where the code comes from, not that it is flawless: only reviewing the public code can tell.",
-          "The security settings sent with the pages (the server's headers) are not verified: only the content of the files is.",
-          "The future iOS and Android apps will embed this code, signed by the app stores: it will no longer come from our server on every visit. That will be the strongest protection against this risk.",
-        ],
+        link: { label: "Privacy", path: "/confidentialite" },
       },
     ],
-    tech: {
-      h: "Technical details (for experts)",
-      list: [
-        "Manifest: release.json (schema 1) gives the version, the commit, and for every served file, .br and .gz variants included, its path, size and SHA-256; written by web/scripts/release-manifest.mjs, published with SHA256SUMS and dist.tar.gz.",
-        "Signature: cosign sign-blob, keyless, by the release.yml workflow on a web-v<x.y.z> tag (GitHub Actions OIDC identity, Fulcio certificate, Rekor log). Always verify with the exact identity, never an open expression, and never without the transparency log.",
-        "Verifier: web/scripts/verify-site.mjs, with no dependency. It refuses redirects, checks compressed variants and the single-page fallback, and never answers \"conforme\" after a network error.",
-        "Post-quantum limit: Sigstore signatures use ECDSA P-256; they will be replaced when Sigstore offers a post-quantum signature.",
-      ],
-      links: [
-        { label: "Published versions and signed manifests (GitHub)", url: RELEASES_URL },
-        { label: "Detailed instructions (§3.3)", url: VERIFY_DOC_URL },
-        { label: "Sigstore public log", url: REKOR_URL },
-        { label: "Public source code (GitHub)", url: SOURCE_URL },
-      ],
-    },
   }),
 };
 
@@ -944,10 +1067,11 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       {
         h: "Vos droits",
         p: [
-          "Sans compte, nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits, utilisez le contact des mentions légales. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
-          "Avec un compte : vous pouvez exporter vos données (le fichier est fait sur votre appareil), corriger votre pseudo et votre photo, et supprimer votre compte à tout moment depuis ses paramètres. Pour un recours contre un bannissement, écrivez-nous en donnant l'identifiant montré à la connexion (contact des mentions légales).",
+          "Sans compte, nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits, écrivez-nous (page Contact). Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
+          "Avec un compte : vous pouvez exporter vos données (le fichier est fait sur votre appareil), corriger votre pseudo et votre photo, et supprimer votre compte à tout moment depuis ses paramètres. Pour un recours contre un bannissement, écrivez-nous en donnant l'identifiant montré à la connexion (page Contact).",
           "Le responsable de ces traitements est l'éditeur de Shhgone (voir les mentions légales). Vous pouvez aussi adresser une réclamation à la CNIL (cnil.fr).",
         ],
+        link: { label: "Page Contact", path: "/contact" },
       },
     ),
   }),
@@ -959,7 +1083,7 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       p: [
         "Un compte gratuit sert seulement à créer des salons ; partager, ouvrir un lien et rejoindre un salon restent sans compte. Il faut avoir au moins 15 ans.",
         "Le compte s'ouvre par une passkey ou par la clé de récupération montrée à sa création. Sans passkey ni clé de récupération, le compte ne peut pas être récupéré : nous n'avons aucun moyen de vous le rendre.",
-        "Un compte qui crée des salons pour nuire peut être banni : il ne peut plus créer de salon et ses salons sont fermés, pendant la durée du bannissement (3 ans par défaut). Le motif est montré à la connexion ; un recours est possible par le contact des mentions légales.",
+        "Un compte qui crée des salons pour nuire peut être banni : il ne peut plus créer de salon et ses salons sont fermés, pendant la durée du bannissement (3 ans par défaut). Le motif est montré à la connexion ; un recours est possible en nous écrivant (page Contact).",
         "Un compte sans connexion pendant 13 mois est effacé, au plus tard au début du 14e mois.",
       ],
     }),
@@ -978,6 +1102,10 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         "Un pseudo ne prouve pas une identité : dans un salon, n'importe qui peut choisir le même.",
       ],
     }),
+  }),
+  contact: (p) => ({
+    ...p,
+    blocks: p.blocks.map((b) => (b.id === "jamais" ? { ...b, p: [b.p![0]!, "Nous ne vous demanderons jamais un mot de passe ni votre clé de récupération de compte."] } : b)),
   }),
 };
 
@@ -1007,10 +1135,11 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       {
         h: "Your rights",
         p: [
-          "Without an account, we keep nothing that could identify you or find your shares from your identity. To exercise your rights, use the contact in the legal notice. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
-          "With an account: you can export your data (the file is made on your device), correct your nickname and photo, and delete your account at any time from its settings. To appeal against a ban, write to us quoting the identifier shown at sign-in (contact in the legal notice).",
+          "Without an account, we keep nothing that could identify you or find your shares from your identity. To exercise your rights, write to us (Contact page). A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
+          "With an account: you can export your data (the file is made on your device), correct your nickname and photo, and delete your account at any time from its settings. To appeal against a ban, write to us quoting the identifier shown at sign-in (Contact page).",
           "The controller of this processing is Shhgone's publisher (see the legal notice). You can also complain to the CNIL (cnil.fr).",
         ],
+        link: { label: "Contact page", path: "/contact" },
       },
     ),
   }),
@@ -1022,7 +1151,7 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       p: [
         "A free account is only used to create rooms; sharing, opening a link and joining a room need no account. You must be at least 15.",
         "The account opens with a passkey or with the recovery key shown when it is created. Without a passkey or the recovery key, the account cannot be recovered: we have no way to give it back to you.",
-        "An account that creates rooms to do harm can be banned: it can no longer create rooms and its rooms are closed, for the length of the ban (3 years by default). The reason is shown at sign-in; an appeal is possible through the contact in the legal notice.",
+        "An account that creates rooms to do harm can be banned: it can no longer create rooms and its rooms are closed, for the length of the ban (3 years by default). The reason is shown at sign-in; an appeal is possible by writing to us (Contact page).",
         "An account with no sign-in for 13 months is erased, at the latest at the start of the 14th month.",
       ],
     }),
@@ -1041,5 +1170,9 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         "A nickname does not prove an identity: in a room, anyone can pick the same one.",
       ],
     }),
+  }),
+  contact: (p) => ({
+    ...p,
+    blocks: p.blocks.map((b) => (b.id === "jamais" ? { ...b, p: [b.p![0]!, "We will never ask you for a password or for your account recovery key."] } : b)),
   }),
 };

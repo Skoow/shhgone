@@ -18,7 +18,8 @@
 #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 #     --certificate-identity https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v<x.y.z>
 # Ce fichier est donc lui-même une partie de l'identité : le renommer change ce que vérifient
-# deploy/provenance.sh, verifier-site.yml et la page /verifier.
+# deploy/provenance.sh, verifier-site.yml et la section « Vérifier cette version » de la page Sécurité
+# (adresse /verifier).
 #
 # Le manifeste n'est pas commité avant l'étiquette (spec §28.2) : le
 # numéro de version du site est le commit lui-même, un commit ne peut pas contenir le manifeste
@@ -356,7 +357,7 @@ jobs:
             echo "deploy/deploy.sh $EMPREINTE $NUMERO $(git rev-parse HEAD)"
             echo '```'
             echo
-            echo "Vérifier (deploy/README.md §3.3, page /verifier du site) :"
+            echo "Vérifier (deploy/README.md §3.3, page Sécurité du site, section « Vérifier cette version » : /verifier) :"
             echo
             echo '```sh'
             echo "cosign verify-blob release.json --bundle release.json.sigstore.json \\"

@@ -261,7 +261,7 @@ cosign verify "$(sed -n 's/^  "image": "\(.*\)",$/\1/p' image.json)" \
   --certificate-identity "https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v$v"
 ```
 
-Pour prouver en plus « build local = build CI » : se placer sur l'étiquette (`git checkout web-v$v`), puis `cd web && npm ci --ignore-scripts && SHH_SITE_COMPTES=1 SHH_BUILD_ID=$(git rev-parse --short=7 HEAD) SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npm run build`, et `node scripts/release-manifest.mjs dist --name shhdrop-web --version $v --commit $(git rev-parse HEAD) --out /tmp/rel && cmp /tmp/rel/release.json ../release.json`. La page `/verifier` du site dit la même chose, en clair.
+Pour prouver en plus « build local = build CI » : se placer sur l'étiquette (`git checkout web-v$v`), puis `cd web && npm ci --ignore-scripts && SHH_SITE_COMPTES=1 SHH_BUILD_ID=$(git rev-parse --short=7 HEAD) SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npm run build`, et `node scripts/release-manifest.mjs dist --name shhdrop-web --version $v --commit $(git rev-parse HEAD) --out /tmp/rel && cmp /tmp/rel/release.json ../release.json`. La section « Vérifier cette version » de la page Sécurité du site (adresse directe `/verifier`) dit la même chose, en clair.
 
 ### 3.4 Contrôles et limites
 

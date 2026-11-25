@@ -824,7 +824,7 @@ Le cadenas ouvert dans une boîte en pointillés ne voulait rien dire : **il est
 - `/securite` : le mécanisme en quatre paragraphes **en langage courant, sans nom d'algorithme** (§20.8), avec un lien vers la documentation technique publique du dépôt (`docs/securite-technique.md` sur GitHub) et vers « Vérifier cette version » (spec §28.4) (clé dans le `#`, mot de passe, chiffrement dans le navigateur, autodestruction), le modèle de menaces résumé (spec §2), **les limites assumées** (spec §18, intégralement, en langage simple), la phrase de §18.11. Jamais « 100 % sécurisé ».
 - `/confidentialite` : la liste exacte de ce qui est traité (spec §9) ; « Shhdrop ne dépose aucun cookie et ne mesure pas l'audience » ; l'adresse IP est vue sans être enregistrée (spec §18.3). Section `#verification` (**24 novembre**, repli Google retiré ; `routes/pages/content.ts`) : « Vérification anti-robot » — « Une petite preuve de calcul est faite par votre navigateur, sans service extérieur. »
 - Mesure 68 ch, `--fs-body` 1.0625rem, titres en `--fs-h2`.
-- `/verifier` (révision 4, spec §28.4) : version, commit, lien vers la Release GitHub et le mode d'emploi, et la phrase « Cette page ne peut pas prouver sa propre intégrité… ».
+- `/verifier` (révision 4, spec §28.4 ; depuis le 25 novembre, section « Vérifier cette version » de `/securite`, que cette adresse ouvre à son titre) : version, commit, lien vers la Release GitHub et le mode d'emploi, et la phrase « Cette page ne peut pas prouver sa propre intégrité… ».
 
 ### 9.14 Fonctions payantes : écrans (révision 7, spec §38.9 ; tâches P3, P4, P5, F0 à F11, toutes après la V1)
 

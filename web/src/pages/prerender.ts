@@ -20,6 +20,7 @@ export const PAGE_FILES: Readonly<Partial<Record<Route["name"], string>>> = {
   mentions: "mentions-legales.html",
   signaler: "signaler.html",
   verifier: "verifier.html",
+  contact: "contact.html",
 };
 
 export type Rendered = { body: string; title: string; description: string; path: string | undefined };

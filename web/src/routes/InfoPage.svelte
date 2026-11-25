@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Page d'information (Sécurité, Confidentialité, Conditions, Mentions légales, Signaler un
-  // abus, Vérifier) : lecture d'abord, colonne de texte de 70 à 80 signes par ligne, titres
+  // Page d'information (Sécurité, avec sa section « Vérifier cette version », Confidentialité,
+  // Conditions, Mentions légales, Signaler un abus, Contact) : lecture d'abord, colonne de texte de 70 à 80 signes par ligne, titres
   // ancrés par id (sans « # » dans l'adresse : le « # » est réservé aux clés). Bandeau « En cours de rédaction »
   // pour les pages juridiques que doit compléter.
   // Refonte (« ancien, trop serré, pavé ») : plus de carte ni de
@@ -9,20 +9,62 @@
   // téléphone, il devient une rangée de pastilles. Sections espacées, texte plus grand.
   import { followLink, href } from "../app/router.svelte";
   import { getLang, t } from "../i18n/i18n.svelte";
+  import { announce } from "../ui/announce";
+  import { copyText } from "../ui/clipboard";
+  import { Check, Copy } from "../ui/Icon";
   import PageHeader from "../ui/PageHeader.svelte";
-  import { infoPage, type InfoName } from "./pages/content";
+  import { CONTACT_EMAIL, infoPage, type InfoName } from "./pages/content";
 
-  let { name }: { name: InfoName } = $props();
+  /** `section` : id d'une section ouverte au chargement (« /verifier » : la section de Sécurité). */
+  let { name, section }: { name: InfoName; section?: string } = $props();
   const page = $derived(infoPage(name, getLang()));
   const idOf = (b: { id?: string }, i: number) => b.id ?? `info-b-${i}`;
   let current = $state("");
 
-  function go(id: string) {
+  function go(id: string, smooth = true) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    el.scrollIntoView({ behavior: smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto", block: "start" });
     el.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
     current = id;
+  }
+
+  // Ouverture à une section (« /verifier ») : une fois la page en place, sans animation.
+  $effect(() => {
+    if (section === undefined) return;
+    const id = section;
+    const raf = requestAnimationFrame(() => go(id, false));
+    return () => cancelAnimationFrame(raf);
+  });
+
+  // Lien vers une section de la même page : défilement, sans changer d'adresse ; un clic modifié
+  // (nouvel onglet) suit l'adresse, qui ouvre la page à cette section.
+  function toSection(e: MouseEvent, id: string) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    go(id);
+  }
+
+  // Page Contact : « Copier l'adresse ». Sans presse-papiers : l'adresse est sélectionnée, pour une
+  // copie à la main.
+  let copied = $state(false);
+  let addr: HTMLAnchorElement | undefined = $state();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => () => clearTimeout(timer));
+  async function copyMail() {
+    clearTimeout(timer);
+    if ((await copyText(CONTACT_EMAIL)) === "copied") {
+      copied = true;
+      announce(t("info.mail.copied"));
+      timer = setTimeout(() => (copied = false), 2000);
+      return;
+    }
+    copied = false;
+    const sel = getSelection();
+    if (addr && sel) {
+      sel.selectAllChildren(addr);
+      announce(t("copy.manual"));
+    }
   }
 
   // Section lue : la dernière dont le titre a passé le haut de l'écran (sous l'en-tête du site).
@@ -41,6 +83,21 @@
     return () => io.disconnect();
   }
 </script>
+
+{#snippet content(b: { p?: string[]; list?: string[]; code?: string[]; after?: string[] })}
+  {#each b.p ?? [] as para, j (j)}<p>{para}</p>{/each}
+  {#if b.list}
+    <ul>{#each b.list as li, j (j)}<li>{li}</li>{/each}</ul>
+  {/if}
+  <!-- Commandes à recopier (section « Vérifier cette version », spec §28.4) : texte seul, jamais
+       exécuté. Le bloc défile en largeur : il doit pouvoir prendre le focus au clavier
+       (règle « scrollable-region-focusable » d'axe), d'où tabindex. -->
+  {#if b.code}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <pre class="cmd" tabindex="0" aria-label={t("info.commands")} data-cmd><code>{b.code.join("\n")}</code></pre>
+  {/if}
+  {#each b.after ?? [] as para, j (j)}<p>{para}</p>{/each}
+{/snippet}
 
 <article class="info" data-info={name} aria-labelledby="info-title">
   <PageHeader id="info-title" size="display" title={page.title} lede={page.lede}>
@@ -62,21 +119,33 @@
       {#each page.blocks as b, i (i)}
         <section class="blk" id={idOf(b, i)} aria-labelledby="info-h-{i}">
           <h2 id="info-h-{i}" tabindex="-1">{b.h}</h2>
-          {#each b.p ?? [] as para, j (j)}<p>{para}</p>{/each}
-          {#if b.list}
-            <ul>{#each b.list as li, j (j)}<li>{li}</li>{/each}</ul>
+          {#if b.mail}
+            <!-- Page Contact : l'adresse, en lien mailto (rien n'est envoyé par le site), et sa copie. -->
+            <div class="mail" data-mail>
+              <span class="sr-only">{t("info.mail")}</span>
+              <a class="addr" href="mailto:{CONTACT_EMAIL}" bind:this={addr} translate="no">{CONTACT_EMAIL}</a>
+              <button type="button" class="copy" onclick={copyMail} data-copy-mail>
+                {#if copied}<Check size={18} strokeWidth={1.75} aria-hidden="true" />{t("info.mail.copied")}{:else}<Copy size={18} strokeWidth={1.75} aria-hidden="true" />{t("info.mail.copy")}{/if}
+              </button>
+            </div>
           {/if}
-          <!-- Commandes à recopier (page « Vérifier cette version », spec §28.4) : texte seul, jamais
-               exécuté. Le bloc défile en largeur : il doit pouvoir prendre le focus au clavier
-               (règle « scrollable-region-focusable » d'axe), d'où tabindex. -->
-          {#if b.code}
-            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-            <pre class="cmd" tabindex="0" aria-label={t("info.commands")} data-cmd><code>{b.code.join("\n")}</code></pre>
-          {/if}
-          {#each b.after ?? [] as para, j (j)}<p>{para}</p>{/each}
+          {@render content(b)}
+          {#each b.sub ?? [] as s (s.id)}
+            <div class="sub" data-sub={s.id}>
+              <h3>{s.h}</h3>
+              {@render content(s)}
+            </div>
+          {/each}
           {#if b.link}
             {@const l = b.link}
-            <p><a class="more" href={href(l.path)} onclick={(e) => followLink(e, l.path)}>{l.label}</a></p>
+            {@const target = l.section}
+            <p>
+              {#if target !== undefined}
+                <a class="more" href={href(l.path)} onclick={(e) => toSection(e, target)}>{l.label}</a>
+              {:else}
+                <a class="more" href={href(l.path)} onclick={(e) => followLink(e, l.path)}>{l.label}</a>
+              {/if}
+            </p>
           {/if}
         </section>
       {/each}
@@ -262,6 +331,74 @@
   h2:focus {
     outline: none;
   }
+  /* Parties d'une section (« Vérifier cette version ») : titre de niveau 3, plus d'air au-dessus
+     qu'en dessous, pour que chaque partie se lise comme un groupe. */
+  .sub {
+    display: grid;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-4);
+  }
+  h3 {
+    margin: 0;
+    color: var(--text);
+    font-size: 1.1875rem;
+    line-height: 1.3;
+    font-weight: 650;
+    text-wrap: balance;
+  }
+  /* Page Contact : l'adresse, grande et dans la couleur d'accent, avec sa copie à côté. */
+  .mail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3) var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    border-radius: var(--r-lg, 14px);
+    background: rgb(255 255 255 / 0.03);
+    box-shadow: inset 0 0 0 1px var(--hair-2);
+  }
+  .addr {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--accent);
+    font-size: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+    font-weight: 600;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    border-radius: 6px;
+  }
+  .addr:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    text-decoration-thickness: 1px;
+  }
+  .addr:focus-visible,
+  .copy:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .copy {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: 44px;
+    padding: var(--sp-2) var(--sp-4);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: rgb(255 255 255 / 0.04);
+    box-shadow: inset 0 0 0 1px var(--hair-2);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-small);
+    font-weight: 560;
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+  .copy:hover {
+    background: rgb(255 255 255 / 0.08);
+  }
   p,
   li {
     margin: 0;
@@ -378,8 +515,12 @@
       border-width: 2px;
     }
     .tech,
-    .cmd {
+    .cmd,
+    .mail {
       border: 1px solid CanvasText;
+    }
+    .copy {
+      border: 1px solid ButtonText;
     }
   }
 </style>

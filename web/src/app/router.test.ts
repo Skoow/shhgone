@@ -9,8 +9,15 @@ describe("match", () => {
     expect(match("/")).toEqual({ name: "home" });
     expect(match("/securite")).toEqual({ name: "securite" });
     expect(match("/confidentialite")).toEqual({ name: "confidentialite" });
-    // « Vérifier cette version » (spec §28.4) : page d'information bilingue, servie par son fichier.
+    // « Vérifier cette version » (spec §28.4) : section de la page Sécurité ; « /verifier » reste une
+    // adresse bilingue, servie par son fichier, qui ouvre la page Sécurité à cette section.
     expect(match("/verifier")).toEqual({ name: "verifier" });
+    // Contact : page d'information bilingue, servie par son fichier.
+    expect(match("/contact")).toEqual({ name: "contact" });
+    expect(match("/contact.html")).toEqual({ name: "contact" });
+    expect(match("/en/contact", "", "/", false, false, false, true)).toEqual({ name: "contact" });
+    expect(otherEntry("/contact")).toBe(true);
+    expect(href("/contact", "en", true)).toBe("/en/contact");
     expect(match("/verifier.html")).toEqual({ name: "verifier" });
     expect(match("/en/verifier", "", "/", false, false, false, true)).toEqual({ name: "verifier" });
     expect(otherEntry("/verifier")).toBe(true);

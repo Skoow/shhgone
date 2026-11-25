@@ -36,15 +36,17 @@ const reopenHere = () =>
   typeof history !== "undefined" && (history.state as Record<string, unknown> | null)?.[REOPEN_MARK] === true;
 
 /** Pages d'information (pied de page) : chemin → route. */
-export type InfoRoute = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler" | "verifier";
+export type InfoRoute = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler" | "verifier" | "contact";
 export const INFO_PATHS: Readonly<Record<string, InfoRoute>> = {
   "/securite": "securite",
   "/confidentialite": "confidentialite",
   "/conditions": "conditions",
   "/mentions-legales": "mentions",
   "/signaler": "signaler",
-  // « Vérifier cette version » (spec §28.4).
+  // « Vérifier cette version » (spec §28.4) : section de la page Sécurité, ouverte à son titre
+  // (pages/PagesApp.svelte) ; adresse gardée, citée par les Releases, le README et la spec.
   "/verifier": "verifier",
+  "/contact": "contact",
 };
 
 /** Pages du compte, seulement si __COMPTES__ : chemin → route. */
@@ -169,7 +171,7 @@ const base = () => import.meta.env.BASE_URL;
  * pages, un lien charge l'autre page (navigation complète) ; à l'intérieur de l'une ou de
  * l'autre, rien ne change.
  */
-export const PAGE_ROUTES: ReadonlySet<Route["name"]> = new Set<Route["name"]>(["securite", "confidentialite", "conditions", "mentions", "signaler", "verifier", "offres"]);
+export const PAGE_ROUTES: ReadonlySet<Route["name"]> = new Set<Route["name"]>(["securite", "confidentialite", "conditions", "mentions", "signaler", "verifier", "contact", "offres"]);
 /** Écrans de la page « /s » (s.html) : ouverture et gestion d'un partage. */
 export const LINK_ROUTES: ReadonlySet<Route["name"]> = new Set<Route["name"]>(["open", "manage"]);
 type Entry = "app" | "pages" | "s";

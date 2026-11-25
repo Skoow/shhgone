@@ -1,5 +1,7 @@
 <script lang="ts">
-  // Pages d'information servies par leur propre fichier HTML (pages séparées) : Sécurité, Confidentialité, Offres, Conditions, Mentions légales, Signaler.
+  // Pages d'information servies par leur propre fichier HTML (pages séparées) : Sécurité (et
+  // « /verifier », sa section « Vérifier cette version »), Confidentialité, Offres, Conditions,
+  // Mentions légales, Signaler, Contact.
   // Seulement la coque (en-tête, menu, pied) et la page : ni composeur, ni moteur de chiffrement,
   // ni compte, ni salon. Le même composant sert au rendu du build (contenu déjà écrit dans le
   // HTML, pour les moteurs de recherche et l'affichage avant le script) et au navigateur.
@@ -43,6 +45,10 @@
 <AppShell banner={demo ? demoBanner : undefined}>
   {#if name === "offres"}
     <Offres />
+  {:else if name === "verifier"}
+    <!-- « /verifier » (ancienne page, citée par les Releases, le README et la spec §28.4) : la page
+         Sécurité, ouverte à sa section « Vérifier cette version ». -->
+    <InfoPage name="securite" section="verifier" />
   {:else}
     <InfoPage name={name as InfoName} />
   {/if}

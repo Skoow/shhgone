@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { en } from "../../i18n/en";
 import { fr } from "../../i18n/fr";
-import { infoPage } from "./content";
+import { CONTACT_EMAIL, infoPage, type Block, type InfoName, type InfoPage } from "./content";
+
+/** Tout le texte affiché d'une page : sections, parties, commandes, liens, détails techniques. */
+const PAGES: readonly InfoName[] = ["securite", "confidentialite", "conditions", "mentions", "signaler", "contact"];
+const blocTexte = (b: Block) => [b.h, ...(b.p ?? []), ...(b.list ?? []), ...(b.code ?? []), ...(b.after ?? []), b.link?.label ?? "", ...(b.sub ?? []).flatMap((s) => [s.h, ...(s.p ?? []), ...(s.list ?? []), ...(s.code ?? []), ...(s.after ?? [])])];
+const pageTexte = (p: InfoPage) => [p.title, p.lede, ...p.blocks.flatMap(blocTexte), p.tech?.h ?? "", ...(p.tech?.p ?? []), ...(p.tech?.list ?? [])].join("\n");
 
 // Un abonné a des partages et des appels inclus : le mécanisme anonyme reste interne, jamais le
 // mot « jeton » ni « token » dans un texte affiché (la commande de vérification garde l'adresse de
@@ -14,9 +19,9 @@ describe("aucun « jeton » ni « token » affiché", () => {
   test("pages d'information et dictionnaires, en français et en anglais, avec et sans compte", () => {
     for (const comptes of [false, true])
       for (const lang of ["fr", "en"] as const)
-        for (const nom of ["securite", "confidentialite", "conditions", "mentions", "signaler", "verifier"] as const) {
-          const p = infoPage(nom, lang, comptes);
-          const texte = [p.title, p.lede, ...p.blocks.flatMap((b) => [b.h, ...(b.p ?? []), ...(b.list ?? []), ...(b.after ?? []), b.link?.label ?? ""]), p.tech?.h ?? "", ...(p.tech?.p ?? []), ...(p.tech?.list ?? [])].join("\n");
+        for (const nom of PAGES) {
+          // L'adresse de l'émetteur de GitHub (token.actions…) est dans une commande, pas un texte.
+          const texte = pageTexte(infoPage(nom, lang, comptes)).replace("https://token.actions.githubusercontent.com", "");
           expect(texte, `${nom} ${lang}`).not.toMatch(/\bjetons?\b|\btokens?\b/iu);
         }
     for (const [lang, d] of [["fr", fr], ["en", en]] as const)
@@ -234,13 +239,25 @@ describe("Confidentialité : section paiement", () => {
   });
 });
 
-// « Vérifier cette version » (spec §28.4, §28.8 C1 et C7).
-describe("page Vérifier cette version", () => {
-  const page = (lang: "fr" | "en") => infoPage("verifier", lang);
+// « Vérifier cette version » (spec §28.4, §28.8 C1 et C7) : section de la page Sécurité (25
+// novembre, demande du propriétaire), même contenu que l'ancienne page « /verifier ».
+describe("section « Vérifier cette version » de la page Sécurité", () => {
+  const section = (lang: "fr" | "en", comptes = false) => infoPage("securite", lang, comptes).blocks.find((b) => b.id === "verifier")!;
+  const sub = (lang: "fr" | "en", id: string) => section(lang).sub!.find((s) => s.id === id)!;
   const textes = (lang: "fr" | "en") => {
-    const p = page(lang);
-    return [p.title, p.lede, ...p.blocks.flatMap((b) => [b.h, ...(b.p ?? []), ...(b.list ?? []), ...(b.code ?? []), ...(b.after ?? [])]), ...(p.tech ? [p.tech.h, ...(p.tech.list ?? [])] : [])].join("\n");
+    const p = infoPage("securite", lang);
+    return [...blocTexte(section(lang)), ...(p.tech?.list ?? [])].join("\n");
   };
+
+  test("titre exact, dernière section, avec ou sans compte ; ses parties dans l'ordre", () => {
+    for (const comptes of [false, true]) {
+      expect(section("fr", comptes).h).toBe("Vérifier cette version");
+      expect(section("en", comptes).h).toBe("Verify this version");
+      for (const lang of ["fr", "en"] as const) expect(infoPage("securite", lang, comptes).blocks.at(-1)?.id).toBe("verifier");
+    }
+    for (const lang of ["fr", "en"] as const) expect(section(lang).sub!.map((s) => s.id)).toEqual(["pourquoi", "preuve", "version", "commandes", "verif-limites"]);
+    expect(section("fr").p).toEqual(["Vous n'avez pas à nous croire sur parole : n'importe qui peut vérifier que les fichiers servis par ce site sont exactement ceux construits depuis notre code public."]);
+  });
   // Identité exacte du signataire, lue dans deploy/provenance.sh : la page dit ce que vérifie deploy.sh.
   const provenance = readFileSync(fileURLToPath(new URL("../../../../deploy/provenance.sh", import.meta.url)), "utf8");
   const depot = /^readonly PROVENANCE_DEPOT=(\S+)$/mu.exec(provenance)?.[1];
@@ -262,7 +279,7 @@ describe("page Vérifier cette version", () => {
   test("commandes : identité exacte de deploy/provenance.sh, émetteur de GitHub, jamais d'expression ouverte ni sans journal", () => {
     expect(depot).toBe("Skoow/shhgone");
     for (const lang of ["fr", "en"] as const) {
-      const code = page(lang).blocks.find((b) => b.id === "commandes")?.code ?? [];
+      const code = sub(lang, "commandes").code ?? [];
       const tout = code.join("\n");
       expect(tout).toContain(`--certificate-identity "https://github.com/${depot}/.github/workflows/release.yml@refs/tags/web-v$v"`);
       expect(tout).toContain("--certificate-oidc-issuer https://token.actions.githubusercontent.com");
@@ -278,17 +295,28 @@ describe("page Vérifier cette version", () => {
   test("aucune empreinte calculée ni affichée par la page (C7) ; version du build citée", () => {
     for (const lang of ["fr", "en"] as const) {
       expect(textes(lang)).not.toMatch(/\b[0-9a-f]{40,}\b/u);
-      expect(page(lang).blocks.find((b) => b.id === "version")?.p?.join(" ")).toContain("dev"); // BUILD_ID des tests
+      expect(sub(lang, "version").p?.join(" ")).toContain("dev"); // BUILD_ID des tests
     }
   });
 
-  test("liens : seulement le dépôt public et le journal de Sigstore (liens sortants, rien n'est chargé)", () => {
-    for (const lang of ["fr", "en"] as const)
-      for (const l of page(lang).tech?.links ?? []) expect(l.url).toMatch(/^https:\/\/(github\.com\/Skoow\/shhgone(\/|$)|search\.sigstore\.dev\/$)/u);
+  test("liens : seulement le dépôt public et le journal de Sigstore (liens sortants, rien n'est chargé), sans doublon", () => {
+    for (const lang of ["fr", "en"] as const) {
+      const links = infoPage("securite", lang).tech?.links ?? [];
+      for (const l of links) expect(l.url).toMatch(/^https:\/\/(github\.com\/Skoow\/shhgone(\/|$)|search\.sigstore\.dev\/$)/u);
+      expect(new Set(links.map((l) => l.url)).size).toBe(links.length);
+      expect(links.map((l) => l.url)).toEqual(expect.arrayContaining(["https://github.com/Skoow/shhgone/releases", "https://search.sigstore.dev/"]));
+    }
   });
 
-  test("la page Sécurité mène à /verifier, en français et en anglais", () => {
-    for (const lang of ["fr", "en"] as const) expect(infoPage("securite", lang).blocks.find((b) => b.id === "limites")?.link?.path).toBe("/verifier");
+  test("« Ce que Shhgone ne peut pas faire » mène à la section, sans « # » (adresse /verifier)", () => {
+    for (const lang of ["fr", "en"] as const) expect(infoPage("securite", lang).blocks.find((b) => b.id === "limites")?.link).toMatchObject({ path: "/verifier", section: "verifier" });
+  });
+
+  test("un écart se signale par la page Contact ; le lien des versions publiées est dit en bas de la page", () => {
+    expect(textes("fr")).toMatch(/Toute autre réponse est un écart : écrivez-nous \(page Contact\)\./u);
+    expect(textes("en")).toMatch(/Any other answer is a difference: write to us \(Contact page\)\./u);
+    expect(textes("fr")).toMatch(/lien dans les détails techniques, en bas de cette page/u);
+    expect(textes("en")).toMatch(/link in the technical details, at the bottom of this page/u);
   });
 });
 
@@ -374,5 +402,53 @@ describe("pages juridiques : conditions de vente, confidentialité, mentions", (
       expect(t).toMatch(/OVH SAS[\s\S]*Strasbourg/u);
       expect(t).not.toMatch(/COMPLÉTER|TO BE COMPLETED|SIREN/u);
     }
+  });
+});
+
+// Page Contact (25 novembre, demande du propriétaire) : l'adresse de contact n'est écrite que sur
+// Contact et sur les Mentions légales (obligation légale) ; aucune autre page ne porte d'adresse.
+describe("page Contact et adresses e-mail", () => {
+  test("une adresse e-mail seulement sur Contact (bloc « mail ») et Mentions légales, jamais ailleurs", () => {
+    expect(CONTACT_EMAIL).toBe("contact@shhgone.com");
+    for (const comptes of [false, true])
+      for (const lang of ["fr", "en"] as const)
+        for (const nom of PAGES) {
+          const p = infoPage(nom, lang, comptes);
+          const texte = pageTexte(p);
+          const mails = p.blocks.filter((b) => b.mail);
+          if (nom === "contact") {
+            expect(mails.map((b) => b.id), `${nom} ${lang}`).toEqual(["adresse"]);
+            expect(texte).not.toContain("@"); // l'adresse vient de CONTACT_EMAIL, rendue par InfoPage
+          } else {
+            expect(mails, `${nom} ${lang}`).toEqual([]);
+            if (nom !== "mentions") expect(texte, `${nom} ${lang}`).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.-]+|mailto/u);
+            else expect(texte.match(/[\w.+-]+@[\w.-]+/gu)?.every((m) => m === CONTACT_EMAIL)).toBe(true);
+          }
+        }
+  });
+
+  test("contenu : pour quoi écrire, ce qu'il ne faut jamais envoyer, langues ; ni adresse postale ni délai promis", () => {
+    const f = pageTexte(infoPage("contact", "fr", false));
+    for (const re of [/En français ou en anglais/u, /Signaler un abus/u, /autorités[^.]*demandes de retrait/u, /RGPD/u, /CNIL/u, /faille/u, /Le lien complet d'un partage avec son mot de passe/u, /Seule exception, un signalement d'abus par écrit/u, /hébergée par OVH/u])
+      expect(f).toMatch(re);
+    const e = pageTexte(infoPage("contact", "en", false));
+    for (const re of [/In French or English/u, /Report abuse/u, /removal requests/u, /GDPR/u, /flaw/u, /The full link of a share together with its password/u, /The only exception is a written abuse report/u]) expect(e).toMatch(re);
+    for (const lang of ["fr", "en"] as const)
+      for (const comptes of [false, true]) {
+        const t = pageTexte(infoPage("contact", lang, comptes));
+        expect(t).not.toMatch(/\b\d{5}\b|rue |street|BP \d|cedex|\d+\s?(h|heures?|hours?|jours?|days?)\b|sous \d|within \d|délai|promptly|rapidement/iu);
+      }
+    expect(infoPage("contact", "fr").blocks.find((b) => b.id === "pourquoi")?.link?.path).toBe("/signaler");
+    // Avec le compte : la clé de récupération ne s'envoie jamais non plus.
+    expect(pageTexte(infoPage("contact", "fr", true))).toMatch(/jamais un mot de passe ni votre clé de récupération/u);
+    expect(pageTexte(infoPage("contact", "fr", false))).not.toMatch(/clé de récupération/u);
+  });
+
+  test("les autres pages renvoient vers la page Contact, plus vers « le contact des mentions légales »", () => {
+    for (const comptes of [false, true])
+      for (const lang of ["fr", "en"] as const) for (const nom of PAGES) expect(pageTexte(infoPage(nom, lang, comptes))).not.toMatch(/contact des mentions légales|contact in the legal notice|adresse est dans les mentions|address is in the legal notice/u);
+    for (const [k, v] of Object.entries({ ...fr, ...en })) expect(v, k).not.toMatch(/contact des mentions légales|contact in the legal notice/u);
+    expect(infoPage("mentions", "fr").blocks.some((b) => b.link?.path === "/contact")).toBe(true);
+    expect(infoPage("confidentialite", "en", true).blocks.some((b) => b.link?.path === "/contact")).toBe(true);
   });
 });

@@ -46,11 +46,14 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   // Phrase de l'hébergeur de la démo : dans la démo seulement.
   await expect(foot.locator("[data-demo-host]")).toHaveCount(0);
   // Plus d'« Offres » ni de « Licence » : la licence est dite sur GitHub.
-  for (const l of ["Sécurité", "Confidentialité", "Open source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales"])
+  for (const l of ["Sécurité", "Confidentialité", "Open source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales", "Contact"])
     await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toBeVisible();
   for (const l of ["Offres", "Licence"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toHaveCount(0);
-  // 6 liens, plus le logo (retour à l'accueil, UI7).
-  await expect(foot.getByRole("link")).toHaveCount(7);
+  // 7 liens (« Vérifier cette version » est une section de Sécurité, plus un lien à part ; « Contact »
+  // ajouté le 25 novembre), plus le logo (retour à l'accueil, UI7) et « Version xxxxxxx », qui mène
+  // à cette section.
+  await expect(foot.getByRole("link")).toHaveCount(9);
+  await expect(foot.getByRole("link", { name: /^Vérifier cette version$/ })).toHaveCount(0);
   await expect(foot.getByRole("link", { name: "Shhgone, accueil" })).toBeVisible();
   await expect(foot.getByRole("link", { name: /^Open source/ })).toHaveAttribute("href", "https://github.com/Skoow/shhgone");
   await expect(foot.getByRole("link", { name: /^Open source/ })).toHaveAttribute("rel", "noopener noreferrer");
@@ -58,6 +61,7 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   await expect(foot.getByText(/publicité/)).toHaveCount(0);
   await expect(foot.locator(".base .sig")).toHaveText(/^Shhgone\s*©\s2026$/);
   await expect(foot.locator("[data-build]")).toHaveText(/^Version ([0-9a-f]{7}|dev)$/);
+  await expect(foot.locator("[data-build]")).toHaveAttribute("href", "/verifier");
   // Ni langue ni nettoyage automatique ; « À propos » reste.
   await expect(foot.getByRole("combobox")).toHaveCount(0);
   await expect(foot.getByRole("group", { name: "Langue" })).toHaveCount(0);
@@ -115,7 +119,7 @@ test("référencement : robots.txt et sitemap.xml ; pages publiques indexées, p
   expect(map.headers()["content-type"]).toMatch(/xml/);
   const locs = [...(await map.text()).matchAll(/<loc>https:\/\/shhgone\.com([^<]*)<\/loc>/g)].map((m) => m[1]);
   // Pages bilingues : chaque page indexée et sa version « /en ».
-  expect(locs).toEqual(["/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales"].flatMap((p) => [p, p === "/" ? "/en" : "/en" + p]));
+  expect(locs).toEqual(["/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/contact"].flatMap((p) => [p, p === "/" ? "/en" : "/en" + p]));
   const meta = (n: string) => page.locator(`meta[name="${n}"]`);
   for (const p of locs) {
     await page.goto(shh.origin + p);
@@ -123,7 +127,7 @@ test("référencement : robots.txt et sitemap.xml ; pages publiques indexées, p
     await expect(page.locator('link[rel="canonical"]'), p).toHaveAttribute("href", shh.origin + p);
     expect((await meta("description").getAttribute("content"))!.length, p).toBeGreaterThan(40);
   }
-  for (const p of ["/envoyer", "/signaler", "/inconnu"]) {
+  for (const p of ["/envoyer", "/signaler", "/verifier", "/inconnu"]) {
     await page.goto(shh.origin + p);
     await expect(meta("robots"), p).toHaveAttribute("content", "noindex");
     await expect(page.locator('link[rel="canonical"]'), p).toHaveCount(0);
