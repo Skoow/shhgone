@@ -189,6 +189,11 @@ describe("gestion : shareStatus et destruction", () => {
     o.wipe();
     await expect(o.destroy()).rejects.toThrow("cles_effacees");
   });
+});
+
+// Groupe à part : 3 partages gratuits par jour et par connexion (CreatesPer64), déjà pris ci-dessus.
+describe("gestion : types de lien", () => {
+  const srv = useServer();
   it("lien de partage sans mot de passe refusé ; mauvais type de lien refusé", async () => {
     const r = await share(srv(), [textItem("c")]);
     await expect(destroyShare(r.link, srv().origin, {})).rejects.toThrow("mot_de_passe_requis");
