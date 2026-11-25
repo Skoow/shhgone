@@ -14,7 +14,7 @@ import type { StartWorker } from "./argon2";
 
 async function verified(url: string, sri: string): Promise<ArrayBuffer> {
   try {
-    const res = await fetch(url, { integrity: sri, credentials: "omit", redirect: "error" });
+    const res = await fetch(url, { integrity: sri, credentials: "same-origin", redirect: "error" });
     if (!res.ok) throw new Error("reseau");
     return await res.arrayBuffer();
   } catch {

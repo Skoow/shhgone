@@ -21,7 +21,8 @@
 #      jeton ni le témoin n'atteignent l'amont ; jeton vide dans la configuration : rien ne passe ;
 #   5. webhooks des trois prestataires (POST, chemin exact) : relayés sans témoin ; GET, autre
 #      nom, majuscules, suffixe : maintenance ;
-#   6. requête d'une page de l'origine (Sec-Fetch-Site: same-origin, hors navigation) : relayée ;
+#   6. Sec-Fetch-Site: same-origin sans témoin (en-tête forgeable, risque PP1) : maintenance, quel
+#      que soit Sec-Fetch-Mode ; avec le témoin : relayé ;
 #   7. aucun cache en préproduction : Cache-Control de l'amont (immutable) remplacé par no-store,
 #      une seule valeur ; sans préproduction (SHH_PREPROD absent), Cache-Control de l'amont
 #      inchangé, ni marqueur, /acces/<jeton> relayé comme tout chemin, aucun témoin posé.
@@ -221,17 +222,20 @@ for p in stripe paypal nowpayments; do
 	check "webhook $p (POST, sans témoin) : relayé à l'amont" bash -c "grep -q '^HTTP/[0-9.]* 200' '$work/h-wh' && grep -q '^POST /api/paiement/webhook/$p\$' '$work/b-wh'"
 done
 
-# --- 6. Requêtes des pages de l'origine (credentials: "omit") ------------------------------------
+# --- 6. Sec-Fetch-Site ne suffit pas (risque PP1) ------------------------------------------------
+# Le site envoie tout en credentials: "same-origin" : ses appels portent le témoin.
 for m in cors no-cors same-origin websocket; do
-	check "Sec-Fetch-Site: same-origin, Sec-Fetch-Mode: $m, sans témoin : relayé (200)" \
-		test "$(code c1 -H 'Sec-Fetch-Site: same-origin' -H "Sec-Fetch-Mode: $m" "$P/api/salons/x")" = 200
+	check "Sec-Fetch-Site: same-origin, Sec-Fetch-Mode: $m, sans témoin : 503" \
+		test "$(maint c1 -H 'Sec-Fetch-Site: same-origin' -H "Sec-Fetch-Mode: $m" "$P/api/salons/x")" = 503-maintenance
+	check "Sec-Fetch-Site: same-origin, Sec-Fetch-Mode: $m, avec le témoin : relayé (200)" \
+		test "$(code c1 -H "Cookie: __Host-shh_preprod=$jeton" -H 'Sec-Fetch-Site: same-origin' -H "Sec-Fetch-Mode: $m" "$P/api/salons/x")" = 200
 done
 
 # --- 7. Cache, et production inchangée --------------------------------------------------------------
 c1 -H "X-Shh-Preprod: $jeton" -D "$work/h-cache" -o /dev/null "$P/assets/index-abc.js"
 check "préproduction : Cache-Control de l'amont (immutable) remplacé par no-store, une seule valeur" \
 	test "$(hdr "$work/h-cache" Cache-Control)" = no-store
-c1 -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: no-cors' -D "$work/h-cache2" -o /dev/null "$P/assets/index-abc.js"
+c1 -H "Cookie: __Host-shh_preprod=$jeton" -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: no-cors' -D "$work/h-cache2" -o /dev/null "$P/assets/index-abc.js"
 check "préproduction, fichier demandé par une page : no-store aussi" test "$(hdr "$work/h-cache2" Cache-Control)" = no-store
 c0 -D "$work/h-prod" -o "$work/b-prod" "$Q/assets/index-abc.js"
 check "production : Cache-Control de l'amont inchangé" test "$(hdr "$work/h-prod" Cache-Control)" = "public, max-age=31536000, immutable"

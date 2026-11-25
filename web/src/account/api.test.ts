@@ -72,7 +72,7 @@ const CALLS: [string, (n: A.Net) => Promise<unknown>, string, unknown, unknown][
 const SANS_SESSION = new Set(["inscriptionDebut", "inscriptionFin", "connexionDebut", "connexionFin", "recup", "pseudoVerifier (étape)"]);
 
 describe("routes et en-têtes", () => {
-  it("toutes les requêtes vont à /api/compte*, méthode, chemin et corps exacts, sans cookie, sans redirection, rien dans l'URL, aucun null", async () => {
+  it("toutes les requêtes vont à /api/compte*, méthode, chemin et corps exacts, même origine, sans redirection, rien dans l'URL, aucun null", async () => {
     for (const [name, call, route, corps, res] of CALLS) {
       const { n, seen } = net(() => ok(res, name === "inscriptionFin" ? 201 : 200));
       await call(n);
@@ -80,7 +80,7 @@ describe("routes et en-têtes", () => {
       const s = seen[0]!;
       expect(`${s.method} ${s.url.replace(/^https:\/\/shh\.test\/api\/compte\/?/, "")}`, name).toBe(route);
       expect(s.url, name).not.toContain("?");
-      expect(s.init.credentials, name).toBe("omit");
+      expect(s.init.credentials, name).toBe("same-origin");
       expect(s.init.redirect, name).toBe("error");
       expect(s.body, name).toEqual(corps);
       expect(JSON.stringify(s.body ?? {}), name).not.toContain("null");

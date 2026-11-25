@@ -52,7 +52,7 @@ describe("couche HTTP du paiement", () => {
     for (const tva of [{ regime: "autre", taux: {} }, { regime: "oss", taux: { DE: 19.5 } }, { regime: "oss", taux: { de: 1900 } }, { regime: "oss", taux: { DE: 20000 } }, "oss"])
       expect((await A.lireOffre(net(() => rep({ ...avec, tva })).n))?.tva).toBeNull();
     expect(seen[0]!.url).toBe("https://shh.test/api/paiement");
-    expect(seen[0]!.init.credentials).toBe("omit");
+    expect(seen[0]!.init.credentials).toBe("same-origin");
     expect(seen[0]!.init.redirect).toBe("error");
     expect(await A.lireOffre(net(() => rep({ error: "not_found" }, 404)).n)).toBeNull();
     expect(await A.lireOffre(net(() => rep({ v: 2, moyens: [], pays: [], bientot: [] })).n)).toBeNull();

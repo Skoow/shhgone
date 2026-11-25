@@ -36,12 +36,12 @@ const errorOf = async (f: () => Promise<unknown>) => {
 };
 
 describe("production (source.verified.ts)", () => {
-  it("le .wasm est lu avec son empreinte, sans cookie ni redirection", async () => {
+  it("le .wasm est lu avec son empreinte, même origine, sans redirection", async () => {
     const f = vi.fn(async () => new Response(new Uint8Array([1, 2, 3])));
     vi.stubGlobal("fetch", f);
     const { wasmBytes } = await import("./source.verified");
     expect(new Uint8Array(await wasmBytes())).toEqual(new Uint8Array([1, 2, 3]));
-    expect(f.mock.calls).toEqual([["/assets/engine-AbCd1234.wasm", { integrity: "sha384-moteur", credentials: "omit", redirect: "error" }]]);
+    expect(f.mock.calls).toEqual([["/assets/engine-AbCd1234.wasm", { integrity: "sha384-moteur", credentials: "same-origin", redirect: "error" }]]);
   });
 
   it("octets refusés par le navigateur (empreinte), coupure, statut d'erreur, corps interrompu : Error(\"reseau\")", async () => {
@@ -73,7 +73,7 @@ describe("production (source.verified.ts)", () => {
     const { startWorker } = await import("./source.verified");
     await startWorker();
     await startWorker();
-    expect(f.mock.calls).toEqual([["/assets/engine-kdf-EfGh5678.js", { integrity: "sha384-worker", credentials: "omit", redirect: "error" }]]);
+    expect(f.mock.calls).toEqual([["/assets/engine-kdf-EfGh5678.js", { integrity: "sha384-worker", credentials: "same-origin", redirect: "error" }]]);
     expect(made).toEqual([
       { url: "blob:https://shh.test/b1", opts: undefined },
       { url: "blob:https://shh.test/b1", opts: undefined },

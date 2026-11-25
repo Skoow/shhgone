@@ -7,7 +7,7 @@ import { integrity, src } from "virtual:shh-salon";
 
 export async function salonWasmBytes(): Promise<ArrayBuffer> {
   try {
-    const res = await fetch(src, { integrity, credentials: "omit", redirect: "error" });
+    const res = await fetch(src, { integrity, credentials: "same-origin", redirect: "error" });
     if (!res.ok) throw new Error("reseau");
     return await res.arrayBuffer();
   } catch {

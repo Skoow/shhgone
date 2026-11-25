@@ -12,7 +12,7 @@ export async function jetonsWasmBytes(): Promise<ArrayBuffer> {
       const b = await readFile(WASM);
       return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
     }
-    const res = await fetch(WASM, { credentials: "omit", redirect: "error" });
+    const res = await fetch(WASM, { credentials: "same-origin", redirect: "error" });
     if (!res.ok) throw new Error("reseau");
     return await res.arrayBuffer();
   } catch {

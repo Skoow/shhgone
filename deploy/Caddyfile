@@ -97,15 +97,12 @@
 #   - /acces/<jeton> : pose le témoin __Host-shh_preprod=<jeton> (30 jours) et redirige vers / ;
 #     le propriétaire ouvre ce lien une fois par appareil ;
 #   - une requête qui porte le jeton : témoin __Host-shh_preprod (navigations du propriétaire,
-#     WebSocket), ou en-tête X-Shh-Preprod (contrôles de deploy.sh et preprod.sh) ;
+#     appels du site, fichiers, WebAssembly, WebSocket : le site envoie tout en
+#     credentials: "same-origin"), ou en-tête X-Shh-Preprod (contrôles de deploy.sh et preprod.sh) ;
 #   - les webhooks des prestataires de paiement (POST, trois chemins exacts) : ils arrivent sans
-#     témoin, leur signature est vérifiée par le serveur Go ;
-#   - une requête qui n'est pas une navigation et que le navigateur dit venir d'une page de cette
-#     origine (Sec-Fetch-Site: same-origin, hors Sec-Fetch-Mode: navigate) : le site envoie ses
-#     appels (API du salon et du paiement, WebAssembly, preuve anti-robot) avec
-#     credentials: "omit", donc SANS témoin ; sans cette exception, il ne marcherait pas.
-#     LIMITE : un client qui n'est pas un navigateur peut écrire cet en-tête et joindre l'API
-#     (README §15, risque PP1).
+#     témoin, leur signature est vérifiée par le serveur Go.
+# Aucune exception sur Sec-Fetch-Site (risque PP1, README §15, corrigé) : cet en-tête s'écrit à la
+# main ; seul le jeton ouvre la préproduction.
 # Le défi ACME (port 80, ou TLS-ALPN) est traité par Caddy avant ces blocs : aucune exemption.
 # Comparaisons de chaînes de Caddy, pas en temps constant : acceptable avec 256 bits (README §15).
 # Ni le jeton, ni le témoin n'atteignent le serveur Go (Cookie et X-Shh-Preprod retirés plus
@@ -143,10 +140,6 @@
 		not {
 			method POST
 			path_regexp ^/api/paiement/webhook/(stripe|paypal|nowpayments)$
-		}
-		not {
-			header Sec-Fetch-Site same-origin
-			not header Sec-Fetch-Mode navigate
 		}
 	}
 	handle @preprod_maintenance {
@@ -242,7 +235,14 @@ www.{$SHH_DOMAIN} {
 		# Jeton de préproduction (contrôles de deploy.sh) : reste à Caddy.
 		header_up -X-Shh-Preprod
 		header_up -Sec-CH-UA*
-		header_up -Sec-Fetch-*
+		# Sec-Fetch-Site seul reste (refus des requêtes intersites sur /api par le serveur Go, qui
+		# protège les quotas d'une adresse partagée) : il ne dit que d'où vient la requête
+		# (same-origin, same-site, cross-site, none), rien du navigateur ni de la personne. Les
+		# autres Sec-Fetch-* connus sont retirés un à un (Caddy n'a pas de joker « tout sauf »).
+		header_up -Sec-Fetch-Mode
+		header_up -Sec-Fetch-Dest
+		header_up -Sec-Fetch-User
+		header_up -Sec-Fetch-Storage-Access
 		header_up -DNT
 		header_up -Priority
 

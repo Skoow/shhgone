@@ -108,7 +108,7 @@ describe("xhrUploader", () => {
 });
 
 describe("fetchUploader", () => {
-  it("PUT par fetch (credentials omit, redirect error, signal) ; octets annoncés à l'acquittement", async () => {
+  it("PUT par fetch (credentials same-origin, redirect error, signal) ; octets annoncés à l'acquittement", async () => {
     const inits: RequestInit[] = [];
     const f = vi.fn(async (_: RequestInfo | URL, init?: RequestInit) => {
       inits.push(init!);
@@ -119,7 +119,7 @@ describe("fetchUploader", () => {
     const body = new Uint8Array(10);
     expect(await fetchUploader(f as unknown as typeof fetch)(URL_, { A: "b" }, body, (n) => seen.push(n), ac.signal)).toEqual({ status: 204, json: null });
     expect(f.mock.calls[0]![0]).toBe(URL_);
-    expect(inits[0]).toMatchObject({ method: "PUT", headers: { A: "b" }, body, credentials: "omit", redirect: "error", signal: ac.signal });
+    expect(inits[0]).toMatchObject({ method: "PUT", headers: { A: "b" }, body, credentials: "same-origin", redirect: "error", signal: ac.signal });
     expect(seen).toEqual([10]);
   });
   it("erreur HTTP : JSON rendu, aucun octet annoncé ; coupure : TypeError", async () => {

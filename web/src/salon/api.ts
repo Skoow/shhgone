@@ -4,7 +4,8 @@
 // - secrets en en-tête seulement, en base64url sans bourrage : X-Shh-Access (K_accès_s),
 //   X-Shh-Manage (J_gestion = jetonGestion(S_gestion), JAMAIS S_gestion : spec salon v3 §15.2),
 //   X-Shh-Membre (jeton de membre) ; rien dans l'adresse ;
-// - JSON strict (clés exactes, jamais null) ; sans cookie, sans redirection, un seul essai ;
+// - JSON strict (clés exactes, jamais null) ; credentials: "same-origin" (témoin de
+//   préproduction seulement, retiré par Caddy), sans redirection, un seul essai ;
 // - erreurs : SalonError (statut, code du serveur, essais restants, délai) ; coupure réseau :
 //   Error("reseau") ; réponse 2xx mal formée : Error("reponse_invalide").
 import { b64u, unb64u } from "../engine/pure";
@@ -76,7 +77,7 @@ async function appel(n: Net, method: "GET" | "POST", path: string, headers: Reco
       method,
       headers: body === undefined ? headers : { ...headers, "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       cache: "no-store",
     });
@@ -216,7 +217,7 @@ export async function creerPiece(n: Net, jeton: string, bucket: number, vocal: b
 
 async function brut(n: Net, method: "GET" | "PUT" | "POST", path: string, headers: Record<string, string>, body?: BodyInit): Promise<Response> {
   try {
-    return await n.fetch(n.origin + "/api/salons" + path, { method, headers, body, credentials: "omit", redirect: "error", cache: "no-store" });
+    return await n.fetch(n.origin + "/api/salons" + path, { method, headers, body, credentials: "same-origin", redirect: "error", cache: "no-store" });
   } catch {
     throw new Error("reseau");
   }

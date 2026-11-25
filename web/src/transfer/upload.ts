@@ -39,6 +39,8 @@ export const xhrUploader: Uploader = (url, headers, body, onBytes, signal) =>
     const onAbort = () => x.abort();
     const end = () => signal?.removeEventListener("abort", onAbort);
     x.open("PUT", url);
+    // Aucun cookie vers une autre origine ; la même origine reçoit le témoin de préproduction
+    // (comme credentials: "same-origin" de fetch).
     x.withCredentials = false;
     for (const [k, v] of Object.entries(headers)) x.setRequestHeader(k, v);
     x.upload.onprogress = (e) => onBytes(e.loaded);
@@ -66,7 +68,7 @@ export const xhrUploader: Uploader = (url, headers, body, onBytes, signal) =>
 /** Node, tests, ou `fetch` fourni par l'appelant : les octets ne sont annoncés qu'à l'acquittement. */
 export function fetchUploader(f: typeof fetch): Uploader {
   return async (url, headers, body, onBytes, signal) => {
-    const r = await f(url, { method: "PUT", headers, body, credentials: "omit", redirect: "error", signal });
+    const r = await f(url, { method: "PUT", headers, body, credentials: "same-origin", redirect: "error", signal });
     let text: string;
     try {
       text = await r.text();

@@ -27,7 +27,7 @@ const errorOf = async (f: () => Promise<unknown>) => {
 };
 
 describe("production (pow-source.verified.ts)", () => {
-  it("script lu une fois avec son empreinte, sans cookie ni redirection ; un Worker neuf par preuve, depuis un Blob de l'origine (script classique)", async () => {
+  it("script lu une fois avec son empreinte, même origine, sans redirection ; un Worker neuf par preuve, depuis un Blob de l'origine (script classique)", async () => {
     const f = vi.fn(async () => new Response("self.onmessage=0"));
     vi.stubGlobal("fetch", f);
     const blobs: Blob[] = [];
@@ -44,7 +44,7 @@ describe("production (pow-source.verified.ts)", () => {
     const { startPowWorker } = await import("./pow-source.verified");
     await startPowWorker();
     await startPowWorker();
-    expect(f.mock.calls).toEqual([["/assets/pow-worker-AbCd1234.js", { integrity: "sha384-pow", credentials: "omit", redirect: "error" }]]);
+    expect(f.mock.calls).toEqual([["/assets/pow-worker-AbCd1234.js", { integrity: "sha384-pow", credentials: "same-origin", redirect: "error" }]]);
     expect(made).toEqual([
       { url: `blob:${ORIGIN}/b1`, opts: undefined },
       { url: `blob:${ORIGIN}/b1`, opts: undefined },

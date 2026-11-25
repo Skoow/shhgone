@@ -5,7 +5,8 @@
 //   (ni /api/shares, ni /api/manage, ni les autres routes du salon), sauf POST /api/salons, la
 //   création d'un salon (creerSalon, conception §10.4 ; écrans du salon) ;
 // - JSON strict : clés exactes, jamais `null` (le serveur le refuse), secrets en base64url sans
-//   bourrage ; rien dans l'URL ; sans cookie (credentials: "omit"), sans redirection ;
+//   bourrage ; rien dans l'URL ; credentials: "same-origin" (témoin de préproduction seulement, retiré par
+//   Caddy), sans redirection ;
 // - un seul essai : aucune route du compte n'est rejouée d'elle-même (une écriture de
 //   coffre ou une connexion ne se renvoient qu'à la demande de l'écran).
 // Erreurs : CompteError (code du serveur, date, gen, Retry-After) ; coupure
@@ -95,7 +96,7 @@ async function appel(n: Net, method: "GET" | "POST" | "PUT", route: string, opts
       method,
       headers,
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       cache: "no-store",
       ...(opts.keepalive ? { keepalive: true } : {}),
@@ -454,7 +455,7 @@ export async function creerSalon(n: Net, session: string, entetes: { acces: stri
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Shh-Session": session, "X-Shh-Access": entetes.acces, "X-Shh-Manage": entetes.gestion },
       body: JSON.stringify(corps),
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       cache: "no-store",
     });

@@ -20,14 +20,14 @@ const b64 = (b: Uint8Array) => Buffer.from(b).toString("base64url");
 const h = (v: Vu) => v.init.headers as Record<string, string>;
 
 describe("salon/api", () => {
-  it("meta : X-Shh-Access seul, sans cookie ni redirection", async () => {
+  it("meta : X-Shh-Access seul, même origine, sans redirection", async () => {
     const { n, vus } = net(200, { expires_in_s: 3600, salt: b64(new Uint8Array(16).fill(2)), kdf_ops: 3, kdf_mem: 67108864 });
     const m = await meta(n, k32);
     expect(m).toMatchObject({ expiresInS: 3600, kdfOps: 3, kdfMem: 67108864 });
     expect(m.salt.length).toBe(16);
     expect(vus[0]!.url).toBe("https://shhgone.test/api/salons/meta");
     expect(h(vus[0]!)).toEqual({ "X-Shh-Access": b64(k32) });
-    expect(vus[0]!.init).toMatchObject({ method: "GET", credentials: "omit", redirect: "error" });
+    expect(vus[0]!.init).toMatchObject({ method: "GET", credentials: "same-origin", redirect: "error" });
   });
   it("rejoindre : preuve dans le corps ; créateur : X-Shh-Manage = jeton de gestion", async () => {
     const rep = { member_token: "T".repeat(43), seat: 0, seq: 4, nonce_arrivee: b64(new Uint8Array(16).fill(3)), expires_in_s: 60, max_members: 4, members_can_destroy: false, budget_left: 10 };

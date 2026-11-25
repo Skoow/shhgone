@@ -7,7 +7,7 @@ import { integrity, src } from "virtual:shh-lang";
 export const bundled: Record<string, string> | undefined = undefined;
 
 export async function fetchEn(): Promise<unknown> {
-  const res = await fetch(src, { integrity, credentials: "omit", redirect: "error" });
+  const res = await fetch(src, { integrity, credentials: "same-origin", redirect: "error" });
   if (!res.ok) throw new Error("reseau");
   return JSON.parse(await res.text()) as unknown;
 }

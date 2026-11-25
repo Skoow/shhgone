@@ -78,7 +78,7 @@ describe("règles de sources", () => {
   it("pas de fetch( ni XMLHttpRequest dans les écrans", () => {
     expect(offenders(/\bfetch\s*\(|XMLHttpRequest/, (r) => inUiDir(r) && r !== "captcha/pow-source.verified.ts")).toEqual([]);
     const pow = files.find((f) => f.rel === "captcha/pow-source.verified.ts")!.text;
-    expect(pow).toMatch(/fetch\(src, \{ integrity, credentials: "omit", redirect: "error" \}\)/);
+    expect(pow).toMatch(/fetch\(src, \{ integrity, credentials: "same-origin", redirect: "error" \}\)/);
     expect(pow).not.toMatch(/\/api\/|XMLHttpRequest/);
   });
   it("aucun stockage navigateur (hors historique local et retours, ci-dessous)", () =>
@@ -272,6 +272,10 @@ describe("règles de sources", () => {
     .map((f) => ({ ...f, text: readFileSync(f.abs, "utf8") }));
   it("jamais setAttribute(\"style\") (CSSOM seulement, S6), dans tout src/", () =>
     expect(everySource.filter((f) => /setAttribute\s*\(\s*["'`]style["'`]/.test(f.text)).map((f) => f.rel)).toEqual([]));
+  // Préproduction (risque PP1) : toute requête du site porte le témoin __Host-shh_preprod
+  // (Caddy le retire avant le serveur Go) ; jamais de cookie vers une autre origine.
+  it("credentials: \"same-origin\" seulement (ni omit, ni include), dans tout src/", () =>
+    expect(everySource.filter((f) => /credentials:\s*["'`](?!same-origin["'`])|withCredentials\s*=\s*true/.test(f.text)).map((f) => f.rel)).toEqual([]));
   it("aucun document.cookie, dans tout src/ (démo comprise)", () =>
     expect(everySource.filter((f) => /document\.cookie/.test(f.text)).map((f) => f.rel)).toEqual([]));
   it("getImageData seulement sous viewers/ (aucune lecture des pixels du contenu)", () =>

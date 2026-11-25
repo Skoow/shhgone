@@ -123,7 +123,7 @@ async function send<T>(c: Ctx, q: Req, read: (r: Response) => Promise<T>): Promi
         method: q.method,
         headers: q.headers,
         body: q.body,
-        credentials: "omit",
+        credentials: "same-origin",
         redirect: "error",
         keepalive: q.keepalive,
         signal: q.signal,

@@ -15,7 +15,7 @@ function workerScript(): Promise<string> {
   if (!script) {
     script = (async () => {
       try {
-        const res = await fetch(src, { integrity, credentials: "omit", redirect: "error" });
+        const res = await fetch(src, { integrity, credentials: "same-origin", redirect: "error" });
         if (!res.ok) throw new Error("reseau");
         const b = await res.arrayBuffer();
         return URL.createObjectURL(new Blob([b], { type: "text/javascript" }));

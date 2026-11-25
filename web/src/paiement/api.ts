@@ -2,7 +2,8 @@
 // server/internal/api/handlers_paiement.go). SEUL fichier du site qui écrit l'en-tête X-Shh-Pass
 // (source-rules.test.ts), et seulement vers /api/paiement/* :
 // - le pass P (32 octets) part en base64url dans l'en-tête, jamais dans l'adresse ni dans un corps ;
-// - sans cookie (credentials: "omit"), sans redirection, rien dans l'adresse ;
+// - credentials: "same-origin" (témoin de préproduction ; le site ne pose aucun cookie et Caddy
+//   retire l'en-tête Cookie), sans redirection, rien dans l'adresse ;
 // - aucune donnée personnelle : ni nom, ni e-mail ; le pays seul, pour la TVA (jamais gardé par
 //   le serveur) ;
 // - l'adresse de la page hébergée rendue par le serveur est revérifiée ici contre la liste fermée
@@ -64,7 +65,7 @@ const chaines = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) =
 
 async function appel(n: Net, route: string, init: RequestInit): Promise<Response | null> {
   try {
-    return await n.fetch(`${n.origin}/api/paiement${route}`, { ...init, credentials: "omit", redirect: "error", cache: "no-store" });
+    return await n.fetch(`${n.origin}/api/paiement${route}`, { ...init, credentials: "same-origin", redirect: "error", cache: "no-store" });
   } catch {
     return null;
   }
@@ -229,13 +230,13 @@ export type Defi = { challenge: Record<string, unknown>; shownAt: string; receiv
 
 /**
  * Lit un défi pour `commander` (la page Offres est une page
- * d'information, elle ne doit pas tirer le moteur de chiffrement par transfer/). Sans cookie,
- * sans redirection. « limite » : 429 ; null : autre échec (réseau, réponse mal formée).
+ * d'information, elle ne doit pas tirer le moteur de chiffrement par transfer/). Même origine
+ * seulement (credentials: "same-origin"), sans redirection. « limite » : 429 ; null : autre échec (réseau, réponse mal formée).
  */
 export async function lireDefi(n: Net = netParDefaut()): Promise<Defi | "limite" | null> {
   let r: Response;
   try {
-    r = await n.fetch(n.origin + "/api/captcha", { method: "GET", credentials: "omit", redirect: "error", cache: "no-store" });
+    r = await n.fetch(n.origin + "/api/captcha", { method: "GET", credentials: "same-origin", redirect: "error", cache: "no-store" });
   } catch {
     return null;
   }
