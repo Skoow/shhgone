@@ -1,10 +1,10 @@
 package main
 
-// Relais de sortie (conception du paiement §4, S1 ; d'abord écrit pour le relais SMTP du compte
-// par e-mail, retiré le 22 novembre) : les seules sorties du serveur Go vers Internet, une par
-// cible (API des trois prestataires de paiement). Le serveur reste sur le réseau Docker interne
-// (aucune route vers Internet) ; son /etc/hosts fait pointer le nom de l'API vers ce relais, qui
-// recopie les octets, dans les deux sens, vers une seule cible fixée au démarrage (hôte:port).
+// Relais de sortie (conception du paiement §4) : les seules sorties du serveur Go vers Internet,
+// une par cible (API des trois prestataires de paiement). Le serveur reste sur le réseau Docker
+// interne (aucune route vers Internet) ; son /etc/hosts fait pointer le nom de l'API vers ce
+// relais, qui recopie les octets, dans les deux sens, vers une seule cible fixée au démarrage
+// (hôte:port).
 // Le client ne choisit rien : quoi qu'il envoie, la connexion part vers cette cible. TLS est de
 // bout en bout entre le serveur Go et le prestataire (certificat vérifié pour ce nom par le
 // serveur) : le relais ne voit que des octets chiffrés. Il n'écrit rien (ni journal, ni

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Restauration de comptes.db ou de paiements.db depuis une sauvegarde chiffrée par
-# deploy/sauvegarder.sh (conception du compte §21.13 ; plan, lot 8 ; conception du paiement §5.1).
+# deploy/sauvegarder.sh (conception du compte §21.13 ; conception du paiement §5.1).
 # La base est reconnue à ses tables (comptes, sessions, bannis, ou passes, commandes, refs).
 # Linux, outils : age, sqlite3, coreutils.
 #
 #   restaurer.sh verifier <sauvegarde.age> <identité age>
-#       Essai mensuel (décision du propriétaire du 14 novembre) : déchiffre en mémoire
-#       (/dev/shm), vérifie l'intégrité et les tables, affiche la version du schéma et le
-#       nombre de comptes, efface le clair. Ne touche à aucune base.
+#       Essai mensuel : déchiffre en mémoire (/dev/shm), vérifie l'intégrité et les tables,
+#       affiche la version du schéma et le nombre de comptes, efface le clair. Ne touche à
+#       aucune base.
 #
 #   restaurer.sh installer [--remplacer] <sauvegarde.age> <identité age> <dossier de données>
 #       Sur la machine, SERVEUR ARRÊTÉ : déchiffre dans le dossier de données lui-même (le clair
@@ -22,8 +22,9 @@
 #
 # Règles (README §12) : toujours la sauvegarde la PLUS RÉCENTE (les suppressions de comptes
 # antérieures y sont appliquées ; en restaurer une plus ancienne ferait revenir des comptes
-# supprimés) ; la restauration ne sert à rien sans la même clé du serveur (K_serveur,
-# copie hors ligne). L'identité age peut être protégée par une phrase (age la demande).
+# supprimés) ; sans la même clé du serveur (K_serveur, copie hors ligne), les comptes restent
+# utilisables mais l'unicité des pseudos est perdue (README §12.2). L'identité age peut être
+# protégée par une phrase (age la demande).
 #
 # Codes de sortie : 0 réussite, 1 échec, 2 erreur d'usage.
 set -euo pipefail

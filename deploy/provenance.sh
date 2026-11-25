@@ -11,7 +11,7 @@
 # commandes ; il n'existe AUCUNE option, variable ou commande pour sauter la vérification
 # (spec §28.8, C2).
 #
-# L'image elle-même (décision du propriétaire du 25 novembre) : construite par release.yml sur
+# L'image elle-même : construite par release.yml sur
 # la même étiquette (deux builds sur deux machines, même empreinte exigée), publiée sur
 # ghcr.io/skoow/shhgone et signée sans clé par la même identité ; son empreinte est liée au
 # manifeste par image.json, signé lui aussi, que deploy.sh exige égal, octet pour octet, à celui
@@ -22,7 +22,7 @@
 # (journal public Rekor). Ce qu'elle ne prouve pas : que ce code est sain.
 
 # Dépôt public et identité exacte du signataire. Le nom du dépôt est celui que GitHub inscrit
-# dans le certificat (remote du dépôt, 24 novembre : Skoow/shhgone).
+# dans le certificat (remote du dépôt : Skoow/shhgone).
 readonly PROVENANCE_DEPOT=Skoow/shhgone
 readonly PROVENANCE_EMETTEUR=https://token.actions.githubusercontent.com
 # Seul dépôt d'images accepté (en minuscules, comme l'exige le registre), public : le serveur le

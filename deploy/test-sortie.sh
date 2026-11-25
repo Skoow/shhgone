@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Test des sorties (conception du paiement §4, S1 ; plan 2026-11-22-compte-passkey.md, lot S8) :
-# le serveur Go n'a aucune route vers Internet, même compte ou paiement activé ; le compte par
-# passkey n'a aucune sortie (plus de relais SMTP depuis le 22 novembre) ; les seules sorties
-# sont les relais des prestataires de paiement, qui ne joignent chacun que l'hôte de son API,
-# sur 443.
+# Test des sorties (conception du paiement §4) : le serveur Go n'a aucune route vers Internet,
+# même compte ou paiement activé ; le compte par passkey n'a aucune sortie (aucun relais SMTP) ;
+# les seules sorties sont les relais des prestataires de paiement, qui ne joignent chacun que
+# l'hôte de son API, sur 443.
 #
 # 1. Statique (docker compose config, sans démon) : sur la vraie compose.yaml,
-#    - SHH_COMPTES vaut "1" (décision D8 du 19 novembre), sans aucune variable SHH_SMTP_* ni
+#    - SHH_COMPTES vaut "1", sans aucune variable SHH_SMTP_* ni
 #      SHH_MAIL_FROM ; aucun relais SMTP ; sans profil, ni relais ni réseau « sortie » ; aucun
 #      service ne publie de port ;
 #    - le serveur n'est que sur le réseau « interne » (internal: true) ;
@@ -32,7 +31,6 @@
 # Outils : docker (Compose 2.24 ou plus), jq ; partie dynamique : openssl, python3.
 # Code de sortie : 0 tout passe ; 1 un contrôle échoue ; 2 erreur d'usage ; 3 partie
 # dynamique non faite (aucun démon Docker) : rien n'est alors prouvé sur le réseau réel.
-set -euo pipefail
 set -euo pipefail
 export LC_ALL=C
 
@@ -87,9 +85,9 @@ tous=paiement-stripe,paiement-paypal,paiement-nowpayments
 cfg "$tous" >"$work/tous.json" || die "docker compose config (tous les profils) échoue"
 j() { jq -e "$1" "$2" >/dev/null; }
 cfg appels >"$work/appels.json" || die "docker compose config (profil appels) échoue"
-S=$work/sans.json A=$work/sans.json T=$work/tous.json P=$work/appels.json
+S=$work/sans.json T=$work/tous.json P=$work/appels.json
 
-check "SHH_COMPTES vaut \"1\" dans compose.yaml (décision D8 du 19 novembre)" j '.services.shhdrop.environment.SHH_COMPTES == "1"' "$A"
+check "SHH_COMPTES vaut \"1\" dans compose.yaml" j '.services.shhdrop.environment.SHH_COMPTES == "1"' "$S"
 check "compte par passkey : aucune variable d'e-mail (SHH_SMTP_*, SHH_MAIL_FROM)" \
 	j '[.services[] | .environment // {} | keys[] | select(startswith("SHH_SMTP_") or . == "SHH_MAIL_FROM")] == []' "$T"
 check "aucun relais SMTP, quel que soit le profil" j '[.services | keys[] | select(. == "relais-smtp")] == []' "$T"
@@ -134,7 +132,7 @@ check "tous les profils : aucun port publié" j '[.services[] | .ports // [] | l
 check "tous les profils : aucune variable de secret en valeur" \
 	j '[.services[] | .environment // {} | keys[] | select(test("PASSWORD|MDP|SECRET|TOKEN|CLE|KEY|JETON|IPN|WEBHOOK_FILE") and (endswith("_FILE") or endswith("_SHA256") or . == "SHH_PREPROD_JETON" | not))] == []' "$T"
 # shellcheck disable=SC2016 # filtre jq
-check "caddy : non root (65532), aucune capacité, no-new-privileges, lecture seule (D9, 22 novembre)" \
+check "caddy : non root (65532), aucune capacité, no-new-privileges, lecture seule" \
 	j '.services.caddy | .user == "65532:65532" and .cap_drop == ["ALL"] and (.cap_add // [] | length) == 0 and (.security_opt | index("no-new-privileges:true")) != null and .read_only == true' "$T"
 # jr <filtre> : filtre jq sur la configuration de tous les profils, avec $n (relais), $ip et $h.
 jr() { jq -e --arg n "$n" --arg ip "$ip" --arg h "$h" "$1" "$T" >/dev/null; }

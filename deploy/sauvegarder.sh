@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sauvegarde quotidienne chiffrée de comptes.db et de paiements.db (conception du compte §21.13 ;
-# plan, lot 8 ; conception du paiement §5.1, S11 : perdre paiements.db perdrait les pass payés).
+# conception du paiement §5.1 : perdre paiements.db perdrait les pass payés).
 # Lancée par le minuteur systemd deploy/systemd/shhdrop-sauvegarde.timer, en root, sur la
 # machine (jamais dans le conteneur : le serveur Go n'a aucune sortie de plus pour elle).
 #

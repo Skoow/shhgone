@@ -153,7 +153,7 @@ r=$(machine conntrack)
 echo 432000 >"$r/proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established"
 refuse "conntrack 5 jours" "$r" "$SSHD_BON" "le ramener à 1800"
 
-# 7. Registres des connexions (IP5). Ubuntu 24.04 : wtmp, btmp, lastlog écrits par sshd.
+# 7. Registres des connexions. Ubuntu 24.04 : wtmp, btmp, lastlog écrits par sshd.
 for f in wtmp btmp lastlog; do
 	r=$(machine "registre-$f")
 	rm "$r/var/log/$f"
@@ -196,7 +196,7 @@ r=$(machine pam-commente)
 printf '#session optional pam_wtmpdb.so\n  # session optional pam_lastlog2.so\nsession optional pam_lastlogx.so\n' >>"$r/etc/pam.d/common-session"
 accepte "PAM : modules commentés ou autre nom" "$r" "$SSHD_BON"
 
-# 8. Minuteur de purge du journal (IP6).
+# 8. Minuteur de purge du journal.
 r=$(machine minuteur)
 rm "$r/etc/systemd/system/timers.target.wants/shhdrop-journal.timer"
 refuse "minuteur non activé" "$r" "$SSHD_BON" "shhdrop-journal.timer non activé"

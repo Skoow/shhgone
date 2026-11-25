@@ -50,7 +50,7 @@
 #                         redémarrage ; jamais une variable)
 #   SHH_ALERTE_FROM       expéditeur (« Shhgone <alertes@shhgone.com> » ou une adresse)
 #   Ces réglages ne servent qu'aux alertes de l'exploitant, envoyées depuis la machine : le
-#   serveur Go et le compte (par passkey depuis le 22 novembre) n'envoient aucun e-mail, et
+#   serveur Go et le compte (par passkey) n'envoient aucun e-mail, et
 #   SHH_SMTP_* / SHH_MAIL_FROM (anciens réglages du compte) font refuser deploy.sh.
 #   SHH_DOMAIN            nom du site (certificat, DNS, échéance du domaine)
 #   SHH_DATA_ROOT         racine du volume chiffré (défaut /srv/shhdrop)

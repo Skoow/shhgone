@@ -1,6 +1,6 @@
 package main
 
-// Gardes du relais TURN autour de la bibliothèque (chasse aux défauts du 21 novembre) :
+// Gardes du relais TURN autour de la bibliothèque :
 //
 //   - écoute TCP bornée (ecouteBornee) : pion arrête pour toujours son écoute TCP à la première
 //     erreur d'Accept (EMFILE après une inondation de connexions muettes) et n'a ni plafond de

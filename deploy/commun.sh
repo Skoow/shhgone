@@ -90,22 +90,22 @@ export SHH_PREPROD SHH_PREPROD_JETON
 	die "compose.yaml : une seule ligne SHH_COMPTES attendue"
 comptes=$(sed -nE 's/^ +SHH_COMPTES: "([01])"$/\1/p' compose.yaml)
 [ "$comptes" = 0 ] || [ "$comptes" = 1 ] || die "compose.yaml : SHH_COMPTES doit valoir \"0\" ou \"1\""
-# Compte par e-mail, retiré le 22 novembre : une variable d'envoi d'e-mails restée dans
-# deploy/.env désigne un secret qui traîne ou une installation ancienne ; jamais ignorée.
+# Compte par e-mail retiré : une variable d'envoi d'e-mails restée dans deploy/.env désigne
+# un secret qui traîne ou une installation ancienne ; elle fait refuser, jamais ignorer.
 for v in $(compgen -v); do
 	case $v in
 	SHH_SMTP_* | SHH_MAIL_FROM) die "deploy/.env : $v ne sert plus (compte par e-mail retiré le 22 novembre, compte par passkey) : l'ôter (README §12)" ;;
 	esac
 done
 # rp.id des passkeys = hôte de SHH_ORIGIN (https://SHH_DOMAIN) : définitif, le changer rend
-# toutes les passkeys inutilisables (conception du compte par passkey R1, Q7 : shhgone.com).
+# toutes les passkeys inutilisables (conception du compte par passkey).
 if [ "$comptes" = 1 ] && [ "$SHH_DOMAIN" != shhgone.com ]; then
 	die "compte activé : SHH_DOMAIN doit valoir shhgone.com (identifiant des passkeys, définitif ; README §12)"
 fi
 profils=
 secrets=$SHH_DATA_ROOT/secrets
 
-# Paiement (README §13 ; conception du paiement §10, S1) : interrupteurs dans compose.yaml
+# Paiement (README §13 ; conception du paiement §10) : interrupteurs dans compose.yaml
 # seulement. Un prestataire est configuré quand ses fichiers de secrets sont là ; ce script pose
 # alors ses chemins (…_FILE) et démarre son relais, vers l'hôte de son API (production ou bac à
 # sable). Tout ce qui vient de deploy/.env pour ces chemins et ces hôtes est remplacé ici.
@@ -227,8 +227,8 @@ ports_turn() {
 # dc <état> <arguments de docker compose…>
 # « -f compose.yaml » explicite : sans lui, docker compose fusionne de lui-même un
 # compose.override.yaml posé à côté et suit COMPOSE_FILE (deploy/.env), qui pourraient changer
-# l'environnement du serveur sans rien dire (audit adverse du 13 novembre, stockage, H1). Un
-# seul fichier fait foi : celui de la copie du dépôt.
+# l'environnement du serveur sans rien dire. Un seul fichier fait foi : celui de la copie du
+# dépôt.
 # Même raison pour COMPOSE_PROFILES : posé ici, d'après compose.yaml seulement (une valeur venue
 # de deploy/.env démarrerait un relais, compte ou paiement désactivé).
 dc() {
@@ -239,7 +239,7 @@ dc() {
 }
 need_current() { etat_valide "$cur" || die "aucune version installée (deploy/.release absent)"; }
 
-# Contrôles de la machine, bloquants (spec §15.1, §22 ; audits de confidentialité P5, P6).
+# Contrôles de la machine, bloquants (spec §15.1, §22).
 preflight() {
 	local opts src
 	docker compose version >/dev/null 2>&1 || die "docker compose introuvable"
@@ -250,7 +250,7 @@ preflight() {
 		die "$SHH_DATA_ROOT n'est pas monté avec noatime (options : $opts)"
 	[ -d "$SHH_DATA_ROOT/data" ] && [ -d "$SHH_DATA_ROOT/caddy" ] ||
 		die "$SHH_DATA_ROOT doit contenir data/ et caddy/ (compte 65532) : voir le README"
-	# Caddy non root (D9, 22 novembre) : son dossier lui appartient, et la machine laisse un
+	# Caddy non root : son dossier lui appartient, et la machine laisse un
 	# compte ordinaire écouter sur 80 et 443.
 	[ "$(stat -c '%u:%g %a' "$SHH_DATA_ROOT/caddy")" = "65532:65532 700" ] ||
 		die "$SHH_DATA_ROOT/caddy doit appartenir à 65532:65532, mode 0700 (Caddy non root) : chown -R 65532:65532 $SHH_DATA_ROOT/caddy && chmod 0700 $SHH_DATA_ROOT/caddy"
@@ -292,7 +292,7 @@ preflight() {
 				die "$secrets/$f absent ou mal réglé : fichier du compte 65532, droits 0400 (README §13)"
 		done
 	fi
-	# Journaux de la machine (README §1 ; inventaire des adresses IP du 22 novembre, journaux.sh) :
+	# Journaux de la machine (README §1, journaux.sh) :
 	# aucun syslog ni ancien journal sur le disque, journald en mémoire une heure au plus, sshd
 	# silencieux, ufw sans journal, suivi des connexions ramené à 30 min, registres des connexions
 	# (wtmp, btmp, lastlog, wtmpdb, lastlog2) vers /dev/null, minuteur de purge du journal. Bloquant.

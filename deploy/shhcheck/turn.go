@@ -1,7 +1,7 @@
 package main
 
 // Relais TURN des appels audio et vidéo du salon (conception des appels,
-// docs/superpowers/specs/2026-11-20-appels-design.md) : dans notre image, lancé par compose.yaml
+// docs/conception/specs/2026-11-20-appels-design.md) : dans notre image, lancé par compose.yaml
 // à chaque installation, sans rien à installer sur la machine ni chez les utilisateurs.
 //
 //	shhcheck turn
@@ -26,7 +26,7 @@ package main
 // participants d'un appel passent par ce relais (politique « relais seulement » du site) : le
 // correspondant d'une allocation est toujours une autre allocation, sur l'adresse du relais et
 // dans sa plage. Le relais n'est donc ni un mandataire ouvert vers Internet, ni un rebond vers
-// les services de la machine ou un réseau interne (revue du 21 novembre).
+// les services de la machine ou un réseau interne.
 
 import (
 	"errors"

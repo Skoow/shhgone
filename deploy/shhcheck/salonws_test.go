@@ -1,6 +1,6 @@
 package main
 
-// Essai du WebSocket du salon à travers Caddy (plan C-2 Task 17, Review Focus 3 ; spec §36 S2),
+// Essai du WebSocket du salon à travers Caddy (spec §36 S2),
 // lancé par deploy/test-proxy.sh, qui pose les variables ci-dessous ; sans elles, le test est
 // sauté (go vet et go test de ce module restent possibles hors du banc). Bibliothèque standard
 // seulement, comme shhcheck : le client WebSocket (RFC 6455, HTTP/1.1, trames masquées) est

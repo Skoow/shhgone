@@ -1,7 +1,7 @@
-# Purge du journal de la machine (README §1 ; inventaire des adresses IP du 22 novembre, IP6) :
-# journald n'applique MaxRetentionSec qu'en écrivant ; sur une machine calme, une entrée
-# (adresse vue par sshd ou le noyau) pouvait rester plus longtemps en mémoire. Ferme le fichier
-# en cours, puis efface les fichiers fermés dont la dernière entrée a plus d'une heure.
+# Purge du journal de la machine (README §1) : journald n'applique MaxRetentionSec qu'en
+# écrivant ; sur une machine calme, une entrée (adresse vue par sshd ou le noyau) pourrait
+# rester plus longtemps en mémoire. Ferme le fichier en cours, puis efface les fichiers fermés
+# dont la dernière entrée a plus d'une heure.
 # Installation : copier ce fichier et shhdrop-journal.timer dans /etc/systemd/system/, puis :
 #   systemctl daemon-reload && systemctl enable --now shhdrop-journal.timer
 # (deploy.sh refuse d'installer tant que le minuteur n'est pas activé.)

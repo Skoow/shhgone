@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Test de la sauvegarde et de la restauration de comptes.db (conception du compte §21.13 ;
-# plan, lot 8) et de paiements.db (conception du paiement §5.1, S11), sur des données factices,
-# en mémoire (/dev/shm), avec le vrai serveur Go.
+# Test de la sauvegarde et de la restauration de comptes.db (conception du compte §21.13) et de
+# paiements.db (conception du paiement §5.1), sur des données factices, en mémoire (/dev/shm),
+# avec le vrai serveur Go.
 #
 # Ce qui est prouvé :
 #   1. un compte de test est créé par le vrai parcours (ALTCHA, inscription/debut, passkey ES256

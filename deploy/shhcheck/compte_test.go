@@ -1,9 +1,9 @@
 package main
 
-// Compte de test pour deploy/test-restauration.sh (plan du compte par passkey, lot S8) : une
-// inscription complète par passkey (authentificateur ES256 joué ici, bibliothèque standard
-// seulement) puis, après sauvegarde, effacement et restauration de comptes.db, une connexion
-// par la même passkey et une récupération par la même clé. Lancé par le script, qui démarre le
+// Compte de test pour deploy/test-restauration.sh : une inscription complète par passkey
+// (authentificateur ES256 joué ici, bibliothèque standard seulement) puis, après sauvegarde,
+// effacement et restauration de comptes.db, une connexion par la même passkey et une
+// récupération par la même clé. Lancé par le script, qui démarre le
 // vrai serveur (SHH_COMPTES=1, origine http://localhost:<port>) et pose les variables
 // ci-dessous ; sans elles, le test est sauté.
 //

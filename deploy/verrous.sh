@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verrous de mise en ligne (décision du propriétaire du 25 novembre ; README §3.5, spec §28.7) :
+# Verrous de mise en ligne (README §3.5, spec §28.7) :
 # contre un compte GitHub volé qui pousserait un code piégé que le propriétaire installerait
 # ensuite par erreur. Trois verrous, tous obligatoires, sans option, variable ni commande pour
 # les sauter :

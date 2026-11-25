@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test du proxy : le Caddyfile de production devant le vrai serveur Go, sur la boucle locale.
 #
-# Ce qui est prouvé (audit de sécurité F3, audit de confidentialité P6, spec §28.7, §30, §36) :
+# Ce qui est prouvé (spec §28.7, §30, §36) :
 #   1. « caddy validate » et « caddy fmt --diff » sur deploy/Caddyfile ;
 #   2. X-Shh-Client-IP envoyé par le client est REMPLACÉ par l'adresse du pair TCP, et rien
 #      d'autre ne porte l'adresse ni ne décrit le navigateur vers le serveur ;
@@ -14,7 +14,7 @@
 #      (Alt-Svc) et écouté en UDP (la requête HTTP/3 elle-même n'est pas faite), 0-RTT refusé
 #      dans la configuration adaptée (« allow_0rtt »:false ; aucune requête 0-RTT n'est faite) ;
 #   6. aucune adresse de client dans ce que Caddy et le serveur écrivent (fichiers, sorties) ;
-#   7. salon (SHH_SALONS=1, plan C-2 Task 17) : Caddy garde l'en-tête Origin et laisse passer la
+#   7. salon (SHH_SALONS=1) : Caddy garde l'en-tête Origin et laisse passer la
 #      mise à niveau WebSocket ; un WebSocket de /api/salons/ws, ouvert depuis l'adresse repère
 #      du client (couverte par la section 6), reste ouvert SALON_GARDE secondes (75 par défaut,
 #      au-delà de « idle 1m ») avec les pings du serveur, puis répond encore ; une origine
@@ -107,7 +107,7 @@ handlers=$(SHH_DOMAIN=$name "$caddy" adapt --config "$here/Caddyfile" --adapter 
 	grep -o '"handler":"[a-z_]*"' | sort -u | tr '\n' ' ')
 check "gestionnaires du Caddyfile : headers, request_body, reverse_proxy, static_response, subroute ($handlers)" \
 	test "$handlers" = '"handler":"headers" "handler":"request_body" "handler":"reverse_proxy" "handler":"static_response" "handler":"subroute" '
-# Salon (§36 S2, plan C-2 Task 17) : aucun en-tête retiré vers l'amont n'est Origin ni un en-tête
+# Salon (§36 S2) : aucun en-tête retiré vers l'amont n'est Origin ni un en-tête
 # de la mise à niveau WebSocket (le serveur Go refuse un WebSocket sans Origin exact : 403).
 deleted=$(SHH_DOMAIN=$name "$caddy" adapt --config "$here/Caddyfile" --adapter caddyfile 2>/dev/null |
 	grep -o '"delete":\[[^]]*\]' | tr '\n' ' ')
@@ -137,7 +137,7 @@ fi
 # --- Démarrage ------------------------------------------------------------------------------
 # Serveur Go, comme en production : derrière le proxy, échec fermé.
 # Salon activé (SHH_SALONS=1) : SHH_ORIGIN est l'origine publique, telle que la voit le client ;
-# 4 Gio : une création de salon exige 2 Gio libres sous SHH_STORAGE_MAX (plan C-2, point 10).
+# 4 Gio : une création de salon exige 2 Gio libres sous SHH_STORAGE_MAX.
 env -i PATH="$PATH" SHH_DATA_DIR="$srv/data" SHH_STATIC_DIR="$static" SHH_LISTEN="127.0.0.1:$p_go" \
 	SHH_BEHIND_PROXY=1 SHH_STORAGE_MAX=4294967296 SHH_SALONS=1 SHH_ORIGIN="https://$name:$p_https" \
 	"$shhdrop" serve >"$srv/shhdrop.stdout" 2>"$srv/shhdrop.stderr" &
@@ -290,7 +290,7 @@ for path in / "/$asset" /api/captcha /x.js; do
 		[ "$got" = 1 ] || ko "$path : $h présent $got fois (attendu : 1)"
 	done
 	check "$path : ni Server, ni Via" bash -c "! grep -qiE '^(server|via):' '$cli/h-caddy$n'"
-	# HTTP/3 (13 novembre) : un seul Alt-Svc, qui annonce h3 sur le port HTTPS et rien d'autre.
+	# HTTP/3 : un seul Alt-Svc, qui annonce h3 sur le port HTTPS et rien d'autre.
 	check "$path : Alt-Svc annonce h3 sur le port $p_https, une fois" \
 		test "$(tr -d '\r' <"$cli/h-caddy$n" | grep -i '^alt-svc:')" = "Alt-Svc: h3=\":$p_https\"; ma=2592000"
 done
@@ -332,7 +332,7 @@ check "HTTP → HTTPS : « $loc »" test "$loc" = "308 https://$name/abc"
 curl -sS --noproxy '*' --max-time 10 --interface "$client" -o /dev/null -D "$cli/h-308" \
 	-H "Host: $name" "http://127.0.0.1:$p_http/abc"
 check "308 de Caddy : ni Server, ni Via" bash -c "! grep -qiE '^(server|via):' '$cli/h-308'"
-# www.<nom> (24 novembre) : HTTP vers HTTPS sur www d'abord (préchargement HSTS), puis 308 vers
+# www.<nom> : HTTP vers HTTPS sur www d'abord (préchargement HSTS), puis 308 vers
 # le site, chemin et requête gardés ; rien d'autre servi (ni le serveur Go ni l'écho : Caddy B,
 # devant l'écho, répond de même) ; mêmes réglages TLS que le site (bloc tls commun).
 www=www.$name
@@ -353,15 +353,15 @@ tlswww=$(SSL_CERT_FILE=$ca "$shhcheck" tls "127.0.0.1:$p_https" "$www" 2>&1) || 
 check "www : TLS 1.3 avec X25519MLKEM768 : « $tlswww »" test "$tlswww" = "TLS 1.3, X25519MLKEM768"
 check "www : TLS 1.2 refusé" bash -c "! curl -sS --noproxy '*' --max-time 10 --cacert '$ca' --tls-max 1.2 \
 	--resolve '$www:$p_https:127.0.0.1' -o /dev/null 'https://$www:$p_https/'"
-# HTTP/3 (décision du 13 novembre) : h1, h2 et h3 dans la configuration, et Caddy écoute en UDP
+# HTTP/3 : h1, h2 et h3 dans la configuration, et Caddy écoute en UDP
 # sur le port HTTPS (QUIC). La requête HTTP/3 elle-même n'est pas faite : le curl de la CI n'a
 # pas HTTP/3 ; l'annonce Alt-Svc est vérifiée en section 4.
 protos=$(SHH_DOMAIN=$name "$caddy" adapt --config "$here/Caddyfile" --adapter caddyfile 2>/dev/null |
 	grep -o '"protocols":\["h1","h2","h3"\]' | sort -u)
 check "Caddyfile : protocoles h1, h2 et h3" test "$protos" = '"protocols":["h1","h2","h3"]'
-# 0-RTT refusé sur chaque serveur (audit adverse du 13 novembre, 3e campagne, site, F1 : Caddy
-# 2.11.9 l'accepte par défaut en HTTP/3 ; une requête anticipée arrive sans adresse de client
-# vérifiée et /api répond 500). Autant de « allow_0rtt »:false que de serveurs, aucun « true ».
+# 0-RTT refusé sur chaque serveur (Caddy 2.11.9 l'accepte par défaut en HTTP/3 ; une requête
+# anticipée arrive sans adresse de client vérifiée et /api répond 500). Autant de
+# « allow_0rtt »:false que de serveurs, aucun « true ».
 adapte=$(SHH_DOMAIN=$name "$caddy" adapt --config "$here/Caddyfile" --adapter caddyfile 2>/dev/null)
 n_srv=$(grep -o '"protocols":\[' <<<"$adapte" | wc -l)
 n_0rtt=$(grep -o '"allow_0rtt":false' <<<"$adapte" | wc -l)
@@ -387,7 +387,7 @@ grep -h 'WebSocket à travers Caddy' "$cli/salon-ws.txt" | sed 's/^ */    /' || 
 
 # --- 6. Rien d'écrit avec l'adresse du client -----------------------------------------------
 # Erreurs provoquées depuis l'adresse repère : HTTP en clair sur le port TLS, TLS 1.2, nom
-# inconnu, connexion coupée. Par défaut, Caddy les écrirait avec l'adresse (audit P6).
+# inconnu, connexion coupée. Par défaut, Caddy les écrirait avec l'adresse.
 curl -sS --noproxy '*' --max-time 5 --interface "$client" -o /dev/null "http://127.0.0.1:$p_https/" 2>/dev/null || true
 curl -sS --noproxy '*' --max-time 5 --interface "$client" --cacert "$ca" --tls-max 1.2 \
 	--resolve "$name:$p_https:127.0.0.1" -o /dev/null "$A/" 2>/dev/null || true

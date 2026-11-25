@@ -9,7 +9,7 @@
 # Variables facultatives :
 #   SHH_STORAGE_MAX  plafond de stockage en octets (défaut : 200 Gio, spec §24)
 #   SHH_SHARE_EGRESS_MAX  octets servis au plus par un partage, toutes ouvertures confondues
-#                    (défaut : 250 Gio, au moins 32 Gio ; README §11, décision du 24 novembre)
+#                    (défaut : 250 Gio, au moins 32 Gio ; README §11)
 #   SHH_UPLOADS_MAX, SHH_DOWNLOADS_MAX, SHH_WATCH_MAX, SHH_WS_MAX, SHH_DISK_OPS_MAX : capacité
 #                    (défaut : calculée d'après GOMEMLIMIT et nofile, README §11)
 #   SHH_SALONS_MAX   salons vivants au plus (défaut : 200 ; 50 proposé pour un usage personnel),
@@ -21,11 +21,11 @@
 # du client, en IPv4 comme en IPv6, sans dépendre de la traduction d'adresses de Docker).
 # Le serveur Go est sur un réseau Docker interne, sans route vers Internet et sans port
 # publié : seul Caddy, depuis la machine, peut le joindre. Le compte par passkey n'a aucune
-# sortie (plus d'e-mail ni de relais SMTP depuis le 22 novembre). Paiement activé seulement
+# sortie (ni e-mail ni relais SMTP). Paiement activé seulement
 # (SHH_PAIEMENT: "1", ci-dessous) : un relais par prestataire configuré (même image,
 # « shhcheck relais », 172.30.53.4 Stripe, .5 PayPal, .6 NOWPayments, profils « paiement-… »),
 # sur ce réseau interne ET sur le réseau « sortie », vers le seul hôte de l'API du prestataire,
-# port 443 (README §13 ; conception du paiement §4, S1). Le serveur n'a donc AUCUNE route vers
+# port 443 (README §13 ; conception du paiement §4). Le serveur n'a donc AUCUNE route vers
 # Internet ; rien d'autre n'est joignable, même paiement activé.
 #
 # Secrets (clé du compte, prestataires) : fichiers de <SHH_DATA_ROOT>/secrets, montés en lecture
@@ -48,7 +48,7 @@ services:
       # Descripteurs : explicites, pour que les places calculées (au plus nofile / 8 par
       # catégorie, config/capacity.go) ne dépendent pas du réglage de Docker sur la machine.
       nofile: 65536
-    # Fils du système (audit du 13 novembre, D4) : Go crée un fil par appel système bloquant
+    # Fils du système : Go crée un fil par appel système bloquant
     # (lecture, écriture, fsync, SQLite). 256 pouvait être atteint sous un disque lent, et le
     # processus s'arrêtait net (« failed to create new OS thread »). 1 024, et les appels de
     # fichiers sont bornés par le serveur : SHH_DISK_OPS_MAX (64) pour les partages et les
@@ -56,7 +56,7 @@ services:
     # au pire. Le serveur lit cette limite et refuse de démarrer si ces fils en dépasseraient
     # la moitié (README §11).
     pids_limit: 1024
-    # Plafonds (audit du 11 novembre) : un abus ou une fuite de mémoire ne fait pas tomber la
+    # Plafonds : un abus ou une fuite de mémoire ne fait pas tomber la
     # machine (sshd, Caddy, déverrouillage du volume). Pire cas avec les places calculées
     # d'après GOMEMLIMIT (README §11) : 67 envois simultanés gardés en mémoire (≤ 4 Mio
     # chacun) = 268 Mio, plus 360 téléchargements avec un tampon de 256 Kio chacun = 90 Mio,
@@ -83,10 +83,9 @@ services:
       SHH_TRUSTED_PROXY: 172.30.53.1/32
       SHH_STORAGE_MAX: ${SHH_STORAGE_MAX:-214748364800}
       SHH_SHARE_EGRESS_MAX: ${SHH_SHARE_EGRESS_MAX:-}
-      # Salon (spec §39, plan C-2) : ACTIVÉ et OUVERT AU PUBLIC dès le premier déploiement
-      # (décisions du propriétaire du 19 et du 24 novembre, avec le compte, qui l'exige). Le
-      # propriétaire assume le risque sans l'avis du juriste sur l'hébergement des conversations
-      # (Q-SAL8, §39.7). Le couper : "0" ici.
+      # Salon (spec §39) : ACTIVÉ et OUVERT AU PUBLIC dès le premier déploiement (le compte
+      # l'exige). Risque assumé : ouvert sans l'avis du juriste sur l'hébergement des
+      # conversations (Q-SAL8, §39.7). Le couper : "0" ici.
       SHH_SALONS: "1"
       # Origine publique du site, comparée à l'en-tête Origin du WebSocket et copiée dans la CSP.
       # Vérifiée même salon coupé : une valeur refusée (majuscules dans SHH_DOMAIN, par exemple)
@@ -108,12 +107,11 @@ services:
       SHH_SEGMENTS_PER_MIN: ${SHH_SEGMENTS_PER_MIN:-}
       # Trames non volatiles rangées au plus par salon (100 000 ≈ 417 Mo de disque).
       SHH_SALON_FRAMES_MAX: ${SHH_SALON_FRAMES_MAX:-}
-      # Compte par passkey (conception docs/superpowers/specs/2026-11-22-compte-passkey-design.md,
-      # README §12) : ACTIVÉ et OUVERT AU PUBLIC dès le premier déploiement (décision D8 du
-      # propriétaire, 19 novembre, confirmée le 24 novembre). Le propriétaire assume le risque
-      # sans le passage manuel sur appareils réels (conception §14) et sans l'avis du juriste
-      # (risque LCEN, spec §37). Exige SHH_SALONS: "1" et, pour deploy.sh,
-      # SHH_DOMAIN=shhgone.com : l'hôte de SHH_ORIGIN est le rp.id des passkeys, définitif (R1).
+      # Compte par passkey (conception docs/conception/specs/2026-11-22-compte-passkey-design.md,
+      # README §12) : ACTIVÉ et OUVERT AU PUBLIC dès le premier déploiement. Risque assumé :
+      # ouvert sans le passage manuel sur appareils réels (conception §14) et sans l'avis du
+      # juriste (risque LCEN, spec §37). Exige SHH_SALONS: "1" et, pour deploy.sh,
+      # SHH_DOMAIN=shhgone.com : l'hôte de SHH_ORIGIN est le rp.id des passkeys, définitif.
       # Aucun e-mail, aucun relais, aucune sortie. Le couper : "0" ici (fichier relu, commité).
       SHH_COMPTES: "1"
       SHH_COMPTES_MAX: ${SHH_COMPTES_MAX:-}
@@ -124,12 +122,11 @@ services:
       # relaie que vers :8080, barrière de préproduction comprise. Empreinte du jeton seulement.
       SHH_ADMIN_LISTEN: ${SHH_ADMIN_LISTEN:-}
       SHH_ADMIN_TOKEN_SHA256: ${SHH_ADMIN_TOKEN_SHA256:-}
-      # Paiement des offres Plus et Pro (conception du paiement, docs/superpowers/specs/
-      # 2026-11-19-paiement-design.md) : DÉSACTIVÉ tant que le propriétaire n'a pas fourni ce
-      # que liste son §13 (comptes des prestataires, régime de TVA, mentions des notes de
-      # vente). Activé ("1") : deploy.sh démarre le relais de chaque prestataire dont les
-      # secrets sont dans secrets/ (README §13) et refuse d'installer sans SHH_TVA ni secrets
-      # bien réglés. Comme SHH_COMPTES : la valeur de production est ici (le chiffre après « :- »,
+      # Paiement des offres Plus et Pro (conception du paiement, docs/conception/specs/
+      # 2026-11-19-paiement-design.md) : DÉSACTIVÉ tant que manque ce que liste son §13 (comptes
+      # des prestataires, régime de TVA, mentions des notes de vente). Activé ("1") : deploy.sh
+      # démarre le relais de chaque prestataire dont les secrets sont dans secrets/ (README §13)
+      # et refuse d'installer sans SHH_TVA ni secrets bien réglés. Comme SHH_COMPTES : la valeur de production est ici (le chiffre après « :- »,
       # fichier relu, commité), jamais dans .env. SHH_PAIEMENT_SERVI et SHH_PAIEMENT_ESSAI_SERVI
       # sont posées par deploy.sh : cette valeur, sauf en préproduction (SHH_PREPROD=1), où
       # SHH_PREPROD_PAIEMENT et SHH_PREPROD_PAIEMENT_ESSAI de deploy/.env la remplacent (README §15).
@@ -181,7 +178,7 @@ services:
     # Fichiers temporaires éventuels : en mémoire, jamais sur disque.
     tmpfs:
       - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
-    # Aucun journal de conteneur sur disque (audit de confidentialité P6, spec §36 S1).
+    # Aucun journal de conteneur sur disque (spec §36 S1).
     # Pour lire un message de démarrage : « deploy.sh diagnose » (premier plan, rien d'écrit).
     logging:
       driver: none
@@ -338,12 +335,12 @@ services:
     image: caddy:2.11.9@sha256:0c2243efcf437ab7f7a978f1027fcf0d4f9be8a75df27b1b3fbc5dbe0ffa8cf0
     restart: unless-stopped
     # Réseau de la machine : Caddy écoute directement sur 80/tcp, 443/tcp et 443/udp (HTTP/3,
-    # QUIC, décision du 13 novembre). Aucune ligne « ports: » : Docker l'ignore avec
+    # QUIC). Aucune ligne « ports: » : Docker l'ignore avec
     # network_mode: host (rien n'est publié ni traduit). Le pare-feu de la machine doit laisser
     # passer 443/udp (README §1).
     network_mode: host
     read_only: true
-    # Non root (D9, décision du propriétaire du 22 novembre, voie (a)) : compte 65532, aucune
+    # Non root : compte 65532, aucune
     # capacité. Écouter sur 80 et 443 vient du réglage de la machine
     # net.ipv4.ip_unprivileged_port_start=80 (README §1, vérifié par deploy.sh) : la capacité de
     # fichier de l'image (« +p ») est ignorée sous no-new-privileges.
@@ -392,8 +389,7 @@ networks:
   interne:
     # Aucune sortie vers Internet depuis le serveur Go, même paiement activé : il ne joint que les
     # relais des prestataires de paiement (.4 à .6), sur ce réseau. /29 : .1 passerelle (Caddy, sur
-    # la machine), .2 serveur, .3 libre (ancien relais SMTP, retiré le 22 novembre), .4 à .6
-    # relais.
+    # la machine), .2 serveur, .3 libre (ancien relais SMTP, retiré), .4 à .6 relais.
     internal: true
     ipam:
       config:

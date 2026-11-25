@@ -44,9 +44,9 @@
 # démarrage, le contrôle de santé lance verify-site.mjs à travers Caddy (le retour arrière suit
 # un écart). Aucune option, variable ni commande ne saute ces vérifications (spec §28.8, C2).
 #
-# Verrous du 25 novembre (deploy/verrous.sh, README §3.5), avant tout démarrage, sans option non
-# plus : V1, le commit du manifeste et chaque commit depuis le commit installé sont signés par une
-# clé de /etc/shhdrop/signataires-autorises ; V2, le commit installé est un ancêtre du nouveau ;
+# Verrous (deploy/verrous.sh, README §3.5), avant tout démarrage, sans option non plus : V1, le
+# commit du manifeste et chaque commit depuis le commit installé sont signés par une clé de
+# /etc/shhdrop/signataires-autorises ; V2, le commit installé est un ancêtre du nouveau ;
 # V3, le commit donné en argument est celui du manifeste. La copie du dépôt (celle de ce script)
 # est mise à jour par l'exploitant avec « git fetch origin » seulement (jamais « git pull ») : ce
 # script, celui du commit installé, vérifie le nouveau commit, avance la copie (git merge

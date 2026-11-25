@@ -5,7 +5,7 @@
 #
 # SHH_BUILD_ID est obligatoire : le contexte n'a pas de dossier .git (.dockerignore), et le
 # numéro de version du site (pied de page) doit être celui du build public pour que les
-# empreintes de dist/ soient les mêmes que celles de la CI (spec §28, audit du 11 novembre, I6).
+# empreintes de dist/ soient les mêmes que celles de la CI (spec §28).
 #
 # Images de base épinglées par empreinte (index multi-architecture), relevées le
 # 10 novembre 2026 sur registry-1.docker.io et mirror.gcr.io. À chaque montée de version :
@@ -81,8 +81,8 @@ COPY --from=engine /out/paiement/pkg ./src/paiement/pkg
 # check-dist.mjs : le build de production est conforme (variantes .br et .gz exactes,
 # aucun code de démo, aucune adresse http(s):// externe dans index.html, le CSS et
 # pdf-frame.html). Un écart arrête le build de l'image.
-# Compte construit (décision D8 du propriétaire, 19 novembre ; par passkey depuis le 22 novembre) : --comptes exige
-# alors le module de compte. Même valeur que web/scripts/repro.sh (images comparées en CI).
+# Compte par passkey construit : --comptes exige alors le module de compte. Même valeur que
+# web/scripts/repro.sh (images comparées en CI).
 RUN SHH_SITE_COMPTES=1 SHH_ENGINE_PREBUILT=1 npm run build && node scripts/check-dist.mjs --comptes
 
 # Le site seul, pour la CI (job repro-docker), qui compare chaque fichier aux empreintes de ses
@@ -100,9 +100,8 @@ RUN go mod download && go mod verify
 COPY server/ ./
 # Empreinte du commit gravée dans le binaire (main.buildID), affichée par le tableau de bord
 # d'administration : sans .git ni empreinte vcs (-buildvcs=false), la page ne pouvait pas dire
-# quel code tourne (audit adverse du 13 novembre, 3e campagne, tableau de bord, F6). Même
-# SHH_BUILD_ID, même binaire : la reproductibilité tient. Forme revérifiée ici (ARG propre à
-# cette étape : la valeur ne peut rien injecter dans -ldflags).
+# quel code tourne. Même SHH_BUILD_ID, même binaire : la reproductibilité tient. Forme
+# revérifiée ici (ARG propre à cette étape : la valeur ne peut rien injecter dans -ldflags).
 ARG SHH_BUILD_ID
 RUN printf '%s' "$SHH_BUILD_ID" | grep -Eqx '[0-9a-f]{7,40}' || { echo "SHH_BUILD_ID manquant ou invalide : 7 à 40 chiffres hexadécimaux minuscules" >&2; exit 1; } \
  && go build -trimpath -buildvcs=false -ldflags="-s -w -buildid= -X main.buildID=$SHH_BUILD_ID" -o /out/shhdrop ./cmd/shhdrop
@@ -119,9 +118,9 @@ RUN mkdir -m 0700 /out/data
 # --- Image finale : rien d'autre que deux binaires, le site et les certificats racine -----
 # scratch : ni shell, ni bibliothèque, ni gestionnaire de paquets. Connexions sortantes du
 # serveur : l'API de chaque prestataire de paiement configuré, avec SHH_PAIEMENT=1 seulement
-# (compose.yaml ; plus de SMTP depuis le compte par passkey, 22 novembre) ; elles exigent les certificats racine,
-# copiés de l'étape server (paquet ca-certificates de l'image golang épinglée ci-dessus), au
-# chemin que lit crypto/x509 sous Linux.
+# (compose.yaml ; le compte par passkey n'a aucune sortie) ; elles exigent les certificats
+# racine, copiés de l'étape server (paquet ca-certificates de l'image golang épinglée
+# ci-dessus), au chemin que lit crypto/x509 sous Linux.
 FROM scratch
 # Relie le paquet ghcr.io/skoow/shhgone à son dépôt (page du paquet sur GitHub).
 LABEL org.opencontainers.image.source=https://github.com/Skoow/shhgone
