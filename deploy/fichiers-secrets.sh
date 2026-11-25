@@ -19,7 +19,7 @@ readonly SECRETS_ETC=/etc/shhdrop
 # Secrets que seul le propriétaire possède (deploy/secret.sh), puis ceux que la machine tire
 # elle-même. Ordre de « deploy/secret.sh --liste » et de deploy/etat.sh.
 readonly SECRETS_SAISIS="shh_stripe_cle shh_stripe_webhook shh_paypal_secret shh_nowpayments_cle shh_nowpayments_ipn alerte_smtp_mdp"
-readonly SECRETS_TIRES="shh_comptes_cle shh_turn_secret preprod-jeton"
+readonly SECRETS_TIRES="shh_comptes_cle shh_salons_cle shh_turn_secret preprod-jeton"
 
 # fiche_secret <nom> : pose s_fichier, s_proprio (uid:gid), s_mode (sans le 0 de tête, comme
 # stat %a), s_quoi (description, jamais la valeur). Rend 1 pour un nom inconnu.
@@ -33,6 +33,7 @@ fiche_secret() {
 	shh_nowpayments_ipn) s_quoi="NOWPayments : secret IPN" ;;
 	alerte_smtp_mdp) s_quoi="alertes : mot de passe SMTP" s_proprio=0:0 s_mode=600 s_fichier=$SECRETS_ETC/$1 ;;
 	shh_comptes_cle) s_quoi="compte : clé du serveur (tirée par deploy.sh)" ;;
+	shh_salons_cle) s_quoi="salons : clé maîtresse des salons persistants (tirée par deploy.sh)" ;;
 	shh_turn_secret) s_quoi="appels : secret du relais TURN (tiré par deploy.sh)" ;;
 	preprod-jeton) s_quoi="préproduction : jeton d'accès (tiré par preprod.sh)" s_proprio=0:0 s_mode=600 s_fichier=$SECRETS_ETC/$1 ;;
 	*) return 1 ;;

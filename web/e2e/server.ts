@@ -52,6 +52,18 @@ export type StartOpts = {
    */
   salons?: boolean;
   /**
+   * Salons persistants (conception du salon v3 §5.2) : chemin de la clé maîtresse
+   * (SHH_SALONS_CLE_FILE, hors du dossier de données ; le serveur la tire si elle manque). Par
+   * défaut, avec le salon : un fichier neuf dans un dossier à part, supprimé par dispose().
+   * `false` : aucune clé (aucun salon repris après un redémarrage).
+   */
+  cleSalons?: string | false;
+  /**
+   * Redémarrage simulé : dossier de données d'un serveur arrêté (stop(), dossier gardé) et port
+   * de son origine, repris tels quels (le dossier n'est ni créé ni vidé ; dispose() le supprime).
+   */
+  reprendre?: { dataDir: string; port: number };
+  /**
    * Compte activé (SHH_COMPTES=1, salon compris ; compte par passkey, sans e-mail) : K_serveur
    * est écrite dans un dossier à part (hors du dossier de données, 0400), supprimé par
    * dispose(). L'origine est alors http://localhost:<port> : c'est le rp.id des passkeys, et
@@ -85,7 +97,7 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
   let secrets: string | undefined;
   let adminOrigin: string | undefined;
   if (opts.salons || opts.comptes || opts.paiement) {
-    const port = await portLibre();
+    const port = opts.reprendre?.port ?? (await portLibre());
     const hote = opts.comptes ? "localhost" : "127.0.0.1";
     salons = { SHH_LISTEN: `127.0.0.1:${port}`, SHH_ORIGIN: `http://${hote}:${port}` };
     // Paiement seul : SHH_ORIGIN (adresses de retour) sans le salon.
@@ -122,10 +134,16 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
       SHH_NOWPAYMENTS_IPN_FILE: f("np_ipn", opts.paiement.ipnNOWPayments),
     });
   }
+  if (opts.salons || opts.comptes) {
+    if (opts.cleSalons === undefined) {
+      secrets ??= mkdtempSync(join(tmpdir(), "shh-e2e-secrets-"));
+      salons.SHH_SALONS_CLE_FILE = join(secrets, "salons_cle");
+    } else if (opts.cleSalons !== false) salons.SHH_SALONS_CLE_FILE = opts.cleSalons;
+  }
   const retirerSecrets = () => {
     if (secrets) rmSync(secrets, { recursive: true, force: true });
   };
-  const dataDir = mkdtempSync(join(tmpdir(), "shh-e2e-"));
+  const dataDir = opts.reprendre?.dataDir ?? mkdtempSync(join(tmpdir(), "shh-e2e-"));
   const env: Record<string, string> = {};
   // SHH_DISABLE_DUMPABLE_HARDENING : le test « le serveur ne voit rien » lit /proc/<pid>/mem du
   // serveur ; PR_SET_DUMPABLE(0) (Z2) l'en empêcherait. Éteint pour les tests

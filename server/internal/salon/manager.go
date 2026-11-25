@@ -100,6 +100,11 @@ type Config struct {
 	// par le palier (salon créé avant que SHH_COMPTES passe à 0 : sa ligne survit au
 	// redémarrage).
 	Palier func(h [16]byte) (Palier, error)
+	// CleReprise (facultatif, SHH_SALONS_CLE_FILE, LireCleMaitresse) : clé maîtresse des salons,
+	// qui enveloppe la clé de chaque conversation rangée à un arrêt propre (reprise.go). nil :
+	// aucun salon n'est repris après un redémarrage (conversations et pièces purgées, comme avant
+	// le 25 novembre).
+	CleReprise *[32]byte
 }
 
 // Palier : ce que le compte créateur permet (conception du compte §11) : salons vivants à la

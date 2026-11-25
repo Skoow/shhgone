@@ -227,6 +227,12 @@ secrets_auto() {
 			echo "  à faire une fois : une copie hors ligne de cette clé, dans votre propre fenêtre SSH (README §12.2)"
 		fi
 	fi
+	# Clé maîtresse des salons persistants (conception du salon v3 §5.2, README « Salons
+	# persistants ») : enveloppe, le temps d'un redémarrage, la clé de chaque conversation ouverte.
+	# La perdre ne perd que les salons ouverts à ce moment-là (repli : les membres rentrent) : elle
+	# se tire sans condition et ne se sauvegarde pas.
+	tirer_secret "$secrets/shh_salons_cle" 65532:65532 400 octets32 "salons : clé maîtresse" ||
+		die "$secrets/shh_salons_cle mal réglé : fichier du compte 65532, droits 0400 (README, salons persistants)"
 	if [ "$appels" = 1 ]; then
 		tirer_secret "$secrets/shh_turn_secret" 65532:65532 400 hex24 "appels : secret du relais" ||
 			die "$secrets/shh_turn_secret mal réglé : fichier du compte 65532, droits 0400 (README §14)"

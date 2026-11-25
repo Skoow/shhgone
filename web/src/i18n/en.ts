@@ -1265,7 +1265,7 @@ export const en = {
   "salon.join.empty.body": "Open the full invitation link you were sent. Were you already in a room? Open its invitation link again and re-enter the password: your seat is kept in this browser.",
   "salon.intro.title": "A room that erases itself",
   "salon.intro.1": "Encrypted on each device. The server only passes along messages it cannot read.",
-  "salon.intro.2": "Nothing is kept in the clear: messages are written encrypted on the server's disk, unreadable to it, and everything is erased at the latest in {duree}, or sooner if the room is destroyed. A server restart makes them unreadable.",
+  "salon.intro.2": "Nothing is kept in the clear: messages are written encrypted on the server's disk, unreadable to it, and everything is erased at the latest in {duree}, or sooner if the room is destroyed. A server update or restart keeps them; only a server crash can make them unreadable.",
   "salon.intro.3": "You will not see messages sent before you arrived.",
   "salon.intro.4": "A screenshot, or a photo of the screen, is always possible: only write what you would accept to see copied.",
   "salon.intro.5": "Shhgone checks nobody's identity: a nickname is just a chosen name.",

@@ -369,11 +369,11 @@ pty "$D/secret.sh" --liste -- >"$o-liste" 2>&1; echo $? >"$o-liste.code"
 # secrets_auto (commun.sh, comme preflight l'appelle) : tout tiré, puis tout présent.
 auto() { (cd "$D" && here=$PWD jeton_preprod=installer bash -c '. ./commun.sh && secrets_auto && printf "%s" "$SHH_PREPROD_JETON" >"$1"' _ "$1"); }
 auto "$o-auto1.jeton" >"$o-auto1" 2>&1; echo $? >"$o-auto1.code"
-for f in shh_comptes_cle shh_turn_secret; do stat -c "$f %u:%g %a %s" "$W/vol/secrets/$f"; done >"$o-auto1.stat" 2>&1
+for f in shh_comptes_cle shh_salons_cle shh_turn_secret; do stat -c "$f %u:%g %a %s" "$W/vol/secrets/$f"; done >"$o-auto1.stat" 2>&1
 stat -c 'preprod-jeton %u:%g %a %s' /etc/shhdrop/preprod-jeton >>"$o-auto1.stat" 2>&1
-cat "$W/vol/secrets/shh_comptes_cle" "$W/vol/secrets/shh_turn_secret" /etc/shhdrop/preprod-jeton | sha256sum >"$o-auto1.somme"
+cat "$W/vol/secrets/shh_comptes_cle" "$W/vol/secrets/shh_salons_cle" "$W/vol/secrets/shh_turn_secret" /etc/shhdrop/preprod-jeton | sha256sum >"$o-auto1.somme"
 auto "$o-auto2.jeton" >"$o-auto2" 2>&1; echo $? >"$o-auto2.code"
-cat "$W/vol/secrets/shh_comptes_cle" "$W/vol/secrets/shh_turn_secret" /etc/shhdrop/preprod-jeton | sha256sum >"$o-auto2.somme"
+cat "$W/vol/secrets/shh_comptes_cle" "$W/vol/secrets/shh_salons_cle" "$W/vol/secrets/shh_turn_secret" /etc/shhdrop/preprod-jeton | sha256sum >"$o-auto2.somme"
 # Base de comptes sans sa clé (restauration incomplète) : refus, rien n'est tiré.
 mv "$W/vol/secrets/shh_comptes_cle" "$W/cle-de-cote"
 touch "$W/vol/data/comptes.db"
@@ -423,12 +423,13 @@ EOF
 	grep -qE '^  alerte_smtp_mdp +présent' "$o-liste" || ko "--liste : alerte_smtp_mdp non présent"
 	attendu auto1 0 "compte : clé du serveur : créé"
 	grep -qx "appels : secret du relais : créé" "$o-auto1" || ko "secrets_auto : relais non créé ($(cat "$o-auto1"))"
+	grep -qx "salons : clé maîtresse : créé" "$o-auto1" || ko "secrets_auto : clé des salons non créée ($(cat "$o-auto1"))"
 	grep -qx "préproduction : jeton d'accès : créé" "$o-auto1" || ko "secrets_auto : jeton non créé"
-	printf 'shh_comptes_cle 65532:65532 400 32\nshh_turn_secret 65532:65532 400 49\npreprod-jeton 0:0 600 65\n' |
+	printf 'shh_comptes_cle 65532:65532 400 32\nshh_salons_cle 65532:65532 400 32\nshh_turn_secret 65532:65532 400 49\npreprod-jeton 0:0 600 65\n' |
 		cmp -s - "$o-auto1.stat" || ko "secrets_auto : droits $(cat "$o-auto1.stat")"
 	[ "$(cat "$o-auto1.jeton")" = "$(cat "$o-jeton-final")" ] || ko "secrets_auto : jeton tiré non donné à Caddy"
 	attendu auto2 0 "compte : clé du serveur : présent"
-	if ! grep -qx "appels : secret du relais : présent" "$o-auto2" || ! grep -qx "préproduction : jeton d'accès : présent" "$o-auto2"; then
+	if ! grep -qx "appels : secret du relais : présent" "$o-auto2" || ! grep -qx "salons : clé maîtresse : présent" "$o-auto2" || ! grep -qx "préproduction : jeton d'accès : présent" "$o-auto2"; then
 		ko "secrets_auto (2e fois) : $(cat "$o-auto2")"
 	fi
 	grep -q créé "$o-auto2" && ko "secrets_auto : recréé"

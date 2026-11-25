@@ -85,6 +85,9 @@ var allowedMaps = map[string]string{
 	"salon/pieces.go:lus":               "§9.5 budget de lecture par (jeton de membre, pièce) (§24, M1), effacé avec la pièce",
 	"salon/manager.go:vivants":          "§9.5 salons vivants par bloc (§39.3.6, 12 novembre) : id interne → clé de bloc, jusqu'à la fin du salon",
 	"salon/manager.go:parBloc":          "§9.5 salons vivants par bloc (§39.3.6, 12 novembre) : clé de bloc → nombre, jusqu'à la fin du salon",
+	"salon/reprise.go:conv":             "§9.5 démarrage seulement (salons persistants, v3 §5.2) : fichiers de conversation des salons repris, à garder par la purge ; oublié après elle",
+	"salon/reprise.go:pieces":           "§9.5 démarrage seulement (salons persistants, v3 §5.2) : pièces des salons repris, à garder par la purge ; oublié après elle",
+	"salon/reprise.go:octets":           "§9.5 démarrage seulement (salons persistants, v3 §5.2) : budget recompté des salons repris (pieces_bytes) ; oublié après la purge",
 	// Limites du compte (conception du compte §8.8 ; conception du compte par passkey §7.2) : clés
 	// HMAC du jour, aucune adresse IP ni h en clair, vidées à la minute, à l'heure ou à minuit UTC.
 	"limits/limits.go:insc64":    "conception du compte par passkey §7.2 comptes créés du jour par connexion (3), minuit UTC",

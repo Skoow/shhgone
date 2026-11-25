@@ -92,6 +92,26 @@ const compteCheck = `CHECK(compte IS NULL OR (typeof(compte)='blob' AND length(c
 // salonsIndexes : après la migration 2 → 3 (la colonne compte doit exister).
 const salonsIndexes = `CREATE INDEX IF NOT EXISTS salons_compte ON salons(compte)`
 
+// repriseSchema : salons repris après un arrêt propre (conception du salon v3 §5.2, décision du
+// 25 novembre). Une ligne par salon ouvert au moment de l'arrêt, écrite par l'arrêt
+// (salon.Manager.Sauvegarder) et effacée (réécrite de zéros, puis supprimée ; secure_delete) au
+// démarrage suivant, avant toute écoute (salon.Manager.PurgerAuDemarrage) : en marche, la table
+// est vide. cle : clé du fichier de conversation enveloppée par la clé maîtresse des salons
+// (SHH_SALONS_CLE_FILE, hors de la base et des sauvegardes) : nonce (12) ‖ AES-256-GCM (32 + 16).
+// etat : état du salon (sièges, journal, index des trames, pièces) chiffré sous la clé de la
+// conversation. Aucune colonne en clair hormis l'identifiant interne, déjà dans salons ; effacée
+// avec la ligne du salon (ON DELETE CASCADE).
+//
+// Sans changement de SchemaVersion (exception assumée à la règle « incrémenter avec toute
+// migration ») : une table neuve, créée si elle manque, qu'un binaire plus ancien ignore sans
+// risque (il purge les conversations au démarrage, dont les fichiers mis de côté sous leur nom
+// de reprise : rien ne peut être repris sur un fichier qu'il aurait recréé), et le retour arrière
+// de deploy.sh reste possible.
+const repriseSchema = `CREATE TABLE IF NOT EXISTS salons_reprise(
+  salon_id TEXT PRIMARY KEY REFERENCES salons(id) ON DELETE CASCADE,
+  cle BLOB NOT NULL CHECK(typeof(cle)='blob' AND length(cle)=60),
+  etat BLOB NOT NULL CHECK(typeof(etat)='blob')) WITHOUT ROWID`
+
 // Les PRAGMA passent par le DSN pour s'appliquer à chaque connexion. synchronous(FULL) :
 // valeur par défaut, écrite pour qu'un changement du pilote ne l'abaisse pas en silence
 // (NORMAL perdrait les dernières transactions à une coupure de courant).
@@ -252,6 +272,10 @@ func Open(path string) (*sql.DB, error) {
 	if _, err := db.Exec(salonsIndexes); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("création des index du salon : %w", err)
+	}
+	if _, err := db.Exec(repriseSchema); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("création de la table de reprise des salons : %w", err)
 	}
 	if version < SchemaVersion {
 		if _, err := db.Exec(fmt.Sprintf(`PRAGMA user_version=%d`, SchemaVersion)); err != nil {

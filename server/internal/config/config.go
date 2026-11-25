@@ -40,6 +40,12 @@ type Config struct {
 	// Origin (SHH_ORIGIN, obligatoire avec SHH_SALONS=1) : origine publique du site, comparée
 	// à l'en-tête Origin du WebSocket et copiée dans la CSP (connect-src wss://hôte).
 	Origin string
+	// SalonsCleFile (SHH_SALONS_CLE_FILE, facultatif, exige SHH_SALONS=1) : clé maîtresse des
+	// salons (32 octets, 0400 ou 0600, chemin absolu hors de SHH_DATA_DIR), qui enveloppe la clé
+	// de chaque conversation rangée à un arrêt propre (salons persistants, conception du salon v3
+	// §5.2). Absente du disque : tirée au premier démarrage (salon.LireCleMaitresse ; en
+	// production, deploy.sh la tire avant). Vide : aucun salon n'est repris après un redémarrage.
+	SalonsCleFile string
 	// TurnURLs, TurnSecretFile (SHH_TURN_URLS, SHH_TURN_SECRET_FILE ; appels.go) : relais des
 	// appels du salon ; vides : pas d'appels.
 	TurnURLs       []string
@@ -176,6 +182,12 @@ func FromEnv() (Config, error) {
 	}
 	if c.Salons && c.Origin == "" {
 		return Config{}, errors.New("SHH_SALONS=1 exige SHH_ORIGIN (origine publique du site, ex. https://shhgone.com)")
+	}
+	if c.SalonsCleFile, err = secretFile("SHH_SALONS_CLE_FILE", c.DataDir); err != nil {
+		return Config{}, err
+	}
+	if c.SalonsCleFile != "" && !c.Salons {
+		return Config{}, errors.New("SHH_SALONS_CLE_FILE exige SHH_SALONS=1 (clé des salons persistants)")
 	}
 	if err := comptesFromEnv(&c); err != nil {
 		return Config{}, err

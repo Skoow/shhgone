@@ -466,6 +466,7 @@ describe("le serveur ne voit rien : repères de requête, base minimale (spec §
         "index:shares_manage_v",
         "table:salon_pieces",
         "table:salons",
+        "table:salons_reprise",
         "table:shares",
       ]);
       expect(s.salonCols, label).toEqual([

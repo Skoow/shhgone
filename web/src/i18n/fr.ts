@@ -1269,7 +1269,7 @@ export const fr = {
   "salon.join.empty.body": "Ouvrez le lien d'invitation complet que l'on vous a envoyé. Vous étiez déjà dans un salon ? Rouvrez son lien d'invitation et redonnez le mot de passe : votre place est gardée sur ce navigateur.",
   "salon.intro.title": "Un salon qui s'efface",
   "salon.intro.1": "Chiffré sur chaque appareil. Le serveur ne fait que transmettre des messages qu'il ne peut pas lire.",
-  "salon.intro.2": "Rien n'est gardé en clair : les messages sont écrits chiffrés sur le disque du serveur, illisibles pour lui, et tout s'efface au plus tard dans {duree}, ou plus tôt si le salon est détruit. Un redémarrage du serveur les rend illisibles.",
+  "salon.intro.2": "Rien n'est gardé en clair : les messages sont écrits chiffrés sur le disque du serveur, illisibles pour lui, et tout s'efface au plus tard dans {duree}, ou plus tôt si le salon est détruit. Une mise à jour ou un redémarrage du serveur les garde\u202f; seule une panne du serveur peut les rendre illisibles.",
   "salon.intro.3": "Vous ne verrez pas les messages envoyés avant votre arrivée.",
   "salon.intro.4": "Une capture d'écran, ou une photo de l'écran, reste toujours possible : n'écrivez que ce que vous accepteriez de voir copié.",
   "salon.intro.5": "Shhgone ne vérifie l'identité de personne : un pseudonyme n'est qu'un nom choisi.",

@@ -92,6 +92,9 @@ services:
       # empêche le serveur de démarrer ET « shhdrop admin » de tourner (deploy/README.md §10).
       SHH_ORIGIN: https://${SHH_DOMAIN:?SHH_DOMAIN manquant (nom du site)}
       SHH_SALONS_MAX: ${SHH_SALONS_MAX:-200}
+      # Salons persistants : clé maîtresse tirée par deploy.sh (secrets_auto), lue en lecture
+      # seule ; un arrêt propre range les salons ouverts, le démarrage suivant les reprend.
+      SHH_SALONS_CLE_FILE: /run/secrets/shh_salons_cle
       # Appels audio et vidéo du salon (README §14) : posés par deploy.sh (relais « relais-turn »
       # ci-dessous, profil « appels », actif par défaut) ; vides = pas d'appels. Le serveur ne
       # parle jamais au relais : il calcule des identifiants temporaires avec le secret partagé.
@@ -182,8 +185,10 @@ services:
     # Pour lire un message de démarrage : « deploy.sh diagnose » (premier plan, rien d'écrit).
     logging:
       driver: none
-    # Le serveur laisse 30 s aux transferts en cours avant de s'arrêter.
-    stop_grace_period: 40s
+    # Le serveur laisse 30 s aux transferts en cours avant de s'arrêter, 5 s aux WebSocket du
+    # salon, puis range les salons ouverts (salons persistants : quelques secondes au plus) ; un
+    # arrêt forcé avant la fin ne range que les salons déjà faits (les autres se refondent).
+    stop_grace_period: 60s
     healthcheck:
       # /healthz ne répond qu'à la boucle locale du conteneur, sans passer par Caddy (spec §8).
       test: ["CMD", "/shhcheck", "health"]

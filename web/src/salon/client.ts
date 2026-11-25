@@ -16,7 +16,8 @@
 // - accusés `recu`/`vu` groupés, une trame au plus toutes les 2,5 s (19) ; `0x05` pour une trame
 //   des règles 1 à 3 qui ne donne aucun message lisible (14), et pour un message vu ;
 // - renouvellement MLS après 100 trames envoyées ou 1 h (12) ;
-// - fermetures : 1001, 1011, 4006, coupure → reconnexion avec `depuis` (1 s, 2 s… 30 s) ;
+// - fermetures : 1001 (arrêt ou mise à jour du serveur : salon repris avec le même jeton, spec v3
+//   §5.2), 1011, 4006, coupure → reconnexion avec `depuis` (1 s, 2 s… 30 s) ;
 //   4004 → nouvelle entrée par `rejoindre` (16) ; 4005 → arrêt sans reconnexion (35) ; 4002 ou
 //   `0x05` raison 5 → exclusion ; `0x05` raisons 1, 2, 7 → fin du salon ;
 // - groupe orphelin (17) : le créateur hors du groupe recrée le groupe à la fin
@@ -199,7 +200,8 @@ export class ClientSalon {
    * Retour par la preuve de membre (D41-26) : même jeton, même siège, nouvelle identité. Aucun
    * `rejoindre` (aucun essai de mot de passe compté) : l'accueil demande une reprise (`0x0A`,
    * nouveau `nonce_arrivée`) ; l'état MLS naît au 0x0D qui suit. Jeton refusé (4004 : place
-   * libérée, serveur redémarré) : nouvelle entrée par `rejoindre`, comme d'habitude.
+   * libérée, salon perdu par un arrêt brutal du serveur) : nouvelle entrée par `rejoindre`, comme
+   * d'habitude ; après un redémarrage propre, le jeton reste valable (spec v3 §5.2).
    */
   static reprendre(deps: Deps, o: { kLien: Uint8Array; cles: ClesSalon; jeton: string; siege: number; sGestion?: Uint8Array }): ClientSalon {
     const e: api.Entree = { jeton: o.jeton, siege: o.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: 0, maxMembers: 0, membersCanDestroy: false, budgetLeft: 0, appels: false };
@@ -354,7 +356,7 @@ export class ClientSalon {
     this.#connecter(this.#salon ? BigInt(this.#dernierSeq) : DEPUIS_REPRISE);
   }
 
-  /** Jeton refusé (4004 : place libérée, redémarrage du serveur) : nouvelle entrée par `rejoindre`. */
+  /** Jeton refusé (4004 : place libérée, salon perdu par un arrêt brutal du serveur) : nouvelle entrée par `rejoindre`. */
   async #nouvelleEntree(): Promise<void> {
     // Après une rotation reçue, l'ancien lien n'ouvre plus le salon : seule la nouvelle invitation.
     if (!this.#lienValide) return this.#terminer("introuvable");
@@ -371,7 +373,8 @@ export class ClientSalon {
       this.#dernierSeq = 0;
       this.#depart = 0;
       this.#reprendreLaFile();
-      // Après un redémarrage du serveur, plus rien du groupe n'existe : le créateur le refonde.
+      // Salon perdu (arrêt brutal du serveur ; un redémarrage propre le garde, spec v3 §5.2) :
+      // plus rien du groupe n'existe, le créateur le refonde.
       this.#salon = this.#deps.eng.Salon.creer(e.siege, e.nonce, this.#cles, false, this.#sGestion);
       this.#emettre({ k: "nouvelleEntree", siege: e.siege });
       this.#emettre({ k: "groupe", dansLeGroupe: false });

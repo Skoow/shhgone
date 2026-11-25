@@ -14,7 +14,9 @@ import (
 // État en mémoire d'un salon : sièges, jetons, rangs, journal des annonces et index des
 // trames. Rien de tout cela n'est écrit sur disque (spec §39.3.5, v3
 // §5.1) : seules les trames non volatiles le sont, chiffrées (Conversation), sans rang,
-// siège, heure ni drapeau. Un redémarrage l'oublie.
+// siège, heure ni drapeau. En marche, rien de cet état n'est écrit ; un arrêt propre le range,
+// chiffré sous la clé de la conversation, pour le démarrage suivant (reprise.go, salons
+// persistants) ; un arrêt brutal l'oublie.
 
 const (
 	// nbSieges : sièges 0 à 49 (SurMesurePlacesMax) ; le 0 est réservé au créateur. Un salon

@@ -20,9 +20,12 @@ import (
 // Fichier de conversation (v3 §5.1) : un emplacement de
 // TailleEmplacement octets par trame non volatile, dans l'ordre d'arrivée :
 // nonce (12, aléatoire) ‖ AES-256-GCM(clé, nonce, trame, adConv ‖ numéro d'emplacement (8)).
-// La clé est tirée à l'ouverture et ne vit qu'en mémoire : un disque saisi ou copié, ou un
-// redémarrage, ne donne que des emplacements illisibles. Aucun seq, siège, heure ni drapeau
-// en clair. Aucun fsync : le fichier ne sert plus après un redémarrage (clé perdue).
+// La clé est tirée à l'ouverture et ne vit qu'en mémoire tant que le serveur tourne : un disque
+// saisi ou copié pendant la marche ne donne que des emplacements illisibles. Aucun seq, siège,
+// heure ni drapeau en clair. Seul un arrêt propre (reprise.go, décision du 25 novembre) range la
+// clé sur le disque, enveloppée par la clé maîtresse des salons, le temps du redémarrage ; elle
+// est relue puis effacée de la base au démarrage suivant. Aucun fsync par trame : un arrêt
+// brutal ne range rien, et le fichier est alors purgé au démarrage (clé perdue).
 //
 // Ce que le fichier ne dit pas à qui lit le disque :
 //   - trame effacée = emplacement écrasé d'octets ALÉATOIRES (et non de zéros) : il ne
@@ -109,11 +112,13 @@ type Conversation struct {
 	// l'ouverture (etat, renouvellement) ; nil : sans borne (tests). Prise avant mu, jamais
 	// dessous (les lectures du rattrapage tenaient un fil du système par connexion).
 	lec *blob.Gate
-	// aead : seule copie de la clé gardée (tirée dans OuvrirConversation, jamais rangée
-	// ailleurs) ; lâchée par Detruire. La bibliothèque standard ne permet pas d'effacer le
-	// calendrier de clés d'un chiffrement AES : la clé est oubliée, pas effacée de la
-	// mémoire.
+	// aead : chiffrement de la clé (tirée dans OuvrirConversation) ; lâché par Detruire. La
+	// bibliothèque standard ne permet pas d'effacer le calendrier de clés d'un chiffrement
+	// AES : la clé est oubliée, pas effacée de la mémoire. cle : la clé elle-même, gardée pour
+	// être enveloppée à un arrêt propre (mettreDeCote, reprise.go) ; mise à zéro par Detruire et
+	// mettreDeCote. Jamais écrite ailleurs qu'enveloppée.
 	aead cipher.AEAD
+	cle  [32]byte
 	n    uint32 // emplacements écrits
 	// inutilisable : Truncate a échoué après une écriture ratée ; tailleMax borne alors le
 	// fichier réel (Taille ne le sous-compte jamais).
@@ -235,14 +240,8 @@ func ouvrirConversation(dossier, id, chemin string) (*Conversation, error) {
 	if c.lecteur, err = blob.OpenRead(c.chemin); err != nil {
 		return nil, es(err)
 	}
-	var cle [32]byte
-	rand.Read(cle[:]) // ne rend jamais d'erreur (Go ≥ 1.24)
-	bloc, err := aes.NewCipher(cle[:])
-	clear(cle[:]) // la clé ne reste que dans le chiffrement (aead)
-	if err != nil {
-		return nil, err
-	}
-	if c.aead, err = cipher.NewGCM(bloc); err != nil {
+	rand.Read(c.cle[:]) // ne rend jamais d'erreur (Go ≥ 1.24)
+	if err := c.poserCle(); err != nil {
 		return nil, err
 	}
 	if err := sansDate(c.chemin); err != nil {
@@ -250,6 +249,96 @@ func ouvrirConversation(dossier, id, chemin string) (*Conversation, error) {
 	}
 	ok = true
 	return c, nil
+}
+
+// poserCle : chiffrement AES-256-GCM de c.cle.
+func (c *Conversation) poserCle() error {
+	bloc, err := aes.NewCipher(c.cle[:])
+	if err != nil {
+		return err
+	}
+	c.aead, err = cipher.NewGCM(bloc)
+	return err
+}
+
+// reouvrirConversation : conversation d'un salon repris après un arrêt propre (reprise.go) :
+// fichier existant dossier/id, clé cle, n emplacements écrits. La taille du fichier doit être
+// exactement celle de n emplacements arrondie au palier (Ajouter : un palier entier écrit d'un
+// coup, ramené à sa taille d'avant en cas d'échec) ; sinon ErrInutilisable, rien n'est gardé
+// ouvert. La clé est copiée : l'appelant met la sienne à zéro.
+func reouvrirConversation(dossier, id string, cle [32]byte, n uint32) (*Conversation, error) {
+	if !idValide(id) || n == math.MaxUint32 {
+		return nil, errIDConv
+	}
+	c := &Conversation{chemin: filepath.Join(dossier, id), cle: cle, n: n}
+	f, err := os.OpenFile(c.chemin, os.O_RDWR|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		clear(c.cle[:])
+		return nil, es(err)
+	}
+	c.f = f
+	ok := false
+	defer func() {
+		if !ok {
+			clear(c.cle[:])
+			c.aead = nil
+			c.f.Close()
+			if c.lecteur != nil {
+				c.lecteur.Close()
+			}
+		}
+	}()
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, es(err)
+	}
+	attendue := (int64(n) + emplacementsParPalier - 1) / emplacementsParPalier * TaillePalier
+	if !fi.Mode().IsRegular() || fi.Size() != attendue {
+		return nil, ErrInutilisable
+	}
+	if c.lecteur, err = blob.OpenRead(c.chemin); err != nil {
+		return nil, es(err)
+	}
+	if err := c.poserCle(); err != nil {
+		return nil, err
+	}
+	c.taille.Store(attendue)
+	if err := sansDate(c.chemin); err != nil {
+		return nil, err
+	}
+	ok = true
+	return c, nil
+}
+
+// mettreDeCote : arrêt propre (reprise.go) : plus rien ne s'écrit ni ne se lit dans la
+// conversation (ErrDetruite), son fichier prend le nom chemin (même dossier) et ses descripteurs
+// sont fermés ; rend une copie de la clé et le nombre d'emplacements écrits, puis met la clé à
+// zéro. Le fichier n'est jamais supprimé ensuite par cette conversation (Detruire ne le touche
+// plus). Conversation détruite ou inutilisable : son erreur, rien n'est changé. Le renommage
+// d'abord : le nom de reprise ne désigne jamais un fichier encore écrit par ce processus, et un
+// ancien serveur qui purge le dossier au démarrage l'efface (aucune reprise sur un fichier qu'il
+// aurait recréé sous le nom du salon).
+func (c *Conversation) mettreDeCote(chemin string) (cle [32]byte, n uint32, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.etat(); err != nil {
+		return cle, 0, err
+	}
+	if err := os.Rename(c.chemin, chemin); err != nil {
+		return cle, 0, es(err)
+	}
+	c.chemin = chemin
+	dossierSansDate(chemin)
+	_ = sansDate(chemin)
+	cle, n = c.cle, c.n
+	clear(c.cle[:])
+	c.aead = nil
+	c.detruite, c.supprime = true, true // plus à elle : ni écrite, ni lue, ni supprimée
+	if c.lecteur != nil {
+		c.lecteur.Close()
+	}
+	c.f.Close()
+	return cle, n, nil
 }
 
 // ad : données authentifiées de l'emplacement e.
@@ -344,6 +433,7 @@ func (c *Conversation) Detruire() error {
 	if !c.detruite {
 		c.detruite = true
 		c.aead = nil // clé oubliée (voir le champ)
+		clear(c.cle[:])
 		if c.lecteur != nil {
 			errFermeture = c.lecteur.Close()
 		}

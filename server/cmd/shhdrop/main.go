@@ -266,12 +266,22 @@ func setupSalons(cfg config.Config, db *sql.DB, svc *share.Service, lim *limits.
 	if cfg.Comptes && cpt != nil {
 		palier = api.PalierDuCompte(&cpt.svc)
 	}
+	// Salons persistants (conception du salon v3 §5.2) : clé maîtresse lue (tirée si elle manque),
+	// sans elle aucun salon n'est repris après un redémarrage. Message : le chemin, jamais la clé.
+	var cleReprise *[32]byte
+	if cfg.SalonsCleFile != "" {
+		k, _, err := salon.LireCleMaitresse(cfg.SalonsCleFile)
+		if err != nil {
+			return nil, shown(err.Error())
+		}
+		cleReprise = &k
+	}
 	m, err := salon.NewManager(salon.Config{DB: db,
 		Pieces:               &blob.Store{Dir: filepath.Join(cfg.DataDir, dirSalonPieces), NoSparse: cfg.BehindProxy, Gate: gate},
 		DossierConversations: filepath.Join(cfg.DataDir, dirSalons), Now: cfg.Now, Max: cfg.SalonsMax,
 		StorageMax: cfg.StorageMaxBytes, UsedPartages: svc.UsedShares, OnAbandon: lim.AbandonUpload,
 		TramesMax: cfg.Capacity.SalonFrames, SalonFramesTotal: cfg.Capacity.SalonFramesTotal,
-		ConvDiskOps: cfg.Capacity.ConvDiskOps, Vidage: vidage, Palier: palier})
+		ConvDiskOps: cfg.Capacity.ConvDiskOps, Vidage: vidage, Palier: palier, CleReprise: cleReprise})
 	if err != nil {
 		return nil, err
 	}
@@ -502,10 +512,14 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if sm != nil {
 		// net/http ne suit plus une connexion mise à niveau : Shutdown ne l'attend pas.
 		srv.RegisterOnShutdown(sm.FermerTout)
-		// Exécuté avant db.Close (defer) : WebSocket fermés et attendus (au plus salonWait).
+		// Exécuté avant db.Close (defer) et après l'arrêt de l'entretien (defer posé plus bas, donc
+		// exécuté avant celui-ci) : WebSocket fermés et attendus (au plus salonWait), puis salons
+		// ouverts rangés pour le démarrage suivant (salons persistants ; sans clé maîtresse, rien).
+		// Aucune sortie : une erreur laisse le salon non repris (repli du client : rejoindre).
 		defer func() {
 			sm.FermerTout()
 			sm.AttendreConnexions(salonWait)
+			_, _ = sm.Sauvegarder()
 		}()
 	}
 	ln, err := net.Listen("tcp", cfg.Listen)

@@ -102,7 +102,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
   let clesEnvoyees: Needle[]; // envoyées par conception (K_accès_s, K_preuve_s, jetons, S_gestion) : jamais sur disque ni dans les sorties
   let traces: Needle[]; // témoins : présents sur disque tant que le salon vit
   let reperesRequete: Needle[];
-  type Instantane = { master: string[]; salonCols: string[]; pieceCols: string[]; salons: number; pieces: number };
+  type Instantane = { master: string[]; salonCols: string[]; pieceCols: string[]; salons: number; pieces: number; reprises: number };
   const instantanes: Record<string, Instantane> = {};
   let conversations: Buffer[] = [];
   const tailles = { avant: 0, apres: 0, nonVolatiles: 0, nonVolatilesApres: 0 };
@@ -138,6 +138,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
         pieceCols: colonnes("salon_pieces"),
         salons: compte("salons"),
         pieces: compte("salon_pieces"),
+        reprises: compte("salons_reprise"),
       };
     } finally {
       db.close();
@@ -381,6 +382,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
       "index:shares_manage_v",
       "table:salon_pieces",
       "table:salons",
+      "table:salons_reprise",
       "table:shares",
     ]);
     expect(s.salonCols).toEqual([
@@ -392,6 +394,8 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
     expect(s.pieceCols).toEqual(["id", "salon_id", "bucket", "state", "segments_mask"]);
     expect(s.salons).toBe(1);
     expect(s.pieces).toBe(3);
+    // Salons persistants (v3 §5.2) : rien n'est rangé en marche ; la table ne se remplit qu'à un arrêt propre.
+    expect(s.reprises).toBe(0);
   });
 
   it("mémoire du processus serveur : aucun repère de contenu ni de clé", async () => {

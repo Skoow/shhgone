@@ -558,17 +558,41 @@ func (m *Manager) passeSure(passe func()) {
 // tourne hors du serveur et ne le voit pas (deploy/README.md §10).
 func (m *Manager) PaniquesTick() int64 { return m.paniquesTick.Load() }
 
-// PurgerAuDemarrage : à appeler une fois, avant toute autre méthode et avant
-// l'écoute. Les clés des conversations, les jetons et les planchers des pièces étaient en
-// mémoire : tout fichier de conversation et toute pièce sont effacés (fichiers d'abord, puis
-// toutes les lignes salon_pieces, pieces_bytes = 0) ; les lignes des salons vivants restent
-// (lien et mot de passe valables) ; salons échus et lignes à 10 essais supprimés. Dossiers
-// ramenés à 0700 (MkdirAll ne resserre pas un dossier existant), puis vidage du WAL.
+// PurgerAuDemarrage : à appeler une fois, avant toute autre méthode et avant l'écoute.
+// D'abord la reprise (reprise.go, avec une clé maîtresse) : salons rangés par un arrêt propre et
+// encore vivants remis en mémoire (sièges, jetons, journal, index, pièces prêtes), lignes de
+// reprise effacées AVANT (réécrites de zéros puis supprimées : une ligne ne sert jamais deux
+// fois). Puis la purge de tout le reste, comme avant : les clés des autres conversations, les
+// jetons et les planchers de leurs pièces étaient en mémoire, donc tout fichier de conversation
+// et toute pièce d'un salon non repris sont effacés (fichiers d'abord, puis leurs lignes
+// salon_pieces ; pieces_bytes recalculé : 0, ou la somme des pièces gardées d'un salon repris) ;
+// les lignes des salons vivants restent (lien et mot de passe valables) ; salons échus et lignes
+// à 10 essais supprimés. Dossiers ramenés à 0700 (MkdirAll ne resserre pas un dossier
+// existant), puis vidage du WAL.
 func (m *Manager) PurgerAuDemarrage() error {
+	now := m.cfg.Now().Unix()
 	for _, d := range []string{m.cfg.DossierConversations, m.cfg.Pieces.Dir} {
-		if err := viderDossier(d); err != nil {
+		if err := preparerDossier(d); err != nil {
 			return err
 		}
+	}
+	l, err := m.lireReprises(now)
+	if err != nil {
+		return err
+	}
+	if err := effacerReprises(m.cfg.DB); err != nil {
+		for i := range l {
+			clear(l[i].cle[:])
+			clear(l[i].clair)
+		}
+		return err
+	}
+	g := m.reprendre(l)
+	if err := viderDossier(m.cfg.DossierConversations, g.conv); err != nil {
+		return err
+	}
+	if err := viderDossier(m.cfg.Pieces.Dir, g.pieces); err != nil {
+		return err
 	}
 	if err := m.cfg.Pieces.Resync(); err != nil {
 		return es(err)
@@ -578,18 +602,39 @@ func (m *Manager) PurgerAuDemarrage() error {
 		return base(err)
 	}
 	defer tx.Rollback()
-	for _, q := range []string{
-		`DELETE FROM salon_pieces`,
-		`UPDATE salons SET pieces_bytes=0`,
-		`DELETE FROM salons WHERE expires_at<=? OR failed_attempts>=?`,
-	} {
-		args := []any{}
-		if strings.Contains(q, "?") {
-			args = []any{m.cfg.Now().Unix(), maxEssais}
-		}
-		if _, err := tx.Exec(q, args...); err != nil {
+	var orphelines []string
+	rows, err := tx.Query(`SELECT id FROM salon_pieces`)
+	if err != nil {
+		return base(err)
+	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
 			return base(err)
 		}
+		if !g.pieces[id] {
+			orphelines = append(orphelines, id)
+		}
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return base(err)
+	}
+	for _, id := range orphelines {
+		if _, err := tx.Exec(`DELETE FROM salon_pieces WHERE id=?`, id); err != nil {
+			return base(err)
+		}
+	}
+	if _, err := tx.Exec(`UPDATE salons SET pieces_bytes=0`); err != nil {
+		return base(err)
+	}
+	for id, n := range g.octets {
+		if _, err := tx.Exec(`UPDATE salons SET pieces_bytes=? WHERE id=?`, min(n, Budget), id); err != nil {
+			return base(err)
+		}
+	}
+	if _, err := tx.Exec(`DELETE FROM salons WHERE expires_at<=? OR failed_attempts>=?`, now, maxEssais); err != nil {
+		return base(err)
 	}
 	if err := tx.Commit(); err != nil {
 		return base(err)
@@ -597,19 +642,24 @@ func (m *Manager) PurgerAuDemarrage() error {
 	return base(store.Checkpoint(m.cfg.DB))
 }
 
-// viderDossier : dossier d créé s'il manque, ramené à 0700, vidé, dates à l'epoch.
-func viderDossier(d string) error {
+// preparerDossier : dossier d créé s'il manque, ramené à 0700.
+func preparerDossier(d string) error {
 	if err := os.MkdirAll(d, 0o700); err != nil {
 		return es(err)
 	}
-	if err := os.Chmod(d, 0o700); err != nil {
-		return es(err)
-	}
+	return es(os.Chmod(d, 0o700))
+}
+
+// viderDossier : dossier d vidé de tout ce qui n'est pas dans garder (noms), dates à l'epoch.
+func viderDossier(d string, garder map[string]bool) error {
 	es0, err := os.ReadDir(d)
 	if err != nil {
 		return es(err)
 	}
 	for _, e := range es0 {
+		if garder[e.Name()] && e.Type().IsRegular() {
+			continue
+		}
 		if err := os.RemoveAll(filepath.Join(d, e.Name())); err != nil {
 			return es(err)
 		}
@@ -694,7 +744,12 @@ func detruireHorsLigneID(db *sql.DB, pieces *blob.Store, dossierConv, id string)
 		if err := m.effacerPiecesEnBase(id); err != nil {
 			return false, err
 		}
-		for _, f := range []string{id, id + suffixeProvisoire} {
+		// Salon rangé par un arrêt propre (serveur arrêté) : ligne de reprise effacée, fichier
+		// mis de côté supprimé (la ligne partirait aussi avec celle du salon, ON DELETE CASCADE).
+		if err := effacerReprise(db, id); err != nil {
+			return false, err
+		}
+		for _, f := range []string{id, id + suffixeProvisoire, id + suffixeReprise} {
 			if err := os.Remove(filepath.Join(dossierConv, f)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return false, es(err)
 			}
@@ -781,6 +836,9 @@ func EffacerTout(db *sql.DB, dossierPieces, dossierConv string) (int64, error) {
 				return 0, es(err)
 			}
 		}
+	}
+	if err := effacerReprises(db); err != nil {
+		return 0, err
 	}
 	tx, err := db.Begin()
 	if err != nil {

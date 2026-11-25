@@ -215,10 +215,11 @@ func masterNames(t *testing.T, db *sql.DB) []string {
 	return out
 }
 
-// wantMaster : contenu exact de sqlite_master au schéma 3 (partages et salon ; index du lien
-// compte ↔ salons, conception du compte §8.2), rien d'autre.
+// wantMaster : contenu exact de sqlite_master au schéma 4 (partages et salon ; index du lien
+// compte ↔ salons, conception du compte §8.2 ; table de reprise des salons, vide en marche,
+// conception du salon v3 §5.2), rien d'autre.
 const wantMaster = "index:salon_pieces_salon,index:salons_access_v,index:salons_compte,index:salons_manage_v," +
-	"index:shares_access_v,index:shares_manage_v,table:salon_pieces,table:salons,table:shares"
+	"index:shares_access_v,index:shares_manage_v,table:salon_pieces,table:salons,table:salons_reprise,table:shares"
 
 // Spec §36 S5, S12 : progress_at, upload_deadline et purge_at vivent en
 // mémoire ; la base ne garde qu'une date (expires_at). sqlite_master : shares et ses index.
