@@ -369,13 +369,12 @@ html.kbd-open .dock {
 }
 
 /* En-tête des pages d'information et des offres (InfoPage, Offres) : titre et sous-titre dans
-   le bandeau (.titre-bandeau, ci-dessous), à la largeur de ce bloc. Téléphone et tablette :
-   centrés. Grand écran (1100 px et plus) : alignés à gauche, sur le bord du contenu. */
+   le bandeau (.titre-bandeau, ci-dessous), sur toute la largeur du contenu. Téléphone et
+   tablette : centrés. Grand écran (1100 px et plus) : alignés à gauche. */
 .page-card {
   display: grid;
   justify-items: center;
   gap: var(--sp-4);
-  margin-inline: auto;
   margin-block: var(--sp-3) var(--sp-2);
   text-align: center;
 }
@@ -406,7 +405,6 @@ html.kbd-open .dock {
   .page-card {
     justify-items: start;
     gap: var(--sp-5);
-    margin-inline: 0;
     margin-block: var(--sp-6) var(--sp-3);
     text-align: start;
   }
@@ -420,16 +418,19 @@ html.kbd-open .dock {
 }
 
 /* Bandeau des titres principaux : un voile léger derrière le bloc titre + sous-titre de chaque
-   page (classe unique, posée sur l'élément qui contient le h1 et son sous-titre). Il prend la
-   largeur du bloc (jamais toute la page), plus une marge de chaque côté et en haut et en bas.
-   Pas de fond sombre : menthe et bleu nuit transparents (8 à 14 %) qui s'estompent vers le
-   centre et les bords, un filet à peine visible, coins arrondis. Le centrage ou l'alignement
-   à gauche reste à l'écran (margin-inline: auto, justify-self...). Contraste : le titre et le
+   page (classe unique, posée sur l'élément qui contient le h1 et son sous-titre). Il va d'un
+   bord à l'autre de la colonne de contenu (dans la marge latérale de la page, jamais jusqu'aux
+   bords de l'écran), avec une marge intérieure de chaque côté et en haut et en bas. Pas de
+   fond sombre : menthe et bleu nuit transparents (8 à 14 %) qui s'estompent vers le centre et
+   les bords, un filet à peine visible, coins arrondis. L'alignement du texte (centré ou à
+   gauche) reste à l'écran. Contraste : le titre et le
    sous-titre restent au-dessus de AA (le voile éclaircit à peine le fond). Contraste renforcé
    ou couleurs forcées : pas de voile. CSS seul. */
 .titre-bandeau {
-  width: fit-content;
-  max-width: 100%;
+  box-sizing: border-box;
+  justify-self: stretch;
+  width: auto;
+  max-width: none;
   min-width: 0;
   padding: clamp(18px, 3vw, 32px) clamp(20px, 3.5vw, 40px);
   border-radius: clamp(16px, 2.5vw, 24px);

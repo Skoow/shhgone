@@ -87,8 +87,8 @@
 </script>
 
 <section class="hist" aria-labelledby="h-title" aria-busy={shares.status === "loading" || shares.status === "idle" ? "true" : undefined}>
-  <div class="top">
-    <div class="tt titre-bandeau">
+  <div class="top titre-bandeau">
+    <div class="tt">
       <h1 id="h-title" class="title" tabindex="-1" data-large-title bind:this={title}>{t("hist.title")}</h1>
       {#if shares.status === "ready" && shares.entries.length > 0}
         <p class="counts num" data-counts>{t("hist.count.active", { n: activeCount })} · {t("hist.count.ended", { n: endedCount })}</p>

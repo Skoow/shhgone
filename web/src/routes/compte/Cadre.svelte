@@ -56,11 +56,10 @@
   .titre:focus {
     outline: none;
   }
-  /* Titre et sous-titre : dans le bandeau des titres (ui/base.css), centré dans le cadre. */
+  /* Titre et sous-titre : dans le bandeau des titres (ui/base.css), sur toute la largeur du cadre. */
   .tete {
     display: grid;
     gap: var(--sp-2);
-    justify-self: center;
   }
   .sous {
     margin: 0;
