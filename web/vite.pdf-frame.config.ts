@@ -10,7 +10,7 @@
 // Access-Control-Allow-Origin: * sur pdf-frame.js et pdf-frame.css (static_paths.go ; GitHub
 // Pages le fait pour la démo). Rien en développement (vite dev) : public/pdf-frame.html reste nu.
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import { precompress } from "./vite.config.ts";
 import { addSri } from "./scripts/sri.mjs";
@@ -22,10 +22,16 @@ export function withCrossorigin(html: string): string {
   );
 }
 
-function pdfFrameSri(outDir: string): Plugin {
+// Dossier de sortie RÉSOLU (configResolved) : celui de la configuration, ou celui de
+// `--outDir` (site avec compte, ui-e2e/comptes-site.ts : dist-comptes).
+function pdfFrameSri(): Plugin {
+  let outDir = "";
   return {
     name: "shh-pdf-frame-sri",
     apply: "build",
+    configResolved(c) {
+      outDir = resolve(c.root, c.build.outDir);
+    },
     // writeBundle : après l'écriture de pdf-frame.js et .css, avant la précompression (closeBundle).
     writeBundle: {
       sequential: true,
@@ -49,7 +55,7 @@ export default defineConfig(({ mode }) => {
   const demo = mode === "demo";
   const outDir = demo ? "dist-demo" : "dist";
   return {
-    plugins: [pdfFrameSri(join(import.meta.dirname, outDir)), ...(demo ? [] : [precompress()])],
+    plugins: [pdfFrameSri(), ...(demo ? [] : [precompress()])],
     build: {
       outDir,
       emptyOutDir: false,
