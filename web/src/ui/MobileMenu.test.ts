@@ -30,6 +30,18 @@ describe("MobileMenu", () => {
     b.click();
     flushSync();
     expect(b.getAttribute("aria-expanded")).toBe("true");
+    // Sécurité : replié à l'ouverture du menu, déplié au toucher (accordéon).
+    const sec = document.querySelector<HTMLButtonElement>("[data-mm-toggle]")!;
+    const list = document.getElementById(sec.getAttribute("aria-controls")!)!;
+    expect(sec.textContent!.trim()).toBe("Sécurité");
+    expect(sec.getAttribute("aria-expanded")).toBe("false");
+    expect(list.hidden).toBe(true);
+    sec.click();
+    flushSync();
+    expect(sec.getAttribute("aria-expanded")).toBe("true");
+    expect(list.hidden).toBe(false);
+    expect(list.querySelector("[data-mm-page]")!.getAttribute("href")).toBe("/securite");
+    expect(list.querySelector("[data-mm-page]")!.textContent!.trim()).toBe("Sécurité en détail");
     const how = document.querySelector<HTMLButtonElement>('[data-mm-sec="how"]')!;
     const server = document.querySelector<HTMLButtonElement>('[data-mm-sec="server"]')!;
     expect(how.textContent!.trim()).toBe("Comment ça marche");
@@ -39,6 +51,10 @@ describe("MobileMenu", () => {
     expect(S.allerSection).toHaveBeenLastCalledWith("comment", undefined);
     expect(b.getAttribute("aria-expanded")).toBe("false");
     b.click();
+    flushSync();
+    // Rouvert : de nouveau replié.
+    expect(document.querySelector("[data-mm-toggle]")!.getAttribute("aria-expanded")).toBe("false");
+    document.querySelector<HTMLButtonElement>("[data-mm-toggle]")!.click();
     flushSync();
     document.querySelector<HTMLButtonElement>('[data-mm-sec="server"]')!.click();
     flushSync();

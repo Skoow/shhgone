@@ -10,13 +10,15 @@
   import { presence } from "../history/presence.svelte";
   import { t } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
-  import { ChevronRight, Compass, Download, LogOut, MessagesSquare, Plus, Server, Share2, ShieldCheck, SlidersHorizontal, Tag, User } from "./Icon";
+  import { ChevronDown, ChevronRight, Compass, Download, LogOut, MessagesSquare, Plus, Server, Share2, ShieldCheck, SlidersHorizontal, Tag, User } from "./Icon";
   import { allerSection } from "./section";
   import type { Component } from "svelte";
 
   let { busy = false }: { busy?: boolean } = $props();
 
   let open = $state(false);
+  /** Entrée à sous-menu dépliée (son chemin) ; toutes repliées à chaque ouverture du menu. */
+  let deplie = $state<string | null>(null);
   let wrap: HTMLElement | undefined = $state();
   let button: HTMLButtonElement | undefined = $state();
   const uid = $props.id();
@@ -28,7 +30,7 @@
   // `subs` : sections de l'accueil sous une entrée (Sécurité : « Comment ça marche », « Ce que voit
   // le serveur », comme le menu Sécurité de l'ordinateur, TopNav.svelte ; ui/section.ts).
   type Sub = { id: string; label: string; icon: Component; section: string; faq?: boolean };
-  type Link = { label: string; path: string; icon: Component; soon?: string; subs?: Sub[] };
+  type Link = { label: string; path: string; icon: Component; soon?: string; subs?: Sub[]; page?: string };
   const links = $derived<Link[]>([
     // « Mes partages » seulement s'il y a des partages sur cet appareil.
     ...(accountFlag.connected ? [{ label: t("nav.home"), path: "/", icon: Share2 }] : presence.any ? [{ label: t("nav.shares"), path: "/envois", icon: Share2 }] : []),
@@ -40,6 +42,7 @@
       label: t("nav.security"),
       path: "/securite",
       icon: ShieldCheck,
+      page: t("nav.sec.page.t"),
       subs: [
         { id: "how", label: t("nav.sec.how.t"), icon: Compass, section: "comment" },
         { id: "server", label: t("nav.sec.server.t"), icon: Server, section: "serveur" },
@@ -128,7 +131,9 @@
     aria-disabled={busy ? "true" : undefined}
     aria-describedby={busy ? "foot-busy" : undefined}
     onclick={() => {
-      if (!busy) open = !open;
+      if (busy) return;
+      open = !open;
+      deplie = null;
     }}
     data-menu-button
   >
@@ -158,21 +163,22 @@
             </button>
             <span id="{uid}-soon-{i}" class="sr-only">{l.soon}</span>
           {:else}
-            <a
-              class="mm-l"
-              href={href(l.path)}
-              aria-current={here(l.path)}
-              onclick={(e) => {
-                close();
-                followLink(e, l.path);
-              }}
-            >
-              <span class="mm-ic" aria-hidden="true"><l.icon size={20} strokeWidth={1.9} /></span>
-              <span class="mm-t">{l.label}</span>
-              <ChevronRight size={18} strokeWidth={1.9} aria-hidden="true" />
-            </a>
             {#if l.subs}
-              <ul class="mm-sub">
+              <!-- Accordéon : replié à l'ouverture du menu, déplié au toucher (aria-expanded) ; la
+                   page de l'entrée devient la dernière ligne de la liste. -->
+              <button
+                type="button"
+                class="mm-l"
+                aria-expanded={deplie === l.path}
+                aria-controls="{uid}-sub-{i}"
+                onclick={() => (deplie = deplie === l.path ? null : l.path)}
+                data-mm-toggle
+              >
+                <span class="mm-ic" aria-hidden="true"><l.icon size={20} strokeWidth={1.9} /></span>
+                <span class="mm-t">{l.label}</span>
+                <span class="mm-chev" aria-hidden="true"><ChevronDown size={18} strokeWidth={1.9} /></span>
+              </button>
+              <ul class="mm-sub" id="{uid}-sub-{i}" hidden={deplie !== l.path}>
                 {#each l.subs as s (s.id)}
                   <li>
                     <button type="button" class="mm-l mm-s" onclick={() => versSection(s)} data-mm-sec={s.id}>
@@ -181,7 +187,36 @@
                     </button>
                   </li>
                 {/each}
+                <li>
+                  <a
+                    class="mm-l mm-s"
+                    href={href(l.path)}
+                    aria-current={here(l.path)}
+                    onclick={(e) => {
+                      close();
+                      followLink(e, l.path);
+                    }}
+                    data-mm-page
+                  >
+                    <span class="mm-ic" aria-hidden="true"><l.icon size={16} strokeWidth={1.9} /></span>
+                    <span class="mm-t">{l.page ?? l.label}</span>
+                  </a>
+                </li>
               </ul>
+            {:else}
+              <a
+                class="mm-l"
+                href={href(l.path)}
+                aria-current={here(l.path)}
+                onclick={(e) => {
+                  close();
+                  followLink(e, l.path);
+                }}
+              >
+                <span class="mm-ic" aria-hidden="true"><l.icon size={20} strokeWidth={1.9} /></span>
+                <span class="mm-t">{l.label}</span>
+                <ChevronRight size={18} strokeWidth={1.9} aria-hidden="true" />
+              </a>
             {/if}
           {/if}
         </li>
@@ -491,10 +526,27 @@
     color: var(--text-2);
   }
   /* Sections de l'accueil sous « Sécurité » : en retrait, plus petites. */
-  .mm-sub {
+  .mm-sub:not([hidden]) {
     display: grid;
     gap: 2px;
     padding-inline-start: 26px;
+  }
+  /* Chevron de l'accordéon : tourne quand la liste est dépliée. */
+  .mm-chev {
+    display: grid;
+    color: var(--text-3);
+    transition: transform var(--dur-base) var(--ease-out);
+  }
+  [aria-expanded="true"] .mm-chev {
+    transform: rotate(180deg);
+  }
+  [aria-expanded="true"] .mm-chev :global(svg) {
+    color: var(--accent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mm-chev {
+      transition: none;
+    }
   }
   .mm-s {
     min-height: 44px;

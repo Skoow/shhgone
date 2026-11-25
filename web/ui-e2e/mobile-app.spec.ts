@@ -96,7 +96,14 @@ test.describe("téléphone façon app", () => {
     // « Nouveau partage », « Mes partages » seulement s'il y a des
     // partages sur l'appareil (aucun ici), « Offres » ; le reste est dans le pied de page.
     // Menu : « Nouveau partage », puis Salon (bientôt, un bouton), Sécurité, Offres.
-    await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Sécurité", "Offres"]);
+    // Sécurité : accordéon replié à l'ouverture du menu ; un toucher le déplie (ses sections de
+    // l'accueil, puis la page « Sécurité en détail »).
+    await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Offres"]);
+    const sec = menu.getByRole("button", { name: "Sécurité", exact: true });
+    await expect(sec).toHaveAttribute("aria-expanded", "false");
+    await sec.click();
+    await expect(sec).toHaveAttribute("aria-expanded", "true");
+    await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Sécurité en détail", "Offres"]);
     await expect(menu.getByRole("button", { name: /^Salon/ })).toHaveAttribute("aria-disabled", "true");
     await expect(menu.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
     expect(await smallTargets(page, "header")).toEqual([]);
