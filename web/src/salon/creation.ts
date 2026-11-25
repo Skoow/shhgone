@@ -8,12 +8,9 @@ import { KDF_CREATE, b64u } from "../engine/pure";
 import { passwordKeyForCreate } from "../engine/index";
 import type { ClesSalon, SalonEngine } from "./engine";
 import type { CorpsCreation } from "./api";
+import { PLACES_MIN, PLACES_SUR_MESURE_MAX, TOUTES, type Duree } from "./durees";
 
-export type Duree = 1 | 6 | 12 | 24;
-export const DUREES: readonly Duree[] = [1, 6, 12, 24];
-/** Places : 2 à 10, créateur compris (`max_members`, §39.1) ; « Ouvert » = 10. */
-export const PLACES_MIN = 2;
-export const PLACES_MAX = 10;
+export { DUREES, DUREES_LONGUES, PLACES_MAX, PLACES_MIN, PLACES_SUR_MESURE_MAX, dureeEnJours, dureesPermises, placesPermises, type Duree } from "./durees";
 
 export type Preparation = {
   kLien: Uint8Array<ArrayBuffer>;
@@ -33,7 +30,7 @@ const alea = (n: number) => crypto.getRandomValues(new Uint8Array(n));
  * `cles` (entrée dans le salon), puis les efface ; s'il abandonne : `oublier(p)`.
  */
 export async function preparer(eng: SalonEngine, motDePasse: string, o: { ttlHours: Duree; maxMembers: number; membersCanDestroy: boolean }): Promise<Preparation> {
-  if (!DUREES.includes(o.ttlHours) || !Number.isInteger(o.maxMembers) || o.maxMembers < PLACES_MIN || o.maxMembers > PLACES_MAX) throw new Error("argument_invalide");
+  if (!TOUTES.includes(o.ttlHours) || !Number.isInteger(o.maxMembers) || o.maxMembers < PLACES_MIN || o.maxMembers > PLACES_SUR_MESURE_MAX) throw new Error("argument_invalide");
   const kLien = alea(32);
   const sGestion = alea(32);
   const salt = alea(16);

@@ -6,7 +6,8 @@
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatDuration } from "../../i18n/format";
   import * as S from "../../salon/salon.svelte";
-  import { DUREES, PLACES_MAX, PLACES_MIN, type Duree } from "../../salon/creation";
+  import { PLACES_MIN, dureeEnJours, dureesPermises, placesPermises, type Duree } from "../../salon/creation";
+  import { account, etatCompte } from "../../account/session.svelte";
   type Regle = 0 | 1 | 2 | 3;
   import Segmented from "../../ui/Segmented.svelte";
   import Stepper from "../../ui/Stepper.svelte";
@@ -26,7 +27,28 @@
   let places = $state(vue.places);
   let duree = $state<Duree>(24);
   let message = $state("");
-  const durees = $derived(DUREES.map((d) => ({ value: d, label: t("salon.new.hours", { n: d }) })));
+  // Limites du compte connecté (sur mesure : durées longues et jusqu'à 50 places) ; sans compte
+  // ouvert, celles d'un salon ordinaire. Le serveur borne de toute façon par le palier du compte
+  // qui a créé le salon.
+  let maxHeures = $state<number | undefined>(undefined);
+  let maxPlaces = $state<number | undefined>(undefined);
+  // (Le module du compte est déjà chargé par salon.svelte.ts.)
+  $effect(() => {
+    if (!__COMPTES__ || account.etat !== "ouvert") return;
+    void etatCompte()
+      .then((e) => {
+        maxHeures = e.limites.heures;
+        maxPlaces = e.limites.places;
+      })
+      .catch(() => undefined);
+  });
+  const durees = $derived(
+    dureesPermises(maxHeures).map((d) => {
+      const j = dureeEnJours(d);
+      return { value: d, label: j === null ? t("salon.new.hours", { n: d }) : t("salon.new.days", { n: j }) };
+    }),
+  );
+  const placesMax = $derived(Math.max(placesPermises(maxPlaces), vue.places));
   const reste = $derived(Math.max(0, (vue.finMs - Date.now()) / 1000));
 
   function choisir(r: Regle): void {
@@ -55,7 +77,7 @@
   <section class="bloc" aria-labelledby="gestion-t">
     <h2 id="gestion-t">{t("salon.gestion.titre")}</h2>
     <div class="ligne">
-      <Stepper label={t("salon.gestion.places")} bind:value={places} min={PLACES_MIN} max={PLACES_MAX} />
+      <Stepper label={t("salon.gestion.places")} bind:value={places} min={PLACES_MIN} max={placesMax} />
       <span class="val">{t("salon.new.places.value", { n: places })}</span>
       <Button variant="secondary" dense onpress={async () => {
           const e = await S.reglerPlaces(places);

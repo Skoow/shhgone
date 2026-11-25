@@ -294,6 +294,8 @@ export type EtatServeur = {
   palier: "neuf" | "confirme";
   confirmeLe: string | null;
   limites: { salons: number; places: number; heures: number };
+  /** Limites sur mesure posées par l'exploitant (comptes qu'il connaît) : `limites` les donne. */
+  surMesure: boolean;
   salonsActifs: number;
   banniId: string | null;
   banniJusqu: string | null;
@@ -326,6 +328,7 @@ export async function etat(n: Net, session: string): Promise<EtatServeur> {
     palier: o.palier,
     confirmeLe: jourOuNull(o, "confirme_le"),
     limites: { salons: entier(l as Obj, "salons"), places: entier(l as Obj, "places"), heures: entier(l as Obj, "heures") },
+    surMesure: o.sur_mesure === true,
     salonsActifs: entier(o, "salons_actifs"),
     banniId: typeof id === "string" ? id : null,
     banniJusqu: jourOuNull(o, "banni_jusqu"),

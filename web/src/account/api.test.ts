@@ -152,9 +152,10 @@ describe("réponses", () => {
   });
 
   it("GET /api/compte : état décodé (dates ou null, motif, identifiant de bannissement), forme stricte", async () => {
-    expect(await A.etat(net(() => ok(ETAT)).n, JETON)).toEqual({ creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salonsActifs: 0, banniId: null, banniJusqu: null, banniMotif: null });
+    expect(await A.etat(net(() => ok(ETAT)).n, JETON)).toEqual({ creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, surMesure: false, salonsActifs: 0, banniId: null, banniJusqu: null, banniMotif: null });
     const banni = await A.etat(net(() => ok({ ...ETAT, banni: true, banni_id: "B-ABCD-EFGH-JKMNP", banni_jusqu: "2029-11-14", banni_motif: 6 })).n, JETON);
     expect(banni).toMatchObject({ banniId: "B-ABCD-EFGH-JKMNP", banniJusqu: "2029-11-14", banniMotif: 6 });
+    expect(await A.etat(net(() => ok({ ...ETAT, sur_mesure: true, limites: { salons: 2, places: 50, heures: 720 } })).n, JETON)).toMatchObject({ surMesure: true, limites: { salons: 2, places: 50, heures: 720 } });
     for (const bad of [{ ...ETAT, banni_jusqu: 3 }, { ...ETAT, banni_motif: 11 }, { ...ETAT, palier: "or" }, { ...ETAT, banni_id: "X" }])
       await expect(A.etat(net(() => ok(bad)).n, JETON)).rejects.toThrow("reponse_invalide");
   });

@@ -102,4 +102,37 @@ describe("Salon, avec une session : l'écran de création", () => {
     expect([...document.querySelectorAll("button")].some((b) => b.textContent!.includes(fr["salon.new.create"]))).toBe(true);
     expect(C.etatCompte).toHaveBeenCalled();
   });
+
+  // Durées proposées (boutons du groupe « Durée ») selon les limites du compte.
+  const durees = () => {
+    const g = [...document.querySelectorAll('[role="radiogroup"]')].find((x) => x.getAttribute("aria-label") === fr["salon.new.duration"])!;
+    return [...g.querySelectorAll(".opt")].map((b) => b.textContent!.replace(/\s+/gu, " ").trim());
+  };
+  const ouvert = () => [...document.querySelectorAll(".opt")].map((b) => b.textContent!.replace(/\s+/gu, " ").trim()).find((x) => x.startsWith("Ouvert"));
+
+  it("compte ordinaire : 1, 6, 12, 24 h et 10 places au plus, aucune durée longue", async () => {
+    vi.stubGlobal("__COMPTES__", true);
+    account.etat = "ouvert";
+    C.etatCompte.mockResolvedValue({ limites: { salons: 3, places: 10, heures: 24 }, surMesure: false });
+    await monter(Nouveau);
+    await attendre();
+    expect(durees()).toEqual(["1 h", "6 h", "12 h", "24 h"]);
+    expect(ouvert()).toContain("10");
+  });
+
+  it("compte sur mesure : 3, 7, 14 et 30 jours et jusqu'à 50 places, selon ses limites", async () => {
+    vi.stubGlobal("__COMPTES__", true);
+    account.etat = "ouvert";
+    C.etatCompte.mockResolvedValue({ limites: { salons: 2, places: 50, heures: 720 }, surMesure: true });
+    await monter(Nouveau);
+    await attendre();
+    expect(durees()).toEqual(["1 h", "6 h", "12 h", "24 h", "3 j", "7 j", "14 j", "30 j"]);
+    expect(ouvert()).toContain("50");
+    demonter();
+    C.etatCompte.mockResolvedValue({ limites: { salons: 1, places: 20, heures: 7 * 24 }, surMesure: true });
+    await monter(Nouveau);
+    await attendre();
+    expect(durees()).toEqual(["1 h", "6 h", "12 h", "24 h", "3 j", "7 j"]);
+    expect(ouvert()).toContain("20");
+  });
 });

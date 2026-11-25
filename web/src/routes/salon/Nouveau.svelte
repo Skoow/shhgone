@@ -10,7 +10,7 @@
   import { followLink, href, navigate } from "../../app/router.svelte";
   import { account, etatCompte } from "../../account/session.svelte";
   import { creer, type ErreurCreation } from "../../salon/salon.svelte";
-  import { DUREES, PLACES_MAX, PLACES_MIN, type Duree } from "../../salon/creation";
+  import { PLACES_MAX, PLACES_MIN, dureeEnJours, dureesPermises, placesPermises, type Duree } from "../../salon/creation";
   import Cadre from "../compte/Cadre.svelte";
   import Segmented from "../../ui/Segmented.svelte";
   import Stepper from "../../ui/Stepper.svelte";
@@ -32,16 +32,19 @@
   let duree = $state<Duree>(24);
   let ouvert = $state(true);
   let places = $state(2);
-  // Limites du palier du compte (conception compte §11) : places et durée au plus ; 10 et 24 h sans réponse.
+  // Limites du palier du compte (conception compte §11) : places et durée au plus ; 10 et 24 h
+  // sans réponse. Un compte sur mesure (limites posées par l'exploitant) voit jusqu'à 50 places
+  // et les durées longues (3, 7, 14, 30 jours) que ses limites permettent.
   let maxPlaces = $state(PLACES_MAX);
   let maxHeures = $state(24);
   $effect(() => {
     if (!connecte) return;
     void etatCompte()
       .then((e) => {
-        maxPlaces = Math.max(PLACES_MIN, Math.min(PLACES_MAX, e.limites.places));
+        maxPlaces = placesPermises(e.limites.places);
         maxHeures = e.limites.heures;
         places = Math.min(places, maxPlaces);
+        if (duree > maxHeures) duree = 24;
       })
       .catch(() => undefined);
   });
@@ -65,7 +68,12 @@
   let etape = $state<"cles" | "robot" | "envoi" | null>(null);
   let erreur = $state<ErreurCreation | null>(null);
 
-  const durees = $derived(DUREES.filter((d) => d <= maxHeures).map((d) => ({ value: d, label: t("salon.new.hours", { n: d }) })));
+  const durees = $derived(
+    dureesPermises(maxHeures).map((d) => {
+      const j = dureeEnJours(d);
+      return { value: d, label: j === null ? t("salon.new.hours", { n: d }) : t("salon.new.days", { n: j }) };
+    }),
+  );
   const choixPlaces = $derived([
     { value: "ouvert", label: t("salon.new.places.open", { n: maxPlaces }) },
     { value: "fixe", label: t("salon.new.places") },
@@ -131,7 +139,7 @@
 {:else}
   <Cadre titre={t("salon.new.title")} sous={t("salon.new.sub")}>
     <div class="form">
-      <Segmented label={t("salon.new.duration")} options={durees} bind:value={duree} />
+      <Segmented label={t("salon.new.duration")} options={durees} bind:value={duree} columns={durees.length > 4 ? 4 : undefined} />
       <Segmented label={t("salon.new.places")} options={choixPlaces} bind:value={mode} />
       {#if !ouvert}
         <div class="places">
