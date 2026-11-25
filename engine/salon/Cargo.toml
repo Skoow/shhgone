@@ -22,7 +22,7 @@ openmls_traits = "=0.6.0"
 # compilée (openmls_basic_credential signe avec elle) ; seule l'arête directe est ajoutée au
 # Cargo.lock. Utilisée seulement pour `SigningKey::from_bytes` → clé publique (la signature reste
 # celle d'OpenMLS, `SignatureKeyPair::from_raw`).
-ed25519-dalek = { version = "=2.2.0", default-features = false }
+ed25519-dalek = { version = "=3.0.0", default-features = false }
 zeroize = { version = "1.9", default-features = false, features = ["alloc", "derive"] }
 serde = { version = "1", default-features = false, features = ["std"] }
 serde_json = "1"
