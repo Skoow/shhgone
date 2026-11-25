@@ -104,6 +104,24 @@ func bancJetons(t *testing.T) (*banc, *Jetons) {
 	return b, b.s.Jetons()
 }
 
+// autreCle : une clé Pro publiée dont le dernier octet de token_key_id diffère de celui de
+// spki (seul octet porté par une demande d'émission).
+func autreCle(t *testing.T, j *Jetons, spki []byte) []byte {
+	t.Helper()
+	cles, err := j.Cles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	kid := sha256.Sum256(spki)
+	for _, c := range cles {
+		if k := sha256.Sum256(c.SPKI); c.Offre == Pro && k[31] != kid[31] {
+			return c.SPKI
+		}
+	}
+	t.Fatal("aucune clé Pro d'un autre octet de token_key_id")
+	return nil
+}
+
 func clePour(t *testing.T, j *Jetons, o Offre, decalage int64) []byte {
 	cles, err := j.Cles()
 	if err != nil || len(cles) != 2*(JoursAvance+1) {
@@ -234,7 +252,11 @@ func TestJetonsRefus(t *testing.T) {
 	spki := clePour(t, j, Plus, 0)
 	r, fin := client(t, spki, "shhgone.test")
 	// Lot vide ou trop grand, demande d'une autre clé, d'un autre type : refus, rien de décompté.
-	pro, _ := client(t, clePour(t, j, Pro, 0), "shhgone.test")
+	// « Autre clé » : la demande ne porte que le dernier octet de token_key_id (RFC 9578 §6.1) ;
+	// une clé Pro tirée au hasard partage cet octet avec la clé Plus du jour une fois sur 256, et
+	// le test échouait alors (1 fois sur 512 environ). La clé Pro prise est donc une des clés
+	// publiées dont cet octet diffère.
+	pro, _ := client(t, autreCle(t, j, spki), "shhgone.test")
 	mauvais := bytes.Clone(r)
 	mauvais[1] = 3
 	for _, lot := range [][][]byte{nil, {r, r, r, r, r, r}, {pro}, {mauvais}, {r[:100]}} {

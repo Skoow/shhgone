@@ -10,9 +10,11 @@ import (
 	"net/netip"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -357,11 +359,13 @@ func TestHoteControle(t *testing.T) {
 	}
 }
 
-// Aucun frein aux essais de jeton (26 900 par seconde
-// mesurés). Un jeton faux pose maintenant un délai global (rien par adresse) : sa réponse, et
-// celle de toute vérification arrivée entretemps, bonne ou fausse, n'est rendue qu'à la fin
-// du délai ; chaque jeton faux le prolonge, jusqu'à un plafond.
-// L'exploitant n'est jamais refusé : au pire il attend le plafond.
+// Aucun frein aux essais de jeton (26 900 par seconde mesurés). Un jeton faux pose maintenant
+// un délai global (rien par adresse) : sa réponse, et celle de toute vérification arrivée
+// entretemps, bonne ou fausse, n'est rendue qu'à la fin du délai ; chaque jeton faux le
+// prolonge, jusqu'à un plafond. L'exploitant n'est jamais refusé : au pire il attend le plafond.
+//
+// Horloge de testing/synctest : le temps n'avance que quand toutes les goroutines du test
+// attendent, donc les durées mesurées sont exactes, même sur une machine chargée.
 func TestFreinApresJetonFaux(t *testing.T) {
 	const pas, plafond = 40 * time.Millisecond, 160 * time.Millisecond
 	av, avMax := delaiFaux, delaiFauxMax
@@ -375,60 +379,70 @@ func TestFreinApresJetonFaux(t *testing.T) {
 		return time.Since(t0), w.Code
 	}
 
-	// Sans jeton faux : aucune attente.
-	b := nouveauBanc()
-	if d, code := duree(b, juste); code != 200 || d > pas/2 {
-		t.Fatalf("bon jeton, aucun essai faux : %d après %v", code, d)
-	}
-	// Essais faux à la suite : un pas chacun (force brute sur une connexion : 1 par pas au plus).
-	t0 := time.Now()
-	for range 4 {
-		if _, code := duree(b, faux); code != 404 {
-			t.Fatal("jeton faux accepté :", code)
+	synctest.Test(t, func(t *testing.T) {
+		// Sans jeton faux : aucune attente.
+		b := nouveauBanc()
+		if d, code := duree(b, juste); code != 200 || d != 0 {
+			t.Fatalf("bon jeton, aucun essai faux : %d après %v", code, d)
 		}
-	}
-	if d := time.Since(t0); d < 4*pas {
-		t.Fatalf("FAIBLESSE F4 : 4 essais faux à la suite en %v (au moins %v attendu)", d, 4*pas)
-	}
-	// Le délai est écoulé : le bon jeton passe de nouveau sans attendre.
-	if d, code := duree(b, juste); code != 200 || d > pas/2 {
-		t.Fatalf("bon jeton après les essais faux : %d après %v", code, d)
-	}
+		// Essais faux à la suite : un pas chacun (force brute sur une connexion : 1 par pas au plus).
+		for i := range 4 {
+			if d, code := duree(b, faux); code != 404 || d != pas {
+				t.Fatalf("FAIBLESSE F4 : essai faux %d : %d après %v (%v attendu)", i+1, code, d, pas)
+			}
+		}
+		// Le délai est écoulé : le bon jeton passe de nouveau sans attendre.
+		if d, code := duree(b, juste); code != 200 || d != 0 {
+			t.Fatalf("bon jeton après les essais faux : %d après %v", code, d)
+		}
+	})
 
 	// Rafale d'essais faux en même temps : le délai monte jusqu'au plafond, pas au-delà ; un bon
-	// jeton arrivé pendant la rafale est servi (jamais refusé), au plus tard au plafond, et pas
-	// avant la fin du délai en cours (sa réussite ne se voit pas plus tôt qu'un échec).
-	b = nouveauBanc()
-	var wg sync.WaitGroup
-	debut := time.Now()
-	var plusLong time.Duration
-	var mu sync.Mutex
-	for range 50 {
-		wg.Go(func() {
-			d, code := duree(b, faux)
-			if code != 404 {
-				t.Error("jeton faux accepté :", code)
+	// jeton arrivé pendant la rafale est servi (jamais refusé), au plafond, et pas avant la fin du
+	// délai en cours (sa réussite ne se voit pas plus tôt qu'un échec).
+	synctest.Test(t, func(t *testing.T) {
+		b := nouveauBanc()
+		var wg sync.WaitGroup
+		debut := time.Now()
+		var mu sync.Mutex
+		var durees []time.Duration
+		for range 50 {
+			wg.Go(func() {
+				d, code := duree(b, faux)
+				if code != 404 {
+					t.Error("jeton faux accepté :", code)
+				}
+				mu.Lock()
+				durees = append(durees, d)
+				mu.Unlock()
+			})
+		}
+		synctest.Wait() // les 50 essais faux attendent tous
+		time.Sleep(pas / 4)
+		d, code := duree(b, juste)
+		wg.Wait()
+		if code != 200 {
+			t.Fatal("DÉNI DE SERVICE : bon jeton refusé pendant une rafale d'essais faux :", code)
+		}
+		// Arrivé à pas/4, il attend la fin du délai en cours : le plafond, ni plus tôt ni plus tard.
+		if d != plafond-pas/4 {
+			t.Fatalf("bon jeton servi en %v pendant une rafale (%v attendu : fin du délai en cours)", d, plafond-pas/4)
+		}
+		// Le délai monte d'un pas par essai faux, jusqu'au plafond : k-ième essai servi à
+		// min(k × pas, plafond).
+		slices.Sort(durees)
+		for k, d := range durees {
+			if want := min(time.Duration(k+1)*pas, plafond); d != want {
+				t.Fatalf("essai faux n° %d servi après %v (%v attendu)", k+1, d, want)
 			}
-			mu.Lock()
-			plusLong = max(plusLong, d)
-			mu.Unlock()
-		})
-	}
-	time.Sleep(pas / 4)
-	d, code := duree(b, juste)
-	wg.Wait()
-	if code != 200 {
-		t.Fatal("DÉNI DE SERVICE : bon jeton refusé pendant une rafale d'essais faux :", code)
-	}
-	if d < pas/2 {
-		t.Fatalf("bon jeton servi en %v pendant une rafale : sa réussite se voit avant la fin du délai", d)
-	}
-	if d > plafond+pas || plusLong > plafond+pas || time.Since(debut) > 2*plafond+pas {
-		t.Fatalf("attente au-delà du plafond : bon jeton %v, essai faux le plus long %v (plafond %v)", d, plusLong, plafond)
-	}
-	if b.etats != 1 {
-		t.Fatal("appels à State :", b.etats)
-	}
+		}
+		if tout := time.Since(debut); tout != plafond {
+			t.Fatalf("rafale finie en %v (plafond %v)", tout, plafond)
+		}
+		if b.etats != 1 {
+			t.Fatal("appels à State :", b.etats)
+		}
+	})
 }
 
 // Après une coupure du tunnel, l'onglet

@@ -786,9 +786,13 @@ func (s *Service) seal(id string) {
 	}
 	s.finalizing.sealing[id] = struct{}{}
 	s.finalizing.mu.Unlock()
+	// Barrière, section critique vide voulue : obtenir le verrou exclusif prouve que les
+	// écritures de segment en vol (qui tiennent ce verrou en lecture) sont finies ; il est
+	// rendu aussitôt (au retour), sans rien protéger d'autre. Les écritures suivantes voient
+	// sealed et sont refusées.
 	mu := s.uploadLock(id)
 	mu.Lock()
-	mu.Unlock() // barrière : les écritures en vol (RLock) sont finies
+	defer mu.Unlock()
 }
 
 // sealed : un Finalize de l'envoi id est en cours (à lire sous le verrou de l'envoi en lecture).
