@@ -21,9 +21,11 @@
   import Piece from "./Piece.svelte";
   import Fichiers from "./Fichiers.svelte";
   import Appel from "./Appel.svelte";
+  import Panneau from "./Panneau.svelte";
   import IconButton from "../../ui/IconButton.svelte";
   import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
-  import { Folder, Mic, Paperclip, Phone, Users, Video, Volume, VolumeX } from "../../ui/Icon";
+  import { Clock, Ellipsis, Folder, Hourglass, Mic, Paperclip, Phone, SlidersHorizontal, TriangleAlert, Video, Volume, VolumeX, X } from "../../ui/Icon";
+  import { reducedMotion } from "../../ui/motion";
   import { doitSonner, jouer, SILENCE_TOUJOURS } from "../../salon/son";
   import { SvelteSet } from "svelte/reactivity";
 
@@ -89,7 +91,8 @@
   let edition = $state<Bulle | null>(null);
   let menu = $state<string | null>(null);
   let emojis = $state(false);
-  let membres = $state(false);
+  /** Panneau « Paramètres du salon » (participants, règle d'effacement, gestion) ouvert. */
+  let params = $state(false);
   let erreur = $state("");
   // Limite de trames du serveur (0x0B) : l'envoi repart tout seul ; on le dit au lieu de rester muet.
   const ralenti = $derived(ralentiRestant(vue.ralentiJusqua, maintenant));
@@ -473,11 +476,39 @@
   // --- Affichage ---------------------------------------------------------------------------------------
 
   function coche(b: Bulle): string {
+    if (vuPartiel(b)) return t("salon.room.tick.vupar", { n: b.vus.length, total: b.attendus.length });
+    return t(`salon.room.tick.${conv.coche(b)}`);
+  }
+  /** Groupe : vu par une partie seulement des participants attendus (« Vu par 1 / 3 »). */
+  function vuPartiel(b: Bulle): boolean {
     const c = conv.coche(b);
-    if (c === "vu" || c === "recu" || c === "envoye") {
-      if (b.attendus.length > 1 && b.vus.length > 0 && c !== "vu") return t("salon.room.tick.vupar", { n: b.vus.length, total: b.attendus.length });
-    }
-    return t(`salon.room.tick.${c}`);
+    return (c === "recu" || c === "envoye") && b.attendus.length > 1 && b.vus.length > 0;
+  }
+  /** Décompte court d'un message éphémère (« 42 s », « 4 min »), ou null hors décompte. */
+  function decompte(b: Bulle): { court: string; long: string } | null {
+    if (b.regle === 0 || b.retire) return null;
+    const ef = S.effacement(b, maintenant);
+    if (ef.etat !== "rebours") return null;
+    if (ef.finMs <= maintenant) return { court: "", long: t("salon.room.attente.lecture") };
+    const d = formatDuration((ef.finMs - maintenant) / 1000, lang);
+    return { court: d, long: t("salon.room.rebours", { duree: d }) };
+  }
+  /**
+   * Message effacé (règle du salon) qui quitte le fil : il se défait en trame de points qui
+   * dérive vers le haut, comme l'effet « efface » du site (ui/DestroyedArt.svelte), avec un fondu.
+   * Transform, opacité et masque seulement ; mouvement réduit : il part sans animation.
+   */
+  function dissoudre(_n: HTMLElement) {
+    if (reducedMotion()) return { duration: 0 };
+    return {
+      duration: 640,
+      css: (x: number) => {
+        const p = 1 - x;
+        const r = 4.4 * (1 - p * p);
+        const m = `radial-gradient(circle, #000 ${r.toFixed(2)}px, transparent ${(r + 0.6).toFixed(2)}px) 0 0 / 6px 6px`;
+        return `opacity:${Math.min(1, x * 1.6).toFixed(3)};transform:translate(${(p * 6).toFixed(2)}px,${(-p * 10).toFixed(2)}px);-webkit-mask:${m};mask:${m}`;
+      },
+    };
   }
   function cite(b: Bulle): { nom: string; texte: string } | null {
     if (!b.cite) return null;
@@ -493,15 +524,6 @@
     return t(`salon.room.sys.${e.quoi}`, { nom: nomDe(e) });
   }
   const attente = $derived(vue.attenteDepuis === null ? "" : maintenant - vue.attenteDepuis > 30_000 ? t("salon.room.wait.long") : maintenant - vue.attenteDepuis > 2_000 ? t("salon.room.wait.short") : "");
-  // Disposition large (panneau des participants à droite) : suit la fenêtre (redimensionnement, appareil tourné).
-  const mqLarge = typeof matchMedia === "function" ? matchMedia("(min-width: 1100px)") : null;
-  let large = $state(mqLarge?.matches ?? false);
-  $effect(() => {
-    if (!mqLarge) return;
-    const suivre = () => (large = mqLarge.matches);
-    mqLarge.addEventListener("change", suivre);
-    return () => mqLarge.removeEventListener("change", suivre);
-  });
   /** Échap, où que soit le focus dans le salon : ferme le sélecteur d'émojis ou le menu d'un message. */
   function echappe(e: KeyboardEvent): void {
     if (e.key !== "Escape" || e.defaultPrevented) return;
@@ -515,7 +537,9 @@
 
 <svelte:window onscroll={defile} onkeydown={echappe} />
 
+<!-- Scène (fond de la vitrine) et cadre de la conversation, qui a son propre fond. -->
 <div class="salon">
+<div class="ecran">
   <header class="tete">
     <div class="titre">
       <h1 tabindex="-1">{t("title.salon")}</h1>
@@ -537,7 +561,8 @@
         <button type="button" class="bt" aria-label={t("salon.son.silence")} aria-expanded={choixSilence} onclick={() => (choixSilence = !choixSilence)}><Volume size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.son.silence")}</span></button>
       {/if}
       <button type="button" class="bt" aria-label={t("salon.files.title")} onclick={() => (fichiers = true)}><Folder size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.files.title")}</span></button>
-      {#if !large}<button type="button" class="bt" aria-label={t("salon.room.members")} onclick={() => (membres = true)}><Users size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.room.members")}</span></button>{/if}
+      <!-- Participants, règle d'effacement et gestion : dans le panneau, la conversation garde toute la largeur. -->
+      <button type="button" class="bt" aria-label={t("salon.params")} aria-haspopup="dialog" aria-expanded={params} aria-controls="salon-params" onclick={() => (params = !params)}><SlidersHorizontal size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.params.court")}</span></button>
     </div>
   </header>
 
@@ -577,12 +602,19 @@
             <li class="sys">{ligne(e)}</li>
           {:else}
             {@const al = albums.get(e.cle)}
-            <li class={["msg", { moi: e.moi, album: al !== undefined, choisi: selection && choix.has(e.cle) }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e} use:appuiLong={e}>
+            {@const dc = decompte(e)}
+            <li class={["msg", { moi: e.moi, album: al !== undefined, choisi: selection && choix.has(e.cle) }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e} use:appuiLong={e} out:dissoudre>
               {#if selection && selectionnable(e)}
                 <input type="checkbox" class="sel" id="sel-{e.cle}" checked={choix.has(e.cle)} aria-label={t("salon.files.choisir", { nom: nomPiece(e) })} onchange={() => basculer(e.cle)} />
               {/if}
               <div class="bulle">
-                {#if !e.moi && al !== "suite"}<span class="auteur">{nomDe(e)}</span>{/if}
+                {#if (!e.moi && al !== "suite") || dc}
+                  <div class="haut">
+                    {#if !e.moi && al !== "suite"}<span class="auteur">{nomDe(e)}</span>{/if}
+                    <!-- Effacement (règle du salon) : temps restant court, en haut à droite. -->
+                    {#if dc}<span class="minuteur" data-decompte><Hourglass size={12} strokeWidth={2} aria-hidden="true" />{#if dc.court}<span aria-hidden="true">{dc.court}</span>{/if}<span class="sr-only">{dc.long}</span></span>{/if}
+                  </div>
+                {/if}
                 {#if e.retire}
                   <p class="retire">{t("salon.room.retracted")}</p>
                 {:else}
@@ -598,11 +630,24 @@
                 {/if}
                 {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>
                   {#if e.echec === "trop_grand" && !e.piece && e.texte}<Button variant="secondary" dense onpress={() => enFichier(e.texte)}>{t("salon.room.toolong.txt")}</Button>{/if}{/if}
+                <!-- Bas de la bulle, à droite : « modifié », accusés (nos messages), heure. -->
                 <p class="meta">
+                  {#if e.modifie && !e.retire}<span class="modifie">{t("salon.room.edited")}</span>{/if}
+                  {#if e.moi}
+                    {@const c = conv.coche(e)}
+                    <span class={["coche", c, { partiel: vuPartiel(e) }]}>
+                      {#if c === "attente"}<Clock size={13} strokeWidth={2} aria-hidden="true" />
+                      {:else if c === "echec"}<TriangleAlert size={13} strokeWidth={2} aria-hidden="true" />
+                      {:else}
+                        <svg class="tic" viewBox="0 0 18 12" width="18" height="12" aria-hidden="true" focusable="false">
+                          {#if c === "envoye" && !vuPartiel(e)}<path d="M3.5 6.6l2.9 2.9L13 2.9" />{:else}<path d="M1 6.6l2.9 2.9L10.5 2.9" /><path d="M7.6 9.2l.3.3L14.5 2.9" />{/if}
+                        </svg>
+                      {/if}
+                      {#if vuPartiel(e)}<span aria-hidden="true">{e.vus.length}/{e.attendus.length}</span>{/if}
+                      <span class={c === "echec" ? "" : "sr-only"}>{coche(e)}</span>
+                    </span>
+                  {/if}
                   <time>{formatClock(e.heureMs, lang)}</time>
-                  {#if e.modifie && !e.retire}<span>· {t("salon.room.edited")}</span>{/if}
-                  {#if e.moi}<span class={["coche", conv.coche(e)]}>· {coche(e)}</span>{/if}
-                  {#if e.regle !== 0 && !e.retire}{@const ef = S.effacement(e, maintenant)}{#if ef.etat === "rebours"}<span class="rebours">· {ef.finMs > maintenant ? t("salon.room.rebours", { duree: formatDuration((ef.finMs - maintenant) / 1000, lang, { precise: true }) }) : t("salon.room.attente.lecture")}</span>{/if}{/if}
                 </p>
                 {#if e.reactions.length > 0}
                   <ul class="reactions">
@@ -613,7 +658,7 @@
                 {/if}
               </div>
               {#if !e.retire && e.id}
-                <button type="button" class="plus" aria-label={t("salon.room.actions")} aria-expanded={menu === e.cle} onclick={() => (menu = menu === e.cle ? null : e.cle)}>⋯</button>
+                <button type="button" class="plus" aria-label={t("salon.room.actions")} aria-expanded={menu === e.cle} onclick={() => (menu = menu === e.cle ? null : e.cle)}><Ellipsis size={20} aria-hidden="true" /></button>
                 {#if menu === e.cle}
                   <div class="actions-msg" role="group" aria-label={t("salon.room.actions")}>
                     <div class="rapides">
@@ -683,13 +728,13 @@
         {#if reponse}
           <div class="contexte">
             <span>{t("salon.room.reply.to", { nom: nomDe(reponse) })}</span>
-            <button type="button" aria-label={t("salon.room.reply.cancel")} onclick={() => (reponse = null)}>✕</button>
+            <button type="button" aria-label={t("salon.room.reply.cancel")} onclick={() => (reponse = null)}><X size={18} aria-hidden="true" /></button>
           </div>
         {/if}
         {#if edition}
           <div class="contexte">
             <span>{t("salon.room.edit.mode")} — {t("salon.room.edit.note")}</span>
-            <button type="button" aria-label={t("salon.room.edit.cancel")} onclick={annulerEdition}>✕</button>
+            <button type="button" aria-label={t("salon.room.edit.cancel")} onclick={annulerEdition}><X size={18} aria-hidden="true" /></button>
           </div>
         {/if}
         {#if emojis}<Emojis onpick={(x) => ((texte += x), saisie?.focus())} onclose={() => ((emojis = false), saisie?.focus())} />{/if}
@@ -719,15 +764,11 @@
       <!-- Repère dans le flux (la saisie est collée en bas) : la fin de la conversation. -->
       <div bind:this={repere}></div>
     </section>
-    {#if large}
-      <aside class="panneau" aria-label={t("salon.room.members")}><Membres /></aside>
-    {/if}
   </div>
 </div>
+</div>
 
-{#if !large}
-  <Sheet bind:open={membres} title={t("salon.room.members")}><Membres /></Sheet>
-{/if}
+<Panneau bind:open={params} id="salon-params" title={t("salon.params")}><Membres /></Panneau>
 <Sheet bind:open={infosOuverte} title={t("salon.infos.titre")} onclose={() => (infosDe = null)}>
   {#if infos?.f}
     {@const f = infos.f}
@@ -758,15 +799,18 @@
 <VoiceRecorder bind:open={vocal} ondone={(v) => S.envoyerVocal(v)} />
 
 <style>
+  /* Scène : le fond de la vitrine (Vitrine.svelte), d'un bord à l'autre de la fenêtre (100cqw,
+     comme Nouveau.svelte), collée sous l'en-tête du site. */
   .salon {
-    width: 100%;
-    max-width: 1180px;
-    margin-inline: auto;
-    padding: var(--sp-3) var(--sp-4) 0;
-    /* La saisie reste en bas de l'écran, le pied de page sous la ligne de flottaison (messagerie). */
-    min-height: calc(100dvh - 4.5rem);
-    display: flex;
-    flex-direction: column;
+    position: relative;
+    isolation: isolate;
+    margin-inline: calc(50% - 50cqw);
+    margin-block-start: calc(-1 * var(--sp-5));
+    padding: var(--sp-5) clamp(16px, 4vw, 72px) var(--sp-6);
+    background:
+      radial-gradient(70% 60% at 20% 30%, rgb(95 227 181 / 0.08), transparent 70%),
+      radial-gradient(60% 70% at 90% 90%, rgb(51 102 255 / 0.1), transparent 70%),
+      var(--bg-deep);
     /* Couleurs des participants (§39.4 point 5) : ≥ 6,7:1 sur --surface-3. */
     --p0: #5fe3b5;
     --p1: #7cc4ff;
@@ -778,6 +822,44 @@
     --p7: #4fd8e0;
     --p8: #e0a8f0;
     --p9: #d9c3a0;
+  }
+  .salon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(circle, rgb(233 236 242 / 0.08) 1.1px, transparent 1.6px) 0 0 / 14px 14px;
+    -webkit-mask-image: radial-gradient(80% 70% at 30% 40%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(80% 70% at 30% 40%, #000 20%, transparent 75%);
+    pointer-events: none;
+  }
+  /* Cadre de la conversation (l'« écran » de la vitrine) : son propre fond, bord fin, ombre
+     douce. La saisie reste collée en bas de la fenêtre, le pied de page sous la ligne de flottaison. */
+  .ecran {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 880px);
+    min-height: calc(100dvh - 64px - var(--sp-5) - var(--sp-6));
+    box-sizing: border-box;
+    margin-inline: auto;
+    padding: var(--sp-3) var(--sp-5) 0;
+    border-radius: 20px;
+    background: var(--bg);
+    box-shadow:
+      inset 0 0 0 1px var(--hair-2),
+      0 40px 80px -40px rgb(0 0 0 / 0.9);
+  }
+  @media (max-width: 899px) {
+    .salon {
+      margin-block-start: calc(-1 * var(--sp-3));
+      padding: var(--sp-2) var(--sp-2) var(--sp-4);
+    }
+    .ecran {
+      min-height: calc(100dvh - 56px - var(--sp-2) - var(--sp-4));
+      padding-inline: var(--sp-3);
+      border-radius: 16px;
+    }
   }
   .boutons {
     display: flex;
@@ -827,7 +909,7 @@
   /* Titre à l'échelle des en-têtes d'écran, en version compacte (l'écran est un outil). */
   .tete h1 {
     margin: 0;
-    font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+    font-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
     font-weight: 700;
     font-stretch: var(--wd-display, 112%);
     line-height: 1.1;
@@ -937,32 +1019,15 @@
   }
   .corps {
     flex: 1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5);
-  }
-  @media (min-width: 1100px) {
-    .corps {
-      grid-template-columns: minmax(0, 720px) 320px;
-      justify-content: center;
-    }
+    display: flex;
+    flex-direction: column;
   }
   .col {
+    flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-  }
-  /* Le panneau ne dicte plus la hauteur de la page (850 px de vide entre
-     le dernier message et la saisie) : il reste sous la barre du site et défile en lui-même. */
-  .panneau {
-    position: sticky;
-    top: 64px;
-    align-self: start;
-    max-height: calc(100dvh - 64px);
-    overflow: auto;
-    padding: var(--sp-4) 0;
-    overscroll-behavior: contain;
   }
   .bandeau {
     margin: var(--sp-2) 0 0;
@@ -995,6 +1060,11 @@
   }
   .fil > .msg.album {
     grid-column: auto;
+  }
+  /* Album : la photo prend toute la case, le bouton « ⋯ » passe dessous. */
+  .album .bulle {
+    flex: 1 1 100%;
+    max-width: none;
   }
   .album :global(.img) {
     width: 100%;
@@ -1031,7 +1101,7 @@
     flex-wrap: wrap;
     align-items: flex-start;
     gap: var(--sp-1);
-    max-width: min(86%, 560px);
+    max-width: min(92%, 600px);
   }
   .msg.moi {
     justify-self: end;
@@ -1041,6 +1111,9 @@
      sur son nom) ; le coin du bas, du côté de l'auteur, est resserré. */
   .bulle {
     min-width: 0;
+    /* Le bouton « ⋯ » reste à côté de la bulle (il passait dessous sur téléphone). */
+    flex: 0 1 auto;
+    max-width: calc(100% - 48px);
     padding: var(--sp-2) var(--sp-3);
     border-radius: 16px 16px 16px 6px;
     background: var(--surface-1);
@@ -1127,13 +1200,51 @@
   .qn {
     font-weight: 600;
   }
-  .meta {
-    margin: var(--sp-1) 0 0;
+  /* Haut de la bulle : l'auteur à gauche, le décompte d'effacement à droite. */
+  .haut {
     display: flex;
-    gap: var(--sp-1);
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+  }
+  .minuteur {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-inline-start: auto;
+    color: var(--text-3);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .minuteur :global(svg) {
+    flex: none;
+  }
+  /* Bas de la bulle, à droite : « modifié », coches, heure ; chiffres alignés. */
+  .meta {
+    margin: 2px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
     flex-wrap: wrap;
     color: var(--text-3);
     font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .coche {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .tic {
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .coche.vu {
     color: var(--accent);
@@ -1164,6 +1275,9 @@
     border-color: var(--accent);
   }
   .plus {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
     min-width: 44px;
     min-height: 44px;
     border: 0;
@@ -1172,6 +1286,16 @@
     font-size: 1.25rem;
     cursor: pointer;
     border-radius: 10px;
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .plus:hover {
+      background: rgb(255 255 255 / 0.06);
+      color: var(--text);
+    }
+  }
+  .plus[aria-expanded="true"] {
+    color: var(--text);
   }
   .plus:focus-visible,
   .emo:focus-visible,

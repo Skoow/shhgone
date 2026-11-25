@@ -16,6 +16,7 @@
   import Pret from "./Pret.svelte";
   import Explication from "./Explication.svelte";
   import Conversation from "./Conversation.svelte";
+  import Termine from "./Termine.svelte";
 
   const lang = $derived(getLang());
   let mdp = $state("");
@@ -120,8 +121,10 @@
     </div>
   </Cadre>
 {:else if vue.etape === "fin"}
-  <Cadre titre={t("salon.end.title")}>
-    <p class="note" role="status">{fin()}</p>
+  <!-- Salon expiré ou détruit : « Cette conversation est terminée », avec l'heure où cette page l'a
+       vu finir ; autres fins (exclusion, place reprise, départ) : « Fin du salon ». -->
+  {@const terminee = vue.fin === "expire" || vue.fin === "detruit"}
+  <Termine titre={terminee ? t("salon.termine.titre") : t("salon.end.title")} texte={fin()} finLe={terminee ? vue.finLe : null} creer={!vue.reprise}>
     {#if vue.reprise}<div class="actions"><Button onpress={() => reprendreLaMain()}>{t("salon.end.reprendre")}</Button></div>{/if}
     {#if vue.reprise && vue.detruireFin === "possible"}
       <div class="actions">
@@ -131,8 +134,7 @@
     {:else if vue.reprise && vue.detruireFin === "lien"}
       <p class="note">{t("salon.end.detruire.sans")}</p>
     {/if}
-    <div class="actions"><Button variant="secondary" onpress={() => navigate("/")}>{t("salon.end.home")}</Button></div>
-  </Cadre>
+  </Termine>
 {:else if vue.etape === "gestion" && vue.gestionSeule}
   <!-- Lien de gestion ouvert seul : il ne fait entrer personne (v3 §15.2, 32). -->
   <Cadre titre={t("salon.gestionseule.title")} sous={t("salon.gestionseule.sub", { n: vue.gestionSeule.present, duree: formatDuration(reste, lang, { coarse: true }) })}>
@@ -143,6 +145,10 @@
   </Cadre>
 {:else if vue.etape === "chargement"}
   <Cadre titre={t("salon.join.title")}><p class="note" aria-busy="true">…</p></Cadre>
+{:else if vue.erreur?.code === "introuvable"}
+  <!-- Lien d'un salon fini, détruit ou inconnu : le serveur ne les distingue pas (aucun oracle),
+       la page non plus ; aucune date (rien de sûr sur cet appareil). -->
+  <Termine titre={t("salon.termine.inconnu.titre")} texte={t("salon.termine.inconnu.texte")} />
 {:else}
   <Cadre titre={vue.erreur ? t("salon.join.title") : t("salon.join.empty.title")}>
     {#if vue.erreur}

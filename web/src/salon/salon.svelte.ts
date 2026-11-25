@@ -76,6 +76,8 @@ export const vue = $state({
   /** Limite de trames du serveur (0x0B) : heure où l'envoi en attente repart (affichage seulement). */
   ralentiJusqua: null as number | null,
   fin: null as Fin | null,
+  /** Heure (ms, horloge de l'appareil) où cette page a vu le salon se terminer, ou null : affichage seulement. */
+  finLe: null as number | null,
   membresPeuventDetruire: false,
   /** Créateur délogé : « Reprendre la main ici » est proposé (le lien lui-même n'est pas dans cet état : reprendreLaMain). */
   reprise: false,
@@ -142,6 +144,7 @@ export async function detruireApresDelogement(): Promise<boolean> {
   try {
     await api.detruire(net(), { jGestion: j });
     vue.fin = "detruit";
+    vue.finLe = Date.now();
     vue.reprise = false;
     vue.detruireFin = null;
     lienReprise = null;
@@ -359,6 +362,7 @@ export async function detruireParGestion(): Promise<boolean> {
     oublierGestion();
     vue.gestionSeule = null;
     vue.fin = "detruit";
+    vue.finLe = Date.now();
     vue.etape = "fin";
     return true;
   } catch {
@@ -465,6 +469,7 @@ function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
   vue.createur = c.createur;
   vue.membresPeuventDetruire = e.membersCanDestroy;
   vue.fin = null;
+  vue.finLe = null;
   vue.appels = e.appels;
   vue.appelReserve = false;
   // Lecture locale seulement (aucune requête) : un pass payé est-il gardé sur cet appareil ?
@@ -655,6 +660,7 @@ function surEvenement(x: Session, ev: EvClient): void {
       break;
     case "fin":
       vue.fin = ev.raison;
+      vue.finLe = Date.now();
       vue.etape = "fin";
       x.appel?.fermer();
       // Créateur délogé (35) : pas de reconnexion d'elle-même ; « Reprendre la main ici »

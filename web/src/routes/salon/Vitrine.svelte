@@ -7,7 +7,7 @@
   // Animation en CSS seulement (arrivée des messages, saisie, onde), arrêtée sous mouvement réduit.
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatBytes, formatClock, formatDuration } from "../../i18n/format";
-  import { FileArchive, FileText, Folder, Mic, Paperclip, Pause, Phone, Video } from "../../ui/Icon";
+  import { FileArchive, FileText, Folder, Mic, Paperclip, Pause, Phone, SlidersHorizontal, Video } from "../../ui/Icon";
 
   const lang = $derived(getLang());
   // Heures d'exemple : un soir, à la minute ; seules les heures sont montrées.
@@ -42,6 +42,7 @@
           <span class="reserve">{t("salon.vitrine.appels")}</span>
         </span>
         <span class="bt"><Folder size={20} /><span class="lib">{t("salon.files.title")}</span></span>
+        <span class="bt"><SlidersHorizontal size={20} /><span class="lib">{t("salon.params.court")}</span></span>
       </div>
     </div>
 
@@ -73,7 +74,7 @@
                 <p class="fic"><span class="nom">{t("salon.vitrine.pdf")}</span><span class="taille">{formatBytes(184 * 1024, lang)}</span></p>
                 <span class="enr">{t("salon.piece.enregistrer")}</span>
               </div>
-              <p class="meta"><time>{h(2)}</time><span class="coche vu">· {t("salon.room.tick.vu")}</span></p>
+              <p class="meta"><span class="coche vu"><svg class="tic" viewBox="0 0 18 12" width="18" height="12" focusable="false"><path d="M1 6.6l2.9 2.9L10.5 2.9" /><path d="M7.6 9.2l.3.3L14.5 2.9" /></svg></span><time>{h(2)}</time></p>
             </div>
           </li>
           <li class="msg c2">
@@ -176,7 +177,7 @@
     align-content: center;
     justify-items: center;
     min-width: 0;
-    padding: var(--sp-5) clamp(24px, 4vw, 72px) var(--sp-4);
+    padding: var(--sp-8) clamp(24px, 4vw, 72px);
     background:
       radial-gradient(70% 60% at 20% 30%, rgb(95 227 181 / 0.1), transparent 70%),
       radial-gradient(60% 70% at 90% 90%, rgb(51 102 255 / 0.12), transparent 70%),
@@ -203,9 +204,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    width: min(100%, 780px);
+    width: min(100%, 720px);
     /* Tient dans la fenêtre (sous la barre du site de 64 px) : le fil garde ses derniers messages. */
-    height: max(600px, calc(100dvh - 64px - var(--sp-5) - var(--sp-4)));
+    height: clamp(540px, calc(100dvh - 64px - 2 * var(--sp-8)), 720px);
     box-sizing: border-box;
     padding: var(--sp-3) var(--sp-4) 0;
     border-radius: 20px;
@@ -422,18 +423,20 @@
   .msg.moi {
     align-self: flex-end;
   }
+  /* Bulles : celles de Conversation.svelte (surface et filet, coin resserré du côté de
+     l'auteur, ses propres messages en teinte menthe ; la couleur de la personne sur son nom). */
   .bulle {
     min-width: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: 14px;
+    border-radius: 16px 16px 16px 6px;
     background: var(--surface-1);
-    border-inline-start: 3px solid var(--pc, var(--line));
+    box-shadow: inset 0 0 0 1px var(--hair);
     overflow-wrap: anywhere;
   }
   .moi .bulle {
-    background: var(--surface-2);
-    border-inline-start: 0;
-    border-inline-end: 3px solid var(--accent);
+    border-radius: 16px 16px 6px 16px;
+    background: var(--accent-tint);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.14);
   }
   .auteur {
     display: block;
@@ -446,13 +449,27 @@
   }
   .meta {
     display: flex;
-    gap: var(--sp-1);
-    margin: var(--sp-1) 0 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin: 2px 0 0;
     color: var(--text-3);
     font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .coche {
+    display: inline-flex;
   }
   .coche.vu {
     color: var(--accent);
+  }
+  .tic {
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   /* ---------- Pièces (Piece.svelte) ---------- */
