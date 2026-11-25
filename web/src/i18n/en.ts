@@ -414,7 +414,6 @@ export const en = {
   "ready.col.manage": "Tracking and deletion",
   "ready.created": "Share created.",
   "ready.delete.confirm": "Delete this share for everyone? The link will lead nowhere.",
-  "ready.never": "This link and this password will never be shown again.",
   "ready.active": "Active",
   "ready.selfdestruct": "Erases itself: after {opens}, or at that time ({ttl} after sending, rounded up to the next quarter hour).",
   "ready.opens.one": "{n} open",

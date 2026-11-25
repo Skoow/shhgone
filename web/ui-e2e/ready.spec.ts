@@ -44,15 +44,15 @@ test.describe("fr-FR", () => {
     await toReady(page, context, shh.origin);
     await expect(readyHeading(page)).toBeFocused();
 
-    // Ordre du DOM : avertissement → un seul cadre (lien, mot de passe, infos) →
+    // Ordre du DOM : un seul cadre (lien, mot de passe, infos) →
     // Supprimer → Nouveau partage ; plus de « Gérer ce partage ».
     const order = await page.evaluate(() => {
-      const els = [...document.querySelectorAll(".ready p.never, .ready [data-ready-card] [role=group][aria-label], .ready [data-ready-facts], .ready .danger-zone, .ready .done")];
+      const els = [...document.querySelectorAll(".ready [data-ready-card] [role=group][aria-label], .ready [data-ready-facts], .ready .danger-zone, .ready .done")];
       return els.map((e) => e.getAttribute("aria-label") ?? e.className.split(" ").find((c) => c && !c.startsWith("svelte-")));
     });
-    expect(order).toEqual(["never", "Lien", "Mot de passe", "facts", "danger-zone", "done"]);
+    expect(order).toEqual(["Lien", "Mot de passe", "facts", "danger-zone", "done"]);
     await expect(page.getByText("Gérer ce partage")).toHaveCount(0);
-    await expect(page.locator(".ready p.never")).toHaveText("Ce lien et ce mot de passe ne seront plus jamais affichés.");
+    await expect(page.locator(".ready p.never")).toHaveCount(0);
     // Aucune action principale en bas : « Nouveau partage » discret (fantôme), Supprimer aussi.
     await expect(newShare(page)).toHaveClass(/\bghost\b/);
     await expect(page.locator(".ready .done .btn.primary")).toHaveCount(0);

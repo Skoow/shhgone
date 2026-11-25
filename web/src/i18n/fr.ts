@@ -415,7 +415,6 @@ export const fr = {
   "ready.col.manage": "Suivi et suppression",
   "ready.created": "Partage créé.",
   "ready.delete.confirm": "Supprimer ce partage pour tout le monde\u202f? Le lien ne mènera plus à rien.",
-  "ready.never": "Ce lien et ce mot de passe ne seront plus jamais affichés.",
   "ready.active": "Actif",
   "ready.selfdestruct": "S'efface tout seul\u202f: après {opens}, ou à cette heure ({ttl} après l'envoi, arrondie au quart d'heure supérieur).",
   "ready.opens.one": "{n}\u202fouverture",

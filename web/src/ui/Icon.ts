@@ -38,7 +38,6 @@ export { default as Trash2 } from "./icons/Trash2.svelte";
 export { default as Flag } from "./icons/Flag.svelte";
 export { default as ChevronLeft } from "./icons/ChevronLeft.svelte";
 export { default as WifiOff } from "./icons/WifiOff.svelte";
-export { default as ClipboardX } from "./icons/ClipboardX.svelte";
 export { default as CircleHelp } from "./icons/CircleHelp.svelte";
 export { default as Minus } from "./icons/Minus.svelte";
 export { default as Plus } from "./icons/Plus.svelte";

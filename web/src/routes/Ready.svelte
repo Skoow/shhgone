@@ -19,7 +19,7 @@
   import { copyText } from "../ui/clipboard";
   import CopyField from "../ui/CopyField.svelte";
   import Deadline from "../ui/Deadline.svelte";
-  import { Check, ClipboardX, Copy, Eye, Lock, Plus, QrCode as QrIcon, Send, Share2, Trash2 } from "../ui/Icon";
+  import { Check, Copy, Eye, Lock, Plus, QrCode as QrIcon, Send, Share2, Trash2 } from "../ui/Icon";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import Logo from "../ui/Logo.svelte";
   import QrCode from "../ui/QrCode.svelte";
@@ -236,11 +236,9 @@
 
       <!-- Ordinateur : deux colonnes. À gauche le « ticket » (le lien, une perforation, le mot de
            passe) et l'envoi ; à droite l'échéance et la gestion. Téléphone : une colonne, même
-           ordre (celui du DOM : avertissement, lien, mot de passe, informations, Supprimer, Nouveau partage). -->
+           ordre (celui du DOM : lien, mot de passe, informations, Supprimer, Nouveau partage). -->
       <div class="corps" data-ready-card>
         <div class="gauche">
-          <p class="never" data-fan><ClipboardX size={18} strokeWidth={1.75} aria-hidden="true" />{t("ready.never")}</p>
-
           <!-- Le ticket : lien, perforation, mot de passe (masqué à l'arrivée, œil pour l'afficher,
                copiable masqué). Rien entre les deux : la paire reste ensemble. -->
           <!-- Apparition propre au ticket (CSS, coupée en mouvement réduit), pas l'éventail data-fan. -->
@@ -765,22 +763,6 @@
   .qr figcaption {
     font-size: var(--fs-small);
     color: var(--text-2);
-  }
-  .never {
-    max-width: none;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--warn-tint);
-    color: var(--text);
-    font-weight: 560;
-  }
-  .never :global(svg) {
-    flex: none;
-    color: var(--warn);
   }
   .cell {
     min-width: 0;
