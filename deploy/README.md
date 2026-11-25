@@ -9,6 +9,7 @@ Caddy (TLS) devant le serveur Go, dans Docker. Références : spécification §8
 | `compose.yaml` | les deux conteneurs (plus les relais du paiement et des appels, §13 et §14), en lecture seule, sans capacité, sans journal |
 | `deploy.sh` | installe une version par empreinte, après vérification de sa provenance (§3), contrôle, revient en arrière ; commandes d'administration |
 | `provenance.sh`, `test-provenance.sh` | vérification de provenance du site (manifeste signé par cosign, spec §28.7), chargée par `deploy.sh` ; son banc d'essai, sans réseau (§3) |
+| `verrous.sh`, `test-verrous.sh` | verrous de mise en ligne V1 à V3 (commits signés par une clé autorisée, aucune histoire réécrite, commit confirmé par le propriétaire), chargés par `deploy.sh` ; leur banc d'essai, avec un dépôt et des clés SSH temporaires (§3.5) |
 | `shhcheck/` | petit programme Go : santé du conteneur, test TLS hybride, relais de sortie du paiement (§13), contrôle d'un hôte joignable en TLS (`joindre`), relais TURN (§14) ; `salonws_test.go` et `compte_test.go` : essais de banc (tests seulement, hors du binaire) |
 | `test-proxy.sh` | test du proxy : le Caddyfile devant le vrai serveur (salon activé), sur la boucle locale |
 | `journaux.sh`, `test-journaux.sh` | contrôles des journaux de la machine (aucune adresse IP sur le disque, une heure au plus en mémoire), bloquants dans `deploy.sh` ; leur banc d'essai, sur une machine factice (§1) |
@@ -117,11 +118,13 @@ install -d -o 65532 -g 65532 -m 0700 /srv/shhdrop/data
 install -d -o 65532 -g 65532 -m 0700 /srv/shhdrop/caddy
 install -d -o root -g 65532 -m 0750 /srv/shhdrop/secrets
 
-# Réglages, cosign (§3.2), puis installation d'une version (empreinte de l'image et numéro de
-# sa Release signée, voir §3).
+# Réglages, cosign (§3.2), signataires autorisés (§3.5), puis installation d'une version
+# (empreinte de l'image, numéro de sa Release signée et commit confirmé, voir §3).
 cp deploy/env.example deploy/.env && editor deploy/.env
-deploy/deploy.sh sha256:<empreinte> <x.y.z>
+deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>
 ```
+
+La copie du dépôt (par exemple `/opt/shhdrop`) est un clone public en https, sans identifiant : **le serveur ne détient jamais d'accès en écriture à GitHub** (ni jeton, ni clé de déploiement, ni assistant d'identifiants). Elle appartient à root et n'est modifiable que par lui (`chown -R root:root /opt/shhdrop`) : `deploy.sh` tourne en root depuis elle, et ses verrous lancent git sans `safe.directory`, donc refusent une copie d'un autre compte.
 
 Ne pas inscrire le volume dans `/etc/fstab` ni `/etc/crypttab` avec une clé : il se déverrouille à la main (§5).
 
@@ -164,14 +167,16 @@ install -m 0755 -o root -g root /tmp/cosign /usr/local/bin/cosign && rm /tmp/cos
 
 cosign lit la racine de confiance de Sigstore (TUF) sur `tuf-repo-cdn.sigstore.dev` et la garde dans `~/.sigstore` ; le serveur doit aussi joindre `github.com` (téléchargement du manifeste) et Docker Hub (image Node épinglée du contrôle). Un pare-feu sortant doit les laisser passer pendant `deploy.sh`.
 
-Sur le serveur :
+Sur le serveur (jamais `git pull` : voir §3.5) :
 
 ```sh
-git pull                                      # Caddyfile, compose.yaml, deploy.sh à jour
-deploy/deploy.sh sha256:<empreinte> <x.y.z>   # vérifie la provenance, installe, contrôle, revient en arrière si le contrôle échoue
-deploy/deploy.sh status                       # version en service, version précédente, conteneurs
-deploy/deploy.sh rollback                     # réinstalle la version précédente (provenance revérifiée)
+git fetch origin                                       # télécharge les commits, ne change aucun fichier
+deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>   # verrous (§3.5), provenance, installe, contrôle, revient en arrière si le contrôle échoue
+deploy/deploy.sh status                                # version, commit en service et précédents, commit installé, conteneurs
+deploy/deploy.sh rollback                              # réinstalle la version précédente (provenance et verrous revérifiés)
 ```
+
+`<commit>` : le commit complet (40 chiffres hexadécimaux) de l'étiquette `web-v<x.y.z>`, donné par la conversation de développement, **jamais copié depuis GitHub** (§3.5, V3).
 
 **Vérification de provenance** (spec §28.7 ; `deploy/provenance.sh`), avant que rien ne démarre, sans option, variable ni commande pour la sauter (spec §28.8, C2) :
 
@@ -205,10 +210,69 @@ Contrôle fait par `deploy.sh` après le démarrage, sans option pour le sauter 
 À savoir :
 
 - **chaque redémarrage du serveur efface les envois en cours et les partages en cours de lecture** (les jetons ne survivent pas, §36 S12). Relancer `deploy.sh` avec la même empreinte ne redémarre rien ;
-- le retour arrière ne concerne que l'image. Pour ramener `Caddyfile` ou `compose.yaml` en arrière : `git checkout <commit> -- deploy/`, puis `deploy.sh` ;
-- une version installée avant la vérification de provenance n'a pas de numéro (`deploy/.release.version` absent) : `rollback` vers elle est refusé, et le contrôle d'un retour arrière automatique vers elle échoue (le site reste alors à vérifier à la main). Réinstaller avec `deploy/deploy.sh sha256:<empreinte> <x.y.z>` ;
-- `deploy/deploy.sh "$(cat deploy/.release)"` (après un redémarrage, §5) réinstalle l'image en service avec sa version déjà vérifiée (`deploy/.release.version`) : la provenance est revérifiée, ce qui demande Sigstore (et `github.com` si le manifeste n'est pas déjà gardé dans `deploy/.provenance/`) ;
+- le retour arrière ne concerne que l'image : `Caddyfile`, `compose.yaml` et `deploy.sh` restent ceux du commit installé (§3.5). Pour les ramener en arrière : un nouveau commit signé qui les rétablit, une nouvelle Release, puis `deploy.sh` (une copie modifiée à la main, `git checkout <commit> -- deploy/` par exemple, est refusée par les verrous) ;
+- une version installée avant la vérification de provenance n'a pas de numéro (`deploy/.release.version` absent), et une version installée avant les verrous n'a pas de commit (`deploy/.release.commit` absent) : `rollback` vers elle est refusé, et le contrôle d'un retour arrière automatique vers une version sans numéro échoue (le site reste alors à vérifier à la main) ;
+- `deploy/deploy.sh "$(cat deploy/.release)"` (après un redémarrage, §5) réinstalle l'image en service avec sa version et son commit déjà vérifiés (`deploy/.release.version`, `deploy/.release.commit`) : la provenance et les verrous sont revérifiés (§3.5), ce qui demande Sigstore (et `github.com` si le manifeste n'est pas déjà gardé dans `deploy/.provenance/`) ;
 - si le serveur refuse de démarrer, son message n'est écrit nulle part (aucun journal). Pour le lire : `deploy/deploy.sh diagnose`.
+
+### 3.5 Verrous de mise en ligne (25 novembre)
+
+Risque visé : un compte GitHub volé pousse un code piégé (dans le site, le serveur, ou `deploy.sh` lui-même), signe une Release avec `release.yml` (§3.1 : la signature cosign prouve « construit par ce workflow », pas « voulu par le propriétaire »), et le propriétaire l'installe par erreur. Trois verrous, **tous obligatoires**, sans option, variable ni commande pour les sauter (`deploy/verrous.sh`, décision du propriétaire du 25 novembre ; spec §28.7) :
+
+| Verrou | Ce que `deploy.sh` exige | Contre quoi |
+|---|---|---|
+| **V1** signatures | le commit du manifeste signé (`release.json`, champ `commit`) est dans la copie du dépôt et passe `git verify-commit` avec `/etc/shhdrop/signataires-autorises` ; puis **chaque** commit entre le commit installé et le nouveau, fusions et leurs branches comprises, a une bonne signature d'un signataire autorisé (`%G?` = `G`) | un commit poussé par quelqu'un qui n'a pas la clé de signature : non signé, signé par une autre clé, ou fait sur le site de GitHub (signé par la clé GPG de GitHub, jamais acceptée : seules les signatures SSH du fichier comptent, gpg est désactivé pour cette vérification) |
+| **V2** histoire | le commit installé (`/etc/shhdrop/commit-installe`) est un ancêtre du nouveau (`git merge-base --is-ancestor`) | une histoire réécrite (`push --force`) qui retirerait ou remplacerait des commits déjà vérifiés, ou ferait revenir à un ancien commit (et à ses failles corrigées depuis) |
+| **V3** confirmation | le commit complet donné en argument (`deploy.sh sha256:<empreinte> <x.y.z> <commit>`) est celui du manifeste signé | une Release ou une étiquette posée sur un autre commit que celui que le propriétaire a voulu ; le commit vient de la conversation de développement, un autre canal que GitHub |
+
+Avant d'installer, `deploy.sh` affiche le résumé des changements depuis le commit installé : `git log --oneline` (30 commits au plus, puis le nombre restant) et `git diff --stat` (30 fichiers au plus, puis la ligne de total), sans caractère de contrôle. Le lire : un changement dans `deploy/`, `server/` ou un fichier inattendu se voit ici.
+
+**Fichiers du serveur**, hors de la copie du dépôt, à root :
+
+```sh
+install -d -o root -g root -m 0755 /etc/shhdrop
+cat >/etc/shhdrop/signataires-autorises <<'EOF'
+shhgone-dev namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKy87HxSEheG8vEPhSs9u2KZCtVErAQfpmprtUJCZ2w7
+EOF
+chown root:root /etc/shhdrop/signataires-autorises && chmod 0644 /etc/shhdrop/signataires-autorises
+# Contrôle : l'empreinte doit être SHA256:32dP45eSMmVSt/G/CGvcxl/P+MO3Nwj9xeTh/GSA2wc
+cut -d' ' -f3,4 /etc/shhdrop/signataires-autorises | ssh-keygen -lf -
+```
+
+- `signataires-autorises` : format `allowedSignersFile` de git (une ligne par clé : principal, `namespaces="git"`, clé publique SSH). `shhgone-dev` est la clé qui signe tous les commits de ce dépôt (empreinte `SHA256:32dP45eSMmVSt/G/CGvcxl/P+MO3Nwj9xeTh/GSA2wc`, clé publique tirée de la signature SSH d'un commit, `git cat-file -p HEAD`, et recalculée). `deploy.sh` refuse si le fichier manque, n'est pas un fichier ordinaire à root (lien refusé), a des droits plus larges que 0644, ne nomme aucune clé, ou si `/etc/shhdrop` est modifiable par le groupe ou les autres.
+- **V4, plus tard** : la clé du propriétaire, sur son propre appareil, en deuxième ligne `proprietaire namespaces="git" ssh-ed25519 AAAA…`. Pas encore exigée : tant qu'elle n'y est pas, tout commit signé par `shhgone-dev` passe V1.
+- `commit-installe` : écrit par `deploy.sh` seulement, après une installation réussie (contrôle de santé compris), jamais à la main. Un fichier présent mais mal réglé ou illisible est refusé, jamais pris pour une absence.
+- Outils : `git` et `ssh-keygen` (paquet `openssh-client`). La copie du dépôt est **celle de `deploy.sh`** (pas de variable dans `deploy/.env`) : ce sont ses `Caddyfile`, `compose.yaml`, `deploy.sh` et `verify-site.mjs` que l'installation emploie, c'est donc elle qui doit être au commit vérifié.
+
+**Procédure** :
+
+1. `git fetch origin` dans la copie du dépôt, **jamais `git pull`**. `deploy.sh` ne fait aucun accès réseau pour les verrous (choix : la copie n'est mise à jour que par l'exploitant, et `git fetch` ne change aucun fichier ; `alerte.sh` en fait déjà un par jour, §4). Le serveur n'a aucun accès en écriture à GitHub (§2).
+2. `deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>`. Le `deploy.sh` qui tourne est celui du commit installé (déjà vérifié) : il vérifie le nouveau commit (V1, V2), avance la copie (`git merge --ff-only <commit>`, sans réseau ; refusé si la copie n'est pas propre ou pas sur le commit installé), puis relance le `deploy.sh` de ce commit vérifié, qui refait toutes les vérifications, affiche le résumé, puis vérifie la provenance et V3 avant que rien ne démarre.
+3. Après une installation réussie, `/etc/shhdrop/commit-installe` et `deploy/.release.commit` nomment le nouveau commit.
+
+Pourquoi jamais `git pull` : il mettrait dans la copie le `deploy.sh` venu de GitHub **avant** toute vérification, et c'est lui qui tournerait. Un `deploy.sh` piégé ne vérifie rien. Si la copie n'est pas sur le commit installé, `deploy.sh` refuse et dit de revenir au commit installé (`git reset --hard $(cat /etc/shhdrop/commit-installe)`, les fichiers non suivis comme `deploy/.env` restent).
+
+**Première installation sous verrous** (`/etc/shhdrop/commit-installe` absent) : seul V1 s'applique, au commit installé ; l'histoire qui le précède n'est pas vérifiée, et `deploy.sh` le dit (« PREMIÈRE installation sous verrous »). Le `deploy.sh` en place sur le serveur avant le 25 novembre n'a pas les verrous : cette fois-là, vérifier à la main avant d'avancer la copie, puis installer :
+
+```sh
+git fetch origin
+S=/etc/shhdrop/signataires-autorises
+git -c gpg.ssh.program=ssh-keygen -c gpg.ssh.allowedSignersFile=$S -c gpg.program=false verify-commit <commit>   # « Good "git" signature for shhgone-dev »
+git merge --ff-only <commit>
+deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>
+```
+
+**Retour arrière et réinstallation** : `deploy.sh rollback` et `deploy.sh "$(cat deploy/.release)"` reprennent le commit noté avec l'image (`deploy/.release.prev.commit`, `deploy/.release.commit`). Les verrous y sont revérifiés autrement : le commit doit passer V1 et être le commit installé ou **l'un de ses ancêtres** (histoire déjà vérifiée), son manifeste doit le nommer (V3), et la copie doit être sur le commit installé (ou sur un descendant qui passe V1 et V2 : après une installation qui a échoué au contrôle, la copie reste sur le nouveau commit). Un retour arrière ne change **pas** `commit-installe` : il reste le plus récent commit installé, et la prochaine installation devra en descendre. Un code fautif se corrige donc par un nouveau commit signé (un `git revert`), jamais en réécrivant l'histoire. Une version installée avant les verrous n'a pas de commit noté : `rollback` vers elle est refusé.
+
+**Limites, honnêtement** :
+
+- La clé `shhgone-dev` est **partagée par l'environnement Claude Code** : elle signe tout commit fait dans une session Claude Code qui a accès à ce dépôt. Qui contrôle **à la fois** le compte GitHub **et** une telle session peut signer un commit piégé, qui passera V1 et V2. Il reste V3 (le propriétaire doit confirmer ce commit, depuis la conversation de développement) et le résumé des changements. **V4** (la clé du propriétaire, seule exigée sur le commit installé) fermera ce cas.
+- V3 ne vaut que si le propriétaire tire le commit de la conversation de développement et lit le résumé : un commit copié depuis GitHub ne prouve rien.
+- Les verrous prouvent qui a signé, pas que le code est sain.
+- Le premier `deploy.sh` sous verrous, et la copie du dépôt à ce moment-là, sont à vérifier à la main (ci-dessus) ; ensuite, chaque `deploy.sh` qui tourne est celui d'un commit vérifié, tant que personne ne fait `git pull` ni ne modifie la copie à la main.
+- Qui est root sur le serveur peut tout changer (fichiers de `/etc/shhdrop`, copie du dépôt) : les verrous protègent contre GitHub, pas contre le serveur.
+- Les binaires de l'image (serveur, `shhcheck`) ne sont toujours pas reconstruits ni comparés (§9) : les verrous portent sur le commit du manifeste, et l'image doit être construite depuis ce commit (§3.2).
+- git identifie les objets par SHA-1 (avec détection des collisions connues) : une signature couvre l'empreinte SHA-1 de l'arbre et des parents.
 
 ## 4. Commandes d'administration (§15.3)
 
@@ -231,7 +295,7 @@ Le lien signalé ne se donne **jamais** en argument (il irait dans l'historique 
   - **URGENT** : machine redémarrée (accès possible : vérifier avant de déverrouiller) ; volume chiffré verrouillé ; certificat inconnu dans les journaux publics ; serveur muet ; 5 signalements dans l'heure ; conteneur malade ; disque (données ou système) ou inodes à 90 % ; mémoire disponible sous 10 % ; certificat TLS à moins de 7 jours ; domaine ou location du serveur à moins de 7 jours de l'échéance ; nom de domaine qui ne pointe plus vers la machine (détournement, expiration) ; aucune sauvegarde réussie depuis 26 h ; disque qui annonce une panne (`smartctl`, paquet `smartmontools`).
   - **À prévoir** : disque à 75 %, ou plein dans moins de 14 jours au rythme du jour ; certificat à moins de 21 jours (Caddy renouvelle à 30 : le renouvellement échoue) ; domaine ou location à moins de 45 jours ; échéance du domaine illisible ; mises à jour de sécurité du système en attente ; redémarrage demandé ; commits de retard sur GitHub (correctif à déployer) ; horloge non synchronisée ; unité systemd en échec ; charge trop haute.
   - **Rappel** tous les 30 jours : essayer une restauration (§12). **Bilan** chaque semaine, même sans problème (disque, jours restants du certificat, du domaine et de la location, mises à jour, retard) : s'il n'arrive pas, c'est l'alerte qui ne marche plus (fournisseur d'envoi, minuteur).
-  - Réglages : `SHH_SERVEUR_ECHEANCE` (fin de la location, à remettre à jour après chaque renouvellement), `SHH_DOMAINE_ECHEANCE` seulement si RDAP ne répond pas. L'échéance du domaine se lit par RDAP (`rdap.org`, qui renvoie au registre : seul le nom du domaine, public, est envoyé). Le retard sur GitHub suppose que la copie du dépôt est un clone `git` lisible par root (`git config --global --add safe.directory /opt/shhdrop`).
+  - Réglages : `SHH_SERVEUR_ECHEANCE` (fin de la location, à remettre à jour après chaque renouvellement), `SHH_DOMAINE_ECHEANCE` seulement si RDAP ne répond pas. L'échéance du domaine se lit par RDAP (`rdap.org`, qui renvoie au registre : seul le nom du domaine, public, est envoyé). Le retard sur GitHub suppose que la copie du dépôt est un clone `git` à root (§2 ; un `safe.directory` ne suffit pas aux verrous de `deploy.sh`, §3.5). Le message dit `git fetch`, jamais `git pull` (§3.5).
   - Envoi depuis la machine (pas depuis le conteneur, qui n'a pas de sortie) par un fournisseur SMTP : `SHH_ALERTE_SMTP_HOST` (TLS implicite sur 465), avec un **identifiant réservé aux alertes** (par exemple `alertes@shhgone.com`, envoi seulement) dans `SHH_ALERTE_SMTP_USER`, et `SHH_ALERTE_FROM`. Le mot de passe va dans `/etc/shhdrop/alerte_smtp_mdp` (`install -d -m 0700 /etc/shhdrop`, fichier root 0600), hors du volume chiffré pour que l'alerte parte même volume verrouillé après un redémarrage. Un envoi raté est retenté au passage suivant. Avant le 22 novembre, ces réglages s'appelaient `SHH_SMTP_HOST` et `SHH_MAIL_FROM` et servaient aussi au compte. Ces noms sont maintenant refusés : les renommer. Ce mot de passe est sur le disque système, en clair : quelqu'un qui lirait ce disque pourrait envoyer des e-mails avec, rien d'autre, d'où un identifiant à part, que l'on change s'il fuit. Aucune donnée d'utilisateur ni adresse IP dans les e-mails ni dans l'état (`/var/lib/shhdrop-alerte` : des dates et un pourcentage par jour). Santé lisible à la main : `deploy/deploy.sh health`.
 - Les **demandes des autorités** (Pharos, injonctions) arrivent à `contact@shhgone.com` : notification activée sur le téléphone. Chaque demande traitée va au registre des retraits (`docs/juridique/registre-retraits-modele.md`, tenu hors du serveur).
 
@@ -290,7 +354,7 @@ Le site reste hors service tant que le volume n'est pas déverrouillé (les cont
 ```sh
 cryptsetup open /dev/sdb shhdrop
 mount -o noatime,nodev,nosuid,noexec /dev/mapper/shhdrop /srv/shhdrop
-deploy/deploy.sh "$(cat deploy/.release)"   # provenance revérifiée (§3.4)
+deploy/deploy.sh "$(cat deploy/.release)"   # provenance et verrous revérifiés (§3.4, §3.5)
 ```
 
 ## 6. Plan d'incident (§15.5)
@@ -365,7 +429,7 @@ docker run --rm --network host --log-driver none -v /etc/ssl/certs/ca-certificat
 
 ```sh
 CADDY=/chemin/vers/caddy deploy/test-proxy.sh     # Caddy 2.10 ou plus, curl 7.83 ou plus, Go, web/dist construit (≈ 2 min 30 : WebSocket gardé 75 s)
-make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux et de la provenance (Node exigé), go vet et tests de shhcheck
+make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux, de la provenance (Node exigé) et des verrous (git, ssh-keygen), go vet et tests de shhcheck
 SHH_IMAGE=shhdrop:ci make test-sortie             # sorties : configuration, puis réseau réel (démon Docker ; code 3 sans démon)
 sudo make test-restauration                       # sauvegarde et restauration d'un compte de test, en mémoire (≈ 45 s)
 ```
@@ -385,7 +449,7 @@ Un job rouge = une faille connue : GitHub envoie un e-mail d'échec au propriét
 ## 9. Ce que ce kit ne fait pas
 
 - **Démarches légales (§17)** : avis d'un juriste sur la conservation des données d'identification (LCEN, décret 2021-1362, en conflit avec « aucune adresse IP enregistrée »), point de contact DSA, déclaration ANSSI, mentions légales, CGU. Rien n'ouvre au public avant.
-- **Provenance du code (§28.7)** : ~~ni `release.yml`, ni signature~~ **24 novembre** : `release.yml` signe le manifeste du site (cosign sans clé), `deploy.sh` refuse une image dont le site n'est pas celui d'un manifeste signé et vérifie le site servi à travers Caddy (§3), une surveillance horaire compare le site en ligne aux derniers manifestes signés (`.github/workflows/verifier-site.yml`, §4). **Reste** : (1) les **binaires** de l'image (serveur, `shhcheck`) ne sont ni signés ni comparés à un build public (le serveur ne voit que du chiffré : cette preuve servirait l'exploitation, spec §28.7) ; l'image n'est pas construite par la CI et aucun registre n'est choisi ; (2) la première étiquette `web-v<x.y.z>` et la protection des étiquettes `web-v*` (règle du dépôt, création réservée au propriétaire) sont à faire par le propriétaire ; (3) la vérification ne protège pas une victime ciblée par un serveur compromis (spec §28.8) ; (4) `verify-site.mjs` ne contrôle pas les en-têtes (CSP…) ; (5) la démo (GitHub Pages) n'est pas signée (Q-C3).
+- **Provenance du code (§28.7)** : ~~ni `release.yml`, ni signature~~ **24 novembre** : `release.yml` signe le manifeste du site (cosign sans clé), `deploy.sh` refuse une image dont le site n'est pas celui d'un manifeste signé et vérifie le site servi à travers Caddy (§3), une surveillance horaire compare le site en ligne aux derniers manifestes signés (`.github/workflows/verifier-site.yml`, §4). **25 novembre** : verrous de mise en ligne V1 à V3 (§3.5 : commits signés par une clé autorisée, aucune histoire réécrite, commit confirmé par le propriétaire). **Reste** : (0) V4, la clé du propriétaire (la clé de développement est partagée par l'environnement Claude Code, §3.5) ; (1) les **binaires** de l'image (serveur, `shhcheck`) ne sont ni signés ni comparés à un build public (le serveur ne voit que du chiffré : cette preuve servirait l'exploitation, spec §28.7) ; l'image n'est pas construite par la CI et aucun registre n'est choisi ; (2) la première étiquette `web-v<x.y.z>` et la protection des étiquettes `web-v*` (règle du dépôt, création réservée au propriétaire) sont à faire par le propriétaire ; (3) la vérification ne protège pas une victime ciblée par un serveur compromis (spec §28.8) ; (4) `verify-site.mjs` ne contrôle pas les en-têtes (CSP…) ; (5) la démo (GitHub Pages) n'est pas signée (Q-C3).
 - ~~**Surveillance (§15.2)** : ni sonde externe, ni script horaire d'alerte.~~ **22 novembre** : sonde externe et alerte de la machine en place (§4, « Surveillance »).
 - **Déverrouillage (§22)** : pas de `deploy/unlock.sh` ; les trois commandes du §5 en tiennent lieu. Pas d'alerte « redémarrage nécessaire ».
 - **Dates et tailles des fichiers** (audit adverse du 13 novembre, stockage, F4). Les dates de contenu et d'accès sont au 1er janvier 1970 ; la date de changement d'inode (`ctime`) de tous les fichiers est ramenée, une fois par minute, à l'heure de ce passage. Restent lisibles par qui lit le disque déverrouillé : la **date de création** (`btime`, sur ext4) de chaque fichier de partage, de pièce et de conversation, qu'aucun appel système ne permet de changer, donc l'heure de création de chaque partage vivant et du premier message de chaque salon ; pendant une minute au plus, le `ctime` d'un fichier qui vient d'être écrit ; la taille d'une conversation, par paliers de 64 messages (plus le nombre exact) ; l'ordre de création (numéros d'inode). Le dossier de données lui-même, `frozen`, `kill/`, `kill.key`, `shares.db`, `shares.db-wal` et `shares.db-shm` ont, depuis la 3ᵉ campagne de l'audit adverse (stockage, F5), leurs dates de contenu et d'accès remises à l'epoch à chaque passage du janitor (une fois par minute) et leur `ctime` ramené à l'heure de ce passage : l'heure du dernier gel, dégel, destruction par l'administrateur ou écriture en base ne se lit plus qu'à la minute près ; un gel et un dégel remettent aussi les dates aussitôt. Restent : la **date de création de `frozen`**, qui donne l'heure du gel en cours tant qu'il dure, et celle de `kill/`, créé au premier passage du serveur (heure du démarrage, sans rapport avec une destruction). Seuls le volume chiffré et l'absence d'instantanés les protègent.

@@ -397,7 +397,7 @@ else
 	printf '%s' "$retard" >"$retard_cache"
 fi
 if [[ ${retard:-} =~ ^[0-9]+$ ]] && [ "$retard" -gt 0 ]; then
-	envoyer maj-service $JOUR "$retard commit(s) de retard sur GitHub (correctifs possibles) : git pull, vérifier la CI, puis deploy.sh"
+	envoyer maj-service $JOUR "$retard commit(s) de retard sur GitHub (correctifs possibles) : vérifier la CI, puis deploy.sh avec le commit confirmé (git fetch, jamais git pull : README §3.5)"
 fi
 ntp=$(lire SHH_ALERTE_NTP timedatectl show -p NTPSynchronized --value)
 if [ -n "$ntp" ] && [ "$ntp" != yes ]; then

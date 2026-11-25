@@ -4,11 +4,13 @@
 # celui du manifeste signé, contrôle la santé, et revient à la version précédente si le
 # contrôle échoue. Lancé à la main, sur le serveur, depuis une copie du dépôt.
 #
-#   deploy/deploy.sh sha256:<64 chiffres hexadécimaux> <x.y.z>
+#   deploy/deploy.sh sha256:<64 chiffres hexadécimaux> <x.y.z> <commit de 40 chiffres hexadécimaux>
 #                                                         installe cette image, dont le site doit
-#                                                         être celui de la Release web-v<x.y.z>
+#                                                         être celui de la Release web-v<x.y.z>,
+#                                                         construite depuis ce commit (confirmé
+#                                                         par le propriétaire, verrous V1 à V3)
 #   deploy/deploy.sh sha256:<empreinte en service>        la réinstalle (après un redémarrage),
-#                                                         avec sa version déjà vérifiée
+#                                                         avec sa version et son commit déjà vérifiés
 #   deploy/deploy.sh rollback                             réinstalle la version précédente
 #   deploy/deploy.sh status                               versions et état des conteneurs
 #   deploy/deploy.sh admin freeze|unfreeze|destroy -|wipe --yes
@@ -27,8 +29,10 @@
 # activé (SHH_PAIEMENT: "1") : un relais par prestataire dont les secrets sont dans
 # <SHH_DATA_ROOT>/secrets (README §13).
 # État : deploy/.release (empreinte en service) et deploy/.release.prev (la précédente), leurs
-# versions dans deploy/.release.version et deploy/.release.prev.version ; manifestes vérifiés
-# dans deploy/.provenance/<x.y.z>/.
+# versions dans deploy/.release.version et deploy/.release.prev.version, leurs commits dans
+# deploy/.release.commit et deploy/.release.prev.commit ; manifestes vérifiés dans
+# deploy/.provenance/<x.y.z>/ ; dernier commit installé (verrou V2) dans
+# /etc/shhdrop/commit-installe.
 #
 # Provenance (spec §28.7 ; deploy/provenance.sh, README §3) : avant tout démarrage, cosign
 # (binaire contrôlé par son empreinte épinglée) vérifie que release.json de la Release
@@ -37,9 +41,18 @@
 # démarrage, le contrôle de santé lance verify-site.mjs à travers Caddy (le retour arrière suit
 # un écart). Aucune option, variable ni commande ne saute ces vérifications (spec §28.8, C2).
 #
+# Verrous du 25 novembre (deploy/verrous.sh, README §3.5), avant tout démarrage, sans option non
+# plus : V1, le commit du manifeste et chaque commit depuis le commit installé sont signés par une
+# clé de /etc/shhdrop/signataires-autorises ; V2, le commit installé est un ancêtre du nouveau ;
+# V3, le commit donné en argument est celui du manifeste. La copie du dépôt (celle de ce script)
+# est mise à jour par l'exploitant avec « git fetch origin » seulement (jamais « git pull ») : ce
+# script, celui du commit installé, vérifie le nouveau commit, avance la copie (git merge
+# --ff-only), puis relance le deploy.sh de ce commit vérifié, qui refait toutes les vérifications.
+#
 # Limites, dites aussi dans le README :
 #   - le retour arrière ne concerne que l'image ; Caddyfile et compose.yaml viennent de la
-#     copie du dépôt (pour les ramener en arrière : git, puis relancer ce script) ;
+#     copie du dépôt, au commit installé (pour les ramener en arrière : un nouveau commit signé,
+#     une nouvelle Release, puis ce script ; README §3.4) ;
 #   - seuls les fichiers du site sont prouvés : les binaires de l'image (serveur, shhcheck) ne
 #     sont pas signés (README §9).
 set -euo pipefail
@@ -54,11 +67,13 @@ die() {
 	exit "${2:-1}"
 }
 usage() {
-	printf 'usage: deploy.sh sha256:<empreinte> [<x.y.z>] | rollback | status | admin <commande> | health | diagnose\n' >&2
+	printf 'usage: deploy.sh sha256:<empreinte> [<x.y.z> <commit>] | rollback | status | admin <commande> | health | diagnose\n' >&2
 	exit 2
 }
 
 [ $# -ge 1 ] || usage
+# Arguments gardés pour relancer le deploy.sh du commit vérifié (verrous, plus bas).
+args=("$@")
 [ -f .env ] || die "deploy/.env absent (copier deploy/env.example et l'adapter)"
 set -a
 # shellcheck disable=SC1091 # fichier propre à chaque serveur
@@ -71,6 +86,11 @@ set +a
 # l'emportent sur toute variable du même nom venue de deploy/.env.
 # shellcheck source=deploy/provenance.sh
 . ./provenance.sh
+# shellcheck source=deploy/verrous.sh
+. ./verrous.sh
+# Copie du dépôt vérifiée par les verrous : celle de ce script (ses Caddyfile, compose.yaml et
+# verify-site.mjs sont ceux qu'utilise l'installation), jamais une autre.
+depot=$(cd "$here/.." && pwd)
 # Autorités pour le contrôle TLS. Changé seulement par les essais (autorité interne de Caddy).
 ca=${SHH_CHECK_CA:-/etc/ssl/certs/ca-certificates.crt}
 
@@ -81,6 +101,8 @@ cur=$(cat .release 2>/dev/null || true)
 prev=$(cat .release.prev 2>/dev/null || true)
 cur_v=$(cat .release.version 2>/dev/null || true)
 prev_v=$(cat .release.prev.version 2>/dev/null || true)
+cur_c=$(cat .release.commit 2>/dev/null || true)
+prev_c=$(cat .release.prev.commit 2>/dev/null || true)
 valid() { [[ $1 =~ ^sha256:[0-9a-f]{64}$ ]]; }
 
 # Compte par passkey (README §12) : activé seulement par compose.yaml (SHH_COMPTES: "1", fichier
@@ -338,12 +360,48 @@ check() {
 	}
 }
 
+# verrous <commit> <suite|retour> : V1 et V2 (deploy/verrous.sh, README §3.5), puis la copie du
+# dépôt au bon commit. suite : nouveau commit ; si la copie n'y est pas encore, elle y est
+# avancée, puis le deploy.sh de ce commit (vérifié) est relancé avec les mêmes arguments et refait
+# tout. retour : retour arrière ou réinstallation ; la copie doit être sur le commit installé
+# (ou sur un descendant qui passe V1 et V2).
+verrous() {
+	local c=$1 mode=$2 installe
+	if ! command -v git >/dev/null 2>&1 || ! command -v ssh-keygen >/dev/null 2>&1; then
+		die "git et ssh-keygen exigés par les verrous (paquets git et openssh-client, README §3.5)"
+	fi
+	controle_signataires "$VERROUS_SIGNATAIRES" 0 || die "installation refusée : signataires autorisés (V1, README §3.5)"
+	installe=$(lire_commit_installe "$VERROUS_COMMIT_INSTALLE" 0) || die "installation refusée : commit installé illisible (V2, README §3.5)"
+	verifier_commit "$depot" "$VERROUS_SIGNATAIRES" "$installe" "$c" "$mode" ||
+		die "installation refusée : commit $c non vérifié (README §3.5)"
+	if [ "$mode" = retour ]; then
+		copie_verifiee "$depot" "$VERROUS_SIGNATAIRES" "$installe" ||
+			die "refusé : la copie du dépôt doit être sur le commit installé $installe (ou un descendant vérifié), sans modification (README §3.5)"
+		return 0
+	fi
+	if ! copie_au_commit "$depot" "$VERROUS_SIGNATAIRES" "$c" 2>/dev/null; then
+		avancer_copie "$depot" "$VERROUS_SIGNATAIRES" "$installe" "$c" ||
+			die "installation refusée : copie du dépôt à remettre sur le commit installé (README §3.5)"
+		echo "copie du dépôt avancée au commit $c (signé, vérifié) : relance du deploy.sh de ce commit"
+		# Toute la commande « case » en cours a été lue avant de s'exécuter : rien de plus n'est
+		# lu de l'ancien fichier. Le verrou est rendu, le nouveau script le reprend.
+		exec 9>&-
+		exec "$here/deploy.sh" "${args[@]}"
+	fi
+	resume_changements "$depot" "$VERROUS_SIGNATAIRES" "$installe" "$c"
+}
+
+# install_version <empreinte> <x.y.z> <commit> <suite|retour>
 install_version() {
-	local new=$1 new_v=$2 cosign
+	local new=$1 new_v=$2 new_c=$3 mode=$4 cosign
 	valid "$new" || usage
+	commit_valide "$new_c" ||
+		die "commit refusé : « $new_c » (le commit complet, 40 chiffres hexadécimaux, donné par la conversation de développement : README §3.5)" 2
 	# Une seule installation à la fois (status et admin restent possibles pendant ce temps).
 	exec 9>.deploy.lock
 	flock -n 9 || die "une autre installation est en cours"
+	# Verrous V1 et V2, avant tout le reste (README §3.5).
+	verrous "$new_c" "$mode"
 	preflight
 	cosign=$(command -v cosign || true)
 	controle_cosign "$cosign" "$COSIGN_SHA256" || exit 1
@@ -355,6 +413,9 @@ install_version() {
 	# n'est pas celui du manifeste signé web-v<x.y.z>.
 	verifier_provenance "$cosign" docker curl "$SHH_IMAGE_REPO@$new" "$new_v" "$here/.provenance" ||
 		die "installation refusée : le site de $new n'est pas prouvé conforme à la Release web-v$new_v (README §3)"
+	# V3 : le commit confirmé par le propriétaire est celui du manifeste signé.
+	controle_commit_annonce "$here/.provenance/$new_v/release.json" "$new_c" ||
+		die "installation refusée : commit non confirmé (V3, README §3.5)"
 
 	echo "installation de $new"
 	dc "$new" up -d --remove-orphans || true # l'échec éventuel est constaté par check
@@ -370,11 +431,19 @@ install_version() {
 			if valid "$cur"; then
 				printf '%s\n' "$cur" >.release.prev
 				printf '%s\n' "$cur_v" >.release.prev.version
+				if commit_valide "$cur_c"; then printf '%s\n' "$cur_c" >.release.prev.commit; else rm -f .release.prev.commit; fi
 			fi
 			printf '%s\n' "$new" >.release.tmp && mv .release.tmp .release
 		fi
 		printf '%s\n' "$new_v" >.release.version.tmp && mv .release.version.tmp .release.version
-		echo "en service : $new (web-v$new_v)"
+		printf '%s\n' "$new_c" >.release.commit.tmp && mv .release.commit.tmp .release.commit
+		# V2 : le commit installé n'avance qu'après une installation réussie, et jamais en arrière
+		# (un retour arrière ou une réinstallation le laisse tel quel).
+		if [ "$mode" = suite ]; then
+			ecrire_commit_installe "$VERROUS_COMMIT_INSTALLE" "$new_c" ||
+				die "en service, mais $VERROUS_COMMIT_INSTALLE n'a pas pu être écrit : le corriger avant la prochaine installation (README §3.5)"
+		fi
+		echo "en service : $new (web-v$new_v, commit $new_c)"
 		return 0
 	fi
 
@@ -395,12 +464,15 @@ install_version() {
 
 case $1 in
 sha256:*)
-	if [ $# -eq 2 ]; then
-		install_version "$1" "$2"
+	if [ $# -eq 3 ]; then
+		install_version "$1" "$2" "$3" suite
+	elif [ $# -eq 1 ] && [ "$1" = "$cur" ] && version_valide "$cur_v" && commit_valide "$cur_c"; then
+		# Réinstallation (après un redémarrage) : provenance et verrous revérifiés.
+		install_version "$1" "$cur_v" "$cur_c" retour
 	elif [ $# -eq 1 ] && [ "$1" = "$cur" ] && version_valide "$cur_v"; then
-		install_version "$1" "$cur_v" # réinstallation (après un redémarrage) : provenance revérifiée
-	elif [ $# -eq 1 ]; then
-		die "version manquante : deploy/deploy.sh $1 <x.y.z> (Release web-v<x.y.z> dont le manifeste signé décrit le site de cette image, README §3)" 2
+		die "commit de la version en service inconnu (installée avant les verrous) : deploy/deploy.sh $1 $cur_v <commit> (README §3.5)" 2
+	elif [ $# -le 2 ]; then
+		die "version ou commit manquant : deploy/deploy.sh $1 <x.y.z> <commit> (Release web-v<x.y.z> dont le manifeste signé décrit le site de cette image, et son commit complet, confirmé par la conversation de développement : README §3.5)" 2
 	else
 		usage
 	fi
@@ -409,13 +481,16 @@ rollback)
 	[ $# -eq 1 ] || usage
 	valid "$prev" || die "aucune version précédente (deploy/.release.prev absent)"
 	version_valide "$prev_v" ||
-		die "version de la précédente inconnue (installée avant la vérification de provenance) : deploy/deploy.sh $prev <x.y.z>"
-	install_version "$prev" "$prev_v"
+		die "version de la précédente inconnue (installée avant la vérification de provenance) : retour arrière impossible"
+	commit_valide "$prev_c" ||
+		die "commit de la précédente inconnu (installée avant les verrous) : retour arrière impossible (README §3.5)"
+	install_version "$prev" "$prev_v" "$prev_c" retour
 	;;
 status)
 	[ $# -eq 1 ] || usage
-	echo "en service : ${cur:-aucune}${cur_v:+ (web-v$cur_v)}"
-	echo "précédente : ${prev:-aucune}${prev_v:+ (web-v$prev_v)}"
+	echo "en service : ${cur:-aucune}${cur_v:+ (web-v$cur_v)}${cur_c:+, commit $cur_c}"
+	echo "précédente : ${prev:-aucune}${prev_v:+ (web-v$prev_v)}${prev_c:+, commit $prev_c}"
+	echo "commit installé (V2) : $(cat "$VERROUS_COMMIT_INSTALLE" 2>/dev/null || echo aucun)"
 	if valid "$cur"; then dc "$cur" ps -a; fi
 	;;
 admin)
