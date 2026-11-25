@@ -142,6 +142,22 @@ controle_journaux() {
 	f=$r/etc/systemd/system/timers.target.wants/shhdrop-journal.timer
 	[ -L "$f" ] || [ -e "$f" ] ||
 		pb+=("minuteur shhdrop-journal.timer non activé ; l'installer depuis deploy/systemd/, puis systemctl enable --now shhdrop-journal.timer (README §1)")
+	# 9. Vidages mémoire coupés : une copie de la mémoire d'un programme planté (adresses, clés en
+	#    cours d'usage) écrite sur le disque système, non chiffré. Sur Ubuntu, apport réécrit
+	#    kernel.core_pattern à chaque démarrage, après /etc/sysctl.d/ : il doit être masqué.
+	f=$r/proc/sys/kernel/core_pattern
+	if [ -r "$f" ]; then
+		v=$(cat "$f")
+		[ "$v" = '|/bin/false' ] ||
+			pb+=("kernel.core_pattern = « $v » (vidages mémoire sur le disque) ; masquer apport (systemctl mask apport.service apport-autoreport.path apport-autoreport.service apport-forward.socket, enabled=0 dans /etc/default/apport) et poser kernel.core_pattern=|/bin/false (README §1)")
+	fi
+	# 10. Docker : aucun journal de conteneur sur le disque par défaut (compose.yaml le coupe pour
+	#     les nôtres ; ceci couvre tout conteneur lancé à la main).
+	if [ -e "$r/usr/bin/dockerd" ]; then
+		f=$r/etc/docker/daemon.json
+		grep -Eq '"log-driver"[[:space:]]*:[[:space:]]*"none"' "$f" 2>/dev/null ||
+			pb+=("/etc/docker/daemon.json : \"log-driver\": \"none\" absent (journaux des conteneurs écrits sur le disque) ; le poser puis systemctl restart docker (README §1)")
+	fi
 	[ ${#pb[@]} -eq 0 ] && return 0
 	printf '%s\n' "${pb[@]}"
 	return 1

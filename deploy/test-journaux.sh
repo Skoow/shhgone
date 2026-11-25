@@ -26,6 +26,10 @@ machine() {
 	: >"$r/usr/sbin/ufw"
 	printf 'ENABLED=yes\nLOGLEVEL=off\n' >"$r/etc/ufw/ufw.conf"
 	echo 1800 >"$r/proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established"
+	mkdir -p "$r/proc/sys/kernel" "$r/usr/bin" "$r/etc/docker"
+	echo '|/bin/false' >"$r/proc/sys/kernel/core_pattern"
+	: >"$r/usr/bin/dockerd"
+	printf '{\n  "log-driver": "none"\n}\n' >"$r/etc/docker/daemon.json"
 	# Registres des connexions : liens vers /dev/null ; PAM d'Ubuntu 24.04 sans pam_lastlog
 	# (ligne commentée), minuteur de purge activé.
 	mkdir -p "$r/etc/pam.d" "$r/etc/logrotate.d" "$r/etc/systemd/system/timers.target.wants"
@@ -119,6 +123,18 @@ refuse "MaxFileSec absent (1 mois)" "$r" "$SSHD_BON" "poser MaxFileSec=15min"
 # 4. sshd.
 r=$(machine sshd)
 accepte "sshd LogLevel SILENT (OpenSSH 10)" "$r" "${SSHD_BON/loglevel QUIET/loglevel SILENT}"
+r=$(machine vidages)
+echo '|/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -- %E' >"$r/proc/sys/kernel/core_pattern"
+refuse "apport réécrit core_pattern" "$r" "$SSHD_BON" "masquer apport"
+echo core >"$r/proc/sys/kernel/core_pattern"
+refuse "core_pattern = core" "$r" "$SSHD_BON" "kernel.core_pattern"
+r=$(machine dockerjournal)
+printf '{}\n' >"$r/etc/docker/daemon.json"
+refuse "Docker sans log-driver none" "$r" "$SSHD_BON" "log-driver"
+rm "$r/etc/docker/daemon.json"
+refuse "Docker sans daemon.json" "$r" "$SSHD_BON" "log-driver"
+rm "$r/usr/bin/dockerd"
+accepte "sans Docker installé" "$r" "$SSHD_BON"
 refuse "sshd LogLevel INFO" "$r" "${SSHD_BON/loglevel QUIET/loglevel INFO}" "LogLevel QUIET"
 refuse "sshd sans sortie (sshd -T échoue)" "$r" "" "LogLevel QUIET"
 refuse "sshd mot de passe" "$r" "${SSHD_BON/passwordauthentication no/passwordauthentication yes}" "passwordauthentication"
