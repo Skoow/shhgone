@@ -76,6 +76,11 @@ usage() {
 args=("$@")
 # shellcheck disable=SC2034 # lue par commun.sh (verrous)
 relance=deploy.sh
+# Installation : le jeton de préproduction qui manque est tiré par preflight (commun.sh) ;
+# sinon il est exigé tout de suite (jamais une valeur venue de l'environnement).
+# shellcheck disable=SC2034 # lue par commun.sh
+jeton_preprod=lire
+case $1 in sha256:* | rollback) jeton_preprod=installer ;; esac
 # Réglages de deploy/.env, verrous, contrôles de la machine, démarrage et contrôle de santé :
 # partie commune avec preprod.sh (README §15).
 # shellcheck source=deploy/commun.sh
@@ -95,7 +100,6 @@ install_version() {
 	preflight
 	cosign=$(command -v cosign || true)
 	controle_cosign "$cosign" "$COSIGN_SHA256" || exit 1
-	secret_turn
 	ports_turn
 	# Image (README §3.2), avant tout téléchargement : image.json et release.json signés par
 	# release.yml sur web-v<x.y.z>, image.json lie cette empreinte au manifeste, et l'image est

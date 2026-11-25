@@ -47,10 +47,11 @@ die() {
 
 env_file=${SHH_ENV_FILE:-$here/.env}
 [ -f "$env_file" ] || die "$env_file absent"
-set -a
-# shellcheck disable=SC1090 # fichier propre à chaque serveur
-. "$env_file"
-set +a
+# Lu en NOM=valeur, jamais exécuté (lire-env.sh : refusé s'il n'est pas à root ou modifiable par
+# d'autres) ; ses variables sont exportées, comme avant.
+# shellcheck source=deploy/lire-env.sh
+. "$here/lire-env.sh"
+lire_env "$env_file" 1 || die "$env_file refusé (voir ci-dessus)"
 
 root=${SHH_DATA_ROOT:-}
 dest=${SHH_SAUVEGARDE_DESTINATAIRE:-}

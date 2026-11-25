@@ -426,7 +426,7 @@ ex=$(lignec '"$here/$relance" "${args\[@\]}"')
 [ -n "$av" ] && [ -n "$ex" ] && [ "$av" -lt "$ex" ] || ko "commun.sh : relance du script vérifié absente"
 grep -qx 'relance=deploy.sh' "$dsh" || ko "deploy.sh : ne se relance pas lui-même"
 grep -qx 'relance=preprod.sh' "$pps" || ko "preprod.sh : ne se relance pas lui-même"
-e=$(lignec '^\. \./\.env')
+e=$(lignec '^lire_env \./\.env 1 ')
 l=$(lignec '^\. \./verrous\.sh')
 [ -n "$e" ] && [ -n "$l" ] && [ "$e" -lt "$l" ] || ko "commun.sh : verrous.sh chargé avant deploy/.env (constantes remplaçables)"
 # preprod.sh : barrière exigée, commit complet, verrous (suite) avant le contrôle de la machine, la
@@ -435,7 +435,7 @@ p1=$(lignep '^\[ "$preprod" = 1 \] ||$')
 p2=$(lignep '^commit_valide "$c" ||$')
 p3=$(lignep '^verrous "$c" suite$')
 p4=$(lignep '^preflight$')
-p5=$(lignep 'docker build -f Dockerfile')
+p5=$(lignep 'docker build -f "$ctx/deploy/Dockerfile"')
 p6=$(lignep '^mettre_en_service "$etat" preprod "$c" suite$')
 for x in p1 p2 p3 p4 p5 p6; do [ -n "${!x}" ] || ko "preprod.sh : ligne $x introuvable"; done
 if [ -n "$p1$p2$p3$p4$p5$p6" ]; then
@@ -490,7 +490,7 @@ chmod 0755 "$jd"
 # dans un dépôt git aux commits signés : deploy.sh et preprod.sh y tournent pour de vrai.
 pp=$work/pp
 mkdir -p "$pp/deploy"
-cp -- "$here"/{deploy,commun,preprod,verrous,provenance,journaux}.sh "$here"/{compose.yaml,Caddyfile,maintenance.html} "$pp/deploy/"
+cp -- "$here"/{deploy,commun,preprod,verrous,provenance,journaux,lire-env,fichiers-secrets}.sh "$here"/{compose.yaml,Caddyfile,maintenance.html} "$pp/deploy/"
 git init -q -b main "$pp"
 git -C "$pp" add -A
 git -C "$pp" "${ident[@]}" -c gpg.format=ssh -c "user.signingkey=$work/k-dev" commit -q -S -m "copie d'essai"
@@ -552,9 +552,13 @@ if [ ! -e "$PREPROD_JETON_FICHIER" ]; then
 	lance_pp sans-jeton deploy.sh "$base_env
 SHH_PREPROD=1" status
 	refuse_pp sans-jeton "jeton de préproduction illisible"
+	# preprod.sh (installation) : le jeton qui manque n'est pas exigé au chargement ; il est tiré
+	# par preflight, après les verrous. Ici les verrous refusent (aucun signataire) : rien n'est tiré.
 	lance_pp sans-jeton-pp preprod.sh "$base_env
 SHH_PREPROD=1" "$pb2"
-	refuse_pp sans-jeton-pp "jeton de préproduction illisible"
+	refuse_pp sans-jeton-pp "installation refusée : signataires autorisés"
+	grep -q "jeton de préproduction illisible" "$work/pp-sans-jeton-pp.err" && ko "preprod.sh : jeton exigé avant les verrous"
+	[ ! -e "$PREPROD_JETON_FICHIER" ] || ko "preprod.sh : jeton tiré avant les verrous"
 fi
 
 # preprod.sh et /etc/shhdrop : root et un espace de montage à part (unshare), /etc recouvert par

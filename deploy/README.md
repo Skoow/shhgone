@@ -23,6 +23,8 @@ Caddy (TLS) devant le serveur Go, dans Docker. Références : spécification §8
 | `restaurer.sh` | vérification mensuelle et restauration d'une sauvegarde (§12.5) |
 | `test-restauration.sh` | sauvegarde, effacement, restauration et reconnexion d'un compte de test, puis de `paiements.db` avec un pass factice, en mémoire (§12.5) |
 | `env.example` | modèle de `deploy/.env` |
+| `etat.sh`, `secret.sh`, `lien-acces.sh`, `admin-jeton.sh` | commandes du quotidien (section « Commandes du quotidien ») : résumé sans secret, saisie masquée d'un secret, lien de la préproduction, jeton du tableau de bord |
+| `fichiers-secrets.sh`, `lire-env.sh`, `test-outils.sh` | secrets en fichiers (tirage, écriture atomique, droits exacts, formats) ; lecture de `deploy/.env` sans l'exécuter ; leur banc d'essai et celui des commandes du quotidien (§8) |
 
 Ce kit réduit les risques ; il ne rend pas le service invulnérable. Les limites sont listées en fin de page.
 
@@ -138,6 +140,8 @@ La copie du dépôt est **`/opt/shhdrop`** : un clone public en https, **sans id
 Ne pas inscrire le volume dans `/etc/fstab` ni `/etc/crypttab` avec une clé : il se déverrouille à la main (§5).
 
 **Machine installée sans `secrets/`** : le créer (dernière ligne ci-dessus) avant le prochain `deploy.sh`, qui refuse sinon.
+
+**`deploy/.env` est lu, jamais exécuté** (`lire-env.sh`, par `deploy.sh`, `preprod.sh`, `alerte.sh` et `sauvegarder.sh`, tous en root). Il doit appartenir à root et n'être modifiable que par lui (`chown root:root deploy/.env && chmod 0644 deploy/.env`), sinon tout est refusé. Chaque ligne est vide, un commentaire (`#…`) ou `SHH_…=valeur` (`export` devant est toléré) ; une valeur avec une espace se met entre guillemets simples. Refusés, avec le numéro de la ligne : toute autre variable (`PATH`, `COMPOSE_FILE`…), et dans une valeur sans guillemets simples `$`, `` ` ``, `\`, `;`, `&`, `|`, `<`, `>`, `(`, `)`. Ce qui était accepté avant garde la même valeur.
 
 ## 3. Mise à jour et retour arrière
 
@@ -330,6 +334,33 @@ deploy/deploy.sh sha256:<empreinte> <x.y.z> <commit>
 - Les verrous portent sur le commit du manifeste ; l'image est liée à ce manifeste par `image.json` et construite par `release.yml` depuis ce même commit (deux builds, même empreinte, §3.2) : ses binaires (serveur, `shhcheck`) sont donc couverts aussi.
 - git identifie les objets par SHA-1 (avec détection des collisions connues) : une signature couvre l'empreinte SHA-1 de l'arbre et des parents.
 
+## Commandes du quotidien
+
+Sur le serveur, dans `/opt/shhdrop`. **Règle** : un secret ne s'affiche que dans **votre propre fenêtre SSH** (PowerShell, `ssh ubuntu@…`), jamais dans une session Claude, et ne se colle dans aucune conversation. Les commandes qui affichent ou demandent un secret refusent de tourner sans terminal (session Claude, tuyau, fichier).
+
+| Commande | Ce qu'elle fait | Secret affiché ? |
+|---|---|---|
+| `sudo deploy/etat.sh` | résumé : version, préproduction ou production, conteneurs, certificat HTTPS et son échéance, disque, volume chiffré, secrets présents ou absents, paiement et appels, tableau de bord, mises à jour du système | non (utilisable depuis Claude) |
+| `sudo deploy/secret.sh --liste` | noms des secrets attendus : présent, absent ou mal réglé | non |
+| `sudo deploy/secret.sh shh_stripe_cle` | saisie masquée, deux fois, d'un secret que vous seul possédez ; forme vérifiée ; écrit avec ses droits exacts | non : tapé, jamais affiché |
+| `sudo deploy/secret.sh --remplacer <nom>` | remplace un secret existant (passage du test au réel, §13.5) | non |
+| `sudo deploy/lien-acces.sh` | lien de la préproduction `https://shhgone.com/acces/<jeton>` (§15.2), puis efface l'écran | **oui** : votre fenêtre seulement |
+| `sudo deploy/admin-jeton.sh` | jeton du tableau de bord (§4) : tiré, empreinte et `SHH_ADMIN_LISTEN` mis dans `deploy/.env`, jeton affiché une fois, puis commande du tunnel depuis Windows et réinstallation proposée | **oui**, une fois : votre fenêtre seulement |
+
+**Secrets de `secret.sh`** (que seul le propriétaire possède) :
+
+| Nom | Quoi | Où, droits |
+|---|---|---|
+| `shh_stripe_cle` | clé Stripe : `sk_test_`/`rk_test_` en essai (`SHH_PREPROD_PAIEMENT_ESSAI=1`), `sk_live_`/`rk_live_` en réel | `<SHH_DATA_ROOT>/secrets`, compte 65532, 0400 |
+| `shh_stripe_webhook` | secret de signature du webhook Stripe, `whsec_…` | idem |
+| `shh_paypal_secret` | « Secret » de l'application PayPal | idem |
+| `shh_nowpayments_cle`, `shh_nowpayments_ipn` | clé d'API et secret IPN de NOWPayments | idem |
+| `alerte_smtp_mdp` | mot de passe SMTP des alertes (§4, « Surveillance ») ; ni accent, ni `"`, ni `\` | `/etc/shhdrop`, root, 0600 |
+
+Les secrets du serveur ne s'écrivent que volume chiffré ouvert (jamais sur le disque du dessous). Un secret existant n'est jamais remplacé sans `--remplacer`. La valeur n'apparaît ni à l'écran, ni dans l'historique du shell (ce n'est pas un argument), ni dans la liste des processus. Pris en compte : à la prochaine installation (la commande exacte est donnée), au prochain passage de l'alerte pour `alerte_smtp_mdp`.
+
+**Tirés par la machine elle-même**, à chaque `deploy.sh` ou `preprod.sh`, s'ils manquent (une ligne « créé » ou « présent », jamais la valeur, jamais d'écrasement) : jeton de la préproduction (§15), clé du serveur du compte (§12.2 ; **en faire ensuite une copie hors ligne**), secret du relais des appels (§14).
+
 ## 4. Commandes d'administration (§15.3)
 
 Elles s'exécutent dans le conteneur en marche. Codes de sortie : 0 réussite, 1 échec, 2 erreur d'usage.
@@ -352,7 +383,7 @@ Le lien signalé ne se donne **jamais** en argument (il irait dans l'historique 
   - **À prévoir** : disque à 75 %, ou plein dans moins de 14 jours au rythme du jour ; certificat à moins de 21 jours (Caddy renouvelle à 30 : le renouvellement échoue) ; domaine ou location à moins de 45 jours ; échéance du domaine illisible ; mises à jour de sécurité du système en attente ; redémarrage demandé ; commits de retard sur GitHub (correctif à déployer) ; horloge non synchronisée ; unité systemd en échec ; charge trop haute.
   - **Rappel** tous les 30 jours : essayer une restauration (§12). **Bilan** chaque semaine, même sans problème (disque, jours restants du certificat, du domaine et de la location, mises à jour, retard) : s'il n'arrive pas, c'est l'alerte qui ne marche plus (fournisseur d'envoi, minuteur).
   - Réglages : `SHH_SERVEUR_ECHEANCE` (fin de la location, à remettre à jour après chaque renouvellement), `SHH_DOMAINE_ECHEANCE` seulement si RDAP ne répond pas. L'échéance du domaine se lit par RDAP (`rdap.org`, qui renvoie au registre : seul le nom du domaine, public, est envoyé). Le retard sur GitHub suppose que la copie du dépôt est un clone `git` à root (§2 ; un `safe.directory` ne suffit pas aux verrous de `deploy.sh`, §3.5). Le message dit `git fetch`, jamais `git pull` (§3.5).
-  - Envoi depuis la machine (pas depuis le conteneur, qui n'a pas de sortie) par un fournisseur SMTP : `SHH_ALERTE_SMTP_HOST` (TLS implicite sur 465), avec un **identifiant réservé aux alertes** (par exemple `alertes@shhgone.com`, envoi seulement) dans `SHH_ALERTE_SMTP_USER`, et `SHH_ALERTE_FROM`. Le mot de passe va dans `/etc/shhdrop/alerte_smtp_mdp` (`install -d -m 0700 /etc/shhdrop`, fichier root 0600), hors du volume chiffré pour que l'alerte parte même volume verrouillé après un redémarrage. Un envoi raté est retenté au passage suivant. Les anciens noms `SHH_SMTP_HOST` et `SHH_MAIL_FROM`, qui servaient aussi au compte par e-mail, sont refusés : les renommer. Ce mot de passe est sur le disque système, en clair : quelqu'un qui lirait ce disque pourrait envoyer des e-mails avec, rien d'autre, d'où un identifiant à part, que l'on change s'il fuit. Aucune donnée d'utilisateur ni adresse IP dans les e-mails ni dans l'état (`/var/lib/shhdrop-alerte` : des dates et un pourcentage par jour). Santé lisible à la main : `deploy/deploy.sh health`.
+  - Envoi depuis la machine (pas depuis le conteneur, qui n'a pas de sortie) par un fournisseur SMTP : `SHH_ALERTE_SMTP_HOST` (TLS implicite sur 465), avec un **identifiant réservé aux alertes** (par exemple `alertes@shhgone.com`, envoi seulement) dans `SHH_ALERTE_SMTP_USER`, et `SHH_ALERTE_FROM`. Le mot de passe va dans `/etc/shhdrop/alerte_smtp_mdp` (fichier root 0600 : `sudo deploy/secret.sh alerte_smtp_mdp`, saisie masquée), hors du volume chiffré pour que l'alerte parte même volume verrouillé après un redémarrage. Un envoi raté est retenté au passage suivant. Les anciens noms `SHH_SMTP_HOST` et `SHH_MAIL_FROM`, qui servaient aussi au compte par e-mail, sont refusés : les renommer. Ce mot de passe est sur le disque système, en clair : quelqu'un qui lirait ce disque pourrait envoyer des e-mails avec, rien d'autre, d'où un identifiant à part, que l'on change s'il fuit. Aucune donnée d'utilisateur ni adresse IP dans les e-mails ni dans l'état (`/var/lib/shhdrop-alerte` : des dates et un pourcentage par jour). Santé lisible à la main : `deploy/deploy.sh health`.
 - Les **demandes des autorités** (Pharos, injonctions) arrivent à `contact@shhgone.com` : notification activée sur le téléphone. Chaque demande traitée va au registre des retraits (`docs/juridique/registre-retraits-modele.md`, tenu hors du serveur).
 
 ### Détruire un lien depuis un téléphone (signalement, demande d'une autorité)
@@ -386,9 +417,15 @@ Elle est servie par un **écouteur à part**, jamais par Caddy, jamais sur le po
       SHH_ADMIN_TOKEN_SHA256: ${SHH_ADMIN_TOKEN_SHA256:-}
 ```
 
+#### Le plus simple : `admin-jeton.sh`, sur le serveur
+
+Dans **votre propre fenêtre SSH** (jamais dans une session Claude) : `cd /opt/shhdrop && sudo deploy/admin-jeton.sh`. Le script tire le jeton (256 bits), écrit `SHH_ADMIN_LISTEN=172.30.53.2:9191` et l'**empreinte** dans `deploy/.env` (mêmes propriétaire et droits ; une ancienne ligne `SHH_ADMIN_TOKEN` en clair est retirée), affiche le jeton **une seule fois**, attend Entrée puis efface l'écran et son historique de défilement, donne la commande exacte du tunnel à lancer depuis PowerShell (étape 5 ci-dessous), et propose de réinstaller la version en service (étape 4). Le jeton n'est écrit nulle part sur le serveur. Changer de jeton : `sudo deploy/admin-jeton.sh --remplacer` (sans cette option, un jeton existant n'est jamais remplacé).
+
+Différence avec la méthode ci-dessous : le jeton est tiré **sur le serveur** et passe par sa mémoire et votre terminal. Root du serveur a déjà tout ce que le tableau de bord donne ; une session Claude sur le serveur ne peut pas lancer le script (terminal exigé). Effacer aussi le presse-papiers de Windows (Win+V) après l'avoir rangé.
+
 #### Mise en route depuis un poste Windows (PowerShell), préproduction ou production
 
-1. **Tirer le jeton, sur son poste** (jamais sur le serveur). Ouvrir PowerShell (pas en administrateur) et coller :
+1. **Tirer le jeton, sur son poste** (méthode sans `admin-jeton.sh` : le jeton ne passe jamais par le serveur). Ouvrir PowerShell (pas en administrateur) et coller :
 
    ```powershell
    $b = New-Object byte[] 32
@@ -521,7 +558,7 @@ docker run --rm --network host --log-driver none -v /etc/ssl/certs/ca-certificat
 ```sh
 CADDY=/chemin/vers/caddy deploy/test-proxy.sh     # Caddy 2.10 ou plus, curl 7.83 ou plus, Go, python3, web/dist construit (≈ 2 min 30 : WebSocket gardé 75 s) ; lance aussi test-preprod.sh (barrière, §15)
 CADDY=/chemin/vers/caddy deploy/test-preprod.sh   # barrière de préproduction seule (≈ 10 s)
-make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux, de l'image et de la provenance (Node exigé) et des verrous (git, ssh-keygen ; partie préproduction de preprod.sh en root seulement : sudo deploy/test-verrous.sh), go vet et tests de shhcheck
+make lint-deploy                                  # bash -n, ShellCheck, bancs de l'alerte, des journaux, de l'image et de la provenance (Node exigé), des verrous (git, ssh-keygen ; partie préproduction de preprod.sh en root seulement : sudo deploy/test-verrous.sh) et des outils (test-outils.sh : deploy/.env, secrets ; commandes du quotidien pour de vrai en root seulement, avec python3 : sudo deploy/test-outils.sh), go vet et tests de shhcheck
 SHH_IMAGE=shhdrop:ci make test-sortie             # sorties : configuration, puis réseau réel (démon Docker ; code 3 sans démon)
 sudo make test-restauration                       # sauvegarde et restauration d'un compte de test, en mémoire (≈ 45 s)
 ```
@@ -636,7 +673,9 @@ Un fichier dans `/srv/shhdrop/secrets/`. Ce dossier est sur le volume chiffré, 
 
 Le dépôt, `deploy/.env`, la configuration du conteneur (`docker inspect`) et l'environnement du processus n'en contiennent que le **chemin**.
 
-Compte activé, `deploy.sh` refuse d'installer si le fichier manque ou n'a pas exactement ces droits. Le serveur refuse aussi de démarrer (clé de 32 octets, droits 0400 ou 0600).
+**Tirée par `deploy.sh` (ou `preprod.sh`) elle-même** à la première installation, si elle manque : 32 octets de `/dev/urandom`, compte 65532, 0400, jamais affichée ; la ligne « compte : clé du serveur : créé » le dit. Elle n'est **jamais** tirée si `data/comptes.db` existe déjà : une base sans sa clé est une restauration incomplète, et une nouvelle clé perdrait l'unicité des pseudos sans rien dire ; l'installation est alors refusée, jusqu'à ce que la clé soit remise depuis sa copie hors ligne. Ensuite, `deploy.sh` refuse d'installer si le fichier manque ou n'a pas exactement ces droits. Le serveur refuse aussi de démarrer (clé de 32 octets, droits 0400 ou 0600).
+
+Même chose à la main (inutile d'habitude) :
 
 ```sh
 install -d -o root -g 65532 -m 0750 /srv/shhdrop/secrets   # déjà fait au §2
@@ -774,9 +813,11 @@ Fichiers de `<SHH_DATA_ROOT>/secrets` (compte 65532, droits 0400, comme §12.2),
 et, pour tous, `SHH_TVA` (`franchise`, `france` ou `oss` : régime choisi par le propriétaire avec son comptable ; en `oss`, la crypto n'est ni proposée ni acceptée, même avec les secrets NOWPayments en place, car elle ne donne qu'une preuve de localisation : conception du paiement §9.1 ; ses webhooks restent traités). Paiement activé, `deploy.sh` refuse d'installer sans `SHH_TVA`, sans aucun prestataire, ou si un fichier attendu manque, est un lien ou n'a pas le bon propriétaire et les bons droits. Le serveur, lui, refuse de démarrer avec une clé Stripe de production en essai ou l’inverse, ou un prestataire à moitié configuré (message sans valeur).
 
 ```sh
-(umask 077 && cat > /srv/shhdrop/secrets/shh_stripe_cle)   # coller la clé, Entrée, Ctrl-D
-chown 65532:65532 /srv/shhdrop/secrets/shh_stripe_cle && chmod 0400 /srv/shhdrop/secrets/shh_stripe_cle
+sudo deploy/secret.sh shh_stripe_cle   # saisie masquée, deux fois ; forme et droits vérifiés
+sudo deploy/secret.sh --liste          # présent ou absent, jamais la valeur
 ```
+
+`secret.sh` (section « Commandes du quotidien ») vérifie la forme (Stripe : clé de test en essai, réelle sinon, comme le serveur) et écrit le fichier d'un coup, compte 65532, 0400. Sans lui : `(umask 077 && cat > <SHH_DATA_ROOT>/secrets/<nom>)`, coller, Entrée, Ctrl-D, puis `chown 65532:65532` et `chmod 0400`.
 
 ### 13.3 Sauvegarde et restauration
 
@@ -786,7 +827,7 @@ chown 65532:65532 /srv/shhdrop/secrets/shh_stripe_cle && chmod 0400 /srv/shhdrop
 
 But : payer « pour de faux » sur `https://shhgone.com` (barrière d'accès de la préproduction en place) avec les clés de **test** des trois prestataires, et voir le pass s'activer. Aucune adresse n'est à écrire nulle part : le serveur construit lui-même, depuis `SHH_ORIGIN` (`https://${SHH_DOMAIN}`, `compose.yaml`), l'adresse de retour `https://shhgone.com/offres/retour` (réussite et abandon, sans paramètre) et l'adresse IPN de NOWPayments ; les API (production ou bac à sable) sont fixées dans le code d'après `SHH_PAIEMENT_ESSAI`.
 
-**Les secrets ne passent jamais par le chat, le dépôt ni `deploy/.env`** : le propriétaire les tape lui-même sur le serveur, dans un fichier par secret (commande du §13.2 : `umask 077`, coller, Ctrl-D, puis `chown 65532:65532` et `chmod 0400` ; compte 65532 parce que c'est lui qui fait tourner le serveur et doit les lire). `deploy/.env` ne reçoit que des réglages publics (identifiants PayPal, régime de TVA).
+**Les secrets ne passent jamais par le chat, le dépôt ni `deploy/.env`** : le propriétaire les tape lui-même sur le serveur, dans sa propre fenêtre SSH, un par un : `sudo deploy/secret.sh <nom>` (§13.2 : saisie masquée, compte 65532 parce que c'est lui qui fait tourner le serveur et doit les lire). `deploy/.env` ne reçoit que des réglages publics (identifiants PayPal, régime de TVA).
 
 **1. Interrupteurs** : le jour où les secrets d'au moins un prestataire sont en place, et seulement alors (sans secret, `deploy.sh` refuse d'installer). **En préproduction** (`SHH_PREPROD=1`, §15), sans commit, dans `deploy/.env` (refusés sans la barrière ; `compose.yaml` garde les valeurs de production, `"0"`) :
 
@@ -891,10 +932,9 @@ Le serveur de production tourne **avant l'ouverture** sur `https://shhgone.com`,
 Sur le serveur, en root, dans `/opt/shhdrop`, la machine prête (§1, §2, §3.5 ; paquet `docker-buildx-plugin` installé : `preprod.sh` construit l'image) :
 
 ```sh
-# 1. Jeton (une fois) : tiré SUR LE SERVEUR, jamais copié ailleurs.
-install -d -o root -g root -m 0755 /etc/shhdrop
-(umask 077 && openssl rand -hex 32 >/etc/shhdrop/preprod-jeton)
-chown root:root /etc/shhdrop/preprod-jeton && chmod 0600 /etc/shhdrop/preprod-jeton
+# 1. Jeton : rien à faire. preprod.sh (ou deploy.sh) le tire SUR LE SERVEUR à la première
+#    installation (/etc/shhdrop/preprod-jeton, root 0600, jamais affiché ni remplacé ;
+#    « préproduction : jeton d'accès : créé »), après les verrous.
 
 # 2. Réglages : ajouter la ligne SHH_PREPROD=1 à deploy/.env (et, pour l'essai du paiement,
 #    §13.4 : SHH_PREPROD_PAIEMENT=1 et SHH_PREPROD_PAIEMENT_ESSAI=1).
@@ -905,19 +945,20 @@ editor deploy/.env
 git fetch origin
 deploy/preprod.sh <commit>
 
-# 4. Le lien d'accès, à ouvrir sur chaque appareil (ne le coller dans aucun message) :
-echo "https://shhgone.com/acces/$(cat /etc/shhdrop/preprod-jeton)"
+# 4. Le lien d'accès, à ouvrir sur chaque appareil (ne le coller dans aucun message), dans
+#    VOTRE PROPRE fenêtre SSH (jamais dans une session Claude : le script refuse sans terminal) :
+sudo deploy/lien-acces.sh
 ```
 
 **Sur chaque appareil** : ouvrir ce lien une fois. PC : dans chaque navigateur utilisé. iPhone : dans Safari, **pas en navigation privée** (le témoin y est oublié à la fermeture). On arrive sur l'accueil du vrai site ; le témoin dure 30 jours (rouvrir le lien ensuite). Pour faire passer le lien à l'iPhone sans le confier à un service tiers : le taper, ou l'afficher dans une session SSH ouverte depuis l'iPhone (Termius, Blink : §4). **Le lien reste dans l'historique du navigateur**, synchronisé par iCloud ou Chrome si la synchronisation est active : après l'avoir ouvert, effacer cette entrée de l'historique.
 
-**Changer le jeton** (lien diffusé par erreur, appareil perdu, ou par précaution) : refaire l'étape 1 (le fichier est remplacé), puis `deploy/preprod.sh "$(cat deploy/.release.commit)"` (ou `deploy/deploy.sh "$(cat deploy/.release)"` si une Release est en service) : Caddy est recréé avec le nouveau jeton, tous les témoins existants deviennent inutiles ; rouvrir le nouveau lien sur chaque appareil.
+**Changer le jeton** (lien diffusé par erreur, appareil perdu, ou par précaution) : `shred -u /etc/shhdrop/preprod-jeton` (un nouveau est tiré à l'installation qui suit), puis `deploy/preprod.sh "$(cat deploy/.release.commit)"` (ou `deploy/deploy.sh "$(cat deploy/.release)"` si une Release est en service) : Caddy est recréé avec le nouveau jeton, tous les témoins existants deviennent inutiles ; rouvrir le nouveau lien sur chaque appareil.
 
 **Versions suivantes** : `git fetch origin && deploy/preprod.sh <nouveau commit>`. Réinstaller la même (après un redémarrage, §5) : `deploy/preprod.sh "$(cat deploy/.release.commit)"`. `deploy/deploy.sh status` dit « PRÉPRODUCTION ». Place disque : les images `shhdrop-preprod:<commit>` et le cache de construction s'accumulent ; de temps en temps, `docker image ls shhdrop-preprod`, `docker rmi` des anciennes (jamais celle en service ni la précédente), `docker builder prune`.
 
 ### 15.3 `preprod.sh` : ce qui est vérifié, et ce qui ne l'est pas
 
-Vérifié, sans option pour le sauter : `SHH_PREPROD=1` (sinon refus) ; **verrous V1, V2 et V3** de `verrous.sh`, comme `deploy.sh` (commit complet en argument ; signé par une clé de `/etc/shhdrop/signataires-autorises`, et chaque commit depuis le commit installé aussi ; descendant du commit installé ; la copie est avancée par `git merge --ff-only`, puis le `preprod.sh` du commit vérifié est relancé) ; les contrôles de la machine (`preflight`, journaux compris) ; après le démarrage, le contrôle de santé de `deploy.sh` (barrière comprise ; `verify-site.mjs` contre un manifeste calculé du `/site` de l'image construite, `deploy/.preprod/<commit>/release.json`) ; retour à la version d'avant s'il échoue. L'image est construite par le Docker du serveur depuis la copie du dépôt au commit vérifié (`docker build`, mêmes arguments que `release.yml`, contexte limité par `.dockerignore` : ni `deploy/.env` ni secret), étiquetée `shhdrop-preprod:<commit>`. `/etc/shhdrop/commit-installe` avance comme avec `deploy.sh` : la Release d'ouverture devra être posée sur un commit **descendant** du dernier commit installé en préproduction (V2).
+Vérifié, sans option pour le sauter : `SHH_PREPROD=1` (sinon refus) ; **verrous V1, V2 et V3** de `verrous.sh`, comme `deploy.sh` (commit complet en argument ; signé par une clé de `/etc/shhdrop/signataires-autorises`, et chaque commit depuis le commit installé aussi ; descendant du commit installé ; la copie est avancée par `git merge --ff-only`, puis le `preprod.sh` du commit vérifié est relancé) ; les contrôles de la machine (`preflight`, journaux compris) ; après le démarrage, le contrôle de santé de `deploy.sh` (barrière comprise ; `verify-site.mjs` contre un manifeste calculé du `/site` de l'image construite, `deploy/.preprod/<commit>/release.json`) ; retour à la version d'avant s'il échoue. L'image est construite par le Docker du serveur depuis les **fichiers suivis du commit vérifié seulement** (`git archive` de ce commit, extrait dans un dossier temporaire effacé à la fin : un fichier non suivi ou ignoré de la copie, que les verrous ne regardent pas, n'entre jamais dans l'image), avec le même `Dockerfile` et le même contexte qu'avant (`docker build`, mêmes arguments que `release.yml`, contexte limité par `.dockerignore` : ni `deploy/.env` ni secret), étiquetée `shhdrop-preprod:<commit>`. `/etc/shhdrop/commit-installe` avance comme avec `deploy.sh` : la Release d'ouverture devra être posée sur un commit **descendant** du dernier commit installé en préproduction (V2).
 
 Hôtes de plus pendant `preprod.sh` (construction) : registres npm, crates.io, proxy Go et Docker Hub (images de base du `Dockerfile`).
 

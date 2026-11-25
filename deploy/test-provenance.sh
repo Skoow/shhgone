@@ -267,7 +267,7 @@ grep -q 'controle_cosign "$cosign" "$COSIGN_SHA256"' "$d" || ko "deploy.sh : cos
 grep -q 'verifier_site_servi docker' "$com" || ko "commun.sh : verify-site absent du contrôle"
 grep -qiE -- '--(no|skip|sans)-?(verif|provenance)|SHH_(SKIP|SANS)_|PROVENANCE=0' "$d" "$com" "$here/preprod.sh" && ko "deploy.sh : option pour sauter la vérification"
 grep -qE '^\. \./provenance\.sh' "$com" || ko "commun.sh : provenance.sh non chargé"
-e=$(lignec '^\. \./\.env')
+e=$(lignec '^lire_env \./\.env 1 ')
 l=$(lignec '^\. \./provenance\.sh')
 [ -n "$e" ] && [ -n "$l" ] && [ "$e" -lt "$l" ] || ko "commun.sh : provenance.sh chargé avant deploy/.env (constantes remplaçables)"
 # preprod.sh n'emploie ni cosign ni l'image de la Release, et deploy.sh n'installe jamais une

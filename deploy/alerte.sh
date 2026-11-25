@@ -72,8 +72,11 @@ here=$(cd "$(dirname "$0")" && pwd)
 die() { printf 'alerte : %s\n' "$*" >&2; exit 1; }
 env_file=${SHH_ENV_FILE:-$here/.env}
 [ -f "$env_file" ] || die "$env_file absent"
-# shellcheck disable=SC1090
-. "$env_file"
+# Lu en NOM=valeur, jamais exécuté (lire-env.sh : refusé s'il n'est pas à root ou modifiable par
+# d'autres).
+# shellcheck source=deploy/lire-env.sh
+. "$here/lire-env.sh"
+lire_env "$env_file" 0 || die "$env_file refusé (voir ci-dessus)"
 root=${SHH_DATA_ROOT:-/srv/shhdrop}
 etat=${SHH_ALERTE_ETAT:-/var/lib/shhdrop-alerte}
 mkdir -p "$etat" && chmod 0700 "$etat"

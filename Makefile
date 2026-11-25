@@ -43,6 +43,7 @@ lint-deploy:
 	deploy/test-journaux.sh
 	deploy/test-provenance.sh
 	deploy/test-verrous.sh
+	deploy/test-outils.sh
 	cd deploy/shhcheck && go vet ./... && go test -race -count=1 ./...
 
 # Test du proxy (deploy/test-proxy.sh) : Caddy 2.10 ou plus dans le PATH (ou CADDY=…), site

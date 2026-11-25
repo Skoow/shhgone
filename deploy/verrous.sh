@@ -218,6 +218,21 @@ controle_commit_annonce() {
 	fi
 }
 
+# contexte_du_commit <dépôt> <signataires> <commit> <dossier vide> : extrait dans le dossier les
+# fichiers suivis de ce commit, et rien d'autre (git archive : ni fichier non suivi ou ignoré, ni
+# modification de la copie de travail). Contexte de construction de preprod.sh.
+contexte_du_commit() {
+	local depot=$1 sign=$2 c=$3 dest=$4
+	if [ ! -d "$dest" ] || [ -n "$(ls -A -- "$dest")" ]; then
+		echo "$dest : dossier vide attendu" >&2
+		return 1
+	fi
+	local etats
+	git_sur "$depot" "$sign" archive --format=tar "$c" | tar -x --no-same-owner -C "$dest"
+	etats="${PIPESTATUS[*]}"
+	[ "$etats" = "0 0" ]
+}
+
 # copie_au_commit <dépôt> <signataires> <commit> : HEAD de la copie est ce commit, et aucun
 # fichier suivi n'est modifié (Caddyfile, compose.yaml, deploy.sh… sont ceux du commit vérifié).
 copie_au_commit() {
@@ -324,7 +339,7 @@ lire_jeton_preprod() {
 	local f=$1 uid=$2 d j
 	d=$(dirname -- "$f")
 	if [ ! -e "$f" ] && [ ! -L "$f" ]; then
-		echo "$f absent : (umask 077 && openssl rand -hex 32 >$f) (README §15)" >&2
+		echo "$f absent : il est tiré par deploy/preprod.sh (ou deploy.sh) à la prochaine installation (README §15)" >&2
 		return 1
 	fi
 	if [ ! -d "$d" ] || ! droits_surs "$d" "$uid" 022 || [ -L "$f" ] || [ ! -f "$f" ] || ! droits_surs "$f" "$uid" 7177; then

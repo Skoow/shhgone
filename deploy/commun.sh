@@ -22,11 +22,19 @@ die() {
 	exit "${2:-1}"
 }
 
+# jeton_preprod (posée par le script appelant, avant ce fichier ; lue avant deploy/.env) :
+# « lire » (défaut) : jeton de préproduction exigé dès maintenant ; « installer » (deploy.sh et
+# preprod.sh qui installent) : s'il manque, il est tiré par preflight (secrets_auto), après les
+# verrous ; « sans » (outils qui ne joignent pas le site : secret.sh, etat.sh, admin-jeton.sh).
+mode_jeton=${jeton_preprod:-lire}
+case $mode_jeton in lire | installer | sans) ;; *) die "jeton_preprod : « $mode_jeton » inconnu" ;; esac
+
 [ -f .env ] || die "deploy/.env absent (copier deploy/env.example et l'adapter)"
-set -a
-# shellcheck disable=SC1091 # fichier propre à chaque serveur
-. ./.env
-set +a
+# Lu en NOM=valeur, jamais exécuté ; refusé s'il n'est pas à root ou modifiable par d'autres
+# (lire-env.sh). Toutes ses variables sont exportées, comme avant.
+# shellcheck source=deploy/lire-env.sh
+. ./lire-env.sh
+lire_env ./.env 1 || die "deploy/.env refusé (voir ci-dessus)"
 : "${SHH_DOMAIN:?SHH_DOMAIN manquant dans deploy/.env}"
 : "${SHH_DATA_ROOT:?SHH_DATA_ROOT manquant dans deploy/.env}"
 # Après deploy/.env : ses constantes (dépôt, identité, image, cosign épinglé) sont en lecture
@@ -39,6 +47,8 @@ SHH_IMAGE_REPO=${SHH_IMAGE_REPO:-$PROVENANCE_IMAGE}
 depot_image_valide "$SHH_IMAGE_REPO" || exit 1
 # shellcheck source=deploy/verrous.sh
 . ./verrous.sh
+# shellcheck source=deploy/fichiers-secrets.sh
+. ./fichiers-secrets.sh
 # Copie du dépôt vérifiée par les verrous : celle de ce script (ses Caddyfile, compose.yaml et
 # verify-site.mjs sont ceux qu'utilise l'installation), jamais une autre.
 depot=$(cd "$here/.." && pwd)
@@ -77,9 +87,13 @@ preprod=${SHH_PREPROD:-0}
 [ "$preprod" = 0 ] || [ "$preprod" = 1 ] || die "SHH_PREPROD doit valoir 0 ou 1 (deploy/.env, README §15)"
 [ -z "${SHH_PREPROD_JETON+x}" ] || die "deploy/.env : SHH_PREPROD_JETON n'a rien à y faire (le jeton est dans $PREPROD_JETON_FICHIER, README §15) : l'ôter"
 SHH_PREPROD_JETON=""
-if [ "$preprod" = 1 ]; then
-	SHH_PREPROD_JETON=$(lire_jeton_preprod "$PREPROD_JETON_FICHIER" 0) ||
-		die "SHH_PREPROD=1 : jeton de préproduction illisible ($PREPROD_JETON_FICHIER, README §15) : rien ne démarre sans lui"
+if [ "$preprod" = 1 ] && [ "$mode_jeton" != sans ]; then
+	if [ "$mode_jeton" = installer ] && [ ! -e "$PREPROD_JETON_FICHIER" ] && [ ! -L "$PREPROD_JETON_FICHIER" ]; then
+		: # absent : tiré par preflight (secrets_auto), après les verrous ; rien ne démarre avant
+	else
+		SHH_PREPROD_JETON=$(lire_jeton_preprod "$PREPROD_JETON_FICHIER" 0) ||
+			die "SHH_PREPROD=1 : jeton de préproduction illisible ($PREPROD_JETON_FICHIER, README §15) : rien ne démarre sans lui"
+	fi
 fi
 SHH_PREPROD=$preprod
 export SHH_PREPROD SHH_PREPROD_JETON
@@ -194,18 +208,54 @@ if [ "$appels" = 1 ]; then
 fi
 export SHH_TURN_URLS SHH_TURN_SECRET_FILE
 
-# secret_turn : crée le secret du relais s'il manque (48 caractères hexadécimaux, compte 65532,
-# 0400), sans jamais l'afficher ; un secret présent est gardé tel quel.
-secret_turn() {
-	local f=$secrets/shh_turn_secret
-	[ "$appels" = 1 ] || return 0
-	if [ ! -e "$f" ] && [ ! -L "$f" ]; then
-		(umask 077 && od -An -N24 -tx1 /dev/urandom | tr -d ' \n' >"$f.tmp" && printf '\n' >>"$f.tmp")
-		chown 65532:65532 "$f.tmp" && chmod 0400 "$f.tmp" && mv "$f.tmp" "$f"
-		echo "appels : secret du relais créé ($f)"
+# secrets_auto : tire les secrets que la machine peut tirer seule, s'ils manquent (fichiers-secrets.sh :
+# jamais affichés, jamais écrasés, droits exacts ; une ligne « créé » ou « présent » chacun,
+# sans la valeur). Appelé par preflight seulement : volume chiffré monté, secrets/ contrôlé,
+# après les verrous.
+secrets_auto() {
+	local cle=$secrets/shh_comptes_cle
+	if [ "$comptes" = 1 ]; then
+		# Clé du serveur du compte (README §12.2) : tirée seulement s'il n'existe encore aucun
+		# compte. Une base de comptes sans sa clé, c'est une restauration où la clé manque : en
+		# tirer une autre perdrait l'unicité des pseudos sans rien dire. Refus : la remettre.
+		if [ ! -e "$cle" ] && [ ! -L "$cle" ] && [ -e "$SHH_DATA_ROOT/data/comptes.db" ]; then
+			die "$cle absente, mais $SHH_DATA_ROOT/data/comptes.db existe : remettre la clé depuis sa copie hors ligne (base64 -d, README §12.2), jamais en tirer une autre"
+		fi
+		tirer_secret "$cle" 65532:65532 400 octets32 "compte : clé du serveur" ||
+			die "$cle absent ou mal réglé : fichier du compte 65532, droits 0400 (README §12)"
+		if [ "$secret_cree" = 1 ]; then
+			echo "  à faire une fois : une copie hors ligne de cette clé, dans votre propre fenêtre SSH (README §12.2)"
+		fi
 	fi
-	[ -f "$f" ] && [ ! -L "$f" ] && [ "$(stat -c '%u %a' "$f")" = "65532 400" ] ||
-		die "$f mal réglé : fichier du compte 65532, droits 0400 (README §14)"
+	if [ "$appels" = 1 ]; then
+		tirer_secret "$secrets/shh_turn_secret" 65532:65532 400 hex24 "appels : secret du relais" ||
+			die "$secrets/shh_turn_secret mal réglé : fichier du compte 65532, droits 0400 (README §14)"
+	fi
+	if [ "$preprod" = 1 ]; then
+		if [ -n "$SHH_PREPROD_JETON" ]; then
+			# Déjà lu et contrôlé au chargement (lire_jeton_preprod : 0600 ou 0400).
+			secret_cree=0
+			echo "préproduction : jeton d'accès : présent"
+		else
+			tirer_secret "$PREPROD_JETON_FICHIER" 0:0 600 hex32 "préproduction : jeton d'accès" ||
+				die "jeton de préproduction : $PREPROD_JETON_FICHIER mal réglé (README §15)"
+			SHH_PREPROD_JETON=$(lire_jeton_preprod "$PREPROD_JETON_FICHIER" 0) ||
+				die "SHH_PREPROD=1 : jeton de préproduction illisible ($PREPROD_JETON_FICHIER, README §15) : rien ne démarre sans lui"
+			export SHH_PREPROD_JETON
+		fi
+		if [ "$secret_cree" = 1 ]; then
+			echo "  lien d'accès : sudo deploy/lien-acces.sh, dans votre propre fenêtre SSH (README §15)"
+		fi
+	fi
+}
+
+# commande_reinstallation : la commande qui réinstalle la version en service (prise en compte
+# d'un secret ou d'un réglage) ; vide si aucune version n'est installée.
+commande_reinstallation() {
+	case $cur in
+	preprod:*) printf 'sudo deploy/preprod.sh %s' "${cur#preprod:}" ;;
+	sha256:*) printf 'sudo deploy/deploy.sh %s' "$cur" ;;
+	esac
 }
 
 # ports_turn : ports du relais ouverts dans le pare-feu de la machine. ufw actif : les règles
@@ -263,6 +313,7 @@ preflight() {
 	# conteneur, jamais créé par Docker).
 	[ -d "$secrets" ] && [ ! -L "$secrets" ] && [ "$(stat -c '%u:%g %a' "$secrets")" = "0:65532 750" ] ||
 		die "$secrets absent ou mal réglé : install -d -o root -g 65532 -m 0750 $secrets (README §12)"
+	secrets_auto
 	if [ "$comptes" = 1 ]; then
 		grep -qE '^ +SHH_SALONS: "1"$' compose.yaml || die "SHH_COMPTES=1 exige SHH_SALONS: \"1\" dans compose.yaml"
 		[ -f "$secrets/shh_comptes_cle" ] && [ ! -L "$secrets/shh_comptes_cle" ] &&
