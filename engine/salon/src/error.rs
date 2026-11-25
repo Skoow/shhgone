@@ -32,11 +32,11 @@ pub enum Error {
     MlsInvalide,
     /// Un Commit de ce membre attend encore son écho du serveur : ni autre Commit, ni envoi
     /// (un message chiffré maintenant le serait à l'époque que ce Commit ferme, lisible par un
-    /// membre qu'il retire ; audit du 13 novembre, F1).
+    /// membre qu'il retire).
     CommitEnCours,
     /// Envoi refusé : un siège que le serveur a dit parti (0x03) ou exclu (0x09) a encore une
     /// feuille dans l'arbre et lirait le message. Le retirer d'abord (`a_retirer`, `retirer`),
-    /// puis renvoyer (audit du 13 novembre, F2).
+    /// puis renvoyer.
     RetraitEnAttente,
     /// Message `rotation` refusé : il ne vient pas du créateur, n'est pas de l'époque courante,
     /// ou un siège parti ou exclu est encore dans l'arbre (il aurait pu lire la nouvelle clé).

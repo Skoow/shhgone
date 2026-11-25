@@ -135,7 +135,7 @@ fn parsed(p: ParsedLink) -> Parsed {
 /// Seul cas `link` dont le résultat Rust diffère du vecteur (hôte IDN, voir README).
 const IDN_LINK: &str = "https://été.example/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8";
 
-/// Cas de `v2.json` remplacés par `v3-liens.json` (liens sous `/s`, 16 novembre) : les liens
+/// Cas de `v2.json` remplacés par `v3-liens.json` (liens sous `/s`) : les liens
 /// écrits (forme racine) et les deux refus de `…/s#…`. `v2.json` est figé : ils y restent.
 fn superseded_by_v3(c: &Value) -> bool {
     match c["fn"].as_str().unwrap() {
@@ -1028,7 +1028,7 @@ fn share_opened_cases() {
     let sh = &v["share"];
     let files = ShareFiles(share_server_files(&v), Default::default());
     let ParsedLink::Share { origin, k_lien } =
-        // Lien de v2.json écrit à la racine : lu sous /s (seule forme lue, 18 novembre).
+        // Lien de v2.json écrit à la racine : lu sous /s (seule forme lue).
         parse_link(&sh["link"].as_str().unwrap().replacen('#', "s#", 1), "/").unwrap()
     else {
         panic!("lien de partage attendu");

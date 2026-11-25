@@ -59,7 +59,7 @@ Aucune cryptographie maison : WebCrypto pour AES-GCM et l'aléa, bibliothèques 
 
 Aucune ressource tierce sur le site (ni CDN, ni police externe, ni statistiques, ni traceur), une politique de sécurité du contenu stricte, des empreintes d'intégrité (SRI) sur chaque script, et un test automatique « le serveur ne voit rien » qui fouille la mémoire, la base et le disque du serveur après un partage : il bloque toute mise en ligne.
 
-Ces mesures réduisent fortement les risques ; aucune ne rend un service invulnérable. Le détail des menaces prises en compte et des limites connues est dans la [spécification](docs/superpowers/specs/2026-11-03-shhdrop-design.md).
+Ces mesures réduisent fortement les risques ; aucune ne rend un service invulnérable. Le détail des menaces prises en compte et des limites connues est dans la [spécification](docs/conception/specs/2026-11-03-shhdrop-design.md).
 
 ## Offres
 
@@ -82,7 +82,7 @@ engine/   moteur commun en Rust : chiffrement, format des partages, liens
           (core, wasm pour le site, salon) et vecteurs de test communs
 server/   serveur en Go : API, stockage SQLite, limites, nettoyage
 deploy/   Caddy (TLS 1.3), Docker, scripts d'installation, de sauvegarde et de contrôle
-docs/     spécifications et plans
+docs/     spécifications, revues et documents juridiques
 ```
 
 - Le site a trois sortes de pages : `/` (accueil et envoi), `/s` (ouverture et gestion d'un partage, sans le code d'envoi) et une page par page d'information (`/securite`, `/confidentialite`, `/offres`…).
@@ -105,10 +105,10 @@ make test
 
 ## Documentation
 
-- [Spécification principale](docs/superpowers/specs/2026-11-03-shhdrop-design.md) : format, sécurité, ce que voit le serveur, décisions
-- [Spécification de l'interface](docs/superpowers/specs/2026-11-04-shhdrop-ui-design.md)
-- [Moteur Rust](docs/superpowers/specs/2026-11-10-moteur-rust-1-chiffrement-design.md) et [vecteurs de test](engine/vectors/README.md)
-- [Liens sous /s et pages séparées](docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md)
+- [Spécification principale](docs/conception/specs/2026-11-03-shhdrop-design.md) : format, sécurité, ce que voit le serveur, décisions
+- [Spécification de l'interface](docs/conception/specs/2026-11-04-shhdrop-ui-design.md)
+- [Moteur Rust](docs/conception/specs/2026-11-10-moteur-rust-1-chiffrement-design.md) et [vecteurs de test](engine/vectors/README.md)
+- [Liens sous /s et pages séparées](docs/conception/specs/2026-11-16-liens-s-et-pages-design.md)
 - [Déploiement](deploy/README.md)
 
 ## Signaler une faille

@@ -50,7 +50,7 @@
 //! saute au plus 1 000 générations d'un expéditeur : au-delà, ses messages sont refusés
 //! (`mls_invalide`).
 //!
-//! **Membres fantômes (risque accepté, décision du 11 novembre)** : un serveur malveillant
+//! **Membres fantômes (risque accepté)** : un serveur malveillant
 //! peut annoncer un siège pour un KeyPackage à lui ; le membre désigné l'ajoutera, et ce
 //! « membre » lira la suite. MLS ne peut pas l'empêcher sans service d'authentification ;
 //! seuls les codes de vérification (`empreinte`, comparés hors du salon) le révèlent.
@@ -58,9 +58,8 @@
 //! **Créateur** : l'identifiant du groupe MLS est `tag_salon` (16) ‖ siège du créateur (1) ‖ sa
 //! clé d'identité Ed25519 (32), fixé à la création et authentifié par MLS (contexte du groupe)
 //! chez tous les membres, arrivés plus tard compris. Le rôle (retirer un membre présent, envoyer
-//! la rotation, recréer le groupe) tient au siège **et** à cette clé (relecture du 13 novembre,
-//! point 4). **Depuis le 14 novembre (décision du propriétaire : « L'admin ne doit jamais perdre
-//! ses rôles admin »)**, cette clé est la **clé de rôle**, tirée de `S_gestion`
+//! la rotation, recréer le groupe) tient au siège **et** à cette clé.
+//! Le créateur ne perd jamais son rôle : cette clé est la **clé de rôle**, tirée de `S_gestion`
 //! (`identite_createur` : HKDF « shhdrop/v2/salon/role », puis Ed25519) et non plus tirée au
 //! hasard : le créateur revenu (rechargement, page fermée, « Quitter » puis retour, autre
 //! appareil muni du lien de gestion) entre avec la même clé, et la feuille de son KeyPackage,
@@ -73,19 +72,18 @@
 //! Commit qui ajoute la nouvelle retire l'ancienne, une feuille par siège). Ce Commit porte
 //! `createur_revenu` chez tous (`Membres`, `CommitPerdu`, `CommitAccepte`) : l'écran le dit.
 //!
-//! **Parti ou exclu : par arrivée, pas par siège** (relecture du 13 novembre, point 1) : la
+//! **Parti ou exclu : par arrivée, pas par siège** : la
 //! marque porte sur l'arrivée `(siège, nonce_arrivee)` de la feuille. Une nouvelle annonce sur
 //! le même siège ne l'efface pas ; l'arrivée marquée n'est jamais réadmise. Après une liste
 //! complète, une feuille qui n'est pas l'annonce courante de son siège est à retirer, y compris
-//! l'ancienne feuille d'une reprise (0x0A) jusqu'au Commit qui la remplace (14 novembre : la
+//! l'ancienne feuille d'une reprise (0x0A) jusqu'au Commit qui la remplace (la
 //! liste ne distingue pas une reprise d'un départ suivi d'une arrivée ; le flux et la liste
 //! doivent donner le même jugement chez tous).
 //!
-//! **Priorité du retrait** (point 6) : tant qu'une feuille est à retirer, un Commit qui ne les
+//! **Priorité du retrait** : tant qu'une feuille est à retirer, un Commit qui ne les
 //! retire pas toutes est refusé ; `ajouter`, `retirer` et `renouveler` les retirent d'office.
 //!
-//! **Exclusion et départ : le moteur impose l'ordre** (audit adverse du 13 novembre, F1 et F2 ;
-//! spec salon v3 §15). Une erreur de l'appelant donne un refus, jamais une fuite :
+//! **Exclusion et départ : le moteur impose l'ordre** (spec salon v3 §15). Une erreur de l'appelant donne un refus, jamais une fuite :
 //! - `envoyer` est refusé tant qu'un Commit de ce membre attend son écho (`commit_en_cours`) :
 //!   le message serait chiffré à l'époque que ce Commit ferme, lisible par le membre qu'il
 //!   retire ;
@@ -133,15 +131,15 @@ use shhdrop_core::kdf::sha256;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 const SUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
-/// Étiquette de l'exporteur MLS (Global Constraints du plan C-1).
+/// Étiquette de l'exporteur MLS (commune au site et aux apps).
 const SFRAME: &str = "shhdrop/v2/salon/sframe";
 /// Préfixe du code de vérification (spec v3 §9, point 4).
 const VERIF: &[u8] = b"shhdrop/v2/salon/verif";
 
 /// Code de vérification d'une clé publique Ed25519 (spec v3 §9, point 4) : SHA-256(« shhdrop/v2/salon/verif »
 /// ‖ clé), cinq `u32` gros-boutistes pris modulo 100 000, 5 chiffres chacun, séparés par une espace
-/// (25 chiffres, 10^25 ≈ 2^83 codes ; 20 chiffres, ≈ 2^66, jusqu'au 13 novembre : fabriquer une
-/// clé du même code restait à la portée d'un État, audit du 13 novembre).
+/// (25 chiffres, 10^25 ≈ 2^83 codes ; avec 20 chiffres, ≈ 2^66, fabriquer une
+/// clé du même code serait à la portée d'un État).
 pub fn code_verification(cle_publique: &[u8; 32]) -> String {
     let mut entree = VERIF.to_vec();
     entree.extend_from_slice(cle_publique);
@@ -260,7 +258,7 @@ pub enum Evenement {
     /// (un retour après rechargement figure dans les deux listes). `createur_revenu` : ce Commit
     /// ajoute la feuille de la clé de rôle (le créateur a repris la main : rechargement, retour ou
     /// autre appareil muni du lien de gestion) ; son ancienne feuille, s'il en avait une, est
-    /// retirée par ce même Commit et n'a plus aucun droit (14 novembre).
+    /// retirée par ce même Commit et n'a plus aucun droit.
     Membres {
         ajoutes: Vec<u8>,
         retires: Vec<u8>,
@@ -307,7 +305,7 @@ pub enum Evenement {
 
 /// Ce que le serveur a annoncé des sièges : la politique en dépend (voir l'en-tête du module).
 ///
-/// **Suivi par arrivée** (13 novembre) : « parti ou exclu » se dit d'une arrivée `(siège,
+/// **Suivi par arrivée** : « parti ou exclu » se dit d'une arrivée `(siège,
 /// nonce_arrivee)`, celle que porte la credential de la feuille, jamais d'un numéro de siège :
 /// une nouvelle annonce sur le même siège n'efface pas la marque de l'ancienne feuille.
 #[derive(Clone, Default)]
@@ -383,7 +381,7 @@ impl Registre {
     /// exclue ; après une liste complète du serveur, seulement si elle est l'annonce courante
     /// de son siège.
     ///
-    /// 14 novembre : une feuille remplacée par une reprise (0x0A) n'est **plus** admise jusqu'au
+    /// une feuille remplacée par une reprise (0x0A) n'est **plus** admise jusqu'au
     /// Commit qui la remplace. La liste complète (0x0D) ne dit que l'annonce courante de chaque
     /// siège : elle ne distingue pas « reprise » de « départ puis nouvelle arrivée ». Un membre
     /// qui a vu le 0x0A en direct et un membre qui n'a reçu que la liste (reconnexion) doivent
@@ -722,7 +720,7 @@ fn createur_ajoute(ch: &Changements, (siege, cle): Createur) -> bool {
     })
 }
 
-/// 14 novembre : la clé de rôle n'est admise qu'au siège du créateur. Ailleurs (lien de gestion
+/// la clé de rôle n'est admise qu'au siège du créateur. Ailleurs (lien de gestion
 /// volé utilisé depuis une place d'invité, client modifié), la feuille n'aurait aucun droit
 /// (le rôle tient aussi au siège) mais prendrait la clé : MLS refusant deux feuilles de même clé,
 /// le vrai créateur ne pourrait plus revenir. `empreinte` : SHA-256 de la clé de la feuille.
@@ -769,7 +767,7 @@ impl Salon {
     /// `recevoir_trame` comme toute trame. Seule l'étiquette du salon est lue dans `cles`
     /// (l'appelant les garde pour les trames).
     ///
-    /// **Contrat (14 novembre)** : le créateur passe `identite_createur` (clé de rôle tirée de
+    /// **Contrat** : le créateur passe `identite_createur` (clé de rôle tirée de
     /// `S_gestion`), pour créer le groupe comme pour revenir ; une identité tirée au hasard
     /// (`nouvelle_identite`) fonderait un groupe dont le rôle serait perdu au premier
     /// rechargement. Les liaisons (site : `Salon.creer(…, createur, sGestion)` ; apps : même
@@ -1386,7 +1384,7 @@ impl Salon {
     /// Message MLS d'une enveloppe (JSON strict de `encoder`), l'octet des drapeaux de sa trame
     /// en données authentifiées MLS (signées par l'expéditeur).
     ///
-    /// Refus avant tout chiffrement (audit du 13 novembre, F1 et F2) : `commit_en_cours` si un
+    /// Refus avant tout chiffrement (F1 et F2) : `commit_en_cours` si un
     /// Commit de ce membre attend son écho ; `retrait_en_attente` si un siège parti ou exclu a
     /// encore une feuille dans l'arbre (`non_membre` si c'est le nôtre) ; `rotation_refusee`
     /// pour un message `rotation` qui ne vient pas du créateur (siège et clé d'identité), dont
@@ -1398,7 +1396,7 @@ impl Salon {
         let groupe = self.pret_a_chiffrer()?;
         let rotation = match e.message {
             Message::Rotation { n, .. } => {
-                // Une seule rotation en vol (14 novembre) : deux rotations du même `n` et de
+                // Une seule rotation en vol : deux rotations du même `n` et de
                 // clés différentes seraient lues par les membres dans l'ordre (la première
                 // acceptée, la seconde refusée), et l'écho de la première, plus reconnu, ne
                 // dirait rien au créateur ; il refonderait sous la seconde clé, seul.
@@ -1821,7 +1819,7 @@ impl Salon {
     /// crée le nouveau ; les autres publient un nouveau `key_package` et attendent leur Welcome,
     /// comme à l'arrivée.
     ///
-    /// **Identités gardées** (13 novembre) : le nouveau salon retient la clé d'identité de
+    /// **Identités gardées** : le nouveau salon retient la clé d'identité de
     /// chaque membre admis de l'ancien groupe. Tant que l'arrivée `(siège, nonce_arrivee)` est
     /// la même, ce siège ne revient qu'avec cette clé : un KeyPackage d'une autre clé est
     /// ignoré, son ajout refusé (`commit_refuse`), un Welcome où il figure refusé. Un membre
@@ -1834,7 +1832,7 @@ impl Salon {
     /// reçue), ou chez le créateur à `RotationAcceptee` : l'identifiant du groupe MLS porte
     /// l'étiquette de l'invitation, une arrivante munie de la nouvelle invitation n'entre que
     /// dans un groupe créé sous elle ; un exclu n'a aucune feuille ni aucun secret du nouveau
-    /// groupe (audit du 13 novembre, F3).
+    /// groupe.
     /// En cas d'erreur (`mls_interne`), l'ancien état est perdu : repartir d'un `Salon` neuf.
     pub fn refonder(self, cles: &ClesSalon) -> Result<Salon> {
         let createur = self.groupe.is_some() && self.suis_createur();
@@ -2048,7 +2046,7 @@ mod tests {
         }
     }
 
-    /// F1 (audit du 13 novembre) : une rotation fabriquée par un membre qui n'est pas le créateur
+    /// F1 : une rotation fabriquée par un membre qui n'est pas le créateur
     /// (client modifié) est refusée par tous ; celle du créateur passe.
     #[test]
     fn rotation_d_un_non_createur_refusee() {
@@ -2183,11 +2181,11 @@ mod tests {
         }
     }
 
-    /// Relecture du 13 novembre, point 1 : chez le destinataire aussi, la marque suit l'arrivée
+    /// chez le destinataire aussi, la marque suit l'arrivée
     /// (siège, nonce) de la feuille. Après le 0x09 du siège 2 puis une nouvelle annonce sur ce
     /// siège, une rotation fabriquée par le créateur (client modifié) reste refusée, un message
     /// de l'exclu aussi. Pendant une simple reprise (0x0A), l'ancienne feuille est à retirer
-    /// (14 novembre : comme pour qui ne reçoit que la liste complète) : rotation et message de
+    /// (comme pour qui ne reçoit que la liste complète) : rotation et message de
     /// cette feuille refusés.
     #[test]
     fn nouvelle_annonce_ne_leve_rien_chez_le_destinataire() {
@@ -2226,11 +2224,11 @@ mod tests {
         );
     }
 
-    /// 14 novembre : le flux (0x0A reçu en direct) et la liste complète (0x0D à la reconnexion,
+    /// le flux (0x0A reçu en direct) et la liste complète (0x0D à la reconnexion,
     /// qui ne porte que l'annonce courante du siège) jugent l'ancienne feuille d'une reprise de
     /// la même façon ; sinon un renouvellement qui ne la retire pas serait fusionné par l'un et
-    /// refusé par l'autre (groupe scindé). Défaut du registre « arrivées remplacées » (travail du
-    /// 13 novembre, non commité) : son propre test donnait `a_retirer` = `[]` en direct ; après la
+    /// refusé par l'autre (groupe scindé). Défaut d'un registre « arrivées remplacées » envisagé
+    /// puis écarté : son propre test donnait `a_retirer` = `[]` en direct ; après la
     /// liste, l'ancienne feuille n'était pas une arrivée remplacée, donc `[2]`.
     #[test]
     fn reprise_meme_jugement_par_le_flux_et_par_la_liste() {
@@ -2262,7 +2260,7 @@ mod tests {
         assert!(matches!(ev[1], Ok(Evenement::CommitAccepte { .. })));
     }
 
-    /// 14 novembre (point 2) : une seule rotation en vol. Une seconde, envoyée avant l'écho de la
+    /// une seule rotation en vol. Une seconde, envoyée avant l'écho de la
     /// première, est refusée : les membres liraient la première et refuseraient la seconde (même
     /// `n`), alors que le créateur, l'écho de la première n'étant plus reconnu, refonderait sous
     /// la seconde clé. Après l'écho, le créateur sait ce qui a été accepté.
@@ -2286,7 +2284,7 @@ mod tests {
         assert!(matches!(ev[1], Ok(Evenement::Message { .. })));
     }
 
-    /// Relecture du 13 novembre, point 4 : une reprise annoncée du siège du créateur (autre clé
+    /// une reprise annoncée du siège du créateur (autre clé
     /// d'identité) entre dans le groupe ; un Commit qui retire un membre présent et une rotation
     /// fabriqués avec cette feuille (client modifié) sont refusés par tous.
     #[test]
@@ -2356,7 +2354,7 @@ mod tests {
         ));
     }
 
-    /// Relecture du 13 novembre, point 3 : après une refondation, un Welcome dont le groupe
+    /// après une refondation, un Welcome dont le groupe
     /// porte bien la clé du créateur attendu mais dont l'arbre n'a pas sa feuille (groupe
     /// fabriqué par un autre membre de l'ancien groupe) est refusé.
     #[test]
@@ -2408,7 +2406,7 @@ mod tests {
         assert!(m[1].groupe.is_none());
     }
 
-    /// 14 novembre : un Commit fabriqué par un membre (client modifié, hors `Salon::ajouter`) qui
+    /// un Commit fabriqué par un membre (client modifié, hors `Salon::ajouter`) qui
     /// ajoute la clé de rôle à une place d'invité (lien de gestion volé) est refusé par tous avant
     /// fusion ; un Welcome dont l'arbre la porte hors du siège du créateur aussi.
     #[test]
@@ -2588,7 +2586,7 @@ mod tests {
         }
     }
 
-    /// IMPORTANT 1 (relecture) : un serveur malveillant remplit la file de copies d'un vrai
+    /// IMPORTANT 1 : un serveur malveillant remplit la file de copies d'un vrai
     /// KeyPackage et du vrai Commit (siège attesté 0, époque E−1) rangées avant l'annonce qui
     /// rend le Welcome vérifiable : chaque copie du Commit est un candidat refusé. Le registre
     /// avance d'un seul passage : au plus une vérification par KeyPackage de la file (coût

@@ -4,7 +4,7 @@
 //! - chaque élément est chiffré sous sa propre clé K_élément = HKDF(k, « shhdrop/v2/element »),
 //!   k = 32 octets de l'aléa de la plateforme, données authentifiées « shhdrop/v2/element-ad » ;
 //! - un élément d'un segment ou plus part d'une frontière de segment ; les petits sont
-//!   empaquetés par morceaux dans des segments partagés (audit H-2), sans déborder du leur ;
+//!   empaquetés par morceaux dans des segments partagés, sans déborder du leur ;
 //! - le morceau `g` du paquet est chiffré sous nonce(g, faux), comme le paquet v2 (§29.3) ;
 //! - au clic, le manifeste (graines des seuls éléments gardés) est chiffré sous K_contenu dans
 //!   le dernier morceau du palier final (nonce(B − 1, vrai), AD = en-tête « SHH2 »).
@@ -82,7 +82,7 @@ pub fn chunks_for(size: u64) -> Result<u64> {
     Ok(safe(size)?.div_ceil(CHUNK64))
 }
 
-/// Petit élément (audit H-2) : moins d'un segment ; empaqueté avec d'autres dans un segment
+/// Petit élément : moins d'un segment ; empaqueté avec d'autres dans un segment
 /// partagé, sans déborder de son segment.
 pub fn is_small(size: u64) -> bool {
     size > 0 && size < SEG_PLAIN
@@ -90,7 +90,7 @@ pub fn is_small(size: u64) -> bool {
 
 /// Emprise d'un élément, en morceaux : ⌈taille / 64 Kio⌉ (D41-38) ; seule la fin de son
 /// dernier morceau est faite de zéros chiffrés. Le serveur voit donc, pendant l'envoi, la taille
-/// de chaque élément à 64 Kio près (fuite acceptée par le propriétaire).
+/// de chaque élément à 64 Kio près (fuite acceptée).
 pub fn footprint_for(size: u64) -> Result<u64> {
     chunks_for(size)
 }
@@ -128,7 +128,7 @@ pub struct ElementSealer<P: Platform> {
     pieces: Vec<Piece>,
     produced: Vec<Cell<bool>>,
     /// Élément d'au plus TEXT_BYTES_MAX octets (une seule pièce) : verdict de `check_text` sur
-    /// le clair chiffré par `piece`, pour `check_note` (audit M6). `None` tant que la pièce n'a
+    /// le clair chiffré par `piece`, pour `check_note`. `None` tant que la pièce n'a
     /// pas été chiffrée.
     note: Cell<Option<Result<()>>>,
 }
@@ -204,7 +204,7 @@ impl<P: Platform> ElementSealer<P> {
         self.first
     }
 
-    /// L'élément peut-il entrer dans le manifeste comme une note (audit M6) ? Le lecteur refuse
+    /// L'élément peut-il entrer dans le manifeste comme une note ? Le lecteur refuse
     /// tout le partage pour une note de plus de TEXT_MAX points de code ou qui n'est pas de
     /// l'UTF-8 strict : elle est refusée ici, avant le manifeste. `texte_trop_long` au-delà de
     /// TEXT_BYTES_MAX octets ; `texte_invalide` tant que la pièce n'a pas été chiffrée (le moteur
@@ -430,7 +430,7 @@ pub async fn seal_final_palier<P: Platform>(
     seal_final_complet(entries, keys, rights, keep_ttl_h, palier, None).await
 }
 
-/// [`seal_final`] avec le nom du partage (19 novembre) : `title` nettoyé par
+/// [`seal_final`] avec le nom du partage : `title` nettoyé par
 /// [`manifest::title_for_seal`] (vide après nettoyage : aucun titre), refusé au-delà de
 /// `TITLE_MAX` points de code (« titre_trop_long », vérifié après les droits, avant les entrées).
 pub async fn seal_final_titled<P: Platform>(

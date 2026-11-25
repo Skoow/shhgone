@@ -20,7 +20,7 @@ const DEBUT_CHIFFRE: usize = DEBUT_NONCE + 24;
 const TAILLE_TAG_AEAD: usize = 16;
 const _: () = assert!(DEBUT_CHIFFRE + TAILLE_O + TAILLE_TAG_AEAD == TAILLE_TRAME);
 
-/// Règle d'effacement du message (2 bits des drapeaux ; spec v3 §5, 13 novembre) : 0 jusqu'à la
+/// Règle d'effacement du message (2 bits des drapeaux ; spec v3 §5) : 0 jusqu'à la
 /// fin du salon ou à son renouvellement ; 1, 2, 3 : effacé par le serveur 1 min, 5 min ou 1 h
 /// après la dernière lecture des lecteurs attendus (`0x0E`, qui fait foi ; `effacement::etat`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

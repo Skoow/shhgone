@@ -1,9 +1,9 @@
 name: pages
 # Démo de l'interface sur GitHub Pages (aucun serveur : rien n'est envoyé ; UI §14.3).
 # Publiée seulement quand le workflow « ci » (tests Go, tests web, e2e, UI) a réussi sur main :
-# workflow_run se déclenche à la fin de ci, jamais sur un push rouge (CLAUDE.md : le test « le
+# workflow_run se déclenche à la fin de ci, jamais sur un push rouge (règles du projet : le test « le
 # serveur ne voit rien » bloque toute mise en ligne).
-# Pas de workflow_dispatch (audit du 11 novembre) : il publiait n'importe quelle branche, sans ci
+# Pas de workflow_dispatch : il publierait n'importe quelle branche, sans ci
 # verte. Pour republier : relancer le workflow « ci » du commit voulu de main (Re-run).
 on:
   workflow_run:
@@ -28,7 +28,7 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
-      # Pas de cache npm (audit du 11 novembre) : ce job publie, et un cache est inscriptible par
+      # Pas de cache npm : ce job publie, et un cache est inscriptible par
       # tout code npm des jobs de ci (tests, Playwright) ; npm ci vérifie déjà chaque paquet
       # contre les empreintes du verrou, mais rien de ce qui est publié ne doit venir d'un cache.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

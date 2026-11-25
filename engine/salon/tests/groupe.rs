@@ -1,4 +1,4 @@
-//! Groupe MLS du salon (Task 6) : 10 membres sauf mention. Le « réseau » des tests joue le
+//! Groupe MLS du salon : 10 membres sauf mention. Le « réseau » des tests joue le
 //! serveur : il numérote chaque message MLS (`seq`) et le remet à tous les membres, expéditeur
 //! compris (§39.3.1 : la trame est renvoyée à son expéditeur).
 use shhdrop_core::{KLien, KMdp};
@@ -503,7 +503,7 @@ fn politique_regles() {
     assert_eq!(v(&[], &[2], &[0, 1], 1, &[]), refus);
     assert_eq!(v(&[], &[2], &[0, 1], 1, &[2]), Ok(()));
     assert_eq!(v(&[], &[2, 3], &[0, 1], 1, &[2]), refus);
-    // 13 novembre. Suivi par arrivée : la feuille d'une AUTRE arrivée du siège parti (nonce 1)
+    // Suivi par arrivée : la feuille d'une AUTRE arrivée du siège parti (nonce 1)
     // n'est pas retirable par tous ; auteur dont l'arrivée est partie : refusé.
     let autre_arrivee = Changements {
         retraits: vec![(2, nonce(2, 1))],
@@ -758,7 +758,7 @@ fn empreinte_stable() {
     entree.extend_from_slice(id.cle_publique());
     assert_eq!(id.cle_publique().len(), 32);
     let h = shhdrop_core::kdf::sha256(&entree);
-    // 25 chiffres depuis le 13 novembre (20 avant : audit adverse, défense en profondeur).
+    // 25 chiffres (défense en profondeur).
     let attendu = h[..20]
         .chunks(4)
         .map(|c| format!("{:05}", u32::from_be_bytes(c.try_into().unwrap()) % 100_000))
@@ -1067,14 +1067,14 @@ fn kp_usurpe_par_un_membre() {
 /// IMPORTANT 2 : retour du créateur ; un membre tente de prendre son siège avec le nouveau
 /// nonce (public) avant lui : refusé ; le vrai retour passe.
 ///
-/// **Changé le 13 novembre (relecture, point 4 ; à valider par le propriétaire)** : avant, le
+/// **Règle** : avant, le
 /// créateur revenu « gardait le droit de retirer » par son seul numéro de siège ; un fantôme
 /// annoncé par le serveur sur ce siège l'aurait eu aussi. Le rôle tient maintenant au siège
 /// **et** à la clé d'identité portée par l'identifiant du groupe : revenu avec une nouvelle
 /// clé, il ne retire plus un membre présent (refus local, sans divergence) ; il retire toujours
 /// un siège parti, comme tout membre. Le rôle revient quand le groupe est recréé.
 ///
-/// **14 novembre (décision du propriétaire, spec salon v3 §15.2)** : le créateur de ce test a
+/// le créateur de ce test a
 /// une identité tirée au hasard, il revient donc **sans son lien de gestion** : c'est toujours
 /// la règle (membre ordinaire). Avec `S_gestion`, il revient avec la même clé de rôle et retrouve
 /// ses droits dès son ajout (`role_*` de `tests/redteam.rs`).
@@ -1821,7 +1821,7 @@ fn n2_welcome_hors_arbre_refuse() {
     r.message(3, 1);
 }
 
-/// Renouvellement du salon (0x10, spec v3 §3.6.1, décision du 13 novembre) : le serveur efface
+/// Renouvellement du salon (0x10, spec v3 §3.6.1) : le serveur efface
 /// tout, Commits, Welcomes et KeyPackages compris ; le groupe MLS est donc recréé. Chacun jette
 /// son état ; le créateur crée un nouveau groupe et ajoute chacun (KeyPackage publié, Commit,
 /// Welcome) comme à la création. Les membres gardent leur siège et leur `nonce_arrivee`

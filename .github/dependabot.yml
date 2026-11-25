@@ -1,9 +1,9 @@
 version: 2
 updates:
   # cooldown : une version n'est proposée que 7 jours après sa publication, le temps que
-  # les paquets piégés soient repérés et retirés (audit du 5 novembre, M2). Les mises à
+  # les paquets piégés soient repérés et retirés. Les mises à
   # jour de sécurité de Dependabot n'attendent pas. Une version majeure attend 14 jours
-  # (semver-major-days, décision du propriétaire du 24 novembre) ; Dependabot n'applique ce
+  # (semver-major-days) ; Dependabot n'applique ce
   # réglage qu'aux écosystèmes à versions SemVer (pour github-actions, docker et docker-compose,
   # selon l'étiquette, default-days peut seul s'appliquer).
   - package-ecosystem: npm
@@ -13,7 +13,7 @@ updates:
     cooldown:
       default-days: 7
       semver-major-days: 14
-  # Outil de vérification des composants Svelte (npm run check), verrou à part (M10).
+  # Outil de vérification des composants Svelte (npm run check), verrou à part.
   - package-ecosystem: npm
     directory: /web/tools/svelte-check
     schedule:
@@ -54,7 +54,7 @@ updates:
     cooldown:
       default-days: 7
       semver-major-days: 14
-  # Images de base de deploy/Dockerfile (étiquette ET empreinte, M10). Chaque image doit rester
+  # Images de base de deploy/Dockerfile (étiquette ET empreinte). Chaque image doit rester
   # alignée sur sa source de vérité, sinon le build ou la comparaison avec la CI échoue (job
   # repro-docker) : rust = engine/rust-toolchain.toml, node = web/.node-version, golang ≥
   # « toolchain » de server/go.mod et deploy/shhcheck/go.mod. Une proposition qui ne change que

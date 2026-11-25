@@ -28,7 +28,7 @@ use zeroize::Zeroizing;
 
 pub const SEED_LEN: usize = 32;
 pub const ID_LEN: usize = 16;
-/// Taille de l'en-tête en clair du segment 0 (même valeur que `format::HEADER`, Task 6).
+/// Taille de l'en-tête en clair du segment 0 (même valeur que `format::HEADER`).
 const HEADER_LEN: usize = 48;
 /// Taille de E : nonce (12) ‖ R chiffrée (32) ‖ tag GCM (16).
 pub const ENVELOPE_LEN: usize = NONCE_LEN + SEED_LEN + TAG_LEN;

@@ -2,11 +2,11 @@
 //! lecture stricte (`parse`, même refus que `parseManifest`, tous en `paquet_corrompu`) et
 //! écriture octet pour octet identique à `JSON.stringify` (`to_json`), champs dans l'ordre
 //! `v, rights, keep_ttl_h?, title?, items[{kind, name, mime, size, offset, text?, k?, clean?, sha256?}]`.
-//! `sha256` (16 novembre, décision du propriétaire) : empreinte SHA-256 du fichier tel qu'envoyé,
+//! `sha256` : empreinte SHA-256 du fichier tel qu'envoyé,
 //! en hexadécimal minuscule (64 caractères), calculée sur l'appareil de l'expéditeur ; fichiers
 //! seulement. Facultative et ignorée si mal formée (comme `clean`) : un ancien lecteur l'ignore,
 //! un ancien manifeste n'en a pas.
-//! `title` (19 novembre, demande du propriétaire) : nom du partage choisi par l'expéditeur, vu
+//! `title` : nom du partage choisi par l'expéditeur, vu
 //! par le destinataire et gardé dans l'historique de l'expéditeur. Facultatif ; nettoyé par
 //! [`clean_title`] à l'écriture comme à la lecture ; refusé au scellement au-delà de
 //! [`TITLE_MAX`] points de code (`titre_trop_long`, [`title_for_seal`]). À la lecture, absent,
@@ -241,7 +241,7 @@ impl fmt::Debug for Entry {
     }
 }
 
-/// Nom du partage (19 novembre), déjà nettoyé par [`clean_title`] : 1 à [`TITLE_MAX`] points
+/// Nom du partage, déjà nettoyé par [`clean_title`] : 1 à [`TITLE_MAX`] points
 /// de code. Mis à zéro à la destruction ; `Debug` ne le montre pas.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Title(String);
@@ -267,7 +267,7 @@ impl fmt::Debug for Title {
 /// Longueur maximale du nom du partage, en points de code, après nettoyage.
 pub const TITLE_MAX: usize = 80;
 
-/// Nettoyage du nom du partage (19 novembre), le même à l'écriture et à la lecture :
+/// Nettoyage du nom du partage, le même à l'écriture et à la lecture :
 /// 1. toute espace Unicode (`White_Space` : tabulation, saut de ligne, U+00A0, U+2028…) devient
 ///    U+0020 ;
 /// 2. retrait des autres caractères de commande (C0, DEL, C1) et de tout
@@ -327,7 +327,7 @@ fn cleaned(raw: &str) -> String {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Manifest {
     pub rights: Rights,
-    /// Nom du partage (19 novembre) ; absent des anciens manifestes.
+    /// Nom du partage ; absent des anciens manifestes.
     pub title: Option<Title>,
     pub items: Vec<Entry>,
 }

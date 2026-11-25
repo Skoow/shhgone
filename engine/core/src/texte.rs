@@ -1,7 +1,7 @@
 //! Règle du pseudo (spec §39.4 point 4), commune au compte (conception compte v2 §21.5) et au
 //! salon (`shhdrop-salon`, qui l'appelle) : une seule copie, pour qu'un pseudo de compte soit
-//! toujours accepté dans un salon. Déplacée telle quelle de `engine/salon/src/texte.rs` le
-//! 14 novembre ; seule différence : trois erreurs au lieu d'une (`pseudo_longueur`,
+//! toujours accepté dans un salon. Reprise telle quelle de `engine/salon/src/texte.rs` ;
+//! seule différence : trois erreurs au lieu d'une (`pseudo_longueur`,
 //! `pseudo_caracteres`, `pseudo_ecritures`), que le salon ramène à `pseudo_invalide`. Les
 //! vecteurs `pseudo` de `salon-v3.json` et de `compte-v3.json` le prouvent.
 //!
@@ -9,7 +9,7 @@
 //! de tout `Default_Ignorable_Code_Point` (l'apostrophe typographique U+2019 devient `'`) ; 3. NFC ;
 //! 4. toute espace Unicode (`White_Space`) devient U+0020, regroupées et rognées ; 5. 2 à 24
 //! graphèmes (UAX #29), 8 points de code au plus par graphème (contre l'empilement de marques) ;
-//! 6. seulement A-Z, a-z et 0-9 (20 novembre, décision du propriétaire : ni accent, ni autre
+//! 6. seulement A-Z, a-z et 0-9 (ni accent, ni autre
 //! écriture, ni espace, ni signe) ; 7. une seule écriture (UAX #24 : intersection
 //! des `Script_Extension` de tous les caractères, **plus strict** que le niveau « Highly
 //! Restrictive » d'UTS #39 ; seuls Han avec hiragana et katakana, avec bopomofo ou avec hangul sont
@@ -129,7 +129,7 @@ pub fn pseudo_valide(s: &str) -> Result<String> {
     if !(PSEUDO_MIN..=PSEUDO_MAX).contains(&n) {
         return Err(Error::PseudoLongueur);
     }
-    // A-Z, a-z et 0-9 seulement (décision du propriétaire, 20 novembre) : ni accent, ni autre
+    // A-Z, a-z et 0-9 seulement : ni accent, ni autre
     // écriture, ni espace, ni signe. Les contrôles suivants restent, sans effet sur l'ASCII.
     if !p.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Err(Error::PseudoCaracteres);
@@ -152,7 +152,7 @@ pub fn pseudo_valide(s: &str) -> Result<String> {
                 return Err(Error::PseudoCaracteres);
             }
             let ok = if i == 0 {
-                // Lettres et chiffres seulement (décision du propriétaire, 20 novembre) : plus
+                // Lettres et chiffres seulement : plus
                 // d'espace ni de « - _ . ' ».
                 if c.is_ascii() {
                     c.is_ascii_alphanumeric()
@@ -184,7 +184,7 @@ pub fn pseudo_canon(pseudo: &str) -> String {
     let bas: String = pseudo.nfkc().collect::<String>().to_lowercase();
     // Squelette UTS #39, puis minuscules de nouveau (le squelette peut redonner des majuscules).
     let sq: String = skeleton(&bas).collect::<String>().to_lowercase();
-    // P2 (audit du 21 novembre) : « I » majuscule et « l » minuscule se confondent à l'écran, et
+    // P2 : « I » majuscule et « l » minuscule se confondent à l'écran, et
     // la clé ignore la casse (I = i) : i, l et 1 sont donc une seule lettre (le squelette donne
     // déjà « l » pour « 1 », et « o » pour « 0 »). « AIice » = « Alice » ; prix : « Lia » = « Lla ».
     sq.nfkc()

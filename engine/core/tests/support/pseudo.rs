@@ -32,37 +32,37 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "simple",
             "Léa".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "majuscules",
             "LÉA".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "decompose",
             "Le\u{301}a".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "espace_interieure",
             "lé a".into(),
-            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement
         ),
         (
             "espaces_regroupees",
             "  Léa \u{a0}\u{3000} Dupont\t".into(),
-            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement
         ),
         (
             "ponctuation",
             "Jean-Luc O'Neil_x.y".into(),
-            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement
         ),
         (
             "apostrophe_typographique",
             "O\u{2019}Neil".into(),
-            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement
         ),
         (
             "sans_accent_distinct",
@@ -72,12 +72,12 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "nfkc_pleine_chasse",
             "ＬＥＡ".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "nfkc_mathematique",
             "𝓛éa".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         ("sosie_m_rn", "Emma".into(), P::Ok("Emma", "ernrna", false)),
         (
@@ -88,17 +88,17 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "cyrillique_seul",
             "Лея".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "sosie_cyrillique_seul",
             "\u{410}\u{4CF}\u{456}\u{441}\u{435}".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "grec",
             "Ελένη".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "han_et_kana",
@@ -112,7 +112,7 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "invisibles_retires",
             "L\u{200B}éa\u{202E}".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         ("deux_graphemes", "ab".into(), P::Id("ab")),
         (
@@ -206,27 +206,27 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "reserve_espace_et_tiret",
             "Shh-Drop".into(),
-            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement
         ),
         (
             "reserve_moderateur_accent",
             "Modérateur".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "reserve_equipe_accent",
             "Équipe".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "reserve_securite_accent",
             "Sécurité".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "reserve_systeme_accent",
             "Système".into(),
-            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement */
         ),
         (
             "non_reserve_suffixe",
@@ -237,7 +237,7 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
     // Chaque mot de la liste, tel quel.
     for (i, w) in PSEUDOS_RESERVES.iter().enumerate() {
         let label: &'static str = Box::leak(format!("liste_{i:02}").into_boxed_str());
-        // Mots accentués : refusés avant même la liste (A-Z, a-z, 0-9 seulement, 20 novembre).
+        // Mots accentués : refusés avant même la liste (A-Z, a-z, 0-9 seulement).
         let want = if w.is_ascii() {
             P::Reserve
         } else {

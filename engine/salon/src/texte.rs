@@ -10,7 +10,7 @@
 //!
 //! **Pseudonyme** (`verifier_pseudo`, spec §39.4 point 4) et sa clé d'unicité (`cle_unicite`) :
 //! règle de `shhdrop_core::texte` (`pseudo_valide`, `pseudo_canon`), commune au salon et au
-//! compte depuis le 14 novembre (une seule copie) ; ses trois erreurs deviennent ici
+//! compte (une seule copie) ; ses trois erreurs deviennent ici
 //! `pseudo_invalide`. « Marque » = caractère qui se lie au précédent dans la segmentation en
 //! graphèmes (UAX #29 : Extend, SpacingMark, ZWJ ; dont les modificateurs de teinte de peau, qui
 //! ne comptent donc pas seuls comme caractère visible) : `shhdrop_core::texte::se_lie`.
@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn pseudo_regles() {
-        // A-Z, a-z et 0-9 seulement (20 novembre) ; blancs en bord rognés, invisibles retirés.
+        // A-Z, a-z et 0-9 seulement ; blancs en bord rognés, invisibles retirés.
         assert_eq!(verifier_pseudo("Lea").unwrap(), "Lea");
         assert_eq!(verifier_pseudo("  Lea \u{a0}\t").unwrap(), "Lea");
         assert_eq!(verifier_pseudo("L\u{200B}ea\u{202E}").unwrap(), "Lea");
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn pseudo_apostrophes_refusees() {
-        // Lettres et chiffres seulement (20 novembre) : aucune apostrophe, droite ou typographique.
+        // Lettres et chiffres seulement : aucune apostrophe, droite ou typographique.
         for ko in [
             "L\u{2019}éa",
             "O\u{2019}Neil",
@@ -373,7 +373,7 @@ mod tests {
     #[test]
     fn pseudo_cle_unicite() {
         assert_eq!(cle_unicite("lea"), cle_unicite("LEA"));
-        assert_eq!(cle_unicite("Jean-Luc O'Neil_x.y"), "jeanluconellxy"); // i = l (P2, 21 novembre)
+        assert_eq!(cle_unicite("Jean-Luc O'Neil_x.y"), "jeanluconellxy"); // i = l (P2)
         assert_eq!(cle_unicite("ＬＥＡ"), "lea");
         // sosies (squelette UTS #39) : la clé reste calculée sur toute entrée, même refusée.
         let latin = cle_unicite("Alice");
@@ -610,7 +610,7 @@ mod tests {
         ] {
             assert!(verifier_pseudo(ko).is_err(), "{ko:?}");
         }
-        // Toute marque est refusée depuis le 20 novembre (A-Z, a-z, 0-9).
+        // Toute marque est refusée (A-Z, a-z, 0-9).
         assert!(verifier_pseudo("a\u{301}b").is_err());
         assert!(verifier_pseudo("Zoe\u{308}").is_err());
     }

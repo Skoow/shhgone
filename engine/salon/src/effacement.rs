@@ -1,4 +1,4 @@
-//! Règles d'effacement côté appareil (spec v3 §5, décision du propriétaire du 13 novembre) :
+//! Règles d'effacement côté appareil (spec v3 §5) :
 //! fonction pure, sans horloge ni E/S. Le temps est passé en paramètre (millisecondes) ;
 //! l'arithmétique est saturante.
 //!

@@ -1,5 +1,5 @@
-//! Non-régression de l'audit adverse du 13 novembre (second passage, protocole d'exclusion) :
-//! les scénarios de l'audit, joués avec le vrai moteur sans contourner son API, affirment
+//! Non-régression du protocole d'exclusion :
+//! les scénarios d'attaque, joués avec le vrai moteur sans contourner son API, affirment
 //! maintenant le comportement corrigé (F1 à F4) ou la limite documentée (F5, H3). Les messages
 //! fabriqués hors de `Salon` (client modifié) sont dans les tests unitaires de `groupe.rs`.
 //!
@@ -12,8 +12,7 @@ use shhdrop_salon::{
     lire_en_tete, nouvelle_identite, ouvrir,
 };
 
-/// Secret de gestion du salon (lien de gestion `#m…`) : la clé de rôle du créateur en est tirée
-/// (14 novembre).
+/// Secret de gestion du salon (lien de gestion `#m…`) : la clé de rôle du créateur en est tirée.
 const S_GESTION: [u8; 32] = [0x5A; 32];
 
 fn cles(n: u8) -> ClesSalon {
@@ -313,7 +312,7 @@ fn h1_course_message_epoque_n_apres_commit() {
 /// F1 : une rotation chiffrée à l'époque n et rangée après un Commit (ici un renouvellement de
 /// A passé entre l'envoi et le rang) est refusée par tous (`rotation_refusee`) : à l'époque
 /// précédente, un membre retiré depuis l'aurait lue. Le créateur le voit (son époque a changé
-/// entre l'envoi et l'écho ; depuis la relecture du 13 novembre, l'écho le dit :
+/// entre l'envoi et l'écho ; l'écho le dit :
 /// `RotationARenvoyer`) et la renvoie à l'époque courante.
 #[test]
 fn rotation_d_une_epoque_passee_refusee() {
@@ -645,7 +644,7 @@ fn exclu_retarde_son_retrait_avant_le_0x09() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Relecture du commit dcb6fa1 (14 novembre) : sept invariants (hypothèses 1 à 7, confirmées à la
+// Relecture du commit dcb6fa1 : sept invariants (hypothèses 1 à 7, confirmées à la
 // lecture du code d'origine ; ces tests utilisent l'interface corrigée et n'y ont pas été
 // rejoués) ; spec salon v3 §15.1, « Relecture des règles du 13 novembre ».
 // Les messages et Commits fabriqués hors de `Salon` sont dans les tests unitaires de `groupe.rs`.
@@ -700,7 +699,7 @@ fn p1_nouvelle_annonce_ne_leve_pas_l_exclusion() {
 
 /// Point 1 : un message `rotation` exige que **chaque** feuille soit l'annonce courante de son
 /// siège. Pendant une reprise (0x0A : A revient après un rechargement, son ancienne feuille
-/// attend d'être remplacée), l'ancienne feuille est à retirer (14 novembre : même jugement que
+/// attend d'être remplacée), l'ancienne feuille est à retirer (même jugement que
 /// par la liste complète, `reprise_meme_jugement_par_le_flux_et_par_la_liste`) : ni message ni
 /// rotation ; le Commit qui ajoute A revenu (ou un retrait) la retire, puis la rotation passe.
 #[test]
@@ -843,7 +842,7 @@ fn p3_refondation_garde_les_identites() {
 /// groupe sans les droits du créateur : son moteur le sait (l'identifiant du groupe porte la clé
 /// du créateur d'origine) et refuse de retirer un membre présent ou d'envoyer la rotation.
 /// (Le Commit et la rotation fabriqués par un client modifié : tests unitaires de `groupe.rs`.)
-/// 14 novembre : la reprise de ce test a une identité tirée au hasard, donc sans `S_gestion`
+/// la reprise de ce test a une identité tirée au hasard, donc sans `S_gestion`
 /// (fantôme, ou créateur revenu sans son lien de gestion) ; avec `S_gestion`, voir `role_*`.
 #[test]
 fn p4_reprise_du_siege_du_createur_sans_ses_droits() {
@@ -1020,9 +1019,8 @@ fn p7_numero_de_rotation_lie_a_l_exclusion() {
 }
 
 // ------------------------------------------------------------------------------------------
-// Rôle du créateur lié à S_gestion (14 novembre, décision du propriétaire : « L'admin ne doit
-// jamais perdre ses rôles admin même après un rechargement, ou quitter, ou fermer la page » ;
-// spec salon v3 §15.2).
+// Rôle du créateur lié à S_gestion : il le garde après un rechargement, un départ ou une page
+// fermée (spec salon v3 §15.2).
 
 type Remis = Vec<(usize, Result<Evenement, Error>)>;
 

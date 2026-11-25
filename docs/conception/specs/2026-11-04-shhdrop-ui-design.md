@@ -1,0 +1,1633 @@
+# Shhdrop — spécification de l'interface
+
+Date : 4 novembre 2026 · **Révision 8 (spec v2.11)** : mot de passe toujours généré et choix payants verrouillés (§9.3, §9.3.1), pages d'erreur (§9.11), écran « partage disparu » qui nomme le fichier en cours (§9.8.9), 200 éléments pour tous (§9.14.1 abandonné) · **Révision 7 (spec v2.10)** : options payantes du composeur (§9.3.1), états d'ouverture « pas encore démarré », « programmé », « marque » (§9.7.2), fermeture de l'interface à la disparition pendant un téléchargement (§9.8.9), fonctions payantes (§9.14), « illimité (50 Go au total) » (§10.1) · **Révision 6 (spec v2.9)** : limites gratuites 15 éléments et 2 Go (§9.2.5, §10.1), tableau de bord de l'expéditeur (§9.6), rechargement sans ouverture de plus (§9.7.1, §12.1), page de contenu « 2027 » avec galerie, visionneuse et archive .zip (§9.8.x), illustration de l'écran « détruit » (§9.10.1), salon : exclusion et explication des clés (§10.1) · Révision 4 (5 novembre : direction artistique v2, §20 ; textes sans termes techniques, §20.8 ; effets à l'écran des décisions spec v2.6 §27 à §34) · Révision 3 : décisions du 4 novembre, analyse critique §18, pré-vol du plan P1–P43, Q2 et Q3 réglées · Statut :
+Spécification de référence : `docs/conception/specs/2026-11-03-shhdrop-design.md` (notée « spec » ci-dessous, avec ses numéros de section, dans sa version v2.6 : exception reCAPTCHA (§26, **retirée le 24 novembre** : plus aucun repli Google, ALTCHA seul ; tout ce qui suit sur `fallbackOrigin`, `VerifFrame`, `verif.*`, §9.4.2 « Repli » et §15 est caduc), coffre (§27), code vérifiable (§28), chiffrement anticipé (§29), post-quantique (§30), mot de passe de 8 caractères (§31), lien court (§32), historique local (§33), droits du destinataire (§34)). En cas de conflit, la spec l'emporte, sauf décision du propriétaire notée en §0.2.
+
+Brief du propriétaire (impératif) : « interface pro d'expert, jolie, avec animations, très belle, 2027 ». Monde visuel : **« Nuit chiffrée »**, toujours sombre. Français et anglais. PWA pensée d'abord pour le téléphone, très bonne aussi sur ordinateur.
+
+Modes de surface : **Operate** (tâche) pour composer, envoyer, gérer, ouvrir et lire ; **Persuade** pour un en-tête d'accueil court, au-dessus du formulaire de composition, sur la même page ; **Read** pour les pages Sécurité et Confidentialité.
+
+---
+
+## 0. Ce qui lie l'interface
+
+### 0.1 API cliente
+
+L'interface n'importe que `web/src/index.ts`. Elle n'importe jamais `transfer/api.ts` ni `crypto/*`. `expectedOrigin` vaut toujours `location.origin`. L'interface ne fabrique jamais d'URL d'API.
+
+**Existant (sur `main` depuis la fusion du durcissement, spec §25) :**
+
+| Fonction | Usage dans l'interface |
+|---|---|
+| `createShare(origin, items, opts)` → `{ link, manage, expiresInS }` | Envoi. `items` : `Item[]` (`{ kind: "text" \| "file", name, mime, data: Uint8Array \| Blob }`) dans l'**ordre** voulu (l'ordre du manifeste est celui du tableau). `opts` : `ttlHours`, `maxOpens`, `password`, `solveCaptcha(challenge)` (sans `ctx` depuis le 24 novembre, §0.1), `prepared?` (défi et preuve pré-calculés, voir les compléments ci-dessous), `onProgress(done, total)` en segments de 4 Mio |
+| `fetchMeta(link, expectedOrigin)` → `{ expiresInS }` | Écran d'ouverture, sans consommer d'ouverture |
+| `openShare(link, password, expectedOrigin, onProgress?)` → `Opened` | Déverrouillage (consomme une ouverture, sauf rouverture avec un octroi valable : spec §41.4, v2.9 ; `openShare` accepte l'octroi gardé par `web/src/session/open-grant.ts`). `onProgress(n, total)` compte les segments lus, tous éléments confondus |
+| `Opened.manifest` | Liste des éléments (textes inclus) |
+| `Opened.safeName(i)` | **Seul** nom affiché ou proposé à l'enregistrement |
+| `Opened.previewKind(i)` | `"image" \| "audio" \| "video" \| "text" \| "pdf" \| "none"` : **seule** source du choix de visionneuse (`none` au-delà de 200 Mio) |
+| `Opened.isRiskyFile(i)` | Avertissement avant enregistrement |
+| `Opened.item(i)` | Non utilisé : toute lecture passe par `saveItem`, dont l'interface compte les octets (§9.8) |
+| `Opened.saveItem(i, sink)` | Aperçu et enregistrement, en flux |
+| `Opened.done()` | Fin de lecture ; part en `keepalive` (survit à la fermeture de la page) |
+| `Opened.destroy(reason?: "report")` | Destruction ou signalement par le destinataire, **même en état `draining`** ; motif non conservé par le serveur ; `Error("cles_effacees")` après `wipe()` |
+| `Opened.wipe()` | Mise à zéro au mieux |
+| `destroyShare(link, expectedOrigin, { password? })` | Utilisé **seulement** avec le lien de gestion (expéditeur). Jamais avec le lien de partage : le destinataire passe par `Opened.destroy` |
+| `shareStatus(manage, expectedOrigin)` → `{ opensUsed, maxOpens, expiresInS, state }` | Page de gestion |
+| `parseLink(url)` | `{kind:"s", origin, id, kLien}` ou `{kind:"m", origin, id, sGestion}` |
+| `generatePassphrase(n ≥ 4)`, `checkPassword(pw)`, `PW_MIN_CHARS` | Écran d'options |
+| `collectToBlob(opened, i)` | Repli d'enregistrement (Blob `application/octet-stream`) |
+| `CAPTCHA_MIN_MS` | 3 100 ms : `createShare` attend lui-même ce délai, compté depuis la **réception du défi** (un défi préparé à l'avance a déjà consommé son attente) |
+| Erreurs | `BadPasswordError{attemptsLeft}`, `NotFoundError`, `LimitError{retryAfterS}`, `Error("reseau")`, `Error("lien_invalide")`, `Error("origine_invalide")`, `Error("mot_de_passe_requis")` (mot de passe vide à l'ouverture) ; côté envoi, codes du serveur `Error("full")` (507), `Error("frozen")` (503), `Error("bad_request")`, `Error("internal")`, et erreurs locales (`vide`, `trop_d_elements`, `trop_gros`, `texte_trop_long`, `mot_de_passe_trop_court`, `mot_de_passe_trop_courant`, `duree_invalide`, `ouvertures_invalides`) ; erreurs du navigateur relayées telles quelles (`NotReadableError`, `NotFoundError` DOM d'un `File` devenu illisible) |
+
+**Compléments demandés par ce plan (tâche 0 du plan, dans `web/src/transfer/`, avec tests) :**
+
+| Ajout | Contrat | Raison |
+|---|---|---|
+| `CreateOpts.signal?: AbortSignal` | Annulation à tout moment. Avant la création : rien n'existe sur le serveur. Après : l'appel `destroy` déjà présent dans le chemin d'échec de `createShare` (avec `S_gestion`, accepté par le serveur en état `uploading`) part en `keepalive`. Rejet par `DOMException("AbortError")` | Bouton Annuler, `pagehide` pendant l'envoi (§9.4). **Aucune nouvelle route serveur** : voir §18, A7 |
+| `CreateOpts.onBytes?(sent, total)` | Octets **chiffrés** envoyés / total chiffré du palier, mis à jour pendant chaque segment ; la valeur émise est le **maximum atteint** (monotone : un segment réessayé n'émet rien avant de dépasser ce maximum) (`XMLHttpRequest.upload.onprogress` pour les `PUT` de segment dans le navigateur ; `fetch` reste utilisé partout ailleurs et en Node) | Vitesse, temps restant, détection de coupure fiables (§18, A3) |
+| `CreateOpts.pause?: () => Promise<void>` | Attendue avant chaque segment : la pause prend effet à la fin du segment en cours | Pause / Reprendre (§9.4) |
+| `CreateOpts.onRetry?({ attempt, inMs, offline })` + budget de coupure | Un segment qui échoue (coupure, 5xx, 429) est réessayé sans limite de nombre (attentes 1, 2, 4, 8, 16 puis 30 s ; `Retry-After` d'une 429 respecté ; essai immédiat sur l'événement `online` ; aucun essai interne, le budget seul réessaie) jusqu'à l'**échéance unique `SERVER_STALL_MS`** : 13 min après le dernier segment acquitté, au-delà `Error("reseau")`. `finalize` suit la même règle (rejouable : il ne fait que constater). 13 min < 15 min, délai d'effacement d'un envoi bloqué (spec §7.4 et §24) : marge de 2 min. La pause (§9.4.4) est bornée par la même échéance | Reprise automatique réelle (spec §13) au lieu d'un abandon après 15,5 s (§18, A4) |
+| `solveCaptcha(challenge)` → `CaptchaProof` | plus de `ctx` ; `CaptchaProof = { kind: "pow", payload: string }` ; le corps de création porte `altcha` (toute autre sorte de preuve est refusée par le client, `preuve_invalide`, et par le serveur). | retiré |
+| `cleanName(name)` exporté (alias de `safeName`) | La fonction de nettoyage déjà utilisée par `safeName`, appliquée aux noms affichés côté expéditeur | Noms piégés affichés chez l'expéditeur (§18, A31) |
+| `prepareCaptcha(origin, net?)` → `PreparedCaptcha` ; `CreateOpts.prepared?: { cap, proof }` | Récupère le défi à l'avance (`GET /api/captcha`, instant de réception noté ; `PreparedCaptcha` expose `challenge`, `fallbackOrigin`, `expiresAt`, le reste est interne). `createShare` utilise `prepared` s'il reste plus de 15 s de validité, sinon il lit un nouveau défi. Les écrans n'appellent jamais `/api/captcha` eux-mêmes | Pré-calcul de la preuve de travail dès le premier élément composé (Q2, §9.4.2) |
+| `SERVER_STALL_MS` (13 min), `PREVIEW_MAX` | Constantes exportées par `index.ts` : échéance unique de la pause et de la coupure ; taille maximale d'aperçu (l'écran ne recopie pas la valeur de `crypto/container`) | §9.4.3, §9.4.4, §9.8 |
+
+### 0.2 Décisions contraignantes
+
+| # | Décision | Effet dans ce document |
+|---|---|---|
+| P1 | **Toujours sombre** « Nuit chiffrée » : thème clair « Aube » supprimé | §3 (un seul jeu de jetons), §11, §14.1 (un seul `theme-color`), plan (tests et captures sombres seulement). Écart avec spec §3 et §19 (« clair et sombre ») à reporter dans la spec (§18, A25) |
+| P2 | **Défauts : 12 h et 1 ouverture** | §9.3 |
+| P3 | **Anti-robot** : preuve de travail maison (Worker, WebCrypto) : preuve de travail seule, deux essais au plus ; aucun repli tiers | §9.4.2 |
+| P4 | **Composer** : glisser-déposer, coller, regroupement par catégorie, réordonnancement, retrait, doublons ; renommage à décider | §9.2 (renommage retenu, §18, A10) |
+| P5 | **Jauge** de taille et de nombre, vivante, dépassement visible avant l'envoi | §9.2.5 |
+| P6 | **Écran d'envoi** complet : progression, vitesse, temps restant, segments, phases, coupure et reprise, Pause, Annuler (suppression côté serveur), sceau lié à la vraie progression ; après succès, « Supprimer ce partage » | §7.3, §9.4, §9.5 |
+| P7 | **Penser à tout** : états limites des deux côtés | §9 (tableaux d'états), §18 |
+| P8 | **Démo sur GitHub Pages** (`skoow.github.io/Shhdrop`) : build à part, faux serveur en mémoire, vrai chiffrement, bandeau permanent, anti-robot désactivé, CSP par meta ; publiée à chaque push sur `main` | §14.3 ; tâche « Démo » tôt dans le plan, puis mise à jour à chaque tâche d'écran |
+| P9 | **Nom affiché : Shhgone** (domaine shhgone.com). Tout ce que voit un visiteur (textes, titres d'onglet, manifeste, logo, pied de page, démo) dit « Shhgone ». L'interne garde « shhdrop » (dépôt, paquets, bases locales, étiquettes HKDF, en-têtes `X-Shh-*`, base `/shhdrop/` de la démo) pour ne casser ni la compatibilité ni le chiffrement. *(15 novembre : dépôt renommé `Skoow/shhgone` par le propriétaire ; GitHub Pages sert la démo sous `/shhgone/`, donc la base de la démo devient `/shhgone/` ; les étiquettes HKDF, bases locales et en-têtes ne changent pas.)* | §6 (logo « shh » plein, « gone » en trame) ; spec D42-24 |
+
+### 0.3 Reports du cœur traités ici
+
+| Report du cœur (serveur et chiffrement) | Traitement |
+|---|---|
+| Nouveau défi anti-robot à chaque création | `createShare` le fait ; l'interface ne garde aucun défi et rappelle `createShare` en entier pour un nouvel essai (§9.4) |
+| Widget ALTCHA compatible `altcha-lib-go` v1 | Remplacé par un solveur maison (P3, §9.4.2) : aucune dépendance |
+| Garder `K_preuve` pour détruire pendant `draining` | Fait par `Opened.destroy` (spec §25, S1) |
+| Un mauvais mot de passe à la destruction coûte un essai | Sans objet : le destinataire détruit par `Opened.destroy`, sans ressaisie |
+| Abandonner le fichier partiel si `saveItem` échoue | `writable.abort()` et message explicite (§9.9) |
+| `done()` ; « en cas d'échec, l'ouverture est perdue » | « Terminer et effacer », `pagehide`, avertissement avant déverrouillage (§9.7) |
+| `finalize` non réessayé | Réessayé dans le budget de coupure (§0.1) ; sinon « Le transfert a été interrompu, réessayez » |
+| Serveur statique : repli SPA, ni liste de dossiers ni fichiers cachés | Déjà livré sur `main` par le durcissement (`server/cmd/shhdrop/static.go`) ; ce plan n'ajoute que des en-têtes par chemin (§14.2) |
+| Noms et types MIME du manifeste non fiables | `safeName`, `previewKind`, Blob `application/octet-stream` (§12) |
+| Mise à jour vite/vitest avant tout `vite dev` | Fait sur `main` (vite 8.3.5, vitest 5.1.0) |
+
+---
+
+## 1. Signalements de la révision 1 (état au 4 novembre)
+
+| # | Gravité | Sujet | État |
+|---|---|---|---|
+| S1 | Important | Destruction par le destinataire en `draining` | **Réglé** par `Opened.destroy` (spec §25). Le repli « mot de passe gardé en mémoire » est supprimé : moins de secret retenu |
+| S2 | Important | Motif de signalement | **Réglé autrement** : l'API n'envoie que `"report"`, le serveur ne garde rien. L'écran ne propose plus de choix de motif (§18, A13) |
+| S3 | Important | ALTCHA 3.x ne lit plus les défis v1 | **Sans objet** : solveur maison (P3) |
+| S4 | Important | `replaceState` immédiat casse « Ouvrir dans le navigateur » des apps | Maintenu (§12.1) |
+| S5 | Important | `svelte-check` et TypeScript 7 | Maintenu : paquet outil séparé sur `typescript@6.0.3` |
+| S6 | Important | JPEG d'iPhone : MPF et images secondaires | Maintenu (§9.2.6) |
+| S7 | Moyen | AVIF, GIF, bureautique non nettoyés | Maintenu |
+| S8 | Moyen | Trusted Types incompatibles avec Svelte 5 | Maintenu : CSP sans Trusted Types, constaté par un test. **Dépassé** : Trusted Types sont exigés aujourd'hui (politiques `svelte-trusted-html` et `shhdrop`, audit web D6 du 13 novembre) |
+| S9 | Moyen | Attributs `style` statiques bloqués par la CSP | Maintenu |
+| S10 | Moyen | pdf.js dans un cadre à origine opaque | Maintenu (§13) |
+| S11 | Moyen | Recharger avant de déverrouiller perd la clé | Maintenu (« Lien incomplet », §9.11) |
+| S12 | Moyen | `done()` pendant `pagehide` | **Réglé** (`keepalive`, spec §25) |
+| S13 | Mineur | Thème clair | **Tranché** : toujours sombre (P1) |
+| S14 | Mineur | Jauge « 34 / 100 Mo » périmée | Maintenu : « 34 Mo / 2 Go · 3 / 15 » (v2.9) |
+| S15 | Mineur | Spec §22 « 300 Mio par jour » contre §24 | Maintenu, à aligner dans la spec |
+| S16 | Mineur | Pages légales | Maintenu : déploiement, avant toute ouverture au public |
+| S17 | Mineur | Progression de lecture | **Réglé** : `openShare(…, onProgress)` existe ; l'interface compte aussi les octets du `sink` |
+
+---
+
+## 2. Monde visuel « Nuit chiffrée »
+
+**Thèse.** La nuit d'un écran de téléphone dans une main, tard, quand on envoie quelque chose de privé. Un fond presque noir, profond et légèrement bleuté ; une seule lumière, menthe, qui marque ce qui est scellé, actif ou sûr. Le produit a deux gestes : **sceller** (le contenu devient illisible, un trait de lumière fait le tour de la capsule et se referme) et **dissoudre** (le contenu se défait en grain et disparaît). Tout le reste est calme, précis, dense quand il le faut. Le sombre est choisi pour la scène d'usage (soir, téléphone, contenu privé) : `color-scheme: dark` sur `:root`, pour que les contrôles natifs, les barres de défilement et les sélecteurs du système soient sombres eux aussi.
+
+**Ce que le monde refuse.** Le dégradé violet des produits « IA », le texte en dégradé, les halos colorés sans décalage autour des boutons, les cadenas en 3D, le vocabulaire « militaire », les cartes identiques icône + titre + texte comme structure de page, les étiquettes au-dessus des titres, les numéros de section décoratifs, « 100 % sécurisé ».
+
+**Signature reconnaissable sans contenu.** Fond `#0B0D12` ; surfaces à peine plus claires, séparées par des filets fins ; un trait menthe de 1 à 2 px qui parcourt le bord de la capsule ; chiffres tabulaires ; phrase de passe en chasse fixe, mots séparés par des tirets fins ; grain discret au moment de la dissolution.
+
+**Lumière d'ambiance (révision 4).** Une aurore de trois nappes très floues qui dérivent lentement (§20.4), à l'échelle de la page, jamais un halo autour d'un élément ; sa luminance derrière du texte reste ≤ 0,050 (§20.2, K5). Retirée en `prefers-contrast: more` et en `forced-colors: active`, immobile en mouvement réduit.
+
+**Forme unique (révision 4).** La capsule du logo devient le réceptacle du composeur et l'objet qui passe d'écran en écran (§20.1).
+
+---
+
+## 3. Couleurs
+
+Stratégie **Restreinte** : neutres teintés de bleu nuit + un accent menthe, réservé aux actions principales, à l'état « scellé », à la sélection et au focus. Le rouge ne sert qu'à la destruction et aux erreurs. **Un seul thème** (P1).
+
+### 3.1 Jetons
+
+| Jeton | Hex | Usage |
+|---|---|---|
+| `--bg` | `#0B0D12` | Fond de page |
+| `--surface-1` | `#12151C` | Panneaux, barre d'actions |
+| `--surface-2` | `#191D27` | Champs, capsule, lignes d'éléments |
+| `--surface-3` | `#202533` | Ligne en cours de déplacement, en-tête de catégorie survolé |
+| `--glass` | `rgb(18 21 28 / 0.80)` + `backdrop-filter: blur(20px) saturate(1.2)` | Barres collantes seulement (§5.4) |
+| `--line` | `#262B36` | Filets décoratifs (non porteurs d'information) |
+| `--line-strong` | `#68728A` | Bord des champs et contrôles (≥ 3:1) |
+| `--text` | `#E9ECF2` | Texte principal |
+| `--text-2` | `#A6AEBD` | Texte secondaire |
+| `--text-3` | `#8A93A4` | Indications, texte d'exemple des champs |
+| `--text-disabled` | `#5A6275` | Contrôles désactivés (exemptés par WCAG ; ne porte jamais seul une information) |
+| `--accent` | `#5FE3B5` | Action principale, scellé, focus, sélection |
+| `--accent-hover` | `#86EDC9` | Survol de l'action principale |
+| `--on-accent` | `#05140F` | Texte sur fond menthe |
+| `--accent-tint` | `#102A23` | Fond d'état « scellé », badge « nettoyé », zone de dépôt active |
+| `--danger` | `#FF8A80` | Destruction, erreurs, jauge dépassée |
+| `--on-danger` | `#1A0605` | Texte sur bouton de destruction |
+| `--danger-tint` | `#2A1414` | Fond de bandeau d'erreur |
+| `--warn` | `#F2C46D` | Avertissements (navigateur intégré, fichier à risque, non nettoyé, doublon, jauge > 90 %) |
+| `--warn-tint` | `#2A2312` | Fond de bandeau d'avertissement |
+| `--info` | `#8DB2FF` | Liens dans le texte, informations neutres |
+| `--selection` | `rgb(95 227 181 / 0.28)` | `::selection` |
+| `--scrim` | `rgb(5 7 10 / 0.72)` | Voile de la cible de dépôt pleine page (§9.2.2) et `::backdrop` |
+
+### 3.2 Contrastes vérifiés (WCAG 2.1, formule de luminance relative)
+
+Calculés pour cette spécification ; la tâche « jetons » du plan les recalcule dans un test unitaire qui échoue sous le seuil.
+
+| Paire | Ratio | Seuil |
+|---|---|---|
+| `--text` / `--bg` | 16,42 | 4,5 |
+| `--text` / `--surface-2` | 14,24 | 4,5 |
+| `--text` / `--surface-3` | 12,92 | 4,5 |
+| `--text-2` / `--surface-2` | 7,55 | 4,5 |
+| `--text-2` / `--surface-3` | 6,85 | 4,5 |
+| `--text-3` / `--surface-2` | 5,45 | 4,5 |
+| `--accent` / `--bg` | 12,16 | 3 (focus, bord) |
+| `--on-accent` / `--accent` | 11,80 | 4,5 |
+| `--on-accent` / `--accent-hover` | 13,45 | 4,5 |
+| `--danger` / `--surface-2` | 7,38 | 4,5 |
+| `--on-danger` / `--danger` | 8,58 | 4,5 |
+| `--danger` / `--danger-tint` | 7,61 | 4,5 |
+| `--warn` / `--warn-tint` | 9,57 | 4,5 |
+| `--warn` / `--surface-2` | 10,34 | 4,5 |
+| `--accent` / `--accent-tint` | 9,54 | 4,5 |
+| `--info` / `--surface-2` | 7,98 | 4,5 |
+| `--line-strong` / `--surface-2` | 3,50 | 3 (bord de champ) |
+| `--text` / verre sur fond blanc (pire cas : photo claire qui défile dessous) | 8,26 | 4,5 |
+| `--text-2` / verre sur fond blanc | **4,38** | 4,5 → **interdit** |
+
+Règle : **sur le verre mobile, seul `--text` (et les boutons opaques) est permis**. Sur le verre statique (réceptacle, capsule : seule l'aurore est dessous), `--text-2` et `--text-3` sont permis (§20.2, S3). Jetons ajoutés par la révision 4 : §20.3. Les valeurs `--surface-3` et `--warn` / `--surface-2` sont nouvelles : le test les vérifie comme les autres.
+
+### 3.3 Contraste forcé (`forced-colors: active`, Windows)
+
+- Focus : `outline: 2px solid CanvasText` ; boutons principaux : `border: 1px solid ButtonText` ; jauge, trait de la capsule, barres de progression : `Highlight` sur `Canvas` ; badges : bord `CanvasText`.
+- Lumière d'ambiance, grain, verre et ombres retirés. Les icônes suivent `currentColor` (déjà le cas).
+
+---
+
+## 4. Typographie
+
+### 4.1 Familles (hébergées, fichiers dans le dépôt)
+
+| Rôle | Police | Licence | Fichier | Poids |
+|---|---|---|---|---|
+| Tout le texte d'interface et l'accueil | **Mona Sans** (GitHub), variable `wght` 200–900 et `wdth` 75–125 | SIL Open Font License 1.1 | `web/src/assets/fonts/mona-sans-latin-standard-normal.woff2`, depuis `@fontsource-variable/mona-sans@5.3.0` | 98 124 octets |
+| Phrase de passe, liens, champ du mot de passe, détails techniques de l'envoi | **JetBrains Mono**, variable `wght` 100–800 | SIL Open Font License 1.1 | `web/src/assets/fonts/jetbrains-mono-latin-wght-normal.woff2`, depuis `@fontsource-variable/jetbrains-mono@5.3.0` | 40 404 octets |
+
+- Le sous-ensemble `latin` couvre le français (accents, « œ », guillemets, espaces fines, « … », « − »). Il ne contient pas « ≈ » ni les flèches : les textes n'en utilisent pas (les raccourcis clavier s'écrivent « Alt + flèche haut »). Les noms de fichiers en écritures non latines (arabe, hébreu, chinois…) s'affichent avec la police système de repli : c'est voulu, aucun sous-ensemble supplémentaire n'est chargé.
+- Empreintes SHA-256 attendues : Mona Sans `5ea3740633e5ac7af56c13d7e8ec32bcae12e7723e53d34284469a8947ccb2f3`, JetBrains Mono `18be452724bfdc236c074ca94a249a7f41a86752c7d04ab258ce9ed5651f6a7e`.
+- Fichiers **copiés** dans `web/src/assets/fonts/` par `web/scripts/copy-fonts.mjs`, empreinte vérifiée par un test, puis commités ; Vite les écrit sous `/assets/` avec une empreinte dans le nom (cache d'un an, A7 du 13 novembre). Licence OFL ajoutée à `THIRD_PARTY_LICENSES.md`.
+- `@font-face` dans `web/src/ui/fonts.css` : `font-display: swap`, `unicode-range` du sous-ensemble latin, plages de `font-weight` et `font-stretch`. Préchargement de Mona Sans seulement.
+- Pourquoi Mona Sans : une grotesque d'outil, nette en petit, avec un axe de **largeur** qui donne à l'accueil une voix propre sans seconde famille. Pourquoi une chasse fixe : la phrase de passe, les liens et les mesures d'envoi sont des données qu'on recopie, dicte ou compare ; elle ne sert nulle part ailleurs.
+- Repli : `"Mona Sans", system-ui, sans-serif` et `"JetBrains Mono", ui-monospace, monospace`.
+
+### 4.2 Échelle (rem fixes, rapport ≈ 1,2 ; titre d'accueil seul fluide)
+
+| Jeton | Taille / interligne | Poids | Largeur (%) | Usage |
+|---|---|---|---|---|
+| `--fs-display` | `clamp(2.625rem, 1.1rem + 4.6vw, 5.5rem)` / 0.98 (révision 4) | 600 | 116 | Titre d'accueil uniquement ; approche −0,035 em ; `max-width: 13ch` |
+| `--fs-h1` | 1.75rem / 1.15 | 650 | 108 | Titre d'écran |
+| `--fs-h2` | 1.4375rem / 1.2 | 620 | 104 | Titre de section, capsule |
+| `--fs-h3` | 1.1875rem / 1.3 | 600 | 100 | Sous-section, en-tête de catégorie |
+| `--fs-body` | 1rem / 1.5 | 430 | 100 | Texte courant (16 px minimum sur téléphone, y compris dans les champs : sinon Safari iOS zoome au focus) |
+| `--fs-small` | 0.875rem / 1.45 | 450 | 100 | Indications, méta |
+| `--fs-micro` | 0.75rem / 1.4 | 520 | 100 | Unités, compteurs ; jamais pour une phrase |
+| `--fs-mono` | 1.0625rem / 1.5 | 480 | — | Phrase de passe (en bloc : 1.25rem) |
+| `--fs-figure` | `clamp(3.5rem, 2rem + 6vw, 5.5rem)` / 1 (révision 4) | 560 | 112 | Pourcentage de l'envoi, dans la capsule ; approche −0,04 em |
+| `--fs-ready`, `--fs-screen` | §20.3 (révision 4) | 600 | 114 / 112 | Titre « Lien prêt » ; titres du destinataire et de fin |
+
+- Chiffres : `font-variant-numeric: tabular-nums` pour la jauge, la progression, la vitesse, le compte à rebours, les tailles.
+- Titres : `text-wrap: balance` ; paragraphes : `text-wrap: pretty`, mesure 65 ch au plus.
+- Typographie française dans `fr.ts` : espace fine insécable (U+202F) avant « ; : ! ? » et à l'intérieur des guillemets, espace insécable (U+00A0) entre nombre et unité (« 34 Mo », « 4 h 15 », « 2,1 Mo/s »).
+
+---
+
+## 5. Espacement, rayons, élévation, verre
+
+### 5.1 Espacement (base 4 px)
+
+`--sp-1` 4 · `--sp-2` 8 · `--sp-3` 12 · `--sp-4` 16 · `--sp-5` 24 · `--sp-6` 32 · `--sp-7` 48 · `--sp-8` 64 · `--sp-9` 96 (px). Groupes serrés (`--sp-2`/`--sp-3`), séparation large (`--sp-6`/`--sp-7`), plus d'espace au-dessus d'un titre qu'en dessous. Marge latérale : 16 px sous 600 px, 24 px jusqu'à 960 px, puis contenu centré, largeur maximale 1120 px. Les marges latérales et la barre collée du bas ajoutent `env(safe-area-inset-left/right/bottom)` (encoche, barre d'accueil, paysage).
+
+### 5.2 Rayons
+
+`--r-sm` 6 px (puces, badges) · `--r-md` 10 px (champs, boutons) · `--r-lg` 16 px (panneaux, lignes d'éléments) · `--r-xl` 24 px (capsule scellée, feuilles) · `--r-pill` 999 px (contrôle segmenté) · `--r-2xl` 32 px (réceptacle, capsule ; révision 4). Rayon intérieur = rayon extérieur − marge.
+
+### 5.3 Élévation (ombres décalées et floues, jamais un halo centré)
+
+| Jeton | Valeur | Usage |
+|---|---|---|
+| `--e-1` | `0 1px 2px rgb(0 0 0 / .40)` | Lignes d'éléments, champs |
+| `--e-2` | `0 8px 24px -8px rgb(0 0 0 / .60), 0 2px 6px rgb(0 0 0 / .35)` | Capsule, panneaux, ligne soulevée pendant un déplacement |
+| `--e-3` | `0 24px 64px -16px rgb(0 0 0 / .70)` | Feuilles (`<dialog>`) |
+| `--edge` | `inset 0 1px 0 rgb(255 255 255 / .05)` | Arête haute des surfaces |
+| `--e-vessel` | §20.3 (révision 4) | Réceptacle, capsule |
+
+### 5.4 Verre : usage restreint et justifié
+
+Le verre ne sert qu'aux éléments **sous lesquels le contenu défile** : la barre d'en-tête une fois la page défilée, la barre d'actions collée en bas sur téléphone, le `::backdrop` des feuilles (`--scrim` + flou 8 px). Ailleurs : surfaces opaques, sauf le **verre statique** de la révision 4 (réceptacle, capsule : remplissage translucide `--vessel`, **sans** `backdrop-filter`, §20.2 K6). Repli si `backdrop-filter` manque, si `prefers-reduced-transparency: reduce` ou en `prefers-contrast: more` : `--surface-1` plein. Sur le verre, seul `--text` (§3.2).
+
+---
+
+## 6. Icônes
+
+- **Jeu maison** (retours UI8, D41-35) : `web/src/ui/icons/` (dessins dans `glyphs.ts`, grille 24, trait 1,75, extrémités et angles arrondis), un composant par icône importé nommément depuis `web/src/ui/Icon.ts`. Aucun paquet d'icônes, aucun chargement extérieur, aucun `{@html}`.
+- Trait 1,75 px, taille 20 px (24 px dans les boutons principaux), `currentColor`, `aria-hidden="true"` ; le libellé est porté par le texte du bouton ou `aria-label`.
+- Jeu fermé (toute icône ajoutée passe en revue) : `paperclip` (fichiers), `camera` (photo), `mic` / `square` (vocal / arrêt), `type` (texte), `clipboard-paste` (coller), `x` (retirer), `undo-2` (annuler un retrait), `pencil` (renommer, modifier un texte), `grip-vertical` (poignée de déplacement), `arrow-up` / `arrow-down` (monter / descendre en mode déplacement), `lock` / `lock-open`, `shield-check` (nettoyé), `shield-alert` (repli retiré le 24 novembre), `triangle-alert` (avertissement), `copy` / `check` (copié), `share-2`, `qr-code`, `refresh-cw` (régénérer, actualiser), `eye` / `eye-off`, `clock`, `timer` (reprise automatique), `pause` / `play`, `download`, `file`, `file-text`, `image`, `music`, `audio-lines` (vocal), `film`, `folder-x` (dossier refusé), `trash-2` (détruire, supprimer), `flag` (signaler), `external-link` (navigateur intégré), `chevron-left`, `languages`, `wifi-off`, `clipboard-x` (vider le presse-papier), `circle-help`, `minus` / `plus` (Stepper), `info` (bandeau d'information). Révision 5 (accueil v3) : `video` (vidéo), `link-2` (lien), `key-round` (mot de passe), `server` (serveur), `user-x` (sans compte), `hard-drive` (aucune IP sur disque), `code-xml` (code ouvert), `shield-x` (essais épuisés), `chevron-down` (question, défilement), `arrow-right` (lien vers une page).
+- Aucun emoji ni caractère Unicode (« ✕ », « ✓ », « ⋯ ») à la place d'une icône.
+- Logo : « Trame », mot-symbole « shhgone » depuis le 12 novembre (P9 ; « shh » plein, « gone » en trame de points ; avant : « shhd » plein, « rop » en trame), statique : aucune animation à l'arrivée ; seul l'écran de destruction l'efface (§9).
+
+---
+
+## 7. Mouvement
+
+### 7.1 Principe (révision 4, remplace la révision 3)
+
+Deux moments écrits, **le scellement** et **la dissolution**, et un objet qui les relie, **la capsule**, qui passe d'écran en écran par des transitions de vue. Autour d'eux, le mouvement a quatre rôles permis, et seulement ceux-là :
+
+1. **Continuité** : transitions de vue entre les étapes (420 ms), la capsule et les lignes d'éléments gardant leur identité ; rappel synchrone, interrompu au premier geste (§20.2, K2).
+2. **Retour d'action** : chaque contrôle répond au survol (180 ms), à la pression (90 ms) et au focus (accroche de l'anneau, 180 ms).
+3. **Entrée** : un seul enchaînement à l'arrivée sur un écran, décalé de 35 à 60 ms, 6 éléments au plus, **900 ms au total au plus** (§20.2, K1). Apparitions au défilement **permises** dans la seule forme de §20.10 (« Révélations au défilement », aligné le 24 novembre) : `animation-timeline: view()`, repli `IntersectionObserver`, une fois par élément, rien en mouvement réduit, rien de caché sans script.
+4. **Ambiance** : l'aurore, la lumière du réceptacle vide et le schéma de l'accueil, lents, composés par le GPU, arrêtés onglet caché et hors écran, retirés en mouvement réduit.
+
+Un mouvement ne retarde jamais une action : tout contrôle est utilisable pendant l'animation (seule exception, la fenêtre d'une transition de vue, ≤ 420 ms, interrompue au premier geste), et aucune animation n'attend une autre pour rendre la main. Le contenu est visible par défaut (si le script échoue, l'état final est affiché). Aucune animation ne précède la réalité : le sceau ne se ferme qu'après la résolution de `createShare`, et la dissolution ne commence qu'après la réponse du serveur ou l'effacement local. Le réordonnancement des lignes reste un changement d'état (FLIP de 180 ms). Détail par moment, budget de performance et accessibilité : §20.4, §20.6, §20.7.
+
+### 7.2 Jetons
+
+| Jeton | Valeur | Usage |
+|---|---|---|
+| `--dur-instant` | 120 ms | Pression, copie confirmée, bascule |
+| `--dur-fast` | 180 ms | Survol, focus, changement de libellé, déplacement d'une ligne |
+| `--dur-base` | 240 ms | Apparition d'un bandeau, d'une ligne, transition du trait de progression |
+| `--dur-slow` | 400 ms | Changement d'étape, ouverture d'une feuille, regroupement en capsule |
+| `--dur-moment` | 640 ms | Fermeture du sceau |
+| `--dur-dissolve` | 1100 ms | Dissolution |
+| `--ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | Arrivées |
+| `--ease-in` | `cubic-bezier(0.7, 0, 0.84, 0)` | Sorties (durée × 0,7) |
+| `--ease-in-out` | `cubic-bezier(0.65, 0, 0.35, 1)` | Dissolution |
+
+Aucun rebond ni ressort. Jetons ajoutés par la révision 4 (`--dur-press`, `--dur-stagger`, `--dur-view`, `--dur-reveal`, `--dur-orbit`, `--dur-ambient`, `--ease-view`, `--rise`, `--blur-in`) : §20.3.
+
+### 7.3 Le scellement (écran d'envoi, §9.4)
+
+> Révision 4 : chorégraphie remplacée par §20.4 (« Scellement »). Restent valables ci-dessous : l'ordre « jamais avant la résolution », les points 4 (pause, coupure) et 6 (échec, annulation), et le composeur masqué intact.
+
+Une **capsule** : surface `--surface-2`, rayon `--r-xl`, qui résume l'envoi (« 3 éléments · 34 Mo », icônes des catégories, noms des éléments sur une ligne chacun, 4 au plus puis « + 6 autres »). Par-dessus son bord, un `<svg>` aux dimensions de la capsule contient un `<rect>` aux mêmes rayons, `pathLength="100"`, trait `--accent`, `stroke-dasharray: 100`. Le tracé **commence et finit au milieu du bord haut**, marqué par une encoche fixe de 2 px en `--line-strong` : on lit d'où part la progression. Au centre : le pourcentage en `--fs-figure` pendant l'envoi.
+
+1. **Regroupement** (au clic « Chiffrer et envoyer », 400 ms, `--ease-out`). Les lignes du composeur glissent vers la capsule (FLIP en Web Animations API, `transform` et `opacity` seulement, décalage de 30 ms entre lignes, 270 ms cumulés au plus). Le composeur n'est pas détruit : il est masqué (`inert`, `hidden`) et revient intact en cas d'échec ou d'annulation.
+2. **Préparation des clés et vérification anti-robot** (durée réelle, indéterminée). Un trait court (8 unités sur 100) parcourt le bord en boucle, 1,6 s par tour, linéaire. Le libellé de phase change en fondu de 180 ms.
+3. **Chiffrement et envoi** (durée réelle). Le trait devient la barre de progression : `stroke-dashoffset = 100 − 100 × envoyé / total` en **octets** (`onBytes`), lissé par une transition de 240 ms. Les noms des éléments deviennent illisibles en proportion : `filter: blur(calc(var(--p) * 5px))`, opacité 1 → 0,55. C'est vrai : chaque segment est chiffré juste avant son envoi.
+4. **Pause** : le trait s'arrête et passe en `--text-3` (180 ms) ; reprise : retour en `--accent`. **Coupure** : le trait reste où il est et pulse en opacité (1 ↔ 0,5, 1,6 s) ; le bandeau de coupure explique (§9.4.3).
+5. **Fermeture du sceau** (après la résolution de `createShare`, donc après `finalize`, 640 ms). Le trait se referme (100 %) et s'épaissit de 1 à 2 px ; l'icône `lock-open` laisse place à `lock` (l'anse descend de 3 px, 220 ms) ; la capsule se comprime d'un souffle (1 → 0,985 → 1, 280 ms) puis monte de 8 px pendant que le panneau « Lien prêt » se déplie dessous (`grid-template-rows: 0fr → 1fr`, 320 ms), trois blocs décalés de 60 ms. **Jamais avant** la résolution : à 100 % des octets, la capsule affiche « Finalisation… » avec le trait plein mais fin.
+6. **Échec ou annulation**. Le trait s'arrête où il est et passe en `--danger` (échec) ou `--text-3` (annulation), 180 ms ; aucun tremblement. Le message apparaît sous la capsule ; les lignes reviennent au composeur (FLIP inverse, 240 ms).
+
+### 7.4 La dissolution (fin de vie : destruction, « Terminer et effacer », « Supprimé »)
+
+> Révision 4 : masque limité à la partie visible et poussière, §20.4 (« Dissolution »). La règle « après la réponse seulement » et les replis restent.
+
+Le contenu (la liste chez le destinataire, la carte d'état sur la page de gestion, le panneau « Lien prêt » après « Supprimer ce partage ») se défait en grain du bas vers le haut, puis le message de fin apparaît à sa place.
+
+- `@property --d { syntax: "<number>"; initial-value: 0; inherits: false }`, animée de 0 à 1 en 1100 ms, `--ease-in-out`.
+- Masque à trois couches, CSS seul : `mask-image: linear-gradient(to top, #000 var(--solid), transparent var(--solid)), url(/assets/grain.png), linear-gradient(to top, transparent var(--solid), #000 var(--solid), #000 var(--edge-top), transparent var(--edge-top));` `mask-composite: add, intersect;` (WebKit : `-webkit-mask-composite: source-over, source-in`), avec `--solid = (1 − --d) × 120 % − 20 %` et `--edge-top = (1 − --d) × 120 %`.
+- `grain.png` : tuile de bruit 128 × 128 px, produite par `web/scripts/gen-grain.mjs` (graine fixe) et commitée. `mask-size: 128px`, `mask-position` décalé de 0 à 24 px pendant l'animation.
+- Le contenu monte de 4 px et prend un flou de 1 px sur le dernier tiers.
+- La dissolution n'est jouée **qu'après** la réponse du serveur ou la mise à zéro locale, jamais avant. À la fin, le nœud est retiré, le message apparaît en fondu de 240 ms et reçoit le focus.
+- Repli si `@supports not (mask-composite: intersect)` ou sans `@property` : fondu et flou (400 ms).
+
+### 7.5 Mouvement réduit (`prefers-reduced-motion: reduce`)
+
+| Moment | Remplacement |
+|---|---|
+| Regroupement FLIP, retour au composeur | Fondu enchaîné de 160 ms |
+| Trait qui tourne (indéterminé) | Trait immobile ; le libellé de phase pulse en opacité (1 ↔ 0,6, 1,2 s) |
+| Progression du trait | Conservée (c'est un état), sans transition |
+| Flou des noms | Opacité seule |
+| Pulsation de coupure | Trait immobile en `--warn` |
+| Fermeture du sceau | Couleur du bord et icône changent sans déplacement ni échelle ; panneau affiché sans dépliage |
+| Dissolution | Fondu de 240 ms, puis message |
+| Déplacement d'une ligne | Sans animation (la ligne change de place, le focus la suit) |
+| Changements d'étape, feuilles, cible de dépôt | Fondu de 120 ms, sans déplacement |
+
+### 7.6 Mise en œuvre
+
+- **CSS** pour les états, la progression, la dissolution ; **Web Animations API** pour le FLIP et l'enchaînement du sceau (promesses `finished`) ; transitions de Svelte 5 (via `element.animate()`, compatibles avec `style-src 'self'`) pour les apparitions simples.
+- **Aucune bibliothèque d'animation** : chaque dépendance est du code tiers sur la page qui détient la clé du lien (spec §2, §10).
+- Une animation ne masque jamais le contenu par défaut : si le script échoue, l'état final est visible. `will-change` seulement pendant l'animation. Effets coûteux bornés à la capsule ou à la liste. Pendant l'envoi, la mise à jour visuelle de la progression est limitée à une fois par image (`requestAnimationFrame`), quel que soit le rythme de `onBytes`.
+- `web/src/ui/motion.ts` : `reducedMotion()` (mise à jour à chaud) et `flip(elements, mutate)`.
+
+---
+
+## 8. Inventaire des composants
+
+Chaque composant interactif a ses états : repos, survol (`@media (hover: hover)`), focus visible, pressé, désactivé, chargement, erreur. Zones tactiles ≥ 44 × 44 px, 8 px au moins entre cibles voisines.
+
+| Composant | Rôle | Notes |
+|---|---|---|
+| `AppShell` | En-tête (logo, langue), contenu, pied (Sécurité, Confidentialité) | Verre au défilement ; `translate="no"` hérité de `<html>` ; intercepte `dragover`/`drop` sur toute la page (§9.2.2) |
+| `Button` | `primary`, `secondary`, `ghost`, `danger` | 48 px (44 px en dense) ; chargement : libellé conservé, icône remplacée par un trait tournant de 16 px, `aria-busy`, **désactivé dès le premier appui** (synchrone) |
+| `IconButton` | Icône seule | `aria-label` obligatoire (type requis, contrôlé par test) |
+| `Segmented` | Durée (1 h, 6 h, 12 h, 24 h) | `role="radiogroup"`, flèches clavier |
+| `Stepper` | Ouvertures 1 à 10 | − / +, valeur tabulaire, `aria-live="polite"` sur la valeur |
+| `TextField` / `TextArea` | Saisie | Bord `--line-strong`, focus : anneau 2 px `--accent` décalé de 2 px ; erreurs par `aria-describedby` ; attributs §12.3 ; `font-size` ≥ 16 px |
+| `PassphraseField` | Phrase générée ou mot de passe personnel | Chasse fixe ; Régénérer, Copier, « Utiliser mon propre mot de passe » |
+| `PasswordChecklist` | Indicateur honnête | Critères vrais (« 12 caractères minimum », « Absent des mots de passe courants ») ; mot de passe généré : « Mot de passe tiré au hasard sur cet appareil » (révision 4 : aucun terme technique, §20.8) |
+| `CopyField` | Lien, mot de passe, lien de gestion | Valeur tronquée au milieu, copie entière, « Copié » 2 s (icône `check`), annoncé en `aria-live` |
+| `Banner` | `info`, `warn`, `danger` | Fond teinté + icône + texte ; pas de bord gauche épais ; `role="status"` ou `role="alert"` ; action facultative (un bouton au plus) |
+| `CapacityGauge` | « 34 Mo / 2 Go · 3 / 15 » | §9.2.5 |
+| `CategoryGroup` | En-tête de catégorie + ses lignes | `<section aria-labelledby>`, titre `--fs-h3` « Photos », méta « 3 · 12 Mo » |
+| `ItemRow` | Élément du composeur ou du contenu | Poignée (composeur), vignette ou icône, nom (`<bdi>`, troncature au milieu, extension toujours visible), taille, badges, actions (retirer, renommer / ouvrir, enregistrer) |
+| `ReorderHandle` | Poignée de déplacement | §9.2.4 |
+| `DropZone` | Ajout par dépôt ou sélection | Bouton natif `<input type="file" multiple>` stylé + zone de dépôt ; contour en tirets `--line-strong`, `--accent` + `--accent-tint` pendant un survol de dépôt |
+| `DropOverlay` | Cible pleine page pendant un glisser | §9.2.2 |
+| `UndoToast` | « Retiré · Annuler » | 6 s, `role="status"`, se ferme au clavier (Échap), une seule à la fois |
+| `VoiceRecorder` | Vocal | États §9.2.7 ; niveau en 5 barres (AnalyserNode), minuteur tabulaire |
+| `SealCapsule` → `Capsule` | Scellement | §20.4, `role="progressbar"` ; couche animée `aria-hidden`, vrais noms masqués (K9) |
+| `Vessel` | Réceptacle du composeur (révision 4) | Contour SVG ajusté par `ResizeObserver`, lumière du contour vide, cible de dépôt (§20.4) |
+| `RightsPicker` | Droit du destinataire (spec §34) | `Segmented` à 3 choix (« Voir seulement », « Voir et enregistrer », « Voir, enregistrer et garder ») |
+| `VaultScreen`, `HistoryScreen`, `VerifyPage` | Coffre, historique, vérification | spec §27.6, §33, §28.4 |
+| `UploadStats` | Mesures de l'envoi | §9.4.1 |
+| `PhaseList` | Quatre phases de l'envoi | §9.4.1, liste ordonnée, état de chaque phase en texte (pas seulement en couleur) |
+| `Countdown` | Temps restant | « 4 h 15 », « 12 min », « 45 s » ; annonces §11 |
+| `InlineConfirm` | Confirmation de destruction, d'annulation, de sortie | Remplace le bouton par « Confirmer / Annuler » sur place, focus sur « Annuler » ; pas de modale |
+| `Sheet` | QR code sur téléphone, signalement | `<dialog>` natif + `showModal()`, Échap ferme, focus rendu au déclencheur |
+| `QrCode` | QR du lien | SVG produit par code (chemins), importé statiquement (spec §28.3), affiché à la demande |
+| `Viewer*` | Image, Audio, Vidéo, Texte, Pdf | §9.8 |
+| `ShareCard`, `StateChip`, `ActiveSharesStrip` | Carte de partage (état, ouvertures, compte à rebours, taille, création, éléments, actions), bande « Vos partages actifs » | §9.6 |
+| `Lightbox`, `WaveformPlayer`, `DownloadBar` | Visionneuse plein écran, lecteur audio à forme d'onde, Télécharger / Tout télécharger / .zip | §9.8.x |
+| `DestroyedArt`, `EmptyArt` | Illustration « détruit » (document qui se défait en points de la Trame) et état vide | §9.10.1, §9.6.5 |
+| `SaveButton` | Enregistrement en flux | Progression en octets, Annuler, états §9.9 |
+| `Dissolve` | Enveloppe la zone qui se dissout | §7.4 |
+| `LiveRegion` | Annonces polies | Une seule région par page, file d'attente, une annonce par seconde au plus |
+
+---
+
+## 9. Écrans et états
+
+Routes (routeur interne d'une trentaine de lignes) : `/` (accueil + envoi), `/s/:id` (ouverture), `/m/:id` (gestion), `/securite`, `/confidentialite`, toute autre adresse → page 404 de l'interface (le serveur répond 200 avec `index.html`, comportement existant de `static.go`, spec §10). Les liens de partage et de gestion ont la forme `/s/{id}#{K_lien}`, `/m/{id}#{S_gestion}`. **Révision 4 (spec §32)** : `/#{K_lien}` (43 caractères) et `/#m{S_gestion}` ; le routeur reconnaît ces fragments sur `/`, tout autre fragment est retiré ; routes ajoutées : `/coffre` (app installée sur téléphone, spec §27), `/envois` (historique, spec §33), `/verifier` (spec §28.4).
+
+Disposition : une colonne sur téléphone ; à partir de 960 px, deux colonnes (composer | options ; liste | visionneuse). La barre d'actions principale est collée en bas sur téléphone (zone du pouce), en fin de colonne sur ordinateur. **Clavier virtuel ouvert** (détecté par `visualViewport.height < 0,75 × innerHeight`) : la barre collée du bas passe dans le flux (plus de `position: sticky`) pour ne jamais couvrir le champ actif ; le champ qui reçoit le focus est amené au centre (`scrollIntoView({ block: "center" })`) ; `<meta name="viewport" … interactive-widget=resizes-content>`. **Paysage sur téléphone** (hauteur < 500 px) : en-tête non collé, capsule réduite (hauteur auto, pas de plein écran), barre d'actions dans le flux. **320 px** : tout tient sans défilement horizontal (contrôlé par test), les rangées de boutons passent à la ligne.
+
+Navigateur pris en charge (vérifié avant toute route) : `crypto.subtle`, `crypto.getRandomValues`, `WebAssembly`, `Blob.prototype.stream`, `TextDecoder`, `AbortController`. `Worker` n'est **pas** exigé : sans lui, la preuve de travail échoue et l'envoi échoue avec « La vérification anti-robot n'a pas pu se faire sur cet appareil. Réessayez, ou essayez depuis un autre navigateur. » (aucun repli depuis le 24 novembre, §9.4.2).
+
+### 9.1 Accueil (révision 5, accueil v3 : l'outil d'abord, puis l'explication)
+
+Révision 5 (objectif : « l'interface n'est pas jolie », « choisir Fichiers ou Photo, c'est nul », « une fenêtre de glisser-déposer », « un site 2027 avec toutes les explications ») : l'accueil n'est plus un Persuade court. Détails de mouvement et de matière en §20.10. Code : `web/src/routes/Home.svelte` et `web/src/routes/home/*.svelte`.
+
+**Premier écran** (ordinateur : texte à gauche, coffre à droite ; téléphone : titre, phrase, coffre, sceaux).
+
+- Titre : **« Un lien, un mot de passe, puis plus rien. »** / « One link, one password, then nothing. », mot par mot, texte complet pour les lecteurs d'écran (K8). Taille propre à l'accueil : `clamp(2.5rem, 1.2rem + 3.9vw, 4.5rem)` (un peu plus petit que `--fs-display`, pour donner du poids au coffre).
+- Phrase : « Texte, photos, vidéos, vocaux, documents. Chiffrés sur votre appareil avant l'envoi : le serveur ne reçoit que des données chiffrées, jamais la clé. »
+- **Trois sceaux de confiance** (liste « En bref ») : carte à double cadre et rosace guillochée, titre et une phrase vraie : « Chiffré de bout en bout » (sur votre appareil, avant l'envoi ; le serveur ne reçoit jamais la clé), « S'efface tout seul » (24 h au plus, ou 1 à 10 ouvertures), « Sans compte » (ni pour envoyer, ni pour recevoir).
+- **Le coffre (fenêtre de dépôt)** : le réceptacle (`Vessel`) agrandi, deux feuillets empilés derrière lui, trame guillochée très pâle. Contenu, de haut en bas :
+  1. **volet de scellement** (`SealBand`) : des lignes en clair passent une ligne de scellement menthe, se brouillent juste avant elle, et deviennent du texte chiffré décoratif (S1), avec la légende honnête « En image, ce que le serveur reçoit : des données illisibles. » ;
+  2. titre « Glissez vos fichiers ici » (au doigt, `hover: none` et `pointer: coarse` : « Que voulez-vous envoyer ? »), phrase « Tout est chiffré sur votre appareil avant de partir. » ;
+  3. **« Parcourir les fichiers »** : seul bouton qui ouvre le sélecteur du système (multiple) ;
+  4. groupe « Ou créez sur place » : **Photo** (`accept="image/*" capture="environment"`), **Vidéo** (`accept="video/*" capture="environment"`), **Vocal** (si `MediaRecorder` existe), **Texte**, **Coller** (si `navigator.clipboard.read` existe) ;
+  5. preuves en chiffres : « 15 éléments · 2 Go · 24 h au plus · 5 essais, puis destruction ».
+- **Un clic sur le verre n'ouvre rien** : le verre est la cible de dépôt, le sélecteur part de son bouton. Remplace la règle de la révision 4 (« un clic sur le réceptacle ouvre le sélecteur »).
+- **Voile de dépôt pleine page** (`DropOverlay`) dès qu'un glisser de fichiers entre dans la fenêtre (§9.2.2) ; le coffre passe en état `drop`.
+- Rappels branchés à 12 : `onfiles(files, source)` (`source` ∈ `fichiers`, `photo`, `video`, `depot`) et `onaction("vocal" | "texte" | "coller")`. Sans eux (avant tâche 10), un avis visuel « N éléments ajoutés » (ou « … arrive bientôt ») et la même phrase par `announce()`.
+- Sur téléphone (390 × 844), le groupe d'actions entier est dans le premier écran (contrôlé par test) ; chaque contrôle fait au moins 44 px de haut.
+- « Comment ça marche » (ordinateur, bas du premier écran) : **bouton** qui fait défiler jusqu'à la section, jamais un lien en `#` (le `#` est réservé aux clés, §12.1).
+- Une fois au moins un élément ajouté (`compact`), le titre se replie (`--fs-h1`) et tout le reste de l'accueil part : seul le composeur reste.
+
+**Sous le pli**, quatre sections titrées (`h2`), chacune révélée au défilement (§20.10) :
+
+1. **« Comment ça marche »** : trois gestes en `<ol>`, chacun avec une petite scène animée (Ajoutez : trois feuillets tombent dans la capsule ouverte ; Scellez : le nom devient illisible, la capsule se ferme, le cadenas apparaît ; Partagez, puis plus rien : le lien et le mot de passe partent par deux chemins, la capsule se défait).
+2. **« Pourquoi c'est sûr »** : colonne collante (titre, phrase, **lien d'exemple** dont la partie après `#` est surlignée avec « La partie après le « # » reste dans votre navigateur : elle n'est jamais envoyée au serveur. », schéma §9.1 v2 « Votre appareil — chiffré — serveur (ne lit rien) — chiffré — destinataire », lien « Tous les détails de sécurité » → `/securite`) ; à côté, neuf affirmations, chacune une phrase vraie : chiffré de bout en bout sur l'appareil ; lien unique tiré au hasard, mot de passe ; autodestruction (1 à 24 h, 1 à 10 ouvertures, le premier atteint) ; 5 mots de passe faux, partage détruit ; le serveur ne reçoit que du chiffré, jamais la clé (le `#` n'est pas envoyé) ; aucun compte ; aucune adresse IP sur disque (vue le temps de la connexion) ; aucun pistage ni publicité (sans exception depuis le 24 novembre : repli Google retiré, spec §26) ; code ouvert sur GitHub (lien sortant `rel="noopener noreferrer"`). Puis **« Ce que Shhdrop ne peut pas faire »** (spec §18) : capture d'écran ou copie par le destinataire ; cacher l'adresse IP au serveur pendant la connexion ; garantir qui envoie un lien ; protéger si le site lui-même était piégé.
+3. **« Vos questions »** : accordéon natif (`<details name="faq">`, une seule réponse ouverte) : Que voit le serveur ? Que se passe-t-il si je perds le lien ? Puis-je récupérer un partage détruit ? Mes fichiers sont-ils analysés ? Le destinataire peut-il garder une copie ? Faut-il installer une application ? Réponses tirées de la spec (§2, §9, §12, §18).
+4. **Appel final** « Quelque chose à transmettre ? » : grande capsule dont la lumière fait le tour, bouton « Commencer » qui ramène au coffre et met le focus sur « Parcourir les fichiers ».
+
+Aucun audit, aucun pays d'hébergement, aucun badge (benchmark B3) ; jamais « 100 % », aucun nom d'algorithme (§20.8).
+
+### 9.2 Composer
+
+**Révision 6 (composeur v3)** — remplace ce qui suit là où c'est contraire :
+
+- **Ordinateur (≥ 760 px), tout dans l'écran** : à 1440 × 900 comme à 1920 × 1080, avec jusqu'à 15 éléments, en-tête, capacité, liste, options, phrase et « Chiffrer et envoyer » tiennent sans défilement de page (testé : `scrollHeight ≤ innerHeight`). Cadre élargi (1 520 px au plus) ; trois colonnes à partir de 1 180 px : liste | réglages | phrase, estimation, textes de confiance et bouton ; deux colonnes de 760 à 1 179 px (l'envoi en pied de la colonne des options). Seules la liste et la colonne des réglages défilent, à l'intérieur. Le titre d'accueil est caché à l'œil (lu par les lecteurs d'écran) et le pied de page se resserre.
+- **Capacité en tête de liste**, à côté de « Votre envoi » : « 5 / 15 éléments · 2,3 Mo / 2 Go » et sa barre (les deux `role="meter"`). **Avec un pass Pro** (spec §38.9.2) : « 1 204 éléments · illimité (50 Go au total) · 3,1 Go / 50 Go », la barre ne mesure que la taille ; Plus : « n / 50 éléments · … / 10 Go ». Les limites viennent des constantes du niveau, jamais de chaînes écrites à la main. Plus de jauge en bas à droite ; au téléphone, un rappel visuel dans la barre collée.
+- **Ajouter** : plus de rangée Fichiers / Photo / Vidéo / Vocal / Texte / Coller. Une zone de dépôt (« Déposez des fichiers n'importe où sur la page », un clic ouvre le sélecteur ; au doigt « Choisir des fichiers ») et « Créer sur place » : **Note texte**, **Mémo vocal** (au doigt, aussi Photo et Vidéo). **Bouton Coller supprimé** (accueil compris) : Ctrl/Cmd + V reste, sans message d'erreur de presse-papier (§9.2.3 : seul le collage clavier subsiste).
+- **Notes** : un titre facultatif (« Note » par défaut, puis « Note 2 »…) et un contenu ; la liste montre le titre et la première ligne. Le crayon d'une note ouvre l'éditeur.
+- **Mémo vocal** : feuille qui hébergera l'enregistreur (autre chantier, `ui/VoiceRecorder.svelte`) ; en attendant, drapeau `VOICE_RECORDER_READY` et texte « arrive bientôt ».
+- **Nettoyage** : si un élément est « Non nettoyé », un seul bouton « Nettoyer tous les fichiers » au-dessus de la liste ; branché sur `cleanFile` de la tâche 9a (relais `flows/clean.ts`, provisoire, qui ne nettoie rien et le dit), puis nettoyage automatique à l'ajout quand elle est livrée. **Révision du 7 novembre (scan UX B3)** : le bouton est **masqué tant que `CLEANER_READY` est faux** (aucun bouton qui ne fait rien) ; les pastilles « Non nettoyé » restent ; une fois visible, il est en style secondaire (contour), jamais en aplat ambre.
+- **Types par le contenu** (`flows/sniff.ts`, premiers octets) : catégorie **Archives** (zip, rar, 7z, tar, gz, tgz, bz2, xz, zst ; un docx, xlsx, epub… reste un document) avec la note « Archive : son contenu n'est ni vérifié ni nettoyé. » ; exécutables (MZ, ELF, Mach-O), images disque ISO et polices → Autres ; HEIC, tableurs, présentations, CSV et fichiers de code → leurs catégories. Programmes et scripts (liste `isRiskyName`, ou contenu exécutable) : badge « À risque » et une ligne d'avertissement ; un programme sous une extension d'image est signalé comme tel.
+- **Révision 6.1 (v3.1)** : sur ordinateur, la zone de dépôt et « Créer sur place » forment une **barre fine en bas de la liste** (le dépôt pleine page reste) ; « Nettoyer tous les fichiers » passe dans l'en-tête ; vignettes de **64 px** (la vignette est le bouton d'actions, pastille d'avertissement, détails en description), photos et vidéos côte à côte : avec un mélange courant, chaque titre de catégorie est visible sans défilement (testé à 1440 × 900 et 1920 × 1080). Entrée **« Conversation »** (badge « Bientôt », drapeau `CHAT_READY`, feuille sans date). Élément en cause d'un blocage ou d'un risque marqué en rouge (S6) ; collage et dépôt inactifs pendant un envoi (S9).
+- **Présentation sur ordinateur** : photos et vidéos en **grille de vignettes** (nom, taille, menu « … » au survol, toujours présent au clavier et au doigt) ; documents, archives et autres en **tableau** (Nom, Type, Taille, Actions ; filets fins, sans zébrures) ; notes et audio en lignes. Alt + flèches déplace partout ; le menu offre Renommer, Monter, Descendre, Retirer. Téléphone : lignes compactes et menu « … » (inchangé).
+
+#### 9.2.1 Ajouter
+
+- Rangée d'ajout (révision 5, §9.1) : **Parcourir les fichiers**, puis **Photo**, **Vidéo**, **Vocal**, **Texte**, et **Coller** (seulement si `navigator.clipboard.read` existe ; surtout utile au téléphone, où Ctrl/Cmd + V n'existe pas). « Photo » = `<input type="file" accept="image/*" capture="environment">` ; « Vidéo » (révision 5) = `<input type="file" accept="video/*" capture="environment">` : sur téléphone, l'appareil photo ou la caméra du système ; sur ordinateur, le sélecteur filtré. Aucun accès direct à la caméra : la `Permissions-Policy` garde `camera=()` (spec §10), car un champ `capture` ouvre l'application du système, pas `getUserMedia`. « Vocal » masqué si `MediaRecorder` manque ou si aucun format n'est pris en charge (§9.2.7).
+- Sur ordinateur, la zone de dépôt (`DropZone`) est sous la rangée : « Déposez des fichiers ici, ou collez-les (Ctrl + V) » (« Cmd + V » sur Apple, détecté par `navigator.platform` / `userAgentData`).
+- Toute addition passe par une seule fonction (`composer.add`), quelle que soit la source (sélecteur, dépôt, collage, photo, vocal), qui applique dans l'ordre : lecture d'essai (§9.2.8) → limite de nombre → nettoyage des métadonnées (images) → détection de doublon → insertion à la fin de sa catégorie → annonce « 3 éléments ajoutés ».
+- Nommage : une vidéo prise par « Vidéo » est nommée **« Vidéo {n}.{ext} »** (extension du fichier reçu, souvent `.mp4` ou `.mov`) ; une photo prise par « Photo » est nommée **« Photo {n}.jpg »** (le nom d'origine, souvent « image.jpg » ou un horodatage, n'est pas gardé) ; une image collée « Image collée {n}.png » ; un vocal « Vocal {n}.m4a » (ou `.webm`) ; un texte n'a pas de nom affiché au destinataire autre que « Texte {n} ». Les fichiers choisis gardent leur nom (renommable, §9.2.4).
+
+#### 9.2.2 Glisser-déposer
+
+- **Cible pleine page** : dès qu'un glisser contenant des fichiers (`dataTransfer.types` inclut `"Files"`) entre dans la fenêtre, `DropOverlay` couvre la page : voile `--scrim`, cadre en tirets `--accent` à 16 px des bords, texte centré « Déposez pour ajouter » + « 15 éléments, 2 Go au plus ». Compteur `dragenter`/`dragleave` pour ne pas clignoter entre éléments enfants ; fermeture sur `drop`, `dragend`, Échap ou sortie de la fenêtre.
+- **Sur toutes les autres routes** (ouverture, contenu, gestion, envoi en cours, lien prêt), `AppShell` appelle `preventDefault()` sur `dragover` et `drop` **sans rien ajouter** : sans cela, déposer un fichier par erreur fait naviguer l'onglet vers ce fichier, ce qui consommerait une ouverture sur la page de contenu ou abandonnerait un envoi (§18, A11).
+- **Dossiers : refusés**, avec un message, pas aplatis. Raison : un dossier dépasse vite 15 éléments, sa structure serait perdue sans le dire, et l'aplatir demande un parcours récursif (`webkitGetAsEntry`) pour un cas rare. Détection : `item.webkitGetAsEntry()?.isDirectory` quand il existe, sinon l'échec de la lecture d'essai (Safari présente un dossier comme un `File` illisible). Message (`warn`, icône `folder-x`) : « Les dossiers ne peuvent pas être ajoutés. Ajoutez les fichiers eux-mêmes, ou une archive .zip. »
+- Plusieurs fichiers d'un coup : acceptés dans l'ordre du dépôt.
+
+#### 9.2.3 Coller
+
+- **Ctrl/Cmd + V** sur la route d'accueil : écouteur `paste` sur `document`.
+  - Si le presse-papier contient des fichiers (`clipboardData.files`, images comprises) : ils sont ajoutés comme éléments, `preventDefault()`, **même si le focus est dans la zone de texte** (on ne colle pas une image dans un texte).
+  - Sinon, si le focus est dans un champ de saisie : comportement natif (le texte est collé dans le champ).
+  - Sinon, du texte brut (`text/plain` seulement, jamais `text/html`) : un nouvel élément Texte est créé, son éditeur s'ouvre avec ce texte, focus dans la zone. Rien n'est ajouté sans que la personne le voie.
+- **Bouton Coller** (téléphone surtout) : `navigator.clipboard.read()` sur ce geste seulement ; pour chaque `ClipboardItem`, les types `image/png`, `image/jpeg`, `image/webp`, `image/gif` deviennent des images (nettoyées comme les autres), `text/plain` un élément Texte (éditeur ouvert). Safari affiche sa bulle système « Coller » : c'est attendu. Refus (`NotAllowedError`) : « Le navigateur a refusé l'accès au presse-papier. » Presse-papier vide ou sans type utilisable : « Rien à coller. »
+- Aucune lecture du presse-papier sans geste explicite. L'écouteur `paste` n'existe que sur la route d'accueil, hors envoi en cours.
+
+#### 9.2.4 Liste : catégories, ordre, retrait, renommage, doublons
+
+- **Catégories**, dans cet ordre fixe : **Texte**, **Photos**, **Vidéos**, **Audio et vocaux**, **Documents**, **Autres**. Attribution (`kinds.ts`, testée) : texte → Texte ; `image/*` ou extension d'image → Photos ; `video/*` → Vidéos ; `audio/*` ou vocal → Audio et vocaux ; PDF, bureautique (`.doc(x)`, `.xls(x)`, `.ppt(x)`, `.odt`, `.ods`, `.odp`, `.rtf`, `.txt`, `.md`, `.csv`, `.pages`, `.numbers`, `.key`, `.epub`) → Documents ; reste → Autres.
+- Affichage : un `CategoryGroup` par catégorie non vide, en-tête « Photos » + méta « 3 · 12 Mo » (nombre et taille cumulée, chiffres tabulaires). Avec une seule catégorie présente, l'en-tête reste (repère constant), sans répétition de la méta dans la jauge.
+- **Ordre du manifeste** = ordre des catégories ci-dessus, puis ordre dans chaque catégorie. Le destinataire voit exactement cet ordre et ces groupes (§9.8). On ne réordonne donc **qu'à l'intérieur d'une catégorie** (§18, A9). Le texte en premier est voulu : c'est souvent le message qui accompagne le reste.
+- **Réordonnancement** :
+  - Poignée `grip-vertical` à gauche de chaque ligne (si la catégorie a au moins 2 éléments), `aria-label` « Déplacer {nom} », `aria-describedby` vers l'aide « Alt + flèche haut ou bas pour déplacer ».
+  - Pointeur (souris et doigt) : appui sur la poignée puis glisser (Pointer Events + `setPointerCapture`, pas l'API HTML Drag and Drop, qui ne marche pas au doigt) ; la ligne se soulève (`--surface-3`, `--e-2`), les autres s'écartent (FLIP 180 ms), défilement automatique près des bords. Au doigt, le glisser démarre après 150 ms d'appui sur la poignée seulement (le reste de la ligne fait défiler la page). `touch-action: none` sur la poignée seulement.
+  - Clavier : **Alt + ↑ / Alt + ↓** sur une ligne ou sa poignée déplace d'un rang ; le focus suit la ligne. En limite de catégorie : rien ne bouge, annonce « Premier de la catégorie » / « Dernier de la catégorie ».
+  - Lecteurs d'écran au toucher (VoiceOver, TalkBack, sans touche Alt) : activer la poignée ouvre le **mode déplacement** de la ligne : deux boutons « Monter » (`arrow-up`) et « Descendre » (`arrow-down`) et « Terminé » apparaissent à sa place ; Échap ou « Terminé » en sort.
+  - Annonce après chaque déplacement : « {nom} : position 2 sur 4 dans Photos. »
+- **Retrait** : bouton `x` (« Retirer {nom} »), immédiat ; `UndoToast` « {nom} retiré · Annuler » pendant 6 s, qui remet l'élément à sa place. Le focus va à la ligne suivante (ou précédente, ou au bouton d'ajout si la liste est vide). Pour un texte, le contenu retiré est gardé 6 s puis oublié. Les URL blob des vignettes sont révoquées à l'oubli définitif.
+- **Renommage : retenu.** Le nom d'un fichier est visible du destinataire et trahit souvent ce que le nettoyage retire ailleurs (« IMG_20261104_235901.jpg » donne la date et l'heure, « CV_Prénom_Nom.pdf » une identité). Bouton `pencil` (« Renommer {nom} ») → champ en place avec la base du nom sélectionnée, l'**extension affichée à part et non modifiable** (« .jpg ») ; Entrée valide, Échap annule, perte de focus valide. Règles : 1 à 120 points de code après `cleanName`, sans `/`, `\` ni caractères de contrôle ; erreur en place (« Nom vide » / « 120 caractères au plus »). Un texte se « Modifie » (rouvre l'éditeur) au lieu de se renommer.
+- **Doublons** : même nom (après `cleanName`, sans casse) **et** même taille qu'un élément présent → l'élément est ajouté quand même, avec un badge `warn` « En double ? » sur les deux lignes et l'annonce « {nom} semble déjà ajouté. » Retirer l'un des deux enlève le badge. Aucun blocage (deux fichiers identiques peuvent être voulus).
+- **Vignettes** : pour les images nettoyées (JPEG, PNG, WebP, GIF, AVIF), vignette carrée de 40 px (`<img>` sur une URL blob de la donnée **nettoyée**, `object-fit: cover`, `decoding="async"`) ; échec de décodage (HEIC hors Safari) : icône de la catégorie. Aucune vignette vidéo (éviterait un décodage lourd).
+- **Ligne** : vignette ou icône, nom (`<bdi>`, troncature au milieu qui garde l'extension, nom complet en `title` et dans l'`aria-label` des actions), taille (« 4,2 Mo », « 0 octet »), badges (« Nettoyé », « Non nettoyé », « En double ? »), actions. Sous 360 px, la taille passe sous le nom.
+
+#### 9.2.5 Jauge de capacité
+
+- `CapacityGauge` toujours visible au-dessus de la barre d'actions (collée avec elle sur téléphone). Deux mesures sur une ligne : **taille** « 340 Mo / 2 Go » et **nombre** « 3 / 15 », chacune avec sa barre fine de 4 px (taille : proportion de `CONTENT_MAX` ; nombre : 15 crans).
+- Liste vide : la jauge affiche « Rien à envoyer pour l'instant · 2 Go et 15 éléments au plus » (pas de « 0 o / 2 Go »).
+- États : < 90 % : `--accent` ; ≥ 90 % : `--warn` + « Presque plein » ; **dépassement** (> `CONTENT_MAX`) : barre pleine `--danger`, valeur en `--danger` et en gras, texte « Trop gros : 2,2 Go sur 2 Go. Retirez 200 Mo. » (`role="alert"` au moment où l'état apparaît), bouton d'envoi désactivé avec la même raison en `aria-describedby`. Le dépassement de taille est **permis dans la liste** pour que la personne voie quoi retirer.
+- Nombre : le 16ᵉ élément et suivants sont **refusés à l'ajout** (« 2 éléments n'ont pas été ajoutés : 15 au plus. » avec leurs noms). Un seizième élément n'a jamais besoin d'exister, contrairement à un dépassement de taille, qu'on règle en choisissant quoi retirer (§18, A27).
+- `CONTENT_MAX = 1 073 741 824 − 65 540` octets (capacité du plus grand palier moins la place maximale du manifeste) ; `createShare` reste l'arbitre (`trop_gros`). La taille affichée est la somme des tailles des éléments (texte compté en octets UTF-8).
+- Mise à jour à chaque ajout, retrait, nettoyage terminé (une image nettoyée est un peu plus petite) ; annonce polie seulement aux franchissements de seuil (90 %, dépassement, retour sous la limite).
+
+#### 9.2.6 Nettoyage des métadonnées
+
+> la liste ci-dessous est ancienne ; la spec §35.2 fait foi. Photos : la vignette d'aperçu (JFIF et EXIF) est gardée. PDF : seules les propriétés du document sont retirées. plus de nettoyage automatique ni d'interrupteur ; balai par fichier et « Tout nettoyer », avec confirmation (§24).
+
+`web/src/media/strip.ts`, sans réencodage, appliqué aux images à l'ajout, avant l'insertion (la ligne affiche « Nettoyage… » pendant ce temps) :
+
+- JPEG : EXIF réécrit avec la seule orientation ; APP2 `ICC_PROFILE` et APP14 `Adobe` conservés ; APP1 XMP, APP13, APP2 MPF, COM et autres APPn retirés ; données coupées au premier EOI de l'image principale (S6).
+- PNG : `tEXt`, `zTXt`, `iTXt`, `eXIf`, `tIME` retirés ; `iCCP`, `sRGB`, `gAMA`, `cHRM` conservés.
+- WebP : `EXIF` et `XMP ` retirés, drapeaux `VP8X` et taille RIFF corrigés ; `ICCP` conservé.
+- Images de plus de 50 Mo : non lues en mémoire, ajoutées « non nettoyées » avec l'avertissement.
+- Badge réussi : « Nettoyé · lieu, appareil et date de prise de vue retirés ». Échec (fichier malformé) : élément **non ajouté**, « Impossible de nettoyer « {nom} ». Elle n'a pas été ajoutée. »
+- **Non nettoyé** (badge `--warn` + phrase) : vidéos (« peut contenir le lieu, la date et l'appareil »), HEIC, AVIF, GIF (« photo non nettoyée (format {format}) »), PDF (« peut contenir l'auteur et le logiciel utilisé »), documents (« peut contenir des informations sur son auteur »). Pour HEIC, en plus : « Sur iPhone, ajoutez-la avec « Photo » : iOS la convertit en JPEG, qui sera nettoyé. »
+
+#### 9.2.7 Texte et vocal
+
+- **Texte** : `TextArea` (attributs §12.3), compteur « 1 234 / 10 000 » en points de code ; au-delà : erreur et bouton « Ajouter » bloqué. Un texte = un élément. Plusieurs textes possibles (« Texte 1 », « Texte 2 »).
+- **Vocal** : repos → demande du micro → refus (« Micro refusé. Autorisez-le dans les réglages du navigateur. ») / enregistrement (minuteur, niveau, Arrêter) → écoute (lecteur natif, « Garder » / « Recommencer »). Format : `audio/mp4` (AAC) si `MediaRecorder.isTypeSupported`, sinon `audio/webm;codecs=opus` (spec §12). Durée maximale d'un vocal : 30 min (borne mémoire ; avertissement à 29 min, arrêt automatique). Pistes du micro arrêtées dès la fin, et sur `pagehide`.
+
+#### 9.2.8 Lecture d'essai et fichiers particuliers
+
+- Chaque fichier ajouté est lu sur son premier octet (`file.slice(0, 1).arrayBuffer()`, ou le fichier entier s'il est vide). Échec : « Impossible de lire « {nom} » (dossier, fichier déplacé ou inaccessible). » et rien n'est ajouté. Cela attrape les dossiers de Safari et les fichiers en nuage non téléchargés.
+- **Fichier vide** (0 octet) : accepté, taille « 0 octet ».
+- **Très gros fichier unique** (jusqu'à 2 Go ; sur un navigateur sans `showSaveFilePicker`, l'enregistrement assemble en mémoire, spec §18.7 : l'écran prévient au-delà de 200 Mo) : accepté sans lecture complète (seules les images ≤ 50 Mo sont lues pour le nettoyage) ; `createShare` lit par tranches.
+- **Noms très longs ou de droite à gauche** : affichés via `cleanName` dans `<bdi>`, troncature au milieu.
+
+#### 9.2.9 Envoyer
+
+- Blocages, chacun avec sa raison sous le bouton (`aria-describedby`) : liste vide (« Ajoutez au moins un élément »), dépassement de taille (§9.2.5), texte en cours d'édition trop long, nettoyage en cours (« Nettoyage en cours… », le bouton se débloque seul), mot de passe personnel refusé (§9.3), hors ligne (`navigator.onLine === false` : « Vous êtes hors ligne. »).
+- Téléphone : **Continuer** passe à l'étape Options (focus sur son titre). Ordinateur : les options sont déjà à droite, l'action est directement **Chiffrer et envoyer**.
+- Le composeur garde tout en mémoire tant que la page vit ; quitter la page avec des éléments dans la liste déclenche `beforeunload` (la liste serait perdue). Aucun stockage.
+
+### 9.3 Options
+
+> plus aucun choix payant verrouillé (2, 3 et 7 jours, « Démarrer à la première ouverture », « Jusqu'à 50 ») ; voir §9.3.1. Plus de sous-option coffre (spec §27).
+
+> **Révision 8 (spec D41-15 et D41-16)** : le mot de passe est **toujours généré** (10 caractères, « Générer un autre » et « Copier » dans le champ) ; « Écrire mon propre mot de passe », le champ saisi, `PasswordChecklist` et les raisons de refus sont **supprimés**, au composeur comme dans la feuille Options du téléphone. Sous la Durée : 2, 3 et 7 jours **verrouillés** (cadenas, bord en tirets, badge « Plus ») et « Démarrer à la première ouverture » (verrouillé, badge « Plus ») ; sous les Ouvertures : « Jusqu'à 50 » (verrouillé, badge « Plus »). Nom accessible = texte visible ; description « Avec Plus, bientôt disponible. ». Un appui ouvre la feuille « Shhdrop Plus » (ce que Plus ajoute, prix prévu de spec §38.8.2, « Bientôt disponible. », « Compris ») et ne change aucune option. Sous « Votre envoi » : « Gratuit : 2 Go · 24 h max ».
+
+**Révision 6** : réglages serrés dans leur colonne (Durée, Ouvertures, Mot de passe, Destinataire) ; la phrase « S'efface dans 12 h ou après 1 ouverture… », l'estimation et les textes de confiance passent dans la colonne de l'envoi (ordinateur large). **Mot de passe généré de 10 caractères** (spec §31, mise à jour) ; un mot de passe saisi : **10 caractères au moins**. En mode personnel, « Utiliser un mot de passe généré » (lien) et « Générer un autre » (dans le champ) rendent un mot de passe généré neuf. Destinataire : interrupteur « Autoriser le téléchargement » (spec §34.1, voir le signalement du rapport composeur sur l'écart).
+
+- **Durée** : `Segmented` 1 h · 6 h · **12 h** (par défaut) · 24 h. Indication : « Comptée à partir de la fin de l'envoi. »
+- **Ouvertures** : `Stepper` 1 à 10, **1** par défaut. Indication : « Une ouverture = un déverrouillage réussi. »
+- **Mot de passe** (révision 4, spec §31) : 8 caractères générés (`generatePassword()`), en grand, en chasse fixe ; **Générer un autre** (sans limite), **Copier**. Avant : phrase de 4 mots. « Utiliser mon propre mot de passe » → champ (chasse fixe, Afficher/Masquer), `PasswordChecklist` en direct, erreurs de `checkPassword` (« 12 caractères minimum », « Ce mot de passe est trop courant »). Revenir à la phrase générée : « Utiliser une phrase générée ». Rappel permanent : « Envoyez-le par un autre moyen que le lien. »
+- **Ce que le destinataire peut faire** (révision 4, spec §34) : `RightsPicker`, « Voir et enregistrer » par défaut ; textes honnêtes de spec §27.6 et §34. La copie chiffrée dans l'app du destinataire est retirée de l'interface (spec §27) : seul reste l'interrupteur « Autoriser le téléchargement ».
+- L'envoi chiffré a déjà commencé en arrière-plan (spec §29.4) ; une ligne le dit sous la jauge : « L'envoi chiffré commence en arrière-plan. Rien n'est partagé tant que vous n'appuyez pas sur Envoyer. »
+- Action : **Chiffrer et envoyer** (`primary`, icône `lock`). Retour possible à « Composer » sans rien perdre.
+
+#### 9.3.1 Options payantes du composeur (révision 7, spec §38.9)
+
+> **Révision 8 (D41-16)** : sans pass, les choix payants de §9.3 sont montrés **verrouillés** avec leur badge (au lieu d'« absente, pas grisée », dernière puce ci-dessous) ; avec un pass, ils deviennent les options décrites ici.
+>
+> **11 novembre, qui remplace la révision 8** : sans pass, ni choix verrouillés ni pastilles « 10 Go · Plus » / « 50 Go · Pro ». Une seule ligne discrète, après les limites gratuites : « Plus de place et de durée avec Plus et Pro, bientôt » (bouton souligné, cible d'appui de 44 px). Elle ouvre la feuille d'information, avec « Bientôt disponible » en tête. Avant : huit options « bientôt » et six arrêts de tabulation dans le composeur.
+
+Visibles **seulement avec un pass** (jeton aveugle disponible) ; sans pass, rien n'est affiché et le destinataire ne voit jamais l'offre (spec §38.1). Les options sont dans un groupe repliable « Options Plus » ou « Options Pro » sous les réglages de §9.3 ; aucune case précochée ; chaque option a une phrase d'effet et, si elle a une limite honnête, la dit.
+
+- **Le compte à rebours démarre…** (`Segmented`, spec §38.9.1) : **« à la création »** (par défaut) · **« à la première ouverture »**. Sous le choix : « Le compte à rebours démarre quand quelqu'un déverrouille le lien. Si personne ne l'ouvre, il disparaît quand même au bout de 7 jours : **le {date, heure}**. » La durée (1 h à 7 j) est bornée par ce plafond ; la phrase de synthèse passe de « S'efface dans 12 h… » à « S'efface 12 h après sa première ouverture, et au plus tard le {date} ».
+- **S'ouvre à partir de** (`DateTimeField`, facultatif, spec §38.9.6) : date et heure locales dans les 7 jours ; validation « au moins 1 h avant la fin » ; texte : « Avant cette heure, le lien ne s'ouvre pas. C'est le serveur qui l'applique. »
+- **Destinataires** (spec §38.9.7) : « Un seul lien » (défaut) · « Un lien par personne » → liste de lignes (nom local, ouvertures 1 à 10) ; Plus 5 lignes, Pro 25 ; les noms restent sur l'appareil (« Les noms ne sont jamais envoyés »). « Mot de passe : le même pour tous » (défaut) ou « un par personne ».
+- **Notification d'ouverture** (spec §38.9.8) : interrupteur « Me prévenir à l'ouverture » ; texte « Vous recevez seulement : « Un de vos partages a été ouvert ». Jamais qui, jamais où. » ; si la notification système n'est pas disponible (Q-F3), l'option devient « Je verrai l'état sur mon tableau de bord ».
+- **Limite de téléchargement par fichier** (spec §38.9.11) : sur chaque ligne de la liste, menu « Limiter les téléchargements » : Aucune · 1 · 2 · 3 · 5. Texte : « Le fichier sera envoyé à part. Cela dissuade, cela n'empêche pas de copier un fichier déjà enregistré. »
+- **Filigrane** (spec §38.9.12) : sous « Autoriser le téléchargement », **activé seulement quand ce dernier est désactivé** : « Superposer « Confidentiel » sur ce qui est affiché » + case « Ajouter le nom du lien ». Texte d'honnêteté obligatoire, sous l'option : « Le filigrane dissuade et aide à retrouver l'origine d'une fuite. Il n'empêche ni la capture d'écran, ni la photo de l'écran. »
+- **Page de réception personnalisée (Pro)** (spec §38.9.9) : choix « Aucune » · « Mon profil de marque » (logo, accent) ; aperçu de la page du destinataire **avec** le bandeau fixe « Page Shhdrop. Le logo est choisi par l'expéditeur ; Shhdrop ne vérifie pas son identité. » ; échec de contraste → l'accent par défaut avec une phrase.
+- **Ajouter des fichiers plus tard** n'est pas une option du composeur : c'est une action de la carte (§9.14.4).
+- États : option indisponible (niveau insuffisant) = absente, pas grisée avec une publicité ; erreur de validation en `danger` avec icône et texte ; clavier : ordre logique, 44 px, `aria-describedby` vers la phrase d'effet.
+
+### 9.4 Envoi (scellement)
+
+L'écran remplace le composeur (masqué, intact). La capsule (§7.3) est en haut ; sous elle, `UploadStats`, `PhaseList`, les actions, puis le rappel « Gardez cet onglet ouvert pendant l'envoi. » (pendant l'envoi seulement, plus sur « Lien prêt ») Le titre de l'onglet devient « 42 % · Shhdrop » pendant l'envoi (repère quand l'onglet est en arrière-plan ; aucune donnée sensible), puis « Shhdrop ».
+
+#### 9.4.1 Phases et mesures
+
+| Phase | Détection | Libellé (FR) |
+|---|---|---|
+| `keys` | Du clic à l'appel de `solveCaptcha` (durée : environ 1 s, plus sur un vieux téléphone ; avec spec §29, quelques millisecondes quand le mot de passe généré est déjà traité) | « Préparation des clés » (aucun terme technique à l'écran, §20.8) |
+| `captcha` | Pendant `solveCaptcha`, puis jusqu'au premier `onProgress(0, total)` (comprend l'attente de 3,1 s et la création) | « Vérification anti-robot » + détail §9.4.2 |
+| `upload` | Après `onProgress(0, total)`, tant que des octets restent | « Chiffrement et envoi » + « chaque bloc est chiffré juste avant d'être envoyé » |
+| `paused` | Pause demandée (§9.4.4) | « En pause » |
+| `offline` | `onRetry` reçu, ou événement `offline`, ou aucun octet depuis 10 s pendant `upload` | Bandeau §9.4.3 |
+| `finalize` | Tous les octets envoyés (`onBytes(total, total)`), promesse non résolue | « Finalisation » |
+| `sealed` | Promesse résolue | Fermeture du sceau, puis §9.5 |
+
+`PhaseList` montre les quatre phases visibles (Préparation des clés · Vérification anti-robot · Chiffrement et envoi · Finalisation), chacune « à venir », « en cours » ou « faite » (texte + icône, pas la couleur seule). La liste sert de repère ; la capsule porte l'information principale.
+
+`UploadStats`, par ordre d'importance (§18, A28) :
+1. **Pourcentage** au centre de la capsule (`--fs-figure`), arrondi à l'entier inférieur (jamais « 100 % » avant le dernier octet).
+2. Ligne principale : « **214 Mo / 400 Mo** · **4,2 Mo/s** · **environ 1 min** ».
+   - Les tailles sont celles du **paquet chiffré** (palier) : il est plus gros que le contenu (34 Mo de contenu → 50 Mo envoyés). Une ligne d'aide l'explique une fois : « La taille envoyée est arrondie au palier supérieur pour masquer la taille réelle. » (§18, A18)
+   - **Vitesse** : moyenne mobile exponentielle sur 3 s des octets de `onBytes` (`v ← v + (1 − e^(−Δt/3)) × (Δoctets/Δt − v)`), affichée seulement après 3 s d'envoi, masquée en pause et pendant une coupure ; unités « Ko/s », « Mo/s ».
+   - **Temps restant** : (total − envoyé) / v, arrondi (« environ 12 min », « environ 1 min », « moins d'une minute »), affiché après 5 s, mis à jour au plus toutes les 2 s, masqué si la vitesse est nulle.
+3. Ligne de détail, en chasse fixe `--fs-small` `--text-2` : « Bloc 12 / 100 » (`onProgress`).
+- **Envoi trop lent pour finir** : si le temps restant estimé dépasse le temps restant avant la limite de 3 h de l'envoi (spec §7.4 ; mesuré depuis la création), bandeau `warn` : « À cette vitesse, l'envoi ne finira pas avant la limite de 3 h. Changez de réseau ou retirez des éléments. » (pas d'arrêt automatique).
+
+#### 9.4.2 Vérification anti-robot (P3)
+
+**Principal : preuve de travail maison**, compatible avec le défi `altcha-lib-go` v1 que sert déjà le serveur (`algorithm: "SHA-256"`, `challenge` = hex(SHA-256(`salt` + `number`)), `maxNumber`, `salt` qui finit par « & », `signature`) :
+
+- `web/src/captcha/pow.ts` (hôte) + `web/src/captcha/pow.worker.ts` (Worker dédié, module, fichier servi par notre origine, donc permis par `script-src 'self'`).
+- Le Worker essaie `number` de 0 à `maxNumber` : `crypto.subtle.digest("SHA-256", encode(salt + number))`, par lots de 64 condensés en parallèle, compare à `challenge`. Il rend `{ number, took }` ou « non trouvé ». Il poste sa progression toutes les 250 ms (`{ tried }`). Pas de SHA-256 écrit à la main (règles du projet : aucune crypto maison).
+- Charge utile : `btoa(JSON.stringify({ algorithm, challenge, number, salt, signature, took }))`, rendue en `{ kind: "pow", payload }`.
+- **Pré-calcul (Q2)** : la preuve de travail est lancée dès le **premier élément ajouté** au composeur (`prepareCaptcha`, puis le Worker), pas au clic d'envoi ; l'envoi la consomme (`CreateOpts.prepared`) si le défi a encore plus de 15 s de validité. Le défi serveur dure 2 min : il est renouvelé quand il reste 30 s de validité, **au plus deux renouvellements**, puis le calcul se fait à l'envoi. Garde-fous (processeur et vie privée) : seulement **page visible** ; arrêt sur `pagehide`, page masquée et liste vidée ; au niveau de difficulté maximal (environ 30 s de calcul), un recalcul toutes les 2 min occuperait un téléphone environ 25 % du temps, d'où la limite de deux renouvellements. Le serveur apprend qu'une composition est en cours (un `GET /api/captcha` part avant l'envoi) ; aucun contenu ni clé n'est concerné. Une preuve est invalidée par une création sur la même connexion (contrôle de niveau du serveur) ou par un changement d'adresse IP : un `bad_request` avec une preuve pré-calculée relance un essai complet **sans** pré-calcul (aucun repli depuis le 24 novembre). Le pré-calcul n'est pas branché dans la démo.
+- **Annulable** : `worker.terminate()` sur Annuler, `pagehide`, borne dépassée.
+- Affichage : trait indéterminé ; libellés « Vérification anti-robot » et « Calcul sur votre appareil. » (partage comme salon). **Retiré le 25 novembre** (jamais codé ; choix le plus simple qui reste juste) : la borne vraie, calculée sur tout l'espace de recherche, serait bien plus longue que la durée réelle (la solution tombe en moyenne à mi-chemin) et inquiéterait pour rien ; une estimation, elle, ne serait pas une borne. Le trait indéterminé suffit : le calcul va jusqu'au bout (`captcha/pow.ts`), sans délai fixe. Si le calcul a été pré-calculé, il est déjà avancé (voire fini) au clic d'envoi.
+- **Échec de la preuve (24 novembre : aucun repli, deux essais au plus)** : `Worker` absent ou erreur à la création (CSP d'un navigateur intégré, mode restreint), erreur du Worker, ou refus du serveur. Ordre des essais d'une création (`flows/send.svelte.ts`, test « jamais de troisième essai ») : (1) preuve pré-calculée ou preuve de travail ; (2) nouvel essai complet en preuve de travail, sans pré-calcul (`Error("bad_request")` au premier) ; **jamais de troisième essai** : ensuite l'erreur `captcha` (§9.4.6), « La vérification anti-robot n'a pas pu se faire sur cet appareil. Réessayez, ou essayez depuis un autre navigateur. » si le calcul lui-même a échoué, sinon « La vérification anti-robot a échoué. Réessayez. ». Il n'y a plus de borne de 60 s : le calcul va jusqu'au bout (`captcha/pow.ts`).
+
+**Repli : Google reCAPTCHA** (**retiré le 24 novembre**, décision du propriétaire : jamais codé côté serveur ; un échec de la preuve de travail est un échec de l'envoi, avec « Réessayer » ; ni feuille de consentement, ni `askFallback`, ni `VerifFrame` n'existent ; les cinq points ci-dessous sont **caducs**, gardés pour l'historique), seulement si `ctx.fallbackOrigin` n'est pas `null` (repli activé côté serveur, §15) :
+
+- La capsule reste ; une `Sheet` s'ouvre : titre « Vérification supplémentaire », texte : « La vérification automatique n'a pas abouti sur cet appareil. Vous pouvez utiliser celle de Google. **Google verra votre adresse IP** et pourra déposer ses cookies dans son cadre. Votre contenu, votre lien et votre mot de passe restent hors de sa portée : la vérification tourne dans une page séparée, sans accès à cette page. » Boutons **Continuer avec Google** (`secondary`, icône `shield-alert`) et **Annuler l'envoi** (`ghost`). Lien « En savoir plus » → `/confidentialite#verification`.
+- **Rien n'est chargé depuis Google avant ce clic** (consentement explicite : le code n'appelle `askFallback`, donc ne crée le cadre, qu'après la résolution `true` de la feuille de consentement ; testé). Après le clic : `VerifFrame` dans la feuille (§15) ; la case « Je ne suis pas un robot » s'affiche ; une éventuelle grille d'images tient dans le cadre (largeur `min(100 %, 400px)`, hauteur `min(600px, 85dvh)`).
+- Jeton reçu → `{ kind: "recaptcha", token }`, la feuille se ferme, l'envoi continue. Jeton expiré (2 min) : la case se réarme d'elle-même dans le cadre. Fermeture de la feuille (Échap) = Annuler l'envoi.
+- Le défi du serveur dure 2 min : si la vérification Google n'est pas finie avant, `createShare` échoue (`bad_request`) et l'écran propose « Réessayer » (nouveau défi, nouvelles clés).
+- Repli désactivé sur le serveur, ou cadre qui ne répond pas en 15 s : « La vérification anti-robot n'a pas pu se faire sur cet appareil. Réessayez, ou essayez depuis un autre navigateur. » + Réessayer.
+
+#### 9.4.3 Coupure réseau et reprise
+
+- Déclencheurs : `onRetry({ attempt, inMs, offline })`, événement `offline`, ou aucun octet depuis 10 s pendant `upload`.
+- Bandeau `warn` (icône `wifi-off`), sous la capsule : « Connexion perdue. Nouvel essai dans 8 s… » (compte à rebours tabulaire, à partir de `inMs`) ; hors ligne : « Hors ligne. L'envoi reprendra dès le retour du réseau. » ; ligne de délai : « L'envoi est conservé encore {durée} sans connexion. » (échéance de 13 min après le dernier segment acquitté, §0.1). Bouton **Réessayer maintenant** (relance l'attente en cours). Le trait pulse (§7.3).
+- Retour du réseau (premier octet reçu) : bandeau remplacé 3 s par « Connexion rétablie », annonce polie.
+- Budget épuisé : `Error("reseau")` → message d'erreur (§9.4.6).
+- **Arrière-plan sur téléphone** (`visibilitychange` → `hidden`) : iOS et Android suspendent souvent la page ; l'envoi s'arrête de fait. Au retour (`visible`), si l'envoi a été interrompu, la reprise se fait par le même mécanisme et un bandeau `info` dit : « L'envoi s'est arrêté pendant que l'app était en arrière-plan. Il reprend. » Pour limiter ce cas, l'écran demande un **verrou d'écran** (`navigator.wakeLock.request("screen")`, si disponible) de la phase `keys` jusqu'à la fin, relâché à la fin, en pause, à l'annulation, et redemandé au retour en `visible`.
+
+#### 9.4.4 Pause et reprise
+
+- Bouton **Pause** (`secondary`, icône `pause`), actif en phase `upload` seulement. Au clic : « Mise en pause après le bloc en cours… » (un bloc fait 4 Mio), puis « En pause ». La promesse de `opts.pause` reste en attente jusqu'à **Reprendre** (`primary`, icône `play`).
+- **Pause bornée à 10 min et par l'échéance de 13 min** (`SERVER_STALL_MS` après le dernier segment acquitté, la même que celle de la coupure) : le serveur efface un envoi qui ne reçoit plus de segment pendant 15 min (spec §7.4). La reprise automatique a lieu à `min(10 min, échéance)`. Pendant la pause : « Reprise automatique dans 9:12 » (`timer`) ; à 0, reprise d'office, annonce « Reprise automatique de l'envoi ». La pause est refusée (bouton désactivé, raison en `title` et `aria-describedby`) s'il reste moins de 15 min avant la limite de 3 h.
+- Pendant la pause, le verrou d'écran est relâché ; la vitesse et le temps restant sont masqués.
+
+#### 9.4.5 Annuler
+
+- Bouton **Annuler** (`ghost`), actif de `keys` à `finalize` exclu. `InlineConfirm` : « Annuler l'envoi ? Ce qui a été envoyé sera effacé du serveur. » → **Annuler l'envoi** / **Continuer**.
+- Effet : `AbortController.abort()` → `createShare` arrête le Worker de preuve ou la vérification, la requête en cours, et détruit le partage s'il a été créé (`S_gestion`, `keepalive`). Retour au composeur intact, focus sur le bouton d'envoi, bandeau `info` : « Envoi annulé. Il compte quand même dans la limite d'envois du jour. » (si la création avait eu lieu ; sinon : « Envoi annulé. »).
+- Pendant `finalize`, Annuler est masqué : l'annulation à cet instant laisserait un partage peut-être déjà actif. On attend la fin, puis « Supprimer ce partage » (§9.5) reste possible.
+
+#### 9.4.6 Sortie de page, double envoi, erreurs
+
+- **`beforeunload`** actif de `keys` jusqu'à la résolution (dialogue générique du navigateur ; inexistant sur Safari iOS, où seul le rappel à l'écran protège).
+- **Bouton Retour** : pendant l'envoi et sur « Lien prêt », une entrée d'historique de garde (même adresse, aucun secret) est ajoutée au clic d'envoi. Un Retour qui la quitte demande confirmation : « Quitter cette page ? L'envoi sera annulé et ce qui a déjà été envoyé sera effacé du serveur. » (sur « Lien prêt » : « … Le lien et le mot de passe ne seront plus jamais affichés. Copiez-les d'abord. »). Refus : l'entrée est remise, on reste. Accord : envoi annulé, secrets oubliés, retour au composeur. Pendant la finalisation (plus annulable), le partage qui en sortira est supprimé dès qu'il existe. Le logo de l'en-tête et le pied de page sont désactivés pendant l'envoi et sur « Lien prêt ». La démo « Ouvrir comme destinataire » passe sans garde (navigation voulue).
+- **`pagehide`** pendant l'envoi : `abort()` (le partage créé est détruit en `keepalive`), arrêt du Worker. Fermer l'onglet ne laisse donc pas, au mieux, de réservation ; au pire (page tuée sans `pagehide`), le serveur l'efface après 15 min sans segment.
+- **Double envoi** : le bouton « Chiffrer et envoyer » est désactivé de façon synchrone au premier appui ; `sender.start()` refuse tout appel hors état `idle` (testé).
+- Erreurs (les éléments restent dans le composeur, rien n'est perdu côté appareil) :
+
+| Erreur | Message | Action |
+|---|---|---|
+| `AbortError` | Aucun message d'erreur (voir Annuler) | — |
+| `Error("reseau")` | « L'envoi n'a pas abouti : la connexion est restée coupée trop longtemps. Ce qui a été envoyé sera effacé. » | Réessayer |
+| `NotFoundError` | « Le transfert a été interrompu (le serveur a peut-être redémarré). Réessayez. » | Réessayer |
+| `LimitError{retryAfterS}` | Le message dit la règle : limite du jour, « Limite du jour atteinte : 3 partages par jour depuis votre connexion. Réessayez dans {durée}. » ; envois en préparation, « Un autre envoi est déjà en préparation depuis votre connexion, dans un autre onglet par exemple (2 au plus à la fois). Terminez-le ou fermez-le, puis réessayez dans {durée}. » ; autre limite, « Limite d'envois atteinte. Réessayez dans {durée}. ». Le bouton Réessayer est désactivé avec un compte à rebours, puis se réactive | Réessayer (différé) |
+| `Error("full")` (507) | « Le service est plein pour le moment. Réessayez plus tard. » | Réessayer |
+| `Error("frozen")` (503) | « Les nouveaux envois sont suspendus pour le moment. Réessayez plus tard. » | — |
+| `Error("bad_request")` | Un nouvel essai complet automatique (nouveau défi, nouvelles clés, sans pré-calcul), et rien de plus (deux essais au plus, aucun repli depuis le 24 novembre, §9.4.2) ; ensuite : « La vérification anti-robot a échoué. Réessayez. » (ou, si le calcul lui-même a échoué : « La vérification anti-robot n'a pas pu se faire sur cet appareil. Réessayez, ou essayez depuis un autre navigateur. ») | Réessayer |
+| `NotReadableError` ou `NotFoundError` DOM | « « {nom} » a été modifié ou déplacé pendant l'envoi. Retirez-le et ajoutez-le à nouveau. » La ligne fautive est marquée en `--danger` au retour au composeur | Retour au composeur |
+| `trop_gros`, `trop_d_elements`, `vide`, `texte_trop_long` | Ne peuvent pas survenir (bloqués avant) ; si cela arrive : retour au composeur avec la raison de la jauge | Retour au composeur |
+| Autre | « Une erreur inattendue a interrompu l'envoi. Réessayez. » (le code n'est jamais affiché) | Réessayer |
+
+« Réessayer » rappelle `createShare` en entier : nouvelles clés, nouveau sel, nouveau défi (jamais de rechiffrement d'un segment avec la même clé). Le focus va au message d'erreur (`role="alert"`, `tabindex="-1"`).
+
+### 9.5 Lien prêt
+
+Affiché seulement quand la promesse de `createShare` est résolue (spec §5.1). Focus sur le titre « Lien prêt ». Annonce : « Partage créé. »
+
+Ordre (révisé le 7 novembre, scan UX « Lien prêt ») : avertissement en tête, puis les deux secrets, la gestion repliée, la suppression en secondaire, et « Terminé » comme action principale.
+
+0. Mention, **en tête**, avant les secrets (c'est la seule chance de les enregistrer) : « Ce lien et ce mot de passe ne seront plus jamais affichés. » (filet `--warn`, fond `--warn-tint`).
+1. **Lien de partage** : `CopyField` + **Partager** (`navigator.share({ url })`, masqué si absent ; ne partage **jamais** le mot de passe) + **QR code** (feuille sur téléphone, en place sur ordinateur ; légende « Le QR contient la clé : ne le montrez qu'au destinataire » ; composant importé statiquement, spec §28.3).
+2. **Mot de passe** : `CopyField` en chasse fixe, **montré en entier** (`whole` : jamais tronqué, espaces gardées ; ce qu'on lit est ce qu'on copie) : « Envoyez-le par un **autre moyen** que le lien. Les deux dans la même messagerie, c'est comme ne pas en mettre. »
+3. **Gérer ce partage** : `<details>` **replié par défaut** ; dedans, le lien de gestion (`CopyField`) + « Gardez-le pour vous : il permet de suivre et de supprimer le partage. » **Remplacé (19 et 24 novembre)** : bascule « Garder dans mon historique », **désactivée par défaut avec ou sans compte** (spec §33) ; désactivée ou historique indisponible, le lien de gestion est montré **d'emblée** sous la bascule (seul moyen de suivre ou de supprimer le partage plus tard) ; activée, l'entrée est gardée et le lien de gestion n'est plus montré (le partage se suit depuis « Mes partages »). Le réglage vaut pour les envois suivants. Même règle sur « Salon prêt » (case à la création du salon ; lien de gestion montré d'emblée s'il n'est pas gardé, sinon derrière « Afficher le lien de gestion »).
+4. **Supprimer ce partage** (`ghost` en `--danger`, icône `trash-2`, action secondaire, dans le fil de la page, **jamais collée en bas**) → `InlineConfirm` `danger` « Supprimer ce partage pour tout le monde ? Le lien ne mènera plus à rien. » → `destroyShare(manage, location.origin)` → dissolution du panneau → « Partage supprimé. » + **Nouvel envoi**. `NotFoundError` (déjà expiré ou détruit) : même résultat (« Partage supprimé. »). `Error("reseau")` : « Connexion impossible : le partage n'a pas été supprimé. » + Réessayer.
+5. Vider le presse-papier : **retiré**. Le site refuse `clipboard-read=()` (spec §10) : la page ne peut pas vérifier que le presse-papier contient encore sa copie, et effacer sans vérifier écraserait ce que la personne y a mis depuis. Rien n'est effacé ; on copie autre chose par-dessus.
+6. **Terminé** (`primary`, dernier bloc ; **collé en bas sur téléphone**, sous le pouce) → `InlineConfirm` « Vous ne pourrez plus les afficher. Terminer ? » → efface l'état (chaînes oubliées, références nulles) et revient au composeur vide.
+- **`beforeunload`** reste actif sur cet écran jusqu'à « Terminé » ou « Supprimer » : recharger ou fermer par erreur ferait perdre le lien et le mot de passe d'un partage qui existe (§18, A12). Le bouton Retour est gardé aussi (§9.4.6).
+
+### 9.6 Gestion de l'expéditeur : tableau de bord (révision 6, 7 novembre 2026, spec §33.1)
+
+Refonte « application » de la gestion. **Pas d'empreinte d'appareil** (refusée, spec §33.1) : tout vient de l'historique local chiffré (`web/src/history/`) et du secret de gestion de chaque entrée. Le même composant `ShareCard` sert à l'accueil, à `/envois` et à la vue `#m…`.
+
+**9.6.1 Accueil : « Vos partages actifs ».** Sous le composeur (au-dessus sur téléphone quand le composeur est vide), une bande `ActiveSharesStrip` n'apparaît que s'il existe au moins une entrée **active** (ou en cours d'effacement) dans l'historique local : titre « Vos partages actifs », jusqu'à trois `ShareCard` compactes, lien « Tout voir (n) » vers `/envois`. Aucune requête au serveur au chargement : état et compte à rebours viennent des données locales (« mis à jour il y a 3 min ») ; une relecture n'a lieu que sur « Actualiser » ou quand la carte est ouverte (§9.6.5). Historique vide, désactivé ou tout terminé : **rien** à l'accueil.
+
+**9.6.2 `/envois` : le tableau de bord.** `AppShell` ; titre « Vos envois » ; sous le titre, une ligne de chiffres locale (« 2 actifs · 5 terminés ») ; filtres `Segmented` « Actifs » / « Terminés » / « Tous » (`role="radiogroup"`) ; liste de cartes (une colonne sur téléphone, deux colonnes à partir de 960 px) triées : en cours d'effacement, actifs par échéance croissante, puis terminés par date de fin ; en pied « Effacer l'historique » (`InlineConfirm`, spec §33) et, avec un compte (spec §37), « Synchronisé avec votre compte (Paramètres) ». Bouton principal « Nouvel envoi ». Squelette de cartes pendant la lecture d'IndexedDB.
+
+**9.6.3 La carte `ShareCard`** (données **locales seulement**, sauf ouvertures et état, relus du serveur sur demande) :
+- En-tête : `StateChip` (icône + mot : Actif, En cours d'effacement, Détruit, Expiré ; jamais la couleur seule) et l'heure de création locale (« il y a 2 h · 5 nov., 21 h 14 », `<time>`).
+- Corps, quatre mesures en chiffres tabulaires : **ouvertures** « 1 / 3 » avec encoches (`TimeRim`) ; **compte à rebours** « Expire dans 4 h 15 » (`Countdown`) avec le contour de temps ; **taille** « 142 Mo » ; **éléments** « 6 éléments ». Aucun nom d'élément, jamais (spec §33).
+- Actions (boutons de 44 px, au clavier dans l'ordre) : **Copier le lien de gestion** (`IconButton` `copy` + libellé ; copie `https://…/#m…` ; sous le bouton après copie : « Gardez-le pour vous : il permet de suivre et de supprimer ce partage. ») ; **Détruire** (`ghost` `danger`, `trash-2`, `InlineConfirm` « Détruire pour tout le monde ? C'est immédiat et définitif. ») ; **Détails** (`chevron-down`, déplie la carte, `aria-expanded`).
+- Détails (déplié) : « Ce que voit le serveur » (`serverCard(status)`, tâche 19 : « un bloc illisible d'environ 142 Mo · s'efface vers 9 h 45 · 1 ouverture sur 3 · aucun nom, aucun texte, aucune clé »), intervalles d'ouverture observés (« ouvert entre 21 h 00 et 21 h 15 », spec §33), échéance « vers 9 h 45 » (arrondie au quart d'heure), bouton **Actualiser** (`refresh-cw`) et « » ; « État lu à 18 h 58 · relu au plus toutes les 5 min » (« État lu le 11 nov., 16 h 58 · … » un autre jour), heure réelle de la dernière lecture du serveur, jamais « à l'instant » à côté d'un compteur qui peut dater de 5 min. Mention honnête : « Le lien de partage n'est pas conservé : il n'a été montré qu'une fois. »
+- Densité : carte compacte (une ligne de mesures) à l'accueil, carte complète à `/envois`.
+
+**9.6.4 Vue de gestion `#m…`.** Même carte, en grand, centrée (ouvertures, contour de temps, actions) ; si le secret n'est pas dans l'historique de ce navigateur, les mesures locales (taille, éléments, création) sont remplacées par « — » avec la note « Ce partage n'a pas été créé sur cet appareil » et un bouton **Ajouter à mes envois** (chiffre `S_gestion` dans l'historique). États `ready`, `draining`, `uploading`, `gone` et relectures : comportement inchangé (toutes les 60 s tant que la page est visible, `LimitError`, hors ligne, `reseau`). l'heure de la dernière lecture est affichée, « Mis à jour à {heure} · relu chaque minute tant que la page est ouverte » ; relecture au retour sur l'onglet ; une relecture en vol ne réaffiche plus un partage supprimé. Supprimer maintenant → dissolution → écran « détruit » (§9.10.1).
+
+**9.6.5 États.**
+| État | Carte | Notes |
+|---|---|---|
+| Chargement | squelette (mesures grisées) | lecture locale d'abord |
+| Actif | complète | « mis à jour il y a n min » ; relecture ≤ 1 fois / 5 min / partage, étalée de 0,5 à 4 s, jamais en arrière-plan |
+| En cours d'effacement | « Toutes les ouvertures sont utilisées · effacement à la fin du dernier téléchargement » | Détruire reste possible |
+| **Expiré** | carte atténuée, `StateChip` « Expiré », « Effacé du serveur à l'échéance » ; mesures locales gardées ; action **Retirer de la liste** | retirée seule 7 jours après (spec §33) |
+| **Détruit** | carte atténuée, « Détruit », `DestroyReceipt` (« Effacé du serveur : le contenu chiffré et son entrée »), **Retirer de la liste** | idem 7 jours |
+| **Vide** | page `/envois` : petite illustration neutre `EmptyArt` (un document intact, en trait, sans points), « Aucun envoi pour l'instant », phrase « Vos envois récents apparaissent ici, sur cet appareil seulement. Ils sont gardés chiffrés dans ce navigateur. », bouton « Envoyer quelque chose » | si l'historique est désactivé : « L'historique est désactivé » + « L'activer pour les prochains envois » |
+| Hors ligne ou erreur | dernier état connu avec « non mis à jour », jamais un chiffre « frais » inventé | `Error("reseau")` : bandeau et Réessayer |
+
+**9.6.6 Mouvement et accessibilité.** Cartes décalées de 40 ms à l'arrivée (12 au plus), dissolution de la carte à la destruction (§7.4), `prefers-reduced-motion` : aucune entrée animée. La liste est un `<ul>` ; chaque carte un `<li>` avec `aria-labelledby` (état + création) ; changements d'état annoncés poliment (`LiveRegion`) ; `forced-colors` : mot d'état souligné ; zones tactiles ≥ 44 px ; 390 px sans défilement horizontal.
+
+### 9.7 Ouverture (`/s/:id`)
+
+1. `parseLink(location.href)` ; `#` absent ou invalide → §9.11 « Lien incomplet » ; sinon `replaceState` (sauf navigateur intégré, S4).
+2. `fetchMeta` (squelette) → `NotFoundError` ou `Error("lien_invalide")` : §9.11 « Lien invalide ». `Error("reseau")` : « Connexion impossible. Vérifiez votre réseau et réessayez. » + Réessayer. `LimitError` : « Trop de demandes rapprochées. Réessayez dans {durée}. »
+3. Écran :
+   - « Quelqu'un vous a envoyé un partage chiffré. Shhdrop ne vérifie pas l'identité de l'expéditeur. »
+   - `Countdown` « Disponible encore 5 h 31 ». **À zéro** (avant déverrouillage) : passage local à « Lien invalide », sans requête (§18, A22).
+   - Champ mot de passe (attributs §12.3), Afficher/Masquer, **Déverrouiller** (`primary`, `lock-open`), Entrée par `keydown`.
+   - Note : « Déverrouiller utilise une ouverture. Si le téléchargement échoue ensuite, cette ouverture est perdue. »
+   - Ouvertures restantes (ruling 5) : `fetchMeta` rend aussi `opensLeft` (déjà connu de qui a `K_accès`) ; la mention de coût se lit « L'ouvrir compte une ouverture. Il peut encore être ouvert {n} fois. » ; recharger ou ouvrir un autre onglet n'en compte pas d'autre jusqu'à l'échéance (D42-22 ; §9.7.1, qui prévaut)
+   - Garde de sortie (ruling 3) : tant que l'écran tient le lien (verrouillé, déverrouillage, erreur de lecture), `beforeunload` demande confirmation : le `#` n'est jamais conservé, recharger perdrait le lien sans bruit. Jamais dans un navigateur intégré (le `#` y reste).
+   - Navigation privée : « Pour laisser moins de traces, ouvrez ce lien en navigation privée » (ruling 1 : jamais « aucune trace »).
+4. Pendant `openShare` : bouton en chargement, « Déchiffrement de la clé… » (Argon2id, environ 1 s, plus sur un vieux téléphone). Double appui sans effet (bouton désactivé synchrone).
+5. Erreurs :
+   - `BadPasswordError{attemptsLeft}` → « Mot de passe incorrect · {n} essai(s) restant(s) » ; avec 1 restant, en plus : « Au prochain échec, le partage sera détruit. » Le champ garde sa valeur, sélectionnée, focus.
+   - Échec du **dernier** essai (on avait `attemptsLeft = 1`, la réponse est `NotFoundError`) → « Mot de passe incorrect. Le partage a été détruit. » (et non le message générique : la personne sait déjà qu'il existait, §18, A23).
+   - `LimitError` → « Trop de tentatives rapprochées. Réessayez dans {durée}. » (bouton désactivé, compte à rebours).
+   - `NotFoundError` (autre cas) → §9.11.
+   - `Error("reseau")` → message réseau, sans affirmer si une ouverture a été consommée (l'écran ne peut pas le savoir).
+
+**Navigateur intégré** (table testée dans `env.ts` : Instagram, FBAN/FBAV/FB_IAB, Messenger, LinkedInApp, Snapchat, TikTok `musical_ly`/`BytedanceWebview`, Line, Telegram, WeChat `MicroMessenger`) : bandeau `warn` avant tout le reste : « Vous êtes dans le navigateur intégré de {app}, qui peut lire cette page. Ouvrez ce lien dans votre navigateur habituel (menu de l'app, puis « Ouvrir dans le navigateur »). » Boutons **Copier le lien** et **Continuer ici quand même**. Le champ n'apparaît qu'après « Continuer ici ». Une PWA installée n'est jamais signalée.
+
+**9.7.1 Rechargement, autres onglets et retour plus tard (révision 6, spec §41.4 ; D42-22).** Après un déverrouillage réussi, recharger la page, ouvrir le même partage dans un autre onglet du même navigateur ou **y revenir plus tard depuis ce navigateur** (lien du message rouvert, onglet ou navigateur fermé entre-temps) **ne consomme pas d'ouverture de plus**, **jusqu'à l'échéance du partage** (remplacé par D42-22).
+- **Retour plus tard (D42-22)** : l'octroi est gardé chiffré dans le navigateur (`web/src/history/returns.ts` : IndexedDB `shhdrop-returns`, AES-256-GCM, clé WebCrypto non extractible, comme l'historique §9.6 ; jamais `K_lien` ni le mot de passe ; démo : mémoire de l'onglet). Le lien rouvert avec son `#` et un octroi gardé : état `reopen` (mêmes textes ; mot de passe ressaisi). Effacé à l'échéance, à la destruction ou disparition, à `grant_invalid` et `reopen_limit`.
+- **Revue du 12 novembre** : textes nuancés (« En général, vous pouvez y revenir depuis ce navigateur… ») et une ligne des limites sous le pied : « Le retour n'est plus possible après la fermeture d'une navigation privée, si ce navigateur refuse le stockage, après un redémarrage de notre serveur ou après 20 retours. Un gros fichier ne se retélécharge que quelques fois. » ; « Détruire » seulement pour la dernière ouverture permise (`last_open`) ; qui revient sans être la dernière quand tout est pris lit « Toutes les ouvertures sont prises. » ; refus d'octroi sans ouverture restante : « Impossible de revenir sur ce partage », avec « Ce partage a déjà été rouvert 20 fois depuis cet appareil ; il ne reste aucune ouverture. » pour la limite. La page `/envois` s'appelle « Mes partages » (comme l'onglet) et n'a pas de bouton Retour quand la barre d'onglets est là.
+- **Oublier ce partage sur cet appareil** : lien discret au pied de l'écran Contenu, sous les limites du retour. Il retire le retour gardé (`returns.forget`, base `shhdrop-returns` supprimée si elle est vide) et l'entrée de l'onglet `shh.og`, et l'onglet ne répond plus aux autres onglets ; rien n'est demandé au serveur. Le contenu reste affiché jusqu'à la sortie de la page ; ensuite : « Oublié sur cet appareil. Ce qui est affiché disparaît quand vous quittez la page. » (EN « Forget this share on this device » / « Forgotten on this device. What's shown disappears when you leave the page. »). Rouvrir le lien comptera alors une ouverture. Pas de lien sur « Impossible de revenir » : cet écran a déjà tout oublié (`end` → `drop`).
+- **Retour impossible (D42-22)** : octroi gardé mais partage introuvable (détruit, expiré, ou serveur redémarré alors que toutes les ouvertures sont prises) : page d'état « Impossible de revenir sur ce partage » (« Ce navigateur l'avait déjà ouvert, mais le serveur ne le reconnaît plus… Demandez à l'expéditeur de vous l'envoyer à nouveau. »). Sans octroi gardé (autre appareil, navigation privée) : « Lien invalide », avec la phrase « Vous l'avez déjà ouvert ? On ne peut y revenir que depuis le même navigateur, hors navigation privée, jusqu'à son échéance. Depuis un autre appareil, il faut une ouverture restante. »
+- **État `reopen`** (rechargement : plus de `#` dans l'adresse, mais `sessionStorage["shh.og"]` présent) : même écran que `locked`, titre « Rouvrir ce partage », phrase « Vous avez déjà déverrouillé ce partage dans ce navigateur. Entrez le mot de passe pour le rouvrir : cela ne compte pas une ouverture de plus. » Le mot de passe est **ressaisi** (jamais gardé). Le bouton s'appelle « Rouvrir ». Un mauvais mot de passe compte comme un essai (« n essais restants »), l'octroi ne contourne rien.
+- **Autre onglet** : au chargement d'un lien valide, `BroadcastChannel` (400 ms, en mémoire) ; si un onglet de ce navigateur détient un octroi valable, l'écran dit « Ce partage est déjà ouvert dans un autre onglet : l'ouvrir ici ne compte pas une ouverture de plus. » ; sinon la phrase M9 de la tâche 20 : « Ce partage peut être ouvert encore **N fois**. Ouvrir ce partage compte une ouverture. Recharger la page ou l'ouvrir dans un autre onglet de ce navigateur n'en compte pas d'autre pendant 30 minutes. » **D42-22** : « Ouvrir compte 1 ouverture sur les {n} restantes ; ensuite, revenir depuis ce navigateur n'en compte pas d'autre, jusqu'à l'échéance. »
+- **Octroi refusé** (`grant_invalid` : expiré, redémarrage du serveur, ouverture terminée) : l'écran revient à `locked` avec « Votre ouverture précédente n'est plus reconnue (le serveur a peut-être redémarré). Déverrouiller en utilisera une nouvelle. » ; **jamais** de consommation silencieuse. Après 20 retours (D42-22) : « Trop de retours sur ce partage : une nouvelle ouverture sera comptée. »
+- Effacement de `shh.og` : (bouton retiré le 8 novembre, §21 ; remplacé le 12 novembre par « Oublier ce partage sur cet appareil », qui efface aussi le retour gardé, audit D6 et R2), destruction, échéance, 30 min d'inactivité, `grant_invalid`, fermeture de l'onglet. Plus de renouvellement (D42-22 : l'octroi vaut jusqu'à l'échéance). Les 30 min d'inactivité n'effacent que `shh.og` (qui contient `K_lien`), pas le retour gardé.
+- **Risque dit** (page Sécurité) : le stockage d'onglet est lisible par qui a accès à l'appareil déverrouillé et à l'onglet, ou par un script injecté ; le mot de passe n'y est pas ; la CSP stricte limite le risque, avec Trusted Types exigés (`require-trusted-types-for 'script'`, en production et dans la démo ; correction du 13 novembre, audit web D6 : l'ancienne mention « non invoqués (S8) » était fausse).
+
+**9.7.2 États d'ouverture ajoutés (révision 7, spec §38.9, §41.8).**
+- **Pas encore démarré** (`starts_on_open`) : à la place du compte à rebours, « Ce lien disparaît **{durée} après sa première ouverture**, et au plus tard dans {durée jusqu'au plafond}. » ; après le déverrouillage, le `Countdown` habituel.
+- **Programmé** (`opens_at_s` > 0) : « Ce partage s'ouvrira le {date, heure} (dans {durée}). » + compte à rebours local ; pas de champ de mot de passe avant l'heure (il apparaît à zéro, sans rechargement) ; le serveur répond 403 `not_yet` s'il est tenté avant.
+- **Marque** (spec §38.9.9) : le logo au-dessus de la carte, accent appliqué ; le bandeau « Page Shhdrop… » est toujours présent, après les textes standards, non masquable, `role="note"`. Échec de déchiffrement ou de décodage de la marque : page standard, sans message.
+- **Lien révoqué ou supprimé** : même écran que « Lien invalide » (§9.11) ; le destinataire n'apprend ni qui ni pourquoi.
+- **Fichier à limite atteinte** : la ligne du fichier dit « Ce fichier a atteint sa limite de téléchargements. » ; le reste de la liste reste utilisable. Avant l'enregistrement : « Ce fichier peut être téléchargé {n} fois de plus. »
+- **Filigrane** : voir §9.14.5.
+
+### 9.8 Contenu
+
+- Bandeau collé en haut (verre) : `Countdown` « Disponible encore 5 h 31 · disparaît quand vous quittez la page · recharger ne compte pas une ouverture de plus pendant 30 min » (v2.9, §9.7.1). **Page de contenu « 2027 »** : voir §9.8.x ci-dessous (galerie, visionneuse, actions) ; la liste de lignes décrite ici en est la version de repli (mêmes règles de lecture).
+- Éléments regroupés par catégorie, dans l'ordre du manifeste (§9.2.4), catégorie déduite de `previewKind(i)` et de l'extension de `safeName(i)` (purement visuel). Chaque ligne : `safeName(i)`, taille, actions selon `previewKind(i)` et la taille :
+
+| `previewKind` | ≤ 200 Mio | > 200 Mio |
+|---|---|---|
+| `text` | Affiché aussitôt (le texte est dans le manifeste), `<pre>` en texte brut, `dir="auto"`, Copier | — (≤ 10 000 caractères) |
+| `image` | **(11 novembre : affichée au toucher seulement, comme le code l'a toujours fait ; refusée au-delà de 50 mégapixels, dimensions lues dans l'en-tête sans décoder, `web/src/media/dimensions.ts`)** ; `<img>` depuis une URL blob, plein écran au toucher, zoom natif | Enregistrer seulement |
+| `audio` | « Écouter » → `<audio controls>` | Enregistrer seulement |
+| `video` | « Regarder » → téléchargement complet avec progression, puis `<video controls playsinline>` (spec §12) | Enregistrer seulement |
+| `pdf` | « Lire » → visionneuse isolée (§13) | Enregistrer seulement |
+| `none` | Enregistrer seulement | Enregistrer seulement |
+
+- Lecture pour l'aperçu : `saveItem(i, sink)` avec un `sink` qui accumule les tranches et compte les octets (progression « 12 Mo / 48 Mo », pourcentage, Annuler) ; à la fin, `new Blob(tranches, { type: TYPE_SUR[kind] })` (table fixe : `image` → type d'origine seulement s'il est dans la liste blanche JPEG, PNG, WebP, GIF, AVIF, HEIC (jamais SVG : `none`, enregistrement seul avec l'avertissement « à risque », décision du 7 novembre) ; `audio` → `audio/mp4` ou `audio/webm` ; `video` → `video/mp4`, `video/quicktime` ou `video/webm` ; sinon refus), puis mise à zéro des tranches. Un seul aperçu en téléchargement à la fois (les autres boutons attendent) : borne mémoire et bande passante.
+- **Échec de décodage** (`error` sur `<img>`, `<audio>`, `<video>`, par exemple une vidéo HEVC d'iPhone sur Android) : la visionneuse est retirée, « Ce fichier ne peut pas être lu sur cet appareil. Enregistrez-le pour l'ouvrir avec une autre application. » + Enregistrer (spec §12 : un échec de décodage vaut `none`).
+- Images : l'URL blob est **révoquée dès `load`** (§12.4).
+- Erreurs de lecture : `Error("reseau")` → « Téléchargement interrompu. » + Réessayer (le jeton vaut 3 h) ; `NotFoundError` ou `GoneError` (410) → **fermeture de l'interface** (§9.8.9, révision 7 : l'ancien « ce qui est déjà affiché reste visible » est supprimé).
+- **Expiration pendant la lecture** (révision 7, spec §41.8) : compte à rebours à zéro → **l'interface se ferme tout de suite** (§9.8.9) ; le téléchargement déjà commencé se termine en arrière-plan (grâce de 2 h au plus).
+- **`beforeunload`** actif seulement pendant un aperçu ou un enregistrement en cours (recharger couperait le téléchargement ; depuis la v2.9 il ne consomme plus d'ouverture de plus, §9.7.1) ; jamais le reste du temps (quitter la page est la fin normale).
+- Pied de la liste : **Terminer et effacer** (`secondary`) → `done()`, `wipe()`, révocation des URL blob, dissolution, « Effacé de cet appareil. » ; **Détruire maintenant** (`danger`, §9.10) ; **Signaler** (`ghost`, `flag`, §9.10).
+- Mémoire : avant un aperçu vidéo ou un enregistrement par Blob de plus de 200 Mio sur un appareil où `navigator.deviceMemory` < 4, ou sur iPhone/iPad, bandeau « Cet appareil risque de manquer de mémoire pour un fichier de cette taille. »
+
+### 9.8.x Page de contenu « 2027 » (révision 6, 7 novembre 2026, spec §41.6)
+
+Remplace la liste simple de lignes par une **galerie**. Les règles de lecture, de sûreté et d'erreur ci-dessus (types de blob, échec de décodage, expiration, `NotFoundError`, mémoire, `beforeunload`) restent valables ; les ajouts :
+
+**9.8.1 Disposition.** En-tête collé (capsule ouverte, `TimeRim`, « Partage reçu · 6 éléments · 142 Mo », compte à rebours). Sous lui, la **barre d'actions** (§9.8.6) puis la galerie : une grille `repeat(auto-fill, minmax(160px, 1fr))` (2 colonnes à 390 px, jusqu'à 5 à 1440 px), groupée par catégorie dans l'ordre du manifeste, tuiles de rayon 20 sur `--surface-1`, filet fin. Chaque **tuile** (`<li>`) montre : l'aperçu (image réduite, première image d'une vidéo avec badge lecture et durée, forme d'onde miniature d'un audio, premières lignes d'un texte, icône et extension d'un autre fichier), le nom (`<bdi>`, extension toujours visible), la taille, et deux boutons de 44 px : **Afficher/Lire** et **Télécharger** (`download`, absent en « voir seulement »). Les éléments sans aperçu possible (`none`, plus de 200 Mio) ont une tuile de fichier avec Télécharger seulement.
+
+**9.8.2 Images et visionneuse plein écran.** **(11 novembre : non réalisé et abandonné ; le code affiche l'image au toucher dans la visionneuse, par `<img>`, après le contrôle des 50 mégapixels. Le texte qui suit est gardé pour mémoire.)** Les images sont décodées par `createImageBitmap(blob)` **sans URL blob** (réduction à 480 px de large pour la tuile, `<canvas role="img" aria-label="{nom}">`) ; l'original reste en `Blob` en mémoire, décodé en pleine taille seulement dans la visionneuse (voisines ±1 préchargées, les autres libérées). Chargement automatique des images ≤ 20 Mio jusqu'à 256 Mio cumulés, puis « Afficher ». GIF et WebP animés : `<img>` dont l'URL blob est révoquée dès `load` (§12.4). Format illisible (HEIC sur Chromium) : message et Télécharger.
+`Lightbox.svelte` (`<dialog>` natif, `showModal()`, `aria-roledescription="carousel"`) :
+- **Clavier** : ← → pour naviguer, Début/Fin, `+` `-` `0` pour le zoom et le retour, Échap ferme (focus rendu à la tuile), Tab piégé dans la boîte ; **souris** : molette et double-clic pour zoomer, glisser pour déplacer ; **tactile** : pincement pour zoomer, double-appui, **balayage horizontal** (seuil de 48 px ou vitesse) pour passer à l'image suivante, balayage vers le bas pour fermer (non zoomé) ; `touch-action: none` sur la scène, `overscroll-behavior: contain`.
+- Pied : « 3 / 12 », le nom, **Télécharger** (absent en « voir seulement »). Annonce polie : « Image 3 sur 12, {nom} ».
+- Ouverture par transition de vue depuis la tuile (repli : fondu de 180 ms) ; mouvement réduit : aucun glissement, changement instantané.
+
+**9.8.3 Vidéo en ligne.** La tuile devient un lecteur à sa place après le téléchargement complet (progression « 48 Mo / 142 Mo », Annuler) : `<video controls playsinline>` dans un cadre de rayon 20 ; plein écran natif ; une seule vidéo à la fois (la précédente est mise en pause). « Voir seulement » : `controlsList="nodownload"`, `disablePictureInPicture`, menu contextuel neutralisé.
+
+**9.8.4 Audio avec forme d'onde.** `WaveformPlayer.svelte` : bouton lecture/pause de 48 px, 96 barres SVG calculées à partir de `decodeAudioData` (audio ≤ 50 Mio ; calcul par tranches pour ne jamais bloquer plus de 50 ms ; au-delà ou en cas d'échec, simple barre de progression), temps « 1:23 / 4:05 » tabulaire, **recherche** par clic ou glissé sur la forme d'onde et au clavier (`role="slider"`, ← → ±5 s, Début/Fin). La lecture elle-même est un `<audio>` sur URL blob (révoquée à la fin) ; l'`AudioContext` est fermé après le calcul.
+
+**9.8.5 Texte.** Tuile de carte : premières lignes, « Tout afficher » (déplie sur place, `<pre dir="auto">`), **Copier** (absent en « voir seulement »).
+
+**9.8.6 Barre d'actions de téléchargement** (`DownloadBar`, absente en « voir seulement » ; désactivée à l'expiration) :
+- **Télécharger** (par tuile) : flux de §9.9.
+- **Tout télécharger** : enregistrements **à la suite**, un par un. Avec `showDirectoryPicker` (Chrome, Edge sur ordinateur) : un seul choix de dossier, puis chaque fichier y est écrit ; un nom déjà présent reçoit « (2) » (jamais d'écrasement). Sans lui : un `<a download>` après l'autre, 1 s entre deux ; si le navigateur bloque les téléchargements multiples, l'écran l'explique (« Autorisez les téléchargements multiples pour ce site, ou utilisez l'archive .zip ») et laisse les boutons de chaque tuile. Progression « 3 / 6 · 120 Mo / 800 Mo », Annuler, une erreur sur un élément n'arrête pas les autres (liste des échecs à la fin). Éléments déjà en mémoire réutilisés sans nouvelle lecture.
+- **Télécharger en une archive (.zip)** : écrivain ZIP « stocké » maison (spec §41.6, `web/src/zip/store-zip.ts`, importé statiquement, jamais d'`import()`), noms sûrs sans dossier, date fixe, ZIP64 au-delà de 4 Gio ; écrit en flux dans `showSaveFilePicker` quand il existe, sinon assemblé en `Blob` jusqu'à 512 Mio (200 Mio sur iPhone/iPad ou `deviceMemory` < 4), au-delà de quoi le bouton est remplacé par « Tout télécharger » avec la raison. Progression en octets, Annuler (`writable.abort()`, fichier partiel supprimé, §9.9), « Enregistré » seulement après `close()`. Si un élément `isRiskyFile` est inclus : `InlineConfirm` `warn` listant les noms avant de commencer.
+
+**9.8.7 « Voir seulement »** (`rights: "voir"`) : **aucune** action de téléchargement n'existe dans le DOM : ni Télécharger sur les tuiles, ni dans la visionneuse, ni Tout télécharger, ni .zip, ni Copier ; la mention « L'expéditeur a choisi « voir seulement ». Cela n'empêche pas une capture d'écran. » reste en haut de la page et dans la visionneuse.
+
+**9.8.8 Style et performance.** Surfaces `--surface-1`, filets `--line`, lueur `--accent` à 10 % au focus ; entrée des tuiles décalée de 40 ms (12 au plus), léger agrandissement 1,02 au survol d'un pointeur fin ; `content-visibility: auto` sur les tuiles hors écran ; aucune image externe ; pas de bibliothèque de galerie. Mouvement réduit : aucune animation d'entrée ; contraste forcé : filets en `CanvasText`. Tests : unit (`gallery.test.ts` : classement, quotas de chargement automatique ; `store-zip.test.ts` : vecteur CRC-32, relecture par `python3 -m zipfile` et `unzip -t`, noms hostiles, doublons, ZIP64 sur flux creux) et e2e (`gallery.spec.ts` : lightbox au clavier et au balayage simulé, zoom, aucune URL blob d'image après `load`, « voir seulement » sans bouton dans le DOM, archive reçue identique octet par octet).
+
+**9.8.9 Fermeture à la disparition du partage (révision 7, spec §41.8, D41-10).** Déclencheurs : compte à rebours local à zéro (sans requête) ; réponse 410 `gone` de n'importe quelle requête ; réponse 410 de la requête tenue `watch` (moins d'une seconde après une suppression) ; destruction faite ici. L'état `gone` est irréversible dans la page.
+- **Ferme tout de suite** : `Content` est retiré du DOM (liste, galerie, visionneuse, lecteurs audio et vidéo arrêtés, aperçus, bandeau), URL blob révoquées, tranches et textes mis à zéro, `sessionStorage["shh.og"]` effacé, `beforeunload` retiré sauf pendant un téléchargement qui se termine, focus rendu au titre de l'écran de fin (`aria-live="assertive"`). Plus aucun appel `meta`, `regrant`, `watch`, pré-lecture ; aucun bouton de téléchargement ; aucune visionneuse, **rien de lisible** du partage.
+- **Écran de fin** : l'illustration de §9.10.1 (document qui se défait) et « Ce partage n'est plus disponible. » (même texte pour l'expiration et la suppression : jamais « supprimé par l'expéditeur »). Pas de lien « Revenir ».
+- **Un téléchargement est en cours** : seul vestige, une ligne discrète sous la phrase, **sans nom ni taille** : « Un téléchargement se termine en arrière-plan. Gardez cette page ouverte. » (`role="status"`, Q-GONE1) ; elle disparaît à la fin (« Téléchargement terminé. » 3 s, puis plus rien) ; la clé est alors mise à zéro. Si le serveur coupe ou refuse : fichier partiel supprimé, « Téléchargement interrompu. ».
+- **Révision 8 (spec D41-18 ; remplace les deux puces précédentes pour l'écran de fin)** : titre selon la cause connue de l'appareil : « Ce partage a expiré. » (compte à rebours), « Ce partage a été supprimé. » (410 ou refus d'une lecture avant l'échéance locale), « Ce partage a été détruit. » (destruction faite ici). **Si un fichier se téléchargeait** : « Le fichier en cours ({nom nettoyé}) est autorisé à se terminer ; vous ne pouvez plus rien ouvrir d'autre. » (pluriel : « Les {n} fichiers en cours… »), puis une ligne par fichier : nom, état « Fichier en cours autorisé à se terminer », barre et octets, puis « Terminé » ou « Téléchargement interrompu. » (annoncés) ; « Gardez cette page ouverte jusqu'à la fin. » tant qu'un fichier tourne. **Sans téléchargement en cours** : la page de fin ordinaire (« Son contenu a été effacé de cette page… » ; destruction faite ici sans téléchargement : l'écran « détruit » de §9.10). Lien « Envoyer quelque chose ». Titre d'onglet « Partage indisponible ». `sessionStorage["shh.og"]` : à effacer quand l'octroi d'ouverture (spec §41.4) existera.
+- **Salon, exclu** : même mécanique, texte « Vous avez été exclu de ce salon. » ; **aucune ligne de fin** : l'exclusion coupe les téléchargements (spec §39.13.6).
+- Mouvement : la dissolution de §7.4 (réduite à un fondu avec `prefers-reduced-motion`).
+
+### 9.9 Enregistrer (fichiers lourds compris)
+
+1. Si `isRiskyFile(i)` : `InlineConfirm` `warn` « « {nom} » peut exécuter du code sur votre appareil. N'ouvrez ce fichier que si vous faites confiance à l'expéditeur. » → « Enregistrer quand même » / « Annuler ».
+2. Si `showSaveFilePicker` existe : sélecteur avec `suggestedName: safeName(i)` → `createWritable()` → `saveItem(i, chunk => writable.write(chunk))` avec progression (« 120 Mo / 800 Mo · 18 Mo/s ») et **Annuler** → `close()` → « Enregistré ». Erreur ou annulation : `writable.abort()` (fichier partiel supprimé) et « Enregistrement interrompu : le fichier incomplet a été supprimé. » + Réessayer. Annulation du sélecteur (`AbortError`) : retour silencieux. Disque plein (`QuotaExceededError`) : « Plus de place sur cet appareil. Le fichier incomplet a été supprimé. »
+3. Sinon : `collectToBlob(opened, i)` (même progression), puis `<a download="{safeName}">` sur une URL blob `application/octet-stream`, cliqué par le code, URL révoquée 60 s après. Note sous le bouton, au-delà de 200 Mio : « Sur ce navigateur, le fichier est assemblé en mémoire avant l'enregistrement. » (spec §18.7). Annuler arrête `saveItem` (signal) et libère le Blob.
+4. Jamais « Enregistré » tant que `close()` n'a pas réussi (ou que le lien n'a pas été déclenché, pour le repli).
+
+### 9.10 Détruire, signaler (destinataire)
+
+- **Détruire maintenant** : `InlineConfirm` `danger` « Détruire ce partage pour tout le monde ? C'est immédiat et définitif. » → `opened.destroy()` → `wipe()` → dissolution → « Ce partage a été détruit. » `LimitError` (429, ruling 7) : rien n'est effacé, « Trop de demandes, réessayez dans un instant. » ; `Error("reseau")` : « Connexion impossible : le partage n'a pas été détruit. »
+- **Signaler** : `Sheet` « Signaler ce contenu » : « Le partage sera détruit immédiatement pour tout le monde. Shhdrop ne peut pas voir le contenu et ne garde aucune trace de votre signalement. Pour un contenu illégal, vous pouvez aussi le signaler aux autorités (en France : PHAROS, internet-signalement.gouv.fr). » → **Signaler et détruire** (`danger`) / **Annuler**. Appel : `opened.destroy("report")`. Pas de choix de motif : le serveur n'en garde aucun (§18, A13).
+- feuille en deux étapes avec les dix catégories de la conception du compte §21.10 et §21.15.7 (`2026-11-14-compte-email-design.md`) ; catégorie facultative, « Autre » par défaut ; appel `opened.destroy(catégorie)`, corps `{"proof":…,"reason":"report","categorie":n}` ; le serveur ne garde que des compteurs en mémoire. Bandeau PHAROS pour les codes 1 et 2, phrase des autorités gardée pour les autres.
+- `NotFoundError` (déjà détruit ou expiré) : même fin (« Ce partage n'existe plus. »), `wipe()`.
+- `Error("reseau")` : « Connexion impossible : le partage n'a pas été détruit. » + Réessayer (rien n'est effacé localement).
+- Après `wipe()`, les boutons de destruction disparaissent (`cles_effacees` ne peut pas être atteint par l'interface).
+
+### 9.10.1 L'écran « partage détruit » : l'illustration (révision 6)
+
+Le cadenas ouvert dans une boîte en pointillés ne voulait rien dire : **il est retiré** de tous les états « détruit » (pas de `lock-open`, pas de capsule en pointillés). Remplacement, dans la maison de style (géométrie, trait fin, Trame de points) :
+- **`DestroyedArt.svelte`** : un **document** (rectangle de rayon 12, coin plié, trois lignes de texte) dont le bord droit et bas se **défont en points carrés de la Trame** (la matrice de points du logo « rop ») qui dérivent vers le haut et à droite en s'effaçant. Partie intacte : remplissage `--surface-1`, filet `--line-strong`. Points : 48, sur une grille de 8 px, `--text-3` (22 % en `--accent`), positions et délais par une fonction pure à graine fixe (`ui/decor.ts`).
+- **Mouvement** : après la dissolution du contenu (§7.4, jamais avant la réponse), les points se détachent colonne par colonne en 900 ms (`transform` et `opacity` seulement), pendant que le logo de l'en-tête joue **`erase()`** (`web/src/ui/logoMotion.ts`, une seule fois). Mouvement réduit : image finale fixe, logo effacé sans animation. Contraste forcé : traits en `CanvasText`, points pleins.
+- Accessibilité : l'illustration est `aria-hidden` ; le titre « Ce partage a été détruit. » porte le sens ; `data-state="destroyed"` sur le composant (remplace celui de la capsule).
+- Emplacements : fin chez le destinataire (§9.10), « Supprimé/Détruit » côté expéditeur (§9.5, §9.6), carte détruite. L'état « Lien invalide » (§9.11) garde sa capsule dissoute ; l'état vide de `/envois` utilise `EmptyArt` (même document, intact).
+- Tests : positions déterministes (`decor.test.ts`), aucun `lock-open` dans le DOM de l'état détruit, `logoMotion.erase` appelé une fois, captures `destroyed-art` (début, milieu, fin), `axe`.
+
+### 9.11 Lien invalide, lien incomplet, navigateur non pris en charge, 404
+
+> **Révision 8 (tâche UP)** : toutes les pages d'état ont la même facture (`StatusPage` : marque du logo dans un halo, icône de la situation, titre, explication honnête, action) et leur titre d'onglet. Ajoutées : **hors ligne** (`navigator.onLine` faux, ou lecture de `meta` impossible : « Vous êtes hors ligne. », relance d'office au retour du réseau), **erreur du serveur** (5xx persistant : « Le serveur a un problème. », Réessayer), **trop de demandes** (429 : compte à rebours de `retry_after_s` ou de l'en-tête `Retry-After`, Réessayer activé à zéro), **maintenance** (503 `frozen`, drapeau `shhdrop admin freeze` : « Shhdrop est en maintenance. », « Revenir à mon envoi », l'envoi est gardé). Le serveur répond **404** (corps : l'application) hors des routes `/`, `/securite`, `/confidentialite`.
+
+| État | Quand | Texte |
+|---|---|---|
+| Lien invalide | `NotFoundError` à `fetchMeta` ou `openShare`, `Error("lien_invalide")`, ou compte à rebours à zéro avant déverrouillage | « Ce lien n'existe pas ou n'est plus disponible. » (message unique, spec §5.2). Visuel : la capsule déjà dissoute (grain immobile), lien « Envoyer quelque chose » vers `/` |
+| Lien incomplet | Pas de `#`, ou `parseLink` refuse localement (la requête `?…` est ignorée avant l'analyse : nos liens n'en portent jamais, les applications y ajoutent `?fbclid=…`) ; depuis le 7 novembre (ruling 2), aussi tout fragment de **20 à 44 caractères** de l'alphabet des clés qui n'est pas une clé valide (lien coupé), au lieu de l'accueil | « Ce lien est incomplet. Rouvrez-le depuis le message d'origine. » + « Il manque une partie du lien : il a peut-être été coupé lors d'un copier-coller, ou sa partie secrète a été retirée de la barre d'adresse après une première visite. Rien n'a été demandé au serveur. » |
+| Navigateur non pris en charge | Une capacité de §9 manque | « Ce navigateur ne permet pas de chiffrer en sécurité. Utilisez une version récente de Safari, Chrome, Firefox ou Edge. » Rien n'est envoyé (spec §10) |
+| 404 | Route inconnue | « Cette page n'existe pas. » + lien accueil |
+
+### 9.12 Pages « Comment ça marche / sécurité » et « Confidentialité » (Read)
+
+- `/securite` : le mécanisme en quatre paragraphes **en langage courant, sans nom d'algorithme** (§20.8), avec un lien vers la documentation technique publique du dépôt (`docs/securite-technique.md` sur GitHub) et vers « Vérifier cette version » (spec §28.4) (clé dans le `#`, mot de passe, chiffrement dans le navigateur, autodestruction), le modèle de menaces résumé (spec §2), **les limites assumées** (spec §18, intégralement, en langage simple), la phrase de §18.11. Jamais « 100 % sécurisé ».
+- `/confidentialite` : la liste exacte de ce qui est traité (spec §9) ; « Shhdrop ne dépose aucun cookie et ne mesure pas l'audience » ; l'adresse IP est vue sans être enregistrée (spec §18.3). Section `#verification` (**24 novembre**, repli Google retiré ; `routes/pages/content.ts`) : « Vérification anti-robot » — « Une petite preuve de calcul est faite par votre navigateur, sans service extérieur. »
+- Mesure 68 ch, `--fs-body` 1.0625rem, titres en `--fs-h2`.
+- `/verifier` (révision 4, spec §28.4) : version, commit, lien vers la Release GitHub et le mode d'emploi, et la phrase « Cette page ne peut pas prouver sa propre intégrité… ».
+
+### 9.14 Fonctions payantes : écrans (révision 7, spec §38.9 ; tâches P3, P4, P5, F0 à F11, toutes après la V1)
+
+Aucun de ces écrans n'existe pour un destinataire ni sans pass ; tous réutilisent les composants existants (`ShareCard`, `Segmented`, `InlineConfirm`, `DateTimeField` ajouté). Aucune statistique de destinataire : jamais de graphique, d'heure précise, de lieu, d'appareil ou de durée de lecture (spec §38.9.0).
+
+- **9.14.1 Liste de plusieurs centaines d'éléments (Pro)** — **abandonné (révision 8, spec D41-17 : 200 éléments pour toutes les formules)** : la liste et la galerie sont **virtualisées** (seules les lignes visibles sont dans le DOM, `aria-rowcount`, `aria-rowindex`, saut clavier par pages), recherche par nom locale ; texte « illimité (50 Go au total) » dans la jauge ; message à 50 000 éléments (« Au-delà de 50 000 éléments, créez une archive. »).
+- **9.14.2 Demander des fichiers** (spec §38.9.3) : bouton secondaire « Demander des fichiers » à l'accueil ; écran « Nouvelle demande » (libellé de 120 caractères, durée, nombre de dépôts, taille) → « Lien de la demande » (copier, partager, QR) et « Lien de gestion » (jamais montré sans avertissement : « Gardez-le : il ouvre les dépôts ») ; **boîte de dépôts** : liste « Dépôts reçus » (nombre, taille, état, pas de nom de déposant sauf celui qu'il a saisi), ouvrir, détruire, fermer la demande. Page du déposant `/d#…` : bandeau « Cette personne vous demande des fichiers. Shhdrop ne vérifie pas son identité. », libellé en texte brut, composeur sans choix de mot de passe, phrase « Seule la personne qui a demandé pourra ouvrir ce dépôt. Vous ne pourrez pas le rouvrir. »
+- **9.14.3 Plusieurs destinataires** (spec §38.9.7) : `ShareCard` avec sous-liste de liens (nom local, « ouvert 1 / 3 » ou « pas encore ouvert », « Révoqué ») ; « Révoquer ce lien » (`InlineConfirm` : « Ce lien ne fonctionnera plus. Ce que la personne a déjà téléchargé lui reste. ») ; « Ajouter un lien » (demande le lien et le mot de passe d'origine).
+- **9.14.4 Prolonger et ajouter** (spec §38.9.4, §38.9.5) : sur la carte et la vue de gestion, « Prolonger » (`Segmented` +1 h · +6 h · +12 h · +24 h · +2 j · +3 j · +7 j, grisé au-delà du plafond, « Au plus tard le {date} ») et « Ajouter des fichiers » (écran qui demande d'abord le lien et le mot de passe, puis le composeur ; texte « Les personnes qui ont le lien verront les nouveaux fichiers. Les ouvertures restantes ne changent pas. »). Boutons absents des partages gratuits.
+- **9.14.5 Filigrane** (spec §38.9.12) : motif de texte incliné, répété, opacité 14 %, dessiné dans le canvas des images et des pages PDF ; la mention « Voir seulement » reste (« Cela n'empêche pas une capture d'écran. ») ; couleurs en `forced-colors` : `CanvasText`.
+- **9.14.6 Notification** (spec §38.9.8) : demande de permission du navigateur déclenchée par un clic sur « Me prévenir à l'ouverture », jamais à l'ouverture de la page ; état « Notifications désactivées par le navigateur » avec ce qu'il faut faire.
+- **9.14.7 Marque** (spec §38.9.9) : écran « Ma page de réception » (envoi d'un logo, recadrage carré, aperçu avec bandeau fixe, deux couleurs avec contrôle de contraste en direct).
+- **9.14.8 Accessibilité** : ordre de tabulation, libellés de chaque option, annonces (`aria-live="polite"`) des changements d'état de la carte (révocation, prolongation), `axe` sans violation sur chaque écran.
+- **CLI / API** (spec §38.9.10) : pas d'écran ; une page de documentation `docs/api.md` et une page du site « Pour les développeurs » (Pro) renvoyant à la Release signée.
+
+---
+
+## 10. Textes (FR / EN)
+
+- Dictionnaires typés : `web/src/i18n/fr.ts` (référence, `as const`) et `en.ts` (`satisfies Record<keyof typeof fr, …>`). Paramètres nommés, pluriels par `Intl.PluralRules`, nombres et tailles par `Intl.NumberFormat`, durées par un formateur testé (FR « 4 h 15 », « 12 min », « 45 s », « moins d'une minute » ; EN « 4h 15m », « 12 min », « 45 s », « less than a minute »), vitesses (« 4,2 Mo/s » / « 4.2 MB/s »). Les formateurs produisent eux-mêmes des espaces insécables entre un nombre et son unité : U+202F en français, U+00A0 en anglais (les écrans n'ont pas besoin de CSS pour éviter la coupure).
+- Langue : `navigator.languages` (la première langue de la liste dont la langue primaire est `fr` ou `en` décide ; aucune des deux → français) ; **aucun choix manuel depuis le 12 novembre** (la bascule du pied de page est retirée, §24 ; avant : en-tête, puis Réglages, puis pied de page), sans mémorisation. Aucune route ni aucun paramètre (`?lang=`, `/en/…`) ne force la langue aujourd'hui. **Quatre langues prévues** (fr, en, es, pt, repli en anglais) : `docs/conception/specs/2026-11-11-langues-design.md`, validée le 11 novembre, **pas encore implémentée** (le site a encore fr et en, repli en français). `<html lang>` mis à jour. La bascule est désactivée pendant un envoi (elle ne change rien d'utile et ferait sauter les libellés).
+- Aucun texte venu du serveur n'est affiché.
+
+Clés principales (extrait normatif ; le plan fixe la liste complète) :
+
+| Clé | FR | EN |
+|---|---|---|
+| `hero.title` | Un lien, un mot de passe, puis plus rien. | One link, one password, then nothing. |
+| `hero.lede` | Texte, photos, vidéos, vocaux, documents. Chiffrés sur votre appareil avant l'envoi : le serveur ne reçoit que des données chiffrées, jamais la clé. | Text, photos, videos, voice notes, documents. Encrypted on your device before sending: the server only receives encrypted data, never the key. |
+| `compose.add.files` / `.photo` / `.voice` / `.text` / `.paste` | Fichiers / Photo / Vocal / Texte / Coller | Files / Photo / Voice / Text / Paste |
+| `compose.drop` | Déposez pour ajouter | Drop to add |
+| `compose.folder` | Les dossiers ne peuvent pas être ajoutés. Ajoutez les fichiers eux-mêmes, ou une archive .zip. | Folders can't be added. Add the files themselves, or a .zip archive. |
+| `compose.cat.*` | Texte / Photos / Vidéos / Audio et vocaux / Documents / Autres | Text / Photos / Videos / Audio and voice / Documents / Other |
+| `compose.moved` | {nom} : position {i} sur {n} dans {categorie}. | {name}: position {i} of {n} in {category}. |
+| `compose.removed` | {nom} retiré | {name} removed |
+| `compose.duplicate` | En double ? | Duplicate? |
+| `compose.gauge` | {taille} / 2 Go · {n} / 15 | {size} / 2 GB · {n} / 15 |
+| `compose.gauge.empty` | Rien à envoyer pour l'instant · 2 Go et 15 éléments au plus | Nothing to send yet · up to 2 GB and 15 items |
+| `compose.tooBig` | Trop gros : {taille} sur 2 Go. Retirez {exces}. | Too big: {size} of 2 GB. Remove {excess}. |
+| `compose.tooMany` | {n} éléments n'ont pas été ajoutés : 15 au plus. | {n} items were not added: 15 at most. |
+| `compose.cleaned` | Nettoyé · lieu, appareil et date de prise de vue retirés | Cleaned · location, device and capture date removed |
+| `options.ttl.hint` | Comptée à partir de la fin de l'envoi. | Counted from the end of the upload. |
+| `options.opens.hint` | Une ouverture = un déverrouillage réussi. | One open = one successful unlock. |
+| `options.submit` | Chiffrer et envoyer | Encrypt and send |
+| `seal.keys` | Préparation des clés | Preparing keys |
+| `seal.captcha` | Vérification anti-robot · calcul sur votre appareil | Bot check · computed on your device |
+| `seal.upload` | Chiffrement et envoi | Encrypting and sending |
+| `seal.padding` | La taille envoyée est arrondie au palier supérieur pour masquer la taille réelle. | The uploaded size is rounded up to hide the real size. |
+| `seal.offline` | Connexion perdue. Nouvel essai dans {duree}… | Connection lost. Retrying in {duration}… |
+| `seal.paused` | En pause · reprise automatique dans {duree} | Paused · resumes automatically in {duration} |
+| `seal.cancel.confirm` | Annuler l'envoi ? Ce qui a été envoyé sera effacé du serveur. | Cancel the upload? What was sent will be erased from the server. |
+| `verif.title` | Vérification supplémentaire | Extra check |
+| `verif.body` | (texte de §9.4.2) | (text of §9.4.2) |
+| `verif.continue` | Continuer avec Google | Continue with Google |
+| `ready.pw.reminder` | Envoyez-le par un autre moyen que le lien. Les deux dans la même messagerie, c'est comme ne pas en mettre. | Send it another way than the link. Both in the same chat is like having no password. |
+| `ready.delete.confirm` | Supprimer ce partage pour tout le monde ? Le lien ne mènera plus à rien. | Delete this share for everyone? The link will lead nowhere. |
+| `ready.never` | Ce lien et ce mot de passe ne seront plus jamais affichés. | This link and this password will never be shown again. |
+| `open.intro` | Quelqu'un vous a envoyé un partage chiffré. Shhdrop ne vérifie pas l'identité de l'expéditeur. | Someone sent you an encrypted share. Shhdrop does not verify who the sender is. |
+| `open.cost` | Ouvrir ce partage compte une ouverture. Recharger la page ou l'ouvrir dans un autre onglet de ce navigateur n'en compte pas d'autre pendant 30 minutes. | Opening this share uses one open. Reloading the page or opening it in another tab of this browser does not use another for 30 minutes. |
+| `open.badPw` | Mot de passe incorrect · {n} essai restant / {n} essais restants | Wrong password · {n} attempt left / {n} attempts left |
+| `open.lastTry` | Au prochain échec, le partage sera détruit. | One more failure and the share will be destroyed. |
+| `open.destroyedByPw` | Mot de passe incorrect. Le partage a été détruit. | Wrong password. The share has been destroyed. |
+| `content.banner` | Disponible encore {duree} · disparaît quand vous quittez la page · recharger ne compte pas une ouverture de plus pendant 30 min | Available for {duration} · disappears when you leave the page · reloading does not use another open for 30 min |
+| `content.finish` | Terminer et effacer | Finish and erase |
+| `content.undecodable` | Ce fichier ne peut pas être lu sur cet appareil. Enregistrez-le pour l'ouvrir avec une autre application. | This file can't be played on this device. Save it to open it with another app. |
+| `content.risky` | « {nom} » peut exécuter du code sur votre appareil. N'ouvrez ce fichier que si vous faites confiance à l'expéditeur. | “{name}” can run code on your device. Only open it if you trust the sender. |
+| `report.body` | (texte de §9.10) | (text of §9.10) |
+| `invalid` | Ce lien n'existe pas ou n'est plus disponible. | This link does not exist or is no longer available. |
+| `manage.status` | Ouvert {u} / {max} · Expire dans {duree} | Opened {u} / {max} · Expires in {duration} |
+| `manage.gone` | Supprimé | Deleted |
+| `err.limit` | Limite d'envois atteinte. Réessayez dans {duree}. | Upload limit reached. Try again in {duration}. |
+| `err.limit.day` | Limite du jour atteinte : {n} partages par jour depuis votre connexion. Réessayez dans {duration}. | Daily limit reached: {n} shares per day from your connection. Try again in {duration}. |
+| `err.limit.pending` | Un autre envoi est déjà en préparation depuis votre connexion, dans un autre onglet par exemple ({n} au plus à la fois). Terminez-le ou fermez-le, puis réessayez dans {duration}. | Another upload is already being prepared from your connection, in another tab for example ({n} at most at a time). Finish or close it, then try again in {duration}. |
+| `err.full` | Le service est plein pour le moment. Réessayez plus tard. | The service is full right now. Try again later. |
+| `rights.view` | Voir seulement | View only |
+| `rights.save` | Voir et enregistrer | View and save |
+| `rights.keep` | Autoriser le destinataire à garder une copie chiffrée sur son téléphone | Allow the recipient to keep an encrypted copy on their phone |
+| `rights.view.notice` | L'expéditeur a choisi « voir seulement ». Cela n'empêche pas une capture d'écran. | The sender chose “view only”. This does not prevent a screenshot. |
+| `rights.view.sender` | Ce n'est qu'une dissuasion : le destinataire peut toujours faire une capture ou filmer l'écran. | This only deters: the recipient can still take a screenshot or film the screen. |
+| `pw.generate` | Générer un autre | Generate another |
+| `pw.generated` | Mot de passe tiré au hasard sur cet appareil | Password picked at random on this device |
+| `vault.keep` | Garder dans le coffre | Keep in the vault |
+| `vault.status` | {n} partages gardés · le prochain s'efface dans {duree} | {n} shares kept · the next one is erased in {duration} |
+| `vault.openInApp` | Si vous avez l'app Shhdrop, ouvrez-y ce lien avant de déverrouiller : c'est là seulement qu'un partage peut être gardé, quand l'expéditeur l'a permis. | If you have the Shhdrop app, open this link there before unlocking: only there can a share be kept, when the sender allowed it. |
+| `preupload.note` | L'envoi chiffré commence en arrière-plan. Rien n'est partagé tant que vous n'appuyez pas sur Envoyer. | The encrypted upload starts in the background. Nothing is shared until you press Send. |
+| `destroyed.body` | Il a été effacé du serveur. Ce que vous avez déjà enregistré sur cet appareil n'est pas concerné. | It was erased from the server. Anything you already saved on this device is not affected. |
+| `history.title` | Vos envois | Your sends |
+| `err.interrupted` | Le transfert a été interrompu (le serveur a peut-être redémarré). Réessayez. | The transfer was interrupted (the server may have restarted). Try again. |
+
+### 10.1 Textes ajoutés ou changés (révision 6)
+
+| Clé | FR | EN |
+|---|---|---|
+| `compose.gauge` | {taille} / 2 Go · {n} / 15 | {size} / 2 GB · {n} / 15 |
+| `compose.gauge.empty` | Rien à envoyer pour l'instant · 2 Go et 15 éléments au plus | Nothing to send yet · up to 2 GB and 15 items |
+| `compose.tooBig` | Trop gros : {taille} sur 2 Go. Retirez {exces}. | Too big: {size} of 2 GB. Remove {excess}. |
+| `compose.tooMany` | {n} éléments n'ont pas été ajoutés : 15 au plus. | {n} items were not added: 15 at most. |
+| `home.proof` | 15 éléments · 2 Go · 24 h au plus · 5 essais, puis destruction | 15 items · 2 GB · 24 h at most · 5 tries, then destruction |
+| `content.banner` | Disponible encore {duree} · disparaît quand vous quittez la page · recharger ne compte pas une ouverture de plus pendant 30 min | Available for {duration} · disappears when you leave the page · reloading does not use another open for 30 min |
+| `open.cost` | Ouvrir ce partage compte une ouverture. Recharger la page ou l'ouvrir dans un autre onglet de ce navigateur n'en compte pas d'autre pendant 30 minutes. | Opening this share uses one open. Reloading the page or opening it in another tab of this browser does not use another for 30 minutes. |
+| `open.reopen.title` | Rouvrir ce partage | Reopen this share |
+| `open.reopen.body` | Vous avez déjà déverrouillé ce partage. Entrez le mot de passe pour le rouvrir : cela ne compte pas une ouverture de plus. | You already unlocked this share. Enter the password to reopen it: this does not use another open. |
+| `open.reopen.otherTab` | Ce partage est déjà ouvert dans un autre onglet : l'ouvrir ici ne compte pas une ouverture de plus. | This share is already open in another tab: opening it here does not use another open. |
+| `open.reopen.expired` | L'ouverture précédente a expiré. Déverrouiller en utilisera une nouvelle. | The previous open has expired. Unlocking will use a new one. |
+| `open.reopen.limit` | Trop de rechargements : une nouvelle ouverture sera comptée. | Too many reloads: a new open will be used. |
+| `mine.title` | Vos envois | Your sends |
+| `mine.active` | Vos partages actifs | Your active shares |
+| `mine.all` | Tout voir ({n}) | See all ({n}) |
+| `mine.empty` | Aucun envoi pour l'instant | Nothing sent yet |
+| `mine.empty.body` | Vos envois récents apparaissent ici, sur cet appareil seulement. Ils sont gardés chiffrés dans ce navigateur. | Your recent sends appear here, on this device only. They are kept encrypted in this browser. |
+| `mine.copyManage` | Copier le lien de gestion | Copy management link |
+| `mine.copyManage.note` | Gardez-le pour vous : il permet de suivre et de supprimer ce partage. | Keep it to yourself: it lets you follow and delete this share. |
+| `mine.noLink` | Le lien de partage n'est pas conservé : il n'a été montré qu'une fois. | The share link is not kept: it was only shown once. |
+| `mine.notHere` | Ce partage n'a pas été créé sur cet appareil. | This share was not created on this device. |
+| `mine.remove` | Retirer de la liste | Remove from list |
+| `mine.stale` | non mis à jour | not updated |
+| `gallery.downloadAll` | Tout télécharger | Download all |
+| `gallery.zip` | Télécharger en une archive (.zip) | Download as one archive (.zip) |
+| `gallery.zip.tooBig` | Cet appareil ne peut pas assembler une archive de cette taille. Utilisez « Tout télécharger ». | This device cannot build an archive this large. Use "Download all". |
+| `gallery.multi.blocked` | Autorisez les téléchargements multiples pour ce site, ou utilisez l'archive .zip. | Allow multiple downloads for this site, or use the .zip archive. |
+| `room.kick.confirm` | Exclure {nom} ? Elle ou il garde ce qui a déjà été vu et ne lira rien ensuite. L'invitation change : l'ancien lien et l'ancien mot de passe ne marchent plus. | Remove {name}? They keep what they already saw and will read nothing afterwards. The invitation changes: the old link and password stop working. |
+| `room.kicked` | {nom} a été exclu du salon | {name} was removed from the room |
+| `room.kicked.you` | Vous avez été exclu de ce salon. Ce que vous avez déjà vu reste sur votre écran. | You were removed from this room. What you already saw stays on your screen. |
+| `room.invite.new` | Nouvelle invitation : l'ancien lien et l'ancien mot de passe ne fonctionnent plus pour personne. Les personnes déjà dans le salon ne sont pas touchées. | New invitation: the old link and password no longer work for anyone. People already in the room are not affected. |
+| `compose.gauge.pro` | {n} éléments · illimité (50 Go au total) · {taille} / 50 Go | {n} items · unlimited (50 GB in total) · {size} / 50 GB |
+| `compose.items.limit.pro` | Au-delà de 50 000 éléments, créez une archive. | Beyond 50,000 items, create an archive. |
+| `opts.start.title` | Le compte à rebours démarre… | The countdown starts… |
+| `opts.start.create` | à la création | at creation |
+| `opts.start.open` | à la première ouverture | at first opening |
+| `opts.start.open.hint` | Le compte à rebours démarre quand quelqu'un déverrouille le lien. Si personne ne l'ouvre, il disparaît quand même au bout de 7 jours : le {date}. | The countdown starts when someone unlocks the link. If nobody opens it, it still disappears after 7 days: on {date}. |
+| `open.starts` | Ce lien disparaît {durée} après sa première ouverture, et au plus tard dans {plafond}. | This link disappears {duration} after it is first opened, and at the latest in {cap}. |
+| `open.scheduled` | Ce partage s'ouvrira le {date} (dans {durée}). | This share opens on {date} (in {duration}). |
+| `open.brand.band` | Page Shhdrop. Le logo est choisi par l'expéditeur ; Shhdrop ne vérifie pas son identité. | Shhdrop page. The logo is chosen by the sender; Shhdrop does not verify their identity. |
+| `gone.title` | Ce partage n'est plus disponible. | This share is no longer available. |
+| `gone.finishing` | Un téléchargement se termine en arrière-plan. Gardez cette page ouverte. | A download is finishing in the background. Keep this page open. |
+| `gone.interrupted` | Téléchargement interrompu. | Download interrupted. |
+| `watermark.honest` | Le filigrane dissuade et aide à retrouver l'origine d'une fuite. Il n'empêche ni la capture d'écran, ni la photo de l'écran. | The watermark deters and helps trace a leak. It does not prevent screenshots or photos of the screen. |
+| `file.limit.reached` | Ce fichier a atteint sa limite de téléchargements. | This file has reached its download limit. |
+| `link.revoke.confirm` | Ce lien ne fonctionnera plus. Ce que la personne a déjà téléchargé lui reste. | This link will stop working. What the person already downloaded stays with them. |
+| `request.banner` | Cette personne vous demande des fichiers. Shhdrop ne vérifie pas son identité. | This person is asking you for files. Shhdrop does not verify their identity. |
+| `notify.body` | Un de vos partages a été ouvert. | One of your shares was opened. |
+| `room.keys` | Votre salon change de clés de chiffrement toutes les 100 messages, toutes les heures et à chaque arrivée ou départ. C'est automatique et invisible : cela ne limite ni le nombre de messages, ni la durée de la conversation. | Your room changes encryption keys every 100 messages, every hour and whenever someone joins or leaves. It is automatic and invisible: it limits neither the number of messages nor how long the conversation lasts. |
+
+---
+
+## 11. Accessibilité (spec §19)
+
+- Contrastes : §3.2, recalculés par test ; `axe-core` sans violation (WCAG 2.1 A et AA) sur chaque écran et état, sur Chromium et WebKit. Contraste forcé : §3.3, vérifié par une capture Chromium en `forced-colors: active`.
+- Clavier : tout atteignable dans l'ordre visuel ; anneau 2 px `--accent` décalé de 2 px, `:focus-visible` seulement, jamais retiré. Au changement d'étape ou d'écran, le focus va au titre (`tabindex="-1"`) ; après une erreur, au message ; après un retrait, à la ligne voisine ; après un déplacement, il reste sur la ligne déplacée. Échap ferme les feuilles et la cible de dépôt. Lien d'évitement « Aller au contenu ». Pendant l'envoi, le composeur masqué est `inert`.
+- Lecteurs d'écran : un seul `LiveRegion` poli. Envoi annoncé tous les 10 % (« 40 %, environ 2 min restantes »), plus « En pause », « Connexion perdue », « Connexion rétablie », « Partage créé » ; preuve de travail : « Vérification anti-robot en cours » une fois ; compte à rebours annoncé aux seuils 1 h, 15 min, 5 min, 1 min et à l'expiration ; affichage visuel à la minute au-delà d'une heure, à la seconde sous 5 min. Erreurs en `role="alert"`. Capsule : `role="progressbar"`, `aria-valuenow`, `aria-valuetext` (« 42 %, 214 Mo sur 400 Mo »). Jauge : deux `role="meter"` (taille, nombre) avec `aria-valuetext`. Icônes décoratives `aria-hidden`.
+- Glisser-déposer, réordonnancement à la souris, collage : chacun a son équivalent au clavier ou par bouton (Fichiers, Alt + flèches et mode déplacement, Coller).
+- Cibles tactiles ≥ 44 × 44 px (poignée de déplacement comprise) ; ≥ 8 px entre cibles.
+- Agrandissement : mise en page en `rem`, aucun texte coupé à 200 % ni avec une police système de 24 px ; testé à 320 px de large et en paysage 844 × 390.
+- Mouvement : §7.5. Transparence : §5.4. `prefers-contrast: more` : filets en `--line-strong`, lumière d'ambiance retirée, verre remplacé par du plein.
+- Langue : `lang` sur `<html>` ; noms de fichiers dans `<bdi>`.
+- Vérification manuelle (spec §14) : VoiceOver (iPhone, y compris le mode déplacement), TalkBack (Android).
+
+---
+
+## 12. Règles de sécurité de l'interface
+
+### 12.1 Lien et historique
+
+- `parseLink(location.href)` (requête ignorée) dès le démarrage de la route, puis `history.replaceState(null, "", location.pathname)` (spec §5.3) : le `#` **et la requête** (paramètres de suivi) quittent la barre et l'historique. Sur **toute autre route** (404 comprise : lien abîmé `/s/{id}/#…`, `/S/…`, hors base de démo), un `#` non vide est retiré de la même façon, y compris quand il est collé dans la barre sur la même page (`hashchange`). Exceptions : navigateur intégré (S4) et navigateur non pris en charge (§9.11). Un dernier segment avec un point (`/s/{id}.`) est servi par l'application comme les autres (spec §10, « Fichiers du site »).
+- L'expéditeur ne voit jamais son lien dans la barre d'adresse : les liens sont affichés, pas navigués.
+- Exceptions écrites (révision 4) : coffre chiffré dans `web/src/vault/` (spec §27 ; module supprimé le 24 novembre, coffre non construit) et `S_gestion` chiffré dans `web/src/history/` (spec §33) ; jamais `K_lien`, mot de passe, `R` ni clair.
+- Aucun lien, clé ni mot de passe dans `localStorage`, `sessionStorage`, IndexedDB, cookies, titre de page, `console`, ni dans un message `postMessage` (cadre PDF, cadre de vérification), **sauf l'exception écrite de la révision 6** : `web/src/session/open-grant.ts` garde dans le `sessionStorage` de l'onglet `K_lien` et l'octroi d'ouverture (jamais le mot de passe, `R` ni le clair), effacés à « Terminer », à la destruction, à l'échéance, après 30 min d'inactivité et à la fermeture de l'onglet (spec §41.4) ; le salon y garde le jeton de membre et la clé courante (spec §39.13.3). Risque dit honnêtement : lisible par qui a accès à l'appareil déverrouillé et à l'onglet, ou par un script injecté ; la CSP stricte le limite, Trusted Types exigés en production et dans la démo (audit web D6 du 13 novembre ; l'ancienne mention « non invoqués (S8) » était fausse).
+
+### 12.2 Cache « page précédente » (spec §21)
+
+- `pagehide` : arrêt de l'envoi en cours (§9.4.6), `opened.wipe()`, révocation de toutes les URL blob, remise à zéro de l'état en mémoire (lien, mot de passe, manifeste, composeur oubliés), arrêt du micro. **`done()` n'est plus envoyé à `pagehide` (v2.9, spec §41.4)** : recharger terminerait l'ouverture, qui, pour un partage à une ouverture, effacerait le partage avant la saisie du mot de passe ; `done()` part à « Terminer et effacer », à la destruction et au signalement, et l'ouverture se termine sinon à l'expiration de l'octroi (30 min). `sessionStorage` n'est pas effacé par `pagehide`.
+- `pageshow` avec `event.persisted` : `location.reload()`.
+- Test e2e : contenu ouvert → navigation → Retour → la page recharge et le contenu n'est plus là.
+
+### 12.3 Saisie
+
+| Champ | Attributs |
+|---|---|
+| Mot de passe du destinataire | `type="password"`, `autocomplete="one-time-code"`, `autocapitalize="off"`, `autocorrect="off"`, `spellcheck="false"`, `name`/`id` neutres (`shh-unlock`), hors de tout `<form>`, `enterkeyhint="go"` |
+| Mot de passe personnel de l'expéditeur | `type="text"` (masquable), mêmes attributs, `autocomplete="off"` |
+| Texte du composeur, renommage | `autocomplete="off"`, `autocorrect="off"`, `spellcheck="false"`, `autocapitalize="off"` (spec §21 ; limite : le clavier peut tout de même apprendre) |
+
+- Aucune balise `<form>` sur les écrans d'envoi et d'ouverture ; Entrée gérée par `keydown`.
+- Vérification manuelle : aucun gestionnaire de mots de passe ne propose d'enregistrer.
+
+### 12.4 Affichage du contenu reçu
+
+- Visionneuse : `previewKind(i)` seulement ; nom : `safeName(i)` seulement.
+- Texte : interpolation Svelte, jamais `{@html}`, jamais de liens rendus cliquables.
+- **`{@html}` interdit dans tout le code** (règle de lint et test de recherche).
+- SVG : **jamais affiché** (`previewKind` rend `none`), même dans `<img>` : enregistrement seul, marqué « à risque » (`isRiskyName`) ; aligné sur spec §12 le 7 novembre.
+- Images : URL révoquée au `load`.
+- Téléchargement : Blob `application/octet-stream`, nom `safeName(i)`.
+- Aucun `URL.createObjectURL` sur un type hors de `TYPE_SUR` (§9.8) côté destinataire ; côté expéditeur, seulement pour les vignettes d'images nettoyées (sa propre donnée).
+
+### 12.5 CSP (spec §10) et code
+
+- Aucun script ni style en ligne, aucun `eval`, aucun `new Function`, aucun attribut `style` statique (S9), aucune URL `data:`.
+- (Repli retiré le 24 novembre : aucun ajout à la CSP.) `connect-src`, `script-src`, `img-src` restent inchangés : Google n'est jamais joignable depuis la page qui détient les clés.
+- Test e2e commun : toute violation CSP ou message « Refused to » fait échouer le test.
+- Test e2e « aucune ressource tierce » : toute requête **du cadre principal** vers une autre origine que le serveur échoue le test. Aucune exception (repli et `VerifFrame` retirés le 24 novembre).
+- `translate="no"` sur `<html>` et `<meta name="google" content="notranslate">`.
+- Le serveur ajoute `X-Robots-Tag: noindex` sur `/s/*` et `/m/*`, `robots.txt` les interdit. `index.html` ne contient aucune balise `og:*`.
+
+### 12.6 Presse-papier
+
+- Écriture seulement sur geste explicite ; repli : sélection du texte et « Copiez-le manuellement ».
+- Lecture seulement sur geste explicite (Ctrl/Cmd + V, bouton Coller), seulement sur l'accueil (§9.2.3).
+- Pas de « Vider le presse-papier » (retiré, §9.5) : `clipboard-read=()` empêche toute vérification.
+
+---
+
+## 13. PDF isolé (spec §12)
+
+- `<iframe src="/pdf-frame.html" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Document PDF">` ; jamais `allow-same-origin`, `allow-popups`, `allow-top-navigation`, `allow-forms`, `allow-downloads`.
+- la CSP de `/pdf-frame.html` porte aussi `sandbox allow-scripts` (`pdfFrameCSP`, spec D42-5). Les mêmes droits sont posés par le serveur, donc valables même si la page est ouverte hors du cadre. Rien ne change pour le cadre de l'application : les deux listes sont identiques.
+- `pdf-frame.html` charge un **script classique** `pdf-frame.js` (build Vite séparé, IIFE) contenant pdf.js (`pdfjs-dist@6.5.438`) et son worker sur le fil principal (`globalThis.pdfjsWorker`), plus `pdf-frame.css`. Le serveur sert ces trois fichiers (noms sans empreinte, produits par `vite.pdf-frame.config.ts`) avec `Cross-Origin-Resource-Policy: cross-origin` (S10) ; ils ne contiennent aucun secret. `/pdf-frame.html` porte en plus `frame-ancestors 'self'` à la place du `frame-ancestors 'none'` des autres réponses (liste fermée, test Go) : sans cela l'application ne pourrait pas l'afficher dans son propre `iframe` en production, alors que la démo, dont la CSP est une meta qui ignore `frame-ancestors`, passerait.
+- Options : `isEvalSupported: false` (sans lui pdf.js compile les polices par `new Function`, ce que la CSP interdit), `disableWorkerRendering: true`, `enableXfa: false`, `useWasm: false`, `isOffscreenCanvasSupported: false`, pas de calque d'annotations ni de texte, rendu en `<canvas>` page par page, à la demande.
+- Données : le parent envoie `{ type: "pdf", bytes }` (ArrayBuffer **transféré**) après `{ type: "ready" }` venu de `event.source === iframe.contentWindow`. Le cadre n'accepte que les messages de `window.parent`, renvoie `{ type: "rendered", pages }` ou `{ type: "error" }`. Cible `"*"` imposée par l'origine opaque ; la vérification porte sur `event.source`.
+- Commandes : page précédente/suivante, zoom −/+, ajustement à la largeur ; libellés passés par le parent.
+- Échec (erreur, 20 s, PDF chiffré) : « Ce PDF ne peut pas être affiché ici. » + Enregistrer.
+- **Vérifié le 10 novembre (retours CLEAN5)** dans `pdfjs-dist@6.5.438` : `isEvalSupported` et `disableWorkerRendering` **n'existent plus** (pdf.js 6 ne compile plus rien par `new Function`) ; options retenues : `useWasm: false`, `enableXfa: false`, `isOffscreenCanvasSupported: false`, `stopAtErrors: false`, rendu `annotationMode: 0`. Ni polices standard ni cartes CMap chargées (aucune requête depuis le cadre) : polices du système en repli. Le bundle du cadre garde trois `import()` de pdf.js sur des chemins inutilisés (WebAssembly, worker séparé) : `check-dist.mjs` exempte `pdf-frame.js` seul.
+- Le prototype de la tâche PDF décide : il tourne contre le **serveur Go** (en-têtes réels), sur Chromium **et** WebKit ; échec sur l'un des deux → visionneuse retirée, `pdf` en « Enregistrer seulement ». La démo n'est qu'un contrôle de plus (ni CORP ni `frame-ancestors` sur Pages).
+
+---
+
+## 14. PWA et serveur statique
+
+### 14.1 Manifeste et icônes (sans service worker, spec §10)
+
+> Révision 4 : un service worker minimal d'épinglage est proposé avec le coffre (spec §28.6, question Q-C1) ; tant qu'il n'est pas accepté, la règle ci-dessous tient.
+
+- `web/public/manifest.webmanifest` : `name` et `short_name` « Shhdrop », `lang` « fr », `start_url` et `scope` « ./ » (relatifs au manifeste : racine en production, `/Shhdrop/` dans la démo ; même valeur dans les deux builds), `display` « standalone », `background_color` et `theme_color` `#0B0D12`, `description` = `hero.lede`, icônes `icon.svg` (`any`), `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (zone sûre 80 %).
+- `apple-touch-icon.png` 180 × 180 ; **une seule** `<meta name="theme-color" content="#0B0D12">` (P1) ; `<meta name="color-scheme" content="dark">`.
+- PNG produits par `web/scripts/gen-icons.mjs` (`rsvg-convert` ou `ffmpeg`, outil local) et commités.
+- Installation vérifiée à la main (iPhone, Android, Chrome ordinateur).
+
+### 14.2 Serveur statique Go
+
+- **Déjà livré** sur `main` par le durcissement (`server/cmd/shhdrop/static.go`) : `SHH_STATIC_DIR`, `os.Root`, fichiers cachés refusés, aucune liste de dossier, repli monopage (chemin sans extension → `index.html`, 200), `GET`/`HEAD` seulement.
+- Ce plan ajoute seulement : `X-Robots-Tag: noindex` sur `/s/*` et `/m/*` ; `robots.txt` (`Disallow: /s/`, `Disallow: /m/`) ; `Cross-Origin-Resource-Policy: cross-origin` sur `/pdf-frame.js`, `/pdf-frame.css`, `/pdf-frame.html` seulement, et `frame-ancestors 'self'` (au lieu de `'none'`) sur `/pdf-frame.html` seulement (§13) ; (repli retiré le 24 novembre). Les en-têtes existants (dont `Cache-Control: no-store`) restent sur toutes les réponses.
+
+---
+
+### 14.3 Démo sur GitHub Pages (P8)
+
+But : essayer toute l'interface à l'adresse `https://skoow.github.io/Shhdrop/` sans serveur. **Le vrai client tourne** (Argon2id, AES-GCM, paquet chiffré, segments) ; seul le réseau est remplacé par un faux serveur en mémoire dans la page.
+
+**Construction séparée, absente de la production.**
+- `npm run build:demo` = `vite build --mode demo` : `base: "/Shhdrop/"`, sortie `web/dist-demo/` (jamais `web/dist/`).
+- Tout le code de démo vit dans `web/src/demo/` et n'est atteint que par `if (import.meta.env.MODE === "demo") await import("./demo/install")` dans `main.ts` : en production, la condition vaut `false` à la compilation et le module disparaît. Deux gardes : un greffon Vite (`demoGuard`) qui **fait échouer** le build de production si un module de `src/demo/` y entre, et un script `web/scripts/check-dist.mjs` (lancé par `make test-web` et la CI après `npm run build`) qui échoue si `dist/` contient la marque `__SHH_DEMO__` (chaîne présente dans chaque module de démo), `fake-server`, la balise meta CSP de démo ou le bandeau, et qui vérifie l'inverse sur `dist-demo/`.
+
+**Faux serveur** (`web/src/demo/fake-server.ts`) :
+- Installé avant le démarrage de l'application : remplace `globalThis.fetch` et `XMLHttpRequest` (les envois de segments passent par XHR, §0.1) pour les seules URL `/api/*` de l'origine ; toute autre requête part normalement (fichiers du site).
+- Répond aux **mêmes routes**, mêmes corps JSON, mêmes codes (`/api/captcha`, création, segments, `finalize`, `meta`, `unlock`, lecture de segments, `done`, `destroy`, `status`) et applique les mêmes règles visibles : palier et taille exacte des segments, `K_accès` / `K_preuve` / `S_gestion` comparés par empreinte SHA-256, ouvertures, 5 essais puis destruction, `draining`, expiration (horloge réelle), 404 uniformes. Il ne stocke que du chiffré, dans une `Map` de la page. Les limites par connexion et les quotas ne sont pas simulés.
+- Débit simulé : 20 Mo/s pour les segments (pour que l'écran d'envoi se voie) ; `?lent` le ramène à 1 Mo/s et `?coupure` coupe le réseau 20 s au milieu de l'envoi (pour essayer la reprise). `?plafond` simule la limite de téléchargement du partage (plafond de sortie à 0 octet, option `egressLimitBytes` du faux serveur) : le déverrouillage rend 403 `egress_limit`, sans consommer d'ouverture, et l'écran affiche « Ce partage a atteint sa limite de téléchargement. » (spec §38.6).
+- Fidélité prouvée : les tests du faux serveur font tourner le **vrai** client (`createShare`, `openShare`, `destroyShare`, `shareStatus`) contre lui, et rejouent les cas d'erreur de la spec §13.
+
+**Anti-robot désactivé** : en démo, `solveCaptcha` rend aussitôt une preuve factice que seul le faux serveur accepte ; le libellé de phase devient « Vérification anti-robot désactivée (démo) ». Aucun repli reCAPTCHA (retiré partout le 24 novembre). L'attente de 3,1 s de `createShare` reste (c'est le vrai client).
+
+**Hébergeur visible** : le pied de page de l'application (`AppShell`) affiche en démo la phrase « Démo hébergée par GitHub, qui voit votre adresse IP. » (EN : « Demo hosted by GitHub, which sees your IP address. »), lue par le crochet `hostNote` de `app/demo-hooks.ts` (fourni par `demo/install.ts`). `check-dist.mjs` l'**exige** dans les scripts de la démo et l'**interdit** en production.
+
+**« Le lien ne marche que dans cet onglet »** : tout est en mémoire ; recharger, ouvrir un nouvel onglet ou un autre appareil fait tout perdre.
+- Bandeau `warn` collé tout en haut, **sur toutes les pages, non fermable** : « Démo : rien n'est envoyé, le lien ne marche que dans cet onglet. » (EN : « Demo: nothing is sent, the link only works in this tab. ») ; le titre des onglets est celui du site (« Démo · » retiré le 22 novembre : le bandeau suffit).
+- Sur « Lien prêt », un bouton en plus : **Ouvrir comme destinataire (démo)**, qui navigue dans l'application (`pushState`, sans rechargement) vers le lien, et un retour « Revenir à la gestion (démo) » sur l'écran de contenu. Coller le lien dans la barre d'adresse recharge la page : le lien est alors invalide, et l'écran « Lien invalide » ajoute en démo « (normal en démo : le partage n'existait que dans l'onglet d'origine) ».
+- Les liens affichés en démo incluent la base (`https://skoow.github.io/Shhdrop/s/{id}#…`) ; `link.ts` retire `import.meta.env.BASE_URL` du chemin avant `parseLink`, et le routeur en fait autant.
+- GitHub Pages n'a pas de repli monopage : le build copie `index.html` en `404.html` (une adresse profonde est servie avec le code 404, l'application s'affiche quand même).
+
+**CSP par balise meta** (Pages n'envoie pas nos en-têtes). Injectée par le greffon Vite en mode démo seulement, en premier élément de `<head>` :
+`<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">`, plus `<meta name="referrer" content="no-referrer">` et `<meta name="robots" content="noindex">`.
+
+Ce qui manque par rapport à la production (écrit aussi sur la page Sécurité de la démo) :
+
+| Protection de production | En démo |
+|---|---|
+| `frame-ancestors 'none'` | **Absent** : ignoré dans une balise meta ; la démo peut être affichée dans le cadre d'un autre site (clickjacking possible, sans enjeu : aucun secret réel) |
+| `report-uri`, `sandbox` de CSP | Absents (non pris en charge en meta) |
+| `Strict-Transport-Security` | Le nôtre est absent ; `github.io` est dans la liste HSTS préchargée des navigateurs et Pages force HTTPS |
+| `Permissions-Policy: microphone=(self), camera=(), geolocation=()` | **Absent** (aucun équivalent meta) : le micro reste demandé par le navigateur, mais la politique n'est pas restreinte |
+| `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` | Absents |
+| `X-Content-Type-Options: nosniff` | Dépend de Pages (non garanti par nous) |
+| `Cache-Control: no-store` | Absent : Pages met en cache ; le bfcache est neutralisé par `pagehide`/`pageshow` comme en production |
+| `X-Robots-Tag: noindex` | Remplacé par la meta `robots` |
+| Origine propre | **Partagée** : `skoow.github.io` est commune à tous les dépôts Pages du propriétaire ; sans enjeu en démo (rien de réel), à ne jamais réutiliser pour la production |
+| `Trusted Types` | Exigés dans les deux (`require-trusted-types-for 'script'` ; audit web D6 du 13 novembre, remplace « absent dans les deux (S8) ») |
+
+Les tests e2e de la démo exigent zéro violation de la CSP meta et zéro requête hors de l'origine.
+
+**Publication** : `.github/workflows/pages.yml` (déjà présent sur `main` avec une page d'attente) se déclenche sur un push vers `main` ; il installe Node, lance `npm ci`, `npm run build:demo`, `node scripts/check-dist.mjs --demo`, puis `actions/upload-pages-artifact` sur `web/dist-demo` et `actions/deploy-pages` (actions épinglées par empreinte). La démo est mise à jour à chaque tâche du plan qui change un écran.
+
+---
+
+## 15. Repli anti-robot reCAPTCHA (P3) : architecture
+
+> **Retiré le 24 novembre 2026** : le repli Google reCAPTCHA n'a jamais été codé côté serveur et ne le sera pas ; la preuve de travail ALTCHA hébergée chez nous est le seul moyen anti-robot ; aucune ressource tierce sur le site, **sans exception**. Cette section est gardée pour l'historique ; rien n'en est à coder.
+
+### 15.1 Choix : reCAPTCHA v2 « case à cocher »
+
+v2 case à cocher plutôt que v3 invisible :
+- **Consentement lisible** : la personne a cliqué « Continuer avec Google », puis coche une case ; v3 tourne en silence, ce qui contredit l'esprit du produit et la mention de la page Confidentialité.
+- **Décision franche** : v2 rend « réussi / échoué » ; v3 rend une note de 0 à 1 qu'il faudrait seuiller, et qui pénalise justement les visiteurs prudents (VPN, Tor, navigateurs anti-pistage), sans recours pour eux. v2 leur propose une grille d'images.
+- **Isolement** : v3 obtient de meilleures notes en tournant sur toutes les pages du site, ce que l'isolement interdit ; v2 n'a besoin que de sa page.
+
+### 15.2 Origine séparée
+
+- Une page statique du dépôt, `web/verif/index.html` + `verif.js` + `verif.css` (build séparé, aucun code partagé avec l'application), servie sur une **origine distincte** fournie par la configuration `SHH_VERIF_ORIGIN`. Le déploiement la déploie (Caddy).
+- **Recommandé : un site distinct**, soit un domaine enregistrable acheté (par exemple `shhverif.net`), soit, sans achat, un sous-domaine d'un suffixe public comme une page GitHub d'une organisation dédiée (`<nom>.github.io`, `github.io` est dans la liste Public Suffix, donc un site à part : même isolement qu'un domaine acheté). Le serveur refuse au démarrage une origine du même site que l'application (spec §26 ; `SHH_ORIGIN` donne l'origine du site, `sameSite()` utilise une liste minimale embarquée des suffixes publics `github.io` et `pages.dev`, sinon les deux derniers labels : `a.github.io` et `b.github.io` sont deux sites, `verif.shhdrop.app` et `shhdrop.app` un seul ; limite : un suffixe à plusieurs labels absent de la liste, comme `co.uk`, est refusé par prudence), pas un sous-domaine de `shhdrop.app` : l'isolement des sites des navigateurs (processus séparés) se fait **par site** (domaine enregistrable), pas par origine ; un sous-domaine partagerait aussi les cookies posés sur `shhdrop.app`. Si le propriétaire garde `verif.shhdrop.app` : `Origin-Agent-Cluster: ?1` sur les deux origines, aucun cookie posé sur le domaine parent, et le risque résiduel est écrit dans la spec (§18, A2, question Q1). **Q1 reste ouverte** (§19) : le code est générique sur `SHH_VERIF_ORIGIN` ; la proposition à étudier est une **organisation GitHub gratuite** dédiée (`<nom>.github.io`, suffixe public, donc un site distinct sans achat de domaine).
+- En-têtes de la page de vérification : `Content-Security-Policy: default-src 'none'; script-src 'self' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; frame-src https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; style-src 'self' 'unsafe-inline'; img-src https://www.gstatic.com/recaptcha/; connect-src https://www.google.com/recaptcha/; frame-ancestors {origine de l'application}; base-uri 'none'; form-action 'none'` (à ajuster sur la documentation CSP de reCAPTCHA pendant le prototype ; `'unsafe-inline'` en style y est acceptable : la page ne détient aucun secret), `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy: same-origin`, `Cache-Control: no-store`. La clé de site (publique) est écrite dans `verif/config.js` au déploiement.
+
+### 15.3 Cadre et messages
+
+- Dans la page de l'application : `<iframe src="{SHH_VERIF_ORIGIN}/?lang=fr" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" allow="" title="Vérification Google reCAPTCHA">`. `allow-same-origin` concerne **l'origine de vérification**, distincte : il ne donne aucun accès à la page de l'application. `allow-popups` laisse s'ouvrir les liens « Confidentialité / Conditions » de Google (la page de l'application a `Cross-Origin-Opener-Policy: same-origin` : aucune fenêtre ouverte ne garde de lien vers elle). Jamais `allow-top-navigation`, `allow-forms`, `allow-modals`.
+- Protocole (`v: 1`) : cadre → parent `{ v: 1, type: "ready" }`, `{ v: 1, type: "token", token }`, `{ v: 1, type: "expired" }`, `{ v: 1, type: "error" }` avec `targetOrigin` = origine de l'application (configurée dans `verif/config.js`) ; parent → cadre : rien (la langue passe par l'URL). Le parent n'accepte un message que si `event.origin === fallbackOrigin` **et** `event.source === iframe.contentWindow` ; le jeton doit être une chaîne de 20 à 4 096 caractères `[A-Za-z0-9_-]`. Tout autre message est ignoré.
+- Le cadre est créé au clic « Continuer avec Google » (la dépendance `consent` du solveur résout `true` ; `askFallback` n'est pas appelé avant, et `false` annule l'envoi), retiré dès le jeton reçu, l'annulation ou la fermeture de la feuille.
+
+### 15.4 Serveur
+
+- Configuration : `SHH_RECAPTCHA_SECRET` (repli désactivé si vide), `SHH_VERIF_ORIGIN` (origine `https://` exacte, obligatoire si le secret est donné, d'un **autre site** que `SHH_ORIGIN`), `SHH_ORIGIN` (origine publique du site, obligatoire si le secret est donné ; sert au contrôle « site différent »), `SHH_RECAPTCHA_VERIFY_URL` (tests seulement ; `https://` sauf boucle locale ; défaut `https://www.google.com/recaptcha/api/siteverify`). Erreur de configuration : arrêt du démarrage.
+- `GET /api/captcha` ajoute `"fallback": "{SHH_VERIF_ORIGIN}"` quand le repli est activé, sinon `"fallback": null`.
+- `POST /api/shares` accepte **soit** `altcha` (inchangé), **soit** `recaptcha` (jeton, ≤ 4 096 caractères) + `captcha_salt` (le sel du défi émis ; la clé `salt` du corps est le sel KDF et ne change pas) ; les deux ou aucun → 400. Contrôles pour `recaptcha` : `shown_at` valide et lié à ce sel, sel au format strict, non expiré, lié à la connexion, **non déjà consommé** (marqué consommé comme un défi résolu), délai de 3 s respecté ; puis appel `siteverify` (`secret`, `response` ; **jamais `remoteip`**), délai 5 s, **hors du verrou** du module anti-robot (le sel est consommé définitivement sous verrou, le verrou est relâché, puis Google est appelé : un `siteverify` lent ne bloque ni les défis ni les autres vérifications ; une panne de Google fait perdre le sel, la personne recommence) ; exige `success: true` et `hostname` = hôte de `SHH_VERIF_ORIGIN`, `challenge_ts` de moins de 2 min. Empreinte SHA-256 du jeton gardée en mémoire 2 min (usage unique, même si Google le revalidait). Échec ou indisponibilité de Google → même réponse que pour une preuve invalide (400 `bad_request`).
+- Une création par repli compte dans la même fenêtre d'une heure que les preuves de travail (la difficulté continue de doubler) et dans toutes les limites de la spec §4.
+- Le jeton n'est jamais journalisé ni stocké.
+
+---
+
+## 16. Dépendances ajoutées (versions exactes)
+
+| Paquet | Version | Licence | Rôle | Pourquoi |
+|---|---|---|---|---|
+| `svelte` | 5.57.3 | MIT | Écrans | Choisi par la spec (§6) |
+| `@sveltejs/vite-plugin-svelte` | 7.3.1 (dev) | MIT | Build | Compatible Vite 8 |
+| `pdfjs-dist` | 6.5.438 | Apache-2.0 | PDF isolé | Spec §6 |
+| `uqr` (recopié) | 0.1.3 | MIT | Matrice du QR code | recopié dans `web/src/qr/vendor/` sans modification, empreintes vérifiées par test ; importé statiquement (spec §28.3) ; rendu SVG par notre code |
+| `@fontsource-variable/mona-sans`, `@fontsource-variable/jetbrains-mono` | 5.3.0 (dev) | OFL-1.1 | Source des polices copiées | §4.1 |
+| `@playwright/test` | 1.64.1 (dev) | Apache-2.0 | Parcours e2e | Spec §14 |
+| `@axe-core/playwright` | 4.14.0 (dev) | MPL-2.0 | Accessibilité | §11 |
+| `typescript` (outil `svelte-check`) | 6.0.3 (dev, paquet séparé) | Apache-2.0 | Vérification des `.svelte` | S5 |
+| `svelte-check` | 4.7.8 (dev, paquet séparé) | MIT | Idem | S5 |
+
+Retiré : `altcha` (P3, solveur maison). reCAPTCHA n'est **pas** une dépendance : son script n'est chargé que par la page de vérification, depuis Google, après consentement. Toutes épinglées sans plage, `package-lock.json` commité, `npm audit`, licences dans `THIRD_PARTY_LICENSES.md`.
+
+---
+
+## 17. Hors du périmètre de l'interface
+
+- Mentions légales, CGU, Contact (S16) → déploiement, avant l'ouverture au public.
+- Compteur de signalements, alertes → déploiement.
+- Déploiement de l'origine de vérification (Caddy, DNS, clé de site) → déploiement.
+- Démo : simulation des limites par connexion et des quotas, persistance entre onglets : non (§14.3).
+- Mise en cache longue des fichiers à empreinte : non (`no-store` partout).
+- Partage depuis la galerie, lecture vidéo pendant le téléchargement : non prévus (spec §3). Aplatir un dossier déposé : refusé (§9.2.2).
+
+---
+
+## 18. Analyse critique et corrections
+
+Méthode : revue de conception sur la spécification (pas encore de rendu) selon les heuristiques de la compétence *impeccable* (Nielsen, charge cognitive, parcours émotionnel, personas, *craft floor*), plus une confrontation ligne à ligne avec la spec v2.4, l'API du durcissement (sur `main`), le code serveur existant et les règles du projet. Le détecteur automatique (`impeccable detect`) ne s'applique qu'à du balisage : il sera lancé  du plan sur le code réel. Toutes les corrections ci-dessous sont **déjà intégrées** aux sections citées et au plan.
+
+### 18.1 Santé de la conception (Nielsen, avant → après corrections)
+
+| # | Heuristique | Avant | Après | Point clé |
+|---|---|---|---|---|
+| 1 | Visibilité de l'état | 2 | 4 | Progression en octets, vitesse, temps restant, phases, coupure avec compte à rebours (A3, A4) |
+| 2 | Correspondance avec le monde réel | 3 | 3 | Taille envoyée ≠ taille du contenu : expliquée, pas cachée (A18) |
+| 3 | Contrôle et liberté | 1 | 4 | Pause, Annuler, Supprimer ce partage, Annuler un retrait, renommer (A5, A7, A10) |
+| 4 | Cohérence et standards | 3 | 4 | « Détruire » (destinataire) / « Supprimer » (expéditeur) fixés ; un seul bouton principal par écran |
+| 5 | Prévention des erreurs | 2 | 4 | Dépôt hors cible neutralisé, double envoi, sortie du « Lien prêt », jauge avant envoi (A11, A12, A21) |
+| 6 | Reconnaître plutôt que se souvenir | 3 | 4 | Catégories, vignettes, ordre identique chez le destinataire |
+| 7 | Souplesse et efficacité | 2 | 4 | Glisser-déposer, coller, Alt + flèches, envoi direct sur ordinateur |
+| 8 | Esthétique et minimalisme | 3 | 3 | L'écran d'envoi reste dense ; hiérarchie imposée (A28) |
+| 9 | Récupération des erreurs | 2 | 4 | Chaque erreur nomme le problème et la suite ; dernier essai de mot de passe explicite (A23) |
+| 10 | Aide et documentation | 3 | 3 | Indications en place ; pages Sécurité et Confidentialité |
+| | **Total** | **24/40 (Acceptable)** | **37/40 (Excellent, sur le papier)** | À confirmer sur le rendu |
+
+Charge cognitive (après) : 1 point faible sur 8 (« choix minimaux » : l'écran d'envoi porte jusqu'à 3 actions et 3 lignes de mesures ; accepté pour un public expert, avec une hiérarchie stricte). Parcours émotionnel : le pic (fermeture du sceau) n'arrive qu'après `finalize` ; la vallée (coupure réseau) est rassurée par un compte à rebours et un délai de conservation lisibles ; la fin (« Lien prêt ») protège contre la perte par fermeture.
+
+### 18.2 Constats
+
+Gravité : **Critique** (bloque les tâches concernées), **Important** (à corriger avant mise en ligne), **Moyen**, **Mineur**. Entre parenthèses, l'équivalent P0–P3.
+
+| # | Gravité | Endroit | Problème | Correction (intégrée) |
+|---|---|---|---|---|
+| A1 | **Critique** (P0) | Règles du projet : « Aucune ressource tierce sur le site » ; spec §22 D4 et §24 (« exclus : reCAPTCHA ») | La décision P3 contredit une règle du projet et deux décisions écrites de la spec. Appliquer P3 sans amendement viole les règles du projet | Conception qui garde **la page de l'application** sans aucune ressource tierce (Google seulement dans un cadre d'une autre origine, après consentement). **Réglé le 5 novembre (Q3)** : le propriétaire a validé l'exception ; les règles du projet et la spec v2.5 (§26) sont amendés ; les tâches 15 et 16 ne sont plus bloquées |
+| A2 | **Critique** (P0) | §15.2, origine `verif.shhdrop.app` proposée | Un sous-domaine est le **même site** : l'isolement des processus du navigateur se fait par site ; le code de Google pourrait partager le processus de la page qui détient les clés (attaques par canaux auxiliaires), et les cookies de domaine seraient communs | Recommandation d'un domaine enregistrable distinct ; à défaut, `Origin-Agent-Cluster: ?1`, aucun cookie de domaine, risque résiduel écrit. Question Q1. **Reste ouverte (Q1)** : code générique sur `SHH_VERIF_ORIGIN`, refus au démarrage d'une origine du même site ; proposition d'une organisation GitHub gratuite |
+| A3 | Important (P1) | §9.4 (rév. 1) : « coupure si aucun `onProgress` depuis 15 s » | Les segments font 4 Mio : à 1 Mbit/s, un segment prend 32 s ; l'écran aurait annoncé une coupure à tort, et vitesse et temps restant n'auraient été mis à jour que tous les 4 Mio | `onBytes` par `XMLHttpRequest.upload.onprogress` (§0.1) ; coupure = 10 s sans **octet** ou `onRetry` ou `offline` |
+| A4 | Important (P1) | API : `RETRIES = 5` (0,5 à 8 s) puis `Error("reseau")`, et `createShare` détruit le partage | Une coupure de plus de 15,5 s (tunnel, ascenseur) perd un envoi de 2 Go ; contredit spec §13 « reprise automatique » et rend impossible le compte à rebours demandé | Échéance de coupure de 13 min (`SERVER_STALL_MS`, après le dernier segment acquitté) avec `onRetry`, essai immédiat à `online` (§0.1, §9.4.3) |
+| A5 | Important (P1) | Pause (P6) | Une pause illimitée dépasse le délai d'effacement d'un envoi bloqué (15 min, `progress_at` à la minute) et la limite de 3 h | Pause bornée à 10 min et par l'échéance de 13 min, avec reprise automatique visible ; refusée à moins de 15 min de la limite (§9.4.4) |
+| A6 | Important (P1) | Envoi de 2 Go sur réseau lent | Jeton d'envoi de 6 h depuis la v2.9 (3 h avant) : à moins de 0,8 Mbit/s, 2 Go ne peuvent pas finir ; l'échec n'arriverait qu'au bout de 6 h | Bandeau dès que le temps restant estimé dépasse le temps disponible (§9.4.1) |
+| A7 | Important (P1) | Annuler (P6) : « DELETE /api/shares/{id} avec le jeton d'envoi » proposé | Inutile : `POST destroy` avec `S_gestion` accepte déjà un partage `uploading`, et `createShare` détruit déjà le partage dans son chemin d'échec. Une nouvelle route ajouterait une surface d'attaque et un second moyen d'authentification | `AbortSignal` dans `createShare`, destruction existante envoyée en `keepalive` ; même chemin pour `pagehide` (§0.1, §9.4.5). Aucune route ajoutée |
+| A8 | Important (P1) | Borne de la preuve de travail (P3, rév. 1 : délai fixe) contre difficulté adaptative jusqu'à environ 30 s (spec §22) | Une personne qui envoie plusieurs fois dans l'heure, sur téléphone, aurait été renvoyée vers Google alors que la preuve aurait abouti ; et le repli pourrait servir à contourner le doublement de difficulté | **Réglé (Q2)** : plus de délai fixe ; preuve pré-calculée dès le premier élément composé ; repli seulement si la borne vraie restante dépasse 60 s (mesurée après 5 s) ou après 60 s ; le serveur compte les créations par repli dans la même fenêtre (pas de contournement des quotas ni du doublement) ; l'écran affiche la borne vraie (§9.4.2) |
+| A9 | Important (P1) | P4 : « regroupé par catégorie » **et** « réordonnancement, ordre conservé dans le manifeste » | Contradiction : si l'on peut placer une vidéo entre deux photos, l'affichage par catégorie ne montre plus l'ordre réel | Ordre du manifeste = catégories dans un ordre fixe, puis ordre dans chaque catégorie ; réordonnancement à l'intérieur d'une catégorie ; même affichage chez le destinataire (§9.2.4, §9.8) |
+| A10 | Important (P1) | Badge « lieu, appareil et date retirés » | Le **nom** du fichier trahit souvent la date et l'heure (IMG_20261104_235901) ou l'identité (CV_Prénom_Nom) : le badge promettait trop | Renommage retenu ; photos de l'appareil renommées « Photo n.jpg » ; badge précisé « date de prise de vue » (§9.2.1, §9.2.4) |
+| A11 | Important (P1) | Toutes les routes | Déposer un fichier hors de la cible fait naviguer l'onglet vers le fichier : sur la page de contenu, ouverture consommée et contenu perdu ; pendant l'envoi, envoi abandonné | `preventDefault` de `dragover`/`drop` sur toute l'application (§9.2.2) |
+| A12 | Important (P1) | « Lien prêt » | Recharger ou fermer par erreur fait perdre lien et mot de passe d'un partage qui existe et compte dans le quota | `beforeunload` jusqu'à « Terminé » ou « Supprimer » ; « Supprimer ce partage » sur place (§9.5) |
+| A13 | Important (P1) | Signalement (rév. 1 : trois motifs) | L'API n'envoie que `"report"` et le serveur ne garde rien : demander un motif est un faux choix | Feuille sans motif, texte honnête, renvoi vers PHAROS pour un contenu illégal (§9.10) |
+| A13 | — | Signalement par catégorie | Décision 5 (conception du compte §21.10) : la catégorie remplace le « sans motif » | Feuille en deux étapes, dix catégories, « Autre » par défaut (§9.10, puce du 14 novembre) |
+| A14 | Important (P1) | Libellé « aucun service tiers », page Confidentialité « aucun cookie » | Deviennent faux dans le cas du repli | Libellés réécrits (« calcul sur votre appareil »), section `#verification` explicite (IP vue par Google, cookies sur ses domaines, rien d'autre) (§9.4.2, §9.12) |
+| A15 | Important (P1) | §0.1 (rév. 1) | API périmée : ordre des paramètres de `destroyShare`, `openShare(…, onProgress)`, `Opened.destroy`, `keepalive` déjà livrés ; repli « mot de passe gardé en mémoire » devenu inutile | §0.1 réécrit ; repli supprimé (moins de secret retenu en mémoire) ; S1, S12, S17 marqués réglés |
+| A16 | Important (P1) | Cadre reCAPTCHA | La grille d'images de v2 dépasse un cadre de 304 × 78 px et serait coupée | Cadre dans une feuille, `min(100 %, 400px)` × `min(600px, 85dvh)` (§9.4.2) |
+| A17 | Important (P1) | Téléphone | Le clavier virtuel couvrait le champ et la barre collée du bas ; Safari zoome sur les champs < 16 px | `visualViewport`, `interactive-widget=resizes-content`, barre dans le flux quand le clavier est ouvert, champs ≥ 16 px (§9, §4.2) |
+| A18 | Moyen (P2) | Progression en octets | Le paquet chiffré a la taille du palier (34 Mo → 50 Mo) : « 50 Mo » surprend après une jauge à 34 Mo | Une ligne d'aide qui explique le masquage de la taille (§9.4.1) |
+| A19 | Moyen (P2) | Arrière-plan sur téléphone | iOS suspend la page : envoi arrêté sans explication | Verrou d'écran pendant l'envoi ; message au retour ; reprise par le budget de coupure (§9.4.3) |
+| A20 | Moyen (P2) | Dossiers et fichiers illisibles | Safari présente un dossier comme un fichier ; un fichier en nuage peut être illisible | Lecture d'essai du premier octet ; dossiers refusés avec message (§9.2.2, §9.2.8) |
+| A21 | Moyen (P2) | « Chiffrer et envoyer », « Déverrouiller » | Double appui = deux partages (quota) ou deux déverrouillages | Désactivation synchrone et machine à états idempotente (§8, §9.4.6, §9.7) |
+| A22 | Moyen (P2) | Ouverture | Compte à rebours à zéro avant déverrouillage : l'essai échouerait après une seconde d'Argon2id | Passage local à « Lien invalide » (§9.7) |
+| A23 | Moyen (P2) | 5ᵉ mauvais mot de passe | Le message générique « n'existe pas » déroute quelqu'un qui vient de taper un mot de passe | « Mot de passe incorrect. Le partage a été détruit. » (§9.7) |
+| A24 | Moyen (P2) | Contraste forcé (Windows) | Anneau de focus, trait de la capsule et jauge personnalisés disparaissent | Règles `forced-colors` (§3.3) |
+| A25 | Moyen (P2) | P1 (toujours sombre) contre spec §3 et §19 (« clair et sombre ») | Écart avec la spec | Appliqué ; `color-scheme: dark` ; à reporter dans la spec v2.5 avec A1 |
+| A26 | Moyen (P2) | Vidéo d'iPhone (HEVC) sur Android ou Firefox | Lecteur noir sans explication | Échec de décodage traité comme `none` avec message (§9.8) |
+| A27 | Moyen (P2) | Limite de 15 éléments (10 avant la v2.9) | « Dépassement visible » (P5) appliqué au nombre ferait exister des éléments inenvoyables | Nombre refusé à l'ajout avec la liste des refusés ; taille permise en dépassement pour choisir quoi retirer (§9.2.5) |
+| A28 | Moyen (P2) | Écran d'envoi | Jusqu'à 9 informations et 3 actions : surcharge (charge cognitive) | Hiérarchie : pourcentage, puis une ligne (octets · vitesse · temps), puis détail en petit ; Annuler en `ghost`, Pause en `secondary` ; `PhaseList` comme repère (§9.4.1) |
+| A29 | Moyen (P2) | Annuler pendant `finalize` | Annulation ambiguë : le partage est peut-être déjà actif | Annuler masqué pendant `finalize` ; « Supprimer ce partage » ensuite (§9.4.5) |
+| A30 | Moyen (P2) | « Terminé » et « Supprimer ce partage » voisins | Confusion entre fermer l'écran et détruire le partage | Séparés, styles différents, confirmations différentes (§9.5) |
+| A31 | Mineur (P3) | Noms côté expéditeur | Un nom contenant des caractères d'inversion (fichier téléchargé ailleurs) s'affichait tel quel | `cleanName` exporté et appliqué (§0.1, §9.2.8) |
+| A32 | Mineur (P3) | Page 404 | La rév. 1 exigeait un code HTTP 404 pour les routes inconnues ; `static.go` rend 200 (spec §10) et rien ne l'exige | Code 200 conservé, page 404 de l'interface, `noindex` sur `/s/` et `/m/` (§9, §14.2) |
+| A33 | Mineur (P3) | Jauge vide | « 0 o / 2 Go · 0 / 15 » est du bruit | Texte d'état vide (§9.2.5) |
+| A34 | Mineur (P3) | Onglet en arrière-plan sur ordinateur | Aucun repère de progression | « 42 % · Shhdrop » dans le titre pendant l'envoi (§9.4) |
+| A35 | Mineur (P3) | Bascule de langue pendant l'envoi | Libellés qui sautent, annonces doublées | Bascule désactivée pendant l'envoi (§10) |
+| A36 | Mineur (P3) | Paysage sur téléphone | Capsule plein écran et barres collées qui mangent la hauteur | Règles paysage (§9) |
+| A37 | Mineur (P3) | Titre d'accueil après ajout | Le Persuade repousse la liste sous le pli | Titre replié après le premier ajout (§9.1) |
+| A38 | Mineur (P3) | Vocal | Enregistrement illimité : mémoire | 30 min au plus (§9.2.7) |
+| A39 | Mineur (P3) | Aperçus simultanés | Plusieurs vidéos de 200 Mio téléchargées en même temps : mémoire | Un aperçu à la fois (§9.8) |
+| A40 | Mineur (P3) | Collage d'un texte HTML | Mise en forme, liens ou contenu caché copiés depuis une page web | `text/plain` seulement (§9.2.3) |
+| A41 | Important (P1) | Démo (P8) | Du code de démo (faux serveur qui remplace `fetch`) dans le build de production serait une porte dérobée : toute requête `/api` pourrait être détournée | Import dynamique sous `import.meta.env.MODE === "demo"`, greffon qui fait échouer le build de production, script `check-dist.mjs` en CI (§14.3) |
+| A42 | Moyen (P2) | Démo : lien copié puis ouvert ailleurs | Le partage n'existe que dans la mémoire de l'onglet : un lien ouvert dans un autre onglet est « invalide » sans explication ; Pages n'a pas de repli monopage | Bandeau permanent, bouton « Ouvrir comme destinataire (démo) » sans rechargement, phrase d'explication sur « Lien invalide », `404.html` (§14.3) |
+| A43 | Moyen (P2) | Démo : CSP par meta | `frame-ancestors`, `Permissions-Policy`, COOP, HSTS propre et `no-store` manquent ; l'origine `skoow.github.io` est partagée entre tous les dépôts Pages du propriétaire | Liste écrite des écarts (§14.3, page Sécurité de la démo) ; la démo ne traite aucune donnée réelle ; ne jamais servir la production depuis cette origine |
+| A44 | Mineur (P3) | Démo : faux serveur infidèle | Une démo qui se comporte autrement que le serveur réel tromperait sur l'interface | Tests du faux serveur avec le vrai client et les cas d'erreur de la spec §13 (§14.3) |
+
+Bilan : **2 critiques, 16 importants, 15 moyens, 11 mineurs** (44 constats).
+
+### 18.3 Ce qui reste juste dans la révision 1
+
+- Le monde « Nuit chiffrée » est propre au produit (sceller, dissoudre) et n'emprunte aucun gabarit de catégorie ; la règle « verre seulement sous ce qui défile » tient.
+- Les règles de sécurité de l'interface (`safeName`, `previewKind`, `TYPE_SUR`, `{@html}` interdit, CSP, bfcache, navigateur intégré) n'avaient pas de faille : elles sont conservées.
+
+### 18.4 Pré-vol du plan
+
+Un contrôle de cohérence de la conception contre le dépôt a relevé 43 points (P1–P43), tous adoptés. Effets sur cette spécification : défi et preuve pré-calculés, `captcha_salt`, `maxNumber`, borne de 60 s, consentement et ordre des essais (§0.1, §9.4.2, §9.4.6, §15) ; échéance unique de 13 min pour la pause et la coupure (§0.1, §9.4.3, §9.4.4) ; `frame-ancestors 'self'` sur `/pdf-frame.html` et `isEvalSupported: false` (§13, §14.2) ; `start_url` et `scope` à `"./"` (§14.1) ; règle « site différent » et `SHH_ORIGIN` (§15.2, §15.4).
+
+---
+
+## 19. Questions ouvertes
+
+| # | Question | Choix par défaut appliqué |
+|---|---|---|
+| Q1 | Origine de vérification : domaine distinct (par exemple `shhverif.net`), organisation GitHub gratuite dédiée (`<nom>.github.io`, suffixe public, donc un site à part) ou `verif.shhdrop.app` (même site, risque résiduel écrit) ? | **Ouverte.** Code générique sur `SHH_VERIF_ORIGIN`, avec refus au démarrage d'une origine du même site que `SHH_ORIGIN` (§15.4) ; tests sur une origine distincte. Proposition : une **organisation GitHub gratuite** dédiée ; le choix réel se fait à la migration (coût si faux : une valeur de configuration) |
+| Q2 | Quand renvoyer vers Google : après un délai fixe, ou seulement si la borne vraie restante est trop longue (avec pré-calcul), pour ne pas y envoyer les personnes qui créent plusieurs partages dans l'heure ? | **Décidée.** Preuve de travail pré-calculée dès le premier élément composé (page visible seulement, au plus deux renouvellements du défi) ; repli Google seulement si le Worker est absent ou en erreur, si le serveur refuse, ou si la borne vraie restante dépasse 60 s (mesurée après 5 s) ou 60 s écoulées. Plus de délai fixe (§9.4.2, §18 A8) |
+| Q4 | Valider la direction artistique v2 avec les corrections K1 à K14 (§20.2), dont le verre statique sans flou (K6) et le texte de fin honnête (K7) ? | Appliquées par défaut ; le prototype reste la référence visuelle |
+| Q5 | Le schéma de l'accueil en boucle (6,4 s) : garder la boucle ou le tracer une fois (révision 3) ? | Boucle, rangée dans l'ambiance (K10) |
+| Q3 | Amender les règles du projet (« aucune ressource tierce sur le site ») et la spec pour écrire l'exception reCAPTCHA isolée ? | **Décidée.** Exception validée : spec v2.5 §26 et les règles du projet amendés ; les tâches 15 et 16 ne sont plus bloquées (§18 A1) |
+
+---
+
+## 20. Direction artistique v2 « Nuit chiffrée, vivante » (amendement A1, révision 4)
+
+Retours : l'interface est « trop simple, pas assez belle » ; il veut plus d'animation, de beauté et de raffinement. Prototype de référence : `docs/conception/design/da-v2/index.html` (polices lues dans `web/public/fonts/` ; à ouvrir par un serveur HTTP lancé à la racine du dépôt, par exemple `python3 -m http.server`, puis `/docs/conception/design/da-v2/`). Captures choisies : `docs/conception/design/da-v2/shots/`. Ce qui n'est pas cité ici reste inchangé. En cas d'écart entre le prototype et cette section, **cette section l'emporte** (corrections de §20.2).
+
+### 20.1 Intention
+
+La v2 garde le monde « Nuit chiffrée » et ses deux gestes, et ajoute :
+
+1. **Une forme unique, la capsule.** La capsule ouverte du logo (trait de 300° qui part du milieu du bord haut) devient le **réceptacle** du composeur ; l'envoi la referme ; on la retrouve sur chaque étape (capsule qui se remplit de texte chiffré, petite capsule scellée de « Lien prêt », capsule verrouillée du destinataire, illustration du document qui se défait, §9.10.1, du partage détruit). Les transitions de vue la font passer d'un écran à l'autre.
+2. **Une lumière d'ambiance vivante (aurore)** : trois nappes très floues qui dérivent lentement, composées par le GPU, dont l'intensité suit le moment.
+3. **Des micro-interactions sur chaque contrôle**, et deux moments écrits plus riches : le scellement (un volet de texte chiffré avance au rythme des octets, un éclair fait le tour du bord à la fermeture) et la dissolution (le contenu se défait en grain et en poussière).
+
+Inchangé : un seul thème sombre, un accent menthe, Mona Sans et JetBrains Mono, aucune ressource tierce, aucune bibliothèque d'animation, `style-src 'self'`.
+
+### 20.2 Contrôle de l'amendement contre les règles, et corrections apportées
+
+Contrôle fait sur le prototype et le texte de l'amendement : **CSP** (aucun attribut `style`, aucune balise `<style>` ni `<script>` en ligne, aucune URL `data:` dans `index.html`, `css/` et `js/` : conforme) ; **mouvement réduit et contraste forcé** (blocs présents, voir corrections) ; **rien qui ralentisse** ; **textes honnêtes** (spec §2, §18.11).
+
+| # | Gravité | Endroit | Problème | Correction appliquée |
+|---|---|---|---|---|
+| K1 | Moyenne | Amendement §4.2 contre sa propre règle §7.1.3 | L'entrée de l'accueil dépassait le plafond de 900 ms qu'elle fixe : réceptacle 220 + 900 = 1 120 ms, texte 380 + 720 = 1 100 ms, dernier mot du titre 390 + 720 = 1 110 ms | Retimée : mots du titre 560 ms, décalage de 35 ms (respiration de 30 ms avant « puis »), dernier mot à 310 ms → fin à 870 ms ; réceptacle sans délai, 640 ms ; texte, lien et schéma après 200 ms, 600 ms. Tout est cliquable dès l'affichage |
+| K2 | Élevée | Transitions de vue | Pendant une transition de vue, le navigateur fige le rendu jusqu'à la fin du rappel et capte les clics par ses pseudo-éléments : la règle « tout contrôle est utilisable pendant l'animation » était fausse | Rappel de `startViewTransition` **synchrone** (mutation du DOM seulement, jamais d'attente réseau) ; `skipTransition()` dès un `pointerdown` ou `keydown` ; jamais pour une mise à jour sur place (ajout d'un 2ᵉ élément, frappe) ; sans l'API (Firefox ancien), changement direct. Durée réelle bloquante ≤ 420 ms |
+| K3 | Moyenne | Fermeture du sceau (1 300 ms) puis transition vers « Lien prêt » | Le lien attendait 1,3 s + 420 ms après la résolution : le geste retardait l'action | Cœur de la fermeture ramené à 900 ms (« Scellé » entre de 560 à 900 ms) ; l'éclat d'aurore (opacité seulement) continue seul sur l'écran suivant ; « Lien prêt » commence à 900 ms ; tout appui ou touche pendant la fermeture saute à la fin (`Animation.finish()`) |
+| K4 | Moyenne | Aurore : états « scellement » (0,26) et éclat (0,55) | La règle de luminance S2 n'était mesurée qu'au repos ; ces états éclairent davantage | Le test de luminance s'applique à chaque état : repos, scellement, éclat à son pic, détruit. Une valeur qui échoue est abaissée, pas la règle |
+| K5 | Moyenne | S2 : plafond 0,045, mesuré 0,046 | L'amendement mesurait 0,046 et fixait 0,045 : il violait sa propre règle | Plafond **0,050** derrière `--text-2` (`--text-2` ≥ 4,70:1, calcul : (0,420 + 0,05) / (0,050 + 0,05)) ; `--text-3` jamais directement sur l'aurore (3,4:1 seulement) |
+| K6 | Moyenne | Verre statique (`backdrop-filter: blur(24px) saturate(1.35)`) | Sous le réceptacle, il n'y a que l'aurore, déjà floue : le flou n'ajoute rien de visible, mais l'aurore bouge, donc le flou est recalculé à chaque image sur un téléphone | Verre statique = remplissage translucide `--vessel` **sans** `backdrop-filter` ; le flou reste réservé au verre mobile (barres sous lesquelles le contenu défile, §5.4) |
+| K7 | **Élevée (honnêteté)** | Écran « Partage détruit » du prototype | « Il n'existe plus nulle part : ni sur le serveur, ni sur cet appareil. » est faux : ce que le destinataire a enregistré reste, la mémoire n'est effacée qu'au mieux (spec §18.1, §18.4, §18.7) | « Ce partage a été détruit. Il a été effacé du serveur. Ce que vous avez déjà enregistré sur cet appareil n'est pas concerné. » |
+| K8 | Moyenne | Titre d'accueil mot par mot | Une `<span>` par mot, transformée, peut être lue mot par mot par VoiceOver | Texte complet dans un `<span class="sr-only">`, copie animée en `aria-hidden="true"` (corrige T4 de l'amendement, qui interdisait `aria-hidden`) |
+| K9 | Moyenne | Noms brouillés, phrase régénérée | Le texte visible change caractère par caractère : un lecteur d'écran lirait des noms illisibles ; une copie pendant l'animation copierait du bruit | Couche animée en `aria-hidden`, vrais noms dans une liste masquée ; Copier lit l'état, jamais le DOM |
+| K10 | Faible | Schéma de l'accueil | Animation en boucle (6,4 s) absente des rôles « ambiance » : ni pause, ni arrêt hors écran | Rangée dans l'ambiance : pause onglet caché et hors écran, retirée en mouvement réduit |
+| K11 | Faible | Calques d'aurore | « Le compositeur agrandit une texture minuscule » n'est pas prouvé : agrandi par `width`/`height`, un calque peut être rastérisé à 150 vmax × DPR (des dizaines de Mo par nappe) | Image posée à 128 px et agrandie par `transform: scale()` ; budget : mémoire des calques d'aurore ≤ 32 Mo (panneau Layers de DevTools), mesurée |
+| K12 | Faible | Poussière | Canvas pleine zone au DPR 3 du téléphone | DPR du canvas plafonné à 2 |
+| K13 | Faible | Focus après transition | « Après chaque transition, le focus va au titre » volerait le focus à qui vient d'ajouter un fichier | Seulement aux changements d'écran ou d'étape (règle §11 inchangée ailleurs) |
+| K14 | **Élevée** | Phase « Préparation des clés » du prototype | Elle affiche « Argon2id, environ 1 s » | Aucun nom d'algorithme à l'écran (§20.8) ; libellé seul « Préparation des clés » |
+
+Signalements de l'amendement conservés : **S1** (texte « chiffré » décoratif tiré d'un générateur à graine fixe, jamais de `crypto`, d'un tampon de chiffrement, de la clé ni du lien ; test : `ui/decor.ts` n'importe rien de `crypto/`, `transfer/` ni `index.ts`) ; **S3** (verre mobile contre verre statique ; sur le verre statique, `--text-2` 5,38:1 et `--text-3` 4,7:1 au pire point, repli plein `--surface-1` en `prefers-reduced-transparency` et `prefers-contrast: more`) ; **S4** (sur téléphone, schéma sous le réceptacle ; rangée d'ajout visible à 390 × 844) ; **S5** (dissolution limitée à la partie visible) ; **S6** (CSSOM et WAAPI seulement ; jamais `setAttribute("style")`) ; **S7** (QR en points : module foncé sur `--paper`, zone de silence ≥ 4 modules, correction M, décodage du SVG rendu en CI) ; **S8** (nappes produites par `web/scripts/gen-aurora.mjs`, graine fixe, environ 11 Ko) ; **S9** (photos du prototype = exemples).
+
+### 20.3 Jetons ajoutés ou modifiés (`web/src/ui/tokens.css`)
+
+| Jeton | Valeur | Usage |
+|---|---|---|
+| `--bg-deep` | `#07080C` | Bord de la vignette |
+| `--hair` / `--hair-2` | `rgb(233 236 242 / 0.08)` / `rgb(233 236 242 / 0.13)` | Filets de verre (non porteurs d'information) |
+| `--vessel` | `rgb(17 20 27 / 0.62)` (sans `backdrop-filter`, K6) | Verre statique : réceptacle, capsule |
+| `--edge-hi` | `inset 0 1px 0 rgb(255 255 255 / 0.06)` | Arête haute du verre |
+| `--seal-light` / `--seal-halo` | `#C9FBE8` / `rgb(95 227 181 / 0.28)` | Pointe du trait et éclair ; halo de 7 px autour de la pointe seulement |
+| `--paper` / `--ink` | `#EEF1F5` / `#0B0D12` | QR |
+| `--aur-mint-o` / `--aur-tide-o` / `--aur-ink-o` | `0.18` / `0.34` / `0.32` | Opacités des nappes (plafond K5) |
+| `--fs-display` | `clamp(2.625rem, 1.1rem + 4.6vw, 5.5rem)` / 0.98 / 600 / largeur 116 %, approche −0,035 em, `max-width: 13ch` | Titre d'accueil |
+| `--fs-figure` | `clamp(3.5rem, 2rem + 6vw, 5.5rem)`, largeur 112 %, approche −0,04 em | Pourcentage dans la capsule |
+| `--fs-ready` | `clamp(2rem, 1.4rem + 2.4vw, 3rem)`, largeur 114 %, approche −0,03 em | Titre « Lien prêt » |
+| `--fs-screen` | `clamp(1.75rem, 1.3rem + 1.8vw, 2.5rem)`, largeur 112 % | Titres du destinataire et de fin |
+| `--r-2xl` | `32px` | Réceptacle, capsule. Boutons : 12 px (48 px de haut), 14 px (56 px), 10 px (44 px) |
+| `--e-vessel` | `0 40px 80px -32px rgb(0 0 0 / .75), 0 12px 24px -12px rgb(0 0 0 / .5)` | Ombre décalée, jamais centrée |
+| `--dur-press` / `--dur-stagger` / `--dur-view` | 90 ms / 35 à 60 ms / 420 ms | Pression (échelle 0,97 ; 0,92 pour `IconButton`) / décalage (6 éléments au plus) / transition de vue |
+| `--dur-reveal` | 560 ms (K1) | Entrée du titre, mot par mot |
+| `--dur-orbit` / `--dur-ambient` | 7,2 s / 46 s, 58 s, 64 s | Lumière du réceptacle vide / dérive des nappes |
+| `--ease-view` | `cubic-bezier(0.22, 1, 0.36, 1)` | Transitions de vue |
+| `--rise` / `--blur-in` | 14 px / 6 px (titre d'accueil seulement) | Montée à l'entrée |
+
+Couleurs des nappes (dans les PNG seulement) : menthe `#5FE3B5`, marée `#28809A`, encre `#3456AA`. Aucun violet. Aucun rebond ni ressort (règle v1).
+
+### 20.4 Mouvement par moment
+
+Les temps se comptent depuis l'événement déclencheur. Valeurs de référence : `da-v2/js/app.js` et `da-v2/css/*.css`, corrigées par §20.2.
+
+**Ambiance (toujours).** Trois `<img>` de 128 px (`alt=""`, `aria-hidden`), `position: fixed`, agrandies par `transform: scale()` (K11), animées en `transform` seulement, `alternate`, 46, 58 et 64 s ; vignette fixe ; grain fixe à 0,035. États par `body[data-screen]`, en opacité, 1,2 s : scellement (menthe et marée 0,26), détruit (aurore × 0,55). Pause à `document.hidden` ; retirée en `prefers-contrast: more` et `forced-colors` ; immobile en mouvement réduit. Le schéma de l'accueil en fait partie (K10).
+
+**Accueil et composeur.** Titre : chaque mot monte de 0,32 em et se défloute de 6 px (K1 pour les temps), une seule fois. Réceptacle : contour `<path pathLength="100">` sur la forme exacte (rayon 32), départ au milieu du bord haut, sens horaire, `stroke-dasharray: 83.33 100` (ouverture de 60°, celle du logo), trait `rgb(233 236 242 / .3)` de 1,5 px, ajusté par `ResizeObserver` (`capPath(w, h, r)`). Lumière qui parcourt le contour vide (deux traits de 9 et 14 unités, 7,2 s par cycle : 62 % de course puis repos, arrêtée hors écran par `IntersectionObserver`). Projecteur au pointeur fin (disque menthe à 7 %, 420 px, `transform`, une fois par image au plus). Cible de dépôt active : fond `rgb(16 42 35 / .72)`, contour `--accent` 2 px, ouverture resserrée de 60° à 14° (`stroke-dasharray` 83 → 96, 400 ms). Premier ajout : transition de vue (titre replié, groupe `hero-title` ; réceptacle agrandi, groupe `capsule` ; catégories décalées de 45 ms, 560 ms ; options après 160 ms). Badge « Nettoyé » : un reflet, une fois. Contrôle segmenté : pastille en `transform`, indice dans `data-i`. Régénérer : lettres qui défilent puis se fixent, 520 ms (K9). Jauge en `scaleX`, 600 ms. « Chiffrer et envoyer » : reflet au survol (760 ms), anse du cadenas qui descend (220 ms), pression 0,97.
+
+**Scellement (remplace §7.3).** Capsule en verre statique, rayon 32, encoche `--line-strong` au milieu du bord haut. Couches : (1) **volet de texte chiffré décoratif** (S1), JetBrains Mono 12 px, menthe à 10 %, révélé de gauche à droite au rythme des octets (enveloppe `translateX((p − 1) × 100 %)`, contenu `translateX((1 − p) × 100 %)`, filet menthe de 1 px au front) ; (2) en-tête (cadenas, « 6 éléments · 142 Mo », puce d'état) ; (3) 4 noms au plus, brouillés avec un flou de `k × 1.6px` et une opacité de 1 → 0,55, `k = clamp(p × 1.35 − i × 0.08)` (K9) ; (4) pourcentage en `--fs-figure`, à l'entier inférieur ; (5) trait `stroke-dasharray: p×100 100` de 2 px, pointe de 2,5 px en `--seal-light` et halo de 7 px placés par `getPointAtLength` (longueur en cache par taille). Phases : regroupement (transition de vue de 420 ms, FLIP du navigateur), `keys` et `captcha` (trait court de 8 unités, 1,6 s par tour), `upload` (tout suit `onBytes`, une fois par image ; point qui pulse, 1,6 s), `paused` (trait et volet en `--text-3`, pointe masquée), `final` (trait plein). **Fermeture**, après la résolution seulement, WAAPI, 900 ms (K3) : 0–640 ms éclair `--seal-light` de 3 px sur un tour, trait 2 → 3 px ; 140–300 ms l'anse ouverte disparaît ; 180–400 ms l'anse fermée descend de 3 px ; 380–560 ms la puce s'éteint ; 420–620 ms le chiffre sort ; 400–800 ms les noms passent à 50 % ; 560–900 ms « Scellé » entre ; 600–800 ms encoche en `--accent` ; 600–900 ms la capsule respire (1 → 0,985 → 1) ; 560–2 160 ms éclat d'aurore (opacité seulement, continue après l'écran). Vers « Lien prêt » à 900 ms : la capsule devient la petite capsule scellée (96 × 60). Avec l'envoi anticipé (spec §29), la capsule montre d'abord, dans le composeur, l'avancée de l'envoi en arrière-plan (trait discret, sans chiffre), puis le scellement ne joue que la fin. Captures : `shots/04-scellement-390.png`, `shots/planche-scellement.png`.
+
+**Scellement, révision du 19 novembre (« la trame »).** Remplace le volet de texte chiffré, le flou des noms et la puce d'état (redite du titre voisin). Sous les noms, une **trame de points** sur `<canvas>` (`ui/Trame.svelte`, calculs purs dans `ui/trame.ts`, testés), pas de 10 px, points de 2 px : colonnes encore sur l'appareil en petits points pâles ; rampe de 2,5 colonnes derrière le front en menthe vive qui se brouille (chaque bloc est chiffré juste avant l'envoi) ; colonnes envoyées en trame menthe qui coule vers la droite **seulement tant que des octets passent** (sans octets, elle se fige). La part allumée suit les octets envoyés, jamais au-delà (rattrapage doux qui ne dépasse jamais la cible ; écart de surface ≤ 1,25 colonne). `keys` et `captcha` : une vague pâle traverse la bande sans rien allumer, **aucun pourcentage** (rien n'est mesuré). `paused` : trame figée en gris ; `offline` : front en `--warn` qui pulse ; erreur : front en `--danger` ; annulé : gris. `final` : trame pleine qui respire, lumière `--seal-light` qui fait un tour du trait (640 ms, D2), cadenas toujours ouvert. `sealed` (après la résolution seulement) : l'anse du cadenas tombe (280 ms), « Prêt » monte, halo menthe sur le cadenas. Mouvement réduit : aucune boucle, dessin figé redessiné à chaque changement. Couleurs forcées : trame masquée, trait seul. Boucle `requestAnimationFrame` de quelques centaines de cercles, arrêtée dès que rien ne bouge ; calque à part (`will-change`). L'écran d'envoi s'ouvre en haut de page ; la place des mesures est réservée dès l'ouverture ; le détail devient « Blocs reçus par le serveur : n / N » (accusés réels, plusieurs blocs partent en parallèle).
+
+**Lien prêt.** Blocs : montée de 14 px et fondu, 640 ms, décalés de 60 ms ; QR qui s'imprime (`clip-path`, 900 ms après 260 ms, une fois) ; Copier : `copy` → `check` (260 ms), « Copié » monte, reflet menthe à 16 % (700 ms), retour à 2 s ; feuille QR sur téléphone : 460 ms.
+
+**Destinataire.** Capsule verrouillée (contour menthe plein, cadenas dans un carré de 64 px), champ de texte décoratif qui dérive (48 s, en boucle, masqué sur les bords, S1). Déverrouiller : bouton occupé (« Déchiffrement… »), puis, **après** la résolution d'`openShare`, le contour se défait vers l'encoche (520 ms) et l'anse s'ouvre. Mot de passe faux : aucun tremblement (règle v1), champ en `--danger`, message en fondu de 180 ms.
+
+**Contenu.** Bandeau collé en verre mobile (`--text` seulement) ; sections décalées de 60 ms (600 ms) ; photos 1 → 1,03 au survol d'un pointeur fin ; confirmation de destruction qui monte (280 ms).
+
+**Dissolution (remplace §7.4).** Après la réponse du serveur ou `wipe()`, jamais avant. Au départ, `--a` et `--span` (≥ 120 px) posés par CSSOM pour la seule partie visible (S5) ; `--d` animée de 0 à 1 par WAAPI en 1 100 ms ; `--lo = --a + (d × 1.5 − 0.3) × --span`, `--hi = --lo + 0.18 × --span` ; masque à trois couches (plein au-dessus de `--hi`, grain de 96 px dans la bande). Contenu qui monte de 4 px, flou de 1 px sur le dernier tiers. **Poussière** : `<canvas>` (DPR ≤ 2, K12), 1 400 grains de 0,8 à 2,5 px (78 % `--text`, 22 % `--accent`) nés au passage du front, fonction pure du temps (graine fixe), **aucune** lecture de pixels du contenu (`getImageData` interdit, test de recherche). Aurore à 55 %. Fin : nœud retiré, illustration `DestroyedArt` (§9.10.1) et mouvement `erase()` du logo, texte K7 et bouton décalés de 70 ms, focus sur le titre et annonce. Replis : sans `mask-composite` ou `@property`, fondu et flou de 400 ms. Captures : `shots/planche-dissolution.png`, `shots/10-detruit-390.png`.
+
+### 20.5 Remplacement de §7.1 (Principe)
+
+Voir §7.1, réécrit (révision 4).
+
+### 20.6 Budget de performance
+
+Cible : **60 images par seconde sur un téléphone de milieu de gamme** (Pixel 6a et Galaxy A34, Chrome, sans limitation de processeur), mesurée par une trace DevTools sur chaque moment.
+
+1. Composé seulement : `transform`, `opacity`, `clip-path`, `filter` sur petits éléments ; jamais `width`, `height`, `top`, `left`, `margin`, `font-size` (exception v1 : `grid-template-rows` du panneau qui se déplie, une fois). Le `transition: font-size` du titre d'accueil disparaît (transition de vue).
+2. Repeints répétés bornés : trait SVG de la capsule (680 × 320 au plus), 4 lignes de noms brouillés, canvas de poussière (1,6 s, 1 400 `fillRect` par image au plus).
+3. Aucune lecture de mise en page dans les boucles (`getBoundingClientRect` une fois au départ de la dissolution ; `getTotalLength` en cache par taille).
+4. Calques : 4 nappes d'aurore au plus, mémoire ≤ 32 Mo (K11) ; 2 `backdrop-filter` actifs au plus sur téléphone, sur du verre mobile seulement (K6) ; `will-change` permanent sur les nappes et le volet chiffré seulement.
+5. Boucles arrêtées onglet caché et hors écran ; point qui pulse seulement pendant l'envoi.
+6. Poids ajouté : 3 PNG (environ 11 Ko), aucune police, aucun script tiers, moins de 6 Ko de JS minifié pour la chorégraphie et la poussière.
+7. Aucune trame longue (Long Animation Frame) de plus de 50 ms pendant le scellement ou la dissolution : contrôlé en e2e Chromium par `PerformanceObserver({ type: "long-animation-frame" })`.
+8. **Rien n'attend une animation** : chaque contrôle répond pendant qu'elle joue, sauf la fenêtre bloquante d'une transition de vue (≤ 420 ms, interrompue au premier geste, K2).
+
+### 20.7 Accessibilité
+
+- **`prefers-reduced-motion: reduce`** : aurore, lumière du réceptacle, schéma animé, texte qui dérive, point qui pulse et poussière retirés ; titre et entrées affichés sans montée ; transitions de vue réduites à un fondu de 120 ms ; scellement : progression gardée (c'est un état), sans flou ni éclair, fermeture = couleur, icône et libellé (160 ms) ; dissolution en fondu de 240 ms ; phase indéterminée : libellé qui pulse en opacité (1 ↔ 0,6). Capture : `shots/a11y-mouvement-reduit-scellement-390.png`.
+- **`forced-colors: active`** : aurore, grain, verre, ombres, volet chiffré, éclair et poussière retirés ; contours en `CanvasText` ; progression en `Highlight` sur 4 px, piste `GrayText` de 1 px ; QR en `Canvas`/`CanvasText`. Capture : `shots/a11y-contraste-force-accueil-1440.png`.
+- **`prefers-reduced-transparency`, `prefers-contrast: more`** : verre remplacé par `--surface-1`.
+- **Contraste** : K5 et S3, mesurés en e2e (capture sans contenu, `main.style.visibility = "hidden"` par CSSOM, échantillonnage de chaque pixel, échec au-delà d'une luminance relative de 0,050), dans chaque état de K4.
+- Annonces inchangées ; les animations n'annoncent rien. Focus : anneau de 2 px en `--accent` qui s'accroche en 180 ms ; K13. Rien n'est porté par le seul mouvement. Rien ne clignote plus de 3 fois par seconde (l'éclair est un passage unique de 640 ms).
+
+### 20.8 Textes qui inspirent confiance
+
+- **Aucun nom d'algorithme ni terme technique à l'écran** : ni « Argon2id », « AES », « GCM », « HKDF », « HMAC », « SHA-256 », « STREAM », « WebCrypto », « libsodium », « ML-KEM », « X25519 », ni « bits » ou « entropie ». La formule la plus technique permise est « chiffré de bout en bout ».
+- Les détails techniques vivent dans la documentation publique du dépôt GitHub (`docs/securite-technique.md`, à écrire) ; la page Sécurité **renvoie** à ce document au lieu de les énumérer (§9.12).
+- Règle testée : `i18n.test.ts` échoue si `fr.ts`, `en.ts`, `pages.fr.ts` ou `pages.en.ts` contient (sans casse) `/argon|\baes\b|gcm|hkdf|hmac|sha-?\d|stream|webcrypto|libsodium|ml-?kem|x25519|\d[\s  ]*bits?\b|entropie|entropy/` (« bits » seulement après un nombre, pour ne pas refuser l'anglais « a bit »), en plus de « 100 % sécurisé » et de « ne voit rien ».
+- Textes modifiés en conséquence : `PasswordChecklist` (« 4 mots tirés au hasard parmi 7 776 (environ 52 bits) » → « Mot de passe tiré au hasard sur cet appareil ») ; phase `keys` (« Préparation des clés », sans parenthèse) ; page Sécurité (§9.12).
+
+### 20.9 Ce que le prototype ne couvre pas
+
+Version anglaise (« One link, one password, then nothing. » en 4 lignes au plus à 390 px) ; états d'erreur de l'envoi (§7.3, point 6, appliqué à la nouvelle capsule ; le volet s'arrête où il est) ; page de gestion (petite capsule et dissolution) ; écrans du coffre, de l'historique et de vérification (spec §27, §28, §33 : mêmes composants) ; PDF isolé, (retirée le 24 novembre), pages Sécurité et Confidentialité : sans changement de mouvement.
+
+### 20.10 Accueil v3 : matière et mouvement (révision 5)
+
+Retours : « transitions, animation » ; « le thème doit respirer la sécurité et la confidentialité » (coffre, enveloppe scellée, jamais un SaaS générique). Benchmark : `docs/conception/design/benchmark-2026-11.md` (motifs 1, 2, 4, 5, 13, 14, 17 retenus). Le prototype de travail et ses captures sont hors dépôt.
+
+**Matière.** Motifs dessinés en géométrie, en ligne (aucune URL `data:`, aucune image) et purs calculs de `ui/decor.ts` : trame **guillochée** (faisceau de 22 à 28 sinusoïdes déphasées, trait `rgb(233 236 242 / 0.05)`, retirée en contraste forcé et renforcé) ; **rosace de sceau** (épitrochoïde fermée) des cartes de confiance. Menthe réservée au signe « scellé, sûr » (cadenas, ligne de scellement, sceaux, texte chiffré) ; les actions principales (« Parcourir les fichiers », « Commencer ») sont en `--paper` sur `--ink`. Feuillets empilés derrière le coffre : `#141821` et `#0f1218`, 56 px de haut.
+
+**Jetons ajoutés** (`tokens.css`) : `--fs-section` = `clamp(2rem, 1.35rem + 2.4vw, 3.25rem)` (titres de section) ; `--ease-settle` = courbe `linear()` d'un ressort très amorti, **sans dépassement** (aucune valeur > 1, testé) : la règle v1 « aucun rebond ni ressort » tient (signalement M1 du rapport : la demande « spring-like » est servie par cette courbe qui se pose, pas par un rebond).
+
+**Mouvement.**
+
+- **Entrée** (K1 inchangé, fin ≤ 900 ms, tout cliquable dès l'affichage) : mots du titre (K1), phrase à 200 ms, sceaux à 240, 285, 330 ms (560 ms), coffre 640 ms (`--ease-settle`), puis volet 100 ms, titre 150, bouton 200, libellé 240, tuiles de 270 à 420 ms, preuves 400 ms (480 ms chacun).
+- **Volet de scellement** (ambiance, 7,2 s) : quatre couches qui ne bougent qu'en `transform` (unités `cqw`) : texte en clair, bande floue de 56 px devant la ligne (`filter: blur(2.4px)` sur un petit élément, le flou ne se recalcule pas), texte chiffré, ligne et cadenas ; 0–55 % traversée, 55–88 % tout scellé, 88–100 % retour en fondu. Image fixe à mi-course en mouvement réduit.
+- **Tuiles** : pression 0,95 ; aimant au pointeur fin (±3 px) et reflet menthe sous le pointeur (`--tx`, `--ty`, `--lx`, `--ly` posés par CSSOM, une fois par image au plus, `ui/attach.ts`) ; geste propre au survol : éclair (Photo), voyant (Vidéo), niveaux (Vocal, 4 allers-retours), curseur (Texte, 2 clignements à 1 Hz). **Coffre** incliné vers le pointeur fin (±2° et ±2,5°, `--rx`, `--ry`).
+- **Voile de dépôt** : fondu 180 ms ; capsule à 16 px des bords qui se referme (60° → 14°, 520 ms) ; texte qui se pose (600 ms) ; pastille qui flotte (1,2 s, aller-retour) seulement pendant le glisser.
+- **Révélations au défilement** : `animation-timeline: view()` (`animation-range: entry 0% entry 70%`, montée de 28 px et fondu) là où le navigateur le sait ; ailleurs, repli `IntersectionObserver` (classes `rv-wait` puis `in`, une fois). Rien en mouvement réduit ; sans script ni observateur, rien n'est caché.
+- **Scènes de « Comment ça marche »** : boucles de 6 s, ambiance (pause hors écran et onglet caché), image fixe parlante en mouvement réduit. **Appel final** : la lumière fait le tour de la grande capsule (7,2 s, ambiance) ; l'anse du cadenas du bouton se ferme au survol, au focus et à l'appui (420 ms).
+- **Questions** : la réponse entre en fondu et montée de 6 px (420 ms) ; aucune hauteur animée (§20.6 point 1). Chevron qui tourne de 180°.
+- **Transitions de vue** : inchangées (repli du titre au premier ajout, changements d'écran). Aucune transition de vue pour le voile, l'accordéon ou les révélations : ce sont des mises à jour sur place (K2).
+
+**Accessibilité.** Mouvement réduit : aucune animation d'image clé (testé au chargement et après défilement) ; transitions de couleur seulement. Contraste forcé : aurore, grain, trame, feuillets, reflets retirés ; tuiles, sceaux, bouton principal et questions avec bordure système. Axe mesuré sur l'état final (le banc attend la fin des entrées). Texte à 200 % sur 320 px : aucun débordement (testé).
+
+**Budget.** JS de production : 119,4 Ko (42,5 Ko compressés) contre 84,1 Ko (31,7 Ko) avant ; l'essentiel est le texte (FR et EN) et le gabarit des sections ; le code de mouvement (`ui/attach.ts`) fait moins de 2 Ko minifié, aucune bibliothèque. CSS : 56 Ko (11,6 Ko compressés). Signalé au rapport (M4).
+
+
+### 20.11 Accueil v4 : un voyage de section en section
+
+Retours : « des sections séparées, chacune avec son fond », « un peu plat », « plus d'animation », puis sur l'appel final (« je n'aime pas trop ») et le schéma (« pas beau, niveau expert »).
+
+- **Fonds de section** (`ui/SectionBg.svelte`), sur toute la largeur de la fenêtre (`100cqw` du conteneur `page` posé sur `#app` ; jamais `100vw`, qui compte la barre de défilement ; pas sur `<body>`, dont le fond cesserait de passer au canevas et cacherait l'aurore) : héros « nuit » (trame de points autour du coffre), « Comment ça marche » « marée » (coupe en biais, réglure), « Pourquoi c'est sûr » « coffre » (encre, guilloché, lumière qui tombe), limites « ambre » (hachures fines), questions « chiffre » (texte chiffré décoratif en filigrane, S1), appel final « aube » (courbe en haut). Coutures en fondu de 140 px. Parallaxe de 3 à 6 % en `transform` (`animation-timeline: view()`). Luminance de chaque fond ≤ 0,050 (K5), mesurée en e2e (`home.spec.ts`, contenu caché par CSSOM). Retirés en contraste forcé et renforcé.
+- **Relief** : cartes (étapes, affirmations, questions, sceaux) à bord dégradé qui accroche la lumière, lumière intérieure, ombre portée ; reflet menthe sous le pointeur fin (`magnet`) ; soulèvement au survol par la propriété `translate` (indépendante des animations de défilement).
+- **Défilement** (CSS `view()` et `scroll()`, repli `IntersectionObserver` pour les révélations, rien en mouvement réduit) : les trois gestes entrent l'un après l'autre et un fil menthe les relie en se traçant ; le coffre du héros recule et ses feuillets rentrent quand le héros sort ; les rosaces des sceaux tournent avec la page ; le médaillon de « Pourquoi c'est sûr » ferme son anse ; le contour de l'appel final se referme et un sceau vient couvrir l'ouverture du logo.
+- **Le trajet** (`ui/Schema.svelte`, remplace le schéma en une ligne) : portable, coffre-serveur opaque (cadran, intérieur en bruit chiffré), téléphone, dessinés en géométrie ; le texte de l'écran se condense en une capsule scellée qui traverse le coffre (cachée dedans) et se rouvre chez le destinataire ; **la clé (« # ») fait le trajet à part, en pointillés ambre, sous le serveur** : « La clé ne passe jamais par le serveur ». Libellés HTML alignés sous chaque objet : « Votre appareil / Chiffré ici », « Serveur / Illisible », « Destinataire / Déchiffré ici ». Boucle de 8 s en `transform` et `opacity` (HTML positionné en `cqw`), ambiance (pause hors écran et onglet caché) ; image fixe à mi-parcours en mouvement réduit. Nom accessible : « Chiffré sur votre appareil, illisible pour le serveur, déchiffré chez le destinataire ; la clé passe à part, jamais par le serveur. »
+- **Limites** : section à part (« Ce que Shhdrop ne peut pas faire », `routes/home/Limits.svelte`).
+- **Appel final** : la capsule du logo en grand, remplie de texte chiffré décoratif sur les bords, centre dégagé ; titre, phrase centrée, bouton-sceau (pastille menthe dont l'anse se ferme au survol et au focus), preuves « Sans compte · 1 Go · 24 h au plus · 5 essais ».
+- **Entrée et LCP** (audit performance du 5 novembre) : titre, phrase et sceaux ne partent plus d'une opacité nulle (montée et flou seulement).
+- **Largeur** : le cadre reste celui d'`AppShell` (1 240 px) ; l'élargir à 1 400 px demande une ligne dans `AppShell.svelte`, laissée au propriétaire de ce fichier pour garder le logo aligné sur le contenu.
+
+## 21. Amendements UI4
+
+Ces points remplacent ce qui les contredit plus haut (§7.4, §9.5, §9.8, §12.2, table des textes).
+
+- **Marques à bulle** (`ui/Tip.svelte`) : le libellé du cadenas (« Chiffré et envoyé », « Déchiffré et vérifié »…) et le détail du nettoyage ne sont plus écrits sur la ligne ; ils s'affichent dans une bulle au survol (souris), au focus clavier ou à l'appui (tactile, bascule), fermée par un appui ailleurs, Échap ou un défilement. Bouton nommé (`aria-label`), bulle `role="tooltip"` liée par `aria-describedby`, dans la couche supérieure (popover : jamais rognée). « Nettoyé » : bouclier seul. « Non nettoyé » : petite pastille visible, raison dans la bulle. « PDF laissé intact » / « Archive laissée intacte » : pastille neutre (spec §35.2, D41-27). Une erreur d'envoi reste annoncée (`role="alert"` masqué).
+- **Groupes** (composeur et destinataire) : un seul contenant par catégorie, titre sur un bandeau (`--surface-2`) séparé des éléments par un filet.
+- **Téléchargé** : icône de téléchargement verte sur la ligne (« Téléchargé » reste pour les lecteurs d'écran et en infobulle).
+- **En-tête du contenu** : seulement l'échéance (plus « disparaît quand vous quittez la page », ni « recharger ne compte pas… »). « Signaler » en haut à droite, à côté du titre.
+- **Échéances** (`ui/Deadline.svelte`, destinataire, « Lien prêt », gestion) : toujours deux lignes : « Se termine le 9 nov. à 14 h 32 » (24 h ; EN « Ends Nov 9 at 2:32 PM »), puis le décompte vivant (« 23 h 50 min » ; sous 1 h « 12 min 05 s »), annonces aux seuils seulement. Remplace « s'efface dans … (à …) » et « Expire dans … ».
+- **Estimations** : seulement sur un débit mesuré dans la session (au moins 2 s de lecture) ; plus d'estimation a priori (Options, résumé, groupes, lignes).
+- **Pied du destinataire** : plus de bouton « Terminer et effacer » (l'effacement local se fait en quittant ; `pagehide` n'envoie toujours pas `done`). « Détruire ce partage » seulement à la dernière ouverture permise (`opens_left` = 0, rendu par `unlock`), avec « Vous êtes la dernière personne à ouvrir ce partage… » ; sinon « Ce lien peut encore être ouvert N fois. ». Centré sur téléphone. **D42-22** : « Vous êtes la dernière personne à pouvoir ouvrir ce partage : personne d'autre ne pourra l'ouvrir. Vous pouvez y revenir depuis ce navigateur jusqu'à son échéance, puis il sera effacé du serveur. Vous pouvez aussi le détruire maintenant. » (en haut : « Dernière ouverture : personne d'autre ne pourra l'ouvrir. Vous pouvez y revenir depuis ce navigateur jusqu'à l'échéance. ») ; sinon « Ce lien peut encore être ouvert N fois. Vous pouvez revenir sur ce partage depuis ce navigateur jusqu'à son échéance sans compter d'ouverture. »
+- **Formules payantes** : bleu (`--plus`, `--plus-tint`, `--plus-line`, contrastes dans `tokens.test.ts`), pointillés compris ; le stockage maximal (10 Go, 50 Go) en grand dans la feuille d'information et en gras dans « Avec Plus… ».
+- **Composeur** : phrase sur les noms centrée : « Les noms de vos fichiers sont chiffrés eux aussi : notre serveur ne peut pas les lire. Vous et votre destinataire les voyez normalement. » ; plus de « Tiré au hasard sur cet appareil » sous le mot de passe.
+- **Signalement (gravité moyenne, exploitation)** : sans « Terminer », `done` n'est plus envoyé par le destinataire ; une dernière ouverture non détruite reste chiffrée sur le serveur jusqu'à sa purge (dernière ouverture + 6 h, ou l'échéance si elle vient avant), au lieu d'être effacée tout de suite. Correction possible : `done` en `keepalive` à la fermeture explicite de l'onglet n'est pas fiable et casserait l'octroi de rechargement ; garder tel quel, ou réduire la fenêtre de purge.
+
+## 22. Amendements UI5
+
+Ces points remplacent ce qui les contredit plus haut (§21 compris).
+
+- **Cadenas en pastille** (`ui/LockMark.svelte`, `badge`) : posé sur le coin bas-droit de l'icône de format de **chaque** ligne (composeur et destinataire), bulle inchangée au survol, au focus et à l'appui (zone d'appui de 24 px). Composeur : gris « En attente » tant que l'envoi n'a pas commencé, gris pendant le chiffrement et l'envoi, vert fermé avec coche à « Chiffré et envoyé » (audit M12 : « Chiffré, prêt à partir », car rien n'est encore partagé ; l'étape « Envoyé » de l'écran d'envoi attend le lien) ; un texte reste gris « Chiffré à l'envoi » (il part dans le manifeste au clic). Destinataire : **fermé gris** « Chiffré, pas encore ouvert » avant la lecture, **ouvert vert** (icône maison distincte : l'anse pivote hors du corps) « Déchiffré et vérifié » après la lecture entière vérifiée (ou le manifeste authentifié pour un texte), rouge « Non vérifié » en échec. La forme change avec la couleur (jamais la couleur seule). **Écart signalé (faible)** : D41-25 disait « aucun cadenas avant » chez le destinataire et « pas de cadenas pour un texte du composeur » ; le cadenas gris reste vrai (le contenu est chiffré), il n'affirme rien de plus.
+- **En-tête** : 8 px d'air au-dessus de la barre, en plus de la zone sûre ; (plus de bouton Réglages, §23).
+- **Pied de page** (`ui/AppShell.svelte`) : trois colonnes — Produit (Envoyer, Salon « bientôt », Offres Plus et Pro), Confiance (Sécurité, Confidentialité, Code source sur GitHub, Signaler un abus), Légal (Conditions d'utilisation, Mentions légales, Licence AGPL-3.0) — puis « Aucun traceur, aucune publicité », « © 2026 Shhdrop » et la version du site (hash court du commit injecté au build, `vite.config.ts` `buildId`, sans secret ; « dev » pour `vite dev` et les tests ; un build sans identifiant échoue, spec §28.1). Remplacé le 11 novembre : pied de page partout, avec langue, nettoyage et À propos (§23). Les liens GitHub ouvrent un nouvel onglet (`noopener noreferrer`) ; rien n'est chargé depuis GitHub.
+- **Pages** : `/securite`, `/confidentialite`, `/conditions`, `/mentions-legales`, `/signaler`, `/offres` (`routes/InfoPage.svelte`, `routes/pages/content.ts`, `routes/Offres.svelte`). Conditions et Mentions légales : squelettes avec le bandeau « En cours de rédaction » et des champs « à compléter par le propriétaire ». **Signalement (élevé, légal)** : aucune identité d'éditeur ni d'hébergeur n'est inventée ; les mentions légales sont obligatoires avant la mise en ligne publique (LCEN, art. 6-III) et doivent être complétées par le propriétaire.
+- **Offres** (`ui/OffersTable.svelte`) : la taille est toujours dite « par partage » (« 2 Go par partage », « 10 Go par partage », « 50 Go par partage »), dans une comparaison Gratuit / Plus / Pro (feuille Plus/Pro et page Offres) ; plus de chiffre seul en grand. Ligne « Avec Plus : jusqu'à 10 Go par partage et 7 jours. »
+- **Bleu Plus/Pro** : `--plus` #5596F8 (texte, ≥ 5,7:1 sur les surfaces), `--plus-line` #3B82F6 (≥ 4,5:1), `--plus-tint` #0F1B33 ; plus de teinte violette.
+  **Remplacé (retours BLUE)** : deux bleus distincts, chaque verrou, badge, carte et colonne au bleu de SON offre. Plus = bleu ciel `--plus` #3EC1F5 (texte, ≥ 7,7:1), `--plus-line` #1FA8E6 (≥ 6,2:1), `--plus-tint` #0B2433 ; Pro = bleu profond `--pro` #5C80FF (texte, ≥ 4,76:1), `--pro-line` #3461FF (≥ 3,4:1), `--pro-tint` #121B40. `--fmt-doc` passe de #66C2FF à #6AB0FF pour rester à 12° au moins des deux bleus. Pastilles « 10 Go · Plus » / « 50 Go · Pro » : cible de 44 px, visuel de 32 px (retirées du composeur le 11 novembre, §9.3.1).
+- **Feuille « Ajouter »** (téléphone) : la ligne des limites gratuites (« 200 éléments et 2 Go maximum ») y est affichée.
+- **Destinataire** : en-tête = date de fin puis décompte, sans « Disponible encore » ; titre « Contenu » (court, tient sur une ligne à côté de « Signaler » à 390 px). **Composeur** : « Les noms de fichiers sont chiffrés aussi : nous ne pouvons pas les lire. »
+- **Lien prêt** (D41-29) : « Partager » (principal) ouvre une feuille à trois choix (Envoyer vers une app, Copier le lien et le mot de passe, Afficher le QR code) ; « Copier le lien et le mot de passe » (secondaire) à côté ; copies séparées dans les champs. **Signalement (faible, design)** : « Terminé » reste le bouton principal collé en bas sur téléphone ; deux boutons principaux sur un écran, à arbitrer.
+- Remplacé par D42-22 (texte au pied du destinataire, ci-dessus).
+
+## 23. Amendements de la vérification du 11 novembre
+
+Rapport tenu hors du dépôt (archive du propriétaire) ; les décisions du propriétaire sont reportées ci-dessous. Ces points remplacent ce qui les contredit plus haut (§21 et §22 compris).
+
+- **Plus de Réglages** : ni bouton engrenage dans l'en-tête, ni feuille Réglages, ni onglet Réglages. Ce qu'ils contenaient est dans le pied de page.
+- **Pied de page partout** (`ui/AppShell.svelte`), ordinateur et téléphone : les trois colonnes de §22, puis trois blocs (**12 novembre : blocs Langue et Fichiers retirés, seul « À propos » reste, §24**). **Langue** : un bouton par langue, écrit dans sa langue (aujourd'hui « Français » et « English »), `aria-pressed` sur la langue choisie. **Fichiers** : interrupteur « Nettoyage automatique » (désactivé par défaut, oublié à la fermeture de l'onglet), deux phrases d'explication, et « En savoir plus » qui déplie le détail. **À propos** : une phrase. Aucun stockage.
+- **Pied désactivé pendant l'envoi et sur « Lien prêt »** : liens, langue et interrupteur passent en `aria-disabled`, avec la raison lue par `aria-describedby` : « Liens et réglages du pied de page désactivés pendant l'envoi et sur l'écran du lien, pour ne rien interrompre ni perdre. » Ils restent **atteignables au clavier** (audit M22 : sur « Lien prêt », Tab sautait les liens). Un clic n'a aucun effet.
+- **Barre d'onglets du téléphone masquée** tant qu'un seul onglet fonctionne (`app/tabbar.ts`, `tabBarUseful` : au moins deux onglets actifs). **Remplacé le 12 novembre (Mes partages actif)** : deux onglets fonctionnent, la barre est visible sur téléphone (`/`, `/envois`, `/securite`, `/offres`, page introuvable), sauf dans la composition (`/envoyer`) ; `app/tabbar.test.ts` fait foi.
+- **Offres payantes** : une seule ligne, « Plus de place et de durée avec Plus et Pro, bientôt » (§9.3.1). **Remplacée le 12 novembre** par un bloc compact Gratuit, Plus, Pro (§24).
+- **Coffre chez le destinataire** : option retirée de l'interface, format conservé (spec §27).
+- **Bouton Retour gardé** pendant l'envoi et sur « Lien prêt » (§9.4.6).
+- **« Chiffré, prêt à partir »** sur la pastille d'une ligne envoyée en avance ; « Envoyé » seulement quand le lien existe.
+- **Page de suivi** : heure de la dernière mise à jour (§9.6.4).
+- **Limites d'envoi** : le message dit la règle (§9.4.6).
+- **Langues** : voir §10 et `docs/conception/specs/2026-11-11-langues-design.md` (4 langues, pas encore implémentées).
+
+## 24. Page d'envoi — amendements
+
+Ces points remplacent ce qui les contredit plus haut (§9.2, §10, §22, §23 compris).
+
+- **Défilement** : la molette fait défiler la page partout sur la page d'envoi, souris sur la zone de dépôt ou sur la liste. Cause du blocage : `overscroll-behavior: contain` sur les colonnes défilantes du composeur (`.lc-scroll`, `.side-scroll`) ; Chromium garde alors la molette dans la colonne même quand elle n'a rien à faire défiler. Retiré : arrivée au bout d'une colonne, la molette passe à la page. Test : `ui-e2e/envoi.spec.ts`.
+- **En tête de la page d'envoi** : le titre de l'accueil (« Un lien, un mot de passe, puis plus rien. »), jusque-là caché à l'œil sur cette page, est visible (plus petit, aucun titre en double), avec trois assurances courtes : « Chiffré dans votre navigateur », « Sans compte », « Le lien s'autodétruit ». Ordinateur : une rangée (titre, assurances, Salon à droite) ; téléphone : les uns sous les autres.
+- **Zone de dépôt compacte** : 184 px de haut sur ordinateur, 120 px au doigt (au lieu de 46 % de l'écran) ; titre, zone, offres et Salon tiennent au premier écran (1440 × 900 et Pixel 7).
+- **Offres** : bloc compact Gratuit, Plus, Pro (`ui/OffersStrip.svelte`), trois limites chacun lues dans les constantes (`CONTENT_MAX`, `TTL_MAX_HOURS`, `MAX_OPENS`, `PAID`) : taille par partage, durée maximale, ouvertures. « aujourd'hui » pour Gratuit, « bientôt » pour Plus et Pro, lien « Voir les offres » vers `/offres` (nouvel onglet quand la liste n'est pas vide, sinon elle serait perdue). Plus et Pro ouvrent sur place la feuille d'information (`PaidSheet`). Ni prix, ni bouton d'achat, ni champ. Ordinateur : au-dessus de « Chiffrer et envoyer » ; téléphone : sous « Votre envoi », trois pastilles côte à côte.
+- **Salon** : le bouton « Salon · bientôt » de l'accueil (icône bulle de l'onglet du téléphone, désactivé, raison lue « Bientôt : un salon de discussion chiffré et éphémère. ») est aussi sur la page d'envoi. Aucun parcours de plus : le salon n'est pas ouvert au public.
+- **Nettoyage** : plus de lien « Nettoyer » écrit sur les lignes ; un **balai** (bouton icône de 44 px, nom accessible « Nettoyer ce fichier : {nom} », en anglais « Clean this file: {name} »), sur ordinateur et au téléphone. Bulle au survol et au focus : ce que le nettoyage retire selon le type (photo : lieu, appareil, dates, vignette d'aperçu gardée qui peut montrer la photo d'avant un recadrage ; vidéo ; son ; document : auteur, logiciel, dates). Un appui ouvre une **petite confirmation** non modale (explication, « C'est fait sur cet appareil, avant le chiffrement. », « Annuler » qui a le focus, « Nettoyer ») ; Échap ou un appui ailleurs la ferment sans rien nettoyer. **« Tout nettoyer »** (balai et texte) à côté de « Tout supprimer », seulement s'il reste un fichier à nettoyer, avec la même confirmation. « Nettoyer » du menu « … » (téléphone) ouvre la même confirmation. « Réessayer » (échec) reste un lien texte, sans confirmation.
+- **Formats non pris en charge** : une photo, une vidéo ou un son que le nettoyage ne lit pas (TIFF, SVG, AVI…) porte dès l'ajout la marque ambre « Nettoyage impossible : format non pris en charge » (bulle du bouclier, deuxième ligne du cadenas, décompte près d'Envoyer) ; rien n'est modifié, ni balai ni « Réessayer ». **Décompte à part** : « N fichier(s) ne peut/peuvent pas être nettoyé(s) (format non pris en charge) », distinct de « N fichier(s) n'a/n'ont pas pu être nettoyé(s) », réservé au nettoyage tenté et raté (échec, signé ou protégé) ; les deux lignes peuvent se suivre.
+- **Nettoyage automatique supprimé** (spec §35.2, décision du 12 novembre) : ni interrupteur, ni état, ni textes. Rien n'est nettoyé à l'ajout.
+- **Mémo vocal** : le lecteur d'un mémo dans la liste est aligné à gauche sous le nom (il était centré dans la ligne).
+- **Pied de page** : plus de choix de langue (la langue suit `navigator.languages`, §10) ni de « Nettoyage automatique » ; « À propos » reste. La raison lue pendant l'envoi devient « Liens du pied de page désactivés… ».
+
+
+## 25. Refonte de l'accueil
+
+Objectif : une page plus épurée et plus moderne, inspirée de l'ambiance de virtua.cloud puis d'alphavps.com, **sans copie** (ni logo, ni texte, ni image). Ces points remplacent ce qui les contredit plus haut (§9.1, §20, §22 à §24 compris).
+
+- **Signature « la trame »** : les points du logo (« rop ») déclinés partout. Fond bleu nuit (`Aurora.svelte`, calque `.night`) et grille de petites croix de 9 px tous les 32 px (calque `.trame`, CSS pur : deux dégradés d'un pixel masqués par un disque par case, fondus vers le bas ; ni image ni `data:`), retirée en contraste renforcé ou forcé ; plafond de luminance K5 tenu. Trois points qui s'éteignent devant le sur-titre, trois points en coin des tuiles d'icône (allumés au survol), poussière de points qui se dissout à la fin de l'infographie. Couleurs : menthe `--accent` (le « scellé », inchangée), bleu vif `--sig-blue` `#3366FF` (survol `#2A55E8`) pour les boutons pleins, texte blanc ≥ 4,5:1 (`tokens.test.ts`).
+- **Barre du haut, ordinateur et tablette (≥ 768 px)** (`ui/TopNav.svelte`) : logo ; « Envoyer ▾ » (« Send ▾ » en anglais ; « Partager ▾ » jusqu'au 12 novembre, renommé pour ne pas avoir deux « Partager » ; Fichiers, Note, Vocal, Photo ou vidéo : tuile d'icône teintée, titre, une ligne ; le geste passe au composeur monté par `chrome.add`, sinon par `/envoyer` avec `chrome.pending`) ; « Salon » désactivé avec « bientôt » ; « Sécurité ▾ » (Comment ça marche, Ce que voit le serveur — ouvre la question de l'accueil —, Sécurité en détail, Confidentialité, Signaler un abus) ; « Offres » ; à droite « Mes partages » (contour) et « Partager » (plein bleu, vers `/envoyer`). Menus en motif *disclosure* : bouton `aria-expanded`/`aria-controls`, Entrée et Espace, flèches haut et bas, Début, Fin, Échap (focus rendu au bouton), Tab hors du menu et clic extérieur ferment, un seul menu ouvert. Pendant un envoi : tout en `aria-disabled` avec la raison du pied (`foot-busy`). **Téléphone (< 768 px)** : barre du haut minimale (logo) et barre d'onglets du bas ; la barre d'onglets passe de < 900 px à < 768 px.
+- **Héros** : sur-titre « Chiffré de bout en bout · Hébergé en Europe » (dans la démo GitHub Pages, hors d'Europe : « Chiffré de bout en bout » seul) ; titre inchangé (le même h1), « puis plus rien. » sur sa ligne, en menthe ; phrase ; bouton blanc « Choisir des fichiers » qui ouvre **directement** le sélecteur du composeur ; bouton contour « Ouvrir un salon · bientôt » (l'entrée Salon existante, désactivée) ; cases cochées « Gratuit jusqu'à {CONTENT_MAX} · Sans compte · S'efface après ouverture » (taille lue dans `limits.ts`). Ordinateur : texte à gauche, infographie à droite ; tablette : centré, infographie dessous ; téléphone : à gauche, boutons pleine largeur.
+- **Infographie** (`ui/SecureDemo.svelte`, figure « Fig. 01 », coins marqués) : petit écran avec barre de fenêtre, scène SVG (Vous, Serveur, Destinataire) et **journal** en JetBrains Mono qui s'écrit ligne à ligne, curseur clignotant, barre d'infos « chiffré de bout en bout · dans votre appareil · aucun compte » (la référence demandait « AES-256 » : refusé par la règle UI §20.8, aucun nom d'algorithme à l'écran). Sept étapes de 2 s (14 s) : dépôt de photo.jpg ; chiffré dans l'appareil (cadenas) ; seul du chiffré voyage — un attaquant stylisé l'intercepte et n'obtient que du brouillé ; le serveur garde un bloc illisible et sa taille arrondie, ni nom de fichier, ni mot de passe, ni adresse IP enregistrés — l'attaquant fouille, rien de lisible ; un lien et un mot de passe à part (il ne part jamais au serveur) ; déchiffré chez le destinataire ; « puis plus rien » : effacé après ouverture ou à l'échéance, l'attaquant repart bredouille. Ton rassurant, jamais alarmiste ; jamais « 100 % sécurisé », « inviolable », « aucune donnée », « intraçable » (test). Un seul minuteur, arrêté hors écran (IntersectionObserver), onglet caché, au survol, au focus et par un bouton pause/lecture visible (WCAG 2.2.2) ; animations en `transform` et `opacity`. Lecteur d'écran : titre h2 et liste des sept étapes (titre et phrase), sans rien annoncer à chaque ligne ; dessin et journal cachés. **Mouvement réduit** : aucun minuteur, scène figée sur l'étape du serveur, liste des étapes affichée en storyboard numéroté.
+- **Bande des engagements** (`ui/PromiseBand.svelte`) sous le héros : six promesses **vraies** qui défilent (chiffré dans votre appareil, sans compte, effacé après ouverture ou à l'échéance, aucune adresse IP écrite sur disque, ni nom de fichier ni mot de passe sur le serveur, code ouvert AGPL-3.0). **Jamais de fausse activité « en direct »** (un faux, et le vrai serait une fuite). Copie de boucle cachée au lecteur d'écran ; arrêt au survol, au focus, hors écran et par un bouton ; immobile en mouvement réduit.
+- **Carte de dépôt** : le composeur vide reste juste sous le héros, en carte (`Vessel`) : icône, « Glissez vos fichiers ici », « Commencer » (contour, vers `/envoyer`), « Ou créez sur place », limites. Le glisser-déposer marche sur toute la page. Bandeau chiffré (`SealBand`), guilloché et feuillets retirés.
+- **Sections** (`routes/home/Sections.svelte`) : « Comment ça marche » (3 cartes numérotées), « Pensé pour la confidentialité » (Sans compte, Rien de lisible sur le serveur, Photos nettoyées, Salon éphémère « bientôt » ; sous les cartes, une ligne avec une clé : « La clé du lien est après le « # » : les navigateurs n'envoient jamais cette partie au serveur. » ; lien « Tous les détails de sécurité »), « Offres » (`OffersStrip cards` : Gratuit, Plus, Pro, valeurs de `limits.ts`, « bientôt », « → » vers `/offres`), puis « Vos questions ». Titres centrés, cartes arrondies à tuile d'icône teintée, apparition au défilement (`reveal`, décalage `--i`), survol en `translate` et opacité. Sections « Pourquoi c'est sûr » (schéma), appel final « Quelque chose à transmettre ? » et lien « Comment ça marche » du héros retirés (la barre du haut y mène).
+- **Premier écran** : 1440 × 900 : « Choisir des fichiers » et le haut de la carte de dépôt visibles ; Pixel 7 : « Choisir des fichiers » visible.
+
+## 26. Téléphone — amendements
+
+Décisions du propriétaire (« vas-y, on voit après ») ; choix d'exécution faits par l'assistant, à revoir sur pièce.
+
+- **Navigation du téléphone (< 768 px)** : plus de barre d'onglets **sans compte** (`app/tabbar.ts` : `TABS` = Mes partages seul, une barre d'un seul onglet n'a pas de sens). « Envoyer » ramenait à l'accueil (doublon du logo) et « Téléchargements » ne sert pas sans compte. À la place, un **menu ☰** en haut à droite (`ui/MobileMenu.svelte`, motif disclosure comme `TopNav`) : Partager (vers `/envoyer`, bouton plein), Mes partages, Offres, Sécurité, Confidentialité, Signaler un abus, Code source. **Connecté** : la barre d'onglets du §21.15.1 de la conception du compte reste (Accueil, Envoyer, Téléchargements, Profil) ; « Téléchargements » figure aussi dans le menu et le pied. Remplace le §21.15.5 de la conception du compte (trois onglets sans compte).
+- **Téléchargements sans compte** : affichés seulement si l'historique est activé sur l'appareil (ci-dessous). Raison : sans compte, l'historique ne vit que dans ce navigateur, ne garde jamais le lien (rien à retélécharger) et Safari sur iPhone efface les données d'un site non installé après 7 jours sans visite. Depuis le 22 novembre 2026 (l'historique des téléchargements est désormais désactivé par défaut, conception du compte R12, §21.9) : sans compte, « Téléchargements » figure dans le menu ☰ et le pied de page (colonne « Produit ») **seulement si l'historique a été activé sur cet appareil**, et disparaît dès qu'il est désactivé. L'application le sait par `downloads/live.svelte.ts`, les pages d'information par le seul drapeau `on` de la base `shhdrop-telechargements` (`history/presence.svelte.ts`, `probeDownloads`, sans clé ni création). La page reste joignable par son adresse ; on l'active aussi depuis l'écran du contenu reçu.
+- **En-tête du téléphone** : fond presque plein une fois la page défilée (le texte se lisait sous le logo et « Retour »).
+- **Héros** : plus de sur-titre « Chiffré de bout en bout » (le titre, la phrase et les cases cochées le disent ; « Hébergé en Europe » part avec lui) ; « Choisir des fichiers » et « Ouvrir un salon » dans un **cadre** (verre sombre, filet menthe vers bleu) ; sur téléphone, sous les deux boutons, « Ou créez sur place : note, vocal, photo » (vers `/envoyer`) ; héros **centré** sur téléphone comme sur tablette.
+- **Titre** : entrée plus fluide (760 ms par mot, 55 ms de décalage, montée courte et opacité, **sans flou**) ; puis **« puis plus rien. » se défait** (analyse du design du 13 novembre, M1) : lettres en points de la trame, de droite à gauche, points qui s'éteignent, lettres qui reviennent ; une seule fois, < 5 s (WCAG 2.2.2), `opacity` et `transform` seulement, rien en mouvement réduit ; la phrase entière reste lue d'un bloc (K8).
+- **Carte de dépôt de l'accueil** : masquée sur téléphone (doublon de « Choisir des fichiers ») ; inchangée sur ordinateur (zone de dépôt, Photo, Vocal, Texte).
+- **Offres de l'accueil** : chaque carte dit le **prix prévu** (« 0 € pour toujours », « 7 € par mois, prévu, ou 70 € par an », lus dans `PAID`) et le sens de chaque chiffre (Taille par partage, Durée au plus, Ouvertures au plus). **Modifie D41-16** (aucun prix hors de `/offres`) : toujours rien en vente, ni bouton d'achat ni adresse demandée.
+- **Pied de page (< 900 px)** : un seul bloc centré (marque et phrase, liens à la suite, signature et version) ; intitulés de colonne gardés pour les lecteurs d'écran ; « À propos » retiré sur téléphone (redisait la phrase de la marque).
+- **Bande des engagements** en mouvement réduit : grille alignée à gauche, chaque promesse passe à la ligne (elles sortaient de l'écran).
+- **Sections et questions (téléphone)** : contenu des cartes centré comme leurs titres ; espaces resserrés (le vide avant le pied de page disparaît).
+- **Mes partages** : à la première entrée gardée, `navigator.storage.persist()` est demandé (une fois, jamais attendu, sans effet en cas de refus) pour que le navigateur n'efface pas l'historique quand la place manque. Signalé : Firefox peut afficher une question à ce moment ; sur iPhone, seul l'ajout à l'écran d'accueil protège des 7 jours de Safari.
+
+## 27. Amendements du 16 novembre
+
+- **Menu ☰ (téléphone)** : Partager (vers `/envoyer`), Mes partages, Offres (et Téléchargements avec un compte, ou sans compte si l'historique des téléchargements est activé sur cet appareil). Sécurité, Confidentialité, Signaler un abus et Code source restent dans le pied de page de chaque écran. Le mot « Partager », trop proche de « Mes partages », sera revu plus tard (décision reportée par le propriétaire).
+- **Offres** : **Plus** va jusqu'à **3 jours** (choix 2 ou 3 jours) et **20 ouvertures** ; **Pro** garde **7 jours** et 50 ouvertures (`limits.ts`, `PAID`). Remplace D41-36 pour Plus (qui gardait les 10 ouvertures du gratuit) et la durée de 7 jours de Plus (§38.8.1 de la spécification principale).
+- **Nombre d'éléments** : la limite (200, la même pour toutes les offres, D41-17) n'est plus annoncée d'avance (accueil, voile de dépôt, jauge vide) ; la jauge de la page d'envoi ne la montre qu'à partir de 80 % (160 éléments). Le refus au-delà reste dit (« compose.tooMany »).
+- **Page d'envoi** : la bande Gratuit / Plus / Pro et sa feuille « Bientôt disponible » sont remplacées par un **petit cadre « Votre offre : Gratuit »** avec ses limites et « Voir les offres » (`ui/CurrentOffer.svelte`).
+- **Pied de page** : son propre fond, opaque ; l'aurore et la trame de la page passent dessous et ne se mêlent plus à son papier peint.
+- **En attente** (maquettes envoyées) : fond de la tuile « Choisir des fichiers » (4a, 4b, 4c), effet du titre, écran animé façon terminal, ligne orange de la démo, page Offres avec paiement (voir signalement ci-dessous).
+- **Signalement (élevé, légal et exploitation)** : le propriétaire veut une page Offres « définitive » où l'on choisit Plus ou Pro, au mois ou à l'année, puis on paie. Aucun paiement n'existe ; vendre exige un statut juridique, des CGV, la TVA et un prestataire (§38.5, Q-P1) ; un bouton « Payer » qui ne paie pas serait trompeur (§38.1). À trancher avant de l'afficher.
+- **Retours du 16 novembre (deuxième série, sur le site en ligne)** :
+  - Tuile « Choisir des fichiers » : aussi une **zone de dépôt** (contour en pointillé menthe, « ou glissez-les ici », s'allume quand des fichiers sont glissés sur la page) ; plus la liste des sortes de fichiers.
+  - Écran animé et bande des engagements : **démarrent seuls**, avec un bouton pause (le propriétaire l'a fait remettre le même jour, ce qui respecte WCAG 2.2.2). Correction : sur écran tactile, un toucher valait « survol » et arrêtait l'animation pour de bon ; seul le survol à la souris l'arrête désormais. Le journal se tape vite (22 ms par lettre), curseur au bout du texte pendant la frappe.
+  - Carte « Photos et vidéos nettoyées » : dit que c'est au choix (« Si vous le voulez »). Règle confirmée par le propriétaire : on retire seulement les métadonnées (EXIF, propriétés du fichier), jamais le contenu ni les modifications (commentaires, suivi des modifications) : c'est déjà le cas (D41-27, `media/office.ts`, `media/pdf.ts`, sans réencodage). **Signalé** : retirer des métadonnées change forcément les octets, donc l'empreinte SHA-1 du fichier ; garder la même empreinte n'est possible qu'en ne nettoyant pas (le nettoyage reste au choix, fichier par fichier).
+  - Plus de ligne sur la clé après le « # » sur l'accueil (la page Sécurité le dit).
+  - Cartes des offres : flèche centrée en bas.
+  - Pied de page (téléphone) : liens en une grille de deux colonnes alignées.
+  - Page d'envoi (téléphone, liste vide) : le cadre « Votre offre » passe sous « Ajouter », qui n'est plus coupé par la barre d'envoi.
+- **Empreinte et nettoyage** :
+  - **Le nettoyage reste au choix** (rien n'est modifié par défaut : le destinataire reçoit les mêmes octets, donc la même empreinte). La confirmation dit désormais : « Le fichier envoyé n'aura plus la même empreinte (SHA-256) que l'original. » **Signalé** : retirer des propriétés change forcément les octets, donc toute empreinte (SHA-1, MD5, SHA-256) ; c'est mathématique.
+  - **Empreinte SHA-256 sur la ligne de chaque fichier** du composeur (petite ligne mono, entière au survol, sélectionnée d'un toucher pour la copier), recalculée après un nettoyage. SHA-256 plutôt que SHA-1 (cassé depuis 2017 : deux fichiers différents peuvent avoir la même empreinte SHA-1). Calculée sur l'appareil, par tranches de 4 Mio (moteur Rust, `FileHasher`, fonction `empreinte` de shhdrop-core, absente du module du salon), un fichier à la fois, cache faible ; **jamais envoyée au serveur**. Exception écrite à UI §20.8 (aucun nom d'algorithme à l'écran) : « SHA-256 », pour comparer avec ses propres outils (`shasum -a 256`, `certutil`).
+  - **Fait (décision du propriétaire du 16 novembre : « trouve le meilleur endroit, au même endroit pour les deux, en petit »)** : l'empreinte que l'expéditeur voit est écrite dans le **manifeste chiffré** (champ `sha256`, spec §29.3) ; le destinataire la voit **au même endroit** (ligne du type et de la taille, composant commun `ui/HashLine.svelte`), **avant tout téléchargement**, et peut la comparer à celle du fichier enregistré avec ses propres outils. Choisi plutôt qu'un calcul pendant le téléchargement : l'empreinte est visible tout de suite, même pour un fichier qu'on ne télécharge pas, et c'est exactement celle de l'expéditeur ; un calcul au téléchargement compliquerait la reprise après une pause ou une erreur. **Signalé** : (a) **faible, exactitude** : c'est l'empreinte annoncée par l'expéditeur ; l'intégrité de ce qui est reçu est garantie par le chiffrement authentifié (AES-GCM), pas par cette ligne ; (b) **faible, confidentialité** : l'empreinte d'un fichier connu permet de le reconnaître ; elle n'est lisible que par qui a le lien et le mot de passe, donc qui peut déjà ouvrir le fichier ; le serveur ne la voit pas (test « le serveur ne voit rien » étendu) ; (c) **faible, exactitude** : 200 fichiers aux noms très longs feraient déborder le manifeste avec les empreintes ; ce partage part alors **sans empreinte** plutôt que d'être bloqué (test A5b) ; (d) partages créés avant ce changement : aucune empreinte affichée.
+- **Pied de page, en-tête, page Offres (du 16 novembre, troisième série)** :
+  - Pied de page : plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » (le logo et le menu y mènent) ; « Offres Plus et Pro » gardé.
+  - Pages d'information (pages séparées) : en-tête ordinaire (logo, menu), plus de « Retour » d'écran d'application.
+  - **Page Offres refaite** (`ui/OffersCheckout.svelte`) : une seule présentation (plus de cartes de prix suivies d'un tableau qui redisait la même chose) ; étapes « 1 Offre · 2 Compte · 3 Paiement » ; facturation Mensuel / Annuel (mensuel par défaut ; mois offerts dits sur Annuel) ; Gratuit = « votre offre », rien à choisir ; Plus ou Pro au choix ; récapitulatif (offre, facturation, prix, conditions, moyens de paiement). **Signalé (élevé, légal)** : « Créer mon compte et payer » reste désactivé, avec sa raison dite (« Les comptes et le paiement ouvriront après la validation juridique et le choix du prestataire de paiement. Rien n'est demandé ni prélevé aujourd'hui. ») : ouvrir le compte au public attend D8 (juriste) ; le paiement attend le statut juridique, les CGV et un prestataire (§38.5, Q-P1). Un bouton « Payer » qui ne paierait pas serait trompeur (§38.1).
+  - Libellés des icônes de format : 7,2 au lieu de 7,6 et 8,4 (« JPG » dépassait sa pastille de 0,25 unité, police du site chargée).
+- **Liens sous `/s` et page d'ouverture séparée** : liens `…/s#<clé>`, `…/s#m<clé>` ; la page `/s` (s.html) n'a que l'ouverture et la gestion (le destinataire charge environ 440 Ko de scripts au lieu de 713 Ko, mesure du build du 16 novembre) ; `/` garde l'accueil et l'envoi (dépôt direct et sélecteur en un clic conservés) ; un ancien lien `/#…` part vers `/s` avant tout affichage. « Rouvrir » de « Mes partages » mène à `/s`. Détails : `2026-11-16-liens-s-et-pages-design.md`. **À faire ensuite** : accueil pré-rempli dans `index.html` (référencement) sans clignotement du titre animé.
+- **Moyens de paiement** : « Carte bancaire » seulement ; la ligne « Crypto-monnaies » est retirée (Q-P1 : Paddle, carte au lancement).
+- **Retours du 17 novembre** : page Offres et cartes de l'accueil, nom et prix **centrés**, prix au format « 7 € / mois », « ou 70 € / an » ; « TTC » retiré de chaque prix et dit **une fois** (« Prix TTC, sans frais caché. », obligation d'affichage TTC en vente aux particuliers) ; cartes de l'accueil : la flèche ronde est remplacée par un bouton texte « Voir l'offre › » en bas de carte (toute la carte reste le lien) ; titre de l'accueil affiché **d'emblée** dans son état final (« puis plus rien. » déjà effacé lettre à lettre, plus d'entrée mot par mot ni d'extinction animée) ; infographie : l'état à droite de chaque ligne est tapé à la même allure que le texte (22 ms par lettre), plus de ligne pointillée entre les deux ; pied de page : plus de ligne « Offres » (colonne « Produit » seulement avec un compte), « Code source sur GitHub · Licence AGPL-3.0 » sur une ligne ; limites : gratuit 5 ouvertures, Plus 10, Pro 20 et 30 Go (spec §38.8.1, décision du 17 novembre).
+- **Pied de page (17 novembre, suite)** : le lien devient « Open source sur GitHub » ; la licence n'est plus affichée dans le pied (elle est dite sur GitHub, fichier LICENSE et README). La licence reste l'AGPL-3.0 (pas la GPL) : un service en ligne qui utilise une version modifiée doit en publier le code, ce que le lien vers le dépôt permet d'offrir à chaque visiteur.
+- **Retours du 17 novembre (troisième série)** :
+  - **Mot de passe** : plus dans les options. Toujours généré sur l'appareil (D41-15), il n'est montré qu'une fois le lien créé, sur « Lien prêt », sous le lien. Plus de « Générer un autre » : le mot de passe est figé dans l'enveloppe au clic sur « Chiffrer et envoyer » ; en changer après, sans nouvelle enveloppe côté serveur (route de gestion à créer), rendrait le lien inutilisable avec le nouveau mot de passe. Composant `PassphraseField` retiré.
+  - **Ouvertures** : des cases tant qu'il y en a 6 au plus (gratuit : 1 à 5) ; au-delà (Plus et Pro : 10 et 20), un compteur « − n + » (`ui/Stepper.svelte`) au lieu d'une grille de cases.
+  - **Page d'envoi** : plus le slogan de l'accueil ; un h1 « Nouveau partage » lu par les lecteurs d'écran seulement. Les trois assurances deviennent trois pastilles égales, sur une ligne, de la hauteur du bouton Salon ; en colonne étroite, libellés courts (« Chiffré », « Sans compte », « S'autodétruit ») et texte seul ; le libellé complet reste lu.
+  - **« Tirer pour actualiser » (téléphone)** : permis là où rien ne peut se perdre (accueil vide, pages d'information, Offres, Mes partages) ; bloqué pendant la composition et l'envoi, et sur la page d'un partage (classe `no-pull`).
+- **Salon avec les actions d'ajout** : plus de bouton Salon en haut de la page d'envoi ; « Salon · bientôt » est une action comme les autres, en dernier : dans la rangée de l'ordinateur (Photo ou vidéo, Vocal, Note, Salon) et dans la feuille « Ajouter » du téléphone (bouton « + »), désactivé avec sa raison (`aria-disabled`, « Bientôt : un salon de discussion chiffré et éphémère. »). Le bouton « Ouvrir un salon » de l'accueil reste. Téléphone : la ligne « Rien à envoyer pour l'instant · 2 Go maximum » n'est plus affichée (la limite est dans « Votre offre » et apparaît dès le premier élément).
+- **Titre de la page d'envoi** : « Nouveau partage », visible (h1), à gauche des trois assurances sur ordinateur, au-dessus sur téléphone. Pastilles : libellé complet si la rangée est large, libellé court en dessous de 820 px de rangée (tablette), et sur téléphone (rangée de 460 px au plus) l'icône au-dessus du libellé court, dans la pastille (56 px de haut).
+- **Retours du 17 novembre (quatrième série)** :
+  - **Page d'envoi** : plus de titre visible « Nouveau partage » (doublon de « Votre envoi ») ; h1 pour les lecteurs d'écran seulement. Les trois assurances sont dans le cadre de dépôt, sous « Déposez des fichiers » (téléphone : sous « Ajouter ») ; sur ordinateur, ce cadre remplit la colonne, contenu centré. Les actions (Photo ou vidéo, Vocal, Note) ont une teinte et un contour d'accent pour se voir comme des boutons ; Salon (bientôt) garde son pointillé.
+  - **« Mes partages »** (en-tête et menu) seulement s'il y a des partages sur l'appareil : historique lu localement (aucune requête) sur l'accueil, l'envoi et la page « /s » ; sur les pages d'information, simple vérification de l'existence de la base (`indexedDB.databases()`, rien d'ouvert ni de créé). Les partages restent dans « Mes partages » quand on quitte le site et revient (même navigateur, même appareil), tant que « Garder dans mon historique » est activé (**désactivé par défaut sans compte depuis le 24 novembre**, décision du propriétaire : « Lien prêt » montre alors le lien de gestion ; activé avec un compte ; `history/live.svelte.ts`, `keepSentDefault`) et que les données du site ne sont pas effacées.
+  - **Bouton « Partager » de l'en-tête retiré** : le lien se partage depuis « Lien prêt », où il est créé ; l'entrée du menu du téléphone s'appelle « Nouveau partage ».
+  - **Vocaux et notes jamais téléchargés** : le vocal (nettoyage « vocal » dit par le manifeste) s'écoute seulement ; la note se lit, et se copie si l'expéditeur autorise le téléchargement ; ni l'un ni l'autre dans « Tout télécharger » ni l'archive .zip. Limite connue : un vocal dont le nettoyage a échoué est vu comme un fichier audio ordinaire.
+  - **Visionneuse PDF** : clic droit, appui long et glisser bloqués sur les pages (le PDF ne s'enregistre que par « Télécharger », quand c'est autorisé). En « voir seulement », images, vidéos et sons l'étaient déjà (pas de menu, `controlslist="nodownload"`, pas d'image dans l'image). Une capture d'écran reste possible : c'est dit à l'expéditeur.
+
+- **Retours du 17 novembre (cinquième série)** :
+  - **Héros : deux boutons** au lieu de trois (« Choisir des fichiers », Salon, « Ou créez sur place » menaient tous à la page d'envoi) : « Choisir des fichiers » (garde le glisser-déposer, ouvre le sélecteur) et « Créer sur place » (note, vocal, photo ou vidéo, salon bientôt), en bordure pleine (le pointillé reste réservé au dépôt). À l'arrivée sur « /envoyer », la zone visée est mise en avant 2,4 s (`chrome.spot`) : zone de dépôt (fichiers) ou rangée « Créer sur place » ; sur téléphone, « Créer sur place » ouvre directement la feuille « Ajouter ». Les actions de la page d'envoi sont des tuiles plus grandes et teintées.
+  - **Phrase du héros** : générale (« Vos fichiers, mais aussi… ») et met en avant les messages vocaux, les notes et le salon de discussion (bientôt).
+  - **« S'efface après ouverture » remplacé par « Durée et ouvertures au choix »** : la destruction après ouverture n'est ni obligatoire ni le seul cas (échéance ou nombre d'ouvertures, au premier des deux).
+  - **Infographie** : l'état de chaque ligne du journal (« ✓ prêt »…) est tapé lui aussi, de gauche à droite, lettre par lettre, avec le curseur qui passe de la commande à l'état ; 40 ms par lettre, étape de 2,8 s. Légende « Fig. 01 » retirée (titre gardé pour les lecteurs d'écran).
+  - **Bande des engagements retirée** de l'accueil (`PromiseBand`) : adresse IP, serveur, traceurs relèvent des pages Sécurité et Confidentialité.
+  - **« Comment ça marche »** devient une frise numérotée (cercles reliés : à l'horizontale sur ordinateur, à gauche sur téléphone), distincte des cartes de « Pensé pour la confidentialité ».
+  - **Offre gratuite** : plus de « Voir l'offre » (rien à acheter) ; gardé pour Plus et Pro.
+  - **Pied de page** : liens centrés sur téléphone ; en bas, le nom à gauche (plus gros) et la version à droite (plus petite) ; marge du bas réduite.
+- **zoom rétabli le 20 novembre (sur la recommandation de l'audit : WCAG 1.4.4, note d'accessibilité PageSpeed)** : viewport sans `maximum-scale` ni `user-scalable`, `app/no-zoom.ts` retiré, règle axe `meta-viewport` de nouveau vérifiée (test `app/zoom.test.ts`) ; `touch-action: manipulation` gardé (pas de zoom au double-toucher, le pincement reste permis). Ancien texte : `maximum-scale=1, user-scalable=no` sur les trois pages (Android) ; sur iPhone, Safari ignore cette balise : pincement refusé par script (`app/no-zoom.ts` : événements `gesture*`, `touchmove` à deux doigts) et double-toucher retiré (`touch-action: manipulation` sur `html`). **Risque signalé et assumé** : écart à WCAG 1.4.4 (agrandir le texte), règle axe `meta-viewport` écartée seule dans les tests ; la visionneuse ne permet plus non plus de pincer une photo. Le zoom du navigateur sur ordinateur (Ctrl +) et la taille de texte du système restent possibles.
+- **Carte « Glissez vos fichiers ici / Commencer » retirée de l'accueil** : doublon des deux boutons du héros. Le dépôt sur toute la page reste possible (voile, tuile « Choisir des fichiers » qui s'allume) ; le composeur ne s'affiche plus que sur la page d'envoi.
+- **« Mes partages » sans compte, relecture du 18 novembre** : un échec passager à l'ouverture de l'historique (base occupée par un autre onglet, écriture d'essai refusée) n'est plus gardé pour tout l'onglet : l'envoi suivant réessaie (`history/live.svelte.ts`, `history/store.ts`). Sur les pages d'information, « Mes partages » n'apparaît que si la base existe **et** contient une entrée (comptée sans clé, entrées chiffrées) : une base restée vide après « Ne pas garder » ou « Effacer l'historique » ne le montre plus (`history/presence.svelte.ts`).
+- **Accueil lisible par les moteurs de recherche** : l'accueil est rendu au build (`src/pages/prerender.ts`, `renderHome` ; `HomeStatic.svelte` = coque + accueil sans composeur) et écrit dans `index.html` entre `<!--shh-home-->` et `<!--/shh-home-->`, avec `robots: index, follow` et l'adresse canonique (hors démo) ; le script le remplace au montage. Les autres adresses de l'application (`/envoyer`, `/envois`…) et le 404 reçoivent `app.html`, la même page sans ce contenu (serveur Go, `static.go` ; démo : `404.html`), pour ne jamais montrer l'accueil avant le script. Depuis le 22 novembre (revue d'ergonomie, U13), `app.html` porte un squelette au lieu d'un écran vide : la coque sans contenu (`ShellStatic.svelte`, `renderShell`, entre `<!--shh-shell-->` et `<!--/shh-shell-->`), dont seuls l'ambiance et le logo se voient tant que `#app` porte `data-squelette` (menus, boutons et pied cachés à leur place : en français et inertes sans script) ; même script, même entrée, rien de chargé en plus (premier affichage d'une page de l'application à 1,6 Mb/s : de 2,5 s à 1,1–1,4 s). `check-dist` vérifie le contenu écrit (h1, aucun attribut `style`, aucune adresse `/src/`) et `app.html`. **Plus d'entrée animée sur l'accueil** : le contenu est déjà affiché avant le script, une entrée jouerait deux fois ou pas du tout. `robots.txt` et `sitemap.xml` existaient déjà. Rien à faire pour le référencement réel tant que le domaine n'est pas en ligne.
+- **Pages bilingues** : l'accueil et les six pages d'information ont une version anglaise écrite au build sous `/en` (`/en`, `/en/securite`, `/en/confidentialite`, `/en/offres`, `/en/conditions`, `/en/mentions-legales`, `/en/signaler` ; fichiers `en.html`, `en-<page>.html`, servis par `static.go`), chacune avec son adresse canonique et les balises `hreflang` fr, en et `x-default` (= français) ; `sitemap.xml` cite les deux langues. **Sur ces pages, l'adresse donne la langue** (`app/langues.ts`, `langueDeLAdresse`) ; ailleurs (envoi, partage, compte, salon), la langue suit toujours le navigateur. Raisons : Google visite avec un navigateur anglais (la page française aurait été lue en anglais), déconseille les renvois automatiques selon la langue, et le serveur ne lit pas `Accept-Language` (§36 S2, Caddy le retire) : aucun renvoi, ni serveur ni script. Un navigateur anglophone sur la version française voit, en haut de page, un bandeau « This page is in French. English version » vers `/en…`, dans le flux au-dessus de la barre du site, fermable (fermeture gardée en mémoire seulement) (`ui/EnglishLink.svelte`). **Changé par le propriétaire le 22 novembre** (revue d'ergonomie du 20 novembre, U10) : le choix du 20 novembre était un petit lien flottant, jugé trop discret. Le bandeau est posé au montage (la langue du navigateur n'est connue que du script) : le décalage cumulé mesuré reste sous 0,01 (contenu écrit au build remplacé, pas déplacé), mais le contenu descend visiblement de 48 px à l'arrivée du script sur réseau lent. Les liens internes restent dans la langue affichée (`href`). La démo n'a pas de version écrite : la langue y suit le navigateur partout. Mesure Lighthouse mobile locale : `/en` sans décalage au chargement (CLS 0, contre 0,275 avant).
+- **Lumière d'ambiance gardée au montage (performance)** : la page écrite au build n'avait pas les échelles `--kx`/`--ky` (posées par le script ; la CSP refuse les styles en ligne) : les nappes restaient à 128 px puis s'agrandissaient au montage. Échelles par défaut en CSS (grand téléphone, écran de 1440 px), et le script garde les trois calques écrits (`ui/ambiance.ts`) au lieu de les redessiner ; il ne leur pose que les échelles exactes et la pause.
+- **Animation « Ce qui se passe » (suite : « 9 s trop long »)** : durée d'une étape = 1 s + 30 ms par caractère du texte affiché, entre 2,5 et 5,5 s, et au moins la frappe du journal de l'étape plus 1 s (`demo-steps.ts`, `dureeEtape`, `lettresEtape` ; test : la frappe finit au moins 0,5 s avant la fin de chaque étape, en français et en anglais).
+- **Infographie, retours du 18 novembre** : journal tapé en JavaScript (`SecureDemo.svelte`), **un seul curseur** qui tape le texte lettre par lettre (35 ms), passe à la ligne si la place manque (plus aucun mot coupé sur téléphone), tape l'état à droite, puis descend à la ligne suivante ; à la fin il clignote au bout de la dernière ligne ; étape de 3 s. Bande du bas : cadenas + « chiffré dans votre appareil » (« aucun compte » retiré : la personne peut en avoir un). « Scellez » devient « Chiffrez » (Comment ça marche) ; l'étape finale de l'envoi « Scellé » devient « Prêt » (« Chiffré » aurait répété la première étape « Chiffré sur cet appareil »).
+- **Page d'envoi sur téléphone, à la hauteur de l'écran** : la hauteur sous l'en-tête est mesurée (`fitViewport`, comme sur ordinateur, au redimensionnement et quand la barre d'adresse change) ; le cadre de dépôt prend la place libre, pour que la barre d'envoi (Options, +, « Chiffrer et envoyer » et la phrase « Ajoutez au moins un élément ») tombe en bas de l'écran. Un écran trop petit garde un plancher de 360 px et défile.
+- **Menu ☰ et compte** : « Nouveau partage » en pastille menthe ; Mes partages (s'il y en a), Salon (bientôt), Sécurité, Offres, chacun avec son icône ; ouverture animée (le panneau glisse, les entrées arrivent l'une après l'autre, rien en mouvement réduit) et voile sur la page. **Compte** (seulement avec `__COMPTES__`) : « Se connecter » et « Créer un compte », ou, connecté, « Mon compte », « Paramètres » et « Se déconnecter » (appelé par `accountFlag.logout`, posé par App.svelte : la coque n'importe rien du compte). En-tête ordinateur : « Se connecter » ou « Mon compte ». Icônes maison ajoutées : `log-out`, `tag`. **Le compte n'est activé ni en production ni dans la démo** (`SHH_SITE_COMPTES` n'est posé nulle part) : ces entrées n'y apparaissent pas encore.
+- **Pied de page** : ligne au plus près du nom et de la version ; version plus petite (10 px).
+- **Pages annexes, signature propre** : Sécurité, Confidentialité, Conditions, Mentions légales et Signaler se présentent comme un **document** centré : cadre aux coins menthe (les équerres de l'infographie de l'accueil), carte de lecture, étiquette mono « shhgone · nom de la page », titre, phrase d'introduction, **sommaire** (boutons qui font défiler, jamais de « # » dans un lien), sections numérotées 01, 02… en pastille mono, puces en petits blocs menthe (les paquets chiffrés de l'infographie), interligne 1,7 et colonne de 64 caractères, détails techniques repliés façon terminal. Téléphone : même cadre, marges réduites.
+- Planche de propositions (« Comment ça marche » A1 à A4, pied de page B1 à B4) envoyée au propriétaire le 18 novembre ; choix en attente.
+- **Retours du 18 novembre (deuxième série)** :
+  - **Fond** : un seul motif, les pictogrammes ; la trame de petites croix est retirée.
+  - **« Comment ça marche » = proposition A2** : trois cartes, grand chiffre en filigrane, icône en haut, texte en bas.
+  - **Pied de page = proposition B2** : trois colonnes resserrées, sans le bloc « À propos ».
+  - **Ordinateur** : premier écran plus large (l'infographie jusqu'à 760 px) et à la hauteur de l'écran avant « Comment ça marche » ; chaque section de l'accueil est une bande à part sur toute la largeur (filet en haut, lueur, une bande sur deux plus claire).
+  - **Infographie, cases** : appareils façon écran (encoche, barre du bas) ; serveur avec ses trois baies vides que les blocs chiffrés remplissent ; destinataire « en attente » (cadenas) avant l'ouverture ; « ✓ envoyé » chez vous à la fin.
+  - **Compte (audit)** : déconnexion envoyée avec `keepalive`, réessayée en arrière-plan sans réseau (le jeton n'est jamais réécrit) ; les autres onglets oublient le compte (signal sur un canal, aucun secret) ; au retour sur l'onglet, une session fermée ailleurs est vue tout de suite ; une session oubliée n'est jamais réécrite par un autre onglet.
+- **Séparation des sections, version soignée** : classe `.band` (ui/base.css), une teinte par section (`--tone` : menthe pour « Comment ça marche », bleu pour la confidentialité, cyan pour les offres, violet pour les questions). Fondu en haut et en bas (aucun bord net entre deux sections), filet de lumière qui s'éclaire vers le centre avec un point lumineux, arc de lueur dessous et brume légère au milieu ; pleine largeur dès 600 px, dans la colonne sur téléphone ; rien ne bouge ; retiré en contraste renforcé.
+- **Reprise des maquettes « La trame » et « Le chiffré »** :
+  - **Héros, cadre d'envoi (« Le chiffré »)** : « Glissez vos fichiers ici », bouton bleu « Choisir des fichiers », « 200 éléments · 2 Go au total » ; à droite « Ou créez sur place » : Photo ou vidéo, Vocal, Salon (bientôt) — la Note reste sur la page d'envoi. Chaque bouton mène à « /envoyer » avec son geste déjà lancé (caméra, enregistreur ; Salon : tuile mise en avant, « bientôt » annoncé). Tout le cadre est la zone de dépôt (il s'allume quand on glisse des fichiers).
+  - **Titre (« La trame », version 1)** : « puis plus rien. » se défait lettre après lettre en trame de points, s'évapore et revient (boucle de 12 s, lisible les deux tiers du temps) ; arrêté quand l'onglet est caché ; rien en mouvement réduit.
+  - **« Comment ça marche » (« Le chiffré », amélioré)** : panneau « en clair | chiffré » ; une ligne menthe le balaie et transforme sur son passage les noms de fichiers, le mémo vocal et une note en chiffré (exemples, texte brouillé à graine fixe, caché aux lecteurs d'écran) ; ne tourne qu'à l'écran ; trois étapes numérotées dessous.
+  - **Séparations (« La trame »)** : couture en demi-teinte entre les sections (rangées de points qui grossissent vers le milieu puis rapetissent, bords fondus), dans la teinte de la section, avec l'arc de lueur des bandes.
+  - **Infographie (« La trame », version 2)** : à l'étape « chiffrer », une ligne menthe descend sur l'écran de l'appareil : au-dessus le chiffré, au-dessous la photo encore lisible.
+  - **Page Offres (« La trame », version 2)** : étapes numérotées (1 Offre et rythme, avec « Ce que Plus ajoute » ; 2 Moyen de paiement : carte bancaire, PayPal, crypto-monnaies (paiement unique pour la période) ; 3 Compte) et récapitulatif collé à droite (4) ; rien n'est encore en vente, le bouton reste désactivé avec sa raison.
+- **Retours du 19 novembre (deuxième série, iPhone)** :
+  - **Titre, effet exact de « La trame » version 1** : en vague depuis la fin de la ligne, chaque lettre de « puis plus rien. » se change en trame de points blancs, vire au menthe, puis se défait en deux nuées de points qui s'envolent vers la droite et s'éteignent ; la ligne reste vide un instant puis revient (boucle de 11 s). Points dessinés par masques CSS ; les nuées sont des copies de la lettre (`data-c`) hors du masque. Le héros coupe tout débordement horizontal (`overflow-x: clip`) : rien ne sort de l'écran. Arrêté onglet caché ; mouvement réduit : lettres pleines menthe.
+  - **Héros** : l'infographie descend dans « Comment ça marche » (elle répétait le panneau « en clair | chiffré », retiré, avec ses textes). Ordinateur : titre, phrase et assurances à gauche, cadre d'envoi à droite (maquette « La trame »). Téléphone : titre plus petit, cadre compact sans « Glissez vos fichiers ici » (on ne glisse pas de fichier sur un téléphone) ; **tout le cadre tient dans les 700 premiers pixels** (iPhone 402 × 874 : bas du cadre à 613 px ; vérifié par test).
+  - **Coutures sur téléphone (« La trame », version 2)** : d'un bord à l'autre de l'écran (coupées par `#app`), fondues seulement sur les côtés ; 104 px au-dessus de chaque titre de section et 64 px sous le héros, pour que la couture ne touche aucun texte.
+  - **Pages annexes, refonte** (« ancien, trop serré, pavé ») : plus de carte ni de cadre ; grand titre sur le fond du site, fermé par une couture bleue ; ordinateur : sommaire collé à gauche qui suit la section lue (trait menthe) ; téléphone : rangée de pastilles qui défile seule ; sections sans numéros, espacées de 48 à 72 px, texte 17 px, interligne 1,75, colonne de 68 caractères ; puces en points menthe.
+- **Retours du 19 novembre (troisième série, maquette « La trame » version 1)** :
+  - **Sections à fond propre** (`.sect`, ui/base.css) : chaque section a son fond d'un bord à l'autre de l'écran ; aucun texte n'est posé sur le papier peint. Héros sur la nuit et l'aurore ; « Comment ça marche » noir ; « Ce qui se passe quand vous partagez » bleu nuit ; « Pensé pour la confidentialité » crème, texte foncé ; « Offres » noir ; questions bleu indigo, trame de points ; pied de page. **Couture** au-dessus de chaque section et du pied : neuf rangées de points de la couleur de la section qui grossissent jusqu'à devenir son fond (CSS seul, aucune image) ; retirée en contraste forcé.
+  - **Papier peint en pictos au pied de page seulement** : retiré des côtés de la page (`.sides` supprimé ; il chargeait aussi un calque fixe masqué, coûteux au défilement).
+  - **Héros** : titre, phrase et assurances à gauche, cadre d'envoi à droite, sur toute la largeur utile ; titre plus grand (jusqu'à 5,5 rem). Cadre : la **zone de dépôt en pointillé menthe** entoure la pastille, « Glissez vos fichiers ici », « Choisir des fichiers » et « 200 éléments · 2 Go au total » ; dessous, « Ou créez sur place » et **trois tuiles toujours sur une ligne** (Photo ou vidéo, Vocal, Salon). **« 2 Go » n'est écrit qu'une fois** (sous le bouton) : l'assurance devient « Gratuit ». Le cadre tient entier au premier écran de 320 à 1920 px de large (mesuré : bas à 610 px sur 402 × 874, 692 px sur 1440 × 900, 644 px sur 1280 × 800, 626 px sur 1024 × 768).
+  - **Titre** : « puis » reste plein ; seuls « plus rien. » se défont (vague étalée, 170 ms par lettre, depuis la fin), comme l'image de la maquette.
+  - **« Comment ça marche »** : trois illustrations fixes (document ; document en trame fermé par un cadenas menthe ; document qui part en points), pointillé entre elles sur ordinateur, étapes numérotées dessous ; aucune animation.
+  - **« Ce qui se passe quand vous partagez »** (section propre, titre visible) : l'infographie à gauche (en-tête « photo.jpg », « étape n sur 7 » et pause en haut à droite ; journal réduit à deux lignes ; plus de bande du bas) et **les sept étapes à droite**, cochées au fil de l'animation, l'étape en cours surlignée (`aria-current="step"`) ; dessous sur téléphone. Dernier état du journal : « ✓ terminé ».
+  - **Confidentialité** : quatre lignes cochées en deux colonnes (le salon, bientôt, case vide) et **le lien en deux** : « va au serveur » `shhgone.com/s` (sans `https://`, que check-dist refuse à juste titre dans la page) | « reste dans le navigateur » `#Kq7mXw2Rt9` (exemple), avec la phrase sur le « # ». **Remplace la décision du 16 novembre** de ne plus montrer la clé sur l'accueil.
+  - **Questions** : titre à gauche, liste à filets à droite (plus de cartes).
+- **Retours du 19 novembre (quatrième série)** :
+  - **Titre figé** : plus aucune animation ; « plus rien. » reste dans son état effacé (maquette « La trame ») : « p » en trame serrée, « lus » en points blancs, « rie » en points menthe, « n. » qui part en points vers la droite. Calculé sur la position des lettres (toute langue) ; contraste forcé : lettres pleines.
+  - **Palette resserrée** : une couleur principale, le **menthe** (#5FE3B5 : logo, bouton principal « Choisir des fichiers », coches, liens, pointillés) ; deux fonds, la **nuit** (fond de la page) et le **crème** (#EBE6DC, panneau Confidentialité) ; textes clair et gris (foncé et gris sur le crème). Le bleu quitte l'accueil (bouton, halos, filets et puce du lien de l'infographie) ; il reste aux seules offres Plus et Pro (couleur de l'offre). Rouge : erreurs et attaquant de l'infographie.
+  - **Transitions plus douces, formes non rectangulaires** : plus de coutures en points ni de changements de fond entre les sections sombres (une lueur menthe très légère en haut de chacune, `.soft`) ; la Confidentialité est un **panneau crème aux coins très arrondis** à 12 px des bords de l'écran (`.panel`) ; le **pied de page** est un panneau aux coins hauts arrondis, fin filet menthe en haut (plus de couture).
+  - **Pied de page (correction du propriétaire)** : ni coins arrondis ni filet menthe ; bord droit, pictos gardés.
+  - **« Se connecter » toujours visible** (19 novembre, 4) : tant que le compte n'est pas ouvert (`__COMPTES__` faux, décision D8 ; la démo n'a pas de serveur), l'en-tête de l'ordinateur et le menu ☰ montrent « Se connecter · bientôt », désactivé comme le Salon ; un clic annonce « Bientôt : un compte facultatif. Partager restera possible sans compte. ». Avec `__COMPTES__`, le vrai bouton (connexion, puis « Mon compte ») le remplace.
+- **Retours du 19 novembre (cinquième série)** :
+  - **Plus de panneau crème** : les sections se distinguent par le **relief et la matière** (`.slab`, ui/base.css) : plaques un peu plus claires que la page, reflet en haut, bord fin, ombre portée, coins arrondis, à 12 px des bords de l'écran. Une matière par plaque : trame de points (« Comment ça marche »), pictos de Shhgone en filigrane (Confidentialité), trame fine (Questions) ; l'infographie et les offres restent posées sur le fond, entre deux plaques.
+  - **« Puis plus rien » seulement dans le titre** : étape 3 de l'infographie « Envoyé chiffré » (au lieu de « Seul du chiffré voyage »), étape 7 « Tout s'efface », journal « effacer le partage », étape 3 de « Comment ça marche » « Partagez » (« Le lien par un moyen, le mot de passe par un autre ; tout s'efface ensuite. »).
+  - **Lien d'exemple à la longueur réelle** : `shhgone.com/s` puis `#` et 43 caractères (la clé de 32 octets en base64url), un exemple, jamais une vraie clé.
+- **Compte essayable dans la démo** : la démo GitHub Pages est construite avec `__COMPTES__` ; son faux serveur du compte (`src/demo/fake-compte.ts`, mêmes routes et réponses que `handlers_compte.go`) répond dans l'onglet ; **aucun e-mail** : le code « envoyé » s'affiche sous la phrase « code envoyé » (`DemoCode.svelte`, crochet `compteCode` de `app/demo-hooks.ts`) avec « Démo : aucun e-mail n'est envoyé ; ce compte n'existe que dans cet onglet et disparaît à sa fermeture. ». Double authentification réelle (TOTP RFC 6238 par WebCrypto, une vraie application fonctionne). État du compte gardé pour l'onglet seulement (`demo/persist.ts`, sessionStorage), perdu à sa fermeture. Preuve anti-robot factice en démo (comme pour un partage). Le moteur du salon (règles du pseudo) est chargé dans un morceau à part, au premier besoin. **D8 prise** (confirmée le 24 novembre) : la production a le compte et le salon, ouverts au public dès le premier déploiement, risque assumé sans le passage manuel sur appareils réels ni l'avis du juriste (`deploy/README.md` §10, §12).

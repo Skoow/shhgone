@@ -6,7 +6,7 @@
 # journal public Rekor) et publié dans la Release GitHub avec son bundle, SHA256SUMS et
 # dist.tar.gz. deploy/deploy.sh refuse toute image dont le site n'est pas ce manifeste.
 #
-# L'image du serveur (décision du propriétaire du 25 novembre ; deploy/README.md §3.2) : construite
+# L'image du serveur (deploy/README.md §3.2) : construite
 # par deploy/construire-image.sh sur deux machines (même empreinte exigée), son /site comparé au
 # manifeste, publiée sur ghcr.io/skoow/shhgone (paquet public, lu sans identifiant) et signée
 # sans clé par la même identité ; image.json (version, commit, image@empreinte, SHA-256 de
@@ -20,7 +20,7 @@
 # Ce fichier est donc lui-même une partie de l'identité : le renommer change ce que vérifient
 # deploy/provenance.sh, verifier-site.yml et la page /verifier.
 #
-# Le manifeste n'est pas commité avant l'étiquette (spec §28.2, corrigée le 24 novembre) : le
+# Le manifeste n'est pas commité avant l'étiquette (spec §28.2) : le
 # numéro de version du site est le commit lui-même, un commit ne peut pas contenir le manifeste
 # de son propre build.
 name: release

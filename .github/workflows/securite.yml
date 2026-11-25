@@ -24,7 +24,7 @@ jobs:
           go-version-file: server/go.mod
           cache: false
       # govulncheck v1.9.0, publié le 11 octobre 2026 (proxy.golang.org), donc plus de 7 jours
-      # avant son épinglage (règle du propriétaire). Même version que le job go de ci.yml : en
+      # avant son épinglage (règle des dépendances, spec §24). Même version que le job go de ci.yml : en
       # changer ici, c'est le changer là-bas.
       - name: govulncheck
         working-directory: server
@@ -33,7 +33,7 @@ jobs:
       - name: govulncheck (relais)
         working-directory: deploy/shhcheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-  # Fuzzing hebdomadaire des analyseurs d'entrées hostiles (revue du 21 novembre) : 2 minutes
+  # Fuzzing hebdomadaire des analyseurs d'entrées hostiles : 2 minutes
   # chacun ; une entrée qui fait paniquer est gardée par Go dans testdata/fuzz et le job échoue.
   fuzz:
     runs-on: ubuntu-latest

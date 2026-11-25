@@ -1,7 +1,6 @@
-//! Liens de partage et de gestion (spec §32, `transfer/link.ts`) : sous `/s` (décision du
-//! propriétaire du 16 novembre, docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md),
-//! le secret après le « # ». Seule cette forme est lue (l'ancienne, à la racine, est refusée depuis le
-//! 18 novembre). Le fragment n'est jamais envoyé au serveur ; ni le lien ni la page ne portent
+//! Liens de partage et de gestion (spec §32, `transfer/link.ts`) : sous `/s`
+//! (docs/conception/specs/2026-11-16-liens-s-et-pages-design.md), le secret après le « # ».
+//! Seule cette forme est lue (l'ancienne, à la racine, est refusée). Le fragment n'est jamais envoyé au serveur ; ni le lien ni la page ne portent
 //! d'identifiant (l'id du partage se calcule à partir de K_lien).
 use crate::encoding::{b64u, unb64u};
 use crate::error::{Error, Result};
@@ -43,7 +42,7 @@ fn allowed_scheme(u: &Url) -> bool {
     u.scheme() == "https" || (u.scheme() == "http" && LOCAL.contains(&u.hostname()))
 }
 
-/// Vérifie une origine (audit F1) : forme canonique exacte `https://hôte[:port]` (http seulement
+/// Vérifie une origine : forme canonique exacte `https://hôte[:port]` (http seulement
 /// pour localhost, 127.0.0.1, [::1]), sans chemin, requête, fragment ni identifiants.
 pub fn check_origin(origin: &str) -> Result<String> {
     match Url::parse(origin) {
@@ -68,7 +67,7 @@ fn check_base(base: &str) -> Result<&str> {
     }
 }
 
-/// Chemin des liens sous la base (16 novembre) : `{base}s`, réservé aux futurs liens universels.
+/// Chemin des liens sous la base : `{base}s`, réservé aux futurs liens universels.
 pub const LINK_PATH: &str = "s";
 
 /// `{origine}{base}s#{K_lien}` : 46 caractères de plus que l'origine avec la base « / ».
@@ -97,7 +96,7 @@ fn strict(s: &str) -> Result<[u8; 32]> {
     b.as_slice().try_into().map_err(|_| Error::LienInvalide)
 }
 
-/// Analyse un lien : chemin `{base}s` (forme écrite depuis le 16 novembre) ou, ancienne forme,
+/// Analyse un lien : chemin `{base}s` (forme écrite) ou, ancienne forme,
 /// égal à `base` exactement (`/shhdrop` sans barre finale toléré pour la démo), sans identifiants dans l'adresse. La requête est ignorée (les messageries ajoutent
 /// `?fbclid=…` en gardant le fragment). L'origine attendue n'est pas vérifiée ici : l'appelant
 /// compare `origin` à la sienne.
@@ -107,7 +106,7 @@ pub fn parse_link(url: &str, base: &str) -> Result<ParsedLink> {
     if !allowed_scheme(&u) || u.has_credentials() {
         return Err(Error::LienInvalide);
     }
-    // Liens sous « /s » seulement (décision du propriétaire du 18 novembre : l'ancienne forme à
+    // Liens sous « /s » seulement (l'ancienne forme à
     // la racine, « base#… », est refusée ; aucune compatibilité à garder avant le lancement).
     if u.pathname().strip_prefix(base) != Some(LINK_PATH) {
         return Err(Error::LienInvalide);
@@ -222,7 +221,7 @@ mod tests {
         r.expect_err("refus attendu")
     }
 
-    /// Forme d'un lien de partage de production (16 novembre) :
+    /// Forme d'un lien de partage de production :
     /// `https://[a-z0-9.-]+(:\d+)?/s#` + 43 caractères base64url.
     fn production_shape(l: &str) -> bool {
         let Some(rest) = l.strip_prefix("https://") else {
@@ -376,7 +375,7 @@ mod tests {
             format!("https://x/s#{k}"),
             format!("https://x/shhdrop/s/#{k}"),
             format!("https://x/shhdrops#{k}"),
-            // Ancienne forme à la racine de la base : refusée (18 novembre).
+            // Ancienne forme à la racine de la base : refusée.
             format!("https://skoow.github.io/shhdrop#{k}"),
             format!("https://skoow.github.io/shhdrop/#{k}"),
         ] {
@@ -442,8 +441,8 @@ mod tests {
 
     #[test]
     fn ancienne_forme_a_la_racine_refusee() {
-        // Décision du propriétaire du 18 novembre : seuls les liens sous « /s » sont lus ;
-        // l'ancienne forme à la racine (avant le 16 novembre) est refusée.
+        // Seuls les liens sous « /s » sont lus ;
+        // l'ancienne forme à la racine est refusée.
         let k = k();
         for (u, b) in [
             (format!("https://x.test/#{k}"), "/"),

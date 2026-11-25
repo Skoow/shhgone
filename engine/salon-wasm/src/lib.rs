@@ -58,7 +58,7 @@ export type Message =
   | { k: "modif"; cible: Uint8Array; x: string }
   | { k: "retrait"; cible: Uint8Array }
   | { k: "ecrit" }
-  /** Appels (conception des appels, 20 novembre), volatils. `appel` : identifiant de l'appel, 16 octets. Présence : envoyée à l'entrée puis à intervalle régulier. */
+  /** Appels (conception des appels), volatils. `appel` : identifiant de l'appel, 16 octets. Présence : envoyée à l'entrée puis à intervalle régulier. */
   | { k: "appel_present"; appel: Uint8Array; video: boolean }
   | { k: "appel_fin"; appel: Uint8Array }
   /** Signalisation WebRTC pour le siège `pour` : morceau `i` sur `n` (au plus 8, 3 600 octets ASCII chacun) d'une offre ou d'une réponse SDP, ou un candidat ICE (`n` = 1). */
@@ -82,7 +82,7 @@ export type Evenement =
   | { type: "message"; deSiege: number; epoque: number; enveloppe: Enveloppe }
   /** Entrée dans le groupe (Welcome reçu) : les trames gardées en attente, rejouées dans l'ordre `seq`. */
   | { type: "entree"; rejoues: Rejoue[] }
-  /** `createurRevenu` (14 novembre) : ce Commit ajoute la feuille de la clé de rôle (le créateur a repris la main : rechargement, retour, autre appareil muni du lien de gestion) ; son ancienne feuille, s'il en avait une, est retirée par ce même Commit. L'écran le dit à tous. */
+  /** `createurRevenu` : ce Commit ajoute la feuille de la clé de rôle (le créateur a repris la main : rechargement, retour, autre appareil muni du lien de gestion) ; son ancienne feuille, s'il en avait une, est retirée par ce même Commit. L'écran le dit à tous. */
   | { type: "membres"; ajoutes: number[]; retires: number[]; createurRevenu: boolean }
   | { type: "commitPerdu"; ajoutes: number[]; retires: number[]; createurRevenu: boolean }
   | { type: "commitAccepte"; welcome: Uint8Array | null; createurRevenu: boolean }
@@ -102,7 +102,7 @@ export type EtatEffacementBrut = { etat: "visible" } | { etat: "rebours"; finMs:
 "#;
 
 // ---------------------------------------------------------------------------------------------
-// Panique (comme shhdrop-wasm, audit F4)
+// Panique (comme shhdrop-wasm)
 // ---------------------------------------------------------------------------------------------
 
 thread_local! {

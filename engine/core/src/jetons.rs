@@ -1,7 +1,7 @@
 //! Jetons anonymes des offres payantes (conception du paiement §7) : Privacy Pass, émission
 //! RFC 9578 type 0x0002 (RSA aveugle publiquement vérifiable), RSABSSA-SHA384-PSS-Deterministic
 //! (RFC 9474), module de 2 048 bits. Bibliothèque reconnue, version épinglée :
-//! `blind-rsa-signatures` 0.19.0 (exception écrite dans CLAUDE.md, décision du 19 novembre).
+//! `blind-rsa-signatures` 0.19.0 (exception écrite dans CLAUDE.md).
 //! Le serveur (Go) signe et vérifie avec `cloudflare/circl` ; vecteurs communs :
 //! engine/vectors/privacypass.json.
 //!

@@ -1,5 +1,5 @@
 {
-  "about": "Liens sous /s (décision du propriétaire du 16 novembre, docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md) : remplacent les cas shareLink et manageLink de v2.json et ses deux cas parseLink qui refusaient « …/s#… ». Lus par engine/core/tests/vectors.rs et web/src/engine/engine.test.ts ; voir engine/vectors/README.md.",
+  "about": "Liens sous /s (décision du propriétaire du 16 novembre, docs/conception/specs/2026-11-16-liens-s-et-pages-design.md) : remplacent les cas shareLink et manageLink de v2.json et ses deux cas parseLink qui refusaient « …/s#… ». Lus par engine/core/tests/vectors.rs et web/src/engine/engine.test.ts ; voir engine/vectors/README.md.",
   "link": [
     {
       "args": [

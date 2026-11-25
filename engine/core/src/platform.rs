@@ -57,7 +57,7 @@ impl Drop for SecretBuf {
 /// Clair d'un lot ouvert, tenu par la plateforme et mis à zéro à sa destruction. Natif :
 /// [`SecretBuf`]. Site : les tampons rendus par WebCrypto, gardés en JavaScript, que le lecteur
 /// livre sans copie au puits de `stream_item` (l'aller-retour par la mémoire WebAssembly coûtait
-/// le tiers du temps d'ouverture, perf-report.md du 11 novembre).
+/// le tiers du temps d'ouverture, mesure du 11 novembre).
 pub trait Opened {
     /// Longueur du clair.
     fn len(&self) -> usize;
@@ -162,7 +162,7 @@ pub trait Platform {
 ///
 /// Le fournisseur est partagé par `Rc` plutôt qu'emprunté (`&'p P`) : les objets du moteur qui
 /// tiennent des clés (lecteur, scelleur d'éléments) seront des classes `wasm-bindgen` possédées
-/// par JavaScript (Task 9), qui ne peuvent pas porter de durée de vie. Un `Rc` les garde
+/// par JavaScript, qui ne peuvent pas porter de durée de vie. Un `Rc` les garde
 /// valides aussi longtemps qu'il le faut, sans `unsafe` ni `'static` forcé.
 pub struct Key<P: Platform> {
     p: Rc<P>,

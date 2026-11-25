@@ -1,5 +1,4 @@
-// Empreinte SHA-256 facultative des fichiers dans le manifeste (décision du propriétaire du
-// 16 novembre) : engine/vectors/v2-empreinte.json, lu ici (lecture et écriture octet pour octet).
+// Empreinte SHA-256 facultative des fichiers dans le manifeste : engine/vectors/v2-empreinte.json, lu ici (lecture et écriture octet pour octet).
 use serde_json::Value;
 use shhdrop_core::manifest::{Clean, Entry, Kind, Manifest, Rights, parse, to_json};
 use zeroize::Zeroizing;

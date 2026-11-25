@@ -1,8 +1,8 @@
 //! Formats des messages du salon (spec salon v3 §4.1) : JSON strict, clés exactes, dans la
 //! charge utile d'une trame (l'encodeur : `JSON_MAX` = 3 900 octets au plus ; le décodeur lit jusqu'à `MAX_CHARGE` = 4 093).
 //!
-//! `{"v":3,"id":<b64u 22>,"t":<ms>,"e":<0..3>,"k":"<sorte>", …champs}`. Sorte `rotation`
-//! (13 novembre) : `"n":<u32>,"cle":<b64u 43>` (`K_maître_s'`, secrète comme une graine). Pas de champ en trop,
+//! `{"v":3,"id":<b64u 22>,"t":<ms>,"e":<0..3>,"k":"<sorte>", …champs}`. Sorte `rotation` :
+//! `"n":<u32>,"cle":<b64u 43>` (`K_maître_s'`, secrète comme une graine). Pas de champ en trop,
 //! manquant ni de mauvais type pour une sorte connue (`message_invalide`) ; une sorte inconnue
 //! (appels futurs, autres versions) devient `Message::Inconnu` et ses champs sont ignorés.
 //! Les entiers sont des entiers JSON (`1.0` est refusé) d'au plus 2^53 − 1. Les champs optionnels
@@ -191,7 +191,7 @@ pub enum Message {
         avatar: Option<RefPiece>,
     },
     Depart,
-    /// Rotation de l'invitation (spec §39.13.2, salon v3 §15, amendement du 13 novembre) : le
+    /// Rotation de l'invitation (spec §39.13.2, salon v3 §15) : le
     /// créateur donne aux membres restants `K_maître_s'` (`cle`) et le numéro de rotation `n`
     /// (celui du `0x09` du serveur). Jamais le lien, `K_lien'` ni le mot de passe. Le groupe
     /// (`groupe.rs`) ne l'envoie et ne l'accepte que du créateur, à l'époque courante, sans
@@ -200,7 +200,7 @@ pub enum Message {
         n: u32,
         cle: Graine,
     },
-    /// Appel audio ou vidéo (conception des appels, 20 novembre) : « je suis dans l'appel `appel` »,
+    /// Appel audio ou vidéo (conception des appels) : « je suis dans l'appel `appel` »,
     /// envoyé à l'entrée puis à intervalle régulier ; `video` : caméra allumée.
     AppelPresent {
         appel: IdMessage,

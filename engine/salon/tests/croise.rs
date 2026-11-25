@@ -1,4 +1,4 @@
-//! Test croisé natif ↔ WebAssembly (Task 9) : ce moteur, compilé en natif, échange avec le même
+//! Test croisé natif ↔ WebAssembly : ce moteur, compilé en natif, échange avec le même
 //! moteur compilé en WebAssembly et chargé par Chromium (web/ui-e2e/salon-moteur.spec.ts). MLS
 //! tire son aléa en interne : les Welcome, Commits et messages ne peuvent pas être écrits à
 //! l'avance, ils sont produits ici en cours de test, échangés par fichiers JSON (hex) dans le

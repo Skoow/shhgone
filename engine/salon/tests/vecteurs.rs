@@ -838,7 +838,7 @@ fn messages() -> Value {
         ("recu_1_id", 0, json!({ "k": "recu", "ids": ids(1) })),
         ("vu_50_ids", 0, json!({ "k": "vu", "ids": ids(50) })),
         ("vu_51_ids", 0, json!({ "k": "vu", "ids": ids(51) })),
-        // Accusés des pièces (salon v3 §14.2, 19 novembre) : mêmes bornes que « vu ».
+        // Accusés des pièces (salon v3 §14.2) : mêmes bornes que « vu ».
         (
             "piece_ouverte_1_id",
             0,
@@ -880,7 +880,7 @@ fn messages() -> Value {
             profil("Alice", 0, avatar(2)),
         ),
         ("depart", 0, json!({ "k": "depart" })),
-        // Appels (20 novembre) : présence, fin, signalisation en morceaux.
+        // Appels : présence, fin, signalisation en morceaux.
         (
             "appel_present",
             0,
@@ -946,7 +946,7 @@ fn messages() -> Value {
             0,
             signal(255, "offre", 0, 1, "a"),
         ),
-        // Rotation de l'invitation (13 novembre) : numéro et K_maître_s' (32 octets).
+        // Rotation de l'invitation : numéro et K_maître_s' (32 octets).
         (
             "rotation",
             0,
@@ -1455,7 +1455,7 @@ fn etat_case(c: &Value) -> Value {
     }
 }
 
-/// Règle du 13 novembre : règle 0 jusqu'à la fin ou au renouvellement ; règles 1 à 3, effacées
+/// Règle 0 jusqu'à la fin ou au renouvellement ; règles 1 à 3, effacées
 /// par le seul `0x0E` du serveur (1 min, 5 min, 1 h après la dernière lecture), avec un compte à
 /// rebours local depuis l'instant où cet appareil a vu le message.
 fn effacement() -> Value {
@@ -1570,7 +1570,7 @@ fn empreinte() -> Value {
 
 // ----------------------------------------------------------------------------------- rôle
 
-/// Clé de rôle du créateur et jeton de gestion (spec salon v3 §15.2, 14 novembre) : graine =
+/// Clé de rôle du créateur et jeton de gestion (spec salon v3 §15.2) : graine =
 /// HKDF(`S_gestion`, « shhdrop/v2/salon/role »), clé publique Ed25519 de cette graine (RFC 8032),
 /// son code de vérification, `J_gestion` = HKDF(`S_gestion`, « shhdrop/v2/salon/gestion-serveur »)
 /// (montré au serveur à la place de `S_gestion`) et l'identifiant du groupe MLS que fonde le
@@ -1821,7 +1821,7 @@ fn salon_v3() {
             .unwrap_or_else(|| panic!("cas {label}"))
             .clone()
     };
-    // Effacement (13 novembre) : jamais effacé sans 0x0E pour les règles 1 à 3, même longtemps
+    // Effacement : jamais effacé sans 0x0E pour les règles 1 à 3, même longtemps
     // après le délai local ; règle 0 jamais effacée par cette fonction.
     let ef = &file["effacement"];
     for n in ["une_minute", "cinq_minutes", "une_heure"] {
@@ -1870,7 +1870,7 @@ fn salon_v3() {
         by(&file["pseudo"], "marque_sur_espace_refusee")["error"],
         "pseudo_invalide"
     );
-    // Sosie cyrillique : refusé depuis le 20 novembre (A-Z, a-z, 0-9 seulement).
+    // Sosie cyrillique : refusé (A-Z, a-z, 0-9 seulement).
     assert_eq!(
         by(&file["pseudo"], "cyrillique_sosie_d_alice")["error"],
         "pseudo_invalide"
@@ -1912,7 +1912,7 @@ fn salon_v3() {
     ] {
         assert_eq!(ok(p), 1, "{p}");
     }
-    // Rotation (13 novembre) : jamais volatile (le serveur la garde pour les membres absents) ;
+    // Rotation : jamais volatile (le serveur la garde pour les membres absents) ;
     // K_maître_s seule redonne les clés ; forme stricte.
     assert_eq!(
         by(

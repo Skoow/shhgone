@@ -1,4 +1,4 @@
-// Vecteurs des cas limites (audit M7) : engine/vectors/v2-limites.json, PRODUIT PAR CE MOTEUR
+// Vecteurs des cas limites : engine/vectors/v2-limites.json, PRODUIT PAR CE MOTEUR
 // (v2.json, figé, vient de l'ancien moteur TypeScript). Chaque cas donne ses entrées et ses
 // sorties ; le test les recalcule à partir des seules entrées du fichier et compare (Rust
 // natif ici, WebAssembly et TypeScript dans web/src/engine/limites.test.ts).
@@ -635,7 +635,7 @@ fn v2_limites() {
         "v2-limites.json n'est plus celui du moteur"
     );
     replay_file(&file);
-    // Couverture attendue (audit M7).
+    // Couverture attendue.
     let l = &file["links"];
     let ok = |c: &Value| c["result"]["kind"].is_string();
     let parse = l["parse"].as_array().unwrap();

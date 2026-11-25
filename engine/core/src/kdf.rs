@@ -19,7 +19,7 @@ pub const KDF_MIN: KdfParams = KdfParams {
     ops: 3,
     mem: 67_108_864,
 };
-/// Plafond accepté du serveur (audit F4) : un serveur compromis ne fait pas allouer 256 Mio.
+/// Plafond accepté du serveur : un serveur compromis ne fait pas allouer 256 Mio.
 pub const KDF_MAX: KdfParams = KDF_MIN;
 /// Paramètres des nouveaux partages, imposés par `password_key_for_create`.
 pub const KDF_CREATE: KdfParams = KDF_MIN;
@@ -36,7 +36,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     sha2::Sha256::digest(data).into()
 }
 
-/// SHA-256 par morceaux (empreinte d'un fichier affichée à l'envoi, 16 novembre) : un fichier de
+/// SHA-256 par morceaux (empreinte d'un fichier affichée à l'envoi) : un fichier de
 /// 2 Go est lu tranche par tranche, jamais entier en mémoire. Même résultat que [`sha256`] sur
 /// la concaténation des tranches. Fonction « empreinte » : seul le moteur des partages l'active
 /// (le module du salon reste sous son plafond de poids).
@@ -122,8 +122,7 @@ pub fn argon2id(pw: &[u8], salt: &[u8], ops: u32, mem: u32) -> Result<Zeroizing<
     Ok(out)
 }
 
-/// Blancs ASCII retirés en début et en fin du mot de passe saisi (décision du propriétaire du
-/// 11 novembre, D42-21) : espace, tabulation, retour chariot, saut de ligne. Un mot de passe
+/// Blancs ASCII retirés en début et en fin du mot de passe saisi (D42-21) : espace, tabulation, retour chariot, saut de ligne. Un mot de passe
 /// collé avec un blanc en bord n'est pas un essai raté. Les blancs intérieurs et les blancs non
 /// ASCII (espace insécable…) sont gardés ; un mot de passe généré n'en a aucun.
 pub fn trim_password(pw: &str) -> &str {
@@ -154,7 +153,7 @@ pub fn password_key(pw: &str, salt: &[u8], ops: u32, mem: u32) -> Result<KMdp> {
 }
 
 /// K_mdp pour CRÉER un partage : seulement un mot de passe de la forme de `generate`
-/// (D41-15, audit F9), paramètres imposés à KDF_CREATE.
+/// (D41-15), paramètres imposés à KDF_CREATE.
 pub fn password_key_for_create(pw: &str, salt: &[u8]) -> Result<KMdp> {
     if !is_generated(pw) {
         return Err(Error::MotDePasseNonGenere);
@@ -163,7 +162,7 @@ pub fn password_key_for_create(pw: &str, salt: &[u8]) -> Result<KMdp> {
 }
 
 /// Cas de `web/src/crypto/kdf.test.ts`, portés un par un. Sans objet en Rust : `randomBytes`
-/// (aléa fourni par la plateforme, Task 5), paramètres non entiers, NaN ou infinis (`u32`),
+/// (aléa fourni par la plateforme), paramètres non entiers, NaN ou infinis (`u32`),
 /// K_lien de 31 ou 33 octets (le type `KLien` a 32 octets).
 #[cfg(test)]
 mod tests {
@@ -297,7 +296,7 @@ mod tests {
         assert_eq!(ok(2, M), weak);
         assert_eq!(ok(3, M - 1), weak);
         assert_eq!(ok(0, 0), weak);
-        // Audit F4 : plafond = paramètres de création.
+        // plafond = paramètres de création.
         assert_eq!(KDF_MAX, KDF_CREATE);
         let bad = Err("paramètres KDF invalides".to_owned());
         assert_eq!(ok(4, M), bad);
@@ -353,7 +352,7 @@ mod tests {
         );
     }
 
-    /// Décision du propriétaire (11 novembre) : un mot de passe collé avec un blanc ASCII en
+    /// Un mot de passe collé avec un blanc ASCII en
     /// bord (espace, tabulation, retour chariot, saut de ligne) donne la même clé que sans.
     #[test]
     fn password_key_ignore_les_blancs_ascii_en_bord() {

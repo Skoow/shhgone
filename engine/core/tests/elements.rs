@@ -4,7 +4,7 @@
 // clé de manifeste réutilisée, lecture de mauvaise taille, aléa indisponible, entrées hostiles,
 // et « ce que seal_final écrit, manifest::parse le relit à l'identique ».
 //
-// Le lecteur complet (openStream) arrive avec la Task 8 : ici, les pièces et le morceau du
+// Le lecteur complet (openStream) est testé à part : ici, les pièces et le morceau du
 // manifeste sont déchiffrés directement sous les clés attendues (HKDF de la graine, K_contenu).
 mod support;
 

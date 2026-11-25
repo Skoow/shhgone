@@ -471,7 +471,7 @@ fn arr<const N: usize>(b: &[u8]) -> core::result::Result<[u8; N], ()> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Constantes, encodage, liens, mot de passe (Task 3)
+// Constantes, encodage, liens, mot de passe
 // ---------------------------------------------------------------------------------------------
 
 /// Constantes du format, du KDF et du mot de passe (même nom que `engine/vectors/v2.json`).
@@ -655,7 +655,7 @@ pub fn is_generated_password(pw: &Uint8Array) -> bool {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Dérivations (Task 4)
+// Dérivations
 // ---------------------------------------------------------------------------------------------
 
 /// SHA-256 (vecteurs communs, §9).
@@ -664,7 +664,7 @@ pub fn sha256(data: &Uint8Array) -> Uint8Array {
     Uint8Array::from(&kdf::sha256(&secret(data))[..])
 }
 
-/// SHA-256 par morceaux (empreinte d'un fichier à l'envoi, 16 novembre) : `update` sur chaque
+/// SHA-256 par morceaux (empreinte d'un fichier à l'envoi) : `update` sur chaque
 /// tranche lue du fichier, puis `finish` (une fois). Les tranches ne sont jamais gardées.
 #[wasm_bindgen(js_name = FileHasher)]
 pub struct FileHasher(Option<kdf::Sha256Stream>);
@@ -879,7 +879,7 @@ pub fn cle_recup_derivees(r: &Uint8Array) -> core::result::Result<Object, JsValu
 }
 
 // ---------------------------------------------------------------------------------------------
-// Graine, clés et enveloppe (Task 5)
+// Graine, clés et enveloppe
 // ---------------------------------------------------------------------------------------------
 
 /// Graine de contenu R, opaque pour JavaScript (jamais rendue en clair). Tirée par `newSeed`
@@ -910,7 +910,7 @@ pub fn new_seed(provider: &Provider) -> core::result::Result<JsSeed, JsValue> {
 
 /// Graine R en clair (32 octets), pour les pièces du salon SEULEMENT (spec salon v3 §3.4 : la
 /// pièce est un paquet d'un élément sous R, et R voyage dans un message MLS chiffré de bout en
-/// bout ; plan C-4). Les partages ne l'appellent jamais (R y reste dans l'enveloppe E). SECRET :
+/// bout). Les partages ne l'appellent jamais (R y reste dans l'enveloppe E). SECRET :
 /// copie que l'appelant met à zéro dès qu'elle est dans le message.
 #[wasm_bindgen(js_name = seedBytes)]
 pub fn seed_bytes(seed: &JsSeed) -> Uint8Array {
@@ -1064,7 +1064,7 @@ pub fn open(keys: &JsAccessKeys, e: &[u8], id: &[u8], header: &[u8]) -> Promise 
 }
 
 // ---------------------------------------------------------------------------------------------
-// Format (Task 6)
+// Format
 // ---------------------------------------------------------------------------------------------
 
 /// En-tête de 48 octets : « SHH2 », version 2, 11 octets nuls, engagement.
@@ -1122,7 +1122,7 @@ pub fn segment_size(bucket: f64, n: f64) -> core::result::Result<f64, JsValue> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Éléments et manifeste final (Task 7)
+// Éléments et manifeste final
 // ---------------------------------------------------------------------------------------------
 
 fn sized(r: Result<u64>) -> core::result::Result<f64, JsValue> {
@@ -1318,12 +1318,12 @@ fn final_entry(v: &JsValue) -> core::result::Result<FinalEntry, JsValue> {
         .and_then(sealer_by_id)
         .ok_or_else(|| js_msg(BAD_ENTRY))?;
     let size = n64(num("size")?);
-    // Note : texte vu par le scelleur, que le lecteur acceptera (audit M6 : UTF-8 strict, au
+    // Note : texte vu par le scelleur, que le lecteur acceptera (UTF-8 strict, au
     // plus TEXT_MAX points de code) ; au-delà de TEXT_BYTES_MAX, `seal_final` la refuse.
     if kind == FinalKind::Text && size <= format::TEXT_BYTES_MAX {
         el.check_note().map_err(js_err)?;
     }
-    // Empreinte SHA-256 du fichier (16 novembre) : facultative ; mal formée ou sur une note :
+    // Empreinte SHA-256 du fichier : facultative ; mal formée ou sur une note :
     // refusée (seul le moteur l'écrit, en hexadécimal minuscule).
     let sum = get(v, "sha256");
     let sha256 = if sum.is_undefined() {
@@ -1349,8 +1349,8 @@ fn final_entry(v: &JsValue) -> core::result::Result<FinalEntry, JsValue> {
 /// Manifeste final : `{ bucket, header, tail }`. Refus de l'ancien moteur (`vide`,
 /// `droits_invalides`, `manifeste_trop_gros`, `texte_trop_long`, `trop_gros`,
 /// `chevauchement`, `cle_deja_utilisee`) ; clés d'ouverture refusées (`cle_deja_utilisee`) ;
-/// note que le lecteur refuserait (`texte_invalide`, `texte_trop_long`, audit M6). `title` :
-/// nom du partage (19 novembre), nettoyé par le moteur, `titre_trop_long` au-delà de
+/// note que le lecteur refuserait (`texte_invalide`, `texte_trop_long`). `title` :
+/// nom du partage, nettoyé par le moteur, `titre_trop_long` au-delà de
 /// `TITLE_MAX` points de code.
 #[wasm_bindgen(
     js_name = sealFinal,
@@ -1400,7 +1400,7 @@ pub fn seal_final(
     })
 }
 
-/// Nom du partage tel que le moteur l'écrira et le relira (19 novembre) : nettoyé
+/// Nom du partage tel que le moteur l'écrira et le relira : nettoyé
 /// (`manifest::clean_title`), ou `undefined` s'il est vide après nettoyage ou dépasse `TITLE_MAX`
 /// points de code. Le site s'en sert pour montrer et garder exactement ce que verra le destinataire.
 #[wasm_bindgen(js_name = cleanTitle)]
@@ -1409,7 +1409,7 @@ pub fn clean_title(raw: &str) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ouverture en flux (Task 8)
+// Ouverture en flux
 // ---------------------------------------------------------------------------------------------
 
 /// Erreur de l'hôte (rejet de `fetchSegment` ou du puits), rendue telle quelle à l'appelant.
@@ -1462,7 +1462,7 @@ const TS_MANIFEST: &str = r#"
 /** Manifeste authentifié, sans les graines `k` (le lecteur garde les clés) ; une note porte son texte. */
 export type OpenedManifest = {
   v: 2; rights: "voir" | "enregistrer" | "coffre"; keep_ttl_h?: 1 | 6 | 12 | 24;
-  /** Nom du partage (19 novembre), déjà nettoyé par le moteur ; absent : aucun titre. */
+  /** Nom du partage, déjà nettoyé par le moteur ; absent : aucun titre. */
   title?: string;
   items: { kind: "text" | "file"; name: string; mime: string; size: number; offset: number; clean?: string; sha256?: string; text?: string }[];
 };

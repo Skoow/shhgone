@@ -11,7 +11,7 @@ const PREUVE: &str = "shhdrop/v2/salon/preuve";
 const CLE: &str = "shhdrop/v2/salon/cle";
 const TRAME: &str = "shhdrop/v2/salon/trame";
 const ID: &str = "shhdrop/v2/salon/id";
-/// Graine de la clé de rôle du créateur (spec salon v3 §15.2, 14 novembre).
+/// Graine de la clé de rôle du créateur (spec salon v3 §15.2).
 const ROLE: &str = "shhdrop/v2/salon/role";
 /// Jeton de gestion montré au serveur à la place de `S_gestion` (spec salon v3 §15.2).
 const GESTION_SERVEUR: &str = "shhdrop/v2/salon/gestion-serveur";
@@ -113,8 +113,7 @@ pub fn cles_depuis_maitre(maitre: &[u8; 32]) -> ClesSalon {
 
 /// Graine (32 octets) de la clé de rôle du créateur : HKDF(`S_gestion`, « shhdrop/v2/salon/role »).
 /// La paire Ed25519 qui en est tirée (`groupe::identite_createur`) est la clé d'identité MLS du
-/// créateur : qui détient `S_gestion` retrouve la même clé sur tout appareil (décision du
-/// propriétaire, 14 novembre). SECRET, effacée à la destruction ; jamais rendue hors du moteur.
+/// créateur : qui détient `S_gestion` retrouve la même clé sur tout appareil. SECRET, effacée à la destruction ; jamais rendue hors du moteur.
 pub(crate) fn graine_role(s_gestion: &[u8; 32]) -> Zeroizing<[u8; 32]> {
     hkdf::<32>(s_gestion, ROLE)
 }
@@ -178,7 +177,7 @@ mod tests {
         assert_ne!(cle_acces(&l).k, cle_acces(&l2).k);
     }
 
-    /// F4 (audit du 13 novembre) : `K_maître_s` suffit à refaire les clés du salon.
+    /// F4 : `K_maître_s` suffit à refaire les clés du salon.
     #[test]
     fn depuis_la_cle_maitre() {
         let (l, m) = entrees(1, 2);
@@ -197,7 +196,7 @@ mod tests {
         }
     }
 
-    /// 14 novembre : la graine de rôle et le jeton du serveur viennent de `S_gestion` par deux
+    /// la graine de rôle et le jeton du serveur viennent de `S_gestion` par deux
     /// étiquettes distinctes de toutes les autres ; le jeton ne donne pas la graine.
     #[test]
     fn role_et_jeton_de_gestion() {

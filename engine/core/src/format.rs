@@ -38,7 +38,7 @@ pub const MAX_SAFE: u64 = (1 << 53) - 1;
 const MAGIC: &[u8; 4] = b"SHH2";
 const VERSION: u8 = 2;
 
-/// Paliers payants en morceaux (spec §38.8.1, décisions du 17 novembre ; conception du paiement
+/// Paliers payants en morceaux (spec §38.8.1 ; conception du paiement
 /// §11) : 5 et 10 Gio (Plus et Pro), 20 et 30 Gio (Pro), chacun plus le morceau du manifeste.
 /// Un partage payant a la même forme qu'un partage gratuit : seul le palier change.
 pub const PAID_BUCKETS: [u32; 4] = [81_921, 163_841, 327_681, 491_521];

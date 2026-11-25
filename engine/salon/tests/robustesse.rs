@@ -1,7 +1,7 @@
 // Robustesse : 100 000 entrées pseudo-aléatoires (xorshift32, graine fixe, donc rejouable) pour
 // chaque fonction qui lit des octets ou du texte venus de l'extérieur. Aucune ne doit paniquer
 // (`catch_unwind`) ; les erreurs, elles, sont attendues. Durée : quelques secondes en debug
-// (mesurée, voir le rapport de la Task 8) : pas besoin de le réserver à la CI en release.
+// (mesurée) : pas besoin de le réserver à la CI en release.
 use shhdrop_core::{KLien, KMdp};
 use shhdrop_salon::{
     ClesSalon, EnTete, Enveloppe, Message, Regle, TAILLE_TRAME, cles_salon, decoder, encoder,

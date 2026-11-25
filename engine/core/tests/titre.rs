@@ -1,4 +1,4 @@
-// Nom du partage dans le manifeste v2 (demande du propriétaire du 19 novembre) :
+// Nom du partage dans le manifeste v2 :
 // engine/vectors/v2-titre.json, produit ici puis relu.
 //
 //   SHH_GEN_TITRE=1 cargo test -p shhdrop-core --test titre

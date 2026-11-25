@@ -7,7 +7,7 @@ on:
   pull_request:
     paths-ignore: ["docs/**", "**/*.md"]
   # Lancement à la main (onglet Actions, « Run workflow ») : seul moyen de lancer le job ui
-  # (Playwright WebKit, ≈ 1 h 30), réservé au produit final (décision du propriétaire, 12 novembre).
+  # (Playwright WebKit, ≈ 1 h 30), réservé au produit final.
   workflow_dispatch:
   # Appelé par release.yml (spec §28.2) : toute la CI, sur le commit de l'étiquette, avant de
   # signer. Le job ui n'y tourne pas (workflow_dispatch seulement).
@@ -57,7 +57,7 @@ jobs:
       # engine-toolchain), par le Rust épinglé. --deny warnings : un avis « non maintenu »,
       # « unsound » ou une version retirée (yanked) échoue aussi. Si un avis tombe : mettre à jour
       # la dépendance (cargo update -p <crate>, tests). Sans correctif publié, l'ignorer exige une
-      # décision du propriétaire, notée dans engine/.cargo/audit.toml ([advisories] ignore =
+      # exception écrite dans engine/.cargo/audit.toml ([advisories] ignore =
       # ["RUSTSEC-…"], avec la raison et une date de réexamen) ; jamais d'ignore silencieux.
       - name: cargo audit
         env:
@@ -77,8 +77,8 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - uses: ./.github/actions/engine-toolchain
-      # svelte-check installé dans son propre dossier (et non par --prefix depuis web/ : le 11 novembre,
-      # la CI y a lu les dépendances de web/ et refusé typescript 7, ERESOLVE).
+      # svelte-check installé dans son propre dossier (et non par --prefix depuis web/ : la CI
+      # y lirait les dépendances de web/ et refuserait typescript 7, ERESOLVE).
       - run: cd web && npm ci --ignore-scripts
       - run: cd web/tools/svelte-check && npm ci --ignore-scripts
       - run: cd web && npm test
@@ -87,10 +87,10 @@ jobs:
       - run: cd web && node scripts/check-dist.mjs
       - run: cd web && npm run build:demo && node scripts/check-dist.mjs --demo
       - run: cd web && npm run check
-      # Toutes les dépendances, outils de build et de test compris (audit du 11 novembre, M11) :
+      # Toutes les dépendances, outils de build et de test compris :
       # Vite, Vitest, Playwright, svelte-check tournent dans la CI et produisent le site. Cet
       # audit contient celui des seules dépendances d'exécution (--omit=dev), au même niveau.
-      # Exceptions datées et motivées, validées par le propriétaire : web/audit-exceptions.json.
+      # Exceptions datées et motivées : web/audit-exceptions.json.
       - name: npm audit
         working-directory: web
         run: |
@@ -118,7 +118,7 @@ jobs:
       - run: make test-e2e
   ui:
     needs: [go, web]
-    # Pas à chaque push : seulement lancé à la main, pour le produit final (propriétaire, 12 novembre).
+    # Pas à chaque push : seulement lancé à la main, pour le produit final.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # ≈ 1 h 30 normalement ; un blocage échoue au bout de 2 h 30 au lieu de 6 h.
@@ -140,7 +140,7 @@ jobs:
       - uses: ./.github/actions/engine-toolchain
       - run: cd web && npm ci --ignore-scripts
       - run: cd web && npx playwright install --with-deps chromium webkit
-        # Miroir apt bloqué (11 novembre : 2 h d'attente) : échec rapide plutôt que blocage.
+        # Miroir apt bloqué : échec rapide plutôt qu'une attente de plusieurs heures.
         timeout-minutes: 15
       - run: make test-ui
       - name: Captures
@@ -209,9 +209,9 @@ jobs:
   # - son pkg du moteur (.wasm et colle ; étape « engine », qui répète les commandes de
   #   web/scripts/build-engine.mjs, sans Node) et tout son site (étape « web », dist/ entier)
   #   doivent être identiques, octet pour octet, à ceux des builds de la CI (SHA256SUMS du job
-  #   repro) : sinon le site servi ne serait pas le build public vérifiable (spec §28, audit I6) ;
+  #   repro) : sinon le site servi ne serait pas le build public vérifiable (spec §28) ;
   # - l'image complète, puis le test du proxy (deploy/test-proxy.sh) avec ses deux binaires, son
-  #   site et le binaire Caddy de l'image épinglée dans deploy/compose.yaml (audit M9).
+  #   site et le binaire Caddy de l'image épinglée dans deploy/compose.yaml.
   repro-docker:
     needs: repro
     runs-on: ubuntu-latest
@@ -250,14 +250,14 @@ jobs:
           echo "image identique à la CI : $(wc -l < "$RUNNER_TEMP/image-pkg.sums") fichiers pkg/, $(wc -l < "$RUNNER_TEMP/image-dist.sums") fichiers dist/"
       - name: Image complète
         run: docker build -f deploy/Dockerfile --build-arg SHH_BUILD_ID -t shhdrop:ci .
-      # Sans --build-arg SHH_BUILD_ID, l'image doit refuser de se construire (audit I6).
+      # Sans --build-arg SHH_BUILD_ID, l'image doit refuser de se construire.
       - name: Image sans SHH_BUILD_ID refusée
         run: |
           if docker build -f deploy/Dockerfile --target web-dist --output "type=local,dest=$RUNNER_TEMP/sans-id" . > "$RUNNER_TEMP/sans-id.log" 2>&1; then
             echo "image construite sans SHH_BUILD_ID" >&2; exit 1
           fi
           grep -q 'SHH_BUILD_ID manquant' "$RUNNER_TEMP/sans-id.log" || { cat "$RUNNER_TEMP/sans-id.log" >&2; exit 1; }
-      # deploy/test-proxy.sh lance aussi un go test (WebSocket du salon à travers Caddy, Task 17).
+      # deploy/test-proxy.sh lance aussi un go test (WebSocket du salon à travers Caddy).
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: server/go.mod
@@ -279,7 +279,7 @@ jobs:
           docker cp "$id:/usr/bin/caddy" "$out/caddy"
           docker rm "$id"
           CADDY="$out/caddy" SHHDROP_BIN="$out/shhdrop" SHHCHECK_BIN="$out/shhcheck" STATIC_DIR="$out/site" deploy/test-proxy.sh
-  # Scripts de déploiement et de build (audit M9) : ShellCheck épinglé (archive vérifiée par son
+  # Scripts de déploiement et de build : ShellCheck épinglé (archive vérifiée par son
   # empreinte), go vet du petit programme deploy/shhcheck.
   deploy-lint:
     runs-on: ubuntu-latest
