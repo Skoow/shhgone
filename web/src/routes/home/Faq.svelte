@@ -9,8 +9,7 @@
   const qs = ["server", "lost", "back", "scan", "copy"] as const;
 </script>
 
-<!-- Fond raccordé (.fondu, ui/base.css) ; titre à gauche (collant), questions
-     à droite sur ordinateur. -->
+<!-- Fond raccordé (.fondu, ui/base.css) ; titre centré, questions centrées dessous. -->
 <section class="faq fondu filet" id="faq" aria-labelledby="faq-title">
   <div class="fh rv" {@attach reveal}>
     <h2 id="faq-title">{t("home.faq.title")}</h2>
@@ -36,26 +35,21 @@
     padding-block: 104px 120px;
     scroll-margin-top: 72px;
   }
+  /* Une colonne centrée : le titre au-dessus, les questions dessous, sur une largeur de lecture
+     (48 rem au plus) ; le texte des questions reste aligné à gauche dans la colonne. */
   .fh {
     display: grid;
-    align-content: start;
     gap: var(--sp-3);
     min-width: 0;
+    text-align: center;
   }
   details {
     scroll-margin-top: 96px;
   }
-  /* Ordinateur : titre à gauche, questions à droite. */
   @media (min-width: 1024px) {
     .faq {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      column-gap: clamp(40px, 5vw, 88px);
+      gap: var(--sp-7);
       padding-block: 136px 144px;
-    }
-    .fh {
-      align-self: start;
-      position: sticky;
-      top: 96px;
     }
   }
   h2 {
@@ -73,6 +67,8 @@
   .qa {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    justify-self: center;
+    width: min(100%, 48rem);
     border-block-start: 1px solid rgb(233 236 242 / 0.16);
   }
   details {

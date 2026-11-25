@@ -225,6 +225,10 @@
     isolation: isolate;
     overflow: hidden;
     display: grid;
+    /* Bloc de 35 rem au plus (la largeur du schéma), centré dans sa moitié dans les deux sens ;
+       le texte reste aligné à gauche dans le bloc. */
+    grid-template-columns: minmax(0, 35rem);
+    justify-content: center;
     align-content: center;
     gap: var(--sp-5);
     padding: var(--sp-8) clamp(40px, 6vw, 112px);

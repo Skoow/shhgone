@@ -43,7 +43,8 @@ describe("Home (UI §9.1)", () => {
     expect(rules).toContain("Le contenu chiffré reste jusqu'à l'échéance");
     expect(document.querySelector(".life .track")!.getAttribute("aria-hidden")).toBe("true");
     expect([...document.querySelectorAll(".sees .sv-col li")].map((l) => l.textContent)).toEqual([
-      "des données chiffrées", "leur taille approximative", "l'heure des échanges", "votre adresse IP, le temps de la connexion",
+      "des données chiffrées", "leur taille approximative", "l'échéance, au quart d'heure près", "les ouvertures et les essais restants",
+      "votre adresse IP", "l'heure des envois et des ouvertures",
       "le contenu", "les noms des fichiers", "le mot de passe", "la clé",
     ]);
     const links = [...document.querySelectorAll(".tcards a")];

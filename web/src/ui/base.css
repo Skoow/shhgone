@@ -387,11 +387,26 @@ html.kbd-open .dock {
   top: 0;
   rotate: 1.72deg;
 }
+/* Section droite juste sous une section en biais : son filet suit la coupe du bas de la section
+   d'au-dessus (jamais un trait droit sous une pente). Coupe du bas de `.fondu-biais` : du bas à
+   gauche jusqu'à --pente plus haut à droite ; de `.fondu-biais-inv` : l'inverse. */
+.fondu-biais:not(.fondu-biais-inv) + .fondu.filet:not(.fondu-biais)::after {
+  top: 0;
+  transform-origin: 0 0;
+  rotate: -1.72deg;
+}
+.fondu-biais-inv + .fondu.filet:not(.fondu-biais)::after {
+  top: calc(-1 * var(--pente));
+  transform-origin: 0 0;
+  rotate: 1.72deg;
+}
 @media (min-width: 1024px) {
-  .fondu-biais.filet::after {
+  .fondu-biais.filet::after,
+  .fondu-biais:not(.fondu-biais-inv) + .fondu.filet:not(.fondu-biais)::after {
     rotate: -2.86deg;
   }
-  .fondu-biais-inv.filet::after {
+  .fondu-biais-inv.filet::after,
+  .fondu-biais-inv + .fondu.filet:not(.fondu-biais)::after {
     rotate: 2.86deg;
   }
 }

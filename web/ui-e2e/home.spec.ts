@@ -324,10 +324,10 @@ test.describe("fr-FR", () => {
     const q2 = page.getByText("Puis-je récupérer un partage détruit ?");
     await q1.scrollIntoViewIfNeeded();
     await q1.click();
-    await expect(page.getByText(/^Des données chiffrées, leur taille approximative/)).toBeVisible();
+    await expect(page.getByText(/^Il voit et garde jusqu'à l'échéance des données chiffrées/)).toBeVisible();
     await q2.click();
     await expect(page.getByText(/^Non\. Un partage détruit ou expiré/)).toBeVisible();
-    await expect(page.getByText(/^Des données chiffrées, leur taille approximative/)).toBeHidden();
+    await expect(page.getByText(/^Il voit et garde jusqu'à l'échéance des données chiffrées/)).toBeHidden();
     expect(await page.locator("details[open]").count()).toBe(1);
   });
 

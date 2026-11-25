@@ -317,53 +317,67 @@
     padding: 0;
     list-style: none;
   }
+  /* Liens principaux : une capsule discrète qui les tient ensemble ; écritures blanches. */
   .main {
     display: flex;
     align-items: center;
     gap: 2px;
+    padding: 4px;
+    border-radius: var(--r-pill);
+    background: rgb(255 255 255 / 0.025);
+    box-shadow: inset 0 0 0 1px rgb(150 175 255 / 0.12);
   }
   .main > li {
     position: relative;
   }
   .nl {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-height: 40px;
-    padding: 0 12px;
+    min-height: 36px;
+    padding: 0 14px;
     border: 0;
     border-radius: var(--r-pill);
     background: transparent;
-    color: var(--text-2);
+    color: #fff;
     font: inherit;
     font-size: 0.9375rem;
     font-weight: 560;
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
-    transition:
-      color var(--dur-fast) var(--ease-out),
-      background-color var(--dur-fast) var(--ease-out);
+    transition: background-color var(--dur-fast) var(--ease-out);
   }
   .nl:hover,
   .nl.on {
-    color: var(--text);
-    background: rgb(255 255 255 / 0.05);
+    background: rgb(255 255 255 / 0.08);
   }
+  /* Page en cours : fond menthe très léger et un trait menthe sous le mot. */
   .nl[aria-current="page"] {
-    color: var(--text);
+    background: rgb(95 227 181 / 0.1);
+  }
+  .nl[aria-current="page"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 14px;
+    inset-block-end: 4px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--accent);
   }
   .dd-b :global(svg) {
-    color: var(--text-3);
+    color: rgb(255 255 255 / 0.7);
     transition: transform var(--dur-base) var(--ease-out);
   }
   .dd-b.on :global(svg) {
     transform: rotate(180deg);
     color: var(--accent);
   }
-  .room {
-    cursor: not-allowed;
-    color: var(--text-3);
+  /* Salon « bientôt » (sans __SALONS__) : un bouton qui l'annonce. Avec __SALONS__, l'entrée est
+     un lien ordinaire : même couleur et même curseur que les autres (plus de « interdit »). */
+  button.room[aria-disabled="true"] {
+    color: var(--text-2);
   }
   .login-soon {
     display: inline-flex;
@@ -512,7 +526,7 @@
   }
   .btn.ghost {
     border: 1px solid rgb(150 175 255 / 0.26);
-    color: var(--text);
+    color: #fff;
   }
   .btn.ghost:hover {
     border-color: rgb(150 175 255 / 0.5);

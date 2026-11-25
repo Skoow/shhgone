@@ -32,7 +32,7 @@
   import { SOURCE_URL } from "../pages/content";
   import { reveal } from "../../ui/attach";
   import { reducedMotion } from "../../ui/motion";
-  import { ArrowRight, Broom, Eye, EyeOff, FileText, KeyRound, ShieldCheck, Trash2, UserX } from "../../ui/Icon";
+  import { ArrowRight, Broom, Eye, EyeOff, FileText, KeyRound, Server, ShieldCheck, Trash2, UserX } from "../../ui/Icon";
   import OffersStrip from "../../ui/OffersStrip.svelte";
   import SecureDemo from "../../ui/SecureDemo.svelte";
   import TabIcon from "../../ui/TabIcon.svelte";
@@ -171,8 +171,11 @@
   </div>
   <!-- Le lien en deux, agrandi : l'adresse va au serveur ; tout ce qui suit le « # » reste dans le
        navigateur. Exemple de la longueur réelle (43 caractères : la clé de 32 octets en base64url),
-       jamais une vraie clé. Dessous, ce que voit le serveur et ce qu'il ne voit jamais, mot pour mot
-       la réponse « Que voit le serveur ? ». -->
+       jamais une vraie clé. Dessous, comme la réponse « Que voit le serveur ? » (spécification §36) :
+       ce qu'il voit et garde jusqu'à l'échéance (données chiffrées, taille arrondie, échéance au
+       quart d'heure, ouvertures et essais restants), ce qu'il voit sans l'enregistrer (adresse IP,
+       jamais sur disque ; heures des envois et des ouvertures, en mémoire seulement) et ce qu'il ne
+       voit jamais. -->
   <figure class="link card-relief rv" data-key-note {@attach reveal} {@attach lueur}>
     <div class="lk-bar" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="lk" aria-hidden="true">
@@ -181,8 +184,12 @@
     </div>
     <div class="sees">
       <div class="sv-col">
-        <p class="sv-t"><Eye size={15} strokeWidth={2} aria-hidden="true" />{t("home.sees.t")}</p>
-        <ul>{#each [1, 2, 3, 4] as n (n)}<li>{t(`home.sees.${n}` as Key)}</li>{/each}</ul>
+        <p class="sv-t"><Server size={15} strokeWidth={2} aria-hidden="true" />{t("home.sees.keep.t")}</p>
+        <ul>{#each [1, 2, 3, 4] as n (n)}<li>{t(`home.sees.keep.${n}` as Key)}</li>{/each}</ul>
+      </div>
+      <div class="sv-col live">
+        <p class="sv-t"><Eye size={15} strokeWidth={2} aria-hidden="true" />{t("home.sees.live.t")}</p>
+        <ul>{#each [1, 2] as n (n)}<li>{t(`home.sees.live.${n}` as Key)}</li>{/each}</ul>
       </div>
       <div class="sv-col never">
         <p class="sv-t"><EyeOff size={15} strokeWidth={2} aria-hidden="true" />{t("home.never.t")}</p>
@@ -267,7 +274,8 @@
 </section>
 
 <section class="sec offers fondu filet" aria-labelledby="offers-title">
-  <div class="head split rv" {@attach reveal}>
+  <!-- Titre centré, le texte d'introduction dessous, centré lui aussi. -->
+  <div class="head centre rv" {@attach reveal}>
     <h2 id="offers-title">{t("home.offers.title")}</h2>
     <p>{t("home.offers.lede")}</p>
   </div>
@@ -343,6 +351,14 @@
     .head.split p {
       padding-block-end: 0.6em;
     }
+  }
+  .head.centre {
+    justify-items: center;
+    gap: var(--sp-4);
+    text-align: center;
+  }
+  .head.centre p {
+    text-wrap: balance;
   }
   h2 {
     margin: 0;
@@ -818,16 +834,25 @@
       border-inline-start: 2px dashed rgb(95 227 181 / 0.5);
     }
   }
+  /* Trois groupes, l'un sous l'autre : vu et gardé jusqu'à l'échéance, vu sans être enregistré,
+     jamais vu. Carte assez large : l'intitulé à gauche, les éléments à droite sur deux colonnes. */
   .sees {
+    container-type: inline-size;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-    gap: var(--sp-3);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-2);
   }
   .sv-col {
-    padding: var(--sp-4);
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: var(--sp-3) var(--sp-4);
     border-radius: var(--r-lg);
     background: rgb(255 255 255 / 0.025);
     box-shadow: inset 0 0 0 1px rgb(233 236 242 / 0.07);
+  }
+  .sv-col.live {
+    background: rgb(141 178 255 / 0.04);
+    box-shadow: inset 0 0 0 1px rgb(141 178 255 / 0.18);
   }
   .sv-col.never {
     background: rgb(95 227 181 / 0.04);
@@ -835,29 +860,73 @@
   }
   .sv-t {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--sp-2);
-    margin: 0 0 var(--sp-2);
+    margin: 0 0 var(--sp-3);
     color: #c9d1e6;
     font-family: var(--font-mono);
     font-size: var(--fs-micro);
+    line-height: 1.4;
     letter-spacing: 0.02em;
+    text-wrap: balance;
+  }
+  .sv-t :global(svg) {
+    flex: none;
+    margin-block-start: 1px;
+  }
+  .live .sv-t {
+    color: #b8cbff;
   }
   .never .sv-t {
     color: var(--accent);
   }
   .sv-col ul {
     display: grid;
-    gap: 6px;
+    gap: 4px var(--sp-4);
     margin: 0;
     padding: 0;
     list-style: none;
     color: #aab6d3;
     font-size: 0.9375rem;
+    line-height: 1.45;
+  }
+  /* Tiret en retrait suspendu : une ligne qui passe à la ligne reste alignée sur le texte. */
+  .sv-col li {
+    padding-inline-start: 1em;
+    text-indent: -1em;
   }
   .sv-col li::before {
     content: "– ";
     color: var(--text-3);
+  }
+  @container (min-width: 34rem) {
+    .sv-col {
+      display: grid;
+      grid-template-columns: 11.5rem minmax(0, 1fr);
+      align-items: start;
+      column-gap: var(--sp-4);
+    }
+    .sv-t {
+      margin: 0;
+      padding-block-start: 2px;
+    }
+    /* Les éléments se suivent dans la phrase, séparés par un point médian. */
+    .sv-col ul {
+      display: block;
+    }
+    .sv-col li {
+      display: inline;
+      padding: 0;
+      text-indent: 0;
+    }
+    .sv-col li::before {
+      content: none;
+    }
+    .sv-col li:not(:last-child)::after {
+      content: "  ·  ";
+      color: var(--text-3);
+      white-space: pre;
+    }
   }
   .link figcaption {
     color: #8f9cbd;
