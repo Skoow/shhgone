@@ -28,11 +28,17 @@ const DEMO_INDEX = `<!doctype html><html><head>
     <script type="module" crossorigin src="/shhgone/assets/index-a.js"></script>
 </head><body></body></html>`;
 
-/** Site d'essai ; `sri` (défaut) : index.html reçoit les empreintes comme au build (spec §28.3). */
+/** Cadre PDF tel que l'écrit vite.pdf-frame.config.ts (avant les empreintes) : crossorigin sur ses deux balises. */
+const FRAME = `<!doctype html><html><head><link crossorigin="anonymous" rel="stylesheet" href="pdf-frame.css" /></head><body><script crossorigin="anonymous" src="pdf-frame.js"></script></body></html>`;
+
+/** Site d'essai ; `sri` (défaut) : index.html reçoit les empreintes comme au build (spec §28.3). Cadre PDF conforme par défaut. */
 function site(input: Record<string, string>, sri = true): string {
   const d = mkdtempSync(join(tmpdir(), "check-dist-"));
   dirs.push(d);
   const files: Record<string, string> = { ...input };
+  files["pdf-frame.js"] ??= "console.info(2)";
+  files["pdf-frame.css"] ??= "body{margin:0}";
+  if (!("pdf-frame.html" in files)) files["pdf-frame.html"] = addSri(FRAME, (rel: string) => Buffer.from(files[rel]!));
   if (sri) files["assets/index-a.js"] ??= "console.info(1)"; // le script que chargent PROD_INDEX et DEMO_INDEX
   for (const page of Object.keys(files).filter((f) => !f.includes("/") && f.endsWith(".html"))) {
     if (!sri || files[page] === undefined) continue;
@@ -210,7 +216,7 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(site({ "index.html": PROD_INDEX, "assets/a.css": svg + svgEnc }), false)).toEqual([]);
     const font = "@font-face{src:url(https://fonts.gstatic.com/x.woff2)}";
     const page = PROD_INDEX.replace("</head>", '<link rel="icon" href="//cdn.example/i.png"></head>');
-    const frame = '<!doctype html><script src="http://cdn.example/pdf.js"></script>';
+    const frame = FRAME.replace("</head>", '<link rel="icon" href="http://cdn.example/pdf.js"></head>');
     expect(checkDist(site({ "index.html": page, "assets/a.css": font, "pdf-frame.html": frame, "pdf-frame.css": "@import '//x.example/a.css';" }), false)).toEqual([
       "assets/a.css : adresse externe « https://fonts.gstatic.com/x.woff2 » (aucune ressource tierce)",
       "index.html : adresse externe « //cdn.example/i.png » (aucune ressource tierce)",
@@ -237,6 +243,24 @@ describe("check-dist.mjs, production", () => {
     ]);
     const demo = { "index.html": DEMO_INDEX, "404.html": DEMO_INDEX, "assets/install-a.js": 'const MARK="__SHH_DEMO__";gtag(1)' + DEMO_ENGINE };
     expect(checkDist(site(demo), true)).toEqual(["assets/install-a.js : statistique « gtag( » (spec §35.1)"]);
+  });
+
+  it("cadre PDF (reçoit le PDF déchiffré) : empreintes exactes et crossorigin exigés sur ses deux balises", () => {
+    const files = { "pdf-frame.js": "console.info(2)", "pdf-frame.css": "body{margin:0}", "assets/index-a.js": "console.info(1)" };
+    const read = (rel: string) => Buffer.from((files as Record<string, string>)[rel]!);
+    const base = { "index.html": addSri(PROD_INDEX, read), ...files };
+    expect(checkDist(site({ ...base, "pdf-frame.html": addSri(FRAME, read) }, false), false)).toEqual([]);
+    expect(checkDist(site({ ...base, "pdf-frame.html": FRAME }, false), false)).toEqual([
+      "pdf-frame.html : pdf-frame.css sans attribut integrity (spec §28.3)",
+      "pdf-frame.html : pdf-frame.js sans attribut integrity (spec §28.3)",
+    ]);
+    const autre = addSri(FRAME, read).replace(sha384(read("pdf-frame.js")), sha384(Buffer.from("autre")));
+    expect(checkDist(site({ ...base, "pdf-frame.html": autre }, false), false)).toEqual(["pdf-frame.html : pdf-frame.js : empreinte integrity différente du fichier"]);
+    const sansCors = addSri(FRAME.replace('<script crossorigin="anonymous" ', "<script "), read);
+    expect(checkDist(site({ ...base, "pdf-frame.html": sansCors }, false), false).join("\n")).toContain('pdf-frame.html : crossorigin="anonymous" absent');
+    const d = site(base, false);
+    rmSync(join(d, "pdf-frame.html"));
+    expect(checkDist(d, false)).toEqual(["pdf-frame.html : absent"]);
   });
 
   it("SRI (spec §28.3) : échoue si un script ou une feuille de style n'a pas d'empreinte, ou une fausse ; passe avec la bonne", () => {
