@@ -667,7 +667,7 @@ export const fr = {
 
   "manage.title": "Suivi du partage",
   "manage.loading": "Lecture de l'état…",
-  "manage.draining": "Toutes les ouvertures sont utilisées · effacé à l'échéance, au redémarrage du serveur, ou avant si le destinataire le détruit",
+  "manage.draining": "Toutes les ouvertures sont utilisées · effacé au plus tard à l'échéance, ou dès que vous le supprimez",
   "manage.uploading": "Envoi en cours",
   "manage.delete": "Supprimer maintenant",
   "manage.delete.confirm": "Supprimer ce partage pour tout le monde\u202f? C'est immédiat et définitif.",

@@ -664,7 +664,7 @@ export const en = {
 
   "manage.title": "Share status",
   "manage.loading": "Reading the status…",
-  "manage.draining": "All opens are used · erased when it expires, when the server restarts, or earlier if the recipient destroys it",
+  "manage.draining": "All opens are used · erased at the latest when it expires, or as soon as you delete it",
   "manage.uploading": "Upload in progress",
   "manage.delete": "Delete now",
   "manage.delete.confirm": "Delete this share for everyone? It is immediate and final.",
