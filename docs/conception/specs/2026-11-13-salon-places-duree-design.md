@@ -2,7 +2,7 @@
 
 Date : 13 novembre 2026.
 
-## Révision du 13 novembre, qui remplace la partie « Durée » ci-dessous
+## Règles retenues (elles font foi ; la durée par paliers décrite plus bas est abandonnée)
 
 - **Prolonger = renouveler** : le créateur relance le salon pour une nouvelle durée (1, 6, 12 ou 24 h sans compte ; plus avec une offre payante), **et toute la conversation est effacée** : messages, vocaux, fichiers, tout ce qui a été partagé. Seuls restent le lien, le mot de passe et **les membres présents à leur place** : « pour plus de facilité, que les contacts restent dans la même conversation ».
 - Possible tant que le salon existe (jamais après la fin : tout est alors détruit, promesse « puis plus rien »).
@@ -26,7 +26,7 @@ Le créateur d'un salon déjà ouvert doit pouvoir **changer le nombre de places
 > **Remplacé par la révision** (en tête) pour la durée : on ne prolonge plus, on renouvelle.
 
 - Places : le créateur choisit une nouvelle valeur entre le nombre de personnes **présentes** (sièges occupés, plus le siège du créateur s'il est parti) et la limite de l'offre (10 sans compte, plafond technique actuel : sièges 0 à 9).
-- Durée : le créateur prolonge le salon par paliers (+1 h, +6 h, +12 h), sans dépasser **24 h depuis la création** sans compte (la limite actuelle de la durée choisie).
+- Durée (**abandonné**, remplacé par le renouvellement, en tête) : le créateur prolongeait le salon par paliers (+1 h, +6 h, +12 h), sans dépasser **24 h depuis la création** sans compte (la limite actuelle de la durée choisie).
 - Tous les membres connectés voient la nouvelle échéance et le nouveau nombre de places tout de suite.
 
 ## Non-objectifs
@@ -57,7 +57,7 @@ Pour prévenir les membres : un **enregistrement serveur sans rang `0x10` « ré
 
 - Route `POST /api/salons/reglages` (`X-Shh-Manage`), corps `{ "max_members"?: N, "prolonger_h"?: 1|6|12 }`, au moins un des deux ; réponse `{ max_members, expires_in_s }`.
 - Places : `N` entier, `besoin minimal ≤ N ≤ 10` (sièges occupés, plus le siège 0 du créateur s'il est vide ; au moins 2) (`SalonPlacesMax`, réglable plus tard par offre) ; sinon `409 occupied` (trop bas) ou `400 bad_request` (hors bornes). Le plafond des arrivées suit (5 × `N`) ; les arrivées déjà comptées restent.
-- Durée : nouvelle échéance = ancienne + palier, arrondie au quart d'heure supérieur, ≤ plafond en mémoire ; sinon `409 limit` avec `max_extra_s` (ce qui reste possible). Jetons d'envoi de pièces : inchangés (déjà bornés à min(6 h, fin du salon) à leur émission).
+- Durée (**abandonné**, voir en tête) : nouvelle échéance = ancienne + palier, arrondie au quart d'heure supérieur, ≤ plafond en mémoire ; sinon `409 limit` avec `max_extra_s` (ce qui reste possible). Jetons d'envoi de pièces : inchangés (déjà bornés à min(6 h, fin du salon) à leur émission).
 - Une seule transaction SQL (`UPDATE … WHERE id=? AND failed_attempts<10 AND expires_at>?`) ; état mémoire mis à jour sous `salon.mu` ; `0x10` diffusé (direct et rattrapage, jamais de fermeture).
 - Mêmes protections que les autres actions du créateur : `S_gestion` en temps constant, mêmes limites que `gestion`, réponses fixes, aucune adresse IP.
 - `meta` et `rejoindre` rendent déjà `max_members` et `expires_in_s` : rien à changer.

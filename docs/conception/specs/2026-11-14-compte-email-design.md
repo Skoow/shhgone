@@ -2,9 +2,9 @@
 
 > **Remplacée le 22 novembre 2026 pour l'identité, la connexion et la récupération** par `docs/conception/specs/2026-11-22-compte-passkey-design.md` (passkey et clé de récupération, sans e-mail, sans mot de passe, sans double authentification ni séquestre ; codé : serveur lots S1 à S8, site lots W1 à W5 et T1 du plan `docs/conception/plans/2026-11-22-compte-passkey.md`). Le reste (pseudo §21.5, coffres §21.2.2, sessions §8.5, ancienneté §11, bannissement §21.11 sauf la clé, accueil §21.7, signalements §21.10, suppression §21.12, sauvegarde §21.13, tableau de bord §21.14 sauf la recherche par adresse) reste valable.
 >
-> **Révision 2 du 14 novembre 2026 (décisions du propriétaire du même jour, 11 points) : §21, à lire en premier.** Elle remplace le code de secours par une récupération par e-mail sans perte du profil, et ajoute pseudo unique, profil, accueil connecté, téléchargements, signalements par catégorie, suppression totale, sauvegarde et le tableau de bord finalisé. Les passages remplacés plus bas sont barrés ou annotés « → §21 ».
+> **Révision 2 (14 novembre 2026, 11 décisions) : §21, à lire en premier.** Elle remplace le code de secours par une récupération par e-mail sans perte du profil, et ajoute pseudo unique, profil, accueil connecté, téléchargements, signalements par catégorie, suppression totale, sauvegarde et le tableau de bord finalisé. Les passages remplacés plus bas sont barrés ou annotés « → §21 ».
 >
-> **À valider par le propriétaire.** Rien n'est codé. Date : 14 novembre 2026. Remplace, pour le compte, §37 de la spécification principale (passkey sans e-mail) et la partie « compte » de D42-25. Les décisions qui lui reviennent sont en §20 (liste courte, avec recommandation).
+> Conception du 14 novembre 2026 ; elle remplaçait, pour le compte, §37 de la spécification principale et la partie « compte » de D42-25. Ses parties sur l'e-mail, le mot de passe, la double authentification et le séquestre ne sont plus codées (conception du compte par passkey §8).
 
 Références lues : spécification principale (`2026-11-03-shhdrop-design.md`) D42-20 à D42-26, §9, §29.2, §33, §36, §37 (entière), §38.4, §39 ; `2026-11-11-salon-v3-design.md` §7, §15.2 ; `2026-11-13-salon-places-duree-design.md` ; `2026-11-13-tableau-de-bord-admin-design.md` ; UI `2026-11-04-shhdrop-ui-design.md` (§8, §10, §11, §12.3) ; code : `server/internal/{api,captcha,limits,store,salon,adminui,config}`, `server/internal/stats_test.go`, `server/cmd/shhdrop/main.go`, `deploy/compose.yaml`, `deploy/Dockerfile`, `web/src/{app,i18n,routes,ui,history,engine}`, `engine/`.
 
@@ -12,7 +12,7 @@ Références lues : spécification principale (`2026-11-03-shhdrop-design.md`) D
 
 ## 1. Intention
 
-Le propriétaire veut qu'on puisse **bannir** quelqu'un qui crée des salons pour nuire, sans pister personne. Il faut donc un compte qui coûte un peu à recréer (une adresse e-mail confirmée, non jetable, plus l'ancienneté) et que le serveur peut relier aux salons créés. Tout le reste reste sans compte : partager, ouvrir un lien, rejoindre un salon.
+Le service doit pouvoir **bannir** quelqu'un qui crée des salons pour nuire, sans pister personne. Il faut donc un compte qui coûte un peu à recréer (une adresse e-mail confirmée, non jetable, plus l'ancienneté) et que le serveur peut relier aux salons créés. Tout le reste reste sans compte : partager, ouvrir un lien, rejoindre un salon.
 
 Ce qui définit la réussite :
 - créer un salon demande un compte gratuit ; rien d'autre n'en demande ;
@@ -54,9 +54,9 @@ Aujourd'hui le serveur n'a **aucune** sortie : test bloquant `TestNoOutgoingHTTP
 |---|---|---|---|
 | **A. Fournisseur d'envoi tiers dans l'UE, par SMTP authentifié (port 465, TLS)** : Scaleway Transactional Email ou Brevo (France), suivi des ouvertures et des clics **désactivé** | le fournisseur : adresse du destinataire, heure, texte du message (le code), notre adresse IP d'envoi ; le fournisseur de la boîte du destinataire : qu'il reçoit un message de Shhgone (inévitable, quelle que soit l'option) | bonne (réputation, SPF/DKIM gérés) | **Oui** (recommandée) |
 | B. Notre propre serveur SMTP (Postfix sur la machine, ou envoi direct aux MX depuis Go) | personne d'autre que le fournisseur de la boîte | mauvaise : IP de VPS mal réputée, port 25 souvent bloqué par l'hébergeur, PTR/SPF/DKIM/DMARC à tenir ; **Postfix écrit les adresses dans sa file et ses journaux, sur disque** (contraire à §2) ; l'envoi direct sans file n'a pas de nouvel essai | Non |
-| C. Aucun e-mail (adresse jamais confirmée, récupération par code de secours seulement) | personne | — | Non : une adresse non confirmée ne coûte rien (n'importe quelle adresse Gmail inventée passe), donc le refus des jetables et le bannissement par adresse ne servent plus à rien. Cela retire la raison d'être du compte (D42-26 point 7). Si le propriétaire refuse tout tiers, un code de secours seul reste possible, mais il faut alors **abandonner le bannissement par adresse** |
+| C. Aucun e-mail (adresse jamais confirmée, récupération par code de secours seulement) | personne | — | Non : une adresse non confirmée ne coûte rien (n'importe quelle adresse Gmail inventée passe), donc le refus des jetables et le bannissement par adresse ne servent plus à rien. Cela retire la raison d'être du compte (D42-26 point 7). Si tout tiers est refusé, un code de secours seul reste possible, mais il faut alors **abandonner le bannissement par adresse** |
 
-Retenu : option A, par SMTP standard (bibliothèque standard de Go, `net/smtp` sur `crypto/tls`) plutôt qu'une API propre au fournisseur : changer de fournisseur ne change que la configuration. Choix du fournisseur : **décision du propriétaire** (§20, D1).
+Retenu : option A, par SMTP standard (bibliothèque standard de Go, `net/smtp` sur `crypto/tls`) plutôt qu'une API propre au fournisseur : changer de fournisseur ne change que la configuration. Choix du fournisseur : décision de l'exploitant (§20, D1).
 
 **Ce qu'il faut garder pour envoyer sans stocker l'adresse** : rien de plus qu'une empreinte. Le serveur n'écrit **jamais** à une adresse qu'il aurait gardée : il écrit à l'adresse **tapée dans la requête en cours**, si son empreinte correspond (récupération, changement d'adresse). Conséquence assumée : **aucun e-mail à l'initiative du serveur** (ni « votre compte va être effacé », ni « connexion depuis un nouvel appareil », ni lettre d'information). C'est dit à l'écran (§12).
 
@@ -64,7 +64,7 @@ Retenu : option A, par SMTP standard (bibliothèque standard de Go, `net/smtp` s
 
 ### 3.3 Récupération et données chiffrées (point 2)
 
-> **→ §21.2 (révision 2)** : le code de secours est abandonné (décision 1 du propriétaire). Le tableau ci-dessous est gardé pour l'historique ; la ligne « Clé de compte gardée par le serveur » est **en partie retenue** pour le profil seulement (séquestre), avec ses limites dites en §21.2.
+> **→ §21.2 (révision 2)** : le code de secours est abandonné (décision 1). Le tableau ci-dessous est gardé pour l'historique ; la ligne « Clé de compte gardée par le serveur » est **en partie retenue** pour le profil seulement (séquestre), avec ses limites dites en §21.2.
 
 | Approche | Retenue |
 |---|---|
@@ -155,7 +155,7 @@ Aucune construction maison : Argon2id et HKDF-SHA-256 du moteur Rust (RustCrypto
 JSON strict (`v: 1`), chiffré, jamais vu par le serveur :
 - `pseudo` : **obligatoire**, mêmes règles que le pseudonyme du salon (§39.4 point 4 : NFC, 2 à 24 graphèmes, une seule écriture…). Le serveur ne peut pas vérifier qu'il est rempli : c'est le client qui l'exige (limite honnête, faible) ;
 - `photo` : facultative, ré-encodée sur l'appareil en 256 × 256, 64 Ko au plus, sans métadonnées (salon v3 §7.2) ;
-- `salons` : `[{ s_gestion, ajoute: "2026-11-14", libelle }]` (libellé local facultatif) ; **ni** le lien d'invitation, **ni** le mot de passe du salon (le propriétaire a demandé le secret de gestion seulement ; garder l'invitation ferait du mot de passe du compte une clé de lecture des conversations) ; une entrée est retirée quand `gestion` répond `not_found` ;
+- `salons` : `[{ s_gestion, ajoute: "2026-11-14", libelle }]` (libellé local facultatif) ; **ni** le lien d'invitation, **ni** le mot de passe du salon (le secret de gestion seulement, par décision ; garder l'invitation ferait du mot de passe du compte une clé de lecture des conversations) ; une entrée est retirée quand `gestion` répond `not_found` ;
 - `reglages` : `{ langue }`.
 
 Écritures concurrentes et retour en arrière : règles de §37.2 inchangées (`if_gen`, 409, fusion ; plus grand `gen` vu gardé sur l'appareil).
@@ -334,7 +334,7 @@ Bouton « Créer un salon » sans session → `/compte/connexion?suite=salon` (p
 | **Confirmé** | 7 jours ou plus depuis `compte_des` | 3 | 10 | 1 à 24 h |
 
 - `compte_des` = jour de création ; **remis au jour d'un signalement** d'un salon du compte (« Quitter et signaler », premier signalement de ce salon). « 7 jours sans signalement » = 7 jours pleins depuis le dernier signalement.
-- **Signalement (faible, ambiguïté)** : « 4 places » est lu comme `max_members = 4`, créateur compris (le serveur compte ainsi, 2 à 10). Si le propriétaire voulait 4 invités, c'est `max_members = 5`.
+- **Signalement (faible, ambiguïté)** : « 4 places » est lu comme `max_members = 4`, créateur compris (le serveur compte ainsi, 2 à 10). Pour 4 invités, ce serait `max_members = 5`.
 - **Signalement (moyenne, abus)** : un invité malveillant peut remettre l'ancienneté du créateur à zéro en signalant à chaque salon. C'est borné (il doit être invité ; un signalement par salon) ; le fondateur peut aussi rendre l'ancienneté depuis le tableau de bord (§13). Choix à confirmer (§20, D4).
 - Le renouvellement d'un salon compte déjà comme une création (quota de connexion) ; il garde les limites du palier.
 - Le payant (§38) ajoutera de la capacité plus tard ; rien ici ne le suppose.
@@ -497,7 +497,7 @@ Le pseudo, la photo et la liste des salons ne s'affichent qu'une fois le coffre 
 
 ## 19. Laissé au constructeur
 
-Découpage interne des paquets ; forme exacte des tests au-delà des noms et assertions du plan ; ordre des sections du coffre JSON ; libellés anglais (relus par le propriétaire avec le reste de `en.ts`).
+Découpage interne des paquets ; forme exacte des tests au-delà des noms et assertions du plan ; ordre des sections du coffre JSON ; libellés anglais (relus avec le reste de `en.ts`).
 
 ## 20. Décisions (recommandation)
 
@@ -516,7 +516,7 @@ Découpage interne des paquets ; forme exacte des tests au-delà des noms et ass
 
 ## 21. Révision 2 : décisions, solutions et conflits
 
-> **À valider par le propriétaire.** Rien n'est codé. Cette révision **remplace** les passages annotés « → §21 » plus haut ; le reste de la conception (normalisation de l'adresse §5, Argon2id sur l'appareil §3.1 et §6, sessions §8.5, anti-abus §8.8, ancienneté §11, règles d'écran communes §12, apps §17) **reste valable**. Les décisions qui restent au propriétaire sont en §21.19 (cinq au plus).
+> Cette révision **remplace** les passages annotés « → §21 » plus haut ; le reste de la conception (normalisation de l'adresse §5, Argon2id sur l'appareil §3.1 et §6, sessions §8.5, anti-abus §8.8, ancienneté §11, règles d'écran communes §12, apps §17) **reste valable**. Les décisions restantes sont en §21.19 (cinq au plus).
 
 ### 21.0 Les onze décisions et où elles sont traitées
 
@@ -549,19 +549,19 @@ Découpage interne des paquets ; forme exacte des tests au-delà des noms et ass
 | R9 | Moyenne, attente déçue | décision 10 | « les liens qui lui ont été partagés » : le site ne sait pas qu'un lien lui est destiné ; il n'y a ni carnet d'adresses ni envoi « à un pseudo » (le serveur apprendrait qui écrit à qui) | « reçus » = **liens qu'il a ouverts** sur un appareil connecté (ou sur cet appareil, sans compte) ; envoi à un pseudo : non (§21.19, R-D4) |
 | R10 | Moyenne, attente déçue | décision 10, « façon WhatsApp » | l'accueil ne peut pas montrer « 3 messages non lus » ni « Léa écrit… » : il faudrait rester connecté à chaque salon (une connexion, une place et un état MLS par salon) ou des notifications par un service tiers (exclu, §39.5) | l'accueil montre ce que l'appareil sait déjà : titre local, temps restant, « Expiré », rôle ; le reste s'affiche en entrant dans le salon ; dit dans l'état vide de l'accueil |
 | R11 | Moyenne, exactitude | décision 10, rouvrir un lien reçu | depuis un **autre appareil**, rouvrir un partage consomme une ouverture (§4, D42-22) et redemande son mot de passe | l'accueil le dit sur la ligne (« Rouvrir ici compte une ouverture ») ; le mot de passe d'un partage ou d'un salon n'est **jamais** gardé dans le compte (sinon le mot de passe du compte ouvrirait les contenus) |
-| R12 | Moyenne, confidentialité de l'appareil | décision 11 | un historique des téléchargements garde les **noms de fichiers**, que l'historique de §33 refusait de garder | chiffré au repos comme l'historique (clé non extractible) ; **désactivé par défaut, activé par la personne elle-même** (choix R12 changé par le propriétaire le 22 novembre 2026) ; le désactiver efface tout ; effacement en un geste ; entrées effacées après 30 jours ; jamais envoyé au serveur ni au compte ; protection honnête : celle du verrouillage de l'appareil (§21.9) |
+| R12 | Moyenne, confidentialité de l'appareil | décision 11 | un historique des téléchargements garde les **noms de fichiers**, que l'historique de §33 refusait de garder | chiffré au repos comme l'historique (clé non extractible) ; **désactivé par défaut, activé par la personne elle-même** (choix R12 changé le 22 novembre 2026) ; le désactiver efface tout ; effacement en un geste ; entrées effacées après 30 jours ; jamais envoyé au serveur ni au compte ; protection honnête : celle du verrouillage de l'appareil (§21.9) |
 | R13 | Élevée, exactitude (promesse) | décision 6 | le serveur ne sait pas (et ne doit pas savoir) quels partages ni quels messages viennent d'un compte : « supprimer tout » n'est vrai que pour ce qu'il peut retrouver | §21.12 : salons créés (lien compte ↔ salon) ; partages créés (rejeu par l'appareil depuis le coffre privé et l'historique local) ; messages dans les salons d'autrui : effacés à la fin de ces salons, pas avant ; l'écran le dit sans rien promettre de faux |
-| R14 | Moyenne, choix validé modifié | décision 5 ; §36 S21, §15.2, UI A13, amendement du 13 novembre (« les signalements restent un booléen ») | le serveur ne gardait aucun motif ; avec des catégories, il apprend la catégorie de chaque signalement | compteurs par catégorie **en mémoire**, depuis le démarrage ; pour un salon vivant, catégories et nombre attachés à la ligne en mémoire jusqu'à la fin du salon (pour que le fondateur agisse) ; rien sur disque sauf le motif d'un bannissement (§21.10, §21.11) |
+| R14 | Moyenne, choix validé modifié | décision 5 ; §36 S21, §15.2, UI A13, spécification principale §9.5 (agrégats d'usage : l'alerte horaire reste un booléen) | le serveur ne gardait aucun motif ; avec des catégories, il apprend la catégorie de chaque signalement | compteurs par catégorie **en mémoire**, depuis le démarrage ; pour un salon vivant, catégories et nombre attachés à la ligne en mémoire jusqu'à la fin du salon (pour que le fondateur agisse) ; rien sur disque sauf le motif d'un bannissement (§21.10, §21.11) |
 | R15 | **Élevée, légal** | décision 5 | contenus terroristes et pédocriminels : obligations de l'hébergeur (LCEN art. 6 : retrait prompt et information des autorités ; DSA art. 16 à 18 ; règlement TCO 2021/784 : retrait en une heure sur injonction, conservation 6 mois des contenus retirés, point de contact). Un signalement anonyme par catégorie, sur un contenu que nous ne pouvons pas lire, ne permet ni de vérifier ni de transmettre le contenu ; la destruction immédiate d'un partage empêche toute conservation | **juriste avant ouverture** ; en attendant : feuille de signalement qui renvoie vers PHAROS pour ces deux catégories et invite à nous envoyer le lien par la page `/signaler` ; procédure écrite pour le fondateur (§21.10.4) |
 | R16 | Moyenne, légal | décision 4 ; DSA art. 17 ; RGPD art. 10 | une restriction de service doit être motivée auprès de la personne ; mais garder « banni pour pédocriminalité » à côté d'une empreinte d'adresse, c'est garder une donnée relative à une infraction présumée | le bannissement garde une **catégorie** (un octet), montrée à la personne à la connexion ; aucun texte libre ; à valider par le juriste |
-| R17 | **Élevée** (relevée le 22 novembre, recherche juridique tenu hors du dépôt (archive du propriétaire) ; points à soumettre au juriste : conception du compte par passkey §12), légal | décision 6 ; LCEN art. 6 et décret 2021-1362 (déjà §16) | une obligation de conserver un an les données de création de compte contredirait « supprimer tout » et « adresse jamais gardée » | inchangé : avis du juriste avant `SHH_COMPTES=1` en public |
+| R17 | **Élevée** (relevée le 22 novembre, recherche juridique tenue hors du dépôt ; points à soumettre au juriste : conception du compte par passkey §12), légal | décision 6 ; LCEN art. 6 et décret 2021-1362 (déjà §16) | une obligation de conserver un an les données de création de compte contredirait « supprimer tout » et « adresse jamais gardée » | inchangé : avis du juriste avant `SHH_COMPTES=1` en public |
 | R18 | Moyenne, légal | décision 7 | une sauvegarde garde un compte supprimé jusqu'à sa rotation (droit à l'effacement) | rotation de 30 jours, dite dans la page Confidentialité ; restauration toujours depuis la plus récente (§21.13) |
 | R19 | Moyenne, exploitation | décision 7 | sauvegarde et clé du serveur volées ensemble = base et clé (profils séquestrés lisibles, adresses testables une à une) | clé de chiffrement de la sauvegarde et clé du serveur rangées séparément, hors ligne ; la sauvegarde ne contient pas `K_serveur` |
 | R20 | Faible, ambiguïté | décision 4 | « désactiver » et « annuler » se recouvrent | retenu : **Suspendre / Réactiver** (le bannissement reste, sans effet), **Lever** (fin maintenant), **Annuler** (erreur : tout est rendu, ancienneté comprise), **Changer l'échéance** (allonger ou raccourcir, 5 ans au plus à partir d'aujourd'hui) (§21.11) |
 | R21 | Faible, sécurité | décision 2 | sans e-mail « votre adresse a changé » vers l'ancienne adresse, un voleur de session qui connaît le mot de passe change l'adresse sans bruit | changement d'adresse : session récente (mot de passe), code de l'application si active, code envoyé à la nouvelle adresse ; impossible pendant les 7 jours qui suivent une récupération (R4) |
 | R22 | Faible, légal | décision 9 | la photo de profil est un contenu hébergé, lisible par le séquestre : une photo illicite peut être signalée par un membre d'un salon | signalement dans le salon (catégorie) ; aucun examen automatique ; au juriste avec R15 |
 | R23 | Faible, inutile retiré | §6, §8.6, §10, §12 | code de secours, ses routes, ses écrans, sa saisie contrôlée, ses vecteurs | retirés (décision 1) |
-| R24 | Faible, nom | e-mails, écrans | la conception parle de « Shhgone » (e-mails, `From`) et la spécification principale de « Shhdrop » | à aligner une fois pour toutes par le propriétaire ; les modèles d'e-mail prennent le nom de la configuration (`SHH_MAIL_FROM`) |
+| R24 | Faible, nom | e-mails, écrans | la conception parle de « Shhgone » (e-mails, `From`) et la spécification principale de « Shhdrop » | à aligner une fois pour toutes ; les modèles d'e-mail prennent le nom de la configuration (`SHH_MAIL_FROM`) |
 
 ### 21.2 Récupération par e-mail sans perte : deux coffres
 
@@ -703,7 +703,7 @@ L'accueil connecté est une **liste unique**, triée par activité, de quatre so
 - **Serveur** : rien de nouveau ; rien n'est gardé au-delà de la vie du partage ou du salon (§7.6, §39.1) ; seule exception déjà écrite : un téléchargement commencé finit jusqu'à 2 h après une suppression (§41.8, S61).
 - **« À télécharger »** : dans un partage ouvert, la galerie (UI §9.8.x) gagne un en-tête de section « À télécharger · 6 éléments · 142 Mo » avec « Tout télécharger » et la mention « Disponible jusqu'au {échéance}, puis effacé du serveur » ; dans un salon, l'écran « Fichiers » (salon v3 §14.6) gagne le filtre « Pas encore téléchargés » et la même mention (fin du salon).
 - **Historique des téléchargements** (`/telechargements`), **sur cet appareil seulement**, jamais envoyé au serveur ni au compte : une entrée par enregistrement réussi (`saveItem` terminé, ou fichier du salon enregistré) : nom (`safeName`), taille, sorte (icône), source (« Partage reçu » ou « Salon »), date et heure locales. Jamais le lien, la clé, le mot de passe ni le contenu.
-- Module `web/src/downloads/` (seul détenteur de la base IndexedDB `shhdrop-telechargements`), chiffré comme l'historique ; réglage « Garder l'historique des téléchargements » (**désactivé par défaut** : choix R12 changé par le propriétaire le 22 novembre 2026 ; tant qu'il n'est pas activé, rien n'est créé sur l'appareil, ni base, ni clé, ni entrée ; le désactiver efface l'existant, et l'écran le dit ; des entrées écrites avant ce changement, sans activation, sont effacées à la lecture). Activation là où l'on enregistre : l'écran du contenu reçu (avec ou sans compte) porte une ligne « Les noms des fichiers enregistrés ne sont pas gardés sur cet appareil. Les garder 30 jours », puis, activé, « Fichiers enregistrés notés dans Téléchargements, sur cet appareil (30 jours). Ne pas garder » ; aussi la page Téléchargements et les Paramètres (Confidentialité). Sans compte, « Téléchargements » est dans le menu et le pied de page seulement si l'historique est activé sur cet appareil (UI §26) ; entrées effacées après **30 jours** ; « Effacer l'historique » en un geste ; « Retirer » par ligne.
+- Module `web/src/downloads/` (seul détenteur de la base IndexedDB `shhdrop-telechargements`), chiffré comme l'historique ; réglage « Garder l'historique des téléchargements » (**désactivé par défaut** : choix R12 changé le 22 novembre 2026 ; tant qu'il n'est pas activé, rien n'est créé sur l'appareil, ni base, ni clé, ni entrée ; le désactiver efface l'existant, et l'écran le dit ; des entrées écrites avant ce changement, sans activation, sont effacées à la lecture). Activation là où l'on enregistre : l'écran du contenu reçu (avec ou sans compte) porte une ligne « Les noms des fichiers enregistrés ne sont pas gardés sur cet appareil. Les garder 30 jours », puis, activé, « Fichiers enregistrés notés dans Téléchargements, sur cet appareil (30 jours). Ne pas garder » ; aussi la page Téléchargements et les Paramètres (Confidentialité). Sans compte, « Téléchargements » est dans le menu et le pied de page seulement si l'historique est activé sur cet appareil (UI §26) ; entrées effacées après **30 jours** ; « Effacer l'historique » en un geste ; « Retirer » par ligne.
 - **Limite dite à l'écran** : le site ne peut pas rouvrir un fichier enregistré (il est dans le dossier Téléchargements de l'appareil, hors de la portée d'une page web). Les apps (D42-20) pourront garder une référence vers le fichier : même format d'entrée.
 
 ### 21.10 Signalements par catégorie (décision 5)
@@ -723,7 +723,7 @@ L'accueil connecté est une **liste unique**, triée par activité, de quatre so
 | 9 | Données personnelles exposées | Adresse, documents d'identité, photos privées d'un tiers |
 | 10 | Autre | — |
 
-« Harcèlement » et « Données personnelles exposées » sont ajoutés à la liste du propriétaire (cas fréquents dans une messagerie) ; à retirer d'un mot s'il les refuse.
+« Harcèlement » et « Données personnelles exposées » sont ajoutés à la liste (cas fréquents dans une messagerie).
 
 #### 21.10.2 Où et comment
 
@@ -747,7 +747,7 @@ L'accueil connecté est une **liste unique**, triée par activité, de quatre so
 
 ### 21.11 Bannissement révisé (décision 4 ; complète §13)
 
-- réduit à 1 an, puis **rétabli à 3 ans le même jour par le propriétaire** (le bannissement porte sur l'empreinte de l'adresse e-mail, jamais sur une adresse IP).
+- **3 ans** par défaut (30 jours ou 1 an au choix) ; le bannissement porte sur le compte (`h`, conception du compte par passkey §7.4), jamais sur une adresse IP.
 - **Actions** sur un bannissement (tableau de bord et ligne de commande) :
   - **Suspendre / Réactiver** : `actif` 0 ou 1 ; suspendu, l'adresse peut recréer un compte et le compte créer des salons ; l'échéance ne bouge pas ;
   - **Changer l'échéance** : allonger ou raccourcir, toute date entre demain et aujourd'hui + 5 ans (au-delà : décision du juriste, la durée de conservation doit rester proportionnée) ;
@@ -781,7 +781,7 @@ Texte de confirmation (`InlineConfirm` sur un écran dédié, mot de passe redem
 - **Fabrication** : chaque jour, sur la machine, `sqlite3 comptes.db ".backup"` vers un fichier temporaire du volume chiffré, puis chiffrement par **age** (format `age-encryption.org/v1`, X25519, outil `age` en version exacte épinglée, construit depuis ses sources ou paquet signé) vers la **clé publique** de l'exploitant ; le clair temporaire est effacé aussitôt ; seul le chiffré sort. Pas de crypto maison, rien dans le serveur Go (aucune sortie de plus pour lui).
 - **Destination** : un stockage objet chez un **autre** fournisseur que l'hébergeur, dans l'UE, avec un compte dédié en écriture seule (le serveur ne peut ni lire ni effacer les anciennes copies : un pirate de la machine ne détruit pas les sauvegardes) ; sortie HTTPS vers ce seul hôte, depuis la machine (pas le conteneur).
 - **Clé privée** : chez l'exploitant, hors ligne (papier ou clé USB chiffrée), **séparée** de la copie hors ligne de `K_serveur` (R19). Sans `K_serveur`, une sauvegarde ne sert à rien : les deux copies sont obligatoires.
-- **Durée** : **7 copies quotidiennes** (décision du propriétaire du 22 novembre : garder le moins longtemps), puis effacement par la règle de cycle de vie du stockage (pas par le serveur).
+- **Durée** : **7 copies quotidiennes** (règle : garder le moins longtemps), puis effacement par la règle de cycle de vie du stockage (pas par le serveur).
 - **Restauration** : toujours depuis la plus récente (les suppressions antérieures y sont déjà appliquées) ; `deploy/restaurer.sh` (déchiffre sur le poste de l'exploitant ou sur la machine avec la clé apportée, vérifie `PRAGMA integrity_check`, remplace `comptes.db` serveur arrêté) ; **test de restauration** mensuel et à chaque changement de schéma (`make test-restauration` : sauvegarde, effacement, restauration, connexion d'un compte de test).
 - **Effet sur le droit à l'effacement** : un compte supprimé reste dans les copies jusqu'à **7** jours ; c'est dit dans la page Confidentialité ; une restauration depuis une copie plus ancienne que la plus récente est interdite par la procédure.
 
@@ -795,7 +795,7 @@ Règles de cette conception **inchangées** : écouteur local par tunnel SSH, je
 2. **Signalements** : compteurs par catégorie depuis le démarrage (tableau 10 lignes × partage / salon), alerte ; liste des **salons signalés en cours** (§21.14.3).
 3. **Bannissements** : liste, recherche par adresse, bannir par adresse ou par lien, actions (§21.11).
 4. **Comptes** : agrégats (§21.14.2).
-5. **Usage** : compteurs existants (amendement du 13 novembre) + compteurs du compte.
+5. **Usage** : agrégats d'usage existants (spécification principale §9.5) + compteurs du compte.
 6. **Actions** : geler / dégeler, détruire par lien (existant).
 
 #### 21.14.2 Comptes et ancienneté (lus en direct, agrégats)
@@ -931,7 +931,7 @@ Validées telles que recommandées : (1) profil (pseudo, photo, langue, abonneme
 
 **Suppression du compte, simplifiée** : on supprime ce dont la personne est l'auteur ou l'admin : ses salons créés (lien compte ↔ salon déjà connu du serveur) et ses partages créés (liste chiffrée du coffre ou de l'appareil, rejouée à la suppression ; un partage absent de ces listes s'efface de toute façon à son échéance, 24 h ou 7 jours au plus). Rien de plus n'est promis : les messages laissés dans le salon d'autrui suivent la fin de ce salon. Aucun lien compte ↔ partage n'est ajouté côté serveur.
 
-**Amendement du 14 novembre (lot 8, déploiement)** : la spécification principale §9.2 dit « aucune sauvegarde » du dossier de données ; c'est remplacé pour `comptes.db` seulement (sauvegarde quotidienne chiffrée par age, chez un autre fournisseur, 30 jours, sessions effacées à la restauration ; `deploy/README.md` §12). Les partages et les salons ne sont jamais sauvegardés. La sortie SMTP passe par un relais (`shhcheck relais`) : le serveur garde un réseau sans route vers Internet. À voir avec le juriste : une restauration fait revenir jusqu'à 24 h de changements (mot de passe ancien, compte supprimé après la dernière copie).
+**Sauvegarde (lot 8, déploiement)** : la spécification principale §9.2 dit « aucune sauvegarde » du dossier de données ; c'est remplacé pour `comptes.db` seulement (sauvegarde quotidienne chiffrée par age, chez un autre fournisseur, 30 jours, sessions effacées à la restauration ; `deploy/README.md` §12). Les partages et les salons ne sont jamais sauvegardés. La sortie SMTP passe par un relais (`shhcheck relais`) : le serveur garde un réseau sans route vers Internet. À voir avec le juriste : une restauration fait revenir jusqu'à 24 h de changements (mot de passe ancien, compte supprimé après la dernière copie).
 
 ---
 

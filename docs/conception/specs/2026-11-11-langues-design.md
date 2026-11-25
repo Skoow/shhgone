@@ -1,13 +1,13 @@
 # Quatre langues sur le site — conception
 
-Date : 11 novembre 2026 · Statut : validée par le propriétaire le 11 novembre (liste des langues revue le même jour)
+Date : 11 novembre 2026 · Statut : validée le 11 novembre
 Complète la spécification UI (`2026-11-04-shhdrop-ui-design.md`, §10 « Textes (FR / EN) ») et la spécification générale (§42, D42-20 : apps natives plus tard).
 
 ## 1. Décisions
 
 - **Quatre langues** : français (fr), anglais (en), espagnol (es), portugais (pt). L'arabe, le hindi, le chinois puis l'allemand, d'abord envisagés, sont retirés : leurs lecteurs ont l'anglais.
-- **Choix de la langue** : si une langue réglée dans le navigateur fait partie des quatre, le site s'affiche dans la première de ces langues ; sinon, en **anglais**. Pas de fuseau horaire, pas d'autre indice. Aujourd'hui le repli est le français : il devient l'anglais.
-- **Décision du propriétaire du 12 novembre** : plus de liste de langues dans le pied de page ; la langue se choisit automatiquement selon le navigateur (UI §10, §24). Un moyen de forcer la langue (paramètre ou chemin) reste à décider s'il devient utile.
+- **Choix de la langue** : si une langue réglée dans le navigateur fait partie des quatre, le site s'affiche dans la première de ces langues ; sinon, en **anglais**. Pas de fuseau horaire, pas d'autre indice. Le repli est l'anglais.
+- **Pas de liste de langues** : plus de liste de langues dans le pied de page ; la langue se choisit automatiquement selon le navigateur (UI §10, §24). Un moyen de forcer la langue (paramètre ou chemin) reste à décider s'il devient utile.
 - **Aucun stockage** (inchangé, UI §10) : la langue choisie à la main vaut pour la visite en cours ; à la visite suivante, la règle du navigateur s'applique de nouveau. Rien n'est envoyé au serveur.
 
 ## 2. Ce qui est traduit, ce qui ne l'est pas

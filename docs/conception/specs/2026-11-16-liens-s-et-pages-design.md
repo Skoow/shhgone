@@ -1,6 +1,6 @@
 # Liens en « /s » et page d'ouverture séparée (conception courte)
 
-Décisions du propriétaire du 16 novembre, après le lot « pages séparées » (`2026-11-16-pages-separees-design.md`, étape 2).
+Décisions du 16 novembre, après le lot « pages séparées » (`2026-11-16-pages-separees-design.md`, étape 2).
 
 ## Problème
 

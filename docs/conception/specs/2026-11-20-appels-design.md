@@ -69,7 +69,7 @@ Défense en profondeur sur les adresses IP : tout candidat qui n'est pas « rela
 
 Apps natives : les mêmes comportements existent dans les API du système (niveau audio, choix de caméra, écran allumé) ; rien à changer au protocole.
 
-**Partage d'écran : retiré le 25 novembre.** Un bouton « Partager l'écran » (`getDisplayMedia`) avait été codé sans figurer dans cette conception, et l'en-tête `Permissions-Policy` du site refuse `display-capture` (audit F3 : un script injecté ne doit pas pouvoir capturer l'écran) : le bouton ne pouvait qu'échouer. Le rouvrir demanderait une décision du propriétaire, puis `display-capture=(self)` et cette section.
+**Partage d'écran : retiré le 25 novembre.** Un bouton « Partager l'écran » (`getDisplayMedia`) avait été codé sans figurer dans cette conception, et l'en-tête `Permissions-Policy` du site refuse `display-capture` (audit F3 : un script injecté ne doit pas pouvoir capturer l'écran) : le bouton ne pouvait qu'échouer. Le rouvrir demanderait une décision, puis `display-capture=(self)` et cette section.
 
 Débit : vidéo 640 × 360, 24 images par seconde, 500 kbit/s au plus vers chaque participant. File d'envoi de la signalisation cadencée sous la limite du serveur pour les trames volatiles.
 
@@ -142,7 +142,7 @@ Apps (D42-20) : même route, même jeton, même ordre (sans jeton, puis avec) ; 
 | Moyenne, confidentialité | **Créateur qui ouvre les appels** : le serveur relie son compte au fait d'avoir Plus ou Pro (en mémoire, le temps de la requête) | Écrit sur la page Confidentialité ; correction possible : ne jamais présenter le jeton depuis le siège 0 (un autre membre ouvre), au prix d'un appel impossible au créateur seul |
 | Moyenne, confidentialité | **S16 résiduel** : sans jeton en réserve, émission (avec le pass) puis dépense à quelques secondes : rapprochement possible du pass et du salon par l'heure | Écrit ; le réapprovisionnement à heure tirée au hasard réduit les cas suivants |
 | Faible, exploitation | **Redémarrage du serveur** : les appels ouverts se referment (état en mémoire) ; un nouveau jeton est demandé au prochain lancement | Rare ; garder l'heure de fin dans `salons.db` si cela gêne (une colonne, sans identifiant) |
-| Faible, économie | Un jeton par salon ouvert, pris sur la réserve des partages payants (30 par période pour Plus) | À valider par le propriétaire (réserve à part pour les appels si besoin) |
+| Faible, économie | Un jeton par salon ouvert, pris sur la réserve des partages payants (30 par période pour Plus) | À valider (réserve à part pour les appels si besoin) |
 
 ## 9. Preuves
 

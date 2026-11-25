@@ -4,7 +4,7 @@ Date : 13 novembre 2026.
 
 ## Intention et pourquoi
 
-Donner à l'exploitant (le propriétaire) une **vue d'ensemble et des commandes** du serveur en marche, sans passer par SSH + ligne de commande à chaque fois : voir la santé (disque, charge, signalements en attente), geler/dégeler les créations, traiter un lien signalé, basculer le stockage S3, et déclencher l'effacement d'urgence. Aujourd'hui tout cela existe en **ligne de commande** (`shhdrop admin freeze|unfreeze|destroy -|wipe`, `shhcheck health`) ; le tableau de bord les réunit dans une page.
+Donner à l'exploitant une **vue d'ensemble et des commandes** du serveur en marche, sans passer par SSH + ligne de commande à chaque fois : voir la santé (disque, charge, signalements en attente), geler/dégeler les créations, traiter un lien signalé, basculer le stockage S3, et déclencher l'effacement d'urgence. Aujourd'hui tout cela existe en **ligne de commande** (`shhdrop admin freeze|unfreeze|destroy -|wipe`, `shhcheck health`) ; le tableau de bord les réunit dans une page.
 
 ## La contrainte de sécurité qui gouverne tout
 
@@ -101,7 +101,7 @@ Légende — **Dispo** : la donnée existe déjà dans le serveur. **Nouveau** :
 - Historique, courbes, séries temporelles enregistrées sur disque ; journal des accès.
 
 ### Points signalés (⚠️), avec le choix par défaut retenu
-- **Nombre exact de signalements** : la spec (§15.2, §36 S21) n'expose volontairement qu'un **booléen**, pour qu'un compteur ne révèle pas l'activité. **Retenu : booléen**, choix validé respecté ; à rouvrir seulement si le propriétaire le décide.
+- **Nombre exact de signalements** : l'alerte horaire de la spec (§15.2, §36 S21) reste un **booléen**, pour qu'un compteur ne révèle pas l'activité. Les agrégats par catégorie depuis le démarrage, ajoutés ensuite (spec §9.5 ; conception du compte par e-mail §21.10.3, R14), sont une autre ligne.
 - **Répartition par palier de taille** (E) : agrégée, mais elle dessine la distribution des tailles. Mise en phase 2.
 - **Faible trafic** : avec très peu d'utilisateurs, des agrégats (« 1 salon, 2 sièges ») peuvent désigner une activité précise. L'exploitant a de toute façon accès à la base par SSH : le tableau de bord n'ajoute aucune exposition nouvelle, mais il ne doit rien **enregistrer**.
 
@@ -121,7 +121,7 @@ Un jeton d'administration volé doit pouvoir faire **le moins de mal possible**.
 - Le tableau de bord atteignable depuis l'Internet public sans barrière forte.
 - Une fuite d'identifiant, d'IP ou de contenu par une page d'administration.
 - Une page d'administration qui, compromise, laisse faire `wipe` sans une seconde preuve.
-- Un couplage qui, si le tableau de bord tombe ou est bogué, dégrade le service public (cloisonnement : un problème ici ne doit rien casser ailleurs — règle du propriétaire).
+- Un couplage qui, si le tableau de bord tombe ou est bogué, dégrade le service public (cloisonnement : un problème ici ne doit rien casser ailleurs — règle du projet).
 
 ## Approches envisagées
 
@@ -162,7 +162,7 @@ Noms internes, découpage des fichiers (un paquet `internal/adminui` servi par u
 
 ## État de réalisation (phase 1 codée)
 
-Codé et testé : paquet `server/internal/adminui` (page, état JSON, actions), câblage dans `server/cmd/shhdrop/admin_serve.go`, variables `SHH_ADMIN_LISTEN` et `SHH_ADMIN_TOKEN` (`server/internal/config`). Désactivé par défaut ; `deploy/compose.yaml` n'est **pas** modifié (activation décrite dans `deploy/README.md` §4, à décider par le propriétaire).
+Codé et testé : paquet `server/internal/adminui` (page, état JSON, actions), câblage dans `server/cmd/shhdrop/admin_serve.go`, variables `SHH_ADMIN_LISTEN` et `SHH_ADMIN_TOKEN` (`server/internal/config`). Désactivé par défaut ; `deploy/compose.yaml` n'est **pas** modifié (activation décrite dans `deploy/README.md` §4, à décider par l'exploitant).
 
 Précisions apportées à l'implémentation :
 
