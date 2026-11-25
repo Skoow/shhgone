@@ -236,7 +236,8 @@ func TestPaniqueContenue(t *testing.T) {
 }
 
 // La page : servie sans jeton (elle ne contient rien), en-têtes stricts, aucune ressource
-// tierce, aucun stockage du jeton, aucun HTML écrit par le script.
+// tierce, aucun stockage du jeton (le navigateur ne garde que les noms des accès offerts), aucun
+// HTML écrit par le script.
 func TestPage(t *testing.T) {
 	b := nouveauBanc()
 	for p, ct := range map[string]string{"/": "text/html", "/admin.css": "text/css", "/admin.js": "text/javascript"} {
@@ -253,6 +254,10 @@ func TestPage(t *testing.T) {
 		for _, interdit := range []string{"http://", "https://", "src=\"//", "url(", "@import", "innerhtml", "outerhtml",
 			"insertadjacenthtml", "document.write", "eval(", "localstorage", "sessionstorage", "document.cookie", "indexeddb",
 			"style=\"", "onclick", "<script>", "sendbeacon"} {
+			// localStorage : seulement les noms des accès offerts (TestNomsOffertsRestentDansLeNavigateur).
+			if interdit == "localstorage" && p == "/admin.js" {
+				continue
+			}
 			if strings.Contains(corps, interdit) {
 				t.Errorf("%s contient %q", p, interdit)
 			}

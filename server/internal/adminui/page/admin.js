@@ -785,6 +785,25 @@ function afficherComptes(a) {
 
 const ETATS_OFFERT = { actif: ['actif', 'etat-ok'], revoque: ['révoqué', 'etat-actif'], echu: ['échu', 'etat-echu'] };
 
+// Noms des accès offerts : gardés dans ce navigateur seulement (localStorage), jamais envoyés au
+// serveur, qui ne garde aucun nom. Clé : l'empreinte de l'accès (o.id), qui ne donne aucun droit.
+const CLE_NOMS = 'shh-admin-noms-offerts';
+const NOM_MAX = 40;
+
+function lireNoms() {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLE_NOMS) || '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch { return {}; }
+}
+
+function nommer(id, nom) {
+  const noms = lireNoms();
+  const propre = String(nom || '').trim().slice(0, NOM_MAX);
+  if (propre) noms[id] = propre; else delete noms[id];
+  try { localStorage.setItem(CLE_NOMS, JSON.stringify(noms)); return true; } catch { return false; }
+}
+
 function oublierLienOffert() {
   $('offert-champ').value = '';
   $('offert-court').textContent = '';
@@ -795,6 +814,8 @@ function ligneOffert(o) {
   const li = el('li');
   const tete = el('p', undefined, 'tete');
   const [etat, classe] = ETATS_OFFERT[o.etat] || [o.etat, ''];
+  const nom = lireNoms()[o.id];
+  if (nom) tete.append(el('span', nom), document.createTextNode(' · '));
   tete.append(el('span', o.court, 'code'), document.createTextNode(' · '), el('span', etat, classe));
   li.append(tete);
   // Révoqué : la fin a été ramenée au jour de la révocation (ligne purgée 31 jours après).
@@ -802,8 +823,18 @@ function ligneOffert(o) {
     ? ' · valable jusqu’au ' + dateFr(veille(o.fin)) + ' · ' + nombre.format(o.jetons) + ' jeton(s) restant(s) sur cette période'
     : o.etat === 'echu' ? ' · terminé le ' + dateFr(veille(o.fin)) : ' · plus aucun jeton émis';
   li.append(el('p', 'Créé le ' + dateFr(o.cree) + suite, 'meta'));
+  const outils = el('div', undefined, 'outils');
+  const renommer = el('button', nom ? 'Renommer' : 'Nommer', 'discret');
+  renommer.type = 'button';
+  renommer.addEventListener('click', () => {
+    const v = prompt('Nom pour ' + o.court + ' (gardé dans ce navigateur seulement, vide pour effacer)', nom || '');
+    if (v === null) return;
+    if (!nommer(o.id, v)) $('offerts-resultat').textContent = 'Ce navigateur refuse d’enregistrer le nom.';
+    chargerOfferts();
+  });
+  outils.append(renommer);
+  li.append(outils);
   if (o.etat === 'actif') {
-    const outils = el('div', undefined, 'outils');
     const rev = el('button', 'Révoquer', 'detruire');
     rev.type = 'button';
     confirmer(rev, 'révoquer ' + o.court + ' (sans retour)', async () => {
@@ -817,7 +848,6 @@ function ligneOffert(o) {
       relire();
     });
     outils.append(rev);
-    li.append(outils);
   }
   return li;
 }
@@ -856,12 +886,15 @@ $('offert-copier').addEventListener('click', async () => {
 confirmer($('offrir-bouton'), 'offrir un accès Pro', async () => {
   oublierLienOffert();
   const duree = $('offrir-duree').value;
+  const nom = $('offrir-nom').value;
   const r = await envoyer('POST', '/api/paiement/offrir', { duree });
   if (!r) return;
   const res = $('offerts-resultat');
   if (r.ok && r.json && typeof r.json.lien === 'string' && r.json.acces) {
     $('offert-champ').value = r.json.lien;
     $('offert-court').textContent = r.json.acces.court;
+    if (nom.trim()) nommer(r.json.acces.id, nom);
+    $('offrir-nom').value = '';
     $('offert-lien').hidden = false;
     res.textContent = 'Accès ' + r.json.acces.court + ' créé, valable jusqu’au ' + dateFr(veille(r.json.acces.fin)) + '.';
     r.json.lien = '';

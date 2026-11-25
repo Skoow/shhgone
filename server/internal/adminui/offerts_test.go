@@ -185,3 +185,22 @@ func TestOffertsListeEtRevoquer(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 }
+
+// Les noms des accès offerts restent dans le navigateur de l'exploitant : la création n'envoie
+// que la durée, et le script ne fait aucun autre envoi qui porterait un nom.
+func TestNomsOffertsRestentDansLeNavigateur(t *testing.T) {
+	js, err := page.ReadFile("page/admin.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(js)
+	if !strings.Contains(s, "envoyer('POST', '/api/paiement/offrir', { duree })") {
+		t.Fatal("la création d'un accès offert envoie autre chose que la durée")
+	}
+	if strings.Count(s, "localStorage.") != 2 || !strings.Contains(s, "localStorage.getItem(CLE_NOMS)") || !strings.Contains(s, "localStorage.setItem(CLE_NOMS,") {
+		t.Fatal("le stockage du navigateur ne doit servir qu'aux noms des accès offerts")
+	}
+	if strings.Contains(s, "localStorage.setItem(CLE_NOMS, jeton") || strings.Contains(s, "sessionStorage") || strings.Contains(s, "document.cookie") {
+		t.Fatal("aucun autre stockage dans la page")
+	}
+}
