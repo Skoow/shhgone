@@ -10,6 +10,10 @@ const SHOTS = fileURLToPath(new URL(`../test-results/captures/lot2-${TAG}/`, imp
 const w = (isMobile: boolean) => (isMobile ? "tel" : "pc");
 
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
+// Captures seulement (Chromium) : la capture d'un élément par WebKit injecte une feuille de style
+// que la CSP refuse (erreur de page comptée par fixtures.ts) ; les vérifications sont dans
+// home.spec.ts, pages.spec.ts et paiement.spec.ts, sur les quatre navigateurs.
+test.skip(({ browserName }) => browserName !== "chromium", "captures Chromium");
 
 test("captures : accueil", async ({ page, shh, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
