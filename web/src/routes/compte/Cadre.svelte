@@ -1,38 +1,88 @@
 <script lang="ts">
-  // Cadre des pages du compte (conception compte §12, §21.15) : colonne centrée de 28 rem au plus,
-  // titre de l'écran (focus à l'arrivée), sous-titre, contenu. (« une
-  // forme jolie ») : une carte arrondie, lueur menthe en haut, titre et sous-titre centrés.
+  // Cadre des pages du compte (conception compte §12, §21.15) : titre de l'écran (focus à
+  // l'arrivée), sous-titre, contenu. Trois formes :
+  // - « panneaux » (connexion, inscription, récupération ; audit design, direction A) : deux
+  //   panneaux sur toute la largeur de la fenêtre. À droite le formulaire (colonne de 30 rem) ; à
+  //   gauche la promesse et le schéma de ce que le serveur garde ou ne reçoit jamais (CLAUDE.md,
+  //   conception du compte §8 : mêmes mots). Téléphone : la scène devient une bande courte
+  //   au-dessus du formulaire. Dans le DOM, la scène vient APRÈS le formulaire (le titre, qui prend
+  //   le focus, se lit en premier) ; seule la grille la place à gauche ou en haut.
+  //   `etape` (1 à 4) : barre d'étapes de l'inscription (direction C) en tête du formulaire.
+  // - « large » (paramètres) : pleine largeur de la colonne de contenu, titre à gauche.
+  // - « carte » (défaut ; profil, suppression, salon) : carte centrée de 30 rem.
   // Démo : la phrase de la démo (aucune passkey créée, compte de cet onglet seulement) sous le titre.
   import { untrack, type Snippet } from "svelte";
   import { getDemo } from "../../app/demo-hooks";
+  import { t } from "../../i18n/i18n.svelte";
+  import { KeyRound, Lock, Server } from "../../ui/Icon";
 
-  type Props = { titre: string; sous?: string; children: Snippet };
-  let { titre, sous, children }: Props = $props();
+  type Props = { titre: string; sous?: string; children: Snippet; forme?: "carte" | "panneaux" | "large"; etape?: 1 | 2 | 3 | 4 };
+  let { titre, sous, children, forme = "carte", etape }: Props = $props();
   let h1: HTMLHeadingElement | undefined = $state();
   $effect(() => {
     if (h1) untrack(() => h1?.focus({ preventScroll: true }));
   });
+  const ETAPES = ["account.steps.1", "account.steps.2", "account.steps.3", "account.steps.4"] as const;
 </script>
 
-<section class="cadre" aria-labelledby="compte-titre">
-  <div class="tete titre-bandeau">
+{#snippet tete(bandeau: boolean)}
+  <div class={["tete", { "titre-bandeau": bandeau }]}>
     <h1 id="compte-titre" class="titre" tabindex="-1" data-large-title bind:this={h1}>{titre}</h1>
     {#if sous}<p class="sous">{sous}</p>{/if}
   </div>
-  {#if getDemo()}<p class="note" data-demo-note>{getDemo()!.compteNote}</p>{/if}
-  {@render children()}
-</section>
+{/snippet}
+
+{#if forme === "panneaux"}
+  <div class="deux" data-panneaux>
+    <section class="cadre panneau" aria-labelledby="compte-titre">
+      <div class="col">
+        {@render tete(false)}
+        {#if etape}
+          <ol class="rail" aria-label={t("account.steps")} data-etapes>
+            {#each ETAPES as cle, i (cle)}
+              <li class={{ on: i + 1 === etape, fait: i + 1 < etape }} aria-current={i + 1 === etape ? "step" : undefined}>
+                <span class="lib"><span class="n">{i + 1}</span>{t(cle)}</span>
+              </li>
+            {/each}
+          </ol>
+        {/if}
+        {#if getDemo()}<p class="note demo" data-demo-note>{getDemo()!.compteNote}</p>{/if}
+        {@render children()}
+      </div>
+    </section>
+    <aside class="scene" aria-labelledby="scene-promesse" data-scene>
+      <p class="sur"><span class="pt" aria-hidden="true"></span>{t("account.scene.eyebrow")}</p>
+      <p class="promesse" id="scene-promesse">{t("account.scene.promise")}</p>
+      <!-- Schéma : appareil (passkey), enveloppe chiffrée, serveur ; décor, dit par le texte dessous. -->
+      <div class="flux" aria-hidden="true">
+        <span class="noeud moi"><span class="ic"><KeyRound size={26} strokeWidth={1.6} /></span>{t("account.scene.device")}</span>
+        <span class="fil"><b></b></span>
+        <span class="noeud"><span class="ic"><Lock size={26} strokeWidth={1.6} /></span>{t("account.scene.envelope")}</span>
+        <span class="fil"><b></b></span>
+        <span class="noeud"><span class="ic"><Server size={26} strokeWidth={1.6} /></span>{t("account.scene.server")}</span>
+      </div>
+      <dl class="registre">
+        <div><dt>{t("account.scene.keeps")}</dt><dd>{t("account.scene.keeps.list")}</dd></div>
+        <div><dt>{t("account.scene.never")}</dt><dd>{t("account.scene.never.list")}</dd></div>
+      </dl>
+    </aside>
+  </div>
+{:else}
+  <section class={["cadre", forme]} aria-labelledby="compte-titre">
+    {@render tete(true)}
+    {#if getDemo()}<p class="note" data-demo-note>{getDemo()!.compteNote}</p>{/if}
+    {@render children()}
+  </section>
+{/if}
 
 <style>
-  .cadre {
+  /* ---------- Forme « carte » (défaut) ---------- */
+  .carte {
     position: relative;
     isolation: isolate;
     width: min(100%, 30rem);
     margin: var(--sp-6) auto var(--sp-8);
     padding: clamp(28px, 5vw, 44px) clamp(20px, 5vw, 40px) clamp(28px, 5vw, 40px);
-    display: grid;
-    gap: var(--sp-5);
-    min-width: 0;
     border-radius: clamp(20px, 3vw, 28px);
     background:
       radial-gradient(90% 60% at 50% -10%, rgb(95 227 181 / 0.14), transparent 70%),
@@ -42,6 +92,11 @@
       inset 0 0 0 1px rgb(233 236 242 / 0.1),
       inset 0 1px 0 rgb(255 255 255 / 0.06),
       0 40px 80px -48px rgb(0 0 0 / 0.9);
+  }
+  .cadre {
+    display: grid;
+    gap: var(--sp-5);
+    min-width: 0;
   }
   .titre {
     margin: 0;
@@ -56,7 +111,7 @@
   .titre:focus {
     outline: none;
   }
-  /* Titre et sous-titre : dans le bandeau des titres (ui/base.css), sur toute la largeur du cadre. */
+  /* Titre et sous-titre : dans le bandeau des titres (ui/base.css) pour la carte et les paramètres. */
   .tete {
     display: grid;
     gap: var(--sp-2);
@@ -67,6 +122,338 @@
     text-align: center;
     text-wrap: pretty;
   }
+
+  /* ---------- Forme « large » (paramètres) ---------- */
+  .large {
+    width: min(100%, 72rem);
+    margin: var(--sp-4) auto var(--sp-8);
+  }
+  .large .titre,
+  .large .sous {
+    text-align: start;
+  }
+
+  /* ---------- Forme « panneaux » (direction A) ---------- */
+  /* D'un bord à l'autre de la fenêtre (100cqw du conteneur #app, pas 100vw : pas de défilement
+     horizontal), collée sous l'en-tête et au-dessus du pied. */
+  .deux {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(min(100%, 34rem), 0.9fr);
+    grid-template-areas: "scene panneau";
+    min-height: calc(100dvh - 64px);
+    margin-inline: calc(50% - 50cqw);
+    margin-block: calc(-1 * var(--sp-5)) calc(-1 * var(--sp-5));
+  }
+  .panneau {
+    grid-area: panneau;
+    align-content: center;
+    justify-items: center;
+    padding: var(--sp-8) clamp(24px, 4vw, 56px);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.03), rgb(255 255 255 / 0.008)), var(--surface-1);
+    box-shadow: inset 1px 0 0 var(--hair);
+  }
+  .col {
+    display: grid;
+    gap: var(--sp-5);
+    width: min(100%, 30rem);
+    min-width: 0;
+  }
+  .panneau .titre {
+    font-size: clamp(1.875rem, 1.5rem + 1vw, 2.25rem);
+    font-weight: 680;
+    font-stretch: 108%;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    text-align: start;
+  }
+  .panneau .sous {
+    text-align: start;
+  }
+  /* Démo : une ligne courte, couleur d'avertissement, comme la maquette A. */
+  .panneau .note.demo {
+    color: var(--warn);
+  }
+
+  /* Barre d'étapes (direction C) : quatre traits, l'étape en cours en menthe, les faites pleines.
+     Placée sous le titre dans le DOM (le titre prend le focus), au-dessus à l'écran. */
+  .rail {
+    order: -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rail li {
+    display: grid;
+    gap: var(--sp-2);
+    min-width: 0;
+    color: var(--text-3);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+  }
+  .rail li::before {
+    content: "";
+    height: 3px;
+    border-radius: 2px;
+    background: var(--hair-2);
+  }
+  .rail li.fait::before {
+    background: var(--accent);
+  }
+  .rail li.on {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .rail li.on::before {
+    background: linear-gradient(90deg, var(--accent) 50%, var(--hair-2) 50%);
+  }
+  .rail .n {
+    margin-inline-end: 0.35em;
+    font-family: var(--font-mono);
+    font-weight: 500;
+  }
+  .rail li.on .n,
+  .rail li.fait .n {
+    color: var(--accent);
+  }
+
+  /* Scène : promesse, schéma, registre. */
+  .scene {
+    grid-area: scene;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: grid;
+    align-content: center;
+    gap: var(--sp-5);
+    padding: var(--sp-8) clamp(40px, 6vw, 112px);
+    background:
+      radial-gradient(70% 60% at 20% 30%, rgb(95 227 181 / 0.1), transparent 70%),
+      radial-gradient(60% 70% at 90% 90%, rgb(51 102 255 / 0.12), transparent 70%),
+      var(--bg-deep);
+  }
+  /* Trame de points (celle du logo), qui s'efface vers la droite. */
+  .scene::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(circle, rgb(233 236 242 / 0.1) 1.1px, transparent 1.6px) 0 0 / 14px 14px;
+    -webkit-mask-image: radial-gradient(80% 80% at 30% 50%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(80% 80% at 30% 50%, #000 20%, transparent 75%);
+    pointer-events: none;
+  }
+  .sur {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--accent);
+    font-size: var(--fs-small);
+    font-weight: 600;
+  }
+  .pt {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgb(95 227 181 / 0.15);
+  }
+  .promesse {
+    margin: 0;
+    max-width: 13ch;
+    font-size: clamp(2.5rem, 1.2rem + 3.2vw, 4.25rem);
+    font-weight: 700;
+    font-stretch: var(--wd-display, 112%);
+    letter-spacing: -0.035em;
+    line-height: 1;
+    text-wrap: balance;
+  }
+  .flux {
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr auto;
+    align-items: start;
+    gap: var(--sp-3);
+    max-width: 560px;
+    margin-top: var(--sp-5);
+  }
+  .noeud {
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-2);
+    color: var(--text-2);
+    font-size: 0.8125rem;
+    text-align: center;
+  }
+  .ic {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #1a1f2a, #12151c);
+    box-shadow:
+      inset 0 0 0 1px var(--hair-2),
+      var(--edge-hi),
+      0 16px 32px -16px #000;
+    color: var(--text);
+  }
+  .moi .ic {
+    color: var(--accent);
+    box-shadow:
+      inset 0 0 0 1px rgb(95 227 181 / 0.35),
+      0 0 0 6px rgb(95 227 181 / 0.06),
+      0 16px 32px -16px #000;
+  }
+  /* Fil en pointillé, une enveloppe qui passe (arrêtée sous mouvement réduit). */
+  .fil {
+    position: relative;
+    align-self: center;
+    margin-top: -24px;
+    height: 2px;
+    background: repeating-linear-gradient(90deg, var(--line-strong) 0 4px, transparent 4px 9px);
+    opacity: 0.7;
+  }
+  .fil b {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 26px;
+    height: 18px;
+    translate: 0 -50%;
+    border-radius: 5px;
+    background: var(--surface-3);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.5);
+    animation: passe 3.6s var(--ease-out) infinite;
+  }
+  .fil b::after {
+    content: "";
+    position: absolute;
+    inset: 5px 8px;
+    border-radius: 2px;
+    background: repeating-linear-gradient(90deg, var(--accent) 0 2px, transparent 2px 4px);
+    opacity: 0.8;
+  }
+  .fil + .noeud + .fil b {
+    animation-delay: 1.8s;
+  }
+  @keyframes passe {
+    0% {
+      left: 0;
+      opacity: 0;
+    }
+    15%,
+    85% {
+      opacity: 1;
+    }
+    100% {
+      left: calc(100% - 26px);
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fil b {
+      animation: none;
+      left: calc(50% - 13px);
+    }
+  }
+  .registre {
+    display: grid;
+    gap: var(--sp-2);
+    max-width: 34rem;
+    margin: var(--sp-3) 0 0;
+    color: var(--text-2);
+    font-size: var(--fs-small);
+  }
+  .registre div {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: var(--sp-4);
+  }
+  .registre dt {
+    padding-top: 2px;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .registre dd {
+    margin: 0;
+    text-wrap: pretty;
+  }
+
+  /* Tablette et téléphone : la scène devient une bande courte (pastille et schéma) au-dessus du
+     formulaire ; la promesse et le registre restent lisibles en petit sous le schéma. */
+  @media (max-width: 899px) {
+    .deux {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "scene" "panneau";
+      min-height: 0;
+      margin-block-end: 0;
+    }
+    .scene {
+      align-content: start;
+      gap: var(--sp-3);
+      padding: var(--sp-5) var(--sp-4) var(--sp-5);
+    }
+    .promesse {
+      max-width: 22ch;
+      font-size: 1.375rem;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .flux {
+      gap: var(--sp-2);
+      margin-top: var(--sp-1);
+    }
+    .ic {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+    }
+    .ic :global(svg) {
+      width: 22px;
+      height: 22px;
+    }
+    .fil {
+      margin-top: -22px;
+    }
+    .registre {
+      display: none;
+    }
+    .panneau {
+      align-content: start;
+      padding: var(--sp-5) var(--sp-4) var(--sp-7);
+      box-shadow: inset 0 1px 0 var(--hair);
+    }
+    .panneau .titre {
+      font-size: 1.75rem;
+    }
+  }
+  @media (max-width: 599px) {
+    .rail li .lib {
+      font-size: 0.75rem;
+    }
+    /* Seule l'étape en cours garde son nom à l'écran ; les autres restent lues (texte masqué). */
+    .rail li:not(.on) .lib {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .rail {
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+    }
+    .carte {
+      margin-block: var(--sp-3) var(--sp-6);
+      gap: var(--sp-4);
+    }
+  }
+
+  /* ---------- Commun aux trois formes ---------- */
   .cadre :global(form) {
     display: grid;
     gap: var(--sp-5);
@@ -198,18 +585,22 @@
   .cadre :global(.actions > .btn) {
     flex: 1 1 auto;
   }
-  @media (max-width: 599px) {
-    .cadre {
-      margin-block: var(--sp-3) var(--sp-6);
-      gap: var(--sp-4);
-    }
-  }
   @media (forced-colors: active) {
-    .cadre {
+    .carte,
+    .panneau {
       border: 1px solid CanvasText;
     }
     .cadre :global(.autre) {
       border-color: ButtonText;
+    }
+    .rail li::before,
+    .rail li.on::before {
+      background: CanvasText;
+    }
+  }
+  @media (prefers-contrast: more) {
+    .scene::before {
+      display: none;
     }
   }
 </style>

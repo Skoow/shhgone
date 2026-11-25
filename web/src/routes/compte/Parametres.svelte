@@ -14,6 +14,7 @@
   import Banner from "../../ui/Banner.svelte";
   import Button from "../../ui/Button.svelte";
   import { ChevronRight } from "../../ui/Icon";
+  import { reducedMotion } from "../../ui/motion";
   import Segmented from "../../ui/Segmented.svelte";
   import Cadre from "./Cadre.svelte";
   import CarteCompte from "./CarteCompte.svelte";
@@ -56,6 +57,23 @@
     await seDeconnecter();
     navigate("/compte/connexion");
   }
+  // Sommaire (ordinateur) : mêmes sections, même ordre ; le titre de la section reçoit le focus.
+  const SOMMAIRE = [
+    ["sec-profil", "account.section.profile"],
+    ["sec-passkeys", "account.section.passkeys"],
+    ["sec-recovery", "account.section.recovery"],
+    ["sec-devices", "account.section.devices"],
+    ["sec-privacy", "account.section.privacy"],
+    ["sec-plan", "account.section.plan"],
+    ["sec-lang", "account.section.lang"],
+    ["sec-data", "account.section.data"],
+  ] as const;
+  function aller(id: string) {
+    const h = document.getElementById(id);
+    if (!h) return;
+    h.scrollIntoView?.({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
+    h.focus({ preventScroll: true });
+  }
   function versSupprimer() {
     vue = "supprimer";
     if (typeof window.scrollTo === "function") window.scrollTo(0, 0);
@@ -65,10 +83,19 @@
 {#if vue === "supprimer"}
   <Supprimer {etat} onretour={() => void (vue = "liste")} />
 {:else}
-  <Cadre titre={t("account.settings.title")}>
+  <Cadre forme="large" titre={t("account.settings.title")}>
     {#if bandeau}<Banner kind="danger">{bandeau}</Banner>{/if}
     {#if account.erreur === "coffre_illisible"}<Banner kind="danger">{t("account.err.coffre")}</Banner>{/if}
 
+    <div class="corps">
+    <!-- Ordinateur : sommaire collant à gauche (boutons : le « # » de l'adresse est réservé aux clés). -->
+    <nav class="sommaire" aria-label={t("info.toc")}>
+      <ul>
+        {#each SOMMAIRE as [id, cle] (id)}
+          <li><button type="button" onclick={() => aller(id)}>{t(cle)}</button></li>
+        {/each}
+      </ul>
+    </nav>
     <div class="secs">
       <Section id="sec-profil" titre={t("account.section.profile")}>
         <a class="profil" href={href("/compte/profil")} onclick={(e) => followLink(e, "/compte/profil")}>
@@ -100,6 +127,7 @@
         <Button variant="danger" onpress={versSupprimer}>{t("account.delete")}</Button>
       </div>
     </div>
+    </div>
   </Cadre>
 {/if}
 
@@ -107,6 +135,56 @@
   .secs {
     display: grid;
     min-width: 0;
+  }
+  /* Téléphone et tablette : une colonne, sans sommaire. Ordinateur : sommaire collant, sections
+     sur 46 rem au plus. */
+  .sommaire {
+    display: none;
+  }
+  @media (min-width: 1024px) {
+    .corps {
+      display: grid;
+      grid-template-columns: 13rem minmax(0, 46rem);
+      gap: var(--sp-7);
+      align-items: start;
+    }
+    .sommaire {
+      display: block;
+      position: sticky;
+      top: calc(64px + var(--sp-5));
+    }
+    .sommaire ul {
+      display: grid;
+      gap: var(--sp-1);
+      margin: 0;
+      padding: var(--sp-4) 0 0;
+      list-style: none;
+    }
+    .sommaire button {
+      width: 100%;
+      min-height: 40px;
+      padding: 0 var(--sp-3);
+      border: 0;
+      border-radius: var(--r-md);
+      background: none;
+      color: var(--text-2);
+      font: inherit;
+      font-size: var(--fs-small);
+      font-weight: 560;
+      text-align: start;
+      cursor: pointer;
+      transition:
+        background-color var(--dur-fast) var(--ease-out),
+        color var(--dur-fast) var(--ease-out);
+    }
+    .sommaire button:hover {
+      background: rgb(255 255 255 / 0.05);
+      color: var(--text);
+    }
+    .sommaire button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
   }
   .profil {
     display: flex;

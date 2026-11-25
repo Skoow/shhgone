@@ -184,10 +184,13 @@
     void preparer();
   }
   const versConnexion = apres === "salon" ? "/compte/connexion?suite=salon" : "/compte/connexion";
+  // Barre d'étapes (Cadre) : à partir de la passkey créée ; ni sur la saisie ni après un échec.
+  const ETAPE_NUM = { second: 1, cle: 2, verif: 3, fini: 4 } as const;
+  const numero = $derived(etape in ETAPE_NUM ? ETAPE_NUM[etape as keyof typeof ETAPE_NUM] : undefined);
   const titre = $derived(etape === "fini" ? t("account.created") : etape === "cle" ? t("account.key.title") : etape === "verif" ? t("account.verify.title") : t("account.signup.title"));
 </script>
 
-<Cadre {titre} sous={etape === "saisie" ? t("account.signup.sub") : undefined}>
+<Cadre forme="panneaux" {titre} etape={numero} sous={etape === "saisie" ? t("account.signup.sub") : undefined}>
   {#if bandeau}<Banner kind="danger">{bandeau}</Banner>{/if}
 
   {#if !dispo}
@@ -238,7 +241,6 @@
     color: var(--text-2);
     font-size: var(--fs-small);
     line-height: 1.5;
-    text-align: center;
     text-wrap: pretty;
   }
 </style>

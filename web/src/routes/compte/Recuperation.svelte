@@ -83,7 +83,7 @@
   const continuer = () => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/");
 </script>
 
-<Cadre titre={vue === "cle" ? t("account.recover.title") : vue === "fini" ? t("account.connected.title") : t("account.recover.passkey.title")} sous={vue === "cle" ? t("account.recover.sub") : undefined}>
+<Cadre forme="panneaux" titre={vue === "cle" ? t("account.recover.title") : vue === "fini" ? t("account.connected.title") : t("account.recover.passkey.title")} sous={vue === "cle" ? t("account.recover.sub") : undefined}>
   {#if bandeau}<Banner kind="danger">{bandeau}</Banner>{/if}
 
   {#if vue === "cle"}

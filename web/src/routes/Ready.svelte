@@ -1,7 +1,8 @@
 <script lang="ts">
   // « Lien prêt » (UI §9.5) : affiché seulement après la résolution de createShare. L'avertissement
-  // « plus jamais affichés » en tête ; un seul cadre : le lien et le mot de passe
-  // (masqué à l'arrivée), chacun avec sa copie, et les informations du partage en bas ; puis « Partager » (feuille : envoyer vers une app, copier le lien et le mot
+  // « plus jamais affichés » en tête ; un « ticket » : le lien, une perforation, le mot de passe
+  // (masqué à l'arrivée), chacun avec sa copie ; ordinateur : l'échéance et la gestion dans une
+  // colonne à droite (audit design, lot 2) ; puis « Partager » (feuille : envoyer vers une app, copier le lien et le mot
   // de passe, QR code du lien et du mot de passe, D41-29) et « Copier le lien et le mot de
   // passe » ; lien de gestion replié ; Supprimer ce partage (secondaire) ; Terminé (principal,
   // collé en bas sur téléphone). Les valeurs ne viennent que des props (Copier lit l'état, jamais le
@@ -221,84 +222,96 @@
         </div>
       </header>
 
-      <p class="never" data-fan><ClipboardX size={18} strokeWidth={1.75} aria-hidden="true" />{t("ready.never")}</p>
+      <!-- Ordinateur : deux colonnes. À gauche le « ticket » (le lien, une perforation, le mot de
+           passe) et l'envoi ; à droite l'échéance et la gestion. Téléphone : une colonne, même
+           ordre (celui du DOM : avertissement, lien, mot de passe, informations, Supprimer, Terminé). -->
+      <div class="corps" data-ready-card>
+        <div class="gauche">
+          <p class="never" data-fan><ClipboardX size={18} strokeWidth={1.75} aria-hidden="true" />{t("ready.never")}</p>
 
-      <!-- Un seul cadre : le lien, le mot de passe (masqué à l'arrivée,
-           œil pour l'afficher, copiable masqué), puis les informations du partage en bas. -->
-      <div class="card" data-fan data-ready-card>
-        <div class="cell" role="group" aria-label={t("ready.link.title")}><CopyField label={t("ready.link.label")} value={result.link} /></div>
-        {#if demo}
-          <div class="row">
-            <Button variant="ghost" dense onpress={() => demo.openAsRecipient(result!.link)}>
-              {#snippet icon()}<Eye size={20} strokeWidth={1.75} />{/snippet}
-              {t("ready.demo.open")}
+          <!-- Le ticket : lien, perforation, mot de passe (masqué à l'arrivée, œil pour l'afficher,
+               copiable masqué). Rien entre les deux : la paire reste ensemble. -->
+          <div class="ticket" data-fan data-ticket>
+            <div class="cell lien" role="group" aria-label={t("ready.link.title")}><CopyField label={t("ready.link.label")} value={result.link} /></div>
+            <div class="perfo" aria-hidden="true"></div>
+            <div class="cell mdp" role="group" aria-label={t("ready.pw.title")}><CopyField label={t("ready.pw.title")} value={result.password} whole secret /></div>
+          </div>
+
+          <div class="send" data-fan>
+            <Button variant="primary" onpress={openSheet} aria-haspopup="dialog">
+              {#snippet icon()}<Share2 size={20} strokeWidth={1.75} />{/snippet}
+              {t("ready.share")}
             </Button>
+            <Button variant="secondary" onpress={copyBoth}>
+              {#snippet icon()}<Copy size={20} strokeWidth={1.75} />{/snippet}
+              {t("ready.share.both")}
+            </Button>
+            {#if copyNote && !sheet}<p class="note" role="status">{copyNote}</p>{/if}
           </div>
-          <p class="demo-note" data-demo-note>{demo.readyNote}</p>
-        {/if}
-        <div class="cell" role="group" aria-label={t("ready.pw.title")}><CopyField label={t("ready.pw.title")} value={result.password} whole secret /></div>
-        <div class="facts" data-ready-facts>
-          <!-- Nom du partage : texte de l'expéditeur, en texte brut, isolé (bdi). -->
-          {#if result.title}<p class="name" data-ready-name><span class="sr-only">{t("ready.name")} </span><bdi>{result.title}</bdi></p>{/if}
-          <p class="active num"><span class="dot" aria-hidden="true"></span>{t("ready.active")}</p>
-          <!-- Heure de fin seule : le serveur l'arrondit au quart d'heure supérieur ;
-               un décompte « 12 h 12 min » à côté de « 12 h » semblait faux. La phrase dit l'arrondi. -->
-          <p class="when"><Deadline expiresInS={result?.expiresInS ?? 0} countdown={false} /></p>
-          <p class="self">{selfDestruct}</p>
+
+          {#if demo}
+            <div class="demo-zone">
+              <Button variant="ghost" dense onpress={() => demo.openAsRecipient(result!.link)}>
+                {#snippet icon()}<Eye size={20} strokeWidth={1.75} />{/snippet}
+                {t("ready.demo.open")}
+              </Button>
+              <p class="demo-note" data-demo-note>{demo.readyNote}</p>
+            </div>
+          {/if}
         </div>
-      </div>
 
-      <div class="send" data-fan>
-        <Button variant="primary" onpress={openSheet} aria-haspopup="dialog">
-          {#snippet icon()}<Share2 size={20} strokeWidth={1.75} />{/snippet}
-          {t("ready.share")}
-        </Button>
-        <Button variant="secondary" onpress={copyBoth}>
-          {#snippet icon()}<Copy size={20} strokeWidth={1.75} />{/snippet}
-          {t("ready.share.both")}
-        </Button>
-        {#if copyNote && !sheet}<p class="note" role="status">{copyNote}</p>{/if}
-      </div>
-
-      <!-- « Gérer ce partage » retiré : avec l'historique, le partage se
-           suit et se supprime depuis « Mes partages ». Sans historique, le lien de gestion est le
-           seul moyen de le suivre ou de le supprimer plus tard : il est alors montré ici. -->
-      <div class="keep" data-keep data-kept={keepId ? "" : undefined}>
-        {#if keepReady && shares.status === "unavailable"}
-          <p class="hint" data-keep-unavailable>{t("ready.keep.unavailable")}</p>
-        {:else}
-          <Switch label={t("ready.keep")} hint={t("ready.keep.hint")} checked={keep} disabled={!keepReady} onchange={setKeep} />
-        {/if}
-        {#if keepReady && (!keep || shares.status === "unavailable")}
-          <div class="manage" data-manage>
-            <CopyField label={t("ready.manage.label")} value={result.manage} />
-            <p class="hint">{t("ready.manage.hint")}</p>
+        <div class="droite" data-fan>
+          <div class="facts" data-ready-facts>
+            <!-- Nom du partage : texte de l'expéditeur, en texte brut, isolé (bdi). -->
+            {#if result.title}<p class="name" data-ready-name><span class="sr-only">{t("ready.name")} </span><bdi>{result.title}</bdi></p>{/if}
+            <p class="active num"><span class="dot" aria-hidden="true"></span>{t("ready.active")}</p>
+            <!-- Heure de fin seule : le serveur l'arrondit au quart d'heure supérieur ;
+                 un décompte « 12 h 12 min » à côté de « 12 h » semblait faux. La phrase dit l'arrondi. -->
+            <p class="when"><Deadline expiresInS={result?.expiresInS ?? 0} countdown={false} /></p>
+            <p class="self">{selfDestruct}</p>
           </div>
-        {/if}
-      </div>
 
-      <div class="danger-zone">
-        <InlineConfirm
-          label={t("ready.delete")}
-          message={t("ready.delete.confirm")}
-          confirmLabel={t("ready.delete.yes")}
-          kind="danger"
-          triggerVariant="ghost"
-          onconfirm={remove}
-        >
-          {#snippet icon()}<Trash2 size={20} strokeWidth={1.75} />{/snippet}
-        </InlineConfirm>
-        {#if deleteError}<p class="del-err" role="alert">{deleteError}</p>{/if}
-      </div>
+          <!-- « Gérer ce partage » retiré : avec l'historique, le partage se
+               suit et se supprime depuis « Mes partages ». Sans historique, le lien de gestion est le
+               seul moyen de le suivre ou de le supprimer plus tard : il est alors montré ici. -->
+          <div class="keep" data-keep data-kept={keepId ? "" : undefined}>
+            {#if keepReady && shares.status === "unavailable"}
+              <p class="hint" data-keep-unavailable>{t("ready.keep.unavailable")}</p>
+            {:else}
+              <Switch label={t("ready.keep")} hint={t("ready.keep.hint")} checked={keep} disabled={!keepReady} onchange={setKeep} />
+            {/if}
+            {#if keepReady && (!keep || shares.status === "unavailable")}
+              <div class="manage" data-manage>
+                <CopyField label={t("ready.manage.label")} value={result.manage} />
+                <p class="hint">{t("ready.manage.hint")}</p>
+              </div>
+            {/if}
+          </div>
 
-      <div class="done">
-        <InlineConfirm
-          label={t("ready.done")}
-          message={t("ready.done.confirm")}
-          confirmLabel={t("ready.done.yes")}
-          triggerVariant="primary"
-          onconfirm={done}
-        />
+          <div class="danger-zone">
+            <InlineConfirm
+              label={t("ready.delete")}
+              message={t("ready.delete.confirm")}
+              confirmLabel={t("ready.delete.yes")}
+              kind="danger"
+              triggerVariant="ghost"
+              onconfirm={remove}
+            >
+              {#snippet icon()}<Trash2 size={20} strokeWidth={1.75} />{/snippet}
+            </InlineConfirm>
+            {#if deleteError}<p class="del-err" role="alert">{deleteError}</p>{/if}
+          </div>
+
+          <div class="done">
+            <InlineConfirm
+              label={t("ready.done")}
+              message={t("ready.done.confirm")}
+              confirmLabel={t("ready.done.yes")}
+              triggerVariant="primary"
+              onconfirm={done}
+            />
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -353,10 +366,93 @@
     display: grid;
     gap: var(--sp-5);
   }
+  /* Pastille cadenas et titre centrés sur le même axe (avant : pastille en haut, titre décalé). */
   .hd {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--sp-5);
+  }
+  /* Une colonne (téléphone, tablette), deux à partir de 1024 px : ticket 7/12, gestion 5/12. */
+  .corps,
+  .gauche,
+  .droite {
+    display: grid;
+    gap: var(--sp-5);
+    align-content: start;
+    min-width: 0;
+  }
+  @media (min-width: 1024px) {
+    .ready {
+      width: min(100%, 1120px);
+    }
+    .corps {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: var(--sp-7);
+    }
+    .droite {
+      padding: var(--sp-5);
+      border: 1px solid var(--hair-2);
+      border-radius: var(--r-xl);
+      background: var(--vessel);
+      box-shadow: var(--edge-hi);
+    }
+    .droite .when {
+      font-size: var(--fs-h3);
+    }
+    .droite .facts {
+      padding-top: 0;
+      border-top: 0;
+    }
+  }
+  /* Le ticket : le lien en haut, une perforation (pointillé et deux encoches), le mot de passe
+     en bas sur fond nuit, bord menthe : la paire à donner ensemble. */
+  .ticket {
+    display: grid;
+    min-width: 0;
+    border-radius: var(--r-xl);
+    box-shadow: var(--edge-hi);
+    filter: drop-shadow(0 24px 32px rgb(0 0 0 / 0.45));
+  }
+  .ticket .lien {
+    padding: var(--sp-5) var(--sp-5) var(--sp-4);
+    border: 1px solid var(--hair-2);
+    border-bottom: 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+  }
+  .ticket .mdp {
+    padding: var(--sp-4) var(--sp-5) var(--sp-5);
+    border: 1px solid rgb(95 227 181 / 0.45);
+    border-top: 0;
+    border-radius: 0 0 var(--r-xl) var(--r-xl);
+    background: linear-gradient(180deg, #0d1a17, var(--bg-deep));
+  }
+  .perfo {
+    position: relative;
+    height: 0;
+    border-top: 2px dashed var(--line-strong);
+    margin-inline: 14px;
+  }
+  .perfo::before,
+  .perfo::after {
+    content: "";
+    position: absolute;
+    top: -13px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg);
+  }
+  .perfo::before {
+    left: -27px;
+  }
+  .perfo::after {
+    right: -27px;
+  }
+  .demo-zone {
+    display: grid;
+    justify-items: start;
+    gap: var(--sp-1);
   }
   .mini {
     flex: none;
@@ -413,21 +509,6 @@
     height: 8px;
     border-radius: 50%;
     background: var(--accent);
-  }
-  .card {
-    display: grid;
-    gap: var(--sp-4);
-    min-width: 0;
-    padding: var(--sp-4);
-    border: 1px solid var(--hair-2);
-    border-radius: var(--r-xl);
-    background: var(--vessel);
-    box-shadow: var(--edge-hi);
-  }
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
   }
   .hint {
     margin: 0;
@@ -532,20 +613,14 @@
     .mini {
       width: 56px;
       height: 56px;
-      align-self: flex-start;
     }
-    .card {
+    .ticket .lien {
       padding: var(--sp-4);
-      border-radius: var(--r-lg);
+      border-radius: var(--r-lg) var(--r-lg) 0 0;
     }
-    /* Actions d'une carte : deux colonnes égales, pleine largeur (pouce, alignement). */
-    .card .row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
-    }
-    .card .row :global(.btn) {
-      width: 100%;
-      justify-content: center;
+    .ticket .mdp {
+      padding: var(--sp-4);
+      border-radius: 0 0 var(--r-lg) var(--r-lg);
     }
     .send {
       display: grid;

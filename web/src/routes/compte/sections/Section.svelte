@@ -9,7 +9,7 @@
 </script>
 
 <section class="sec" aria-labelledby={id}>
-  <h2 {id}>{titre}</h2>
+  <h2 {id} tabindex="-1">{titre}</h2>
   {@render children()}
 </section>
 
@@ -23,8 +23,12 @@
   }
   h2 {
     margin: 0;
+    scroll-margin-top: calc(64px + var(--sp-5));
     font-size: var(--fs-h3);
     line-height: 1.25;
+  }
+  h2:focus {
+    outline: none;
   }
   .sec :global(.ligne) {
     display: flex;

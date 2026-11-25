@@ -129,7 +129,7 @@
   }
 </script>
 
-<Cadre titre={t("account.login.title")}>
+<Cadre forme="panneaux" titre={t("account.login.title")}>
   {#if bandeau}<Banner kind={bandeau.kind}>{bandeau.texte}</Banner>{/if}
   {#if account.erreur === "coffre_illisible" && bandeau?.texte !== t("account.err.coffre")}<Banner kind="danger">{t("account.err.coffre")}</Banner>{/if}
 
@@ -169,12 +169,12 @@
 </Cadre>
 
 <style>
-  /* « Rester connecté » centré sous le bouton. */
+  /* « Rester connecté » sous le bouton, au bord gauche de la colonne (panneau de droite). */
   .connexion {
     gap: var(--sp-3);
   }
   .connexion :global(.case) {
-    justify-self: center;
+    justify-self: start;
   }
   /* Séparateur « ou » et boutons secondaires (.ou, .autres, .autre) : Cadre.svelte. */
 </style>
