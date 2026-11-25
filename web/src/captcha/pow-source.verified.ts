@@ -1,4 +1,4 @@
-// Production (spec §28.3, audit du 20 novembre W3) : new Worker(url) n'a pas de contrôle
+// Production (spec §28.3) : new Worker(url) n'a pas de contrôle
 // d'intégrité. Le script du Worker de la preuve de travail (assets/pow-worker-EMPREINTE.js, construit
 // à part en script classique par le greffon shh-pow) est donc lu par fetch avec son empreinte
 // SHA-384, inscrite dans ce script (lui-même couvert par l'empreinte de la page), puis lancé

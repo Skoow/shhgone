@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// « Salon prêt » et l'historique (décision du 24 novembre, B) : l'historique est désactivé par
+// « Salon prêt » et l'historique (B) : l'historique est désactivé par
 // défaut, avec ou sans compte ; le lien de gestion n'est alors gardé nulle part, il est montré
 // d'emblée (avec l'avertissement) pour être gardé à la main. Gardé dans l'historique : derrière
 // « Afficher le lien de gestion », comme avant.

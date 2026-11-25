@@ -1,5 +1,4 @@
-// Dimensions d'une image lues dans son en-tête, sans la décoder (test d'intrusion du 11
-// novembre : bombe de décompression). Le format est reconnu aux octets, pas au type annoncé :
+// Dimensions d'une image lues dans son en-tête, sans la décoder (bombe de décompression). Le format est reconnu aux octets, pas au type annoncé :
 // <img> reconnaît lui aussi le contenu. Format inconnu, en-tête tronqué ou dimensions
 // introuvables : null, donc pas d'aperçu (le fichier reste enregistrable).
 import { Malformed, startsWith, u16be, u16le, u32be, u32le, u8 } from "./bytes";

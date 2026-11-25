@@ -1,4 +1,4 @@
-// Contenu et visionneuses (Task 21, UI §9.8, §12.4) sur le vrai serveur : groupes et ordre de
+// Contenu et visionneuses (UI §9.8, §12.4) sur le vrai serveur : groupes et ordre de
 // l'envoi, texte brut, image depuis une URL blob révoquée au chargement, audio et vidéo natifs,
 // fichiers piégés jamais affichés, échec de décodage, expiration, destruction pendant la lecture.
 import { destroyShare } from "../src/index";
@@ -66,7 +66,7 @@ test("groupes et ordre de l'envoi ; texte, image, audio, vidéo ; pièges jamais
   }
 
   // Audio et vidéo : téléchargés à la demande, lisibles dans le panneau.
-  await page.getByRole("button", { name: "Écouter vocal.ogg" }).click(); // son : « Écouter » (audit D2)
+  await page.getByRole("button", { name: "Écouter vocal.ogg" }).click(); // son : « Écouter »
   const audio = viewer.locator("audio");
   await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.readyState), { timeout: 20_000 }).toBeGreaterThanOrEqual(1);
   await page.keyboard.press("Escape");

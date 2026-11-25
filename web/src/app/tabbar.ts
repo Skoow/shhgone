@@ -1,4 +1,4 @@
-// Barre d'onglets du téléphone (< 768 px, refonte du 12 novembre) : façon app, jusqu'à la vraie version mobile.
+// Barre d'onglets du téléphone (< 768 px) : façon app, jusqu'à la vraie version mobile.
 // Visible seulement sur les écrans « racine » de l'expéditeur : accueil (composeur vide),
 // Mes partages, Sécurité, Confidentialité, page introuvable. Masquée chez le destinataire (ouverture,
 // contenu), sur la gestion, pendant la composition (l'étape a sa propre barre d'action),
@@ -8,13 +8,13 @@ import type { Route } from "./router.svelte";
 export type TabId = "send" | "shares" | "downloads" | "chat" | "home" | "profile";
 
 /** Onglets dans l'ordre ; `soon` : pas encore construit (désactivé, « Bientôt »). */
-// Sans compte (retours du propriétaire du 15 novembre) : plus de barre d'onglets sur le site.
+// Sans compte : plus de barre d'onglets sur le site.
 // « Envoyer » ramenait à l'accueil, déjà atteint par le logo ; « Téléchargements » ne sert pas sans
 // compte (historique de ce seul navigateur, sans lien pour retélécharger). Il ne reste que « Mes
 // partages », et une barre d'un seul onglet n'a pas de sens (tabBarUseful) : la navigation passe
 // par le menu ☰ (ui/MobileMenu.svelte). Remplace la conception compte §21.15.5 (trois onglets).
 export const TABS: readonly { id: TabId; soon: boolean }[] = [
-  { id: "shares", soon: false }, // historique « Vos envois » (/envois, Task H)
+  { id: "shares", soon: false }, // historique « Vos envois » (/envois)
 ];
 
 /** Connecté (conception compte §21.15.1) : Accueil, Envoyer, Téléchargements, Profil. */
@@ -45,16 +45,15 @@ export function tabBarUseful(tabs: readonly { id?: TabId; soon: boolean }[]): bo
 }
 
 /**
- * Masquée tant qu'un seul onglet fonctionne (décision du propriétaire du 11 novembre, audit
- * M18) ; visible depuis que Mes partages fonctionne ; `useful` : forcé par les tests.
+ * Masquée tant qu'un seul onglet fonctionne ;
+ * visible depuis que Mes partages fonctionne ; `useful` : forcé par les tests.
  */
 export function tabBarVisible(o: { supported: boolean; route: Route["name"]; sending: boolean; composing: boolean; connected?: boolean }, useful = tabBarUseful(tabsFor(!!o.connected))): boolean {
   return useful && o.supported && !o.sending && !o.composing && (o.connected ? ROOTS_CONNECTED : ROOTS).has(o.route);
 }
 
 /** Onglet courant : Envoyer sur l'accueil, Mes partages sur /envois ; aucun ailleurs (plus
- *  d'onglet Réglages : langue, nettoyage et liens d'information sont dans le pied de page,
- *  retours du 11 novembre). */
+ *  d'onglet Réglages : langue, nettoyage et liens d'information sont dans le pied de page). */
 export function currentTab(route: Route["name"], connected = false): TabId | null {
   if (connected) {
     if (route === "home") return "home";

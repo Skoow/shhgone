@@ -1,5 +1,5 @@
-// Suppression totale du compte (conception compte §21.12 et décision du propriétaire du 14 novembre
-// « suppression simplifiée » ; plan, lot 13). Ordre exact : (1) chaque partage connu détruit un par
+// Suppression totale du compte (conception compte §21.12
+// « suppression simplifiée »). Ordre exact : (1) chaque partage connu détruit un par
 // un par son secret de gestion, sans le jeton de session ; (2) départ des salons rejoints (aucune
 // preuve de membre n'existe encore sur l'appareil : écrans du salon, C-5) ; (3) POST supprimer ;
 // (4) effacement de l'appareil si demandé. Une destruction échouée n'arrête pas les autres et est dite.

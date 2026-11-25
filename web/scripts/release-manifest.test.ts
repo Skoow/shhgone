@@ -178,7 +178,7 @@ describe("serialize et sumsOf", () => {
     // execFileSync lève si sha256sum sort en erreur (empreinte fausse, ligne mal formée).
     const out = execFileSync("sha256sum", ["-c", "--strict", sums], { cwd: d, encoding: "utf8" });
     // Les coreutils récents mettent entre guillemets les noms qui contiennent une espace
-    // ('assets/a b.js': OK) : on compare les noms sans ces guillemets (CI du 10 novembre).
+    // ('assets/a b.js': OK) : on compare les noms sans ces guillemets (CI).
     const lines = out.trim().split("\n").map((l) => l.replace(/^'(.*)'(: OK)$/, "$1$2"));
     expect(lines).toEqual(["assets/a b.js: OK", "index.html: OK", "é.txt: OK"]);
   });

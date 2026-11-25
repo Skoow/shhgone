@@ -1,4 +1,4 @@
-// Audit M1 : tous les secrets avaient le type Uint8Array, et envoyer K_lien au serveur
+// Tous les secrets avaient le type Uint8Array, et envoyer K_lien au serveur
 // compilait. Les lignes marquées @ts-expect-error DOIVENT être des erreurs de type :
 // `npm test` lance `tsc --noEmit`, qui échoue si l'une d'elles compile.
 import { describe, expect, it } from "vitest";

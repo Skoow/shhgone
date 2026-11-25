@@ -1,4 +1,4 @@
-// Garde de sortie par le bouton Retour (audit I2) : pendant un envoi et sur « Lien prêt », le
+// Garde de sortie par le bouton Retour : pendant un envoi et sur « Lien prêt », le
 // Retour du navigateur ou du téléphone ne doit pas faire perdre le lien sans prévenir. Une
 // entrée d'historique de garde (même adresse, état marqué, aucun secret) est ajoutée au début
 // de l'envoi (clic : activation de l'utilisateur, sans quoi Chrome peut sauter l'entrée) ; un

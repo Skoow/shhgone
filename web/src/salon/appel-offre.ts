@@ -1,4 +1,4 @@
-// Appels réservés aux offres Plus et Pro (décision du propriétaire, 24 novembre ; conception des
+// Appels réservés aux offres Plus et Pro (conception des
 // appels §5.1) : demande des identifiants du relais, avec un jeton anonyme seulement si le serveur
 // dit les appels du salon fermés (402). Le portefeuille (pass, jetons) est dans paiement/appel.ts.
 import { jetonAppel } from "../paiement/appel";

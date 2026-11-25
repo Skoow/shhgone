@@ -1,4 +1,4 @@
-// Enregistreur vocal (Task 12, spec §35.3) avec le faux micro de Chromium : onde vivante,
+// Enregistreur vocal (spec §35.3) avec le faux micro de Chromium : onde vivante,
 // minuteur « 0:02 / 30:00 max » sur une ligne, pause qui fige le minuteur, reprise, arrêt, réécoute
 // facultative sur la forme d'onde (lecture, déplacement, vitesse), « Valider », ligne du composeur
 // avec mini-onde, durée et vitesse. Micro éteint après l'arrêt et l'annulation ; refus du micro : message clair ; mouvement
@@ -18,7 +18,7 @@ test.use({
 });
 test.skip(({ browserName }) => browserName !== "chromium", "faux micro : Chromium seulement");
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-VOICE5/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/VOICE5/", import.meta.url));
 
 async function spyStreams(page: Page) {
   await page.addInitScript(() => {
@@ -183,7 +183,7 @@ test("arrêter → « Valider » sans réécouter → ligne ajoutée", async ({ 
   await expect(rec).toBeHidden();
   const row = page.locator("[data-row]").filter({ hasText: "Mémo vocal 1" });
   await expect(row).toBeVisible();
-  // WebM de l'enregistreur : du son, jamais « Vidéo » (audit D2).
+  // WebM de l'enregistreur : du son, jamais « Vidéo ».
   await expect(row).toContainText("Audio");
   await expect(row).not.toContainText("Vidéo");
 });
@@ -222,7 +222,7 @@ test("ligne vocale : nom générique renommable (Entrée, Échap, vide → gén�
       expect(a.x, `${sel} à ${w}`).toBeCloseTo(b.x, 0);
     }
     // Icône, nom et « … » sur la même rangée ; le lecteur dessous, aligné à gauche sur le nom
-    // (retours du propriétaire du 12 novembre : il était centré dans la ligne).
+    // (il était centré dans la ligne).
     const [pic, meta, menu, clip, main] = [await box(voice.locator(".pic")), await box(voice.locator(".kind")), await box(voice.locator(act)), await box(voice.locator("[data-voice-clip]")), await box(voice.locator(".main"))];
     expect(Math.abs(pic.y + pic.height / 2 - (menu.y + menu.height / 2))).toBeLessThan(2);
     expect(clip.y).toBeGreaterThanOrEqual(meta.y + meta.height);
@@ -231,7 +231,7 @@ test("ligne vocale : nom générique renommable (Entrée, Échap, vide → gén�
   }
   if (isMobile) await captureOf(voice, { path: `${SHOTS4}voice-row-390.png` });
 
-  // Le vocal se renomme comme les autres (retours UI6) : crayon de la ligne sur ordinateur,
+  // Le vocal se renomme comme les autres : crayon de la ligne sur ordinateur,
   // menu « … » sur téléphone (plus de crayon propre au vocal).
   await expect(voice.locator(".head button:not([data-clean] *)")).toHaveCount(0); // le bouclier de nettoyage suit le nom (UI9)
   const rename = async (from: string, to: string, opts: { cancel?: boolean; shot?: boolean } = {}) => {
@@ -338,7 +338,7 @@ test.describe("mouvement réduit", () => {
   });
 });
 
-// Décision du propriétaire du 17 novembre : un vocal et une note ne se téléchargent jamais,
+// Un vocal et une note ne se téléchargent jamais,
 // même avec « Autoriser le téléchargement » ; le vocal s'écoute, la note se lit (et se copie).
 // Ni l'un ni l'autre dans « Tout télécharger » : ici, rien d'autre à télécharger, donc pas de barre.
 test("destinataire : un vocal s'écoute, jamais téléchargé ; la note se lit et se copie, jamais téléchargée", async ({ page, shh, browser }) => {
@@ -353,7 +353,7 @@ test("destinataire : un vocal s'écoute, jamais téléchargé ; la note se lit e
   await page.getByRole("button", { name: "Chiffrer et envoyer" }).click();
   await expect(page.getByRole("heading", { name: "Lien prêt" })).toBeVisible({ timeout: 60_000 });
   const read = async (name: string) => {
-    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    // Mot de passe masqué à l'arrivée : l'œil l'affiche d'abord.
     const g = page.getByRole("group", { name, exact: true });
     const eye = g.locator("[data-reveal]");
     if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();

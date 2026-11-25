@@ -16,7 +16,7 @@ out="${1:-$web/SHA256SUMS.repro}"
 # Même identifiant de version dans les deux copies (elles n'ont pas de dossier .git).
 SHH_BUILD_ID="${SHH_BUILD_ID:-$(git -C "$web" rev-parse --short=7 HEAD)}"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "$web" log -1 --format=%ct)}"
-# Site de production avec le compte (décision D8, 19 novembre), comme deploy/Dockerfile.
+# Site de production avec le compte (D8), comme deploy/Dockerfile.
 SHH_SITE_COMPTES=1
 export SHH_BUILD_ID SOURCE_DATE_EPOCH SHH_SITE_COMPTES
 
@@ -26,9 +26,8 @@ trap 'rm -rf "$tmp"' EXIT
 build() { # $1 : dossier absolu de la copie (même disposition que le dépôt : web/ et engine/)
   mkdir -p "$1"
   # Les sources suivies par git, telles qu'elles sont sur le disque ; ni dist, ni node_modules,
-  # ni engine/target, ni web/src/engine/pkg. Plus les listes de domaines jetables du serveur,
-  # importées par la page d'inscription (web/src/routes/compte/verifs.ts), comme deploy/Dockerfile.
-  (cd "$repo" && git ls-files -z -- web engine server/internal/compte/jetables.txt server/internal/compte/jetables-ajouts.txt | tar --null -T - -cf - 2>/dev/null) | tar -xf - -C "$1"
+  # ni engine/target, ni web/src/engine/pkg.
+  (cd "$repo" && git ls-files -z -- web engine | tar --null -T - -cf - 2>/dev/null) | tar -xf - -C "$1"
   ln -s "$web/node_modules" "$1/web/node_modules"
   (cd "$1/web" && npm run build >"$1.log" 2>&1) || { cat "$1.log" >&2; exit 1; }
   (cd "$1/web/dist" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)

@@ -1,5 +1,5 @@
-// Exclusion et nouvelle invitation (spec §39.13 ; spec salon v3 §3.6.1, exigences 24 et 25 ; plan
-// C-5 Task 5). Chez le créateur seulement :
+// Exclusion et nouvelle invitation (spec §39.13 ; spec salon v3 §3.6.1).
+// Chez le créateur seulement :
 //   (a) nouvelle invitation tirée ici : K_lien' (32 octets aléatoires), mot de passe généré,
 //       sel, K_mdp' (Argon2id), clés du salon, K_maître_s' ; rien de l'ancienne n'y entre ;
 //   (b) la rotation est préparée dans le client (clé gardée, pas encore envoyée), puis

@@ -1,5 +1,5 @@
-// Logo « Trame » (mot-symbole Shhgone, nom affiché depuis le 12 novembre) et marque « S qui s'efface »
-// (favicon et icônes, choisie par le propriétaire le 21 novembre), construits à la règle et au compas.
+// Logo « Trame » (mot-symbole Shhgone, nom affiché) et marque « S qui s'efface »
+// (favicon et icônes), construits à la règle et au compas.
 // Aucune image générée : chaque tracé est calculé ici, puis écrit dans src/ui/logo-paths.ts,
 // public/logo.svg et public/favicon.svg. Les PNG et l'ICO viennent de scripts/gen-icons.mjs.
 // Déterministe : le test régénère les sorties et les compare octet pour octet.
@@ -7,7 +7,7 @@
 // Construction (unité u, ligne de base y = 0, axe y vers le bas) :
 //   bas-de-casse monoline : hauteur d'x 24, ascendante 34, descendante 10, trait 5 (centré sur l'axe) ;
 //   rondes : axe r 10,1 (débord optique 0,6) ; arches de h et r : r 9,5 centrées à y = −12 ;
-//   S capitale (initiale, 21 novembre) : voir sGeom ; approches 5 / 4,5 / 4,5 / 3 / 3 / 3,5.
+//   S capitale (initiale) : voir sGeom ; approches 5 / 4,5 / 4,5 / 3 / 3 / 3,5.
 //   g : panse du o, fût droit jusqu'à la ligne de base, crochet r 10,1 centré sur la ligne de base
 //   (0° à 160°) ; n : fût d'x et arche du h ; e : panse du o, barre à mi-hauteur, ouverture de 0° à 40°.
 //   « shh » plein ; « gone » échantillonné sur une grille au pas du trait (5 u), origine propre à
@@ -72,7 +72,7 @@ export function sGeom({ cx, cyU, rx, ry, rxU = rx, ryU = ry, W, a0 = -30, cut = 
     s += weights[j] * gap + r;
     const [x, y, nx, ny] = at(s), t = j / (n - 1), off = drift * t * t;
     dots.push([x + nx * off, y + ny * off, r]);
-    // Les points pâlissent vers la fin (propriétaire, 22 novembre) : opacité de 1 à 1 − fade.
+    // Les points pâlissent vers la fin : opacité de 1 à 1 − fade.
     alpha.push(Math.round((1 - fade * t * t) * 100) / 100);
     s += r;
   });
@@ -80,7 +80,7 @@ export function sGeom({ cx, cyU, rx, ry, rxU = rx, ryU = ry, W, a0 = -30, cut = 
 }
 
 /**
- * LE S (22 novembre : un seul dessin pour l'icône et l'initiale du mot). Toutes les mesures sont
+ * LE S (un seul dessin pour l'icône et l'initiale du mot). Toutes les mesures sont
  * des multiples de l'épaisseur du trait W : l'icône et l'initiale ne diffèrent que par l'échelle.
  */
 export const S_FORME = { rx: 1.76, ry: 1.4, rxU: 1.66, ryU: 1.27, n: 6, r0: 0.46, r1: 0.2, k: 1.4, drift: 0.36, ext: 0.8, fade: 0.8 };

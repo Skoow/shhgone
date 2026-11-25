@@ -12,7 +12,7 @@ describe("salon : limite de trames (0x0B)", () => {
   });
 });
 
-describe("salon : type du Blob affiché (audit du 20 novembre)", () => {
+describe("salon : type du Blob affiché", () => {
   it("jamais le type annoncé s'il n'est pas dans la table sûre", () => {
     for (const bad of ["text/html", "image/svg+xml", "application/xhtml+xml", "text/xml", "application/javascript"]) {
       expect(typeAffichage("image", bad)).toBeNull();

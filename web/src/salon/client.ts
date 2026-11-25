@@ -1,11 +1,11 @@
-// Client du salon (plan C-3, Task 3) : WebSocket du serveur (« Protocole » du plan C-2) et moteur
+// Client du salon : WebSocket du serveur (« Protocole ») et moteur
 // MLS (salon/engine.ts), sans aucune vue. Seul fichier du site qui ouvre un WebSocket
 // (source-rules.test.ts). Il suit le contrat de l'appelant du moteur (engine/salon/src/groupe.rs)
-// et les exigences C-3 de la spec salon v3 §3.6.1 :
+// et les spec salon v3 §3.6.1 :
 // - accueil : `0x0D` → `remplacerAnnonces` avant toute trame, KeyPackage publié hors du groupe ;
 //   `0x02`/`0x0A` → `annoncer` ; `0x03` → `marquerParti` ; `0x09` → `marquerExclu` ; `0x01` →
-//   `recevoirTrame` (siège attesté) ; l'arrivant y passe tout dès sa création (exigence 6) ;
-// - fin du rattrapage : pong du ping envoyé après l'accueil (exigence 20) ; avant lui, personne
+//   `recevoirTrame` (siège attesté) ; l'arrivant y passe tout dès sa création ;
+// - fin du rattrapage : pong du ping envoyé après l'accueil ; avant lui, personne
 //   n'est ajouté ; ajouts et retraits faits par le plus petit siège en ligne du groupe ;
 // - arrivant en attente : KeyPackage republié à chaque `0x07` en ligne, `0x02`, `0x0A` (15),
 //   au plus toutes les 5 s ; `attente_pleine` ou retard (`epoque_perdue`) → reprise (6, C-2 5) ;
@@ -19,10 +19,10 @@
 // - fermetures : 1001, 1011, 4006, coupure → reconnexion avec `depuis` (1 s, 2 s… 30 s) ;
 //   4004 → nouvelle entrée par `rejoindre` (16) ; 4005 → arrêt sans reconnexion (35) ; 4002 ou
 //   `0x05` raison 5 → exclusion ; `0x05` raisons 1, 2, 7 → fin du salon ;
-// - groupe orphelin (17, plan C-3 point 6) : le créateur hors du groupe recrée le groupe à la fin
+// - groupe orphelin (17) : le créateur hors du groupe recrée le groupe à la fin
 //   du rattrapage si aucun autre siège n'est en ligne, sinon 10 s plus tard sans Welcome.
 // Secrets : K_lien et S_gestion gardés en mémoire de la page seulement, mis à zéro à `fermer` ;
-// K_accès_s, K_preuve_s et J_gestion mis à zéro après chaque requête (exigences 5, 33).
+// K_accès_s, K_preuve_s et J_gestion mis à zéro après chaque requête.
 import * as api from "./api";
 import { DEPUIS_REPRISE, RAISONS_FIN, accueil, lire, lu, ping, PREND_UN_RANG, quitter, retirer as retirerTrame, trame as trameClient, type Enregistrement } from "./protocole";
 import type { Annonce, ClesSalon, EnveloppeEnvoi, Evenement, Message, Regle, Salon, SalonEngine } from "./engine";
@@ -451,7 +451,7 @@ export class ClientSalon {
         return;
       case 0x10: {
         this.#reglages = { depart: r.depart, secondes: r.secondes, places: r.places };
-        // Renouvellement (spec 2026-11-13, exigence C-3 22) : seulement s'il est postérieur à notre
+        // Renouvellement (spec 2026-11-13, 22) : seulement s'il est postérieur à notre
         // entrée (un 0x10 d'accueil peut redire un renouvellement d'avant notre jeton).
         const nouveau = r.depart > this.#depart && !this.#repriseBase;
         if (this.#repriseBase) this.#depart = Math.max(this.#depart, r.depart);
@@ -479,7 +479,7 @@ export class ClientSalon {
     this.#emettre({ k: "connexion", etat: "ouvert" });
     this.#emettre({ k: "liste", createur: r.createur, annonces: r.annonces, seq: r.seq });
     if (!this.dansLeGroupe()) this.#publierKp(true);
-    // Fin du rattrapage : pong de ce ping (exigence 20).
+    // Fin du rattrapage : pong de ce ping.
     this.#ping = this.#deps.alea(8);
     this.#envoyerWS(ping(this.#ping));
   }
@@ -521,7 +521,7 @@ export class ClientSalon {
     if (code === "salon_casse") return this.#terminer("interrompu");
     if (code === "attente_pleine") return this.#reprendre();
     if ((code === "epoque_perdue" || code === "mls_invalide") && this.dansLeGroupe()) {
-      // Retard sur le groupe, ou groupe refondé sans nous (exigence 17) : seulement si cela
+      // Retard sur le groupe, ou groupe refondé sans nous : seulement si cela
       // touche au moins deux expéditeurs (un message très ancien, ou une trame abîmée, d'un seul
       // siège ne prouve rien), ou le seul autre membre.
       this.#perdues.add(siege);
@@ -536,7 +536,7 @@ export class ClientSalon {
         // Rotation de l'invitation : C-5 (le secret n'est jamais gardé ici).
         if (ev.enveloppe.message.k === "rotation") {
           // Le moteur ne l'a rendue que du créateur, à l'époque courante, pour le `r` du dernier
-          // 0x09, sans siège exclu dans l'arbre (exigence 24 (f)) : nouvelles clés, groupe refondé.
+          // 0x09, sans siège exclu dans l'arbre ((f)) : nouvelles clés, groupe refondé.
           const cle = ev.enveloppe.message.cle;
           try {
             this.#adopter(this.#deps.eng.clesDepuisMaitre(cle), cle, null);
@@ -595,7 +595,7 @@ export class ClientSalon {
         return;
       }
       case "rotationAcceptee": {
-        // Créateur : les membres ont accepté sa rotation ; il refonde à son tour (exigence 24 (f)).
+        // Créateur : les membres ont accepté sa rotation ; il refonde à son tour ((f)).
         const rot = this.#rotation;
         if (!rot || rot.r !== ev.n) return;
         this.#rotation = undefined;
@@ -605,7 +605,7 @@ export class ClientSalon {
       }
       case "rotationARenvoyer":
         // Un Commit, un départ ou une reprise est passé entre l'envoi et l'écho : la même clé,
-        // le même numéro, une fois les sièges à retirer retirés (exigence 24 (e)).
+        // le même numéro, une fois les sièges à retirer retirés ((e)).
         if (this.#rotation?.r === ev.n) {
           this.#rotation.envoyee = false;
           this.#retirerPartis();
@@ -691,7 +691,7 @@ export class ClientSalon {
     });
   }
 
-  /** Groupe orphelin (exigence 17) : le créateur fonde un groupe neuf sous sa clé de rôle. */
+  /** Groupe orphelin : le créateur fonde un groupe neuf sous sa clé de rôle. */
   #refonder(): void {
     if (!this.#sGestion || this.dansLeGroupe()) return;
     this.#salon?.free();
@@ -706,7 +706,7 @@ export class ClientSalon {
   }
 
   /**
-   * Renouvellement du salon (exigence C-3 22, v3 §14.7) : le serveur a effacé Commits, Welcomes et
+   * Renouvellement du salon (22, v3 §14.7) : le serveur a effacé Commits, Welcomes et
    * KeyPackages ; l'état MLS est jeté et un `Salon` neuf repart (même siège, même nonce, liste des
    * membres gardée). Le créateur fonde le nouveau groupe (sa clé de rôle, donc son code, ne change
    * pas) ; les autres publient un KeyPackage (nouvelle identité : nouveau code). Nos messages pas
@@ -733,7 +733,7 @@ export class ClientSalon {
     this.#vider();
   }
 
-  // --- Exclusion et rotation de l'invitation (exigences 24, 25 ; spec §39.13) ---------------------
+  // --- Exclusion et rotation de l'invitation (spec §39.13) ---------------------
 
   /** Plus grand `r` vu : le prochain `POST exclure` prend un numéro plus grand. */
   get dernierR(): number {
@@ -744,7 +744,7 @@ export class ClientSalon {
    * Créateur, juste AVANT `POST exclure` : la nouvelle invitation (clés tirées de K_lien' et
    * K_mdp', K_maître_s' = `cle`, K_lien'). La clé part dans un message `rotation` seulement après
    * le 0x09 de ce numéro et le retrait de l'exclu (moteur : époque courante, aucun siège à
-   * retirer), jamais le lien ni le mot de passe (exigence 25). `annuler` si la requête échoue.
+   * retirer), jamais le lien ni le mot de passe. `annuler` si la requête échoue.
    */
   preparerRotation(r: number, cles: ClesSalon, cle: Uint8Array, kLien: Uint8Array): void {
     this.annulerRotation();
@@ -838,7 +838,7 @@ export class ClientSalon {
   // --- Envoi ----------------------------------------------------------------------------------
 
   /**
-   * Message à envoyer : rendu dans la boîte, chiffré dès que le moteur le permet (exigence 23).
+   * Message à envoyer : rendu dans la boîte, chiffré dès que le moteur le permet.
    * Rend son numéro local ; la suite arrive en événements `chiffre`, `accepte`, `echec`.
    */
   envoyer(message: Message, regle: Regle, piece?: Uint8Array, avant?: (local: number) => void): number {
@@ -979,7 +979,7 @@ export class ClientSalon {
     this.#pousser();
   }
 
-  /** Envoie la trame suivante si aucune n'est en vol (exigence 20). */
+  /** Envoie la trame suivante si aucune n'est en vol. */
   #pousser(): void {
     if (this.#enVol || !this.#rattrape || !this.#ws) return;
     const f = this.#file.shift();
@@ -1033,7 +1033,7 @@ export class ClientSalon {
     if (!f) return;
     f.garde?.();
     f.relance?.();
-    // Mêmes octets après le délai (relecture Task 16 du plan C-2) ; le 0x0B ne désigne pas la
+    // Mêmes octets après le délai (relecture) ; le 0x0B ne désigne pas la
     // trame refusée : c'est la seule en vol.
     this.#emettre({ k: "ralenti", secondes: secondes + 1 });
     f.relance = this.#deps.horloge.plus_tard((secondes + 1) * 1000, () => {

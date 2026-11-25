@@ -1,4 +1,4 @@
-// Refonte de l'accueil (UI §25, 12 novembre) : barre du haut et ses menus au clavier, bouton
+// Refonte de l'accueil (UI §) : barre du haut et ses menus au clavier, bouton
 // « Choisir des fichiers » qui ouvre le sélecteur du composeur, premier écran, infographie
 // (pause, survol, hors écran, mouvement réduit), accessibilité.
 import { STEP_MS } from "../src/ui/demo-steps";
@@ -16,7 +16,7 @@ const inView = (page: Page, sel: string) =>
     return r.top >= 0 && r.bottom <= innerHeight && r.width > 0;
   });
 
-test("premier écran : « Choisir des fichiers » et « Créer sur place » visibles ; plus de carte de dépôt (18 novembre)", async ({ page, shh }) => {
+test("premier écran : « Choisir des fichiers » et « Créer sur place » visibles ; plus de carte de dépôt", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   await expect(page.getByRole("button", { name: "Choisir des fichiers" })).toBeVisible();
   expect(await inView(page, "[data-pick]")).toBe(true);
@@ -91,7 +91,7 @@ test.describe("barre du haut (ordinateur)", () => {
 });
 
 test("infographie : la boucle démarre seule, le bouton pause l'arrête, le survol à la souris aussi ; hors écran, arrêtée", async ({ page, shh }) => {
-  test.setTimeout(120_000); // une étape dure jusqu'à STEP_MS (5,5 s, selon son texte : 20 novembre)
+  test.setTimeout(120_000); // une étape dure jusqu'à STEP_MS (5,5 s, selon son texte :)
   await page.goto(shh.origin + "/");
   const demo = page.locator("[data-demo]");
   await demo.scrollIntoViewIfNeeded();

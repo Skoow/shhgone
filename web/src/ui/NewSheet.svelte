@@ -37,7 +37,7 @@
     </li>
     <li>
       {#if __SALONS__}
-        <!-- Salon (plan C-3) : la page de création. -->
+        <!-- Salon : la page de création. -->
         <button type="button" class="it" data-new-item onclick={() => ((open = false), navigate("/salon/nouveau"))}>
           <span class="ic room"><MessagesSquare size={22} /></span>
           <span class="tx"><span class="t">{t("home.inbox.new.room")}</span> · <span class="d">{t("home.inbox.new.room.live")}</span></span>

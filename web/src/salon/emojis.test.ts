@@ -16,7 +16,7 @@ describe("émojis du sélecteur", () => {
     const eng = await loadSalonEngine();
     const tous = GROUPES.flatMap((g) => g.e);
     expect(tous.some((e) => /[\u{1F3FB}-\u{1F3FF}]/u.test(e))).toBe(false);
-    // Le moteur refuse toute réaction qui n'est pas une séquence de sa liste (Ruling 11).
+    // Le moteur refuse toute réaction qui n'est pas une séquence de sa liste.
     for (const e of [...tous, ...[...TEINTABLES].slice(0, 40).map((i) => teinter(tous[i], 0x1f3fd))])
       expect(() => eng.encoder({ id: new Uint8Array(16), heureMs: 0, regle: 0, message: { k: "reaction", cible: new Uint8Array(16), emoji: e } }), e).not.toThrow();
   });

@@ -7,7 +7,7 @@
   // et dates effacés de l'en-tête (media/strip-capture.ts). Tout reste en mémoire ; les pistes sont
   // arrêtées à la sortie, au passage en arrière-plan et quand la page se ferme. Refus ou API
   // absente : message clair et repli sur l'appareil photo du système (<input capture>, parent).
-  // Le vocal a son propre écran (VoiceRecorder.svelte, Task 12).
+  // Le vocal a son propre écran (VoiceRecorder.svelte).
   import { getLang, t } from "../i18n/i18n.svelte";
   import { formatDuration } from "../i18n/format";
   import { CAPTURE_MAX_S, CAPTURE_TIER } from "../limits";
@@ -50,7 +50,7 @@
   let limitHit = $state(false);
   let url = $state<string | null>(null);
   let flash = $state(false);
-  // Audit F7 : format que le nettoyage ne reconnaît pas (dates, nom du navigateur peut-être
+  // Format que le nettoyage ne reconnaît pas (dates, nom du navigateur peut-être
   // restés) : dit à l'écran, et la personne choisit « Garder tel quel » ou « Annuler ».
   let unclean = $state(false);
 
@@ -534,7 +534,7 @@
   .note.warn {
     color: var(--warn);
   }
-  /* « Avec Plus… » en bleu, comme toute mention des formules payantes (retours UI4). */
+  /* « Avec Plus… » en bleu, comme toute mention des formules payantes. */
   .note .up {
     display: block;
     color: var(--plus);

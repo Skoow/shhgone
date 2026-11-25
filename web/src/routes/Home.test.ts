@@ -25,14 +25,14 @@ afterEach(() => {
 });
 
 describe("Home (UI §9.1)", () => {
-  it("accueil (refonte du 12 novembre) : sur-titre, titre, phrase, deux boutons, méta, infographie, composeur, sections", () => {
+  it("accueil : sur-titre, titre, phrase, deux boutons, méta, infographie, composeur, sections", () => {
     show();
     const h1 = document.querySelector("h1")!;
     expect(title(h1)).toBe("Un lien, un mot de passe, puis ça s'efface.");
     expect(document.querySelectorAll("h1")).toHaveLength(1);
     expect(h1.getAttribute("tabindex")).toBe("-1");
     expect(h1.classList.contains("compact")).toBe(false);
-    // Plus de sur-titre (retours du 15 novembre). Cadre d'envoi (19 novembre, « Le chiffré ») :
+    // Plus de sur-titre. Cadre d'envoi (« Le chiffré ») :
     // « Choisir des fichiers », puis Photo ou vidéo, Vocal, Salon.
     expect(document.querySelector("[data-eyebrow]")).toBeNull();
     expect(document.querySelector("[data-ctas] [data-pick]")).not.toBeNull();
@@ -59,13 +59,13 @@ describe("Home (UI §9.1)", () => {
     const h2 = [...document.querySelectorAll("h2")].map((h) => h.textContent!.trim());
     expect(h2).toEqual([
       "Comment ça marche",
-      "Ce qui se passe quand vous partagez", // section de l'infographie (19 novembre, 3)
+      "Ce qui se passe quand vous partagez", // section de l'infographie
       "Ce qui reste hors de notre portée",
       "Offres",
       "Vos questions",
     ]);
-    expect(document.querySelectorAll("[data-how-card]")).toHaveLength(4); // ajouter, chiffrer, partager, effacé (19 novembre, 5)
-    // « Comment ça marche » (19 novembre, 3, maquette « La trame ») : trois illustrations fixes,
+    expect(document.querySelectorAll("[data-how-card]")).toHaveLength(4); // ajouter, chiffrer, partager, effacé
+    // « Comment ça marche » (maquette « La trame ») : trois illustrations fixes,
     // cachées aux lecteurs d'écran, et trois étapes numérotées ; l'infographie a sa section, titrée
     // par son h2 visible, avec ses sept étapes à droite.
     expect(document.querySelector(".hero [data-demo]")).toBeNull();
@@ -78,11 +78,11 @@ describe("Home (UI §9.1)", () => {
     expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);
     for (const c of [...document.querySelectorAll("[data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
 
-    // Le lien en deux (19 novembre, 3, remplace la décision du 16 novembre) : l'adresse au serveur,
+    // Le lien en deux (remplace la) : l'adresse au serveur,
     // la clé après le « # » dans le navigateur ; un exemple, jamais une vraie clé.
     expect(document.querySelector("[data-key-note] figcaption")!.textContent).toMatch(/^La clé du lien est après le «\s#\s»/);
     expect([...document.querySelectorAll("[data-offer]")].map((o) => o.getAttribute("data-offer"))).toEqual(["free", "plus", "pro"]);
-    // Retours du 15 novembre : prix prévu et sens de chaque chiffre dans les cartes (lus dans PAID).
+    // Prix prévu et sens de chaque chiffre dans les cartes (lus dans PAID).
     const card = (x: string) => document.querySelector(`[data-offer="${x}"]`)!;
     const norm = (s: string | null | undefined) => (s ?? "").replace(/[\u00a0\u202f]/g, " ").replace(/\s+/g, " ").trim();
     expect(norm(card("free").querySelector("[data-price]")!.textContent)).toBe("0 € sans abonnement");
@@ -90,7 +90,7 @@ describe("Home (UI §9.1)", () => {
     expect([...card("pro").querySelectorAll(".dk")].map((d) => d.textContent)).toEqual(["Taille par partage", "Durée au plus", "Ouvertures au plus", "Appels audio et vidéo"]);
     expect(norm(card("pro").querySelectorAll(".dv")[2]!.textContent)).toBe(String(PAID.pro.opens));
     // Appels : absents de l'offre gratuite, inclus dans Plus et Pro (disponibles et réservés à ces
-    // offres depuis le 24 novembre : plus de « bientôt »).
+    // offres : plus de « bientôt »).
     expect(norm(card("free").querySelector("[data-calls] .dv")!.textContent)).toBe("Non inclus");
     for (const x of ["plus", "pro"]) expect(norm(card(x).querySelector("[data-calls] .dv")!.textContent)).toBe("Inclus");
     expect(document.querySelectorAll("details[name=faq]")).toHaveLength(5);
@@ -125,23 +125,23 @@ describe("Home (UI §9.1)", () => {
     const copy = h1.querySelector('[aria-hidden="true"]')!;
     const words = [...copy.querySelectorAll<HTMLElement>(".w")];
     expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "ça", "s'efface."]);
-    // Titre affiché d'emblée dans son état final (17 novembre) : aucun délai d'entrée par mot.
+    // Titre affiché d'emblée dans son état final : aucun délai d'entrée par mot.
     expect(words.map((w) => w.style.getPropertyValue("--d"))).toEqual(words.map(() => ""));
-    // « plus rien. » (19 novembre, « La trame » ; « puis » reste plein) : chaque lettre a son rang, qui décale son
+    // « plus rien. » (« La trame » ; « puis » reste plein) : chaque lettre a son rang, qui décale son
     // effacement en trame de points.
     const letters = [...copy.querySelectorAll<HTMLElement>(".l")];
     expect(letters.map((l) => l.textContent).join("")).toBe("ças'efface.");
-    // Figé (19 novembre, 4) : « p » en trame serrée, « lus » blanc, « rie » menthe, « n. » qui s'envole.
+    // Figé : « p » en trame serrée, « lus » blanc, « rie » menthe, « n. » qui s'envole.
     expect(letters.map((l) => [...l.classList].find((c) => /^s\d$/.test(c)))).toEqual(["s1", "s1", "s2", "s2", "s2", "s3", "s3", "s3", "s4", "s4", "s4"]);
   });
 
-  it("plus d'entrée animée (18 novembre : accueil écrit au build, affiché avant le script)", () => {
+  it("plus d'entrée animée (accueil écrit au build, affiché avant le script)", () => {
     show();
     expect(document.querySelector(".home")!.classList.contains("reveal")).toBe(false);
   });
 
 
-  it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; Photo ou vidéo, Vocal, Salon appellent onmake ; plus de carte de dépôt sur l'accueil (18 novembre)", () => {
+  it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; Photo ou vidéo, Vocal, Salon appellent onmake ; plus de carte de dépôt sur l'accueil", () => {
     const onfiles = vi.fn();
     const onmake = vi.fn();
     const onpick = vi.fn();

@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Paramètres (/compte ; conception compte §21.15.4 ; demandes du propriétaire du 14 novembre ;
-  // plan, lot 13). Monté seulement avec __COMPTES__ et une session ouverte (App.svelte, pages.ts).
+  // Paramètres (/compte ; conception compte §21.15.4).
+  // Monté seulement avec __COMPTES__ et une session ouverte (App.svelte, pages.ts).
   // Sections dans l'ordre (conception du compte par passkey §3.5) : Profil (avec ancienneté et
   // limites), Passkeys, Clé de récupération, Appareils, Confidentialité, Abonnement, Langue, Vos
   // données ; puis « Se déconnecter » et « Supprimer le compte » (écran dédié, sans changer

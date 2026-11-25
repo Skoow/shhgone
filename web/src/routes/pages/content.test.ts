@@ -1,12 +1,28 @@
-// Vignette EXIF gardée (décision du propriétaire) : elle peut montrer la photo d'avant un
-// recadrage ou une retouche ; la bulle du balai, la confirmation et la page Sécurité le disent (test d'intrusion
-// du 11 novembre).
+// Vignette EXIF gardée : elle peut montrer la photo d'avant un
+// recadrage ou une retouche ; la bulle du balai, la confirmation et la page Sécurité le disent.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { en } from "../../i18n/en";
 import { fr } from "../../i18n/fr";
 import { infoPage } from "./content";
+
+// Un abonné a des partages et des appels inclus : le mécanisme anonyme reste interne, jamais le
+// mot « jeton » ni « token » dans un texte affiché (la commande de vérification garde l'adresse de
+// l'émetteur de GitHub, qui n'est pas un texte).
+describe("aucun « jeton » ni « token » affiché", () => {
+  test("pages d'information et dictionnaires, en français et en anglais, avec et sans compte", () => {
+    for (const comptes of [false, true])
+      for (const lang of ["fr", "en"] as const)
+        for (const nom of ["securite", "confidentialite", "conditions", "mentions", "signaler", "verifier"] as const) {
+          const p = infoPage(nom, lang, comptes);
+          const texte = [p.title, p.lede, ...p.blocks.flatMap((b) => [b.h, ...(b.p ?? []), ...(b.list ?? []), ...(b.after ?? []), b.link?.label ?? ""]), p.tech?.h ?? "", ...(p.tech?.p ?? []), ...(p.tech?.list ?? [])].join("\n");
+          expect(texte, `${nom} ${lang}`).not.toMatch(/\bjetons?\b|\btokens?\b/iu);
+        }
+    for (const [lang, d] of [["fr", fr], ["en", en]] as const)
+      for (const [k, v] of Object.entries(d)) expect(v, `${lang} ${k}`).not.toMatch(/\bjetons?\b|\btokens?\b/iu);
+  });
+});
 
 const all = (lang: "fr" | "en") => {
   const p = infoPage("securite", lang);
@@ -20,7 +36,7 @@ describe("vignette d'aperçu gardée : dite honnêtement", () => {
     expect(all("fr")).toMatch(FR_RE);
     expect(all("en")).toMatch(EN_RE);
   });
-  // Plus d'interrupteur dans le pied de page (décision du propriétaire du 12 novembre) : la bulle
+  // Plus d'interrupteur dans le pied de page : la bulle
   // du balai d'une photo et la confirmation de « Tout nettoyer » le disent avant de nettoyer.
   test("bulle du balai d'une photo et confirmation de « Tout nettoyer »", () => {
     for (const k of ["clean.what.photos", "clean.what.all"] as const) {
@@ -97,20 +113,20 @@ describe("textes publics et compte par passkey", () => {
     expect(texte("securite", "en", true)).toMatch(/What the account does not protect/u);
     for (const lang of ["fr", "en"] as const) expect(tout(lang, true)).not.toMatch(/e-?mail\b[^.]*(code|empreinte|fingerprint)|double authentification|two-factor|séquestr|escrow/iu);
   });
-  test("Signaler un abus : la catégorie part avec le signalement (feuille du lot 14, publique)", () => {
+  test("Signaler un abus : la catégorie part avec le signalement (feuille, publique)", () => {
     expect(texte("signaler", "fr", false)).toMatch(/ne contient que la catégorie choisie/u);
     expect(texte("signaler", "fr", false)).not.toMatch(/ni le motif/u);
     expect(texte("signaler", "en", false)).toMatch(/only the category you chose/u);
   });
 
-  test("Confidentialité : l'historique des téléchargements (lot 15, public) est dit, désactivé par défaut (22 novembre)", () => {
+  test("Confidentialité : l'historique des téléchargements (public) est dit, désactivé par défaut", () => {
     expect(texte("confidentialite", "fr", false)).toMatch(/historique des téléchargements est désactivé par défaut[^.]*vous-même\. Activé, il garde chiffrés sur cet appareil/u);
     expect(texte("confidentialite", "fr", false)).toMatch(/le désactiver efface tout/u);
     expect(texte("confidentialite", "en", false)).toMatch(/downloads history is off by default[^.]*yourself\. When on[^.]*encrypted on this device/u);
     expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
   });
 
-  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut avec ou sans compte (24 novembre, B), 7 jours, comment l'effacer (24 novembre)", () => {
+  test("Confidentialité, « Sur votre appareil » : l'historique des envois, ce qu'il garde, désactivé par défaut avec ou sans compte (B), 7 jours, comment l'effacer", () => {
     for (const comptes of [false, true]) {
       const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!.find((l) => l.startsWith("L'historique de vos envois"))!;
       expect(fr).toMatch(/lien de gestion[^.]*jamais le lien de partage ni le mot de passe\./u);
@@ -169,16 +185,16 @@ describe("Confidentialité : section paiement", () => {
         /code à sens unique tiré du pass/u,
         /Jamais votre nom, votre adresse e-mail, votre pays, le montant ni votre adresse IP/u,
         /jamais à vos partages/u,
-        /jeton anonyme/u,
-        /sans pouvoir savoir de quel pass il vient/u,
-        /jour de sa clé\. Un partage payant ne se cache donc que parmi les pass de la même offre qui ont pris des jetons ce jour-là ou la veille/u, // S19
+        /preuve anonyme/u,
+        /sans pouvoir savoir de quel pass elle vient/u,
+        /jour de sa clé\. Un partage payant ne se cache donc que parmi les pass de la même offre qui ont pris des preuves ce jour-là ou la veille/u, // S19
         /au moment même du partage/u, // S16, résiduel
         /à une heure tirée au hasard/u, // S16, corrigé
         // S17 : clés annoncées 7 jours à l'avance, clé différente refusée, limite du premier contact.
         /annonce ses clés sept jours à l'avance/u,
         /refuse, avec un avertissement, une clé différente pour un jour déjà annoncé/u,
         /dès le premier contact ne serait pas détecté par cet appareil seul/u,
-        // Appels réservés à Plus et Pro (24 novembre) : un jeton ouvre les appels du salon ; ce
+        // Appels réservés à Plus et Pro : une preuve anonyme ouvre les appels du salon ; ce
         // que voit le serveur, y compris quand c'est le créateur (connu par son compte).
         /appels audio et vidéo des salons sont réservés à Plus et Pro/u,
         /ouvre les appels pour tout le salon jusqu'à sa fin ; les autres participants n'ont besoin d'aucune offre/u,
@@ -200,9 +216,9 @@ describe("Confidentialité : section paiement", () => {
         /one-way code derived from the pass/u,
         /Never your name, your email address, your country, the amount or your IP address/u,
         /never to your shares/u,
-        /anonymous token/u,
+        /anonymous proof/u,
         /without being able to tell which pass it came from/u,
-        /day of its key\. A paid share therefore only hides among the passes of the same plan that took tokens that day or the day before/u,
+        /day of its key\. A paid share therefore only hides among the passes of the same plan that took proofs that day or the day before/u,
         /at the very moment of the share/u,
         /at a randomly drawn time/u,
         /announces its keys seven days ahead/u,
@@ -218,7 +234,7 @@ describe("Confidentialité : section paiement", () => {
   });
 });
 
-// « Vérifier cette version » (spec §28.4, §28.8 C1 et C7 ; 24 novembre).
+// « Vérifier cette version » (spec §28.4, §28.8 C1 et C7).
 describe("page Vérifier cette version", () => {
   const page = (lang: "fr" | "en") => infoPage("verifier", lang);
   const textes = (lang: "fr" | "en") => {
@@ -276,7 +292,7 @@ describe("page Vérifier cette version", () => {
   });
 });
 
-// Pages juridiques du 25 novembre (décision du propriétaire : mentions simples, éditeur anonyme,
+// Pages juridiques (mentions simples, éditeur anonyme,
 // aucun champ d'identité à compléter sur le site ; conditions de vente et confidentialité
 // complétées selon ce que fait le site). Chiffres comparés au code (limits.ts, offres.go,
 // service.go).
@@ -288,7 +304,7 @@ describe("pages juridiques : conditions de vente, confidentialité, mentions", (
     return b ? [b.h, ...(b.p ?? []), ...(b.list ?? [])].join("\n") : "";
   };
 
-  test("conditions de vente : prix TTC, jetons et durées lus dans le code, rétractation, renouvellement", () => {
+  test("conditions de vente : prix TTC, partages inclus et durées lus dans le code, rétractation, renouvellement", () => {
     expect(offres).toMatch(/Nom: "plus"[^\n]*Mois: 700, An: 7000, JetonsPeriod: 30,/u);
     expect(offres).toMatch(/Nom: "pro"[^\n]*Mois: 2000, An: 20000, JetonsPeriod: 100,/u);
     for (const comptes of [false, true]) {
@@ -349,7 +365,7 @@ describe("pages juridiques : conditions de vente, confidentialité, mentions", (
     }
   });
 
-  test("Mentions légales : éditeur anonyme gardé (décision du propriétaire), hébergeur OVH en France, bandeau gardé jusqu'à l'avis de l'avocat", () => {
+  test("Mentions légales : éditeur anonyme gardé, hébergeur OVH en France, bandeau gardé jusqu'à l'avis de l'avocat", () => {
     for (const lang of ["fr", "en"] as const) {
       expect(infoPage("mentions", lang).draft).toBe(true);
       const t = texte("mentions", lang, true);

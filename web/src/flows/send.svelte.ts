@@ -27,7 +27,7 @@ const TICK_MS = 250;
 
 export type Phase = "idle" | "keys" | "captcha" | "upload" | "paused" | "offline" | "finalize" | "sealed" | "cancelled" | "error";
 /** `element` : un élément n'a pas pu être envoyé (refus du serveur), sa ligne est `failedItem`. */
-export type SendError = "reseau" | "interrompu" | "limite" | "plein" | "gele" | "captcha" | "fichier_modifie" | "element" | "inattendu";
+export type SendError = "reseau" | "interrompu" | "limite" | "plein" | "gele" | "captcha" | "fichier_modifie" | "element" | "inclus" | "inattendu";
 /** Coches sous la capsule (benchmark M3) : chacune seulement après un progrès réel. */
 export type Step = "chiffre" | "envoye" | "scelle";
 
@@ -38,7 +38,7 @@ type Created = { link: string; manage: string; expiresInS: number; title?: strin
 export type SendDeps = {
   createShare: (origin: string, items: Item[], opts: CreateOpts) => Promise<Created>;
   solveCaptcha: (challenge: unknown) => Promise<CaptchaProof>;
-  /** Preuve pré-calculée (Task 14) ; absent en démo. */
+  /** Preuve pré-calculée ; absent en démo. */
   prefetcher?: { take(): Prepared | undefined; stop(): void };
   now?: () => number;
   wakeLock?: { acquire(): void; release(): void };
@@ -58,7 +58,7 @@ export type SendOpts = {
   password: string;
   rights?: Rights;
   keepTtlH?: KeepTtl;
-  /** Nom du partage (19 novembre), facultatif. */
+  /** Nom du partage, facultatif. */
   title?: string;
 };
 
@@ -93,7 +93,7 @@ export function createSender(deps: SendDeps) {
   let retryAt = $state<number | undefined>();
   let failedItem = $state<number | undefined>();
   /**
-   * Règle derrière une LimitError (audit M14 ; le serveur répond « limit » dans tous les cas) :
+   * Règle derrière une LimitError (le serveur répond « limit » dans tous les cas) :
    * à la création, 60 s au plus → trop d'envois en préparation à la fois (2 par connexion, un
    * autre onglet par exemple) ou trop de requêtes ; plus → quota du jour (jusqu'à minuit UTC) ;
    * pendant l'envoi → débit ou octets du jour.
@@ -183,7 +183,7 @@ export function createSender(deps: SendDeps) {
 
   async function fail(e: unknown, id: number) {
     let code: SendError = "inattendu";
-    // Échec d'un élément (audit M1) : sa ligne ; un refus du serveur (bad_request…) n'est pas un
+    // Échec d'un élément : sa ligne ; un refus du serveur (bad_request…) n'est pas un
     // échec anti-robot, c'est « element ».
     const line = failedElement(e);
     if (line !== undefined) {
@@ -204,6 +204,7 @@ export function createSender(deps: SendDeps) {
     } else if (errMsg(e) === "reseau") code = "reseau";
     else if (errMsg(e) === "full") code = "plein";
     else if (errMsg(e) === "frozen") code = "gele";
+    else if (errMsg(e) === "aucun_jeton") code = "inclus";
     error = code;
     phase = "error";
     end();
@@ -222,7 +223,7 @@ export function createSender(deps: SendDeps) {
 
     // Ordre des essais (UI §9.4.2) : (1) preuve pré-calculée ou preuve de travail ; (2) preuve
     // de travail sans pré-calcul. Aucun troisième essai : le repli reCAPTCHA, jamais construit,
-    // est retiré (24 novembre).
+    // est retiré.
     for (let attempt = 1; attempt <= 2; attempt++) {
       let solverFailed = false;
       const live = () => id === run && !signal.aborted;
@@ -270,7 +271,7 @@ export function createSender(deps: SendDeps) {
               if (phase === "keys" || phase === "captcha") phase = "upload";
             } else backOnline();
             // n = 0 : texte seul, rien à envoyer (spec §41.14) : finalisation tout de suite.
-            // « Envoyé » attend le lien (audit M12) : rien n'est partagé avant la finalisation.
+            // « Envoyé » attend le lien : rien n'est partagé avant la finalisation.
             if (done === n) {
               step("chiffre");
               if (phase === "upload" || phase === "offline") phase = "finalize";

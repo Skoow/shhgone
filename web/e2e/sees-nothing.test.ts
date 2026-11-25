@@ -58,7 +58,7 @@ import { startServer, type TestServer } from "./server";
 
 const MARKER = "MOT-REPERE-7f3a";
 const NAME = "nom-repere-91c2.pdf";
-// Nom du partage (19 novembre) : dans le manifeste chiffré seulement.
+// Nom du partage : dans le manifeste chiffré seulement.
 const TITLE = "titre-repere-5d0e Dossier Dupont";
 const PASSWORD = "Rp4#Wx8?T%Q"; // repère de la forme générée (D41-15 : plus de mot de passe saisi)
 const MIB = 1048576;
@@ -190,7 +190,7 @@ describe("le serveur ne voit rien", () => {
       ...windows("mot de passe", PASSWORD),
       needle("mot de passe généré", GENERATED),
       needle("droits (manifeste)", '"rights":"coffre"'),
-      // Le mot seul « coffre » n'est plus cherché (14 novembre) : le binaire du serveur le contient
+      // Le mot seul « coffre » n'est plus cherché : le binaire du serveur le contient
       // désormais comme nom de colonne du compte (comptes.db, internal/compte), donc il est en
       // mémoire même sans aucun partage. Le droit lui-même reste cherché sous sa forme exacte du
       // manifeste, ci-dessus, et sous ses formes binaires (fenêtres du texte, clés).
@@ -358,7 +358,7 @@ describe("le serveur ne voit rien", () => {
   });
 });
 
-// Spec §36 (Task M2) : repères de requête (adresse, User-Agent, Referer, Accept-Language,
+// Spec §36 : repères de requête (adresse, User-Agent, Referer, Accept-Language,
 // identifiant dans une route inconnue, motif de destruction) ; aucun sur disque (base, WAL,
 // fichiers), dans stdout, stderr ni dans une réponse ; base minimale après finalize, pendant
 // la lecture et après la suppression (aucune date sauf expires_at, multiple de 900 ; ni
@@ -449,7 +449,7 @@ describe("le serveur ne voit rien : repères de requête, base minimale (spec §
     await srv?.dispose();
   });
 
-  // Schéma 2 (salon C-2, Task 4) : les tables du salon existent même salon désactivé ; elles restent
+  // Schéma 2 (salon C-2) : les tables du salon existent même salon désactivé ; elles restent
   // vides, et leurs colonnes sont fixées ici : aucun pseudonyme, nom, adresse, date autre que
   // expires_at, ni compteur de messages (§39.3.5).
   it("base : seule date expires_at (multiple de 900), ni ttl_hours, ni colonnes retirées ; tables du salon vides et sans colonne en trop", () => {

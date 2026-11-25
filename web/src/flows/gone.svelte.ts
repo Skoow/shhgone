@@ -4,7 +4,7 @@
 // d'aperçu ni de nouvel enregistrement. Seuls les enregistrements déjà en cours continuent
 // (leurs propres requêtes de segments) ; la fin de lecture (done, wipe, révocation) attend
 // qu'ils aient fini. Rien de tout cela ne passe par le réseau (le serveur ne voit rien).
-// Les noms montrés sont ceux de safeName (décision du propriétaire, 7 novembre).
+// Les noms montrés sont ceux de safeName.
 
 export type GoneCause = "countdown" | "http410" | "watch410" | "destroyed-here";
 export type TransferState = "running" | "done" | "failed";

@@ -32,7 +32,7 @@ export const shares = $state({
   all: [] as HistoryEntry[],
   /**
    * « Garder dans mon historique » de cet appareil (envois et salons créés) : désactivé par
-   * défaut (décision du 24 novembre, comme les téléchargements) ; la personne l'active.
+   * défaut (comme les téléchargements) ; la personne l'active.
    */
   enabled: false,
   info: {} as Record<string, ShareInfo>,
@@ -45,13 +45,13 @@ export const shares = $state({
 });
 
 /** Case « Garder » de la page d'ouverture d'un partage : cochée selon le réglage (§21.7). */
-// Sans compte : décochée (14 novembre, relecture des lots 11 et 12) : garder un lien reçu
+// Sans compte : décochée (relecture) : garder un lien reçu
 // garde sa clé sur l'appareil, qui peut être partagé ; la personne coche si elle le veut.
 // Avec un compte : son réglage « garder les reçus ».
 export const keepReceivedDefault = (): boolean => (shares.account ? shares.account.keepReceived : false);
 /**
  * « Garder dans mon historique » de « Lien prêt » (envoi) et de la création d'un salon : le réglage
- * de l'appareil, désactivé par défaut, AVEC OU SANS compte (décisions du 24 novembre : le lien de
+ * de l'appareil, désactivé par défaut, AVEC OU SANS compte (le lien de
  * gestion resterait sur un appareil peut-être partagé ; « Lien prêt » et « Salon prêt » le montrent
  * alors). La personne l'active elle-même ; avec un compte, ce qui est gardé suit ensuite son coffre.
  */
@@ -62,7 +62,7 @@ export function setAccountPrefs(p: { keepReceived: boolean } | null): void {
 }
 
 /**
- * Ajout, retrait ou renommage (titre d'un envoi, 19 novembre) d'une entrée par un geste sur cet
+ * Ajout, retrait ou renommage (titre d'un envoi) d'une entrée par un geste sur cet
  * appareil (synchronisation du compte).
  */
 export type LocalChange = { kind: "add" | "remove" | "rename"; entry: HistoryEntry };
@@ -100,7 +100,7 @@ const persistStorage = async (): Promise<unknown> => globalThis.navigator?.stora
 let opening: Promise<History | null> | undefined;
 /**
  * Ouvre l'historique, en le créant au besoin (clé, base) : seulement pour y écrire. Un échec
- * n'est pas gardé (relecture du 18 novembre : un premier échec passager, base occupée par un
+ * n'est pas gardé (relecture : un premier échec passager, base occupée par un
  * autre onglet par exemple, empêchait de garder tout envoi suivant dans cet onglet) : le prochain
  * appel réessaie.
  */
@@ -205,7 +205,7 @@ export async function recordReceived(r: { link: string; expiresAt: number; items
 }
 
 /**
- * Renomme un envoi sur cet appareil (titre du partage, 19 novembre) : nettoyé par le moteur comme
+ * Renomme un envoi sur cet appareil (titre du partage) : nettoyé par le moteur comme
  * à l'envoi (cleanTitle) ; vide ou rien que des invisibles : plus de titre. Ne change PAS ce que
  * voit le destinataire (le manifeste chiffré est figé). Rend l'entrée, ou null.
  */
@@ -276,9 +276,9 @@ export async function allEntries(): Promise<HistoryEntry[]> {
 }
 
 export async function clearHistory(): Promise<void> {
-  // Revue D42-22 : les retours gardés (octrois chiffrés, history/returns.ts) partent aussi, en
+  // D42-22 : les retours gardés (octrois chiffrés, history/returns.ts) partent aussi, en
   // parallèle et au plus 2 s : une base tenue par un autre onglet ne bloque jamais
-  // l'effacement de l'historique (relecture du 12 novembre, A).
+  // l'effacement de l'historique (relecture, A).
   // Les preuves de membre du salon (salon/preuve.ts, réglage « silencieux » compris) partent aussi,
   // au plus 2 s de même (restes du salon, spec salon v3 §16).
   const returns = Promise.race([Promise.all([pageReturns().clear(), effacerPreuves()]).then(() => undefined), new Promise<void>((ok) => setTimeout(ok, 2000))]);
@@ -311,7 +311,7 @@ export type ManagedResult = { kind: "status"; status: Status } | { kind: "missin
 const secretOf = (manage: string) => manage.slice(manage.lastIndexOf("#m"));
 
 /**
- * Vue de gestion `#m…` (test d'intrusion du 11 novembre) : reporte une relecture ou une
+ * Vue de gestion `#m…` : reporte une relecture ou une
  * destruction sur l'entrée d'historique du même partage, si elle existe. Aucune requête,
  * aucune entrée créée, et aucun historique créé s'il n'y en a pas encore (peek).
  */

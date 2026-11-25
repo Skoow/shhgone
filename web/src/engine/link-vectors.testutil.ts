@@ -1,6 +1,5 @@
 // Vecteurs des liens pour les tests (pas pour le site) : v2.json est figé ; ses liens écrits à la
-// racine et ses deux refus de « …/s#… » sont remplacés par v3-liens.json (liens sous /s, décision
-// du propriétaire du 16 novembre), comme dans engine/core/tests/vectors.rs.
+// racine et ses deux refus de « …/s#… » sont remplacés par v3-liens.json (liens sous /s), comme dans engine/core/tests/vectors.rs.
 import { readFileSync } from "node:fs";
 
 export type LinkCase = { fn: string; args: string[]; result?: any; error?: string };
@@ -14,7 +13,7 @@ function superseded(c: LinkCase): boolean {
   return path.endsWith("://x/s") || path.endsWith("/shhdrop/s");
 }
 
-/** Lien lu à la racine (avant le 18 novembre) : remplacé par v4-liens-s.json (refus, et la même adresse sous /s). */
+/** Lien lu à la racine : remplacé par v4-liens-s.json (refus, et la même adresse sous /s). */
 function readAtRoot(c: LinkCase): boolean {
   if (c.fn !== "parseLink" || c.result === undefined) return false;
   return !c.args[0]!.split(/[#?]/)[0]!.endsWith("/s");

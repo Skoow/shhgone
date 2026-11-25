@@ -1,4 +1,4 @@
-// Compte essayable de la démo GitHub Pages (propriétaire, 19 novembre ; conception du compte par
+// Compte essayable de la démo GitHub Pages (conception du compte par
 // passkey §11, Q8) : faux serveur du compte dans l'onglet (src/demo/fake-compte.ts) et passkey
 // SIMULÉE (src/demo/passkeys.ts) : aucune feuille du système, aucune passkey laissée dans le
 // gestionnaire du visiteur ; la clé de récupération, les enveloppes et les coffres sont les vrais

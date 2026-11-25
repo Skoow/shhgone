@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Accueil connecté (conception compte §21.15.1 ; plan, lot 12) : la liste de l'appareil
+  // Accueil connecté (conception compte §21.15.1) : la liste de l'appareil
   // (routes/home/Inbox.svelte, qui ne connaît pas le compte) avec le profil du compte (avatar),
   // le bandeau d'après une récupération et celui d'un coffre illisible. Vu seulement par
   // routes/compte/pages.ts, donc seulement avec __COMPTES__.

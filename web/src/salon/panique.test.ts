@@ -1,4 +1,4 @@
-// Panique du module du salon (comme le moteur des partages, audit F4) et mauvais usages des
+// Panique du module du salon (comme le moteur des partages) et mauvais usages des
 // poignées. Le moteur ne panique sur aucune entrée : la panique est simulée comme dans
 // src/engine/index.test.ts, par un appel du module qui appelle le gestionnaire de panique puis
 // lève WebAssembly.RuntimeError (ce que fait une vraie panique sur wasm32).
@@ -34,7 +34,7 @@ function errorOf(f: () => unknown): string | null {
 /** Mémoire de l'instance en cours (initSync rend l'instance déjà faite). */
 const memoire = () => new Uint8Array(pkg.initSync({ module: undefined as never }).memory.buffer);
 
-describe("panique du module du salon (audit F4)", () => {
+describe("panique du module du salon", () => {
   it("mémoire mise à zéro aussitôt, tout appel suivant (moteur, poignées) lève salon_casse ; un nouveau chargement rend un moteur neuf", async () => {
     const S = await loadSalonEngine();
     const cles = S.clesSalon(new Uint8Array(32).fill(9), new Uint8Array(32).fill(8));

@@ -7,8 +7,7 @@ export type Needle = { label: string; forms: Buffer[] };
 // Formes recherchées : octets bruts ; base64url / base64 pour les trois alignements
 // possibles (un secret encodé au milieu d'un texte plus long ne commence pas forcément
 // sur une frontière de 3 octets ; chaque forme couvre au moins 12 octets du secret) ; hex en
-// minuscules et en majuscules ; pour un repère texte, UTF-16LE et UTF-16BE (relecture C-2
-// Task 17).
+// minuscules et en majuscules ; pour un repère texte, UTF-16LE et UTF-16BE.
 export function needle(label: string, raw: Uint8Array<ArrayBuffer> | string): Needle {
   const b = Buffer.from(typeof raw === "string" ? new TextEncoder().encode(raw) : raw);
   const forms = [b];

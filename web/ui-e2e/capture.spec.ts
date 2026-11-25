@@ -247,7 +247,7 @@ test("en-têtes : caméra et micro permis à la page, jamais au cadre PDF", asyn
   expect(f.headers()["permissions-policy"]).toMatch(/^microphone=\(\), camera=\(\), geolocation=\(\), /);
 });
 
-// Audit F7 : un format que le nettoyage ne reconnaît pas ne part plus en silence. Le premier
+// Un format que le nettoyage ne reconnaît pas ne part plus en silence. Le premier
 // morceau de MediaRecorder est préfixé de 4 octets nuls : ni WebM ni MP4 pour strip-capture.
 for (const keep of [true, false]) {
   test(`vocal au format inattendu : averti, ${keep ? "« Garder tel quel » l'ajoute" : "« Annuler » n'ajoute rien"}`, async ({ page, shh }) => {

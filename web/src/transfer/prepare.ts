@@ -54,7 +54,7 @@ export async function prepareCaptcha(origin: string, net?: api.Net): Promise<Pre
 
 /**
  * Champs anti-robot des routes du compte (inscription/debut, oubli/debut, connexion après 5
- * échecs ; plan du compte, lot 10) : les mêmes que POST /api/shares (preuve de travail). Rendus au plus tôt CAPTCHA_MIN_MS après la
+ * échecs) : les mêmes que POST /api/shares (preuve de travail). Rendus au plus tôt CAPTCHA_MIN_MS après la
  * réception du défi (le serveur refuse avant 3 s) ; usage unique (le sel est consommé).
  * Défi forgé, déjà utilisé, d'une autre origine, ou preuve d'une autre sorte : preuve_invalide.
  */

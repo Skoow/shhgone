@@ -1,4 +1,4 @@
-// Lumière d'ambiance gardée au montage (performance, 20 novembre) : la page écrite au build
+// Lumière d'ambiance gardée au montage (performance) : la page écrite au build
 // (accueil, pages d'information) affiche déjà la nuit, l'aurore et le grain. Le script ne les
 // recrée plus : il les garde et Aurora.svelte les reprend (échelles exactes, pause), au lieu d'en
 // dessiner de nouvelles, que le navigateur comptait comme « plus grand élément » tardif (LCP).

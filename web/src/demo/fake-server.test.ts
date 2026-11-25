@@ -32,7 +32,7 @@ function setup(opts: FakeServerOpts = {}) {
   const fake = createFakeServer(opts);
   const seen: Seen[] = [];
   const statuses: string[] = [];
-  const unlocks: string[] = []; // corps des réponses 200 d'unlock (audit D2 : longueur)
+  const unlocks: string[] = []; // corps des réponses 200 d'unlock (longueur)
   const fetch = (async (u: RequestInfo | URL, i?: RequestInit) => {
     const req = new Request(u, i);
     const copy = req.clone();
@@ -185,7 +185,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     await expect(shareStatus(r.manage, ORIGIN, net)).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("plafond de téléchargement (egressLimitBytes, 24 novembre) : segment puis déverrouillage → 403 egress_limit, EgressLimitError, ouverture non consommée", async ({ expect }) => {
+  it("plafond de téléchargement (egressLimitBytes) : segment puis déverrouillage → 403 egress_limit, EgressLimitError, ouverture non consommée", async ({ expect }) => {
     // Palier de 10 Mio (segments de 4, 4 et 2 Mio) : l'ouverture lit les segments 0 et 2 (6 Mio),
     // le fichier lit ensuite le segment 1, qui dépasserait un plafond de 7 Mio.
     const { net, statuses } = setup({ egressLimitBytes: 7 * 1048576 });
@@ -221,12 +221,12 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     expect([last.opensLeft, last.lastOpen]).toEqual([0, true]); // dernière ouverture permise : « Détruire » proposé
     const again = await openShare(r.link, PW, ORIGIN, { grant: last.grant }, net); // rechargement
     expect([again.opensLeft, again.lastOpen]).toEqual([0, true]);
-    // Revue D42-22 : la deuxième personne qui revient n'est pas la dernière, même à 0.
+    // D42-22 : la deuxième personne qui revient n'est pas la dernière, même à 0.
     const back = await openShare(r.link, PW, ORIGIN, { grant: second.grant }, net);
     expect([back.opensLeft, back.lastOpen]).toEqual([0, false]);
   });
 
-  it("unlock : last_open entier 0 ou 1, même longueur de réponse pour les deux (audit D2 du 12 novembre)", async ({ expect }) => {
+  it("unlock : last_open entier 0 ou 1, même longueur de réponse pour les deux", async ({ expect }) => {
     const { net, unlocks } = setup();
     const r = await share(net, 2);
     await openShare(r.link, PW, ORIGIN, undefined, net);
@@ -236,7 +236,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     expect(unlocks[0]!.length).toBe(unlocks[1]!.length);
   });
 
-  it("destroyShare par le lien de gestion ; par lien + mot de passe sans ouverture : octroi refusé (20 novembre)", async ({ expect }) => {
+  it("destroyShare par le lien de gestion ; par lien + mot de passe sans ouverture : octroi refusé", async ({ expect }) => {
     const { fake, net } = setup();
     const a = await share(net);
     await destroyShare(a.manage, ORIGIN, net);
@@ -281,7 +281,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
 
   it("destruction faite ici : la surveillance en cours rend « stop », pas « gone » (l'écran de fin vient de destroy)", async ({ expect }) => {
     const { net } = setup({ watchHoldMs: 10_000 });
-    const r = await share(net, 1); // dernière ouverture : seule à pouvoir détruire (20 novembre)
+    const r = await share(net, 1); // dernière ouverture : seule à pouvoir détruire
     const o = await openShare(r.link, PW, ORIGIN, undefined, net);
     const pending = o.watch();
     await o.destroy();
@@ -304,7 +304,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     const r = await share(net, 2, [bigFile()]);
     const a = await openShare(r.link, PW, ORIGIN, undefined, net);
     const b = await openShare(r.link, PW, ORIGIN, undefined, net);
-    // 2 ouvertures permises : deux voix (20 novembre, suite) ; la première ne coupe rien.
+    // 2 ouvertures permises : deux voix (suite) ; la première ne coupe rien.
     expect(await a.report(1)).toBe(false);
     expect(await b.report(1)).toBe(true);
     await expect(a.item(0)).rejects.toThrow();
@@ -315,8 +315,8 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
       ...["ReperRaison", "", "REPORT", null].map((reason) => ({ reason })),
       ...[0, 11, 1.5, "3", null].map((categorie) => ({ reason: "report", categorie, grant: "g" })),
       { categorie: 3 },
-      { reason: "report" }, // signalement sans octroi (20 novembre)
-      {}, // destruction sans octroi (audit du 20 novembre : seule la dernière ouverture détruit)
+      { reason: "report" }, // signalement sans octroi
+      {}, // destruction sans octroi (seule la dernière ouverture détruit)
       { categorie: 3, grant: "g" }, // catégorie sans signalement
     ];
     for (const extra of bad) {
@@ -375,7 +375,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
   it("coupure simulée au milieu de l'envoi : le client réessaie et réussit", async ({ expect }) => {
     const { fake, net, statuses } = setup({ outage: { atFraction: 0.5, ms: 300 } });
     const retries: number[] = [];
-    // 3 Mio (48 morceaux, envoyés sans bourrage, audit H-2) : plus de la moitié du palier 80.
+    // 3 Mio (48 morceaux, envoyés sans bourrage) : plus de la moitié du palier 80.
     const r = await createShare(ORIGIN, [{ kind: "file", name: "f", mime: "text/plain", data: new Uint8Array(3 * 1048576) }], {
       ttlHours: 1,
       maxOpens: 1,

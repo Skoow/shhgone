@@ -1,10 +1,9 @@
 <script lang="ts">
   // Options de l'envoi (UI §9.3, benchmark M4) : durée et ouvertures (phrase « S'efface dans
   // 12 h ou après 1 ouverture… » sur ordinateur), destinataire (interrupteur
-  // « Autoriser le téléchargement » ; plus de sous-option du coffre, décision du propriétaire du
-// 11 novembre), estimation du temps d'envoi.
-  // `compact` : feuille du téléphone, une ligne d'aide au plus par réglage.
-  // Choix payants : plus aucun ici (décision du propriétaire du 11 novembre, audit M17) ; une
+  // « Autoriser le téléchargement » ; plus de sous-option du coffre), estimation du temps d'envoi.
+// `compact` : feuille du téléphone, une ligne d'aide au plus par réglage.
+  // Choix payants : plus aucun ici ; une
   // seule ligne discrète dans l'en-tête du composeur ouvre la feuille d'information.
   import { PW_TRIES, TITLE_MAX } from "../index";
   import type { Options } from "../flows/options.svelte";
@@ -32,7 +31,7 @@
   const lang = $derived(getLang());
   const ttlLabel = (h: number) => formatDuration(h * 3600, lang);
   const ttlOptions = $derived(options.limites.ttlHours.map((h) => ({ value: h, label: ttlLabel(h) })));
-  // Ouvertures (retours du propriétaire du 17 novembre) : des cases tant qu'il y en a peu
+  // Ouvertures : des cases tant qu'il y en a peu
   // (gratuit : 1 à 5) ; au-delà de 6 (offres Plus et Pro, jusqu'à 10 et 20), un compteur
   // « − n + » plutôt qu'une grille de 10 ou 20 cases. `opensMax` suivra l'offre quand elle existera.
   const opensMax = $derived(options.limites.maxOpens);
@@ -72,7 +71,7 @@
 <section class={["opts", { compact, dense: part === "controls" }]} aria-labelledby={compact ? undefined : "opts-title"} aria-label={compact ? t("options.title") : undefined}>
   {#if !compact}<h2 id="opts-title" class="h">{t("options.title")}</h2>{/if}
 
-  <!-- Nom du partage (demande du propriétaire, 19 novembre) : facultatif, dans le manifeste
+  <!-- Nom du partage : facultatif, dans le manifeste
        chiffré ; le destinataire le voit en titre, l'historique le garde. -->
   <div class="block" data-share-name>
     <TextField
@@ -115,7 +114,7 @@
     </div>
   </div>
 
-  <!-- Plus de mot de passe dans les options (décision du propriétaire du 17 novembre) : il est
+  <!-- Plus de mot de passe dans les options : il est
        généré sur l'appareil et montré une fois le lien créé, sous le lien (« Lien prêt »). -->
   {#if part === "all"}<div class="block">{@render trust()}</div>{/if}
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Offres (page à part, pages séparées) : refaite le 16 novembre (décision du propriétaire) :
+  // Offres (page à part, pages séparées) : refaite :
   // une seule présentation (plus de cartes de prix puis d'un tableau qui redisait la même chose),
   // choix de la facturation et de l'offre, récapitulatif (ui/OffersCheckout.svelte).
   // Retour du prestataire de paiement (/offres/retour, conception du paiement §2 point 5) : même

@@ -1,15 +1,15 @@
-// Historique local des envois et tableau de bord « Vos envois » (spec §33, §33.1 ; UI §9.6 ;
-// Task H), sur le vrai serveur. Preuves : rien en clair dans IndexedDB, clé non extractible ;
+// Historique local des envois et tableau de bord « Vos envois » (spec §33, §33.1 ; UI §9.6), sur le vrai serveur. Preuves : rien en clair dans IndexedDB, clé non extractible ;
 // l'accueil ne fait aucune requête ; relecture seulement à la demande et au plus une fois par
 // 5 min ; ouverture vue avec son intervalle ; Détruire ; filtres ; expiré ; effacer ; bascule
 // désactivée ; hors ligne ; stockage refusé (navigation privée stricte). Captures 1440 et 390.
 import { mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
 import { NotFoundError, fetchMeta } from "../src/index";
 import { axe, capture, expect, test } from "./fixtures";
 import { freshPage, sendShare, unlock } from "./open-helpers";
 
-const SHOTS = "/tmp/claude-0/-home-user/b97dc3e7-f107-54ba-8c5b-d4198f88d7ff/scratchpad/captures-envois";
+const SHOTS = fileURLToPath(new URL("../test-results/captures/envois/", import.meta.url));
 
 async function shot(page: Page, name: string, isMobile: boolean) {
   await capture(page, name);
@@ -87,7 +87,7 @@ test.describe("fr-FR", () => {
     // hasard de l'hex des octets chiffrés (« 4471 » y tombait parfois), ni, en pratique, de leurs octets bruts.
     const MARK = "REPERE-HISTORIQUE-QZWXKJ";
     const sent = await sendShare(page, shh.origin + "/", { text: `Le code de la porte est ${MARK}.`, isMobile, keep: true });
-    // « Lien prêt » : bascule activée par la personne (désactivée par défaut, 24 novembre), avec sa phrase honnête.
+    // « Lien prêt » : bascule activée par la personne (désactivée par défaut), avec sa phrase honnête.
     await expect(keepSwitch(page)).toHaveAttribute("aria-checked", "true");
     await expect(page.getByText("jamais le lien de partage ni le mot de passe", { exact: false })).toBeVisible();
     await expect.poll(async () => (await rawDb(page)).count).toBe(1);
@@ -226,7 +226,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator("[data-history-empty]")).toBeVisible();
   });
 
-  test("lien de gestion #m… : relecture puis « Supprimer maintenant » → l'entrée de l'historique passe à « Détruit » (test d'intrusion du 11 novembre)", async ({ page, shh, isMobile }) => {
+  test("lien de gestion #m… : relecture puis « Supprimer maintenant » → l'entrée de l'historique passe à « Détruit »", async ({ page, shh, isMobile }) => {
     test.setTimeout(150_000);
     const sent = await sendShare(page, shh.origin + "/", { text: "Bonjour", isMobile, keep: true });
     await expect.poll(async () => (await rawDb(page)).count).toBe(1);
@@ -245,7 +245,7 @@ test.describe("fr-FR", () => {
     expect((await rawDb(page)).count).toBe(1);
   });
 
-  test("sans compte, bascule désactivée par défaut sur « Lien prêt » (24 novembre) : lien de gestion montré, aucune entrée, aucune bande ; /envois dit « désactivé » et propose de l'activer", async ({ page, shh, isMobile }) => {
+  test("sans compte, bascule désactivée par défaut sur « Lien prêt » : lien de gestion montré, aucune entrée, aucune bande ; /envois dit « désactivé » et propose de l'activer", async ({ page, shh, isMobile }) => {
     test.setTimeout(120_000);
     const sent = await sendShare(page, shh.origin + "/", { text: "Rien à garder", isMobile });
     await expect(keepSwitch(page)).toHaveAttribute("aria-checked", "false");
@@ -298,10 +298,10 @@ test.describe("en-US", () => {
   test("My shares : textes anglais, pied de page", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/envois");
     await expect(page.getByRole("heading", { level: 1, name: "My shares" })).toBeVisible();
-    // Sans compte, l'historique des envois est désactivé par défaut (24 novembre).
+    // Sans compte, l'historique des envois est désactivé par défaut.
     await expect(page.getByRole("heading", { name: "History is turned off" })).toBeVisible();
     await expect(page.getByText("By default, your shares are not kept on this device", { exact: false })).toBeVisible();
-    // « My shares » n'est dans l'en-tête que s'il y a des partages (17 novembre) : ici, aucun.
+    // « My shares » n'est dans l'en-tête que s'il y a des partages : ici, aucun.
     await expect(page.getByRole("banner").getByRole("link", { name: "My shares", exact: true })).toHaveCount(0);
     // Une simple visite (accueil, « Vos envois ») ne crée aucune base dans le navigateur.
     await page.goto(shh.origin + "/");

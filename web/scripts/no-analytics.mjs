@@ -1,4 +1,4 @@
-// Liste « aucune statistique » de la spec §35.1 (Task M2), partagée par le test des sources
+// Liste « aucune statistique » de la spec §35.1, partagée par le test des sources
 // (src/no-analytics.test.ts) et par check-dist.mjs (dist/, dist-demo/).
 // Recherche insensible à la casse. Ce fichier et les tests qui l'importent sont les seuls à
 // contenir ces mots : ils sont exclus de la recherche dans les sources.

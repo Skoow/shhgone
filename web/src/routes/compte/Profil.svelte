@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Profil (/compte/profil ; conception compte §21.5, §21.15.3 ; plan, lot 13). Monté seulement avec
+  // Profil (/compte/profil ; conception compte §21.5, §21.15.3). Monté seulement avec
   // __COMPTES__ et une session ouverte (App.svelte, routes/compte/pages.ts).
   // - Photo facultative : ré-encodée SUR L'APPAREIL (256 × 256, 64 Ko au plus, sans métadonnées),
   //   rangée dans le coffre de profil ; « Retirer ». Le nom du fichier n'est ni gardé ni montré.
@@ -55,7 +55,7 @@
       await changerPseudo(pseudo);
     } catch (e) {
       const c = codeDe(e);
-      // Prochain changement possible (3 par an au plus, 20 novembre) : date tirée de l'attente.
+      // Prochain changement possible (3 par an au plus) : date tirée de l'attente.
       const apres = (e as { retryAfterS?: number }).retryAfterS ?? 0;
       errPseudo = c === "limit" ? t("account.profile.limit", { date: jourLong(new Date(Date.now() + apres * 1000).toISOString().slice(0, 10)) }) : erreur(e, "parametres").texte;
       announce(errPseudo);

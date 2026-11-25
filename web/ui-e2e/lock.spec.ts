@@ -10,8 +10,8 @@ import { openFilePicker } from "./send-helpers";
 
 test.use({ locale: "fr-FR" });
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-LOCK/", import.meta.url));
-const SHOTS5 = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-UI5/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/LOCK/", import.meta.url));
+const SHOTS5 = fileURLToPath(new URL("../test-results/captures/UI5/", import.meta.url));
 
 test("envoi : cadenas gris tant que le segment n'est pas confirmé, vert après ; 2ᵉ ligne de la bulle : nettoyage (D41-34)", async ({ page, shh, isMobile }) => {
   test.setTimeout(90_000);

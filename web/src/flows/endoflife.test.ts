@@ -73,7 +73,7 @@ describe("destroyFromContent", () => {
       expect(log).toEqual([report !== null ? "report(4)" : "destroy()", `${v} résolu`, "wipe", "dissolution"]);
     }
   });
-  it("Signaler sans atteindre la moitié des ouvertures : « reported », rien n'est effacé (20 novembre)", async () => {
+  it("Signaler sans atteindre la moitié des ouvertures : « reported », rien n'est effacé", async () => {
     const { o } = fake(undefined, undefined, false);
     const onDestroyed = vi.fn();
     expect(await destroyFromContent(o, 3, { onDestroyed })).toBe("reported");

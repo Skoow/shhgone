@@ -1,4 +1,4 @@
-// WebM et Matroska (MKV, MKA) : nettoyage EN PLACE, à longueur constante (spec §35.2, Task 9c).
+// WebM et Matroska (MKV, MKA) : nettoyage EN PLACE, à longueur constante (spec §35.2).
 // - Tags (titre, artiste, commentaire, date, encodeur…) : élément entier remplacé par un Void de
 //   même taille totale ;
 // - dans Info : Title, DateUTC, SegmentUUID, PrevUUID, NextUUID, SegmentFilename, PrevFilename,

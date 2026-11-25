@@ -29,7 +29,7 @@ describe("formatOf", () => {
     expect(f("m4a", "mp4")).toEqual({ label: "M4A", family: "audio" });
     expect(f("bin", "mp4")).toEqual({ label: "MP4", family: "video" });
   });
-  it("mémo vocal en WebM ou MP4 : audio dès que le type MIME ou la catégorie le dit (audit D2), vidéo sinon", () => {
+  it("mémo vocal en WebM ou MP4 : audio dès que le type MIME ou la catégorie le dit, vidéo sinon", () => {
     // Composeur : octets lus (webm), type MIME de l'enregistreur, catégorie « audio ».
     expect(formatOf({ kind: "file", ext: "webm", sniffed: "webm", mime: "audio/webm;codecs=opus" })).toEqual({ label: "WEBM", family: "audio" });
     expect(formatOf({ kind: "file", ext: "webm", sniffed: "webm", category: "audio" })).toEqual({ label: "WEBM", family: "audio" });
@@ -52,7 +52,7 @@ describe("formatOf", () => {
   });
 });
 
-describe("libellé de l'icône (retours UI7)", () => {
+describe("libellé de l'icône", () => {
   it("4 caractères au plus pour chaque extension connue et chaque libellé générique", () => {
     for (const e of KNOWN_EXTS) expect(f(e).label.length, e).toBeLessThanOrEqual(4);
     for (const d of [fr, en]) for (const [k, v] of Object.entries(d)) if (k.startsWith("format.short.")) expect(v.length, k).toBeLessThanOrEqual(4);

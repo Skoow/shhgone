@@ -1,4 +1,4 @@
-// Liens du salon (plan C-3, points 1 et 2) : invitation « https://…/salon#c<K_lien> » et gestion
+// Liens du salon : invitation « https://…/salon#c<K_lien> » et gestion
 // « https://…/salon#s<S_gestion> », 43 caractères base64url (32 octets). Le « # » n'est jamais
 // envoyé au serveur ; la page le lit une fois puis le retire de la barre (spec §5.3). Pur.
 import { b64u, unb64u } from "../engine/pure";

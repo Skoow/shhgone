@@ -5,8 +5,8 @@
 </script>
 
 <script lang="ts">
-  // Bandeau « English version » (propriétaire, 20 novembre ; bandeau au lieu d'une pastille
-  // flottante, revue du 20 novembre, U10) : sur la version française d'une page bilingue
+  // Bandeau « English version » (bandeau au lieu d'une pastille
+  // flottante) : sur la version française d'une page bilingue
   // (app/langues.ts), un navigateur anglophone voit, en haut de page, un lien vers la version
   // « /en… ». L'adresse donne la langue de ces pages (référencement : jamais de renvoi
   // automatique) ; ce bandeau garde le confort des anglophones. Dans le flux, au-dessus de la

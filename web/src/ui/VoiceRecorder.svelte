@@ -3,7 +3,7 @@
 </script>
 
 <script lang="ts">
-  // Enregistreur vocal (spec §35.3, Task 12) : onde vivante, minuteur « 0:42 / 30:00 max » sur une ligne,
+  // Enregistreur vocal (spec §35.3) : onde vivante, minuteur « 0:42 / 30:00 max » sur une ligne,
   // pastille rouge pulsée, Pause / Reprendre (minuteur figé), Arrêter, Annuler (bouton, ou glisser
   // vers la gauche au doigt ; confirmation au-delà de 5 s). Dès l'arrêt, « Valider » ajoute au
   // partage ; la réécoute (onde, vitesse) reste possible, sans obligation, et « Réenregistrer »

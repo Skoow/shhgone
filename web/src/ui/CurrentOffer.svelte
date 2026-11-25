@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Page d'envoi (décision du propriétaire du 16 novembre) : un petit cadre qui dit l'offre de la
+  // Page d'envoi : un petit cadre qui dit l'offre de la
   // personne en ce moment (aujourd'hui toujours Gratuit : aucune vente n'est ouverte) et ses
   // limites, lues dans les constantes ; « Voir les offres » mène à /offres. Remplace la bande
   // Gratuit / Plus / Pro et sa feuille « Bientôt disponible ». `newTab` : la liste en cours serait

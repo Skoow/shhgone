@@ -1,5 +1,5 @@
-// Routes JSON du salon (serveur : server/internal/api/handlers_salon.go ; « Protocole » du plan
-// C-2). Seul fichier du salon qui fait des requêtes HTTP (source-rules.test.ts) ; la création
+// Routes JSON du salon (serveur : server/internal/api/handlers_salon.go ; spec salon v3
+// §17). Seul fichier du salon qui fait des requêtes HTTP (source-rules.test.ts) ; la création
 // avec session passe par account/api.ts (seul fichier qui écrit l'en-tête de session). Règles :
 // - secrets en en-tête seulement, en base64url sans bourrage : X-Shh-Access (K_accès_s),
 //   X-Shh-Manage (J_gestion = jetonGestion(S_gestion), JAMAIS S_gestion : spec salon v3 §15.2),
@@ -155,7 +155,7 @@ const URL_RELAIS = /^turns?:[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:[0-9]{1,5})?(\
 
 /**
  * POST /api/salons/appel : identifiants du relais pour ce membre. Appels réservés aux offres Plus
- * et Pro (24 novembre) : tant qu'ils sont fermés dans le salon, `jetonAnonyme` (Privacy Pass,
+ * et Pro : tant qu'ils sont fermés dans le salon, `jetonAnonyme` (Privacy Pass,
  * « Authorization: PrivateToken », jamais un pass ni un compte) les ouvre pour tout le salon.
  * 402 offre_requise : fermés et aucun jeton ; 404 : pas d'appels sur ce serveur ; 429 : trop de demandes.
  */
@@ -204,7 +204,7 @@ export async function exclure(
   await appel(n, "POST", "/exclure", { "X-Shh-Manage": cle(jGestion), "X-Shh-Access-New": cle(r.kAccesNouvelle) }, body);
 }
 
-// --- Pièces (plan C-4 ; serveur : handlers_salon_pieces.go) --------------------------------------
+// --- Pièces (serveur : handlers_salon_pieces.go) --------------------------------------
 
 /** POST /api/salons/pieces : identifiant de la pièce (16 octets) et jeton d'envoi signé. */
 export async function creerPiece(n: Net, jeton: string, bucket: number, vocal: boolean): Promise<{ piece: Bytes; envoi: string }> {

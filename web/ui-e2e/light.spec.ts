@@ -1,7 +1,7 @@
-// Retours LIGHT du propriétaire : plus de phrase « collez avec Ctrl + V » (le collage reste) ;
+// Retours LIGHT : plus de phrase « collez avec Ctrl + V » (le collage reste) ;
 // lignes et catégories allégées (un seul filet fin entre lignes, en-tête discret, aucun pavé)
 // au composeur et chez le destinataire ; page d'envoi vide : cadre en pointillés, arrondi doux.
-// Captures fr-FR ×2 à 390 et 1440 px : .superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-LIGHT/.
+// Captures fr-FR ×2 à 390 et 1440 px : web/test-results/captures/LIGHT/.
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
@@ -9,7 +9,7 @@ import { expect, test } from "./fixtures";
 import { file, freshPage, settle, unlock } from "./open-helpers";
 import { noViewTransition, openFilePicker, readyHeading, sendButton } from "./send-helpers";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-LIGHT/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/LIGHT/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
 
 const w = (m: boolean) => (m ? 390 : 1440);
@@ -62,7 +62,7 @@ test("composeur et destinataire allégés ; captures", async ({ page, shh, brows
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const read = async (name: string) => {
-    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    // Mot de passe masqué à l'arrivée : l'œil l'affiche d'abord.
     const g = page.getByRole("group", { name });
     const eye = g.locator("[data-reveal]");
     if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();

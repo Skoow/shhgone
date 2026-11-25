@@ -12,11 +12,10 @@ export const TTL_MAX_HOURS = 24;
 /** Valeurs par défaut des options (UI §9.3). */
 export const TTL_DEFAULT: TtlHours = 12;
 export const OPENS_DEFAULT = 1;
-/** Ouvertures au choix, de 1 à MAX_OPENS (spec §4) ; 5 depuis le 17 novembre (décision du
- *  propriétaire, 10 avant). Le serveur refuse au-delà (share.MaxOpens, même valeur). */
+/** Ouvertures au choix, de 1 à MAX_OPENS (spec §4) ; 5 (10
+ * avant). Le serveur refuse au-delà (share.MaxOpens, même valeur). */
 export const MAX_OPENS = 5;
-/** Plus grand nombre d'ouvertures qu'un partage existant peut avoir : 10, l'ancienne limite (avant
- *  le 17 novembre). Sert seulement à vérifier les réponses du serveur, pour qu'un partage créé
+/** Plus grand nombre d'ouvertures qu'un partage existant peut avoir : 10, l'ancienne limite. Sert seulement à vérifier les réponses du serveur, pour qu'un partage créé
  *  avant ce changement s'ouvre encore ; jamais pour en créer un. */
 export const OPENS_SEEN_MAX = 10;
 /** Mots de passe faux avant destruction (spec §4). */
@@ -25,24 +24,25 @@ export const PW_TRIES = 5;
 export const STRIP_MAX = 50 * 1048576;
 /** Longueur maximale d'un nom, en points de code (UI §9.2.4, même borne que cleanName). */
 export const NAME_MAX = 120;
-/** Nom du partage (19 novembre) : longueur maximale en points de code après nettoyage, celle du
+/** Nom du partage : longueur maximale en points de code après nettoyage, celle du
  *  moteur (manifest::TITLE_MAX, prouvée par engine/vectors/v2-titre.json). */
 export const TITLE_MAX = 80;
-/** Partages créés par jour et par connexion (spec §24 ; limits.CreatesPer64 du serveur). */
-export const CREATES_PER_DAY = 10;
+/** Partages gratuits créés par jour et par connexion (spec §24 ; limits.CreatesPer64 du serveur,
+ *  qui borne aussi le réseau entier : limits.CreatesPer48). */
+export const CREATES_PER_DAY = 3;
 /** Envois en préparation (non finalisés) à la fois par connexion (spec §29.5 ; limits.PendingPer64). */
 export const PENDING_MAX = 2;
 
 /**
  * Formules payantes (spec §38.8.1, prix proposés de §38.8.2, TTC, en euros) : présentées par une
- * seule ligne discrète du composeur et une feuille « Bientôt disponible » (décision du 11 novembre) ; rien n'est en
- * vente tant que les Tasks P1 à P3 ne sont pas faites. Le nombre d'éléments n'en fait pas
+ * seule ligne discrète du composeur et une feuille « Bientôt disponible » ; rien n'est en
+ * vente tant que les ne sont pas faites. Le nombre d'éléments n'en fait pas
  * partie : MAX_ITEMS vaut pour toutes (D41-17). Aucune n'apporte de sécurité de plus (§38.9.0).
- * Ouvertures et tailles : voir la décision du 17 novembre ci-dessous.
+ * Ouvertures et tailles : voir la ci-dessous.
  */
 export type PaidTier = "plus" | "pro";
 export const PAID: Readonly<Record<PaidTier, { bytes: number; opens: number; ttlDays: readonly number[]; shares: number; month: number; year: number }>> = {
-  // Décisions du propriétaire : 16 novembre, Plus jusqu'à 3 jours, Pro 7 jours ; 17 novembre,
+  // :, Plus jusqu'à 3 jours, Pro 7 jours ;
   // ouvertures gratuit 5, Plus 10, Pro 20, et Pro 30 Go (50 avant).
   // shares : partages payants (jetons) par période de 30 jours, sans report (offres.go, JetonsPeriod).
   plus: { bytes: 10 * 1024 ** 3, opens: 10, ttlDays: [2, 3], shares: 30, month: 7, year: 70 },
@@ -63,7 +63,7 @@ export function limitesDe(f: Formule): { contentMax: number; ttlHours: readonly 
 
 /**
  * Durées maximales de capture dans l'interface (caméra et micro maison), en secondes, par
- * formule (décision du propriétaire du 8 novembre). Plafonds techniques : l'enregistrement vit
+ * formule. Plafonds techniques : l'enregistrement vit
  * en mémoire jusqu'au chiffrement (vidéo à VIDEO_BPS : 5 min ≈ 94 Mo, 30 min ≈ 560 Mo).
  */
 export type CaptureTier = "free" | PaidTier;

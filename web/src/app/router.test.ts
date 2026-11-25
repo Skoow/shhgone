@@ -18,7 +18,7 @@ describe("match", () => {
     // Page d'envoi vide (retours DROP) : « Commencer » y mène ; un « # » n'y ouvre rien.
     expect(match("/envoyer")).toEqual({ name: "envoyer" });
     expect(match("/envoyer", `#${KEY}`)).toEqual({ name: "envoyer" });
-    // Task H : tableau de bord « Mes partages » (spec §33).
+    // Tableau de bord « Mes partages » (spec §33).
     expect(match("/envois")).toEqual({ name: "envois" });
     expect(match("/telechargements")).toEqual({ name: "telechargements" });
     expect(match("/envois", `#m${KEY}`)).toEqual({ name: "envois" });
@@ -30,7 +30,7 @@ describe("match", () => {
     expect(match("/securite", "", "/", true)).toEqual({ name: "securite" });
   });
 
-  it("ancienne forme à la racine (refusée, 18 novembre) : « / » + fragment, quel qu'il soit → accueil (App retire le « # ») ; la clé n'est pas gardée", () => {
+  it("ancienne forme à la racine (refusée) : « / » + fragment, quel qu'il soit → accueil (App retire le « # ») ; la clé n'est pas gardée", () => {
     for (const h of [`#${KEY}`, `#m${KEY}`, `#${KEY}.YUMzIWNENT8jRmc`, `#${KEY}.`, `#${KEY.slice(0, 20)}`, `#x${KEY}`, "", "#", "#contenu"])
       expect(match("/", h), h).toEqual({ name: "home" });
     expect(JSON.stringify(match("/", `#${KEY}`))).not.toContain(KEY);
@@ -41,7 +41,7 @@ describe("match", () => {
     expect(match("/x", `#${KEY}`)).toEqual({ name: "notfound" });
   });
 
-  it("liens sous /s (16 novembre) : partage, mot de passe du QR et lien coupé → ouverture ; gestion → gestion ; sans fragment → ouverture (lien incomplet)", () => {
+  it("liens sous /s : partage, mot de passe du QR et lien coupé → ouverture ; gestion → gestion ; sans fragment → ouverture (lien incomplet)", () => {
     expect(match("/s", `#${KEY}`)).toEqual({ name: "open" });
     expect(match("/s", `#m${KEY}`)).toEqual({ name: "manage" });
     expect(match("/s", `#${KEY}.YWJj`)).toEqual({ name: "open" });
@@ -72,7 +72,7 @@ describe("match", () => {
   });
 });
 
-// Plan du compte, lot 10 : pages du compte seulement si __COMPTES__ (sinon la même 404 qu'une
+// Pages du compte seulement si __COMPTES__ (sinon la même 404 qu'une
 // adresse inconnue) ; « ?suite=salon » seul paramètre, et aucune donnée dans l'adresse.
 describe("pages du compte", () => {
   const C = (p: string, base = "/") => match(p, "", base, false, true);
@@ -120,7 +120,7 @@ describe("navigate", () => {
     expect(router.current).toEqual({ name: "home" });
   });
 
-  // Pages séparées (16 novembre) : une page d'information a son propre fichier HTML ; depuis
+  // Pages séparées : une page d'information a son propre fichier HTML ; depuis
   // l'application, y aller charge cette page (et inversement), sans toucher au routeur.
   it("vers l'autre fichier HTML (application ↔ page d'information) : chargement complet", () => {
     const assign = vi.spyOn(location, "assign").mockImplementation(() => undefined);
@@ -141,7 +141,7 @@ describe("navigate", () => {
     }
   });
 
-  // Page « /s » (16 novembre) : ouverture et gestion dans leur propre fichier HTML.
+  // Page « /s » : ouverture et gestion dans leur propre fichier HTML.
   it("page /s : autre fichier HTML que l'application et les pages d'information", () => {
     expect(otherEntry("/s")).toBe(true);
     setEntry("s");
@@ -155,7 +155,7 @@ describe("navigate", () => {
     }
   });
 
-  it("ancienne forme à la racine (refusée, 18 novembre) : l'accueil, jamais l'ouverture ni la page /s", () => {
+  it("ancienne forme à la racine (refusée) : l'accueil, jamais l'ouverture ni la page /s", () => {
     const calls: string[] = [];
     const loc = (pathname: string, hash: string) => ({ pathname, hash, replace: (u: string) => void calls.push(u) });
     for (const h of [`#${KEY}`, `#m${KEY}`, `#${KEY}.YWJj`, `#${KEY.slice(0, 30)}`]) {
@@ -165,7 +165,7 @@ describe("navigate", () => {
     expect(calls).toEqual([]);
   });
 
-  // « /s » montré seulement quand il sert (17 novembre).
+  // « /s » montré seulement quand il sert.
   it("adresse montrée : /s et /s.html deviennent / ; tout le reste tel quel", () => {
     expect(shownPath("/s")).toBe("/");
     expect(shownPath("/s.html")).toBe("/");

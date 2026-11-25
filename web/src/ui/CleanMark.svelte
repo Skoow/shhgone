@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Marque de nettoyage d'un fichier (retours UI8, remplace l'étincelle de D41-34) : petit
+  // Marque de nettoyage d'un fichier (remplace l'étincelle de D41-34) : petit
   // bouclier maison juste avant le nom (retours CLEAN2, emplacement fixe posé par la ligne), centré sur le texte, jamais repoussé hors de la ligne, avec sa propre bulle
   // (survol, focus clavier, appui). Nettoyé : bouclier coché, couleur d'accent. Échec : même
   // bouclier, ambre, « ! » à l'intérieur. Tel quel : aucune marque (l'appelant n'en pose pas).
@@ -29,7 +29,7 @@
     align-items: center;
     line-height: 0;
     /* Au-dessus de la cible élargie (44 px) de la pastille cadenas de l'icône, qui déborde à
-       droite jusque sur le bouclier depuis que le nom est sur la 2ᵉ ligne (CI du 20 novembre) :
+       droite jusque sur le bouclier depuis que le nom est sur la 2ᵉ ligne (CI) :
        là où les deux cibles se chevauchent, le bouclier gagne ; chaque dessin reste touchable. */
     position: relative;
     z-index: 1;

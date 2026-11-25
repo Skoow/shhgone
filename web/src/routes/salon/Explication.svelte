@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Page d'explication et pseudonyme (spec §39.4 point 3 ; textes corrigés : v3 §5.1, exigence C-3
-  // 18) : après le mot de passe, avant le salon. Le pseudonyme suit les règles du moteur
+  // Page d'explication et pseudonyme (spec §39.4 point 3 ; textes corrigés : v3 §5.1) :
+  // après le mot de passe, avant le salon. Le pseudonyme suit les règles du moteur
   // (pseudoValide : longueur, caractères, une seule écriture) et l'unicité dans le salon (profils
   // déjà reçus). Le salon est déjà ouvert en arrière-plan : l'arrivée dans le groupe chiffré se
   // fait pendant la lecture.
@@ -27,7 +27,7 @@
   const verdict = $derived((void vue.rev, verifierPseudo(pseudo)));
   let errCompte = $state("");
   const erreur = $derived(errCompte || (essaye || pseudo.length > 0 ? ("code" in verdict ? t(`salon.pseudo.err.${verdict.code}`) : "") : ""));
-  // Avec un compte et son vrai pseudo (20 novembre, propriétaire : un seul pseudo) : le salon
+  // Avec un compte et son vrai pseudo (un seul pseudo) : le salon
   // prend le pseudo du compte, non modifiable ici ; il se change dans le profil (3 fois par an).
   // Pseudo du compte déjà pris dans ce salon (course rare, `refuse`) : le champ se libère.
   const fige = __COMPTES__ && !refuse && untrack(() => pseudoPropose()) !== "";
@@ -39,7 +39,7 @@
     if (envoi) return;
     if (__COMPTES__ && !fige && !("code" in verdict)) {
       // Invité (ou compte qui garde le salon à part) : unique dans la conversation, et jamais le
-      // pseudo d'un autre compte (décision du propriétaire, 22 novembre). Le serveur ne sait pas
+      // pseudo d'un autre compte. Le serveur ne sait pas
       // de quel salon il s'agit ; rien n'est gardé.
       envoi = true;
       try {
@@ -62,7 +62,7 @@
 
 <Cadre titre={t("salon.intro.title")}>
   {#if refuse}<Banner kind="warn">{t("salon.pseudo.err.refuse")}</Banner>{/if}
-  <!-- Revue du 20 novembre (U18) : trois points essentiels visibles (chiffrement, effacement du
+  <!-- Trois points essentiels visibles (chiffrement, effacement du
        salon, effacement des messages et limite des captures), les autres sous « En savoir plus »,
        toujours dans la page (aucun texte retiré) ; le champ du pseudonyme remonte. -->
   <ul class="points" data-points-essentiels>
@@ -105,7 +105,7 @@
       }}
     />
     <!-- Photo pour ce salon (v3 §7.2), facultative : ré-encodée sur l'appareil, envoyée chiffrée. -->
-    <!-- Un seul libellé (restes, point 8) : celui du choix de photo, nommé pour le salon. -->
+    <!-- Un seul libellé : celui du choix de photo, nommé pour le salon. -->
     <AvatarPicker bind:photo initiale={[...pseudo.trim()][0] ?? ""} libelle={t("salon.avatar.photo")} />
     {#if fige}<p class="note" data-pseudo-fige>{t("salon.intro.pseudo.fige")}</p>{/if}
     <div class="actions"><Button onpress={go}>{t("salon.intro.enter")}</Button></div>

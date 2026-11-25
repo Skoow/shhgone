@@ -11,7 +11,7 @@
 //   source (partage reçu, salon) et l'heure locale de l'enregistrement. JAMAIS le lien, une
 //   clé, le mot de passe ni le contenu : tout champ inconnu est ignoré (`clean`). Même format
 //   pour les apps (D42-20).
-// - DÉSACTIVÉ PAR DÉFAUT (décision du propriétaire du 22 novembre 2026, remplace l'« activé »
+// - DÉSACTIVÉ PAR DÉFAUT (remplace l'« activé »
 //   de R12) : rien n'est écrit tant que la personne ne l'a pas activé elle-même (drapeau « on »).
 //   Désactivé, ou réglage coupé : l'historique existant est effacé (y compris des entrées
 //   d'avant ce changement) et plus rien n'est écrit.
@@ -79,7 +79,7 @@ export type Downloads = {
   add(e: NewDownload): Promise<DownloadEntry | null>;
   remove(id: string): Promise<void>;
   clear(): Promise<void>;
-  /** Faux tant que la personne ne l'a pas activé (désactivé par défaut, 22 novembre). */
+  /** Faux tant que la personne ne l'a pas activé (désactivé par défaut). */
   enabled(): Promise<boolean>;
   /** Coupé : l'historique existant est effacé. */
   setEnabled(v: boolean): Promise<void>;
@@ -117,12 +117,12 @@ export async function openDownloads(deps: { backend: Backend | null; now?: () =>
     }
   }
   // Activé seulement par un geste de la personne (setEnabled(true)) : drapeau « on ». L'ancien
-  // drapeau « off » (activé par défaut, avant le 22 novembre) ne vaut plus rien.
+  // drapeau « off » (activé par défaut) ne vaut plus rien.
   const enabled = async () => (await b.flag("on")) === true;
 
   return {
     async list() {
-      // Désactivé : rien à montrer, et rien ne reste (entrées écrites avant le 22 novembre,
+      // Désactivé : rien à montrer, et rien ne reste (entrées écrites,
       // quand l'historique était activé par défaut).
       if (!(await enabled())) {
         await b.clear();

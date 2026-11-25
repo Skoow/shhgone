@@ -1,4 +1,4 @@
-// Réécriture bornée de XML (spec §35.2, Task 9b).
+// Réécriture bornée de XML (spec §35.2).
 import { describe, expect, it } from "vitest";
 import { decodeXml, qn, rewriteXml, rootTag } from "./xmlattr";
 

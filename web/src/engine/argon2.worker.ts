@@ -1,5 +1,5 @@
 // Worker d'Argon2id (64 Mio) : instancie le moteur à partir du module compilé que lui donne la
-// page (déjà vérifié par son empreinte, Task 10), calcule K_mdp, répond { k } ou { error }, puis
+// page (déjà vérifié par son empreinte), calcule K_mdp, répond { k } ou { error }, puis
 // est arrêté par la page (argon2.ts) : sa mémoire est rendue, la clé n'y reste pas. Ne reçoit que
 // le mot de passe et le sel ; ne fait aucune requête.
 import { initSync, passwordKey, passwordKeyForCreate } from "./pkg/shhdrop_wasm.js";

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
-// Profil (/compte/profil ; conception compte §21.5, §21.15.3 ; plan, lot 13) : photo (changer,
+// Profil (/compte/profil ; conception compte §21.5, §21.15.3) : photo (changer,
 // retirer, ré-encodée sur l'appareil, 64 Ko au plus), pseudo unique (« Disponible », « Déjà pris »,
-// une fois par 24 h), carte « Votre compte » (date, palier, « Dès le 21 novembre »), note de
+// une fois par 24 h), carte « Votre compte » (date, palier, « »), note de
 // confidentialité exacte. Le module de compte est remplacé par un double.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../../i18n/i18n.svelte";
@@ -61,7 +61,7 @@ describe("Profil", () => {
     expect(liens).toContainEqual(["En savoir plus", "/securite"]);
     expect(liens).toContainEqual(["Voir les offres", "/offres"]);
     expect(bouton("Paramètres")).toBeTruthy();
-    // Indice du pseudo gardé du lot 10 (décision du propriétaire).
+    // Indice du pseudo gardé.
     expect(t).toContain("Vu par les membres de vos salons, unique parmi les comptes Shhgone. 3 changements par an au plus.");
   });
 
@@ -118,7 +118,7 @@ describe("Profil", () => {
     await apres400();
     C.changerPseudo.mockRejectedValueOnce(new CompteError(429, "limit", { retryAfterS: 122 * 86400 }));
     await presser("Enregistrer");
-    // 14 novembre 2026 + 122 jours = 16 mars 2027.
+    // + 122 jours = 16 mars 2027.
     expect(erreurDe("Pseudo")).toBe("Vous pourrez changer de pseudo le 16 mars 2027 (3\u202ffois par an au plus).");
     C.changerPseudo.mockRejectedValueOnce(new CompteError(409, "pseudo_pris"));
     await presser("Enregistrer");

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Vue de gestion `#m…` et historique (test d'intrusion du 11 novembre) : un partage détruit ou
+// Vue de gestion `#m…` et historique : un partage détruit ou
 // relu depuis `#m…` met à jour son entrée d'historique si elle existe ; aucune entrée n'est
 // créée, et une simple visite ne crée pas d'historique.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -87,7 +87,7 @@ describe("syncManaged : ordre", () => {
   });
 });
 
-describe("revue D42-22 : « Effacer l'historique » efface aussi les retours gardés", () => {
+describe("D42-22 : « Effacer l'historique » efface aussi les retours gardés", () => {
   it("la base shhdrop-returns disparaît avec l'historique", async () => {
     await seed();
     const { pageReturns, RETURNS_DB } = await import("./returns");
@@ -155,11 +155,11 @@ describe("relecture (A) : « Effacer l'historique » ne se bloque jamais sur les
   });
 });
 
-// Conception compte §21.7, §21.8 (plan, lot 11) : partages reçus gardés sur l'appareil (lien,
+// Conception compte §21.7, §21.8 : partages reçus gardés sur l'appareil (lien,
 // jamais le mot de passe), retirés par « Oublier ce partage sur cet appareil » ; « Vos envois »
 // (shares.entries) ne voit que les envois ; entrées du compte importées et retirées à la
 // déconnexion ; chaque ajout ou retrait local est signalé (synchronisation du compte).
-describe("partages reçus (lot 11)", () => {
+describe("partages reçus", () => {
   const KEY = "k".repeat(43);
   const LINK = "https://x.test/#" + KEY;
   const received = () => ({ link: LINK, expiresAt: Date.now() + 3600_000, itemsCount: 2, sizeBytes: 300, format: "image" });
@@ -204,7 +204,7 @@ describe("partages reçus (lot 11)", () => {
   });
 });
 
-describe("ouverture de l'historique : un échec passager n'est pas gardé (relecture du 18 novembre)", () => {
+describe("ouverture de l'historique : un échec passager n'est pas gardé (relecture)", () => {
   it("premier essai refusé (base occupée) : le partage suivant est quand même gardé", async () => {
     idb.failOpen = true;
     const now = Date.now();
@@ -217,7 +217,7 @@ describe("ouverture de l'historique : un échec passager n'est pas gardé (relec
   });
 });
 
-// Renommer un envoi (19 novembre) : nettoyé par le vrai moteur (WebAssembly lu sur le disque),
+// Renommer un envoi : nettoyé par le vrai moteur (WebAssembly lu sur le disque),
 // gardé sur l'appareil, signalé au compte (« rename ») ; un reçu ne se renomme pas.
 describe("renameShare : titre d'un envoi sur cet appareil", () => {
   it("nettoyé par le moteur comme à l'envoi ; vide : plus de titre ; signal « rename » ; reçu refusé", async () => {

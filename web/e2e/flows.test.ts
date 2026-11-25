@@ -69,7 +69,7 @@ describe("création puis ouverture (texte, image 300 Kio, fichier 5 Mio)", () =>
     const o = await openShare(r.link, PW, srv().origin, (d, t) => dl.push([d, t]));
     // À l'ouverture : en-tête et manifeste, lus ensemble (A4) ; la note, déchiffrée dès
     // l'ouverture (D41-37), est dans un de ces deux segments, gardés (A3) : aucune lecture de plus.
-    // Les deux lectures partent ensemble : l'ordre des rappels varie (CI du 18 novembre).
+    // Les deux lectures partent ensemble : l'ordre des rappels varie (CI).
     expect([...dl].sort((x, y) => x[0] - y[0])).toEqual([[1, 3], [3, 3]]);
     expect(o.manifest.items.map((e) => [e.kind, e.name, e.mime])).toEqual([
       ["text", "", "text/plain"],
@@ -89,7 +89,7 @@ describe("création puis ouverture (texte, image 300 Kio, fichier 5 Mio)", () =>
   });
 });
 
-// Nom du partage (19 novembre) : écrit dans le manifeste chiffré, nettoyé par le moteur, relu
+// Nom du partage : écrit dans le manifeste chiffré, nettoyé par le moteur, relu
 // tel quel à l'ouverture ; sans nom, rien ; trop long, refusé avant toute requête de finalisation.
 describe("nom du partage : aller-retour chiffré", () => {
   const srv = useServer();
@@ -162,7 +162,7 @@ describe("gestion : shareStatus et destruction", () => {
     await expect(shareStatus(r.manage, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
     await expect(destroyShare(r.manage, srv().origin, {})).rejects.toBeInstanceOf(NotFoundError);
   });
-  it("destruction par un destinataire : seulement la dernière ouverture, octroi exigé (audit du 20 novembre)", async () => {
+  it("destruction par un destinataire : seulement la dernière ouverture, octroi exigé", async () => {
     const r = await share(srv(), [textItem("b")], 2);
     // Lien + mot de passe sans ouverture : pas d'octroi, refusé (seul l'expéditeur détruit ainsi).
     await expect(destroyShare(r.link, srv().origin, { password: PW })).rejects.toBeInstanceOf(GrantInvalidError);
@@ -183,7 +183,7 @@ describe("gestion : shareStatus et destruction", () => {
     expect(await shareStatus(r.manage, srv().origin)).toMatchObject({ opensUsed: 1, state: "draining" });
     // destroyShare (lien + mot de passe) relit meta : impossible en « draining ».
     await expect(destroyShare(r.link, srv().origin, { password: PW })).rejects.toBeInstanceOf(NotFoundError);
-    expect(await o.report(2)).toBe(true); // une voix sur une ouverture permise : effacé (20 novembre)
+    expect(await o.report(2)).toBe(true); // une voix sur une ouverture permise : effacé
     await expect(shareStatus(r.manage, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
     await expect(o.destroy()).rejects.toBeInstanceOf(NotFoundError);
     o.wipe();

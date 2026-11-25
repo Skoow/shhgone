@@ -1,16 +1,16 @@
 <script lang="ts">
-  // Bloc compact des offres de la page d'envoi (retours du propriétaire du 12 novembre, remplace
+  // Bloc compact des offres de la page d'envoi (remplace
   // la ligne « Plus de place et de durée avec Plus et Pro, bientôt ») : Gratuit, Plus, Pro, avec
   // trois limites chacun, lues dans les constantes (CONTENT_MAX, PAID…), jamais écrites dans les
   // textes ; « bientôt » et un lien vers /offres. Rien n'est en vente : ni prix, ni bouton
   // d'achat, ni adresse demandée (D41-16). Plus et Pro ouvrent leur feuille d'information sur
   // place (`onpaid`, la liste reste). `newTab` : la liste en cours serait perdue en quittant la
   // page, la page des offres s'ouvre alors dans un nouvel onglet.
-  // `cards` (accueil, refonte du 12 novembre) : trois grandes cartes, chacune un lien vers
+  // `cards` (accueil) : trois grandes cartes, chacune un lien vers
   // /offres (« → ») ; le titre est celui de la section de l'accueil.
-  // Cartes de l'accueil (retours du propriétaire du 15 novembre) : le prix prévu (« bientôt »,
+  // Cartes de l'accueil : le prix prévu (« bientôt »,
   // lu dans PAID) et le sens de chaque chiffre (taille par partage, durée, ouvertures).
-  // MODIFIE D41-16 (« ni prix » hors de /offres) à la demande du propriétaire : toujours rien en
+  // MODIFIE D41-16 (« ni prix » hors de /offres) : toujours rien en
   // vente, ni bouton d'achat ni adresse demandée ; le prix est dit « prévu » et « bientôt ».
   import { followLink, href } from "../app/router.svelte";
   import { formatBytes, formatDuration } from "../i18n/format";
@@ -58,13 +58,13 @@
           </span>
           <span class="dt num" data-details>
             {#each details(x) as d (d.k)}<span class="dr"><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></span>{/each}
-            <!-- Appels des salons (20 novembre) : une ligne de l'offre ; Plus et Pro : inclus, avec
+            <!-- Appels des salons : une ligne de l'offre ; Plus et Pro : inclus, avec
                  « bientôt » tant qu'ils ne sont pas ouverts ; Gratuit : non inclus. -->
             <span class="dr" data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}</span></span>
           </span>
-          <!-- Plus de flèche ronde (retours du propriétaire du 17 novembre) : un bouton texte en bas
+          <!-- Plus de flèche ronde : un bouton texte en bas
                de la carte ; toute la carte reste le lien. -->
-          <!-- Gratuit : pas de « Voir l'offre » (17 novembre), c'est l'offre en cours. -->
+          <!-- Gratuit : pas de « Voir l'offre », c'est l'offre en cours. -->
           {#if x !== "free"}<span class="go">{t("offers.card.cta")}<ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" /></span>{/if}
         </a>
       </li>
@@ -296,7 +296,7 @@
     background: linear-gradient(180deg, rgb(18 27 64 / 0.85), rgb(10 15 30 / 0.9));
     box-shadow: inset 0 0 0 1px rgb(52 97 255 / 0.55);
   }
-  /* Nom et prix centrés (retours du propriétaire du 17 novembre), comme sur la page Offres. */
+  /* Nom et prix centrés, comme sur la page Offres. */
   .big .nm,
   .big .pr {
     justify-content: center;
@@ -341,7 +341,7 @@
   }
   .dr {
     display: flex;
-    /* « bientôt (pas encore disponible) » (24 novembre) : passe à la ligne plutôt que déborder. */
+    /* « bientôt (pas encore disponible) » : passe à la ligne plutôt que déborder. */
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 0 var(--sp-3);
@@ -360,7 +360,7 @@
     color: var(--text-3);
     font-weight: 500;
   }
-  /* « Voir l'offre › » en bas de la carte, sur toute sa largeur (17 novembre). */
+  /* « Voir l'offre › » en bas de la carte, sur toute sa largeur. */
   .go {
     display: flex;
     align-items: center;

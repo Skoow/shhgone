@@ -230,7 +230,7 @@ describe("vecteurs salon-v3.json rejoués par le module WebAssembly", () => {
     for (const c of V.empreinte as Cas[]) expect(S.codeVerification(unhex(c.public_key)), c.label).toBe(c.code);
   });
 
-  it("rôle du créateur (14 novembre) : clé publique de rôle, son code, jeton de gestion montré au serveur", () => {
+  it("rôle du créateur : clé publique de rôle, son code, jeton de gestion montré au serveur", () => {
     expect(V.role.length).toBe(5);
     for (const c of V.role as Cas[]) {
       const sg = unhex(c.s_gestion);
@@ -298,7 +298,7 @@ describe("groupe en trames (I1, I2, M4, M5)", () => {
   });
 });
 
-describe("exclusion, rotation de l'invitation, refondation (audit adverse du 13 novembre : F1 à F4)", () => {
+describe("exclusion, rotation de l'invitation, refondation (F1 à F4)", () => {
   const n = (s: number) => new Uint8Array(16).fill(s + 1);
   const texteDe = (x: string) => ({ heureMs: 1, regle: 0 as const, message: { k: "texte" as const, x } });
 
@@ -343,7 +343,7 @@ describe("exclusion, rotation de l'invitation, refondation (audit adverse du 13 
     c.marquerExclu(2, 1);
     a.marquerExclu(2, 1);
     expect(a.aRetirer()).toEqual([2]);
-    // Relecture du 13 novembre : une nouvelle annonce sur le siège n'efface pas la marque, et la
+    // Relecture : une nouvelle annonce sur le siège n'efface pas la marque, et la
     // clé des appels suit les refus de l'envoi.
     a.annoncer(2, new Uint8Array(16).fill(0xee));
     expect(a.aRetirer()).toEqual([2]);
@@ -378,7 +378,7 @@ describe("exclusion, rotation de l'invitation, refondation (audit adverse du 13 
     for (const y of [...r.m, cles]) y.free();
   });
 
-  it("créateur rechargé (14 novembre) : même clé de rôle tirée de S_gestion, rôle rendu dès le Commit qui l'ajoute, signalé à tous, même code de vérification", () => {
+  it("créateur rechargé : même clé de rôle tirée de S_gestion, rôle rendu dès le Commit qui l'ajoute, signalé à tous, même code de vérification", () => {
     const cles = S.clesSalon(new Uint8Array(32).fill(11), new Uint8Array(32).fill(12));
     const { r, tous } = trio(cles);
     const code = r.m[1]!.empreinte(0);
@@ -438,7 +438,7 @@ describe("exclusion, rotation de l'invitation, refondation (audit adverse du 13 
     expect(errorOf(() => r.m[0]!.envoyer(cles, { heureMs: 2, regle: 0, message: { k: "rotation", n: 2, cle } }))).toBe("rotation_refusee");
     const { trame } = r.m[0]!.envoyer(cles, { heureMs: 2, regle: 0, message: { k: "rotation", n: 1, cle } });
     expect(S.lireEnTete(trame)).toEqual({ volatile: false, regle: 0 });
-    // Une seule rotation en vol (14 novembre) : pas de seconde avant l'écho de la première.
+    // Une seule rotation en vol : pas de seconde avant l'écho de la première.
     expect(errorOf(() => r.m[0]!.envoyer(cles, { heureMs: 3, regle: 0, message: { k: "rotation", n: 1, cle: cle0 } }))).toBe("rotation_refusee");
     const [echo, recue] = tous(trame, 0);
     // Écho chez le créateur : les membres l'ont acceptée, il peut refonder.
@@ -502,7 +502,7 @@ describe("frontières du module", () => {
     expect(errorOf(() => S.codeVerification(new Uint8Array(31)))).toBe("argument_invalide");
     for (const siege of [256, -1, 0.5, NaN]) expect(errorOf(() => S.Salon.creer(siege, new Uint8Array(16), cles, true, SG))).toBe("argument_invalide");
     expect(errorOf(() => S.Salon.creer(0, new Uint8Array(15), cles, true, SG))).toBe("argument_invalide");
-    // 14 novembre : créer le groupe exige S_gestion (clé de rôle), de 32 octets.
+    // Créer le groupe exige S_gestion (clé de rôle), de 32 octets.
     expect(errorOf(() => S.Salon.creer(0, new Uint8Array(16), cles, true))).toBe("argument_invalide");
     expect(errorOf(() => S.Salon.creer(0, new Uint8Array(16), cles, true, new Uint8Array(31)))).toBe("argument_invalide");
     expect(errorOf(() => S.jetonGestion(new Uint8Array(33)))).toBe("argument_invalide");

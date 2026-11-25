@@ -1,5 +1,5 @@
-// Nettoyage des métadonnées (spec §35.2, Task 9a ; décision du propriétaire du 8 novembre,
-// D41-23 ; présentation D41-34 ; depuis le 12 novembre, seulement au balai ou par « Tout
+// Nettoyage des métadonnées (spec §35.2, ;
+// D41-23 ; présentation D41-34 ; seulement au balai ou par « Tout
 // nettoyer », plus de réglage automatique) : 2ᵉ ligne de la bulle du cadenas (« Nettoyé : … »,
 // « Fichier tel quel », « Nettoyage impossible : … »), étincelle ou pastille ambre sur la ligne,
 // envoi sans clic, résumé des échecs près d'Envoyer, rien de nettoyé à l'ajout, photo reçue sans
@@ -15,7 +15,7 @@ import { cleanAll, openFilePicker, sendButton } from "./send-helpers";
 test.use({ locale: "fr-FR" });
 
 const FX = (n: string) => readFileSync(fileURLToPath(new URL(`../src/media/fixtures/${n}`, import.meta.url)));
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-9a/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/9a/", import.meta.url));
 const MARKERS = /ReperMake|ReperModel|ReperXMP|ReperSecond|ReperMotion|2001:02:03/;
 const row = (page: Page, name: string) => page.locator("[data-row]").filter({ hasText: name });
 /** Bouton du cadenas de la ligne : son nom porte les deux lignes de la bulle (D41-34). */
@@ -102,8 +102,7 @@ test("états à l'écran (D41-34) après « Tout nettoyer » : nettoyé (photo, 
   await expect(lock(page, "devis")).toHaveAccessibleName(detail("Nettoyé : propriétés du document retirées (auteur, logiciel, dates)"));
   await expect(fail("signe")).toBeVisible();
   await expect(lock(page, "signe")).toHaveAccessibleName(detail("Nettoyage impossible : fichier signé ou protégé"));
-  // Image d'un format que le nettoyage ne lit pas (décision du 10 novembre ; dit dès l'ajout
-  // depuis le 12 novembre) : pastille ambre, sans balai.
+  // Image d'un format que le nettoyage ne lit pas (dit dès l'ajout) : pastille ambre, sans balai.
   await expect(fail("dessin")).toBeVisible();
   await expect(lock(page, "dessin")).toHaveAccessibleName(detail("Nettoyage impossible : format non pris en charge"));
   await expect(row(page, "dessin").getByRole("button", { name: /^Nettoyer ce fichier/ })).toHaveCount(0);
@@ -117,7 +116,7 @@ test("états à l'écran (D41-34) après « Tout nettoyer » : nettoyé (photo, 
   // Aucun choix à faire : plus de bouton, envoi permis, résumé discret près d'Envoyer.
   await expect(page.getByRole("button", { name: /^Envoyer tel quel/ })).toHaveCount(0);
   await expect(page.locator("#send-reason").filter({ visible: true })).toHaveCount(0);
-  // Deux décomptes (audit D5) : abime.jpg et signe.pdf ont échoué ; dessin.svg n'est pas lu.
+  // Deux décomptes : abime.jpg et signe.pdf ont échoué ; dessin.svg n'est pas lu.
   await expect(page.locator("[data-unclean-sum]").filter({ visible: true }).locator("span")).toHaveText(["2\u202ffichiers n'ont pas pu être nettoyés", "1\u202ffichier ne peut pas être nettoyé (format non pris en charge)"]);
   await expect(sendButton(page).filter({ visible: true })).toBeEnabled();
   // Chacun part dès l'ajout (une requête d'envoi par petit élément), puis la version nettoyée
@@ -127,7 +126,7 @@ test("états à l'écran (D41-34) après « Tout nettoyer » : nettoyé (photo, 
   if (isMobile) await page.screenshot({ path: `${SHOTS}compose-clean-states-390.png` });
 });
 
-test("document Word avec auteur (Task 9b, D41-27) : « Nettoyé » au balai, aucune remarque, reçu sans propriétés ; commentaires intacts", async ({ page, shh, browser }) => {
+test("document Word avec auteur (-27) : « Nettoyé » au balai, aucune remarque, reçu sans propriétés ; commentaires intacts", async ({ page, shh, browser }) => {
   test.setTimeout(120_000);
   const doc = { name: "rapport.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", buffer: FX("meta.docx") };
   const s = await freshPage(browser);
@@ -157,7 +156,7 @@ test("document Word avec auteur (Task 9b, D41-27) : « Nettoyé » au balai, auc
   expect(doc.buffer.toString("latin1")).toMatch(/ReperAuteur/);
 });
 
-test("rien n'est nettoyé à l'ajout (plus de réglage, décision du propriétaire du 12 novembre) : « Fichier tel quel » dans la bulle, rien sur la ligne, rien de modifié", async ({ page, shh }) => {
+test("rien n'est nettoyé à l'ajout (plus de réglage) : « Fichier tel quel » dans la bulle, rien sur la ligne, rien de modifié", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   await expect(page.locator("footer[data-foot]").getByRole("switch")).toHaveCount(0);
   await (await openFilePicker(page)).setFiles({ name: "IMG_GPS.jpg", mimeType: "image/jpeg", buffer: FX("iphone-like.jpg") });

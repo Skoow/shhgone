@@ -35,7 +35,7 @@ describe("limites : 200 éléments (toutes formules), 2 Go gratuits", () => {
 
   it("accueil : ligne de preuves, en français et en anglais", () => {
     show(Home);
-    // Ligne du héros (la carte de dépôt « Jusqu'à 2 Go au total » est retirée, 18 novembre).
+    // Ligne du héros (la carte de dépôt « Jusqu'à 2 Go au total » est retirée).
     expect(document.querySelector("[data-ctas] .bx-s")!.textContent).toMatch(/2\sGo au total/);
     setLang("en");
     flushSync();

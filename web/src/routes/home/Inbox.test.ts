@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Accueil connecté (conception compte §21.7, §21.15.1 ; plan, lot 12) : une seule liste lue sur
+// Accueil connecté (conception compte §21.7, §21.15.1) : une seule liste lue sur
 // l'appareil, sans requête au chargement ; filtres Tout / Salons / Reçus / Envoyés ; tri par
 // activité ; « Expiré » ; « Rouvrir ici compte une ouverture » ; retrait au clavier ; relecture
 // d'une entrée au plus une fois toutes les 5 min ; état vide, bandeaux de récupération et de coffre.

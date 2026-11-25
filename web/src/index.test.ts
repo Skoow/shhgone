@@ -1,4 +1,4 @@
-// L'interface publique n'expose ni la couche HTTP ni les dérivations de clés (audit M1).
+// L'interface publique n'expose ni la couche HTTP ni les dérivations de clés.
 import { describe, expect, it } from "vitest";
 import * as pub from "./index";
 
@@ -11,14 +11,14 @@ describe("interface publique", () => {
         // Codes des catégories de signalement (conception compte §21.10.1) : constantes, aucun secret.
         "CATEGORIES",
         "CATEGORIE_AUTRE",
-        // Empreinte SHA-256 d'un fichier, calculée sur l'appareil (16 novembre) : rien de secret n'en sort.
+        // Empreinte SHA-256 d'un fichier, calculée sur l'appareil : rien de secret n'en sort.
         "fileSha256",
-        // Nom du partage (19 novembre) : nettoyage d'un texte de l'expéditeur, aucun secret.
+        // Nom du partage : nettoyage d'un texte de l'expéditeur, aucun secret.
         "cleanTitle",
         "TITLE_MAX",
         "GrantInvalidError",
         "ReopenLimitError",
-        // Destruction par un destinataire avant la dernière ouverture (20 novembre).
+        // Destruction par un destinataire avant la dernière ouverture.
         "StillOpenError",
         "grantTag",
         "CHUNK",
@@ -74,7 +74,7 @@ describe("interface publique", () => {
         "openShare",
         "parseLink",
         "prepareCaptcha",
-        // Plan du compte, lot 10 : champs anti-robot des routes du compte (même preuve qu'un partage).
+        // Champs anti-robot des routes du compte (même preuve qu'un partage).
         "proofForm",
         "PREPARED_MIN_LEFT_MS",
         "shareLink",

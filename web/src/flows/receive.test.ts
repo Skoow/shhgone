@@ -178,7 +178,7 @@ describe("createReceiver (UI §9.7)", () => {
     expect(o.r.state).toBe("invalid");
   });
 
-  it("audit web D3 : CorruptError à l'ouverture → « corrupt » (jamais « invalid »), lien oublié", async () => {
+  it("CorruptError à l'ouverture → « corrupt » (jamais « invalid »), lien oublié", async () => {
     const { r } = setup({ openShare: vi.fn(async () => Promise.reject(new CorruptError())) });
     await flush();
     await r.unlock(PW);
@@ -340,7 +340,7 @@ describe("rechargement et autres onglets (spec §41.4, UI §9.7.1)", () => {
     expect([r.state, r.error, r.attemptsLeft]).toEqual(["reopen", "bad_password", 4]);
   });
 
-  // Audit M2 : Chromium écrit sessionStorage sur le disque et le restaure avec l'onglet
+  // Chromium écrit sessionStorage sur le disque et le restaure avec l'onglet
   // fermé (type de navigation « back_forward », constaté par persist.spec.ts). Hors
   // rechargement, l'entrée ne vaut que 2 min après la dernière sortie de page.
   it.each([
@@ -479,7 +479,7 @@ describe("rechargement et autres onglets (spec §41.4, UI §9.7.1)", () => {
     expect(returns.m.size).toBe(0);
   });
 
-  it("audit R2 : « Oublier ce partage sur cet appareil » sur le contenu ouvert : retour gardé et entrée de l'onglet effacés, plus de réponse aux autres onglets ; le contenu reste affiché", async () => {
+  it("« Oublier ce partage sur cet appareil » sur le contenu ouvert : retour gardé et entrée de l'onglet effacés, plus de réponse aux autres onglets ; le contenu reste affiché", async () => {
     const store = memStore();
     const stop = vi.fn();
     const { r, returns } = setup({ grants: store, answerTabs: () => stop });
@@ -501,7 +501,7 @@ describe("rechargement et autres onglets (spec §41.4, UI §9.7.1)", () => {
     expect(returns.save).toHaveBeenCalledTimes(1);
   });
 
-  it("audit R2 : « Impossible de revenir » (return_lost) a déjà tout oublié : aucun lien d'oubli n'y servirait", async () => {
+  it("« Impossible de revenir » (return_lost) a déjà tout oublié : aucun lien d'oubli n'y servirait", async () => {
     const store = memStore();
     const returns = memReturns({ [TAG]: GRANT });
     const { r } = setup({ grants: store, returns, fetchMeta: vi.fn(async () => Promise.reject(new NotFoundError())) });
@@ -542,7 +542,7 @@ describe("rechargement et autres onglets (spec §41.4, UI §9.7.1)", () => {
     }
   });
 
-  it("revue D42-22 : refus d'octroi sur un partage sans ouverture restante → return_lost (limite dite), jamais « déverrouiller en utilisera une nouvelle »", async () => {
+  it("D42-22 : refus d'octroi sur un partage sans ouverture restante → return_lost (limite dite), jamais « déverrouiller en utilisera une nouvelle »", async () => {
     for (const [err, code] of [[new ReopenLimitError(), "reopen_limit"], [new GrantInvalidError(), "grant_invalid"]] as const) {
       const returns = memReturns({ [TAG]: GRANT });
       const { r } = setup({ returns, fetchMeta: vi.fn(async () => ({ expiresInS: 3600, opensLeft: 0 })), openShare: vi.fn(async () => Promise.reject(err)) });
@@ -555,7 +555,7 @@ describe("rechargement et autres onglets (spec §41.4, UI §9.7.1)", () => {
     }
   });
 
-  it("revue D42-22 : l'état « open » n'arrive qu'une fois le retour écrit", async () => {
+  it("D42-22 : l'état « open » n'arrive qu'une fois le retour écrit", async () => {
     let done!: () => void;
     const returns = memReturns();
     returns.save.mockImplementation(() => new Promise<undefined>((ok) => (done = () => ok(undefined))));
@@ -590,7 +590,7 @@ describe("rechargement et autres onglets (spec §41.4, UI §9.7.1)", () => {
     expect(waits.every((ms) => ms === 2000)).toBe(true);
   });
 
-  it("revue D42-22 : un retour qui n'arrive pas à s'écrire n'empêche pas l'ouverture", async () => {
+  it("D42-22 : un retour qui n'arrive pas à s'écrire n'empêche pas l'ouverture", async () => {
     const returns = memReturns();
     returns.save.mockImplementation(async () => Promise.reject(new Error("idb")));
     const { r } = setup({ returns });
@@ -650,7 +650,7 @@ describe("rechargement et autres onglets (spec §41.4, UI §9.7.1)", () => {
 });
 
 
-describe("audit M2 : écran quitté pendant le déverrouillage ou la lecture", () => {
+describe("écran quitté pendant le déverrouillage ou la lecture", () => {
   it("forget() pendant unlock : rien n'est gardé (ni octroi, ni contenu, ni minuterie), les clés sont effacées", async () => {
     let release!: (o: Opened) => void;
     const done = vi.fn(async () => undefined);
@@ -683,7 +683,7 @@ describe("audit M2 : écran quitté pendant le déverrouillage ou la lecture", (
   });
 });
 
-describe("audit M2 : dispose (écran démonté)", () => {
+describe("dispose (écran démonté)", () => {
   it("contenu affiché : entrée de l'onglet gardée (retour, rechargement), minuteries arrêtées", async () => {
     const t = setup();
     await flush();
@@ -703,10 +703,10 @@ describe("audit M2 : dispose (écran démonté)", () => {
   });
 });
 
-// Conception compte §21.7 (plan, lot 11) : ouverture réussie → entrée « reçu » de l'historique
+// Conception compte §21.7 : ouverture réussie → entrée « reçu » de l'historique
 // de l'appareil si la case « Garder » est cochée (selon le réglage) ; décochée → rien. Le lien
 // passe par valeur, jamais le mot de passe ; « Oublier ce partage sur cet appareil » l'oublie aussi.
-describe("garder le partage reçu (lot 11)", () => {
+describe("garder le partage reçu", () => {
   it("case cochée (réglage) : après l'ouverture, le lien et l'échéance sont gardés, jamais le mot de passe", async () => {
     const keepReceived = vi.fn(async () => undefined);
     const { r, opened } = setup({ keepReceived, keepDefault: () => true });

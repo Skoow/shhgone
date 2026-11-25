@@ -3,7 +3,7 @@
 // d'injection de script (innerHTML, script.src, new Worker(url)…). Notre code n'écrit aucun
 // HTML ; Svelte a sa propre politique pour ses gabarits. Il reste les adresses de script que
 // nous créons nous-mêmes : elles passent par la politique « shhdrop », qui ne laisse passer que
-// nos fichiers de assets/ et les Blob de cette origine (décision du 10 novembre).
+// nos fichiers de assets/ et les Blob de cette origine.
 
 /** Vrai si `url` est un script de notre site (…/assets/….js) ou un Blob de notre origine. */
 export function allowedScriptUrl(url: string, origin: string): boolean {

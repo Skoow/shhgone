@@ -4,7 +4,7 @@
 // et du régime de TVA publié par le serveur (GET /api/paiement, aucun secret). Le serveur ne
 // garde ni identité, ni montant, ni pays, et n'apprend pas qu'une note a été faite.
 //
-// Mentions du vendeur qui dépendent du propriétaire (nom, adresse, SIREN, numéro de TVA,
+// Mentions du vendeur qui dépendent (nom, adresse, SIREN, numéro de TVA,
 // numéro de la série continue) : « [À COMPLÉTER] » tant qu'il ne les a pas fournies (conception
 // §13). Limite écrite : une série de numéros continue exige un registre tenu par le vendeur ;
 // la note porte une référence unique tirée sur l'appareil, pas un numéro de cette série.
@@ -16,7 +16,7 @@
 import { PAID } from "../limits";
 import type { Moyen, OffrePayante, Tva } from "./api";
 
-/** Mentions du vendeur fournies par le propriétaire (conception §13) ; « [À COMPLÉTER] » sinon. */
+/** Mentions du vendeur fournies par (conception §13) ; « [À COMPLÉTER] » sinon. */
 export const VENDEUR = {
   nom: "[À COMPLÉTER : nom ou dénomination du vendeur]",
   adresse: "[À COMPLÉTER : adresse du vendeur]",

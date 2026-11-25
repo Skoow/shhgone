@@ -10,7 +10,7 @@ const go = (f: string) => readFileSync(new URL(`../../server/internal/${f}`, imp
 describe("limites : mêmes valeurs côté serveur (Go)", () => {
   const service = go("share/service.go");
   const sizing = go("share/sizing.go");
-  it("audit M14 : partages par jour et envois en préparation à la fois, par connexion", () => {
+  it("partages par jour et envois en préparation à la fois, par connexion", () => {
     const lim = go("limits/limits.go");
     expect(/CreatesPer64\s*=\s*(\d+)/.exec(lim)?.[1]).toBe(String(CREATES_PER_DAY));
     expect(/PendingPer64\s*=\s*(\d+)/.exec(lim)?.[1]).toBe(String(PENDING_MAX));
@@ -20,7 +20,7 @@ describe("limites : mêmes valeurs côté serveur (Go)", () => {
     expect(/maxAttempts\s*=\s*(\d+)/.exec(service)?.[1]).toBe(String(PW_TRIES));
   });
   it("ouvertures : 1 à MAX_OPENS", () => {
-    // Formules payantes (19 novembre) : la borne vient de la formule ; gratuit : MaxOpens.
+    // Formules payantes : la borne vient de la formule ; gratuit : MaxOpens.
     expect(service).toContain("r.MaxOpens < 1 || r.MaxOpens > t.MaxOpensOf() ||");
     const tier = readFileSync(new URL("../../server/internal/share/tier.go", import.meta.url), "utf8");
     expect(tier).toMatch(/func \(t Tier\) MaxOpensOf\(\) int \{[\s\S]*?\n\treturn MaxOpens\n\}/);
@@ -61,7 +61,7 @@ describe("limites : mêmes valeurs côté serveur (Go)", () => {
   });
 });
 
-describe("durées de capture (décision du 8 novembre)", () => {
+describe("durées de capture", () => {
   it("gratuit 5 min / 30 min ; Plus 15 min / 2 h ; Pro 30 min / 2 h ; seule la limite gratuite s'applique", async () => {
     const { CAPTURE_MAX_S, CAPTURE_TIER } = await import("./limits");
     expect(CAPTURE_MAX_S).toEqual({ free: { video: 300, voice: 1800 }, plus: { video: 900, voice: 7200 }, pro: { video: 1800, voice: 7200 } });

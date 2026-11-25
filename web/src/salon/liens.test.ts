@@ -1,5 +1,5 @@
 // Liens du salon (liens.ts) : lecture du fragment, et détection d'un lien de gestion dans un texte
-// tapé ou collé dans la conversation (exigence C-3 32 : il ne part jamais dans un message).
+// tapé ou collé dans la conversation (32 : il ne part jamais dans un message).
 import { describe, expect, it } from "vitest";
 import { b64u } from "../engine/pure";
 import { lienGestionDans, lienSalon } from "./liens";

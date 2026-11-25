@@ -1,4 +1,4 @@
-// WAV (spec §35.2, Task 9c, technique 3) : seuls les blocs « fmt », « fact », « cue » et
+// WAV (spec §35.2) : seuls les blocs « fmt », « fact », « cue » et
 // « data » sont gardés (recopiés tels quels, « data » par tranche du Blob) ; LIST/INFO, bext
 // (auteur, date, UMID), iXML, axml, « id3 », _PMX (XMP), cart et tout autre bloc retirés ; taille
 // RIFF corrigée ; ce qui suit la fin RIFF est retiré. RF64, tailles incohérentes → `Malformed`.

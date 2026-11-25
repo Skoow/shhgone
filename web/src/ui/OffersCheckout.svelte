@@ -1,17 +1,17 @@
 <script lang="ts">
-  // Page Offres (décision du propriétaire du 16 novembre) : une seule présentation des offres,
+  // Page Offres : une seule présentation des offres,
   // sans redite. On choisit la facturation (mensuelle ou annuelle), puis son offre (Plus ou Pro ;
   // Gratuit est l'offre en cours, rien à choisir) ; un récapitulatif dit le prix et les moyens de
   // paiement. Chiffres lus dans PAID et limits.ts.
   //
-  // Paiement (conception du paiement, 19 novembre) : le bouton n'est actif que si CE serveur
+  // Paiement (conception du paiement) : le bouton n'est actif que si CE serveur
   // propose le moyen choisi (GET /api/paiement ; démo, serveur sans paiement : inactif, la raison
   // est dite), le pays (UE) choisi, le rythme de l'annuel choisi (jamais présélectionné) et la
   // case de renonciation cochée (jamais précochée, §38.1). Au clic : un pass P est tiré et rangé
   // sur l'appareil AVANT la commande, puis la page hébergée du prestataire s'ouvre (redirection,
   // aucun script tiers ici). Rien n'est payé sur Shhgone.
   //
-  // Preuve anti-robot (audit du 20 novembre, S2) : la commande porte une preuve de travail ALTCHA
+  // Preuve anti-robot : la commande porte une preuve de travail ALTCHA
   // (défi lu et calculé dans son Worker dès que le bouton peut servir, comme les pages du compte) ;
   // aucun repli tiers ici (le pass est sur cette page).
   import { formatBytes, formatDuration } from "../i18n/format";
@@ -26,7 +26,7 @@
   import Banner from "./Banner.svelte";
 
   type Billing = "month" | "year";
-  // Mensuel sélectionné par défaut (décision du propriétaire du 16 novembre).
+  // Mensuel sélectionné par défaut.
   let billing = $state<Billing>("month");
   let chosen = $state<PaidTier | null>(null);
   const uid = $props.id();
@@ -45,15 +45,15 @@
   ];
   const price = (x: PaidTier) => (billing === "month" ? PAID[x].month : PAID[x].year);
   const per = $derived(billing === "month" ? t("offers.per.month") : t("offers.per.year"));
-  // Moyen de paiement (propriétaire, 18 et 19 novembre) : carte bancaire (Stripe), PayPal, crypto
+  // Moyen de paiement : carte bancaire (Stripe), PayPal, crypto
   // (NOWPayments). Noms de l'écran (clés de texte) → noms de l'API.
   type Means = "card" | "paypal" | "crypto";
   let means = $state<Means>("card");
   const TOUS: readonly Means[] = ["card", "paypal", "crypto"];
   const API: Readonly<Record<Means, Moyen>> = { card: "carte", paypal: "paypal", crypto: "crypto" };
-  // Appels des salons (19 novembre) : prévus, jamais vendus ni promis comme disponibles.
+  // Appels des salons : prévus, jamais vendus ni promis comme disponibles.
   // Ce que l'offre choisie ajoute au gratuit (lu dans PAID et limits.ts). Le départ du compte à
-  // rebours à la première ouverture n'est pas encore codé : dit « bientôt » (24 novembre).
+  // rebours à la première ouverture n'est pas encore codé : dit « bientôt ».
   const adds = $derived(
     chosen
       ? [
@@ -67,7 +67,7 @@
 
   // Offre de CE serveur (null : pas de paiement ici, ou pas encore lue). Une seule lecture par
   // affichage de la page. `ferme` : réponse reçue, paiement non ouvert (404, démo, injoignable) ;
-  // dit en tête de page et sur les boutons « Bientôt » (revue du 20 novembre, U12), plutôt qu'au
+  // dit en tête de page et sur les boutons « Bientôt », plutôt qu'au
   // bout du parcours seulement.
   let serveur = $state<OffreServeur | null>(null);
   let lue = $state(false);
@@ -80,7 +80,7 @@
     if (MEANS.length > 0 && !MEANS.includes(means)) means = MEANS[0]!;
   });
   // Une offre déjà gardée sur cet appareil (lecture locale seulement, aucune requête) : lien vers
-  // sa page (état, arrêt du renouvellement à tout moment, note de vente ; revue du 25 novembre :
+  // sa page (état, arrêt du renouvellement à tout moment, note de vente ; :
   // la résiliation n'était joignable qu'au retour du paiement).
   let mien = $state(false);
   $effect(() => {
@@ -104,7 +104,7 @@
   const renewAsked = $derived(billing === "year" && means !== "crypto");
   const renouvelle = $derived(means === "crypto" ? false : billing === "month" ? true : renew === "auto");
   let pays = $state("");
-  // Pays proposé d'avance (24 novembre), une fois la liste du serveur lue : deviné sur l'appareil
+  // Pays proposé d'avance, une fois la liste du serveur lue : deviné sur l'appareil
   // (fuseau horaire, langue), jamais envoyé avant la commande ; la personne le vérifie.
   let propose = false;
   $effect(() => {
@@ -191,7 +191,7 @@
   {#if mien}
     <p class="ferme mine" data-mine>{t("offers.mine")} <a href={href("/offres/retour")}>{t("offers.mine.link")}</a></p>
   {/if}
-  <!-- Mise en page « La trame », version 2 (propriétaire, 19 novembre) : étapes numérotées à
+  <!-- Mise en page « La trame », version 2 : étapes numérotées à
        gauche (offre et rythme, moyen de paiement, compte), récapitulatif à droite. -->
   <div class="main">
     <section class="blk" aria-labelledby="{uid}-s1">
@@ -199,7 +199,7 @@
       <fieldset class="tiers">
         <legend class="sr-only">{t("offers.choose.label")}</legend>
         {#each TIERS as x (x)}
-          <!-- Toute la carte choisit l'offre (propriétaire, 24 novembre) : clic n'importe où ; le
+          <!-- Toute la carte choisit l'offre : clic n'importe où ; le
                clavier passe par le bouton radio de la pastille, en haut à droite. -->
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <div class={["card", x, { on: chosen === x, pickable: x !== "free" }]} data-tier={x} onclick={x === "free" ? undefined : () => (chosen = x)}>
@@ -220,7 +220,7 @@
             {/if}
             <ul class="dt num">
               {#each details(x).slice(1) as d (d.k)}<li><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></li>{/each}
-              <!-- Appels des salons : Plus et Pro inclus (disponibles et réservés à ces offres depuis le 24 novembre), Gratuit non. -->
+              <!-- Appels des salons : Plus et Pro inclus (disponibles et réservés à ces offres), Gratuit non. -->
               <li data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}</span></li>
             </ul>
           </div>
@@ -244,7 +244,7 @@
           <p class="same"><Lock size={14} strokeWidth={2.2} aria-hidden="true" />{t("offers.adds.same")}</p>
         </div>
       {/if}
-      <!-- Prix affichés sans « TTC » à chaque ligne (17 novembre) : dit une fois ici. -->
+      <!-- Prix affichés sans « TTC » à chaque ligne : dit une fois ici. -->
       <p class="ttc" data-ttc>{t("offers.ttc")}</p>
     </section>
 
@@ -297,7 +297,7 @@
           <div><dt>{t("offers.means.title")}</dt><dd>{t(`offers.means.${means}`)}</dd></div>
           <div><dt>{t("offers.summary.total")}</dt><dd class="tot num">{eur(price(chosen))} <span>{per}</span></dd></div>
         </dl>
-        <!-- Réserve de partages payants (information obligatoire avant paiement, 25 novembre ;
+        <!-- Réserve de partages payants (information obligatoire avant paiement, ;
              mêmes chiffres que les Conditions de vente : PAID.shares = JetonsPeriod d'offres.go). -->
         <p class="sn" data-reserve>{t("offers.summary.reserve", { n: PAID[chosen].shares })}</p>
         <p class="sn">{means === "crypto" ? t("offers.summary.crypto") : billing === "month" ? t("offers.summary.month") : t("offers.summary.year")}</p>
@@ -495,7 +495,7 @@
     font-weight: 600;
     vertical-align: 1px;
   }
-  /* Carte cliquable en entier (24 novembre) ; pastille ronde en haut à droite : vide, puis
+  /* Carte cliquable en entier ; pastille ronde en haut à droite : vide, puis
      pleine et cochée quand l'offre est choisie. Zone de 44 px autour de la pastille. */
   .card.pickable .nm {
     padding-inline-end: 36px;

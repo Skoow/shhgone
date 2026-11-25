@@ -16,7 +16,7 @@ test("l'accueil se charge sous la CSP, sans violation ni requête tierce", async
 for (const p of ["/s/x", "/m/x"]) {
   test(`${p} : 404 de l'interface, sans X-Robots-Tag`, async ({ page, shh }) => {
     const res = await page.goto(shh.origin + p);
-    expect(res?.status()).toBe(404); // vrai statut (audit de performance, point 5)
+    expect(res?.status()).toBe(404); // vrai statut
     expect(res?.headers()["x-robots-tag"]).toBeUndefined();
     await expect(page.getByRole("heading", { name: /^(Cette page n'existe pas\.|This page does not exist\.)$/ })).toBeVisible();
   });
@@ -29,23 +29,23 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   const foot = page.locator("footer[data-foot]");
   await foot.scrollIntoViewIfNeeded();
   await expect(foot).toBeVisible();
-  // Ordinateur : trois colonnes titrées ; téléphone (retours du 15 novembre) : un seul bloc, les
+  // Ordinateur : trois colonnes titrées ; téléphone : un seul bloc, les
   // titres restent pour les lecteurs d'écran (chaque liste garde son nom).
   for (const c of ["Confiance", "Légal"]) {
     if (isMobile) await expect(foot.getByRole("list", { name: c })).toBeVisible();
     else await expect(foot.getByText(c, { exact: true })).toBeVisible();
   }
-  // Sans compte, plus de colonne « Produit » (17 novembre : « Offres » retiré du pied).
+  // Sans compte, plus de colonne « Produit » (« Offres » retiré du pied).
   await expect(foot.getByText("Produit", { exact: true })).toHaveCount(0);
   // Sans compte, pas de « Téléchargements » tant que l'historique n'est pas activé sur cet appareil
-  // (désactivé par défaut ; décision du propriétaire du 22 novembre, qui change celle du 15 novembre).
+  // (désactivé par défaut ; qui change celle).
   await expect(foot.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
-  // Plus d'« Envoyer », de « Mes partages » ni de « Salon » (16 novembre) : le logo et le menu y mènent.
+  // Plus d'« Envoyer », de « Mes partages » ni de « Salon » : le logo et le menu y mènent.
   for (const l of ["Envoyer", "Mes partages"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}$`) })).toHaveCount(0);
   await expect(foot.getByText(/^Salon/)).toHaveCount(0);
-  // Phrase de l'hébergeur de la démo (24 novembre) : dans la démo seulement.
+  // Phrase de l'hébergeur de la démo : dans la démo seulement.
   await expect(foot.locator("[data-demo-host]")).toHaveCount(0);
-  // Plus d'« Offres » ni de « Licence » (17 novembre) : la licence est dite sur GitHub.
+  // Plus d'« Offres » ni de « Licence » : la licence est dite sur GitHub.
   for (const l of ["Sécurité", "Confidentialité", "Open source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales"])
     await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toBeVisible();
   for (const l of ["Offres", "Licence"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toHaveCount(0);
@@ -58,18 +58,18 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   await expect(foot.getByText(/publicité/)).toHaveCount(0);
   await expect(foot.locator(".base .sig")).toHaveText(/^Shhgone\s*©\s2026$/);
   await expect(foot.locator("[data-build]")).toHaveText(/^Version ([0-9a-f]{7}|dev)$/);
-  // Ni langue ni nettoyage automatique (décision du propriétaire du 12 novembre) ; « À propos » reste.
+  // Ni langue ni nettoyage automatique ; « À propos » reste.
   await expect(foot.getByRole("combobox")).toHaveCount(0);
   await expect(foot.getByRole("group", { name: "Langue" })).toHaveCount(0);
   await expect(foot.getByRole("switch")).toHaveCount(0);
-  // Plus de « À propos » (pied B2, 18 novembre) : la phrase de la marque le dit déjà.
+  // Plus de « À propos » (pied B) : la phrase de la marque le dit déjà.
   await expect(foot.getByText("Shhgone chiffre sur votre appareil avant l'envoi.", { exact: false })).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(600); // fin des apparitions au défilement
   expect(await axe(page)).toEqual([]);
 });
 
-test("Téléchargements sans compte : dans le menu et le pied de page seulement une fois l'historique activé ici, retiré à la désactivation (22 novembre)", async ({ page, shh, isMobile }) => {
+test("Téléchargements sans compte : dans le menu et le pied de page seulement une fois l'historique activé ici, retiré à la désactivation", async ({ page, shh, isMobile }) => {
   const foot = page.locator("footer[data-foot]");
   const link = () => foot.getByRole("link", { name: /^Téléchargements/ });
   const menuHas = async (n: number) => {
@@ -114,7 +114,7 @@ test("référencement : robots.txt et sitemap.xml ; pages publiques indexées, p
   expect(map.status()).toBe(200);
   expect(map.headers()["content-type"]).toMatch(/xml/);
   const locs = [...(await map.text()).matchAll(/<loc>https:\/\/shhgone\.com([^<]*)<\/loc>/g)].map((m) => m[1]);
-  // Pages bilingues (20 novembre) : chaque page indexée et sa version « /en ».
+  // Pages bilingues : chaque page indexée et sa version « /en ».
   expect(locs).toEqual(["/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales"].flatMap((p) => [p, p === "/" ? "/en" : "/en" + p]));
   const meta = (n: string) => page.locator(`meta[name="${n}"]`);
   for (const p of locs) {
@@ -187,10 +187,10 @@ test("vitesse : JS et CSS servis compressés (brotli) ; fichiers à empreinte en
   expect(seen.map((s) => s.url.split(".").pop()).sort()).toEqual(["css", "js"]);
   for (const s of seen) {
     // WebKit sous Linux n'annonce brotli qu'en HTTPS : en HTTP (serveur de test), il reçoit la
-    // variante gzip, précompressée elle aussi (CI du 10 novembre). Les autres reçoivent brotli.
+    // variante gzip, précompressée elle aussi (CI). Les autres reçoivent brotli.
     expect(s.enc, s.url).toBe(browserName === "webkit" ? "gzip" : "br");
     // Le nom porte l'empreinte du contenu, et index.html (jamais en cache) fixe ce nom et son
-    // empreinte SRI : un fichier en cache ne peut pas être une autre version (10 novembre).
+    // empreinte SRI : un fichier en cache ne peut pas être une autre version.
     expect(s.cache, s.url).toBe("public, max-age=31536000, immutable");
   }
 });

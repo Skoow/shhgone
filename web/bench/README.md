@@ -4,7 +4,7 @@
 
 Le banc ne touche le moteur que par `api.ts` (interface neutre : `sealPacket`, `openPacket`, `deriveKey`). Changer de moteur = réécrire `api.ts` (et `vite.config.ts` si le chargement change).
 
-## Comparer avant et après (Task 13)
+## Comparer avant et après
 
 Le bruit d'une passe à l'autre dépasse 5 %, donc on alterne dans la même session, plusieurs tours :
 

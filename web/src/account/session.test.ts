@@ -410,7 +410,7 @@ describe("passkeys du compte", () => {
   });
 });
 
-describe("pseudo d'un invité du salon (22 novembre)", () => {
+describe("pseudo d'un invité du salon", () => {
   it("sans session ni salon : pris par un compte → non ; réservé → non sans requête ; libre → oui ; le sien → oui", async () => {
     await inscription();
     await C.seDeconnecter();

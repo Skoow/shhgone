@@ -1,4 +1,4 @@
-// Paiement (conception du paiement, 19 novembre) contre le vrai serveur avec SHH_PAIEMENT=1 (bacs à
+// Paiement (conception du paiement) contre le vrai serveur avec SHH_PAIEMENT=1 (bacs à
 // sable Stripe et NOWPayments, clés d'essai écrites par e2e/server.ts) : bouton actif seulement
 // quand le moyen est proposé, le rythme de l'annuel choisi, le pays choisi et la case cochée ; pass
 // dans X-Shh-Pass, jamais dans l'adresse ; redirection seulement vers la page hébergée ; page de
@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { axe, expect, test } from "./fixtures";
 
 test.use({ locale: "fr-FR", timezoneId: "Europe/Berlin", shhServer: { paiement: { webhookStripe: "whsec_e2e_test", ipnNOWPayments: "ipn-e2e" } } });
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-19-paiement/shots/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/paiement/", import.meta.url));
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 const PASS = /^[A-Za-z0-9_-]{43}$/;
 
@@ -18,7 +18,7 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(shh.origin + "/offres");
   const co = page.locator("[data-checkout]");
-  // Appels des salons (24 novembre) : Plus et Pro « Inclus », réservés à ces offres, sans
+  // Appels des salons : Plus et Pro « Inclus », réservés à ces offres, sans
   // « bientôt » ; Gratuit « Non inclus ».
   for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus$/);
   await expect(co.locator('[data-tier="free"] [data-calls]')).toHaveText(/^Appels audio et vidéo\s+Non inclus$/);
@@ -27,7 +27,7 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   const sum = co.locator("[data-summary]");
   const go = sum.locator("[data-pay]");
   const pourquoi = sum.locator("[data-wait]");
-  // Seuls les moyens de CE serveur sont montrés (revue du 25 novembre, conception §9.1) : PayPal
+  // Seuls les moyens de CE serveur sont montrés (conception §9.1) : PayPal
   // n'y est pas configuré, et la crypto n'est pas proposée sous SHH_TVA=oss.
   await expect(co.locator('[data-means="card"]')).toHaveCount(1);
   await expect(co.locator('[data-means="paypal"]')).toHaveCount(0);
@@ -36,7 +36,7 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   await expect(co.locator("[data-renew] input:checked")).toHaveCount(0);
   await expect(pourquoi).toHaveText("Choisissez paiement unique ou renouvellement automatique.");
   await co.locator("[data-renew]").getByText("Paiement unique").click();
-  // Pays proposé d'avance d'après le fuseau horaire de l'appareil (24 novembre), modifiable ;
+  // Pays proposé d'avance d'après le fuseau horaire de l'appareil, modifiable ;
   // vidé, il bloque de nouveau.
   await expect(co.locator("[data-pays]")).toHaveValue("DE");
   await co.locator("[data-pays]").selectOption("");
@@ -65,7 +65,7 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   await expect(sum.locator("[data-pay-error]")).toHaveText("Le prestataire de paiement ne répond pas. Rien n'a été prélevé ; réessayez plus tard.");
   expect(vus).toHaveLength(1);
   expect(vus[0]!.headers["x-shh-pass"]).toMatch(PASS);
-  // Preuve anti-robot calculée par la page (défi du vrai serveur, audit du 20 novembre, S2).
+  // Preuve anti-robot calculée par la page (défi du vrai serveur).
   expect(JSON.parse(vus[0]!.body!)).toEqual({ offre: "pro", jours: 365, renouvelle: false, moyen: "carte", pays: "DE", renonciation: true, altcha: expect.stringMatching(/^[A-Za-z0-9+/]+=*$/), hp: "", shown_at: expect.any(String) });
   expect(vus[0]!.url).toBe(shh.origin + "/api/paiement/commande");
   expect(vus[0]!.url + vus[0]!.body).not.toContain(vus[0]!.headers["x-shh-pass"]!);
@@ -91,7 +91,7 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   );
   // La page hébergée est demandée, puis rien n'est affiché (204 : le navigateur reste sur la
   // page) : sous WebKit, après une page d'une autre origine servie par route.fulfill, l'onglet
-  // ne navigue plus (« Assertion error » de Playwright, run CI 44666763368, reproduit en local) ;
+  // ne navigue plus (« Assertion error » de Playwright, run, reproduit en local) ;
   // un abort mène Chromium à une page d'erreur qui coupe la navigation suivante. La requête
   // suffit à la preuve.
   await page.route("https://checkout.stripe.com/**", (route) => route.fulfill({ status: 204 }));
@@ -166,7 +166,7 @@ test("Retour : reçu, puis arrêt du renouvellement ; en attente ; sans commande
 
 test("Le vrai serveur : GET /api/paiement, état d'un pass inconnu, webhook Stripe mal signé refusé", async ({ shh, request }) => {
   const o = await (await request.get(shh.origin + "/api/paiement")).json();
-  // Sous SHH_TVA=oss, la crypto n'est pas proposée (décision du 24 novembre, TestCryptoRefuseEnOSS).
+  // Sous SHH_TVA=oss, la crypto n'est pas proposée (TestCryptoRefuseEnOSS).
   expect(o).toEqual({ v: 1, moyens: ["carte"], pays: expect.arrayContaining(["DE", "FR"]), bientot: [], tva: { regime: "oss", taux: expect.objectContaining({ DE: 1900, FR: 2000 }) } });
   const pass = Buffer.alloc(32, 5).toString("base64url");
   const e = await request.post(shh.origin + "/api/paiement/etat", { headers: { "X-Shh-Pass": pass } });

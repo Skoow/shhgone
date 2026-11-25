@@ -165,7 +165,7 @@
       case "interrompu":
         return t("err.interrupted");
       case "limite": {
-        // La règle d'abord, puis l'attente (audit M14).
+        // La règle d'abord, puis l'attente.
         const duration = formatDuration(s.retryAfterS ?? 60, lang, { coarse: true });
         if (s.limitKind === "jour") return t("err.limit.day", { duration, n: CREATES_PER_DAY });
         if (s.limitKind === "en_cours") return t("err.limit.pending", { duration, n: PENDING_MAX });
@@ -179,6 +179,8 @@
         return s.captchaLocal ? t("err.captcha.local") : t("err.captcha");
       case "fichier_modifie":
         return t("err.changed", { name: items[s.failedItem ?? -1]?.name ?? "?" });
+      case "inclus":
+        return t("err.included");
       case "element":
         return t("err.element", { name: items[s.failedItem ?? -1]?.name ?? "?" });
       default:
@@ -212,7 +214,7 @@
   // ---------- Focus, fermeture du sceau ----------
   let heading: HTMLHeadingElement | undefined = $state();
   // L'écran remplace le composeur en haut de page : sinon, « Chiffrer et envoyer » appuyé en bas
-  // d'une longue liste laissait la capsule coupée sous l'en-tête (relevé du 19 novembre).
+  // d'une longue liste laissait la capsule coupée sous l'en-tête (relevé).
   $effect(() => {
     scrollTo({ top: 0, behavior: "instant" });
   });
@@ -221,7 +223,7 @@
   });
   let capsule: SealCapsule | undefined = $state();
   let closing = false;
-  // Fermeture du sceau jouée pendant la finalisation (D2, décision du 13 novembre) ; arrêtée si
+  // Fermeture du sceau jouée pendant la finalisation (D2) ; arrêtée si
   // l'envoi échoue ou est annulé. « Lien prêt » suit dès la fin de la fermeture.
   $effect(() => {
     if (phase === "finalize") void tick().then(() => capsule?.begin());
@@ -360,7 +362,7 @@
       {#if phase === "upload" && !s.canPause && !s.pausing}<p id="pause-why" class="why">{t("seal.pause.refused", { h: UPLOAD_WINDOW_MS / 3600_000 })}</p>{/if}
     {/if}
 
-    <!-- « Gardez cet onglet ouvert » seulement tant que l'envoi tourne (faible de l'audit). -->
+    <!-- « Gardez cet onglet ouvert » seulement tant que l'envoi tourne. -->
     <p class="foot"><CircleHelp size={18} strokeWidth={1.75} aria-hidden="true" /><span>{t("seal.padding")}{#if phase !== "error" && phase !== "cancelled" && phase !== "sealed"}{" "}{t("seal.keepOpen")}{/if}</span></p>
   </div>
 </section>

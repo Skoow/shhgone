@@ -1,7 +1,7 @@
 <script lang="ts">
   // Interrupteur (role="switch") : un vrai bouton, nommé par son libellé, décrit par sa ligne
   // d'aide. Pas une case à cocher (aucune case sur l'écran d'envoi, benchmark M1).
-  // `disabled` : sans effet (aria-disabled, gardé au clavier pour que sa raison se lise, audit M22) ;
+  // `disabled` : sans effet (aria-disabled, gardé au clavier pour que sa raison se lise) ;
   // `reason` : id de l'élément qui dit pourquoi.
   type Props = { label: string; hint?: string; checked: boolean; onchange: (v: boolean) => void; sub?: boolean; disabled?: boolean; reason?: string };
   let { label, hint, checked, onchange, sub = false, disabled = false, reason }: Props = $props();

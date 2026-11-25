@@ -4,7 +4,7 @@ import { arrive } from "./arrive";
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("arrive (audit I4)", () => {
+describe("arrive", () => {
   it("remonte en haut de page puis met le focus sur le titre, sans défilement de plus", () => {
     const scroll = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
     const h = document.createElement("h2");

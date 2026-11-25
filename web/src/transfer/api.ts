@@ -2,7 +2,7 @@
 // (X-Shh-Access, X-Shh-Manage) ou dans le corps, en base64url sans bourrage, jamais dans
 // l'URL. Aucun chemin ne porte d'identifiant (spec §29.8, §32) : le partage est désigné par
 // un jeton signé du serveur, par K_accès ou par S_gestion ; l'id dérivé du lien ne sort pas. `fetch` est injectable (tests : capture des requêtes, coupures simulées).
-// Les secrets ont des types marqués (engine/pure.ts) : K_lien ne peut pas être envoyé (audit M1).
+// Les secrets ont des types marqués (engine/pure.ts) : K_lien ne peut pas être envoyé.
 // Module interne : l'interface publique est src/index.ts, sans ce module.
 import { b64u, checkOrigin, unb64u, type KAcces, type KPreuve, type SGestion } from "../engine/pure";
 import { fetchUploader, xhrUploader, type Uploader } from "./upload";
@@ -272,7 +272,7 @@ export async function putSegment(
   data: Uint8Array<ArrayBuffer>,
   onBytes: (sent: number) => void,
   signal?: AbortSignal,
-  /** Plage de morceaux à partir du morceau `from` du segment (brouillon, audit H-2). */
+  /** Plage de morceaux à partir du morceau `from` du segment (brouillon). */
   from?: number,
 ): Promise<void> {
   const headers = { ...bearer(token), "Content-Type": "application/octet-stream" };
@@ -297,7 +297,7 @@ export type FinalizeBody = {
   bucket: number;
   header: string;
   tail: string;
-  /** Plages [début, fin) de morceaux de petits éléments retirés, remplies d'aléa (audit H-2). */
+  /** Plages [début, fin) de morceaux de petits éléments retirés, remplies d'aléa. */
   void?: [number, number][];
 };
 
@@ -357,7 +357,7 @@ export async function meta(c: Ctx, kAcces: KAcces, grant?: string): Promise<Meta
 }
 
 /**
- * Audit web D4 : bornes des valeurs du serveur, aux maxima de l'offre actuelle (gratuite :
+ * bornes des valeurs du serveur, aux maxima de l'offre actuelle (gratuite :
  * TTL_MAX_HOURS, OPENS_SEEN_MAX) ; marge de 15 min pour l'arrondi de l'échéance côté serveur.
  * Au-delà, la réponse est refusée : un serveur ne fait pas afficher « 27 777 h » ni « 999 999
  * ouvertures ». À relever avec les formules payantes (limits.ts, PAID), le jour où elles existent.
@@ -370,16 +370,16 @@ function expiresOf(o: Record<string, unknown>): number {
 }
 
 /** Un partage lisible a au moins une ouverture restante (ruling 5), sauf rouvert par octroi ;
- *  jamais plus que OPENS_SEEN_MAX (D4 ; un partage créé avant le 17 novembre peut en avoir 10). */
+ *  jamais plus que OPENS_SEEN_MAX (D4 ; un partage créé peut en avoir 10). */
 function opensLeft(n: number, reopen: boolean): number {
   if (n < (reopen ? 0 : 1) || n > OPENS_SEEN_MAX) throw new BadResponse();
   return n;
 }
 
 /**
- * last_open (revue D42-22) : entier 0 ou 1 exactement, tout le reste refusé (un booléen
+ * last_open (D42-22) : entier 0 ou 1 exactement, tout le reste refusé (un booléen
  * aussi : true et false n'ont pas la même longueur, que verrait un observateur du trafic
- * chiffré ; audit D2 du 12 novembre, spec §29.8). 1 seulement à 0 ouverture restante.
+ * chiffré ; spec §29.8). 1 seulement à 0 ouverture restante.
  */
 function lastOpenOf(o: Record<string, unknown>, left: number): boolean {
   const v = o["last_open"];
@@ -443,11 +443,11 @@ export async function done(c: Ctx, token: string): Promise<void> {
 }
 
 /**
- * GET /api/shares/watch (spec §41.8, route de la Task M2, étape 7b) : requête tenue 25 s au
+ * GET /api/shares/watch (spec §41.8, route de la, étape 7b) : requête tenue 25 s au
  * plus par le serveur. 204 → "alive" ; 410 {"error":"gone"} → "gone" ; 404 (serveur sans la
  * route) → "stop" : la surveillance s'arrête pour de bon ; toute autre réponse ou erreur
  * (429, 5xx, réseau coupé) → "retry" : passagère, la boucle de surveillance réessaie
- * (audit adverse 3, F2 : une seule requête perdue désarmait la révocation jusqu'à la
+ * (3, F2 : une seule requête perdue désarmait la révocation jusqu'à la
  * fermeture de la page). Annulable (signal).
  */
 export type WatchResult = "alive" | "gone" | "stop" | "retry";
@@ -464,8 +464,7 @@ export async function watch(c: Ctx, token: string, signal?: AbortSignal): Promis
 }
 
 /**
- * Destinataire : K_accès, K_preuve et l'octroi de son ouverture (toujours exigé, audit du
- * 20 novembre : seul le dernier destinataire détruit) ; expéditeur : S_gestion.
+ * Destinataire : K_accès, K_preuve et l'octroi de son ouverture (toujours exigé ; seul le dernier destinataire détruit) ; expéditeur : S_gestion.
  */
 export type DestroyAuth = { kAcces: KAcces; kPreuve: KPreuve; grant: string } | { sGestion: SGestion };
 
@@ -479,7 +478,7 @@ export const CATEGORIE_AUTRE: Categorie = 10;
 
 /**
  * Destinataire (K_accès + K_preuve) : POST /api/shares/destroy, corps `{"proof":…,"grant":…}` ;
- * seulement par la dernière ouverture (sinon 409 still_open, 20 novembre).
+ * seulement par la dernière ouverture (sinon 409 still_open).
  * Expéditeur (S_gestion) : POST /api/manage/destroy, S_gestion en en-tête, corps vide (spec
  * §32). keepalive : la requête survit à la fermeture de la page (annulation d'un envoi,
  * `pagehide`).
@@ -498,7 +497,7 @@ export async function destroy(c: Ctx, a: DestroyAuth, keepalive?: boolean): Prom
 }
 
 /**
- * Signalement par un destinataire (décision du propriétaire, 20 novembre) : POST
+ * Signalement par un destinataire : POST
  * /api/shares/destroy, corps exact `{"proof":…,"reason":"report","categorie":n,"grant":…}`.
  * L'octroi de l'ouverture porte une voix ; le partage n'est effacé, pour tous, que quand les
  * voix atteignent la moitié des ouvertures permises (arrondie au-dessus). Rend vrai si cette
@@ -517,7 +516,7 @@ export async function report(c: Ctx, a: { kAcces: KAcces; kPreuve: KPreuve }, ca
     },
     readJSON,
   );
-  // 0 ou 1 (même longueur de réponse dans les deux cas, audit du 20 novembre).
+  // 0 ou 1 (même longueur de réponse dans les deux cas).
   if (o.detruit !== 0 && o.detruit !== 1) throw new BadResponse();
   return o.detruit === 1;
 }

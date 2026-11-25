@@ -1,4 +1,4 @@
-// Garde automatique de fixtures.ts (audit D1) : une exception non attrapée dans la page, levée
+// Garde automatique de fixtures.ts : une exception non attrapée dans la page, levée
 // ou promesse rejetée sans gestionnaire, fait échouer le test. `test.fail` : ces deux tests
 // DOIVENT échouer ; s'ils passaient, la garde ne garderait plus rien.
 import { expect, test } from "./fixtures";

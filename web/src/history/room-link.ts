@@ -1,4 +1,4 @@
-// « Ouvrir le salon » depuis l'historique (audit du 20 novembre) : seul le fragment du lien gardé
+// « Ouvrir le salon » depuis l'historique : seul le fragment du lien gardé
 // est repris, sur la page du salon de CE site. Une entrée écrite par un appareil compromis ou un
 // client modifié (coffre du compte) ne peut donc pas mener vers un autre site.
 import { href } from "../app/router.svelte";

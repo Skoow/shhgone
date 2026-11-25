@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Lots, causeLecture, envoyerPiece, lectureDefinitive, lirePiece } from "./pieces";
+import { Lots, avecReprise, causeLecture, envoyerPiece, lectureDefinitive, lirePiece } from "./pieces";
 import { SalonError, type Net } from "./api";
 
 /** Faux serveur des pièces : segments gardés tels quels, tailles exactes vérifiées. */
@@ -48,7 +48,7 @@ describe("pièces du salon", () => {
       expect(f.vus.filter((v) => v === "GET /api/salons/pieces/segments/0")).toHaveLength(1);
     }, 60_000);
   }
-  // Audit du 20 novembre : la taille annoncée par le message ne lie personne ; la taille réelle
+  // La taille annoncée par le message ne lie personne ; la taille réelle
   // (manifeste) est vérifiée avant de demander la suite.
   it("pièce plus grosse que le plafond donné : refusée sans lire le contenu", async () => {
     const f = fauxServeur();
@@ -101,6 +101,40 @@ describe("pièces du salon", () => {
     expect([(e as SalonError).status, (e as SalonError).code]).toEqual([403, "egress_limit"]);
     expect(causeLecture(e)).toBe("sortie");
     expect(refus).toBe(1); // aucun nouvel essai
+  });
+  it("téléchargement coupé au milieu : repris au segment coupé, rien n'est relu depuis le début", async () => {
+    const f = fauxServeur();
+    const data = new Uint8Array(64 * 65536 * 2 + 10); // trois segments
+    crypto.getRandomValues(data.subarray(0, 65536));
+    const ref = await envoyerPiece(f.n, "J".repeat(43), new Blob([data]), { nom: "a.bin", mime: "application/octet-stream", vocal: false });
+    f.vus.length = 0;
+    const lire = f.n.fetch;
+    let coupe = false;
+    f.n.fetch = async (url, init) => {
+      if (!coupe && String(url).endsWith("/segments/1")) {
+        coupe = true;
+        f.vus.push("coupure");
+        throw new TypeError("Failed to fetch");
+      }
+      return lire(url, init);
+    };
+    const lu = new Uint8Array(await (await lirePiece(f.n, "J".repeat(43), ref)).arrayBuffer());
+    expect(lu).toEqual(data);
+    expect(f.vus.filter((v) => v.startsWith("GET")).sort()).toEqual(["GET /api/salons/pieces/segments/0", "GET /api/salons/pieces/segments/1", "GET /api/salons/pieces/segments/2"]);
+    expect(f.vus).toContain("coupure");
+  }, 60_000);
+  it("avecReprise : réseau et 5xx réessayés (3 fois au plus), refus 4xx jamais", async () => {
+    const attentes: number[] = [];
+    const attendre = async (ms: number) => void attentes.push(ms);
+    let n = 0;
+    expect(await avecReprise(async () => (++n < 3 ? Promise.reject(new SalonError(503, "unavailable")) : "ok"), attendre)).toBe("ok");
+    expect(attentes).toEqual([1000, 3000]);
+    n = 0;
+    await expect(avecReprise(async () => (n++, Promise.reject(new TypeError("x"))), attendre)).rejects.toThrow("x");
+    expect(n).toBe(4);
+    n = 0;
+    await expect(avecReprise(async () => (n++, Promise.reject(new SalonError(429, "budget"))), attendre)).rejects.toThrow("budget");
+    expect(n).toBe(1);
   });
   it("causeLecture : 404 indisponible, 403 egress_limit sortie, 429 budget relu, le reste lecture (réessayable)", () => {
     expect(causeLecture(new SalonError(404, "not_found"))).toBe("indisponible");

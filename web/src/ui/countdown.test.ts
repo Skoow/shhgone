@@ -28,7 +28,7 @@ describe("createCountdown", () => {
     expect(createCountdown(Number.NaN, c.now).remaining()).toBe(0);
   });
 
-  it("display : décompte « 4 h 15 min » au-dessus d'une heure, « 12 min 05 s » en dessous (retours UI4)", () => {
+  it("display : décompte « 4 h 15 min » au-dessus d'une heure, « 12 min 05 s » en dessous", () => {
     const c = clock();
     const cd = createCountdown(4 * 3600 + 15 * 60, c.now);
     expect(cd.display("fr")).toBe("4\u202fh\u202f15\u202fmin");

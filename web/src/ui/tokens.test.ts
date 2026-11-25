@@ -69,7 +69,7 @@ const PAIRS: [string, string, number, number][] = [
   ["--line-strong", "--surface-2", 3.5, 3],
 ];
 
-describe("bleu des boutons pleins (refonte du 12 novembre)", () => {
+describe("bleu des boutons pleins", () => {
   it("texte blanc ≥ 4,5:1 sur --sig-blue et --sig-blue-hover ; bouton ≥ 3:1 sur --bg", () => {
     expect(contrast("#FFFFFF", hex("--sig-blue"))).toBeGreaterThanOrEqual(4.5);
     expect(contrast("#FFFFFF", hex("--sig-blue-hover"))).toBeGreaterThanOrEqual(4.5);
@@ -112,7 +112,7 @@ describe("jetons de couleur (UI §3.1, §3.2)", () => {
   });
 });
 
-describe("icônes de format en couleur (retours UI6)", () => {
+describe("icônes de format en couleur", () => {
   const FMT = ["pdf", "doc", "sheet", "slides", "archive", "image", "video", "audio", "other"].map((f) => `--fmt-${f}`);
   const hue = (h: string) => {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255) as [number, number, number];
@@ -165,9 +165,9 @@ describe("autres jetons (UI §4.2, §5, §7.2)", () => {
       "--text", "--text-2", "--text-3", "--text-disabled", "--accent", "--accent-hover",
       "--on-accent", "--accent-tint", "--danger", "--on-danger", "--danger-tint", "--warn",
       "--warn-tint", "--info", "--selection", "--scrim",
-      // retours UI4 : formules payantes
+      // Formules payantes
       "--plus", "--plus-tint", "--plus-line", "--pro", "--pro-tint", "--pro-line",
-      // refonte de l'accueil (12 novembre) : boutons pleins
+      // refonte de l'accueil : boutons pleins
       "--sig-blue", "--sig-blue-hover",
       // §20.3 matière et aurore
       "--bg-deep", "--hair", "--hair-2", "--vessel", "--edge-hi", "--seal-light",
@@ -447,13 +447,13 @@ describe("Icon.ts (UI §6, jeu maison UI8)", () => {
     "server", "user-x", "chevron-down", "arrow-right",
     "ellipsis", "sliders-horizontal", "file-archive", "upload", "compass", "server-crash",
     "hourglass", "wrench", "monitor-x", "send", "broom", "volume",
-    // Conception compte §21.15 (plan, lot 12) : accueil connecté, revue du jeu fermé.
+    // Conception compte §21.15 : accueil connecté, revue du jeu fermé.
     "search", "user", "messages-square", "chevron-right",
-    // Menu du téléphone, compte et offres (18 novembre).
+    // Menu du téléphone, compte et offres.
     "log-out", "tag",
-    // Appels du salon (20 novembre).
+    // Appels du salon.
     "phone", "phone-off", "video", "video-off", "mic-off",
-    // En-tête du salon sur téléphone (revue du 20 novembre, U8).
+    // En-tête du salon sur téléphone.
     "volume-x", "folder", "users",
   ];
   const pascal = (s: string) =>

@@ -1,4 +1,4 @@
-// Task 9c : nettoyage de l'audio par réassemblage (spec §35.2) : MP3, Ogg Opus et Vorbis, FLAC,
+// Nettoyage de l'audio par réassemblage (spec §35.2) : MP3, Ogg Opus et Vorbis, FLAC,
 // WAV, sur les fichiers d'essai de scripts/gen-media-fixtures.sh (ffmpeg, repères fictifs).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";

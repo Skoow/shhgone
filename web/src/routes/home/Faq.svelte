@@ -9,7 +9,7 @@
   const qs = ["server", "lost", "back", "scan", "copy"] as const;
 </script>
 
-<!-- Fond bleu nuit et trame à gauche (maquette « La trame », 19 novembre, 3) ; titre à gauche,
+<!-- Fond bleu nuit et trame à gauche (maquette « La trame ») ; titre à gauche,
      questions à droite sur ordinateur. -->
 <section class="faq slab fine" aria-labelledby="faq-title">
   <h2 id="faq-title" class="rv" {@attach reveal}>{t("home.faq.title")}</h2>
@@ -34,7 +34,7 @@
   details {
     scroll-margin-top: 96px;
   }
-  /* Titre centré au-dessus des questions (propriétaire, 20 novembre). */
+  /* Titre centré au-dessus des questions. */
   @media (min-width: 1024px) {
     .faq {
       padding-block: 136px 144px;

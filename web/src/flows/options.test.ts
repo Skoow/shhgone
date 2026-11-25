@@ -127,8 +127,8 @@ describe("sans téléchargement (spec §34)", () => {
       { kind: "file", base: "e", ext: ".pdf", mime: "application/pdf", size: 3 },
       { kind: "file", base: "f", ext: ".svg", mime: "image/svg+xml", size: 3 },
     ] as const;
-    // PDF : visionneuse en cadre isolé (Task 22), même règle que le destinataire ; SVG : jamais
-    // affiché (scan du 7 novembre).
+    // PDF : visionneuse en cadre isolé, même règle que le destinataire ; SVG : jamais
+    // affiché (scan).
     expect(viewOnlyBlockers(items)).toEqual(["b.zip", "c.docx", "d.mp4", "f.svg"]);
     expect(viewableInBrowser(items[5])).toBe(true);
     expect(viewableInBrowser(items[0])).toBe(true);

@@ -2,7 +2,7 @@
   // Écran d'envoi (UI §9.1, §9.2, §9.3) : l'accueil tant que la liste est vide ; dès le premier
   // élément (Parcourir, Photo, Vidéo, Texte, Coller, dépôt), une transition de vue ouvre le
   // composeur dans le réceptacle : liste par catégories, jauge, options, « Chiffrer et envoyer ».
-  // Tout reste en mémoire (aucun stockage) ; l'envoi lui-même est la Task 17 (`onsend`).
+  // Tout reste en mémoire (aucun stockage) ; l'envoi lui-même est la (`onsend`).
   import { flushSync, tick, untrack } from "svelte";
   import { MediaQuery } from "svelte/reactivity";
   import { chrome, type AddGesture } from "../app/chrome.svelte";
@@ -44,9 +44,9 @@
   import Options from "./Options.svelte";
 
   /** ids : identifiants des lignes, dans l'ordre de `items` (brouillon d'envoi, spec §41.14). */
-  export type SendState = { items: Item[]; ids: string[]; ttlHours: number; maxOpens: number; password: string; rights: Rights; keepTtlH?: KeepTtl; /** Nom du partage (19 novembre), tel que saisi. */ title?: string };
+  export type SendState = { items: Item[]; ids: string[]; ttlHours: number; maxOpens: number; password: string; rights: Rights; keepTtlH?: KeepTtl; /** Nom du partage, tel que saisi. */ title?: string };
   type Props = {
-    /** Envoi (Task 17). Sans lui : avis « Envoi : prochaine étape ». */
+    /** Envoi. Sans lui : avis « Envoi : prochaine étape ». */
     onsend?: (state: SendState) => void;
     /** Faux pendant un envoi (composeur caché) : ni collage ni dépôt n'ajoutent rien (S9). */
     active?: boolean;
@@ -90,7 +90,7 @@
   });
   // Téléphone (< 760 px) : une vraie app (lignes compactes, menu « … », barre collée, options
   // en feuille). Ordinateur : deux colonnes. Coffre chez le destinataire (spec §27) : retiré de
-  // l'interface tant que les apps n'existent pas (décision du propriétaire du 11 novembre).
+  // l'interface tant que les apps n'existent pas.
   const narrowMq = new MediaQuery("max-width: 759px");
   const narrow = $derived(narrowMq.current);
   const options = createOptions({ generate: generatePassword });
@@ -182,7 +182,7 @@
 
   /** Une action d'ajout ; `live` faux : la galerie du système (appel synchrone, même geste). */
   function addAct(id: AddId, live = sheetActions.find((a) => a.id === id)?.live ?? false) {
-    // Salon (plan C-3) : sa page de création ; « bientôt » sans __SALONS__ (démo, site sans compte).
+    // Salon : sa page de création ; « bientôt » sans __SALONS__ (démo, site sans compte).
     if (id === "room") {
       if (__SALONS__) return navigate("/salon/nouveau");
       say(t("tabs.soon.chat"));
@@ -225,7 +225,7 @@
         const at = document.activeElement;
         if (at && (at === titleEl || at === editorEl)) return;
         // Toujours le contenu, curseur à la fin : c'est ce qu'on vient écrire ; le titre est
-        // facultatif (faible de l'audit du 11 novembre).
+        // facultatif.
         editorEl?.focus();
         editorEl?.setSelectionRange(editorText.length, editorText.length);
       }),
@@ -263,7 +263,7 @@
     else if (r.text !== null && !editorOpen) openEditor(null, r.text);
   }
   // ---------- Ordinateur : tout le composeur dans l'écran, sans défilement de page ----------
-  // Exigence du propriétaire : à 1440 × 900 comme à 1920 × 1080, en-tête, capacité, liste,
+  // À 1440 × 900 comme à 1920 × 1080, en-tête, capacité, liste,
   // options, phrase et bouton d'envoi tiennent dans l'écran ; seule la liste défile au besoin.
   // Le pied de page est juste en dessous (on le voit en faisant défiler), il ne tasse rien.
   // Hauteur de l'app = hauteur de l'écran − ce qui est au-dessus − le bas de <main> (mesurés).
@@ -276,7 +276,7 @@
       const r = node.getBoundingClientRect();
       const end = document.querySelector("main") ?? document.body;
       const tail = end.getBoundingClientRect().bottom - r.bottom;
-      // Téléphone (18 novembre) : la page remplit aussi l'écran ; le cadre de dépôt grandit pour
+      // Téléphone : la page remplit aussi l'écran ; le cadre de dépôt grandit pour
       // que la barre d'envoi (+, « Chiffrer et envoyer », la phrase) tombe en bas de l'écran.
       const floor = innerWidth < 760 ? 360 : 520;
       node.style.setProperty("--app-h", `${Math.max(floor, Math.floor(innerHeight - (r.top + scrollY) - tail))}px`);
@@ -296,7 +296,7 @@
       node.style.removeProperty("--app-h");
     };
   }
-  // Barre du haut (refonte du 12 novembre) : les gestes du menu « Partager » passent par ici
+  // Barre du haut : les gestes du menu « Partager » passent par ici
   // tant que ce composeur est monté et actif. Un geste choisi ailleurs (chrome.pending : accueil,
   // autre page, « ?ajout= ») est joué dès que la page d'envoi est affichée et active, au montage
   // comme plus tard : l'accueil est rendu par ce même composeur, déjà monté quand on y choisit
@@ -321,7 +321,7 @@
       runGesture(g);
     });
   });
-  // Accueil → page d'envoi (17 novembre) : « Choisir des fichiers » ouvre le sélecteur (même
+  // Accueil → page d'envoi : « Choisir des fichiers » ouvre le sélecteur (même
   // geste) et mène à la page d'envoi, zone de dépôt mise en avant ; « Créer sur place » y mène,
   // actions mises en avant (téléphone : la feuille « Ajouter » s'ouvre). Un instant seulement.
   let spot = $state<"drop" | "make" | null>(null);
@@ -330,7 +330,7 @@
     chrome.spot = "drop";
     navigate("/envoyer");
   }
-  // Accueil, « Ou créez sur place » (19 novembre) : la page d'envoi s'ouvre avec ce geste déjà
+  // Accueil, « Ou créez sur place » : la page d'envoi s'ouvre avec ce geste déjà
   // lancé (caméra, enregistreur) ; Salon (bientôt) : sa tuile est mise en avant, et dit « bientôt ».
   function make(g: "media" | "vocal" | "room") {
     if (g === "room") {
@@ -360,7 +360,7 @@
   });
 
   // ---------- Nettoyer tous les fichiers ----------
-  // Le bouton n'apparaît que si le nettoyage est réel (Tasks 9a à 9c) : jamais un bouton qui ne
+  // Le bouton n'apparaît que si le nettoyage est réel : jamais un bouton qui ne
   // fait rien (scan UX B3). Les pastilles « Non nettoyé », honnêtes, restent.
   // ---------- Retrait, annulation ----------
   type Toast = { id: number; message: string; undo: () => void; focusId?: string };
@@ -370,7 +370,7 @@
   let toastSeq = 0;
 
   /** `safe` : jamais « Supprimer » (après un nettoyage, un second Entrée réflexe retirerait le
-   *  fichier, audit D3) : « Réessayer », « Renommer »/« Modifier » ou le menu « … ».
+   *  fichier) : « Réessayer », « Renommer »/« Modifier » ou le menu « … ».
    *  `after-remove` : après un retrait, la ligne suivante prend le focus sur « Renommer »/« Modifier »
    *  ou le menu « … », jamais « Supprimer » (une double frappe sur Entrée retirerait deux éléments). */
   async function focusRow(id: string | undefined, safe: boolean | "after-remove" = false) {
@@ -446,9 +446,9 @@
   const composerBlock = $derived(composer.blockReason());
   // Résumé discret près d'Envoyer (D41-23) : les lignes portent chacune leur marque et leur raison.
   const uncleaned = $derived(composer.uncleanedCount);
-  // Format jamais lu : dit à part, sans parler d'échec (audit D5).
+  // Format jamais lu : dit à part, sans parler d'échec.
   const unsupported = $derived(composer.unsupportedCount);
-  // Nom du partage trop long (19 novembre) : bloqué ici, avant le moteur (« titre_trop_long »).
+  // Nom du partage trop long : bloqué ici, avant le moteur (« titre_trop_long »).
   const reasonText = $derived(
     composerBlock
       ? t(blockKey(composerBlock), { max: composerBlock === "trop_gros" ? formatBytes(options.limites.contentMax, lang) : num(TEXT_MAX) })
@@ -483,7 +483,7 @@
   // Vocal pris ici : extension interne, jamais affichée (comme sur sa ligne).
   const menuExt = $derived(menuItem && menuItem.kind !== "text" && !menuItem.voice ? menuItem.ext : "");
   const menuName = $derived(menuItem ? menuItem.base + menuExt : "");
-  // Menu (retours UI6) : Aperçu (si permis), Renommer ou Modifier, Nettoyer ou Réessayer (si
+  // Menu : Aperçu (si permis), Renommer ou Modifier, Nettoyer ou Réessayer (si
   // utile), Supprimer. Plus de Monter ni Descendre.
   const menuPeek = $derived(menuItem ? composePreview(menuItem) !== null : false);
   const menuFix = $derived(menuItem ? fixOf(menuItem) : null);
@@ -537,7 +537,7 @@
     if (id) void tick().then(() => remove(id));
   }
 
-  // ---------- Aperçu, Nettoyer, Réessayer (retours UI6) ----------
+  // ---------- Aperçu, Nettoyer, Réessayer ----------
   // Ordre de la visionneuse : celui de la liste ; seulement les éléments qui ont un aperçu.
   const viewList = $derived(composer.items.flatMap((i) => {
     const k = composePreview(i);
@@ -579,12 +579,12 @@
     } else onretry?.(id);
   }
 
-  // ---------- Balai : confirmation, puis nettoyage (retours du propriétaire du 12 novembre) ----------
+  // ---------- Balai : confirmation, puis nettoyage ----------
   // Rien n'est nettoyé à l'ajout ni sans validation : le balai d'une ligne ou « Tout nettoyer »
   // ouvre une petite confirmation qui dit ce qui sera retiré ; « Nettoyer » lance le nettoyage.
   const cleanable = $derived(composer.items.filter((i) => canClean(i) === "nettoyer" && !composer.isCleaning(i.id)));
   let cleanAllBtn: HTMLButtonElement | undefined = $state();
-  // « Tout supprimer » : confirmé d'abord (16 novembre), puis l'annulation reste possible (toast).
+  // « Tout supprimer » : confirmé d'abord, puis l'annulation reste possible (toast).
   let clearBtn: HTMLButtonElement | undefined = $state();
   let clearAsk = $state<HTMLElement | null>(null);
   let cleanAsk = $state<{ ids: string[]; anchor: HTMLElement; title: string; body: string } | null>(null);
@@ -644,7 +644,7 @@
     <div class={["make", { spot: spot === "make" }]} role="group" aria-label={t("compose.create.label")}>
       {#each rowActions as a (a.id)}
         {#if a.id === "room"}
-          <!-- Salon, avec les autres actions (17 novembre) : pas encore construit, désactivé avec sa raison. -->
+          <!-- Salon, avec les autres actions : pas encore construit, désactivé avec sa raison. -->
           {#if __SALONS__}
             <button type="button" class="mk room" data-add="room" onclick={() => addAct("room")}>
               <AddIcon id="room" size={22} />
@@ -668,18 +668,18 @@
   </div>
 {/snippet}
 
-<!-- Offre en cours (décision du propriétaire du 16 novembre) : un petit cadre, plus la bande Gratuit / Plus / Pro. -->
+<!-- Offre en cours : un petit cadre, plus la bande Gratuit / Plus / Pro. -->
 {#snippet offers()}<CurrentOffer newTab={filled} />{/snippet}
 
 {#snippet app()}
   <div class={["app", { narrow }]} data-composer {@attach fitViewport}>
     <div class="list-col">
-      <!-- Offres (retours du propriétaire du 12 novembre, remplace la ligne discrète d'audit M17) :
+      <!-- Offres :
            Gratuit, Plus, Pro et leurs limites, « bientôt », lien vers /offres (nouvel onglet si la
            liste n'est pas vide : elle serait perdue en quittant la page). Téléphone : avant la
-           carte « Votre envoi » entière, jamais entre ses boutons et son compteur (audit R4) ;
+           carte « Votre envoi » entière, jamais entre ses boutons et son compteur ;
            ordinateur : au-dessus de « Chiffrer et envoyer », la liste garde sa hauteur. -->
-      <!-- Téléphone, liste vide (retours du 16 novembre) : le cadre passe sous « Ajouter », qui
+      <!-- Téléphone, liste vide : le cadre passe sous « Ajouter », qui
            tient alors au-dessus de la barre d'envoi au lieu d'être coupé par elle. -->
       {#if narrow && filled}<div class="offers">{@render offers()}</div>{/if}
       <div class="top">
@@ -688,7 +688,7 @@
           <NamesTip />
         </div>
         {#if filled}
-          <!-- « Tout nettoyer » et « Tout supprimer » (retours du 16 novembre) : deux petites icônes
+          <!-- « Tout nettoyer » et « Tout supprimer » : deux petites icônes
                à droite du titre, chacune avec sa confirmation (rien n'est fait avant « Nettoyer »
                ou « Supprimer ») ; nom complet pour les lecteurs d'écran et au survol. -->
           <div class="clear">
@@ -708,7 +708,7 @@
         {#if removing > 0}<p class="removing" role="status">{t("compose.up.removing")}</p>{/if}
       </div>
       <!-- Ordinateur : « Créer sur place » en haut, bien visible, au-dessus de la zone de dépôt
-           (retours du propriétaire du 11 novembre). -->
+       . -->
       {#if !narrow}{@render adder()}{/if}
 
 
@@ -755,7 +755,7 @@
       </div>
       {#if narrow && !filled}
         <!-- Page d'envoi vide, téléphone : « Ajouter » au centre (ouvre la feuille d'ajout). -->
-        <!-- Cadre de dépôt avec les trois assurances dessous (17 novembre). -->
+        <!-- Cadre de dépôt avec les trois assurances dessous. -->
         <div class="dz-box" data-dz-box>
           <button type="button" class="dropzone empty" aria-haspopup="dialog" onclick={() => (addOpen = true)}>
             <span class="dz-ic" aria-hidden="true"><Plus size={22} strokeWidth={2.2} /></span>
@@ -771,7 +771,7 @@
         <!-- Filigrane (retours DROP) : l'espace vide sous la liste est la zone de dépôt ; un clic y
              ouvre le choix de fichiers ; on dépose aussi n'importe où sur la page. Texte entier,
              jamais tronqué. Liste vide (page d'envoi) : grand cadre au centre, texte blanc. -->
-        <!-- Liste vide : la flèche SOUS le texte (retours du propriétaire du 11 novembre). -->
+        <!-- Liste vide : la flèche SOUS le texte. -->
         {#snippet upIcon()}<span class="dz-ic" aria-hidden="true"><Upload size={18} strokeWidth={1.8} /></span>{/snippet}
         {#snippet zone()}
           <button type="button" class={["dropzone", filled ? "ghost" : "empty"]} onclick={() => filesIn?.click()}>
@@ -786,7 +786,7 @@
         {#if filled}
           {@render zone()}
         {:else}
-          <!-- Liste vide (17 novembre) : le cadre remplit la colonne, son contenu au centre, et les
+          <!-- Liste vide : le cadre remplit la colonne, son contenu au centre, et les
                trois assurances sous « Déposez des fichiers ». -->
           <div class={["dz-box fill", { spot: spot === "drop" }]} data-dz-box>
             {@render zone()}
@@ -941,7 +941,7 @@
 <Sheet bind:open={() => menuId !== null, (v) => { if (!v) menuId = null; }} title={menuName}>{@render menuBody()}</Sheet>
 
 
-<!-- Aperçu d'un élément avant l'envoi (retours UI6) : la visionneuse du destinataire, sans
+<!-- Aperçu d'un élément avant l'envoi : la visionneuse du destinataire, sans
      téléchargement ; le contenu ne quitte jamais la mémoire de la page. -->
 <ViewerPanel items={viewItems} bind:at={viewAt} viewOnly={false} load={loadLocal} held={false} onclose={() => undefined} />
 
@@ -1059,7 +1059,7 @@
     grid-column: 1 / -1;
     min-width: 0;
   }
-  /* Téléphone : avant la carte « Votre envoi », un peu détachées de son titre (audit R4). */
+  /* Téléphone : avant la carte « Votre envoi », un peu détachées de son titre. */
   .list-col > .offers {
     margin-block-end: var(--sp-2);
   }
@@ -1119,7 +1119,7 @@
       color var(--dur-fast) var(--ease-out),
       transform 400ms var(--ease-settle);
   }
-  /* Cadre de dépôt de la liste vide (17 novembre) : pointillés autour du bouton ET des trois
+  /* Cadre de dépôt de la liste vide : pointillés autour du bouton ET des trois
      assurances ; sur ordinateur il remplit la colonne, contenu centré. Le bouton n'a plus de
      cadre à lui. */
   .dz-box {
@@ -1133,7 +1133,7 @@
     border-radius: var(--r-xl);
     transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
   }
-  /* Mise en avant à l'arrivée depuis l'accueil (17 novembre) : deux pulsations douces. */
+  /* Mise en avant à l'arrivée depuis l'accueil : deux pulsations douces. */
   .dz-box.spot,
   .make.spot {
     border-color: var(--accent);
@@ -1180,7 +1180,7 @@
     background: rgb(95 227 181 / 0.08);
   }
   /* Page d'envoi vide (retours DROP) : cadre en tête de la liste, texte blanc entier. Compact
-     depuis les retours du 12 novembre (il prenait tout l'écran) : titre, offres et Salon restent
+     depuis les (il prenait tout l'écran) : titre, offres et Salon restent
      au premier écran ; la cible garde 120 px de haut au doigt, 184 px sur ordinateur. */
   .dropzone.empty {
     flex: none;
@@ -1217,7 +1217,7 @@
     color: var(--text-2);
     font-size: var(--fs-small);
   }
-  /* Actions « Créer sur place » (17 novembre) : des tuiles égales, icône au-dessus du libellé,
+  /* Actions « Créer sur place » : des tuiles égales, icône au-dessus du libellé,
      pour qu'on les voie comme des boutons (elles se perdaient en petites pastilles). */
   .make {
     display: grid;
@@ -1234,7 +1234,7 @@
     padding: 10px 8px;
     border: 0;
     border-radius: 16px;
-    /* Plus visibles (17 novembre) : teinte d'accent, contour d'accent, icône d'accent. */
+    /* Plus visibles : teinte d'accent, contour d'accent, icône d'accent. */
     background: rgb(95 227 181 / 0.08);
     box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.3);
     color: var(--text);
@@ -1630,8 +1630,7 @@
       gap: var(--sp-3);
       min-height: 0;
     }
-    /* « Créer sur place » en haut de la liste, sous l'en-tête et la capacité (retours du
-       propriétaire du 11 novembre) : bien visible, icône et libellé. */
+    /* « Créer sur place » en haut de la liste, sous l'en-tête et la capacité : bien visible, icône et libellé. */
     .adder.bar {
       flex: none;
       display: flex;
@@ -1690,7 +1689,7 @@
     .groups > :global(section.media) {
       flex: 1 1 200px;
     }
-    /* Tuiles égales sur toute la largeur de la liste (17 novembre). */
+    /* Tuiles égales sur toute la largeur de la liste. */
     .adder.bar .make {
       flex: 1 1 auto;
       grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
@@ -1723,7 +1722,7 @@
       flex-direction: column;
       gap: var(--sp-2);
       overflow-y: auto;
-      /* Pas d'overscroll-behavior: contain (retours du 12 novembre) : dans Chromium, un conteneur
+      /* Pas d'overscroll-behavior: contain : dans Chromium, un conteneur
          défilant qui le porte garde la molette même quand il n'a rien à faire défiler ; la page
          (pied de page dessous) ne défilait plus, souris sur la zone de dépôt ou la liste. Arrivée
          au bout de la liste, la molette passe à la page. */

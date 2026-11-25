@@ -40,7 +40,7 @@ function dump(v: unknown): string {
   return seen.join("\n");
 }
 
-describe("historique des téléchargements : désactivé par défaut (22 novembre 2026)", () => {
+describe("historique des téléchargements : désactivé par défaut", () => {
   it("base neuve : désactivé, rien n'est écrit ; activé seulement par setEnabled(true)", async () => {
     const idb = fakeIndexedDB();
     const d = (await openDownloads({ backend: downloadsIdb(idb), now: () => T0 }))!;
@@ -62,7 +62,7 @@ describe("historique des téléchargements : désactivé par défaut (22 novembr
     const d = (await openDownloads({ backend: b, now: () => T0 }))!;
     await d.setEnabled(true);
     await d.add(fresh());
-    await b.setFlag("on", undefined); // état d'une base écrite avant le 22 novembre
+    await b.setFlag("on", undefined); // état d'une base écrite
     expect(b.raw().size).toBe(1);
     expect(await d.list()).toEqual([]);
     expect(b.raw().size).toBe(0);
@@ -119,7 +119,7 @@ describe("historique des téléchargements : stockage", () => {
   it("réglage coupé : rien d'écrit, l'historique existant est effacé ; rallumé : écrit de nouveau", async () => {
     const b = memoryBackend();
     const d = (await openDownloads({ backend: b, now: () => T0 }))!;
-    expect(await d.enabled()).toBe(false); // désactivé par défaut (22 novembre)
+    expect(await d.enabled()).toBe(false); // désactivé par défaut
     await d.setEnabled(true);
     await d.add(fresh());
     await d.setEnabled(false);

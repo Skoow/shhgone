@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Infographie de l'accueil (refonte du 12 novembre) : ce qui se passe quand on partage, en
+  // Infographie de l'accueil : ce qui se passe quand on partage, en
   // sept étapes, dans un petit écran. Dessin SVG maison, animé en CSS (transform et opacité
   // seulement) ; un seul minuteur, arrêté hors écran, onglet caché, au survol, au focus, et par
   // le bouton pause (WCAG 2.2.2). Mouvement réduit : storyboard statique, aucun minuteur.
@@ -12,7 +12,7 @@
   import { LOG, PAUSE, STEPS, TYPE_MS, dureeEtape, lettresEtape, reperesEtape, type Line } from "./demo-steps";
 
   const uid = $props.id();
-  // Section de l'accueil qui porte le titre visible (19 novembre, 3) : sinon, titre caché propre.
+  // Section de l'accueil qui porte le titre visible : sinon, titre caché propre.
   let { labelledby }: { labelledby?: string } = $props();
 
   // Mouvement réduit, relu si la préférence change pendant la visite.
@@ -31,8 +31,7 @@
   let focused = $state(false);
   let onscreen = $state(true);
   let hidden = $state(typeof document !== "undefined" && document.hidden);
-  // Démarre seule, et un bouton permet de la mettre en pause (décisions du propriétaire du
-  // 16 novembre ; WCAG 2.2.2). S'arrête aussi hors écran, onglet caché, sous la souris ou au focus. Le « survol » ne
+  // Démarre seule, et un bouton permet de la mettre en pause (WCAG 2.2.2). S'arrête aussi hors écran, onglet caché, sous la souris ou au focus. Le « survol » ne
   // compte qu'à la souris : sur un écran tactile, toucher ou faire défiler émet un pointerenter
   // sans pointerleave, et l'animation restait arrêtée jusqu'à ce qu'on touche ailleurs (iPhone).
   const playing = $derived(!reduced && !userPaused && !hover && !focused && onscreen && !hidden);
@@ -42,7 +41,7 @@
   $effect(() => {
     if (!playing) return;
     const now = step; // relu à chaque étape : un minuteur par étape
-    // Durée selon le texte de l'étape (titre et description, 20 novembre).
+    // Durée selon le texte de l'étape (titre et description).
     const ms = dureeEtape(t(`demo.s${now}.t` as Key) + t(`demo.s${now}.d` as Key), lettresEtape(now, t), reperesEtape(now, t).desc);
     const timer = setTimeout(() => {
       step = now === STEPS.length ? 1 : now + 1;
@@ -84,7 +83,7 @@
     dy: Math.round(-20 - r() * 50),
     d: Math.round(r() * 420),
   }));
-  // Poussière de la photo chez le destinataire, à l'effacement (étape 7, 21 novembre).
+  // Poussière de la photo chez le destinataire, à l'effacement (étape).
   const dustPeer = Array.from({ length: 16 }, (_, i) => ({
     x: 310 + (i % 4) * 12,
     y: 74 + Math.floor(i / 4) * 10,
@@ -93,13 +92,13 @@
     d: 500 + Math.round(r() * 400),
   }));
   // Contenu des baies du serveur : brouillé qui change sans cesse (deux jeux qui alternent) : le
-  // serveur ne garde que du chiffré, montré au lieu d'être écrit (propriétaire, 21 novembre).
+  // serveur ne garde que du chiffré, montré au lieu d'être écrit.
   const garble = [cipherText(0xb10c, 9, 3).split("\n"), cipherText(0xc0de, 9, 3).split("\n")];
   const at = (n: number, ...steps: number[]) => steps.includes(n);
 
-  // Journal façon terminal (décision du propriétaire du 16 novembre) : une ligne courte par étape,
+  // Journal façon terminal : une ligne courte par étape,
   // derrière une invite (« $ », « ! » pour l'attaquant), puis son état à droite ; quatre lignes au
-  // plus à l'écran. Frappe en JavaScript (18 novembre) : UN seul curseur, qui tape le texte lettre
+  // plus à l'écran. Frappe en JavaScript : UN seul curseur, qui tape le texte lettre
   // par lettre (il passe à la ligne si la place manque, aucun mot n'est coupé), puis l'état, puis
   // descend à la ligne suivante ; à la fin, il reste et clignote au bout de la dernière ligne. La
   // ligne de l'attaquant (« late ») commence un court instant après celle de l'étape.
@@ -118,10 +117,10 @@
       at += text.length + st.length;
       return row;
     });
-    // Deux lignes au plus (19 novembre, 3) : la scène prend la place ; les étapes sont à droite.
+    // Deux lignes au plus : la scène prend la place ; les étapes sont à droite.
     return all.slice(-2);
   });
-  // Synchronisation (24 novembre) : l'attaquant entre dans la scène quand sa ligne commence, la
+  // Synchronisation : l'attaquant entre dans la scène quand sa ligne commence, la
   // description du cadre du dessous et les étiquettes « ✕ » arrivent avec l'état de la dernière
   // ligne. En pause, la description est montrée tout de suite (on s'arrête souvent pour lire).
   const rep = $derived(reperesEtape(shown, t));
@@ -146,7 +145,7 @@
 
 <svelte:document onvisibilitychange={() => (hidden = document.hidden)} />
 
-<!-- Disposition du 20 novembre : la scène et le journal, puis l'étape en cours dessous ; « étape n
+<!-- Disposition : la scène et le journal, puis l'étape en cours dessous ; « étape n
      sur 7 » et la pause en haut. -->
 <figure class="fig">
 <div
@@ -186,7 +185,7 @@
         </linearGradient>
       </defs>
 
-      <!-- Balayage de l'étape 2 (reprise de « La trame », 19 novembre) : une ligne menthe descend sur
+      <!-- Balayage de l'étape 2 (reprise de « La trame ») : une ligne menthe descend sur
            l'écran ; au-dessus d'elle le chiffré, au-dessous la photo encore lisible. -->
       <clipPath id="{uid}-above"><rect class={["scanr", "up", { go: shown === 2, done: shown > 2 && shown < 7 }]} x="24" y="52" width="84" height="104" /></clipPath>
       <clipPath id="{uid}-below"><rect class={["scanr", "down", { go: shown === 2, done: shown > 2 && shown < 7 }]} x="24" y="52" width="84" height="104" /></clipPath>
@@ -198,7 +197,7 @@
       <g class="node">
         <text class="lbl" x="66" y="40">{t("demo.you")}</text>
         <rect class="dev" x="24" y="52" width="84" height="104" rx="14" />
-        <!-- Écran d'appareil (18 novembre) : encoche en haut, barre du bas. -->
+        <!-- Écran d'appareil : encoche en haut, barre du bas. -->
         <rect class="notch" x="56" y="57" width="20" height="3" rx="1.5" />
         <rect class="home-bar" x="54" y="149" width="24" height="2" rx="1" />
         <g class={["photo", { on: at(shown, 1, 2) }]} clip-path="url(#{uid}-below)">
@@ -227,7 +226,7 @@
       </g>
 
       <!-- Paquet chiffré vers le serveur, puis vers le destinataire -->
-      <!-- Étape 3 (21 novembre) : le bloc chiffré quitte l'appareil, en flot de paquets jusqu'au serveur. -->
+      <!-- Étape 3 : le bloc chiffré quitte l'appareil, en flot de paquets jusqu'au serveur. -->
       {#each [0, 1, 2, 3] as v (v)}
         <g class={["packet", "to-server", { on: at(shown, 3) }]} style:--pd="{300 + v * 260}ms">
           {#each [0, 1, 2, 3] as k (k)}<rect x={106 + (k % 2) * 7} y={99 + Math.floor(k / 2) * 7} width="5" height="5" rx="1" />{/each}
@@ -241,7 +240,7 @@
       <g class="node">
         <text class="lbl" x="200" y="40">{t("demo.server")}</text>
         <rect class={["srv", { gone: at(shown, 7) }]} x="158" y="52" width="84" height="104" rx="12" />
-        <!-- Baies du serveur (18 novembre) : trois emplacements vides, que les blocs chiffrés remplissent. -->
+        <!-- Baies du serveur : trois emplacements vides, que les blocs chiffrés remplissent. -->
         <g class={["slots", { off: at(shown, 7) }]}>
           {#each [0, 1, 2] as k (k)}<rect x="172" y={74 + k * 14} width="56" height="10" rx="3" />{/each}
         </g>
@@ -342,8 +341,7 @@
   {/if}
   </div>
 </div>
-  <!-- Sous la scène, seulement l'étape en cours, sans case à cocher (propriétaire, 20 novembre :
-       la liste répétait l'animation, les coches passaient trop vite) ; fondu à chaque étape. La
+  <!-- Sous la scène, seulement l'étape en cours, sans case à cocher (la liste répétait l'animation, les coches passaient trop vite) ; fondu à chaque étape. La
        liste entière reste lue par les lecteurs d'écran ; mouvement réduit : elle est affichée
        (storyboard). -->
   {#if !reduced}
@@ -821,7 +819,7 @@
   .thief .hood {
     transition: transform 600ms var(--ease-settle);
   }
-  /* L'attaquant entre quand sa ligne du journal commence (--late, 24 novembre). */
+  /* L'attaquant entre quand sa ligne du journal commence (--late). */
   .thief.on {
     transition-delay: var(--late, 0ms);
   }
@@ -860,7 +858,7 @@
     }
   }
 
-  /* Journal façon terminal (16 novembre) : police mono embarquée, vert phosphore, fines lignes de
+  /* Journal façon terminal : police mono embarquée, vert phosphore, fines lignes de
      balayage ; chaque ligne se tape lettre par lettre (largeur en ch, par crans), l'état apparaît
      ensuite ; curseur plein au bout de la dernière ligne. */
   .log {
@@ -889,7 +887,7 @@
       font-size: 0.6875rem;
     }
   }
-  /* Petits téléphones (360 px) : chaque ligne du journal tient sur une ligne (21 novembre). */
+  /* Petits téléphones (360 px) : chaque ligne du journal tient sur une ligne. */
   @media (max-width: 379px) {
     .log {
       padding-inline: 10px;
@@ -995,7 +993,7 @@
     min-width: 0;
     margin: 0;
   }
-  /* La scène, puis dessous l'étape en cours (20 novembre) ; même disposition partout. */
+  /* La scène, puis dessous l'étape en cours ; même disposition partout. */
   .dw {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1017,7 +1015,7 @@
     display: grid;
     gap: 6px;
     align-content: center;
-    /* Centré dans le cadre (propriétaire, 21 novembre) : un <p> est borné à 65ch (base.css) et
+    /* Centré dans le cadre : un <p> est borné à 65ch (base.css) et
        restait collé à gauche sur ordinateur. */
     justify-self: center;
     margin: 0;

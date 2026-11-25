@@ -101,7 +101,7 @@ describe("file de téléchargements", () => {
     expect(summarize(d.rows, [0, 1, 2])).toMatchObject({ total: 95, done: 95, active: 0 });
   });
 
-  it("débit mesuré : null tant que moins de 2 s de lecture (jamais d'estimation sur un débit supposé, retours UI4)", async () => {
+  it("débit mesuré : null tant que moins de 2 s de lecture (jamais d'estimation sur un débit supposé)", async () => {
     const small = setup([30, 25]);
     expect(small.d.measured).toBeNull();
     small.d.start([0, 1]);
@@ -213,7 +213,7 @@ describe("file de téléchargements", () => {
     expect(s.files.get(0)!.aborted).toBe(true);
   });
 
-  it("limite de téléchargement du partage (EgressLimitError) pendant l'enregistrement : arrêt, partiel supprimé, aucun nouvel essai (24 novembre)", async () => {
+  it("limite de téléchargement du partage (EgressLimitError) pendant l'enregistrement : arrêt, partiel supprimé, aucun nouvel essai", async () => {
     const s = memSinks();
     const meter = createReadMeter([{ kind: "file", offset: 0, size: 10 }]);
     const err = Object.assign(new Error("limite_telechargement"), { name: "EgressLimitError" });
@@ -309,14 +309,14 @@ describe("file de téléchargements", () => {
   });
 });
 
-describe("audit M3 : « Enregistrer sous » en file", () => {
+describe("« Enregistrer sous » en file", () => {
   it("sélecteur refusé faute de clic récent (SecurityError, NotAllowedError) : raison « activation », nouvel essai possible", async () => {
     const { classify } = await import("./downloads.svelte");
     for (const n of ["SecurityError", "NotAllowedError"]) {
       expect(classify(new DOMException("x", n))).toEqual({ reason: "activation", retryable: true, keepPartial: false });
     }
   });
-  it("audit web D3 : CorruptError → raison « corrupt », sans nouvel essai, partiel supprimé", async () => {
+  it("CorruptError → raison « corrupt », sans nouvel essai, partiel supprimé", async () => {
     const { classify } = await import("./downloads.svelte");
     const { CorruptError } = await import("../index");
     expect(classify(new CorruptError())).toEqual({ reason: "corrupt", retryable: false, keepPartial: false });

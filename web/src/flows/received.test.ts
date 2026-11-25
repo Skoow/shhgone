@@ -1,4 +1,4 @@
-// Résumé d'un partage ouvert pour l'historique de l'appareil (conception compte §21.7, lot 11) :
+// Résumé d'un partage ouvert pour l'historique de l'appareil (conception compte §21.7) :
 // nombre d'éléments, taille, sorte dominante (icône). Jamais un nom ni un contenu.
 import { describe, expect, it } from "vitest";
 import type { Opened } from "../index";

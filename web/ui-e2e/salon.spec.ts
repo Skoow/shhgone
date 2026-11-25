@@ -1,4 +1,4 @@
-// Salon de bout en bout PAR L'INTERFACE (plan C-3, Task 7) : vrai binaire Go avec SHH_SALONS=1 et
+// Salon de bout en bout PAR L'INTERFACE : vrai binaire Go avec SHH_SALONS=1 et
 // SHH_COMPTES=1 (créer un salon exige un compte, D42-26), site construit avec SHH_SITE_COMPTES=1
 // (web/dist-comptes, comptes-site.ts), origine http://localhost:<port> (rp.id des passkeys).
 // Deux navigateurs : la créatrice (compte par passkey avec l'authentificateur virtuel de Chromium,
@@ -82,7 +82,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   await expect(page).toHaveURL(/\/salon\/nouveau$/);
   // Compte récent : 4 places au plus (conception du compte §11) ; « Ouvert » les prend toutes.
   await expect(page.getByText("Ouvert, 4 au plus")).toBeVisible();
-  // Historique désactivé par défaut, même avec un compte (24 novembre, B) : la créatrice l'active
+  // Historique désactivé par défaut, même avec un compte (B) : la créatrice l'active
   // elle-même ici (la suite s'appuie sur le lien de gestion gardé : « Détruire le salon » après
   // délogement). Sans cela, « Salon prêt » montre le lien de gestion d'emblée (appel.spec.ts).
   const garder = page.getByRole("switch", { name: "Garder dans mon historique" });
@@ -145,7 +145,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await champ(pageB, "Mot de passe du salon").fill(mdp);
     await bouton(pageB, "Continuer").click();
     await expect(titre(pageB, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
-    // Un seul libellé pour la photo (restes, point 8).
+    // Un seul libellé pour la photo.
     await expect(pageB.getByText("Photo pour ce salon", { exact: false })).toHaveCount(1);
     await expect(pageB.getByText("Photo de profil", { exact: false })).toHaveCount(0);
     await captureB("salon-explication");
@@ -153,7 +153,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoA);
     // Unicité : le pseudonyme de la créatrice est déjà pris (dès que son profil est arrivé).
     await expect(pageB.getByText("Déjà pris dans ce salon.")).toBeVisible({ timeout: 30_000 });
-    // Tests croisés de la casse et des sosies (22 novembre) : même refus.
+    // Tests croisés de la casse et des sosies : même refus.
     for (const v of [pseudoA.toUpperCase(), pseudoA.toLowerCase(), pseudoA.replace("L", "I")]) {
       await champ(pageB, "Pseudonyme pour ce salon").fill(v);
       await expect(pageB.getByText("Déjà pris dans ce salon.")).toBeVisible();
@@ -224,7 +224,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await page.getByRole("button", { name: "Retirer pour tous" }).last().click(); // confirmation
     await expect(fil(pageB).locator("p.texte").getByText(t3, { exact: true })).toHaveCount(0, { timeout: 30_000 });
     await expect(fil(pageB).getByText("Message retiré").first()).toBeVisible();
-    // --- Pièces (plan C-4) : une image affichée chez B, un document enregistré chez B ---------------
+    // --- Pièces : une image affichée chez B, un document enregistré chez B ---------------
     const nomDoc = `notes-${r}.txt`;
     const contenuDoc = `Contenu repère du document ${r} `.repeat(50);
     const image = readFileSync(join(FICHIERS, "lac-gele.jpg"));
@@ -323,7 +323,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     if (!(await page.getByRole("complementary", { name: "Participants" }).isVisible())) await bouton(page, "Participants").click();
     await expect(page.getByText(pseudoB, { exact: true }).last()).toBeVisible();
 
-    // --- Plan C-5 : règle d'effacement, codes de vérification, destruction ----------------------------
+    // --- règle d'effacement, codes de vérification, destruction ----------------------------
     await page.getByRole("radio", { name: "1 min après lecture" }).click();
     await expect(fil(pageB).getByText(`${pseudoA} a réglé l'effacement des messages`)).toBeVisible({ timeout: 30_000 });
     // Le code de A vu par A et par B est le même (5 groupes de 5 chiffres).
@@ -354,7 +354,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(fil(page).getByText(`${pseudoB} a rejoint le salon`)).toHaveCount(1);
     await expect(page.getByText("Participant 3")).toHaveCount(0);
 
-    // --- Exclusion (exigences 24, 25, 29) : B exclu, nouvelle invitation, C entre et lit ---------------
+    // --- Exclusion : B exclu, nouvelle invitation, C entre et lit ---------------
     // Participants : panneau sur ordinateur, feuille (souvent encore ouverte) sur téléphone.
     const exclureB = page.getByRole("button", { name: `Exclure ${pseudoB}`, exact: true });
     if (!(await exclureB.isVisible())) await bouton(page, "Participants").click();
@@ -468,7 +468,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     ];
     const dir = shh.server.dataDir;
     expect(scanDir(dir, reperes)).toEqual([]);
-    // Lien de gestion ouvert SEUL (exigence C-3 32), dans un autre navigateur : il ne fait entrer
+    // Lien de gestion ouvert SEUL (32), dans un autre navigateur : il ne fait entrer
     // personne, dit l'état du salon, propose de le détruire (confirmation annulée ici).
     const ctxD: BrowserContext = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
     try {
@@ -485,7 +485,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     } finally {
       await ctxD.close();
     }
-    // Destruction par la créatrice délogée, depuis son écran de fin (restes, point 3) : seul
+    // Destruction par la créatrice délogée, depuis son écran de fin : seul
     // J_gestion part ; fin chez C et E, plus rien sur le disque.
     await bouton(page, "Détruire le salon").first().click();
     await page.getByRole("button", { name: "Détruire le salon" }).last().click(); // confirmation

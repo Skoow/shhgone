@@ -5,7 +5,7 @@ const all = { photo: true, video: true, voice: true };
 const none = { photo: false, video: false, voice: false };
 
 describe("feuille « Ajouter » (téléphone)", () => {
-  it("Photo ou vidéo, Vocal, Note, Fichiers, Salon (17 novembre) ; aucun doublon ; la caméra intégrée d'abord", () => {
+  it("Photo ou vidéo, Vocal, Note, Fichiers, Salon ; aucun doublon ; la caméra intégrée d'abord", () => {
     const a = addActions(all);
     expect(a.map((x) => x.id)).toEqual(["media", "voice", "note", "files", "room"]);
     expect(a[0]).toEqual({ id: "media", live: true });

@@ -1,4 +1,4 @@
-// Lecture et réécriture ZIP (spec §35.2, Task 9b).
+// Lecture et réécriture ZIP (spec §35.2).
 import { describe, expect, it } from "vitest";
 import { zipBytes } from "../../scripts/gen-fixtures.mjs";
 import { DOS_DATE, entryData, isNormalized, readZip, writeZip } from "./zip";

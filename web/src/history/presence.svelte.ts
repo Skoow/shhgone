@@ -1,5 +1,4 @@
-// « Mes partages » n'est montré que s'il y a quelque chose dedans (décision du propriétaire du
-// 17 novembre). Module léger, sans dépendance : l'en-tête et le menu des pages d'information le
+// « Mes partages » n'est montré que s'il y a quelque chose dedans. Module léger, sans dépendance : l'en-tête et le menu des pages d'information le
 // lisent sans charger l'historique ni le moteur. Rien n'est écrit : on lit seulement.
 //  - Accueil, envoi, page « /s » : l'historique de l'appareil est lu (live.svelte.ts) et pose
 //    `any` d'après ses entrées.
@@ -7,8 +6,7 @@
 //    (indexedDB.databases(), sans l'ouvrir ni la créer) ; une base vide compte comme « quelque
 //    chose » (rare : la liste dit alors qu'elle est vide).
 //  - « Téléchargements » (menu ☰, pied de page) sans compte : seulement si l'historique des
-//    téléchargements est activé sur cet appareil (`downloads` ; décision du propriétaire du
-//    22 novembre, qui change celle du 15 novembre, UI §26). L'application le pose d'après
+//    téléchargements est activé sur cet appareil (`downloads`, UI §26). L'application le pose d'après
 //    downloads/live.svelte.ts ; les pages d'information lisent le seul drapeau « on » de la base
 //    des téléchargements, sans clé ni création (downloads/probe.ts, seul module avec store.ts à
 //    nommer cette base).
@@ -18,7 +16,7 @@ const HISTORY_DB = "shhdrop-history";
 
 /**
  * Pages d'information : vrai si la base de l'historique existe ET contient au moins une entrée
- * (relecture du 18 novembre : une base restée vide, après « Ne pas garder » ou « Effacer
+ * (relecture : une base restée vide, après « Ne pas garder » ou « Effacer
  * l'historique », ne montre plus « Mes partages »). Les entrées sont chiffrées : on ne fait que
  * les compter, sans clé. Rien n'est créé : la base n'est ouverte que si elle existe, et une
  * création (base supprimée entre-temps) est annulée.

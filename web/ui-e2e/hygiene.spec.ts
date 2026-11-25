@@ -62,8 +62,8 @@ async function entry(page: Page, secrets: string[]) {
  * (entrée du même document créée par pushState, ou about:blank, autre document).
  * Rend les adresses visitées, de la première à la dernière.
  *
- * `forward` faux (tous les appels sous WebKit) : pas de parcours « Avant ». CI du 11 et du
- * 12 novembre : « Page crashed » du processus WebKit dans page.goForward, sur des variantes
+ * `forward` faux (tous les appels sous WebKit) : pas de parcours « Avant ». En CI :
+ * « Page crashed » du processus WebKit dans page.goForward, sur des variantes
  * différentes d'une exécution à l'autre (navigations de fragment, page fixe sans script du site),
  * sur téléphone comme sur ordinateur, alors qu'elles passaient à l'exécution précédente :
  * plantage du navigateur de test (probable, non prouvé : pas de WebKit ici), pas du site. Le
@@ -110,8 +110,8 @@ function expectOnlyOwnEntries(urls: string[], origin: string, paths: string[]): 
   expect(urls.slice(0, urls.length - own.length).every((u) => u === "about:blank")).toBe(true);
 }
 
-// Spec §32 : lien court sous « /s » (16 novembre), « /s#<clé> » (partage) ou « /s#m<clé> »
-// (gestion) ; l'ancienne forme à la racine est refusée (18 novembre, test plus bas).
+// Spec §32 : lien court sous « /s », « /s#<clé> » (partage) ou « /s#m<clé> »
+// (gestion) ; l'ancienne forme à la racine est refusée (test plus bas).
 for (const [kind, start, frag] of [
   ["partage", "/s", `#${KEY}`],
   ["gestion", "/s", `#m${KEY}`],
@@ -121,7 +121,7 @@ for (const [kind, start, frag] of [
     const api = apiRequests(page);
     const all = allRequests(page);
     await page.goto(`${shh.origin}${start}${frag}`);
-    // « /s » n'est plus montré une fois le lien lu (17 novembre) : l'adresse est « / ».
+    // « /s » n'est plus montré une fois le lien lu : l'adresse est « / ».
     await expect.poll(() => page.url()).toBe(`${shh.origin}/`);
     expect(await hash(page)).toBe("");
     // La lecture de l'état part avant de quitter la page (sinon, sous charge, l'écran est
@@ -166,7 +166,7 @@ test("# collé dans la barre sur la même page (navigation de fragment) : retir�
   expectOnlyOwnEntries(await walkHistory(page, [KEY, KEY2], browserName !== "webkit"), shh.origin, ["/", "/", "/"]);
 });
 
-test("# de lien collé dans la barre sur l'accueil (ancienne forme, refusée le 18 novembre) : rien ouvert, # retiré ; aucune entrée avec un #", async ({ page, shh, browserName }) => {
+test("# de lien collé dans la barre sur l'accueil (ancienne forme, refusée) : rien ouvert, # retiré ; aucune entrée avec un #", async ({ page, shh, browserName }) => {
   const api = apiRequests(page);
   await page.goto(`${shh.origin}/`);
   await expect(page.locator("main#contenu")).toBeVisible();
@@ -244,7 +244,7 @@ test("fichier déposé sur /s/x : défaut empêché, l'adresse ne change pas", a
 // I1 : liens abîmés (ponctuation ajoutée par une messagerie, autre chemin, ancien format
 // /s/{id}, majuscule) : le routeur les classe en accueil ou en 404, le « # » est retiré quand même.
 // Sur « / », un lien abîmé reconnu comme lien (clé tronquée, mot de passe du QR mal formé) part
-// d'abord vers « /s » (16 novembre), qui lit puis montre « / » (17 novembre).
+// d'abord vers « /s », qui lit puis montre « / ».
 for (const [what, path, frag, at] of [
   ["point collé", "/", `#${KEY}.`, "/"],
   ["parenthèse collée", "/", `#${KEY})`, "/"],
@@ -287,7 +287,7 @@ test("/s : 200, pas de X-Robots-Tag (noindex dans la page) ; /s/<id>. (ancien li
   expect(old.status()).toBe(404);
 });
 
-// Ancienne forme à la racine (refusée, 18 novembre) : l'accueil, le # retiré, rien envoyé.
+// Ancienne forme à la racine (refusée) : l'accueil, le # retiré, rien envoyé.
 test("ancien lien /#<clé> et /#m<clé> : accueil, # retiré de l'adresse, aucune requête d'API", async ({ page, shh }) => {
   const api = apiRequests(page);
   for (const frag of [`#${KEY}`, `#m${KEY}`]) {
@@ -315,7 +315,7 @@ test.describe("navigateur intégré (Facebook) avec ?fbclid=", () => {
   test.use({ userAgent: INSTAGRAM.replace(/Instagram .*$/, "[FBAN/FBIOS;FBDV/iPhone15,3;FBMD/iPhone;FBSN/iOS;FBSV/17.1]") });
 
   test("rien n'est retiré (S4), même avec un fragment invalide ou sur une route 404", async ({ page, shh }) => {
-    // Ancienne forme à la racine (refusée, 18 novembre) : l'accueil, fragment gardé ici aussi.
+    // Ancienne forme à la racine (refusée) : l'accueil, fragment gardé ici aussi.
     for (const [path, frag, at] of [
       ["/s?fbclid=x", `#${KEY}`, "/s?fbclid=x"],
       ["/s?fbclid=x", `#m${KEY}`, "/s?fbclid=x"],
@@ -347,7 +347,7 @@ test("kbd-open seulement sur écran tactile (pointer: coarse)", async ({ page, s
   await expect(page.locator("html")).not.toHaveClass(/kbd-open/);
 });
 
-// Audit F3 : Permissions-Policy refuse ce qui ne sert pas ; le navigateur n'y signale aucune
+// Permissions-Policy refuse ce qui ne sert pas ; le navigateur n'y signale aucune
 // fonction inconnue, et la page ne peut plus lire le presse-papiers ni capturer l'écran.
 test("Permissions-Policy : refus explicites reconnus, presse-papiers illisible, capture d'écran refusée", async ({ page, shh, browserName }) => {
   const policyMsgs: string[] = [];
@@ -385,7 +385,7 @@ test.describe("intégrité des scripts et des styles (spec §28.3)", () => {
       await route.fulfill({ response: res, body: Buffer.concat([await res.body(), Buffer.from("\n;window.__piege=1")]) });
     });
     // Page de l'application (app.html, sans contenu écrit au build : l'accueil, lui, est prérendu
-    // depuis le 18 novembre et s'affiche sans script) : sans script exécuté, seul le squelette
+    // et s'affiche sans script) : sans script exécuté, seul le squelette
     // reste (U13 : coque sans contenu, jamais montée), rien de l'application.
     await page.goto(shh.origin + "/envoyer");
     await page.waitForLoadState("load");
@@ -399,8 +399,8 @@ test.describe("intégrité des scripts et des styles (spec §28.3)", () => {
   });
 });
 
-test.describe("Argon2id à la demande, hors du fil principal (10 novembre ; moteur WebAssembly depuis la Task 11)", () => {
-  // Task 11 : libsodium (assets/argon2-*.js) est supprimé ; Argon2id vient du moteur, dans un Worker
+test.describe("Argon2id à la demande, hors du fil principal (moteur WebAssembly depuis la)", () => {
+  // Libsodium (assets/argon2-*.js) est supprimé ; Argon2id vient du moteur, dans un Worker
   // dont le script (assets/engine-kdf-*.js) est lu avec son empreinte. Même intention qu'avant.
   test("accueil : Argon2id n'est pas chargé ; à l'envoi : script du Worker vérifié lu une fois, calcul dans un Worker ; l'ouverture donne le même contenu", async ({ page, shh, browser }) => {
     test.setTimeout(120_000);
@@ -422,7 +422,7 @@ test.describe("Argon2id à la demande, hors du fil principal (10 novembre ; mote
     const sent = await sendShare(s.page, shh.origin + "/", { text: "Argon2id dans un Worker" });
     await s.ctx.close();
     expect(kdf.length).toBe(1);
-    // W3 (audit du 20 novembre) : le Worker anti-robot aussi vient d'un script lu avec son
+    // W3 : le Worker anti-robot aussi vient d'un script lu avec son
     // empreinte, lancé depuis un Blob ; aucun Worker n'est lancé sur une adresse de fichier.
     expect(pow.length).toBe(1);
     expect(workers.filter((u) => !u.startsWith("blob:"))).toEqual([]);
@@ -460,7 +460,7 @@ test.describe("Argon2id à la demande, hors du fil principal (10 novembre ; mote
   });
 });
 
-test("vrai parcours d'ouverture (Task 11) : .wasm modifié d'un octet en route : aucun déchiffrement, message réseau ; Réessayer sans piège ouvre le partage", async ({ page, shh, browser, browserName }) => {
+test("vrai parcours d'ouverture : .wasm modifié d'un octet en route : aucun déchiffrement, message réseau ; Réessayer sans piège ouvre le partage", async ({ page, shh, browser, browserName }) => {
   test.skip(browserName !== "chromium", "chemin de production vérifié sous Chromium");
   test.setTimeout(120_000);
   const s = await freshPage(browser);
@@ -493,7 +493,7 @@ test("vrai parcours d'ouverture (Task 11) : .wasm modifié d'un octet en route :
   shh.cspViolations.length = 0;
 });
 
-test("Trusted Types (10 novembre) : une chaîne brute donnée à innerHTML ou à new Worker est refusée ; seules deux politiques existent", async ({ page, shh, browserName }) => {
+test("Trusted Types : une chaîne brute donnée à innerHTML ou à new Worker est refusée ; seules deux politiques existent", async ({ page, shh, browserName }) => {
   test.skip(browserName !== "chromium", "Trusted Types : vérifié sous Chromium (les autres moteurs l'appliquent selon leur version)");
   await page.goto(shh.origin + "/");
   await expect(page.locator("main h1").first()).toBeVisible();
@@ -518,8 +518,8 @@ test("Trusted Types (10 novembre) : une chaîne brute donnée à innerHTML ou à
   shh.cspViolations.length = 0;
 });
 
-// Moteur WebAssembly (spec moteur §7, Task 10) : chargement vérifié, éprouvé ici isolément (le site
-// l'utilise depuis la Task 11, test précédent) : la page d'essai ui-e2e/engine-page/ (construite par global-setup.ts avec
+// Moteur WebAssembly (spec moteur §7) : chargement vérifié, éprouvé ici isolément (le site
+// l'utilise depuis la, test précédent) : la page d'essai ui-e2e/engine-page/ (construite par global-setup.ts avec
 // les greffons du site, jamais livrée) appelle loadEngine() et l'Argon2id du moteur, servie par le
 // vrai serveur Go (CSP et Trusted Types de production) ou comme par GitHub Pages (démo).
 const ENGINE_PAGE = fileURLToPath(new URL("./engine-page/dist", import.meta.url));

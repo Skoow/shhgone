@@ -1,4 +1,4 @@
-// Appels réservés aux offres Plus et Pro (24 novembre) : pass payé lu sur l'appareil seulement
+// Appels réservés aux offres Plus et Pro : pass payé lu sur l'appareil seulement
 // (aucune requête), jeton anonyme pris du portefeuille.
 import { describe, expect, it } from "vitest";
 import { fakeIndexedDB } from "../history/fake-idb.test-helper";

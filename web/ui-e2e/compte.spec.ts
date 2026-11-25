@@ -1,5 +1,5 @@
 // Compte par passkey de bout en bout, PAR L'INTERFACE (conception 2026-11-22-compte-passkey-design.md
-// §3, §5, §14 ; plan, lot T1). Vrai binaire Go avec SHH_COMPTES=1 (et SHH_SALONS=1), origine
+// §3, §5, §14). Vrai binaire Go avec SHH_COMPTES=1 (et SHH_SALONS=1), origine
 // http://localhost:<port> (rp.id des passkeys), clé K_serveur tirée au hasard ; site construit avec
 // SHH_SITE_COMPTES=1 (web/dist-comptes, comptes-site.ts). Passkeys : authentificateur virtuel de
 // Chromium (CDP WebAuthn.addVirtualAuthenticator, avec ou sans PRF). Chaque test a son serveur neuf.

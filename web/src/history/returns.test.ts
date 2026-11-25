@@ -107,7 +107,7 @@ describe("retours chiffrés (IndexedDB simulé)", () => {
     expect(m.raw().size).toBe(1);
   });
 
-  it("revue D42-22 : base supprimée quand elle est vide (oubli, échéance) ; balayage au démarrage sans rien créer ; clear efface tout", async () => {
+  it("D42-22 : base supprimée quand elle est vide (oubli, échéance) ; balayage au démarrage sans rien créer ; clear efface tout", async () => {
     const idb = fakeIndexedDB();
     let now = T0;
     const r = openReturns({ backend: idbBackend(idb, RETURNS_DB), now: () => now });

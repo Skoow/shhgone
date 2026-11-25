@@ -1,7 +1,7 @@
 // Banc Playwright : un serveur Go neuf par test, sert web/dist (fixture `shh`) ; ou la démo
 // web/dist-demo servie comme par GitHub Pages (fixture `demo`).
 // Gardes de fin de test : aucune violation CSP, aucune requête hors de l'origine du serveur,
-// aucune exception non attrapée dans une page du contexte (audit D1, garde automatique).
+// aucune exception non attrapée dans une page du contexte (garde automatique).
 import AxeBuilder from "@axe-core/playwright";
 import { errors, test as base, expect, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { get } from "node:http";
@@ -42,7 +42,7 @@ function swallowHarnessStyle(page: Page, channel: "event" | "console", text: str
       ? text.startsWith("style-src-elem inline ")
       : text.startsWith("Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive");
   // Un refus par document de la page (cadre PDF compris) : Playwright injecte son style dans
-  // chacun (CI du 10 novembre). Au-delà du nombre de documents, c'est un vrai refus.
+  // chacun (CI). Au-delà du nombre de documents, c'est un vrai refus.
   if (!known || w[channel] >= page.frames().length) return false;
   w[channel]++;
   return true;
@@ -111,7 +111,7 @@ function retryFirstGoto(page: Page, origin: string): void {
 
 /**
  * `page.goto` d'une navigation EN COURS DE TEST (pas la première) : même relance que
- * retryFirstGoto (au plus 2 fois, 15 s chacune, jamais silencieuse). Constat (CI du 11 novembre,
+ * retryFirstGoto (au plus 2 fois, 15 s chacune, jamais silencieuse). Constat (CI,
  * sees-nothing.spec.ts:22, webkit-mobile) : la navigation vers le lien, depuis about:blank, n'a
  * jamais atteint « load » en 120 s alors que la même étape passe aux autres exécutions.
  * Cause probable (non prouvée, pas de WebKit ici) : le même blocage de transport que la première
@@ -142,7 +142,7 @@ async function guard(page: Page, origin: string): Promise<{ cspViolations: strin
   harness.set(page, { capturing: false, event: 0, console: 0 });
   // Toute capture de la page (page.screenshot appelé par un spec, pas seulement capture()) :
   // sous WebKit, Playwright injecte une feuille de style que la CSP refuse ; ce refus-là, et
-  // lui seul, est ignoré le temps de la capture (CI rouge du 10 novembre : 92 faux échecs).
+  // lui seul, est ignoré le temps de la capture (CI rouge : 92 faux échecs).
   const rawShot = page.screenshot.bind(page);
   page.screenshot = ((o?: Parameters<Page["screenshot"]>[0]) => during(page, () => rawShot(o))) as Page["screenshot"];
   await page.exposeFunction("__shhCsp", (d: string) => {
@@ -187,8 +187,8 @@ export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpt
   /**
    * Exceptions non attrapées (erreur levée ou promesse rejetée sans gestionnaire) de toute page
    * du contexte du test, onglets ouverts en cours de test compris (`weberror`). Automatique : un
-   * test qui n'utilise ni `shh` ni `demo` est gardé aussi. Une seule fait échouer le test (audit
-   * D1 : « Transition was skipped » passait inaperçu). Les contextes créés à la main par un test
+   * test qui n'utilise ni `shh` ni `demo` est gardé aussi. Une seule fait échouer le test (« Transition
+   * was skipped » passait inaperçu). Les contextes créés à la main par un test
    * (browser.newContext) ne sont pas couverts.
    */
   pageErrors: [
@@ -196,7 +196,7 @@ export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpt
       // WebKit seulement : l'interception de Playwright (page.route) perd parfois une partie
       // d'un corps de requête Blob quand le test retient la requête (sleep, barrière) : le
       // serveur reçoit un segment plus court que son Content-Length et répond 400. Reproduit
-      // en local (WebKit 27.2, run CI 44666763368) ; sans page.route, ou avec un corps en
+      // en local (WebKit 27.2, run) ; sans page.route, ou avec un corps en
       // octets, les mêmes envois passent. Défaut de l'outil, pas du site (Safari envoie le Blob
       // entier hors interception) : dans le banc WebKit, le corps Blob d'un XMLHttpRequest
       // part donc en octets, mêmes octets.
@@ -287,7 +287,7 @@ export function captureOf(l: Locator, o: Parameters<Locator["screenshot"]>[0]): 
 /**
  * Presse-papiers autorisé pour les tests. WebKit ne connaît pas « clipboard-write » : la
  * demander lève « Unknown permission », et la liste refusée reste attachée au contexte, si bien
- * que le newPage() suivant lève à son tour (CI du 10 novembre). On ne la demande donc jamais
+ * que le newPage() suivant lève à son tour (CI). On ne la demande donc jamais
  * sous WebKit (l'écriture y est permise après un geste, sans permission).
  */
 export async function grantClipboard(ctx: BrowserContext, origin?: string): Promise<void> {
@@ -297,7 +297,7 @@ export async function grantClipboard(ctx: BrowserContext, origin?: string): Prom
 
 /**
  * WebKit (Playwright) ne lit pas le presse-papiers du système en mode sans tête : la page
- * témoin se fermait (« Target page… has been closed », CI du 10 novembre). On y relève donc ce
+ * témoin se fermait (« Target page… has been closed », CI). On y relève donc ce
  * que le site écrit, au point d'écriture lui-même (navigator.clipboard.writeText), sans rien
  * changer à son comportement ; readClipboard rend la dernière écriture de l'onglet.
  */
@@ -343,13 +343,13 @@ export async function axe(page: Page) {
         .map((a) => a.finished.catch(() => undefined)),
     ),
   );
-  // Toutes les règles, « meta-viewport » comprise : le zoom est permis (rétabli le 20 novembre).
+  // Toutes les règles, « meta-viewport » comprise : le zoom est permis (rétabli).
   const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   return r.violations;
 }
 
 /**
- * Lit le presse-papiers depuis une page témoin : le site refuse `clipboard-read=()` (audit F3),
+ * Lit le presse-papiers depuis une page témoin : le site refuse `clipboard-read=`,
  * la page testée ne peut donc pas le lire elle-même. Page vierge servie par Playwright sur
  * une origine sûre (localhost) sans Permissions-Policy, puis l'onglet testé reprend la main.
  */

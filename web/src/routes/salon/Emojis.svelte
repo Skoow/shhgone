@@ -58,7 +58,7 @@
     flex-wrap: wrap;
     gap: var(--sp-1);
   }
-  /* Zones tactiles de 44 px (revue du 20 novembre, U20) ; le dessin des teintes reste un disque
+  /* Zones tactiles de 44 px ; le dessin des teintes reste un disque
      de 28 px, au centre d'un bouton de 44 px. */
   .groupes button {
     min-width: 44px;

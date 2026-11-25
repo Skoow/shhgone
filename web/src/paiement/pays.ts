@@ -1,4 +1,4 @@
-// Pays de résidence proposé d'avance sur la page Offres (propriétaire, 24 novembre : « sans avoir
+// Pays de résidence proposé d'avance sur la page Offres (« sans avoir
 // besoin de l'écrire »). Deviné SUR L'APPAREIL d'après le fuseau horaire du système, puis la
 // région de la langue du navigateur ; aucune requête, aucune adresse IP, rien n'est gardé. Ce
 // n'est qu'une valeur de départ : la personne la voit et la change si besoin (pays déclaré, §9.1).

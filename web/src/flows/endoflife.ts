@@ -1,11 +1,11 @@
 // Fin de vie chez le destinataire (UI §9.8 pied, §9.10, §12.2).
 // - Fin de lecture complète (fermeture « partage disparu », gone.svelte.ts) : done() → wipe() →
-//   révocation des URL. Plus de bouton « Terminer et effacer » (retours UI4, décision du propriétaire).
+//   révocation des URL. Plus de bouton « Terminer et effacer ».
 // - Sortie de page (pagehide, démontage) : wipe() et révocation seulement, SANS done() (spec
 //   §41.4, D42-22) : l'ouverture reste valable jusqu'à l'échéance, pour qu'un rechargement ou un
 //   retour depuis ce navigateur la rouvre.
 // - Détruire : opened.destroy(), puis wipe() ; la dissolution (onDestroyed) ne commence qu'après
-//   la réponse du serveur. Signaler : opened.report(catégorie), une voix (20 novembre) : si elle
+//   la réponse du serveur. Signaler : opened.report(catégorie), une voix : si elle
 //   efface le partage, même fin ; sinon « reported », la lecture continue, rien n'est effacé.
 import { LimitError, NotFoundError, type Categorie, type Opened } from "../index";
 import { revokeAll } from "../viewers/blobs";

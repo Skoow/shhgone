@@ -41,7 +41,7 @@
     cleaning?: (item: ComposeItem) => boolean;
   };
   let { category, items, bytes, helpId, onremove, onrename, onedit, onmove, onmoveto, compact = false, onmenu, cannotOpen, danger, upload, onretry, onpreview, fix, onclean, cleaning }: Props = $props();
-  // Une seule présentation partout (décision du propriétaire du 7 novembre) : lignes compactes,
+  // Une seule présentation partout : lignes compactes,
   // icône de format, nom, type, taille, temps d'envoi estimé, actions.
 
   const KEY = {

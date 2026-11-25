@@ -1,4 +1,4 @@
-// Nettoyage des images (spec §35.2, Task 9a) sur les fichiers d'essai de
+// Nettoyage des images (spec §35.2) sur les fichiers d'essai de
 // scripts/gen-fixtures.mjs et scripts/gen-media-fixtures.sh (repères fictifs).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -98,7 +98,7 @@ describe("nettoyage des images (spec §35.2)", () => {
     const tiff = exif.subarray(6);
     expect(readOrientation(tiff)).toBe(6);
     expect(u16be(tiff, 8)).toBe(1); // une seule entrée dans l'IFD0 : l'orientation
-    // IFD1 : la vignette seule (décision du propriétaire du 11 novembre), octet pour octet.
+    // IFD1 : la vignette seule, octet pour octet.
     expect(tiffTags(tiff)).toEqual([[0x0112], [0x0103, 0x0201, 0x0202]]);
     const srcTiff = jpegSegments(src).find(([m, d]) => m === 0xe1 && ascii(d, 0, 6) === "Exif\0\0")![1].subarray(6);
     expect(readThumbnail(tiff)).toEqual(readThumbnail(srcTiff));
@@ -112,7 +112,7 @@ describe("nettoyage des images (spec §35.2)", () => {
     expect(out.subarray(out.length - body.length)).toEqual(body);
   });
 
-  it("JPEG : APP0 JFIF gardé tel quel, vignette comprise (décision du propriétaire, 10 novembre)", async () => {
+  it("JPEG : APP0 JFIF gardé tel quel, vignette comprise", async () => {
     const src = fx("iphone-like.jpg");
     const [m0, app0] = jpegSegments(src)[0]!;
     expect(m0).toBe(0xe0);
@@ -258,12 +258,12 @@ describe("nettoyage des images (spec §35.2)", () => {
     expect(await stripMetadata(new Blob(["bonjour"]), "text/plain", "a.txt")).toEqual({ state: "sans" });
     const rec = await stripMetadata(new Blob([fx("chromium.webm")]), "video/webm", "v.webm", { recorded: true });
     expect(rec).toMatchObject({ state: "nettoye", family: "video" });
-    // Vidéo importée (Task 9c) : nettoyée elle aussi.
+    // Vidéo importée : nettoyée elle aussi.
     expect(await stripMetadata(new Blob([fx("chromium.webm")]), "video/webm", "v.webm")).toMatchObject({ state: "nettoye", family: "video" });
   });
 });
 
-describe("nettoyage des vidéos et de l'audio (spec §35.2, Task 9c)", () => {
+describe("nettoyage des vidéos et de l'audio (spec §35.2)", () => {
   const AV: [string, string, "video" | "audio"][] = [
     ["phone.mov", "video/quicktime", "video"],
     ["faststart.mp4", "video/mp4", "video"],
@@ -296,7 +296,7 @@ describe("nettoyage des vidéos et de l'audio (spec §35.2, Task 9c)", () => {
   });
 });
 
-describe("EXIF illisible (revue du 10 novembre)", () => {
+describe("EXIF illisible", () => {
   it("JPEG : l'EXIF abîmé est retiré, la photo est nettoyée (pas d'échec qui la laisserait partir avec sa position)", async () => {
     const b = fx("iphone-like.jpg").slice();
     const at = indexOf(b, new TextEncoder().encode("Exif\0\0"));
@@ -309,7 +309,7 @@ describe("EXIF illisible (revue du 10 novembre)", () => {
   });
 });
 
-describe("vignette EXIF gardée (décision du propriétaire du 11 novembre)", () => {
+describe("vignette EXIF gardée", () => {
   const exifOf = (b: Uint8Array) => jpegSegments(b).find(([m, d]) => m === 0xe1 && ascii(d, 0, 6) === "Exif\0\0")![1].subarray(6);
   it("aucune étiquette sensible ne survit (appareil, dates, logiciel, GPS, pointeurs EXIF et GPS) ; la vignette est identique", () => {
     const src = exifOf(fx("iphone-like.jpg"));
@@ -326,7 +326,7 @@ describe("vignette EXIF gardée (décision du propriétaire du 11 novembre)", ()
     // Relu : identique (le nettoyage d'un fichier déjà nettoyé ne change rien).
     expect(keptTiff(bare, 1)).toEqual(bare);
   });
-  // W7 (audit du 20 novembre) : la longueur déclarée dans l'IFD1 peut couvrir plus que la vignette.
+  // W7 : la longueur déclarée dans l'IFD1 peut couvrir plus que la vignette.
   const enc = (s: string) => [...s].map((c) => c.charCodeAt(0));
   const thumbJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 3, 0, 0xff, 0xc0, 0, 3, 0, 0xff, 0xda, 0, 3, 0, 1, 2, 0xff, 0x00, 3, 0xff, 0xd0, 4, 0xff, 0xd9]);
   it("vignette suivie d'octets dans la longueur déclarée : coupée à son EOI, rien après", () => {
@@ -341,7 +341,7 @@ describe("vignette EXIF gardée (décision du propriétaire du 11 novembre)", ()
     expect(readOrientation(keptTiff(fakeTiff(thumbJpeg), 3, 40)!)).toBe(3);
   });
 
-  // Décision du propriétaire du 22 novembre : la vignette est gardée, ses propres métadonnées
+  // La vignette est gardée, ses propres métadonnées
   // partent (segments retirés un à un, le reste octet pour octet).
   const seg = (m: number, body: number[]) => [0xff, m, (body.length + 2) >> 8, (body.length + 2) & 0xff, ...body];
   const GPS = enc("GPS 48.8566N 2.3522E");

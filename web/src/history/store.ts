@@ -15,7 +15,7 @@
 //   d'une lecture naïve du stockage. La vraie protection est le verrouillage de l'appareil.
 // - Une entrée ne contient que : le lien de gestion (S_gestion), l'heure locale de création,
 //   la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures, les ouvertures
-//   observées, l'état et le nom du partage (`label`, demande du propriétaire du 19 novembre :
+//   observées, l'état et le nom du partage (`label` :
 //   celui du manifeste, renommable ici sans changer ce que voit le destinataire ; chiffré comme
 //   le reste de l'entrée). JAMAIS K_lien, le lien de partage, le mot de passe, un nom d'élément
 //   ou un contenu : tout champ inconnu est ignoré (`clean`).
@@ -40,8 +40,7 @@ export type HistoryEntry = {
   /** Reçu : lien « https://…/s#<K_lien> » ; salon : invitation « https://…/#c<K_lien> » ; "" pour un envoi. */
   link: string;
   /**
-   * Libellé local d'un salon (64 caractères au plus) ; envoi : titre du partage (19 novembre,
-   * TITLE_MAX points de code au plus, déjà nettoyé par le moteur) ; "" sinon.
+   * Libellé local d'un salon (64 caractères au plus) ; envoi : titre du partage (* TITLE_MAX points de code au plus, déjà nettoyé par le moteur) ; "" sinon.
    */
   label: string;
   /** Reçu : sorte dominante (FORMATS) ; "" sinon. */
@@ -93,7 +92,7 @@ export type Backend = {
 const MANAGE_LINK = /^https?:\/\/[^#\s]+#m[A-Za-z0-9_-]{43}$/;
 const SHARE_LINK = /^https?:\/\/[^#\s]+#[A-Za-z0-9_-]{43}$/;
 const ROOM_LINK = /^https?:\/\/[^#\s]+#c[A-Za-z0-9_-]{43}$/;
-/** Lien de gestion d'un salon créé ici (« #s<S_gestion> », plan C-3 point 2), chiffré au repos. */
+/** Lien de gestion d'un salon créé ici (« #s<S_gestion> »), chiffré au repos. */
 const ROOM_MANAGE_LINK = /^https?:\/\/[^#\s]+#s[A-Za-z0-9_-]{43}$/;
 const SORTES: readonly Sorte[] = ["envoi", "recu", "salon_cree", "salon_rejoint"];
 const LABEL_MAX = 64;
@@ -129,7 +128,7 @@ export function idbBackend(idb: IDBFactory, name = DB): Backend {
   /**
    * Un autre onglet supprime ou fait monter la base : on lâche la connexion (sinon sa
    * suppression resterait bloquée et toutes les ouvertures suivantes attendraient) ; la
-   * prochaine opération rouvre (relecture du 12 novembre, A).
+   * prochaine opération rouvre (relecture, A).
    */
   const yieldOn = (d: IDBDatabase) => {
     d.onversionchange = () => {
@@ -150,7 +149,7 @@ export function idbBackend(idb: IDBFactory, name = DB): Backend {
       r.onerror = () => ko(r.error ?? new Error("idb"));
       r.onblocked = () => ko(new Error("idb_bloquee"));
     }).catch((e: unknown) => {
-      opened = undefined; // échec passager (base occupée) : la prochaine opération rouvre (18 novembre)
+      opened = undefined; // échec passager (base occupée) : la prochaine opération rouvre
       throw e;
     }));
   async function write(store: string, fn: (s: IDBObjectStore) => void): Promise<void> {
@@ -366,7 +365,7 @@ const aad = (id: string) => new TextEncoder().encode(AAD + id);
  */
 export async function openHistory(deps: { backend: Backend | null; now?: () => number; persist?: () => Promise<unknown> }): Promise<History | null> {
   const now = deps.now ?? Date.now;
-  // Retours du 15 novembre (« Mes partages » doit retrouver mes liens d'une visite à l'autre) :
+  // (« Mes partages » doit retrouver mes liens d'une visite à l'autre) :
   // à la première entrée gardée, le navigateur est prié de ne pas effacer ce stockage quand la
   // place manque (navigator.storage.persist). Une fois par ouverture, jamais attendu ; un refus
   // ou une erreur ne change rien (l'historique marche comme avant). Pas à la simple visite :
@@ -470,9 +469,9 @@ export async function openHistory(deps: { backend: Backend | null; now?: () => n
     },
     remove: (id) => b.del(id),
     clear: () => b.clear(),
-    // « Garder dans mon historique » (décision du 24 novembre) : désactivé par défaut, activé
+    // « Garder dans mon historique » : désactivé par défaut, activé
     // seulement par un geste de la personne (setEnabled(true)) : drapeau « on ». L'ancien drapeau
-    // « off » (activé par défaut, avant le 24 novembre) ne vaut plus rien et part au premier choix.
+    // « off » (activé par défaut) ne vaut plus rien et part au premier choix.
     // Les entrées déjà gardées restent : elles portent des liens de gestion, seul moyen de
     // supprimer ces partages ; « Effacer l'historique » ou « Oublier » les retire.
     enabled: async () => (await b.flag("on")) === true,

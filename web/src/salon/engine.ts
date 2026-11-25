@@ -1,6 +1,6 @@
 // Module WebAssembly du salon (engine/salon-wasm, crate shhdrop-salon-wasm), à part du moteur des
 // partages (src/engine/) : chargé une seule fois, au premier besoin du salon ; aucune page de
-// partage ne l'appelle. Les octets viennent de ./source, remplacé au build (greffon shh-salon,
+// partage ne l'appelle. Les octets viennent ./source, remplacé au build (greffon shh-salon,
 // vite.config.ts) : production, assets/salon-EMPREINTE.wasm lu avec son empreinte SHA-384
 // (source.verified.ts) ; démo, pas de salon (source.demo.ts). Tout échec de lecture est
 // Error("reseau") et ne laisse aucun module : l'appel suivant recommence.
@@ -17,7 +17,7 @@
 //   `renouveler` rendent des trames de 4 140 octets dont l'en-tête est tiré du contenu ;
 //   `recevoirTrame` les ouvre et refuse tout écart (`message_invalide`) ; l'arrivant y passe
 //   toutes les trames dès sa création, son Welcome le fait entrer (`entree`, trames rejouées) ;
-// - exclusion et départ (audit du 13 novembre ; spec salon v3 §15) : le moteur impose l'ordre.
+// - exclusion et départ (spec salon v3 §15) : le moteur impose l'ordre.
 //   `Salon.envoyer` lève `commit_en_cours` tant qu'un Commit de ce membre attend son écho, et
 //   `retrait_en_attente` tant qu'un siège parti (0x03) ou exclu (0x09) est encore dans l'arbre
 //   (`aRetirer()` les donne ; tout membre les retire par `retirer`, puis renvoie) : l'appelant
@@ -28,7 +28,7 @@
 //   courante (`rotation_refusee` sinon : la clé ne sert pas, le créateur la renvoie), puis
 //   passent à `clesDepuisMaitre(cle)` et refondent le groupe (`Salon.refonder`). Jamais le lien,
 //   `K_lien` ni le mot de passe dans un message ;
-// - relecture du 13 novembre (spec salon v3 §15.1, « Relecture ») : le 0x03 va à `marquerParti`,
+// - relecture (spec salon v3 §15.1, « Relecture ») : le 0x03 va à `marquerParti`,
 //   le 0x09 à `marquerExclu(siège ou undefined, r)` ; la marque suit l'arrivée (siège, nonce),
 //   une nouvelle annonce sur le siège ne l'efface pas ; `n` d'une rotation doit être le `r` du
 //   dernier 0x09 ; à l'écho de sa rotation, le créateur reçoit `rotationAcceptee` (il refonde)
@@ -37,11 +37,11 @@
 //   ne peut plus retirer un membre présent ni envoyer la rotation : `commit_refuse`,
 //   `rotation_refusee`) ; tant qu'un siège est à retirer, tout Commit le retire (`renouveler`
 //   et `ajouter` aussi) ; `exporterSframe` suit les refus d'`envoyer` ;
-// - 14 novembre (même section) : une seule rotation en vol (une seconde avant l'écho de la
+// - (même section) : une seule rotation en vol (une seconde avant l'écho de la
 //   première : `rotation_refusee`) ; pendant une reprise de siège (0x0A), l'ancienne feuille
 //   est dans `aRetirer()` jusqu'au Commit qui la remplace (même jugement que par la liste
 //   complète du 0x0D) ;
-// - 14 novembre (spec salon v3 §15.2, décision du propriétaire) : le rôle de créateur tient à
+// - (spec salon v3 §15.2) : le rôle de créateur tient à
 //   `S_gestion`. Le créateur passe `sGestion` à `Salon.creer` à la création comme à chaque retour
 //   (même clé de rôle, même code de vérification ; rôle rendu dès le Commit qui l'ajoute) ;
 //   `createurRevenu` sur `membres`, `commitPerdu` et `commitAccepte` : à afficher à tous. Au
@@ -56,8 +56,8 @@
 // - groupe MLS : contrat de l'appelant sur les annonces du serveur et l'ordre `seq`
 //   (engine/salon/src/groupe.rs, en tête).
 //
-// Panique (un bogue : aucune entrée ne doit en provoquer ; comme le moteur des partages, audit
-// F4) : sur wasm32, elle arrête l'instance (`WebAssembly.RuntimeError`) sans exécuter aucun
+// Panique (un bogue : aucune entrée ne doit en provoquer ; comme le moteur des
+// partages) : sur wasm32, elle arrête l'instance (`WebAssembly.RuntimeError`) sans exécuter aucun
 // `Drop` : les clés, l'état MLS et les clés privées resteraient dans la mémoire du module, et les
 // autres poignées continueraient sur une instance à moitié modifiée. Ici : le module est marqué
 // cassé, sa mémoire est mise à zéro aussitôt, et tout appel suivant (ce moteur, ses poignées)

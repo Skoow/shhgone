@@ -1,6 +1,6 @@
 <script lang="ts">
   // « Lien prêt » (UI §9.5) : affiché seulement après la résolution de createShare. L'avertissement
-  // « plus jamais affichés » en tête ; un seul cadre (19 novembre) : le lien et le mot de passe
+  // « plus jamais affichés » en tête ; un seul cadre : le lien et le mot de passe
   // (masqué à l'arrivée), chacun avec sa copie, et les informations du partage en bas ; puis « Partager » (feuille : envoyer vers une app, copier le lien et le mot
   // de passe, QR code du lien et du mot de passe, D41-29) et « Copier le lien et le mot de
   // passe » ; lien de gestion replié ; Supprimer ce partage (secondaire) ; Terminé (principal,
@@ -28,7 +28,7 @@
   import { forgetShare, keepSentDefault, loadHistory, markDestroyed, recordShare, setHistoryEnabled, shares } from "../history/live.svelte";
   import "../ui/seal.css";
 
-  /** `title` : nom du partage tel que le moteur l'a écrit (nettoyé, 19 novembre) ; absent sans nom. */
+  /** `title` : nom du partage tel que le moteur l'a écrit (nettoyé) ; absent sans nom. */
   export type ReadyResult = { link: string; manage: string; expiresInS: number; password: string; title?: string };
   type Props = {
     /** null après Terminé ou Supprimer : plus aucune référence aux secrets. */
@@ -55,12 +55,12 @@
   );
 
   // ---------- « Garder dans mon historique » (spec §33, §33.1) ----------
-  // Désactivé par défaut, avec ou sans compte (décisions du 24 novembre ; keepSentDefault), le
+  // Désactivé par défaut, avec ou sans compte (keepSentDefault), le
   // lien de gestion est alors montré ici ; activé par la personne, le réglage vaut pour les envois
   // suivants. Une fois activé, gardé dès l'affichage (fermer l'onglet
   // sans « Terminé » ne le perd pas) : le lien de gestion,
   // l'heure locale, la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures et le
-  // nom du partage (19 novembre) ; jamais le lien de partage, le mot de passe ni les noms des
+  // nom du partage ; jamais le lien de partage, le mot de passe ni les noms des
   // éléments. Désactiver retire l'entrée et vaut pour les prochains envois. Opérations à la file : une bascule rapide garde l'ordre.
   const createdAt = Date.now();
   let keep = $state(false);
@@ -71,7 +71,7 @@
   async function save() {
     const r = result;
     if (!r || keepId) return;
-    // Nom du partage (19 novembre) : gardé dans l'entrée, chiffrée comme le reste (history/store.ts).
+    // Nom du partage : gardé dans l'entrée, chiffrée comme le reste (history/store.ts).
     keepId = await recordShare({ manage: r.manage, createdAt, sizeBytes, itemsCount, expiresAt: createdAt + r.expiresInS * 1000, maxOpens, ...(r.title ? { label: r.title } : {}) });
   }
   $effect(() => {
@@ -223,7 +223,7 @@
 
       <p class="never" data-fan><ClipboardX size={18} strokeWidth={1.75} aria-hidden="true" />{t("ready.never")}</p>
 
-      <!-- Un seul cadre (propriétaire, 19 novembre) : le lien, le mot de passe (masqué à l'arrivée,
+      <!-- Un seul cadre : le lien, le mot de passe (masqué à l'arrivée,
            œil pour l'afficher, copiable masqué), puis les informations du partage en bas. -->
       <div class="card" data-fan data-ready-card>
         <div class="cell" role="group" aria-label={t("ready.link.title")}><CopyField label={t("ready.link.label")} value={result.link} /></div>
@@ -238,10 +238,10 @@
         {/if}
         <div class="cell" role="group" aria-label={t("ready.pw.title")}><CopyField label={t("ready.pw.title")} value={result.password} whole secret /></div>
         <div class="facts" data-ready-facts>
-          <!-- Nom du partage (19 novembre) : texte de l'expéditeur, en texte brut, isolé (bdi). -->
+          <!-- Nom du partage : texte de l'expéditeur, en texte brut, isolé (bdi). -->
           {#if result.title}<p class="name" data-ready-name><span class="sr-only">{t("ready.name")} </span><bdi>{result.title}</bdi></p>{/if}
           <p class="active num"><span class="dot" aria-hidden="true"></span>{t("ready.active")}</p>
-          <!-- Heure de fin seule (audit M16) : le serveur l'arrondit au quart d'heure supérieur ;
+          <!-- Heure de fin seule : le serveur l'arrondit au quart d'heure supérieur ;
                un décompte « 12 h 12 min » à côté de « 12 h » semblait faux. La phrase dit l'arrondi. -->
           <p class="when"><Deadline expiresInS={result?.expiresInS ?? 0} countdown={false} /></p>
           <p class="self">{selfDestruct}</p>
@@ -260,7 +260,7 @@
         {#if copyNote && !sheet}<p class="note" role="status">{copyNote}</p>{/if}
       </div>
 
-      <!-- « Gérer ce partage » retiré (propriétaire, 19 novembre) : avec l'historique, le partage se
+      <!-- « Gérer ce partage » retiré : avec l'historique, le partage se
            suit et se supprime depuis « Mes partages ». Sans historique, le lien de gestion est le
            seul moyen de le suivre ou de le supprimer plus tard : il est alors montré ici. -->
       <div class="keep" data-keep data-kept={keepId ? "" : undefined}>
@@ -338,7 +338,7 @@
     color: var(--text);
     overflow-wrap: anywhere;
   }
-  /* Échéance en deux lignes (Deadline, retours UI4). */
+  /* Échéance en deux lignes (Deadline). */
   .when {
     margin: 0;
     font-size: var(--fs-small);
@@ -582,7 +582,7 @@
     margin: 0;
     color: var(--text-2);
   }
-  /* Démo seulement : la mention qui remplace le texte du bandeau (16 novembre). */
+  /* Démo seulement : la mention qui remplace le texte du bandeau. */
   .demo-note {
     margin: var(--sp-2) 0 0;
     color: var(--warn);

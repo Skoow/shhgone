@@ -1,4 +1,4 @@
-// Vidéos et audio ISOBMFF : MP4, MOV, M4V, M4A (spec §35.2, Task 9c). Nettoyage EN PLACE, à
+// Vidéos et audio ISOBMFF : MP4, MOV, M4V, M4A (spec §35.2). Nettoyage EN PLACE, à
 // longueur constante : aucune position (stco, co64, sidx, moof) n'est à recalculer.
 // - boîtes de premier niveau hors liste blanche (prft, uuid, meta, udta, PICT…) : « free » + zéros ;
 //   contenu des free/skip/wide existantes mis à zéro (anciens moov laissés par les éditeurs) ;

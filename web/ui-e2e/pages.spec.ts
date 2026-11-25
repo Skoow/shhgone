@@ -1,11 +1,11 @@
-// Pages d'information (plan Task 25, retours UI5) et en-tête : Sécurité (limites honnêtes),
+// Pages d'information et en-tête : Sécurité (limites honnêtes),
 // Confidentialité, Conditions et Mentions légales (squelettes « En cours de rédaction », aucune
 // identité inventée), Signaler un abus, Offres (« par partage »). Captures fr-FR 390 et 1440.
 import { fileURLToPath } from "node:url";
 import { axe, captureOf, expect, test } from "./fixtures";
 
 test.use({ locale: "fr-FR" });
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-UI5/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/UI5/", import.meta.url));
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 
 test("Sécurité : chiffrement, ce que voit le serveur, limites (historique, onglet, PDF et archives, caméra) ; jamais « 100 % » ; capture", async ({ page, shh, isMobile }) => {
@@ -25,7 +25,7 @@ test("Sécurité : chiffrement, ce que voit le serveur, limites (historique, ong
   await tech.locator("summary").click();
   for (const x of ["AES-256-GCM", "Argon2id", "Permissions-Policy"]) await expect(tech).toContainText(x);
   await expect(tech.getByRole("link", { name: /Code source public/ })).toHaveAttribute("href", "https://github.com/Skoow/shhgone");
-  await expect(tech.getByRole("link", { name: /Spécification publique/ })).toHaveAttribute("href", /docs\/superpowers\/specs\/2026-11-03-shhdrop-design\.md$/);
+  await expect(tech.getByRole("link", { name: /Spécification publique/ })).toHaveAttribute("href", /docs\/conception\/specs\/2026-11-03-shhdrop-design\.md$/);
   await tech.locator("summary").click();
   expect(await axe(page)).toEqual([]);
   await page.screenshot({ path: `${SHOTS}securite-${w(isMobile)}.png`, fullPage: true });
@@ -35,7 +35,7 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   await page.goto(shh.origin + "/confidentialite");
   await expect(page.locator("main")).toContainText("Aucun cookie");
   await expect(page.locator("main")).toContainText("Votre adresse IP n'est pas enregistrée.");
-  // Aucun repli Google reCAPTCHA (retiré le 24 novembre) : la page n'en parle pas.
+  // Aucun repli Google reCAPTCHA (retiré) : la page n'en parle pas.
   await expect(page.locator("#verification")).toContainText("sans service extérieur");
   await expect(page.locator("main")).not.toContainText("Google");
   await page.goto(shh.origin + "/signaler");
@@ -43,7 +43,7 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   await expect(page.locator("main")).toContainText("Signaler");
   // Signalement complet par écrit (DSA art. 16) : lien, explication, nom et e-mail, bonne foi.
   await expect(page.locator("main")).toContainText("de bonne foi");
-  // Mentions légales (22 novembre) : éditeur particulier anonyme (LCEN art. 1-1, II), point de
+  // Mentions légales : éditeur particulier anonyme (LCEN art. 1-1, II), point de
   // contact unique du DSA (art. 11 et 12), hébergeur OVH ; bandeau gardé jusqu'à l'avis du juriste.
   await page.goto(shh.origin + "/mentions-legales");
   await expect(page.getByRole("heading", { level: 1, name: "Mentions légales" })).toBeVisible();
@@ -69,7 +69,7 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   }
 });
 
-test("Offres (refaite le 16 novembre) : une seule présentation, facturation, choix de l'offre, récapitulatif ; rien n'est demandé ni prélevé ; capture", async ({ page, shh, isMobile }) => {
+test("Offres (refaite) : une seule présentation, facturation, choix de l'offre, récapitulatif ; rien n'est demandé ni prélevé ; capture", async ({ page, shh, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
   const lectures: string[] = [];
   page.on("request", (r) => {
@@ -78,13 +78,13 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   await page.goto(shh.origin + "/offres");
   const co = page.locator("[data-checkout]");
   const norm = (s: string) => s.replace(/[\u202f\u00a0]/g, " ");
-  // Paiement pas ouvert sur ce serveur (revue du 20 novembre, U12) : dit en t\u00eate de page, avant
+  // Paiement pas ouvert sur ce serveur : dit en t\u00eate de page, avant
   // les offres, et les boutons portent \u00ab Bient\u00f4t \u00bb ; une seule lecture de /api/paiement.
   const ferme = co.locator("[data-pay-closed]");
   await expect(ferme).toHaveText("Le paiement n'est pas encore ouvert sur ce serveur. Rien n'est demand\u00e9 ni pr\u00e9lev\u00e9 aujourd'hui.");
   expect((await ferme.boundingBox())!.y).toBeLessThan((await co.locator('[data-tier="free"]').boundingBox())!.y);
   for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-soon]`)).toHaveText("Bient\u00f4t");
-  // Appels (24 novembre) : inclus dans Plus et Pro, réservés à ces offres ; plus de « bientôt ».
+  // Appels : inclus dans Plus et Pro, réservés à ces offres ; plus de « bientôt ».
   for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-calls]`)).toHaveText(/^Appels audio et vidéo\s+Inclus$/);
   await expect(co.locator('[data-tier="free"] [data-calls]')).toHaveText(/^Appels audio et vidéo\s+Non inclus$/);
   expect(lectures).toEqual([shh.origin + "/api/paiement"]);
@@ -92,7 +92,7 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   await expect(co.locator("[data-tier]")).toHaveCount(3);
   await expect(page.locator("[data-offers], [data-prices]")).toHaveCount(0);
   for (const [x, size] of [["free", "2 Go"], ["plus", "10 Go"], ["pro", "30 Go"]] as const) expect(norm(await co.locator(`[data-tier="${x}"]`).innerText())).toContain(size);
-  // Mensuel par défaut (16 novembre) ; annuel au choix. Prix « 7 € / mois », TTC dit une fois (17 novembre).
+  // Mensuel par défaut ; annuel au choix. Prix « 7 € / mois », TTC dit une fois.
   expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/7 €\s*\/\s*mois/);
   await co.locator("[data-billing]").getByText("Annuel").click();
   expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/70 €\s*\/\s*an/);
@@ -105,7 +105,7 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   await co.locator('[data-tier="pro"] .big').click();
   const sum = co.locator("[data-summary]");
   expect(norm(await sum.innerText())).toMatch(/Pro · Mensuel · 20 € \/ mois/);
-  // Départ du compte à rebours à la première ouverture : annoncé « bientôt », pas encore codé (24 novembre).
+  // Départ du compte à rebours à la première ouverture : annoncé « bientôt », pas encore codé.
   await expect(co.locator(".adds li").filter({ hasText: "première ouverture" })).toHaveText("Bientôt (pas encore disponible) : le compte à rebours pourra démarrer à la première ouverture");
   // Paiement pas ouvert sur ce serveur (sans SHH_PAIEMENT) : le bouton le dit, aucun prélèvement.
   const go = sum.getByRole("button", { name: "Bientôt" });
@@ -123,7 +123,7 @@ test("en-tête : air au-dessus du logo, sans roue des Réglages ; pied de page ;
   // Le premier élément de la barre (logo, ou « Retour » sur téléphone) n'est plus collé en haut.
   const first = await page.locator(isMobile ? "header.top .bar" : "header.top a.logo").boundingBox();
   expect(first!.y).toBeGreaterThanOrEqual(8);
-  // Plus de roue des Réglages (retours du 11 novembre) : son contenu est dans le pied de page.
+  // Plus de roue des Réglages : son contenu est dans le pied de page.
   await expect(page.getByRole("banner").getByRole("button", { name: "Réglages" })).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}entete-${w(isMobile)}.png` });
   const foot = page.locator("footer[data-foot]");

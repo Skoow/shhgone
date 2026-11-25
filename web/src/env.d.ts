@@ -12,7 +12,7 @@ declare const __SHH_BUILD__: string | undefined;
 /** Compte par e-mail (vite.config.ts, comptesActifs) : false par défaut et dans la démo ; false sous vitest. */
 declare const __COMPTES__: boolean;
 
-/** Salon (plan C-3) : vrai en production avec le compte (création exigée par D42-26), faux dans la démo (pas de serveur du salon) ; faux sous vitest. */
+/** Salon : vrai en production avec le compte (création exigée par D42-26), faux dans la démo (pas de serveur du salon) ; faux sous vitest. */
 declare const __SALONS__: boolean;
 
 /** Pages bilingues écrites au build sous « /en » (app/langues.ts) : vrai hors démo ; faux sous vitest. */
@@ -48,8 +48,8 @@ declare module "virtual:shh-lang" {
 }
 
 // Module WebAssembly du salon (greffon shh-salon, vite.config.ts). Production : adresse et
-// empreinte SRI de assets/salon-EMPREINTE.wasm. Démo : le .wasm en base64 (`wasm`), dans un
-// morceau chargé à part (le pseudo du compte de la démo, 19 novembre).
+// empreinte SRI de assets/salon-EMPREINTE.wasm. Démo : .wasm en base64 (`wasm`), dans un
+// morceau chargé à part (le pseudo du compte de la démo).
 declare module "virtual:shh-salon" {
   export const src: string;
   export const integrity: string;

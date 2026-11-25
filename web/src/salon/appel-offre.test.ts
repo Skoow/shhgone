@@ -1,4 +1,4 @@
-// Appels réservés aux offres Plus et Pro (24 novembre) :
+// Appels réservés aux offres Plus et Pro :
 // jeton anonyme demandé seulement sur 402, jamais quand les appels du salon sont déjà ouverts.
 import { describe, expect, it } from "vitest";
 import { OFFRE_REQUISE, relaisReserve } from "./appel-offre";

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Bandeau « English version » (20 novembre ; bandeau en haut de page, U10) : seulement sur la version française d'une page
+// Bandeau « English version » (bandeau en haut de page, U10) : seulement sur la version française d'une page
 // bilingue, pour un navigateur anglophone, et jamais dans la démo.
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, describe, expect, it } from "vitest";
@@ -38,7 +38,7 @@ describe("EnglishLink", () => {
     expect(lien({ chemin: "/en/securite", navigateur: ["en-US"] })).toBeNull();
     setLang("fr");
   });
-  // Revue du 20 novembre (U10) : bandeau en haut de page, dans le flux (jamais flottant), zones
+  // Bandeau en haut de page, dans le flux (jamais flottant), zones
   // de 44 px, fermable ; la fermeture tient pour la vie de la page (en mémoire seulement).
   // Dernier test du fichier : la fermeture est un état du module.
   it("bandeau dans le flux, fermable, et qui ne revient pas", () => {

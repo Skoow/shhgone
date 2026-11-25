@@ -1,4 +1,4 @@
-// Partie gardée en TypeScript (pure.ts, décisions B1 et B3 du contrôleur, Task 11) : égale au
+// Partie gardée en TypeScript (pure.ts, décisions B1 et B3 du contrôleur) : égale au
 // moteur Rust, prouvée sur les vecteurs communs (engine/vectors/v2.json) ET contre le moteur
 // WebAssembly lui-même, cas par cas (même entrée → même sortie ou même message d'erreur).
 import { readFileSync } from "node:fs";
@@ -85,7 +85,7 @@ describe("géométrie : TypeScript = vecteurs = moteur", () => {
     expect(n).toBeGreaterThan(50);
   });
 
-  it("segmentCount, segmentSize : entrées hostiles refusées comme le moteur (audit F2)", () => {
+  it("segmentCount, segmentSize : entrées hostiles refusées comme le moteur", () => {
     const bad = [-1, -0.5, 0.5, 1.5, NaN, Infinity, -Infinity, 2 ** 32, 2 ** 53, Number.MAX_SAFE_INTEGER, -(2 ** 31), 1e300];
     const good = [0, -0, 1, 16, 63, 64, 65, 400, 32_769, 2 ** 32 - 1];
     let n = 0;
@@ -170,7 +170,7 @@ describe("liens : TypeScript = vecteurs = moteur (v2.json, v3-liens.json, v4-lie
       n++;
     }
     // 58 cas de v2.json, moins 2 remplacés, plus 25 de v3-liens.json (liens sous /s) ; moins les
-    // 26 lectures à la racine (v2 : 20, v3 : 6), plus les 42 de v4-liens-s.json (18 novembre).
+    // 26 lectures à la racine (v2 : 20, v3 : 6), plus les 42 de v4-liens-s.json.
     expect(n).toBe(97);
   });
 

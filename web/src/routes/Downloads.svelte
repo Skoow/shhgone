@@ -1,7 +1,7 @@
 <script lang="ts">
   // « Téléchargements » (/telechargements, conception compte §21.15.5), avec ou sans compte :
   // historique des fichiers enregistrés, sur cet appareil seulement (downloads/store.ts, chiffré,
-  // 30 jours ; désactivé par défaut, décision du propriétaire du 22 novembre 2026). Aucune
+  // 30 jours ; désactivé par défaut). Aucune
   // requête réseau. Le site ne peut pas rouvrir un fichier enregistré : il est dans le dossier
   // Téléchargements de l'appareil (dit dans le sous-titre).
   import { untrack } from "svelte";

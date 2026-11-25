@@ -32,9 +32,9 @@ describe("options : mot de passe généré seulement, aucun choix payant", () =>
     show(Options, { options, unviewable: [] });
     return { options };
   }
-  it("aucune saisie de mot de passe ; plus de mot de passe dans les options (17 novembre : montré sous le lien, sur « Lien prêt »)", () => {
+  it("aucune saisie de mot de passe ; plus de mot de passe dans les options (montré sous le lien, sur « Lien prêt »)", () => {
     const { options } = opts();
-    // Seul champ de texte : le nom du partage (19 novembre), jamais un mot de passe.
+    // Seul champ de texte : le nom du partage, jamais un mot de passe.
     const fields = [...document.querySelectorAll("input[type=text], input:not([type]), input[type=password]")];
     expect(fields.filter((f) => !f.closest("[data-share-name]"))).toHaveLength(0);
     expect(fields.map((f) => f.getAttribute("type"))).not.toContain("password");
@@ -45,7 +45,7 @@ describe("options : mot de passe généré seulement, aucun choix payant", () =>
     // Toujours généré, 11 caractères, prêt pour l'envoi.
     expect(options.password).toHaveLength(11);
   });
-  it("audit M17 (décision du 11 novembre) : aucun choix payant verrouillé dans les options, ni coffre", () => {
+  it("Aucun choix payant verrouillé dans les options, ni coffre", () => {
     opts();
     expect(document.querySelectorAll("[data-locked]")).toHaveLength(0);
     expect(text()).not.toMatch(/jours|première ouverture|Jusqu'à 50|copie chiffrée/);

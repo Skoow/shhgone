@@ -1,7 +1,7 @@
 // JPEG (spec §35.2) : reconstruction segment par segment. Gardés : SOI, APP0 JFIF, APP2 ICC
 // (tous les morceaux, dans l'ordre), APP14 Adobe, tables, SOFn, SOS et données compressées
 // octet pour octet, EOI. APP1 EXIF réécrit avec la seule orientation (boutisme d'origine) et
-// la vignette de l'IFD1 intacte (décision du propriétaire du 11 novembre, exif.ts:keptTiff).
+// la vignette de l'IFD1 intacte (exif.ts:keptTiff).
 // Tout le reste est retiré, y compris ce qui suit le premier EOI (images secondaires
 // MPF, cartes de gain et de profondeur, vidéo des photos animées).
 import { Malformed, concat, slice, startsWith, u16be, u8 } from "./bytes";
@@ -47,7 +47,7 @@ export function cleanJpeg(b: Uint8Array): Uint8Array<ArrayBuffer> {
       continue;
     }
     if (m === 0xe0) {
-      // JFIF gardé tel quel, vignette comprise (décision du propriétaire, 10 novembre) ; JFXX retiré.
+      // JFIF gardé tel quel, vignette comprise ; JFXX retiré.
       if (startsWith(body, 0, "JFIF\0")) out.push(seg);
     } else if (m === 0xe1) {
       if (startsWith(body, 0, EXIF_ID) && !exifDone) {

@@ -2,7 +2,7 @@
 // méta), aucun défilement horizontal, barre d'onglets sur les écrans racine seulement, action
 // principale visible en bas, cibles ≥ 44 px, champs ≥ 16 px (pas de zoom iOS), confirmations
 // en feuille du bas, tableau comparatif en cartes. Ordinateur : rien ne change (≥ 900 px).
-// Captures fr-FR 390 × 844 (×2) : .superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-MOB/.
+// Captures fr-FR 390 × 844 (×2) : web/test-results/captures/MOB/.
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
@@ -11,7 +11,7 @@ import { freshPage, pwField, sendShare, settle, unlock, unlockButton } from "./o
 import { addText, noHScroll, readyHeading, sendButton } from "./send-helpers";
 import { foot, footLink } from "./foot-helpers";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-MOB2/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/MOB2/", import.meta.url));
 const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "fr-FR" } as const;
 
 async function shot(page: Page, name: string) {
@@ -25,7 +25,7 @@ async function shot(page: Page, name: string) {
 const tabbar = (page: Page) => page.getByRole("navigation", { name: "Navigation principale" });
 
 /** Boutons et liens-boutons visibles plus petits que 44 × 44 px (liens dans le texte exclus).
- *  Exception (retours UI6) : pastilles de coin d'une icône de format ([data-corner], cadenas et
+ *  Exception : pastilles de coin d'une icône de format ([data-corner], cadenas et
  *  « Téléchargé ») : deux bulles sur une icône de 44 px, donc 24 px au moins (WCAG 2.5.8). */
 const smallTargets = (page: Page, scope: string) =>
   page.evaluate((sel) => {
@@ -75,11 +75,11 @@ test.describe("téléphone façon app", () => {
     expect(await meta("theme-color")).toBe("#0B0D12");
     expect(await meta("apple-mobile-web-app-capable")).toBe("yes");
     expect(await meta("viewport")).toContain("viewport-fit=cover");
-    // Aucun service worker dans cette tâche (Tasks C1 à C4).
+    // Aucun service worker dans cette tâche.
     expect(await page.evaluate(() => navigator.serviceWorker?.controller ?? null)).toBeNull();
   });
 
-  test("accueil : menu ☰ (retours du 15 novembre), plus de barre d'onglets sans compte, pied de page, ni rebond ni défilement horizontal", async ({ page, shh }) => {
+  test("accueil : menu ☰, plus de barre d'onglets sans compte, pied de page, ni rebond ni défilement horizontal", async ({ page, shh }) => {
     await page.goto(shh.origin + "/");
     // Sans compte, plus de barre d'onglets : le menu ☰ en haut à droite la remplace.
     await expect(tabbar(page)).toHaveCount(0);
@@ -93,9 +93,9 @@ test.describe("téléphone façon app", () => {
     const closeButton = page.getByRole("banner").getByRole("button", { name: "Fermer le menu" });
     await expect(closeButton).toHaveAttribute("aria-expanded", "true");
     const menu = page.locator("[data-menu]");
-    // Décisions des 16 et 17 novembre : « Nouveau partage », « Mes partages » seulement s'il y a des
+    // « Nouveau partage », « Mes partages » seulement s'il y a des
     // partages sur l'appareil (aucun ici), « Offres » ; le reste est dans le pied de page.
-    // Menu du 18 novembre : « Nouveau partage », puis Salon (bientôt, un bouton), Sécurité, Offres.
+    // Menu : « Nouveau partage », puis Salon (bientôt, un bouton), Sécurité, Offres.
     await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Sécurité", "Offres"]);
     await expect(menu.getByRole("button", { name: /^Salon/ })).toHaveAttribute("aria-disabled", "true");
     await expect(menu.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
@@ -118,7 +118,7 @@ test.describe("téléphone façon app", () => {
     // Entrée de l'accueil finie (le cadre de l'infographie grandit un instant) avant de mesurer.
     await page.waitForTimeout(1500);
     expect(await smallTargets(page, "body")).toEqual([]);
-    // Accueil vide : « tirer pour actualiser » permis (rien à perdre, 17 novembre).
+    // Accueil vide : « tirer pour actualiser » permis (rien à perdre).
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY)).not.toBe("none");
     expect(await noHScroll(page)).toBe(true);
     // UI5 : pied de page visible en bas de l'accueil, téléphone compris.
@@ -133,10 +133,10 @@ test.describe("téléphone façon app", () => {
     // Pied de page : Sécurité, Confidentialité.
     await expect(footLink(page, "Sécurité")).toBeAttached();
     await expect(footLink(page, "Confidentialité")).toBeAttached();
-    await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0); // langue du navigateur, plus de choix (12 novembre)
+    await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0); // langue du navigateur, plus de choix
     await footLink(page, "Sécurité").click();
     await expect(page).toHaveURL(/\/securite$/);
-    // Page d'information (page séparée, 16 novembre) : en-tête ordinaire, logo et menu, pas de « Retour ».
+    // Page d'information (page séparée) : en-tête ordinaire, logo et menu, pas de « Retour ».
     await expect(page.getByRole("banner").getByRole("button", { name: "Retour" })).toHaveCount(0);
     await page.getByRole("banner").getByRole("link", { name: "Shhgone, accueil" }).click();
     await expect(page).toHaveURL(new RegExp(`${shh.origin.replace(/[.:/]/g, "\\$&")}/$`));
@@ -146,7 +146,7 @@ test.describe("téléphone façon app", () => {
     test.setTimeout(90_000);
     await page.goto(shh.origin + "/");
     await shot(page, "accueil-ajouter");
-    // « Créer sur place » → page d'envoi, feuille « Ajouter » déjà ouverte (17 novembre) : liste groupée, avec poignée.
+    // « Créer sur place » → page d'envoi, feuille « Ajouter » déjà ouverte : liste groupée, avec poignée.
     await page.locator('[data-make="room"]').click();
     await expect(page).toHaveURL(/\/envoyer$/);
     const add = page.getByRole("dialog", { name: "Ajouter" });
@@ -248,7 +248,7 @@ test.describe("téléphone façon app", () => {
     await expect(tabbar(page)).toHaveCount(0);
     // Sans onglets : le pied de page reste, sans choix de langue (elle suit le navigateur).
     await expect(page.getByRole("banner").getByRole("button", { name: "Réglages" })).toHaveCount(0);
-    await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0); // langue du navigateur, plus de choix (12 novembre)
+    await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0); // langue du navigateur, plus de choix
     await page.evaluate(() => scrollTo(0, 0));
     expect(await smallFields(page)).toEqual([]);
     expect(await inViewport(page, unlockButton(page))).toBe(true);
@@ -272,17 +272,17 @@ test.describe("ordinateur : rien ne change", () => {
     await page.goto(shh.origin + "/");
     await expect(tabbar(page)).toBeHidden();
     await expect(foot(page)).toBeVisible();
-    // En-tête : ni sélecteur de langue ni entrée Réglages (retours du 11 novembre) ; ses seuls
-    // boutons sont ceux des menus de la barre du haut (refonte du 12 novembre).
+    // En-tête : ni sélecteur de langue ni entrée Réglages ; ses seuls
+    // boutons sont ceux des menus de la barre du haut.
     const banner = page.getByRole("banner");
     await expect(banner.getByRole("button", { name: /Réglages|Settings|Langue|Language|Français|English/ })).toHaveCount(0);
-    // « Se connecter · bientôt » tant que le compte n'est pas ouvert (19 novembre, 4).
+    // « Se connecter · bientôt » tant que le compte n'est pas ouvert.
     expect(await banner.getByRole("button").allTextContents()).toEqual(["Envoyer", "Salonbientôt", "Sécurité", "Se connecterbientôt"]);
-    await expect(foot(page).getByText("À propos", { exact: true })).toHaveCount(0); // pied B2 (18 novembre)
-    for (const n of ["Langue", "Fichiers"]) await expect(foot(page).getByText(n, { exact: true })).toHaveCount(0); // retirés le 12 novembre
+    await expect(foot(page).getByText("À propos", { exact: true })).toHaveCount(0); // pied B2
+    for (const n of ["Langue", "Fichiers"]) await expect(foot(page).getByText(n, { exact: true })).toHaveCount(0); // retirés
     await expect(footLink(page, "Sécurité")).toBeVisible();
     await expect(footLink(page, "Confidentialité")).toBeVisible();
-    await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0); // langue du navigateur, plus de choix (12 novembre)
+    await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0); // langue du navigateur, plus de choix
     await expect(page.locator("html")).toHaveAttribute("lang", "fr");
   });
 });

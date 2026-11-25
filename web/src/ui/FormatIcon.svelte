@@ -2,7 +2,7 @@
   // Icône de format maison (listes du composeur et du destinataire) : une feuille à coin plié,
   // trait fin, un petit pictogramme et une pastille de couleur avec le libellé du format,
   // toujours écrit (« PDF », « DOC », « ZIP », « IMG »…) : la couleur n'est jamais la seule
-  // information (retours UI6). Couleurs : jetons --fmt-* (tokens.css). Aucun logo de marque.
+  // information. Couleurs : jetons --fmt-* (tokens.css). Aucun logo de marque.
   // Décorative : le type est dit en texte dans la ligne (aria-hidden ici).
   import { t } from "../i18n/i18n.svelte";
   import { abbr, type Family, type Format } from "./formats";
@@ -34,11 +34,11 @@
     file: "other",
   };
   // Libellé : 4 caractères au plus (sinon abrégé), taille de police selon la longueur ; il tient
-  // toujours DANS la pastille, elle-même DANS la feuille (retours UI7). Garde-fou : s'il dépasse
+  // toujours DANS la pastille, elle-même DANS la feuille. Garde-fou : s'il dépasse
   // malgré tout (police de repli plus large), il est resserré à la largeur de la pastille.
   const label = $derived(abbr(format.label || t(`format.short.${format.family}`)));
   // Taille du libellé : la hauteur de ses glyphes (police du site chargée) tient dans la pastille
-  // (10 unités) ; à 7,6, « JPG » en dépassait de 0,25 (ui7.spec.ts, 16 novembre).
+  // (10 unités) ; à 7,6, « JPG » en dépassait de 0,25 (ui7.spec.ts).
   const fs = $derived(label.length <= 3 ? 7.2 : 6.8);
 </script>
 

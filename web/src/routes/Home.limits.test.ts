@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // Cadre d'envoi de l'accueil : la limite gratuite vient de limits.ts, jamais écrite en dur (écrite
-// une seule fois, sous « Choisir des fichiers », depuis le 19 novembre, 3).
+// une seule fois, sous « Choisir des fichiers »).
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, expect, it, vi } from "vitest";
 

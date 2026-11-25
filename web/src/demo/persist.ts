@@ -200,7 +200,7 @@ export async function openDemoStore(w: Window, now: () => number = Date.now): Pr
 }
 
 /**
- * Compte essayable de la démo (19 novembre) : l'état du faux serveur du compte de CET onglet
+ * Compte essayable de la démo : l'état du faux serveur du compte de CET onglet
  * (demo/fake-compte.ts : identifiants des passkeys simulées, enveloppes et coffres chiffrés,
  * v_r, sessions), en
  * sessionStorage, pour qu'un rechargement retrouve le compte ; perdu à la fermeture de l'onglet,

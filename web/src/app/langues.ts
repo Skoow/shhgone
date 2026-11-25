@@ -1,4 +1,4 @@
-// Pages bilingues (20 novembre, référencement et stabilité de l'affichage) : l'accueil et les pages
+// Pages bilingues (référencement et stabilité de l'affichage) : l'accueil et les pages
 // d'information ont une version anglaise écrite au build sous « /en » (« /en », « /en/securite »…),
 // la version française gardant son adresse. Sur ces pages, l'adresse décide de la langue ; le
 // serveur ne lit jamais Accept-Language (spécification §36 S2) : un navigateur anglophone voit un

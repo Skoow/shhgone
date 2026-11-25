@@ -229,7 +229,7 @@ describe("API v2 (spec §29.8)", () => {
   });
 });
 
-describe("unlock : last_open (revue D42-22, audit D2 du 12 novembre)", () => {
+describe("unlock : last_open (D42-22)", () => {
   it("entier 0 ou 1 exigé (même longueur de réponse) ; 1 seulement à 0 ouverture restante ; sinon BadResponse", async () => {
     const env = Buffer.alloc(60, 7).toString("base64url");
     const reply = (left: number, last: unknown) =>
@@ -260,7 +260,7 @@ describe("Retry-After (tâche UP : compte à rebours de la page « trop de deman
   });
 });
 
-describe("watch (spec §41.8) : 204 alive, 410 gone, 404 stop, le reste retry (audit adverse 3, F2)", () => {
+describe("watch (spec §41.8) : 204 alive, 410 gone, 404 stop, le reste retry (3, F2)", () => {
   const at = (status: number, body = "") => vi.fn(async () => new Response(status === 204 ? null : body, { status }));
   it("chaque réponse, jeton en en-tête, jamais dans l'adresse", async () => {
     const f = at(204);
@@ -277,11 +277,11 @@ describe("watch (spec §41.8) : 204 alive, 410 gone, 404 stop, le reste retry (a
   });
 });
 
-describe("audit web D4 : valeurs de meta bornées aux maxima de l'offre", () => {
+describe("valeurs de meta bornées aux maxima de l'offre", () => {
   const META = { expires_in_s: 3600, salt: "s", kdf: { ops: 3, mem: 1 }, bucket: 1, segments: 1, opens_left: 2 };
   const call = (body: unknown, grant?: string) =>
     meta(ctx("http://x", { fetch: (async () => new Response(JSON.stringify(body))) as unknown as typeof fetch, retryDelayMs: 1 }), new Uint8Array(32) as KAcces, grant);
-  it("dans les bornes : accepté (24 h + 15 min d'arrondi, 10 ouvertures : partage créé avant la limite de 5 du 17 novembre)", async () => {
+  it("dans les bornes : accepté (24 h + 15 min d'arrondi, 10 ouvertures : partage créé avant la limite de 5)", async () => {
     expect((await call({ ...META, expires_in_s: 24 * 3600 + 900, opens_left: 10 })).opensLeft).toBe(10);
     expect((await call({ ...META, expires_in_s: 0 })).expiresInS).toBe(0);
   });
@@ -297,7 +297,7 @@ describe("audit web D4 : valeurs de meta bornées aux maxima de l'offre", () => 
 });
 
 
-it("signalement : catégorie entière 1 à 10 seulement, refusée AVANT toute requête (conception compte §21.10.1) ; octroi dans le corps, réponse {detruit} (20 novembre)", async () => {
+it("signalement : catégorie entière 1 à 10 seulement, refusée AVANT toute requête (conception compte §21.10.1) ; octroi dans le corps, réponse {detruit}", async () => {
   const sent: string[] = [];
   const f = vi.fn(async (_u: string, init?: RequestInit) => {
     sent.push(String(init?.body));

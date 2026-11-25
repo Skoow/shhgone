@@ -1,10 +1,10 @@
 <script lang="ts">
-  // Petite confirmation du nettoyage (retours du propriétaire du 12 novembre) : ouverte par le
+  // Petite confirmation du nettoyage : ouverte par le
   // balai d'une ligne ou par « Tout nettoyer », posée près du bouton (couche supérieure, rien ne
   // la rogne). Elle dit ce que le nettoyage retire ; rien n'est nettoyé avant « Nettoyer ».
   // Non modale : Échap, « Annuler » ou un appui ailleurs la ferment, le focus revient au bouton.
   // Le focus qui la quitte par Tab (au-delà de « Nettoyer ») ou Maj+Tab la ferme aussi :
-  // jamais de dialogue affiché loin du focus (audit D4) ; le focus reste où il est allé.
+  // jamais de dialogue affiché loin du focus ; le focus reste où il est allé.
   import { tick } from "svelte";
   import { t } from "../i18n/i18n.svelte";
   import Broom from "./icons/Broom.svelte";
@@ -17,7 +17,7 @@
     body: string;
     onconfirm: () => void;
     onclose: () => void;
-    /** « delete » : confirmation de « Tout supprimer » (corbeille, bouton rouge, 16 novembre). */
+    /** « delete » : confirmation de « Tout supprimer » (corbeille, bouton rouge). */
     kind?: "clean" | "delete";
   };
   let { anchor, title, body, onconfirm, onclose, kind = "clean" }: Props = $props();

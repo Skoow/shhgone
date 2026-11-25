@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Empreinte SHA-256 d'un fichier (décision du propriétaire du 16 novembre), en petit sur sa
-  // propre ligne, sous le type et la taille, alignée sur le nom (propriétaire, 19 novembre), au même endroit chez l'expéditeur (calculée sur son appareil)
+  // Empreinte SHA-256 d'un fichier, en petit sur sa
+  // propre ligne, sous le type et la taille, alignée sur le nom, au même endroit chez l'expéditeur (calculée sur son appareil)
   // et chez le destinataire (lue dans le manifeste chiffré, donc celle de l'expéditeur).
   // Sélectionnée d'un toucher pour la copier, entière au survol ; coupée par « … » si la place
   // manque. `sum` : hexadécimal, « erreur », ou null (calcul en cours).

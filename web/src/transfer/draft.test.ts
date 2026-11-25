@@ -120,7 +120,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     );
     const o = await openShare(r.link, PW, ORIGIN, undefined, net);
     expect(o.manifest.items.map((e) => e.name)).toEqual(["note-repere", "b-repere.bin", "a-repere.bin"]);
-    // Petits éléments empaquetés (audit H-2) ; emprise = morceaux nécessaires (D41-38) :
+    // Petits éléments empaquetés ; emprise = morceaux nécessaires (D41-38) :
     // a (300 000 octets) occupe 5 morceaux, b commence au morceau 5.
     // La note (D41-36), jamais remise au brouillon, part au clic : morceau 6, après b.
     expect(o.manifest.items.map((e) => e.offset)).toEqual([6 * 65536, 5 * 65536, 0]);
@@ -130,7 +130,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     const kLien = r.link.split("#")[1]!;
     const hay = Buffer.concat(seen.filter((x) => !x.path.includes("/unlock") && !x.path.includes("/meta")).map((x) => Buffer.concat([x.body, Buffer.from(x.path + x.headers)])));
     expect(findIn(hay, [needle("contenu", MARK), needle("nom", "a-repere"), needle("mdp", PW), needle("lien", kLien)])).toEqual([]);
-    // Empreinte SHA-256 (16 novembre) : dans le manifeste chiffré, celle des octets envoyés ;
+    // Empreinte SHA-256 : dans le manifeste chiffré, celle des octets envoyés ;
     // aucune pour la note ; jamais visible par le serveur (ni en hexadécimal, ni en octets).
     const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
     const sumA = sha(Buffer.from(await blobA.arrayBuffer()));
@@ -278,7 +278,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     const o = await openShare(r.link, PW, ORIGIN, undefined, net);
     expect((await o.item(0)).length).toBe(80);
     expect(o.manifest.items[0]!.offset).toBe(65536); // nouvelle place : l'ancienne n'est jamais réutilisée
-    // Petit élément remplacé (audit H-2) : aucun effacement immédiat ; ses morceaux sont
+    // Petit élément remplacé : aucun effacement immédiat ; ses morceaux sont
     // remplacés par de l'aléa à finalize (void).
     expect(seen.some((x) => x.path === "/api/shares/erase")).toBe(false);
     const fin = JSON.parse(seen.find((x) => x.path === "/api/shares/finalize")!.body.toString());
@@ -318,7 +318,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
 
   it("D42-6 : grand fichier retiré pendant son premier segment : sa place non envoyée est rendue, le suivant se place juste après", async () => {
     const { fake, seen, net } = setup(4 * 1048576); // un segment par seconde
-    // Déterministe (CI du 19 novembre : sur une machine lente, le segment 2 était déjà chiffré et
+    // Déterministe (CI : sur une machine lente, le segment 2 était déjà chiffré et
     // compté avant que l'attente par sondage voie « envoi », et l'effacement couvrait 1 à 3) : b est
     // retiré à l'instant où il passe en « envoi » (microtâche), avant le chiffrement du segment 2.
     const a = file(1000, 1), b = file(40 * 1048576, 2), c = file(5 * 1048576, 3);
@@ -345,7 +345,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     expect(Buffer.from(await o.item(1)).equals(Buffer.from(await c.arrayBuffer()))).toBe(true);
   });
 
-  it("audit M4 : effacement refusé (503 busy) réessayé ; deux retraits rapides tous deux effacés", async () => {
+  it("effacement refusé (503 busy) réessayé ; deux retraits rapides tous deux effacés", async () => {
     const { fake, seen, net } = setup();
     let busy = 1;
     const fetch = (async (u: RequestInfo | URL, i?: RequestInit) => {
@@ -354,7 +354,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
       return net.fetch(u, i);
     }) as typeof globalThis.fetch;
     const d = createDraft(ORIGIN, { fetch, retryDelayMs: 1, solveCaptcha, auto: true });
-    // Grands éléments (un segment chacun) : seuls effacés sur le serveur (audit H-2).
+    // Grands éléments (un segment chacun) : seuls effacés sur le serveur.
     const a = file(SEG_PLAIN, 1), b = file(SEG_PLAIN, 2), c = file(SEG_PLAIN, 3);
     d.sync([
       { id: "a", data: a },
@@ -387,7 +387,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     expect(prog).toEqual([[0, 1], [1, 1]]);
   });
 
-  // Audit H-2 : 20 petits fichiers de 1 Mo envoyés sans bourrage (≈ 20 Mo, pas 80 Mio) ;
+  // 20 petits fichiers de 1 Mo envoyés sans bourrage (≈ 20 Mo, pas 80 Mio) ;
   // un grand n'envoie que ses morceaux ; un petit retiré n'est pas lu par le destinataire.
   it("empaquetage : octets envoyés ≈ somme des tailles ; petit retiré absent pour le destinataire", async () => {
     const { seen, fake, net } = setup();
@@ -429,7 +429,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("brouillon perdu pendant le chiffrement (revue du 10 novembre)", { timeout: 60_000 }, () => {
+describe("brouillon perdu pendant le chiffrement", { timeout: 60_000 }, () => {
   it("keep répond 404 pendant qu'un segment se chiffre : l'élément ne reste pas en « envoi », le clic aboutit", async () => {
     const { fake, net } = setup(400 * 1048576);
     let lose = false;
@@ -469,9 +469,9 @@ describe("brouillon perdu pendant le chiffrement (revue du 10 novembre)", { time
   });
 });
 
-// Audit du 11 novembre (I1, I2, M1) : brouillon figé pendant la finalisation, abandon qui
+// (I1, I2, M1) : brouillon figé pendant la finalisation, abandon qui
 // réveille les attentes, « Réessayer » qui relance les éléments en erreur.
-describe("audit du 11 novembre : finalisation", { timeout: 60_000 }, () => {
+describe("Finalisation", { timeout: 60_000 }, () => {
   it("I1 : contenu remplacé (« Nettoyer » fini) pendant finalize : le partage scellé reste lisible, la mise à jour est différée", async () => {
     const { net, seen } = setup();
     const orig = file(5 * 1048576, 3);

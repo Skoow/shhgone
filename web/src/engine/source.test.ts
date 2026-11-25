@@ -1,4 +1,4 @@
-// Chargement vérifié du moteur (spec moteur §7, Task 10) : sources du .wasm et du Worker
+// Chargement vérifié du moteur (spec moteur §7) : sources .wasm et du Worker
 // d'Argon2id dans les builds de production (source.verified.ts) et de démo (source.demo.ts).
 // Le chemin réel (navigateur, CSP, Trusted Types, empreinte refusée) : ui-e2e/hygiene.spec.ts.
 import { readFileSync } from "node:fs";

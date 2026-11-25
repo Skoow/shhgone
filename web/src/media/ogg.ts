@@ -1,4 +1,4 @@
-// Ogg Opus et Ogg Vorbis (spec §35.2, Task 9c, technique 3). Le paquet de commentaires
+// Ogg Opus et Ogg Vorbis (spec §35.2). Le paquet de commentaires
 // (OpusTags, « \x03vorbis ») est remplacé par un paquet vide : ni encodeur, ni commentaire, ni
 // pochette (METADATA_BLOCK_PICTURE). Les pages d'en-tête sont refaites ; les pages audio sont
 // reprises telles quelles, seuls leur numéro de séquence et leur CRC changent si le nombre de

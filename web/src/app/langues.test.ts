@@ -1,4 +1,4 @@
-// Pages bilingues (20 novembre) : adresses « /en… », langue fixée par l'adresse, liens internes
+// Pages bilingues : adresses « /en… », langue fixée par l'adresse, liens internes
 // qui restent dans la langue affichée ; rien de tout cela dans la démo.
 import { describe, expect, it } from "vitest";
 import { langueDeLAdresse } from "../i18n/i18n.svelte";

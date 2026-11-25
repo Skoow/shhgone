@@ -22,11 +22,11 @@
   import AppShell from "./ui/AppShell.svelte";
   import { chrome, takeGestureFromUrl } from "./app/chrome.svelte";
   import { tabBarVisible } from "./app/tabbar";
-  // Pages du compte (plan du compte, lot 10) : seulement si __COMPTES__ (drapeau de construction,
+  // Pages du compte : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
   import { Accueil, Connexion, Inscription, Parametres, Recuperation, Profil, connecte, ecouterAutresOnglets, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
-  // Écrans du salon (plan C-3) : seulement si __SALONS__ (site avec compte, hors démo) ; sans lui,
+  // Écrans du salon : seulement si __SALONS__ (site avec compte, hors démo) ; sans lui,
   // le greffon shh-salons remplace ce module par pages.off.ts (aucun écran, aucun client).
   import { Salon, SalonNouveau } from "./routes/salon/pages";
 
@@ -39,26 +39,26 @@
   // Geste choisi sur une page d'information (« /envoyer?ajout=texte ») : rejoué par le composeur.
   takeGestureFromUrl();
 
-  // Task 17 : vrai pendant un envoi et sur « Lien prêt » (langue figée, dépôt de fichier ignoré).
+  // Vrai pendant un envoi et sur « Lien prêt » (langue figée, dépôt de fichier ignoré).
   let sending = $state(false);
 
   // Téléphone : barre d'onglets sur les écrans racine de l'expéditeur seulement (app/tabbar.ts).
-  // Accueil connecté (plan du compte, lot 12) : seulement avec __COMPTES__ et une session ouverte ;
+  // Accueil connecté : seulement avec __COMPTES__ et une session ouverte ;
   // sans compte (et dans tout build public), l'accueil reste l'accueil actuel.
   const connected = $derived(__COMPTES__ && connecte());
   const tabs = $derived(tabBarVisible({ supported, route: router.current.name, sending, composing: chrome.composing, connected }));
 
   // « Tirer pour actualiser » (téléphone) bloqué seulement quand il ferait perdre la liste en
-  // cours ou un envoi (décision du propriétaire du 17 novembre, base.css : no-pull).
+  // cours ou un envoi (base.css : no-pull).
   $effect(() => {
     document.documentElement.classList.toggle("no-pull", chrome.composing || sending);
     return () => document.documentElement.classList.remove("no-pull");
   });
 
-  // « Mes partages » dans l'en-tête et le menu seulement s'il y a des partages (17 novembre) :
+  // « Mes partages » dans l'en-tête et le menu seulement s'il y a des partages :
   // lecture de l'historique de l'appareil, sans rien créer (live.svelte.ts, presence).
   if (supported) void loadHistory().catch(() => undefined);
-  // « Téléchargements » sans compte seulement si l'historique est activé (22 novembre) : lecture
+  // « Téléchargements » sans compte seulement si l'historique est activé : lecture
   // seule, rien n'est créé s'il n'a jamais été activé ici.
   if (supported) void loadDownloads().catch(() => undefined);
 
@@ -66,9 +66,9 @@
   reloadIfRestored(window);
 
   /**
-   * UI §12.1, spec §32 : l'ouverture et la gestion ont leur page, « /s » (s.html, 16 novembre).
+   * UI §12.1, spec §32 : l'ouverture et la gestion ont leur page, « /s » (s.html).
    * Une ouverture déverrouillée rechargée sous « / » y retourne (moveToLinkPage). Toute autre
-   * route (accueil avec un « # », dont l'ancienne forme de lien refusée depuis le 18 novembre,
+   * route (accueil avec un « # », dont l'ancienne forme de lien refusée,
    * 404, hors base de démo) : un « # » non vide est retiré de l'adresse.
    */
   const inApp = () => inAppBrowser(navigator.userAgent, isStandalone(window)) !== null;
@@ -113,19 +113,19 @@
 
   // UI §9 : clavier virtuel ouvert → classe kbd-open sur <html> (barres collées dans le flux).
   $effect(() => watchKeyboard(window, (open) => document.documentElement.classList.toggle("kbd-open", open)));
-  // Entrée d'onglet (K_lien) effacée après 30 min sans activité, sur tous les écrans (audit web D2).
+  // Entrée d'onglet (K_lien) effacée après 30 min sans activité, sur tous les écrans.
   $effect(() => watchOpenGrant(window));
   // « Rester connecté » (conception compte §9) : la session gardée sur cet appareil est rouverte
   // au démarrage ; échue ou fermée ailleurs, elle est oubliée. Seulement avec __COMPTES__.
   if (__COMPTES__ && supported) {
     restaurer().catch(() => undefined);
-    // Audit du 18 novembre : déconnexion faite dans un autre onglet, session fermée ailleurs.
+    // Déconnexion faite dans un autre onglet, session fermée ailleurs.
     ecouterAutresOnglets();
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") void verifierAuRetour();
     });
   }
-  // « Se déconnecter » du menu (18 novembre) : la coque n'importe rien du compte ; elle appelle ceci.
+  // « Se déconnecter » du menu : la coque n'importe rien du compte ; elle appelle ceci.
   if (__COMPTES__)
     accountFlag.logout = async () => {
       await seDeconnecter();
@@ -139,7 +139,7 @@
   {#if demo}<demo.Banner />{/if}
 {/snippet}
 
-<!-- Pied de page sur toutes les pages (retours du 11 novembre) ; pendant un envoi, ses liens et
+<!-- Pied de page sur toutes les pages ; pendant un envoi, ses liens et
      réglages sont désactivés (busy). Ordinateur : le composeur tient dans l'écran, le pied dessous. -->
 <AppShell banner={demo ? demoBanner : undefined} busy={sending} {tabs}>
   {#if !supported}
@@ -164,7 +164,7 @@
   {:else if router.current.name === "recuperation"}
     <Recuperation />
   {:else if router.current.name === "compte" && (connected || (__COMPTES__ && supprime()))}
-    <!-- Paramètres et profil (lot 13) : avec une session ouverte seulement (et l'écran de fin
+    <!-- Paramètres et profil : avec une session ouverte seulement (et l'écran de fin
          d'une suppression faite ici, alors que la session n'existe plus). -->
     <Parametres />
   {:else if router.current.name === "profil" && connected}
@@ -178,7 +178,7 @@
   {:else if router.current.name === "salonnouveau"}
     <SalonNouveau />
   {:else if PAGE_ROUTES.has(router.current.name)}
-    <!-- Pages d'information : leur propre fichier HTML (pages séparées, 16 novembre). Le serveur
+    <!-- Pages d'information : leur propre fichier HTML (pages séparées). Le serveur
          le sert déjà à cette adresse ; si ce script arrive quand même ici (ancien serveur), il
          recharge l'adresse pour obtenir ce fichier, une fois. -->
     <PageRedirect />

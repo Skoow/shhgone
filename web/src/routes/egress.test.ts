@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Limite de téléchargement du partage (403 egress_limit, 24 novembre) : texte fixe choisi par le
+// Limite de téléchargement du partage (403 egress_limit) : texte fixe choisi par le
 // client, en français et en anglais, sur la page d'état et dans la ligne d'un téléchargement.
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, describe, expect, it } from "vitest";

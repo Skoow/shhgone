@@ -25,6 +25,12 @@ describe("conversation", () => {
     expect(c.message(9, 1, 3, env(1, { k: "texte", x: "autre" }))).toBeNull();
     expect(bulles(c).map((b) => [b.texte, b.seq, b.attendus])).toEqual([["salut", 5, [0, 2]]]);
   });
+  it("alerte de fin : ligne du salon, pas une bulle de membre", () => {
+    const c = conv();
+    c.fermeture(15);
+    expect(c.elements).toEqual([expect.objectContaining({ k: "sys", quoi: "fermeture", minutes: 15 })]);
+    expect(bulles(c)).toEqual([]);
+  });
   it("modif et retrait : de l'auteur seulement", () => {
     const c = conv();
     c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
@@ -111,7 +117,7 @@ describe("conversation", () => {
     c.message(19, 1, 3, env(3, { k: "texte", x: "x" }));
     expect(c.infos(bulles(c)[1]!)).toBeNull();
   });
-  it("changerDeSiege (exigence C-3 32) : notre pseudonyme suit au siège 0 sans être « pris » par notre ancien siège ; l'ancien occupant garde son nom", () => {
+  it("changerDeSiege (32) : notre pseudonyme suit au siège 0 sans être « pris » par notre ancien siège ; l'ancien occupant garde son nom", () => {
     const c = conv(2);
     c.message(5, 0, 3, env(1, { k: "profil", pseudo: "Lea", couleur: 0, avatar: null }));
     c.message(6, 0, 3, env(2, { k: "texte", x: "de l'ancienne page" }));
@@ -215,7 +221,7 @@ describe("conversation", () => {
     // Aucun « Hugo s'appelle maintenant Inès ».
     expect(sys.some((e) => e.quoi === "pseudo")).toBe(false);
   });
-  it("écart groupe / serveur (exigence 27) : signalé après quelques secondes, avec le nom de l'ancien occupant", () => {
+  it("écart groupe / serveur : signalé après quelques secondes, avec le nom de l'ancien occupant", () => {
     const t = { v: 1000 };
     const c = conv(0, t);
     c.message(5, 2, 3, env(1, { k: "profil", pseudo: "Zoé", couleur: 2, avatar: null }));
@@ -279,7 +285,7 @@ describe("morceaux", () => {
   });
 });
 
-describe("morceaux : messages piégés (revue du 21 novembre)", () => {
+describe("morceaux : messages piégés", () => {
   it("longue ponctuation après un lien : coût linéaire, même découpe", () => {
     const t = "https://a" + ".".repeat(1990) + "x";
     const t0 = performance.now();

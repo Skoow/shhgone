@@ -20,7 +20,7 @@
   const sizeText = $derived(t("compose.gauge.size", { size: formatBytes(bytes, lang), max }));
   const countText = $derived(t("compose.gauge.count", { n: count, max: MAX_ITEMS }));
   const uid = $props.id();
-  // Nombre d'éléments (décision du propriétaire du 16 novembre) : la limite est la même pour
+  // Nombre d'éléments : la limite est la même pour
   // toutes les offres et rarement atteinte ; elle n'est montrée qu'à l'approche (80 %).
   const countNear = $derived(count >= Math.floor(MAX_ITEMS * 0.8));
   // « Trop gros : 2 Go sur 2 Go » ne dirait rien : quand les deux tailles s'arrondissent pareil,
@@ -42,7 +42,7 @@
 </script>
 
 {#if count === 0}
-  <!-- Téléphone : rien (17 novembre) ; la limite est dite dans « Votre offre » et dès le premier élément. -->
+  <!-- Téléphone : rien ; la limite est dite dans « Votre offre » et dès le premier élément. -->
   <p class="empty num">{t("compose.gauge.empty", { size: max })}</p>
 {:else if head}
   <div class={["gh", level]}>

@@ -6,7 +6,7 @@ import type { Page } from "@playwright/test";
 import { axe, capture, expect, test } from "./fixtures";
 import { addFile, addText, readyHeading, sendButton } from "./send-helpers";
 
-// Audit F5 (8 novembre) : la démo garde ses données chiffrées dans ce navigateur, sur une
+// La démo garde ses données chiffrées dans ce navigateur, sur une
 // origine partagée par tous les sites GitHub Pages du compte : « ne mettez rien de réel ».
 const BANNER_FR = "Démo : rien n'est envoyé, le lien ne marche que dans cet onglet. N'y mettez rien de réel.";
 const BANNER_EN = "Demo: nothing is sent, the link only works in this tab. Don't put anything real in it.";
@@ -28,17 +28,17 @@ test.describe("fr-FR", () => {
     const banner = page.getByRole("note");
     await expect(banner).toHaveText(BANNER_FR);
     await expect(banner).toBeVisible();
-    // Une ligne orange fine (16 novembre) : le texte n'est lu que par les lecteurs d'écran.
+    // Une ligne orange fine : le texte n'est lu que par les lecteurs d'écran.
     expect((await banner.boundingBox())!.height).toBeLessThanOrEqual(4);
     // Tout en haut de la page, avant l'en-tête, sans bouton de fermeture.
     expect((await banner.boundingBox())!.y).toBe(0);
     await expect(banner.getByRole("button")).toHaveCount(0);
     await expect(page).toHaveTitle("Shhgone · Partagez en secret, puis ça s'efface");
     // La démo est servie par GitHub Pages, hors d'Europe : rien ne prétend le contraire (plus de
-    // sur-titre depuis le 15 novembre).
+    // sur-titre).
     await expect(page.locator("[data-eyebrow]")).toHaveCount(0);
     await expect(page.getByText(/Hébergé en Europe/)).toHaveCount(0);
-    // Décision du 24 novembre : une phrase visible, au pied de chaque page, dit l'hébergeur et ce qu'il voit.
+    // Une phrase visible, au pied de chaque page, dit l'hébergeur et ce qu'il voit.
     const host = page.locator("footer[data-foot] [data-demo-host]");
     await host.scrollIntoViewIfNeeded();
     await expect(host).toHaveText("Démo hébergée par GitHub, qui voit votre adresse IP.");
@@ -61,7 +61,7 @@ test.describe("fr-FR", () => {
     await capture(page, "demo-home-1280");
   });
 
-  // Revue I2 : bandeau collé en haut, en-tête collant juste dessous, sans recouvrement.
+  // Bandeau collé en haut, en-tête collant juste dessous, sans recouvrement.
   for (const [w, h, size] of [
     [390, 560, "100%"],
     [1280, 560, "100%"],
@@ -113,7 +113,7 @@ test.describe("fr-FR", () => {
   });
 
   // Spec §32 : liens sous la base de la démo, « /shhgone/s#<clé> » et « /shhgone/s#m<clé> »
-  // (s.html, 200) ; ancien lien « /shhgone/#… » : retiré (18 novembre), il mène à l'accueil.
+  // (s.html, 200) ; ancien lien « /shhgone/#… » : retiré, il mène à l'accueil.
   for (const [what, start, frag] of [
     ["partage", "s", `#${KEY}`],
     ["gestion", "s", `#m${KEY}`],
@@ -122,10 +122,10 @@ test.describe("fr-FR", () => {
     test(`lien court /shhgone/${start}#… (${what}) : route d'ouverture ou de gestion, # retiré, jamais envoyé`, async ({ page, demo }) => {
       const res = await page.goto(`${demo.url}${start}${frag}`);
       expect(res?.status()).toBe(200);
-      // « /s » n'est plus montré une fois le lien lu (17 novembre).
+      // « /s » n'est plus montré une fois le lien lu.
       await expect.poll(() => page.url()).toBe(demo.url);
       expect(await page.evaluate(() => location.hash)).toBe("");
-      // Ancien lien « /#… » (retiré le 18 novembre) : l'accueil, rien n'est ouvert ni envoyé.
+      // Ancien lien « /#… » (retiré) : l'accueil, rien n'est ouvert ni envoyé.
       if (what === "ancien lien de partage") {
         await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
         await expect(page.getByRole("heading", { level: 1, name: "Ce lien n'existe pas ou n'est plus disponible." })).toHaveCount(0);
@@ -199,7 +199,7 @@ test.describe("fr-FR", () => {
     expect(r.xhr).toBe(404); // jeton inconnu
   });
 
-  // Défaut fermé (revue m1) : connect-src 'none' dans la CSP meta. Seul le faux serveur répond à
+  // Défaut fermé : connect-src 'none' dans la CSP meta. Seul le faux serveur répond à
   // /api ; toute autre requête de la page, même origine ou autre origine, est refusée par le
   // navigateur et n'atteint jamais le réseau, secrets d'en-tête compris.
   test("fetch et XHR hors /api : refusés par la CSP, jamais transmis avec un secret", async ({ page, demo }) => {
@@ -252,7 +252,7 @@ test.describe("fr-FR", () => {
     demo.requests.length = 0;
   });
 
-  // Composeur (Tasks 10, 11, 13) : ajouter (dépôt, collage), réordonner, retirer ; pas de coffre en démo (spec §27.6).
+  // Composeur : ajouter (dépôt, collage), réordonner, retirer ; pas de coffre en démo (spec §27.6).
   test("composeur : dépôt, collage, réordonner, retirer et annuler ; aucun droit « coffre » ; rien n'est stocké", async ({ page, demo, isMobile }) => {
     await page.goto(demo.url);
     await page.evaluate(() => {
@@ -271,7 +271,7 @@ test.describe("fr-FR", () => {
       document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
     });
     await expect(rows).toHaveCount(3);
-    // Téléphone : menu « … » de la ligne (plus de déplacement, retours UI6) ; ordinateur
+    // Téléphone : menu « … » de la ligne (plus de déplacement) ; ordinateur
     // (demo-webkit-desktop) : poignée et boutons sur la ligne.
     const order = isMobile ? ["a.txt", "b.txt", "c.txt"] : ["b.txt", "a.txt", "c.txt"];
     if (isMobile) {
@@ -298,7 +298,7 @@ test.describe("fr-FR", () => {
   });
 });
 
-test.describe("fr-FR : envoi (Tasks 17–18)", () => {
+test.describe("fr-FR : envoi (–18)", () => {
   test.use({ locale: "fr-FR" });
 
   test("Chiffrer et envoyer : progression, Lien prêt avec un lien /shhgone/s#<43>, ouvrir comme destinataire", async ({ page, demo }) => {
@@ -314,9 +314,9 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await expect(page).toHaveTitle("Lien prêt · Shhgone");
     const link = (await page.getByRole("group", { name: "Lien", exact: true }).locator(".sr-only").first().textContent()) ?? "";
     expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhgone/s#[A-Za-z0-9_-]{43}$`));
-    // Le bandeau n'est plus qu'une ligne : l'avertissement est redit sous le lien (16 novembre).
+    // Le bandeau n'est plus qu'une ligne : l'avertissement est redit sous le lien.
     await expect(page.locator("[data-demo-note]")).toHaveText("Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.");
-    // Lien de gestion montré seulement sans historique (19 novembre) : coupé le temps de le lire.
+    // Lien de gestion montré seulement sans historique : coupé le temps de le lire.
     const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
     const wasOn = (await keep.count()) > 0 && (await keep.getAttribute("aria-checked")) === "true";
     if (wasOn) await keep.click();
@@ -365,7 +365,7 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await expect(page.getByRole("heading", { name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible();
   });
 
-  test("« Supprimer ce partage » depuis « Lien prêt », puis le lien de gestion : supprimé (scan du 7 novembre, F2)", async ({ page, demo }) => {
+  test("« Supprimer ce partage » depuis « Lien prêt », puis le lien de gestion : supprimé (scan, F2)", async ({ page, demo }) => {
     test.setTimeout(90_000);
     await page.goto(demo.url);
     await addText(page, "À supprimer.");

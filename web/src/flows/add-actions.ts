@@ -5,7 +5,7 @@
 // Le vocal n'a pas de repli : sans enregistreur, il n'est pas proposé.
 import type { CaptureMode } from "../media/capture";
 
-// « room » : le Salon, avec les autres actions (décision du propriétaire du 17 novembre) ;
+// « room » : le Salon, avec les autres actions ;
 // pas encore construit : « bientôt », sans effet que de le dire.
 export type AddId = "media" | "voice" | "note" | "files" | "room";
 export type AddAction = { id: AddId; live: boolean };

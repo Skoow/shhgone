@@ -45,7 +45,7 @@ describe("applySeo", () => {
     applySeo("home", document, ENV);
     expect(desc()).toMatch(/^Send files/);
   });
-  it("pages bilingues (20 novembre) : canonique dans la langue affichée, hreflang fr, en et x-default", () => {
+  it("pages bilingues : canonique dans la langue affichée, hreflang fr, en et x-default", () => {
     const alt = () => [...document.head.querySelectorAll<HTMLLinkElement>('link[rel="alternate"]')].map((l) => [l.hreflang, l.getAttribute("href")]);
     const B = { ...ENV, bilingue: true };
     applySeo("securite", document, B);

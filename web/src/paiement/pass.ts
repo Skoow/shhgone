@@ -6,7 +6,7 @@
 //   (même mécanisme que l'historique, history/store.ts). Honnêtement : la clé est sur le même
 //   appareil ; cela ne protège que d'une lecture naïve du stockage.
 // - Sans compte, perdre l'appareil (ou effacer les données du site) perd le pass : dit avant le
-//   paiement. Le rangement dans le coffre privé du compte vient ensuite (plan, tâche 8).
+//   paiement. Le rangement dans le coffre privé du compte vient ensuite.
 // - Gardé aussi, ici seulement : le pays déclaré à la commande, pour la note de vente faite sur
 //   l'appareil (TVA du pays, conception §9.3) ; il n'est jamais renvoyé au serveur. Rien d'autre :
 //   ni prix, ni adresse de page de paiement.
@@ -112,7 +112,7 @@ export async function oublier(idb: IDBFactory, id: string): Promise<void> {
   await oublierEtat(idb, id);
 }
 
-// --- État du pass gardé (signalement du 22 novembre) ------------------------------------------
+// --- État du pass gardé (signalement) ------------------------------------------
 // POST /api/paiement/etat envoie P : redemandé à chaque chargement, il datait le pass à chaque
 // visite. L'état lu est gardé chiffré (enregistrement « e:<id du pass> »), avec le jour UTC de sa
 // lecture, et resservi ce jour-là seulement ; oublié quand le pass est rangé de nouveau ou oublié,

@@ -1,9 +1,9 @@
-// Téléphone : la croix « Fermer » est TOUJOURS en haut à droite (demande du propriétaire), dans
+// Téléphone : la croix « Fermer » est TOUJOURS en haut à droite, dans
 // chaque fenêtre ouvrable : feuilles du bas (Ajouter, Nouveau texte, Options, menu d'une ligne,
 // Partager et QR, confirmation, Signaler), caméra, enregistreur vocal, visionneuse.
 // Vérifié : dans le quart supérieur droit de la fenêtre (partie visible), cible ≥ 44 px, dans
 // l'écran. Le retour (flèche) des en-têtes reste à gauche : ce n'est pas une fermeture.
-// Captures fr-FR 390 × 844 (×2) : .superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-CLOSE/.
+// Captures fr-FR 390 × 844 (×2) : web/test-results/captures/CLOSE/.
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
@@ -11,7 +11,7 @@ import { expect, test } from "./fixtures";
 import { file, freshPage, sendShare, settle, unlock } from "./open-helpers";
 import { addText, readyHeading, sendButton, enterComposer } from "./send-helpers";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-CLOSE/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/CLOSE/", import.meta.url));
 const local = process.env.PW_LOCAL_CHROMIUM === "1" ? { executablePath: "/opt/pw-browsers/chromium" } : {};
 test.use({
   viewport: { width: 390, height: 844 },
@@ -77,7 +77,7 @@ test("expéditeur : chaque fenêtre a « Fermer » en haut à droite", async ({ 
   test.setTimeout(120_000);
   await page.goto(shh.origin + "/");
 
-  // Plus de panneau Réglages (retours du 11 novembre) : son contenu est dans le pied de page.
+  // Plus de panneau Réglages : son contenu est dans le pied de page.
   await expect(page.getByRole("button", { name: "Réglages" })).toHaveCount(0);
 
   await checkAndClose(page, await openAdd(page), "feuille-ajouter");

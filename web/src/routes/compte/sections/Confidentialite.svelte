@@ -1,8 +1,8 @@
 <script lang="ts">
-  // Confidentialité (conception compte §21.5, §21.7, §21.9, §21.15.4 point 6 ; plan, lot 13 ; monté
+  // Confidentialité (conception compte §21.5, §21.7, §21.9, §21.15.4 point 6 ; monté
   // seulement avec __COMPTES__). Deux réglages du compte, écrits dans le coffre de profil :
   // proposer pseudo et photo dans les salons, garder les liens ouverts (« Garder les salons que je
-  // rejoins », lu nulle part, retiré le 24 novembre).
+  // rejoins », lu nulle part, retiré).
   // Deux réglages de cet appareil : l'historique des téléchargements (downloads/, jamais envoyé) et
   // « Rester connecté » (seulement coupé d'ici : la durée de la session est fixée par le serveur à
   // la connexion).

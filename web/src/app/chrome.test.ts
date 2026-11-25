@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { chrome, takeGestureFromUrl } from "./chrome.svelte";
 
-// Pages séparées (16 novembre) : un geste choisi sur une page d'information passe par
+// Pages séparées : un geste choisi sur une page d'information passe par
 // « /envoyer?ajout=<geste> », liste fermée, retiré de l'adresse aussitôt lu.
 describe("geste transmis par l'adresse", () => {
   it("« /envoyer?ajout=texte » : geste en attente, adresse nettoyée", () => {
@@ -12,7 +12,7 @@ describe("geste transmis par l'adresse", () => {
     expect(chrome.pending).toBe("texte");
     expect(location.pathname + location.search).toBe("/envoyer");
   });
-  // Audit du 20 novembre : un lien venu d'ailleurs ne doit jamais allumer le micro ni la caméra.
+  // Un lien venu d'ailleurs ne doit jamais allumer le micro ni la caméra.
   it("« ?ajout=vocal » et « ?ajout=media » : aucun geste joué d'office, les actions ressortent seulement", () => {
     for (const g of ["vocal", "media"]) {
       history.replaceState(null, "", "/envoyer?ajout=" + g);

@@ -27,7 +27,7 @@ describe("installDemo", async () => {
     expect(sent).toEqual([`${location.origin}/assets/a.js`, "https://ailleurs.test/api/captcha"]);
   });
 
-  it("titre de l'onglet laissé tel quel, sans « Démo · » (22 novembre)", async () => {
+  it("titre de l'onglet laissé tel quel, sans « Démo · »", async () => {
     document.title = "Ouvrir";
     await new Promise((r) => setTimeout(r, 0));
     expect(document.title).toBe("Ouvrir");
@@ -50,7 +50,7 @@ describe("installDemo", async () => {
     expect(d.hostNote).toBe("Demo hosted by GitHub, which sees your IP address.");
   });
 
-  it("openAsRecipient : charge /s#<43> dans le même onglet (16 novembre) ; refuse un autre lien", () => {
+  it("openAsRecipient : charge /s#<43> dans le même onglet ; refuse un autre lien", () => {
     const d = getDemo()!;
     const assign = vi.spyOn(location, "assign").mockImplementation(() => undefined);
     try {
@@ -70,7 +70,7 @@ describe("installDemo", async () => {
   });
 });
 
-describe("audit web D6 : Trusted Types décrits tels qu'ils sont", async () => {
+describe("Trusted Types décrits tels qu'ils sont", async () => {
   const { readFileSync } = await import("node:fs");
   const src = readFileSync("src/demo/install.ts", "utf8");
   const meta = readFileSync("scripts/demo-meta.mjs", "utf8");

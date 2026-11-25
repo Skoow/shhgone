@@ -1,7 +1,7 @@
 <script lang="ts">
   import LockMark from "./LockMark.svelte";
   import { receiveLock } from "./lock";
-  // Ligne compacte d'un élément reçu (UI §9.8, décisions du 7 novembre) : icône de format, nom
+  // Ligne compacte d'un élément reçu (UI §9.8) : icône de format, nom
   // nettoyé (extension toujours visible), type, taille, temps estimé ; pendant un
   // téléchargement : barre, pourcentage, débit, temps restant ; actions selon l'état et les
   // droits. « Voir seulement » : aucune action de téléchargement ni de copie dans le DOM.
@@ -27,7 +27,7 @@
     kind: "file" | "text";
     /** Nettoyage dit par le manifeste chiffré (D41-35) ; absent : rien n'est affiché. */
     clean?: ManifestClean;
-    /** Faux : jamais téléchargé (vocal, 17 novembre) : « Écouter » seulement. */
+    /** Faux : jamais téléchargé (vocal) : « Écouter » seulement. */
     savable?: boolean;
     /** Empreinte SHA-256 écrite par l'expéditeur dans le manifeste chiffré ; absente : rien. */
     sha256?: string;
@@ -54,8 +54,7 @@
   const ext = $derived(kind === "file" && dot > 0 ? name.slice(dot) : "");
   const mid = $derived(midSplit(base));
   const pct = $derived(row.total > 0 ? Math.min(100, Math.floor((row.done / row.total) * 100)) : row.state === "done" ? 100 : 0);
-  // Temps restant : seulement quand le débit de cette session est mesuré (estimate non nul,
-  // retours UI4), jamais sur les premiers instants.
+  // Temps restant : seulement quand le débit de cette session est mesuré (estimate non nul), jamais sur les premiers instants.
   const left = $derived(estimate !== null && row.rate > 0 ? (row.total - row.done) / row.rate : null);
   const FAIL = { network: "dl.fail.network", budget: "dl.fail.budget", egress: "dl.fail.egress", limit: "dl.fail.limit", disk_full: "dl.fail.disk", write: "dl.fail.write", gone: "dl.fail.gone", activation: "dl.fail.activation", corrupt: "dl.fail.corrupt" } as const;
   let viewBtn: HTMLButtonElement | undefined = $state();
@@ -68,7 +67,7 @@
   <span class="pic">
     <FormatIcon {format} />
     <LockMark badge tone={lock.tone} text={t(lock.key)} detail={cl ? t(cl.key) : undefined} />
-    <!-- Téléchargé (retours UI6) : pastille verte au coin haut-gauche de l'icône, bulle au survol
+    <!-- Téléchargé : pastille verte au coin haut-gauche de l'icône, bulle au survol
          ou à l'appui ; rien dans la ligne (le bouton « Voir » ne bouge pas). -->
     {#if row.state === "done"}
       <span class="got" data-downloaded>
@@ -95,7 +94,7 @@
         <!-- Une note ne montre que son titre : le contenu se lit avec « Voir ». -->
         <span>{t(kind === "text" ? "compose.cat.text" : typeKey(format))}</span><span aria-hidden="true">·</span><span>{formatBytes(row.total, lang)}</span>
         {#if kind === "file" && sha256}<HashLine sum={sha256} />{/if}
-        <!-- Téléchargé : dit par la pastille de l'icône (retours UI6). -->
+        <!-- Téléchargé : dit par la pastille de l'icône. -->
         {#if row.state !== "done" && estimate !== null && !viewOnly}
           <span aria-hidden="true">·</span><span class="eta" title={t("dl.estimate.title")}>{t("dl.estimate", { time: formatDuration(estimate, lang) })}<span class="sr-only"> ({t("dl.estimate.title")})</span></span>
         {/if}
@@ -108,7 +107,7 @@
 
   <div class="actions">
     {#if canView}
-      <!-- Son (mémo vocal compris, audit D2) : « Écouter » ; le reste : « Voir ». -->
+      <!-- Son (mémo vocal compris) : « Écouter » ; le reste : « Voir ». -->
       <Button variant="secondary" dense {disabled} bind:el={viewBtn} onpress={() => onview(viewBtn ?? null)} aria-label={t(listen ? "dl.row.listen" : "dl.row.view", { name })}>
         {#snippet icon()}{#if listen}<Volume size={18} />{:else}<Eye size={18} />{/if}{/snippet}
         <span class="hide-narrow">{t(listen ? "content.listen" : "dl.view")}</span>

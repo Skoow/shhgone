@@ -48,7 +48,7 @@
     inAppBrowser: () => inAppBrowser(navigator.userAgent, isStandalone(window)),
     // Chemin non nu (« //x », « \ ») : repli sur l'accueil plutôt que garder le « # ».
     scrub: () => {
-      // « /s » n'est plus montré une fois le lien lu (17 novembre) : l'adresse devient « / ».
+      // « /s » n'est plus montré une fois le lien lu : l'adresse devient « / ».
       if (!scrubAddressBar(history, shownPath(location.pathname))) scrubAddressBar(history, href("/"));
     },
     // Conception compte §21.7 : « Garder » (historique de l'appareil, chiffré) ; jamais le mot de passe.
@@ -69,7 +69,7 @@
   });
 
   // Démontage (autre route, nouveau lien collé) : un déverrouillage ou une lecture encore en
-  // cours n'aboutit plus à rien, et rien ne continue de tourner (audit M2).
+  // cours n'aboutit plus à rien, et rien ne continue de tourner.
   $effect(() => () => r.dispose());
 
   // ---------- Garde de sortie (ruling 3) ----------
@@ -160,7 +160,7 @@
   const errorText = $derived.by(() => {
     switch (r.error) {
       case "bad_password":
-        // Dernier essai : une seule ligne qui dit tout (audit M20).
+        // Dernier essai : une seule ligne qui dit tout.
         return r.attemptsLeft === 1 ? t("open.lastTry") : t("open.badPw", { n: r.attemptsLeft ?? 0 });
       case "password_required":
         return t("open.pwRequired");
@@ -213,7 +213,7 @@
     if (!title) return;
     untrack(() => title?.focus({ preventScroll: true }));
   });
-  // Détruit après le dernier essai : même titre, autre écran ; on remonte le montrer (audit I4).
+  // Détruit après le dernier essai : même titre, autre écran ; on remonte le montrer.
   $effect(() => {
     if (r.state === "destroyed_by_password") untrack(() => arrive(title));
   });
@@ -615,7 +615,7 @@
     margin-top: 1px;
   }
 
-  /* ---------- Navigation privée (demande du propriétaire) ---------- */
+  /* ---------- Navigation privée ---------- */
   .private {
     max-width: 60ch;
     color: var(--text-2);
@@ -701,7 +701,7 @@
     .title {
       font-size: var(--fs-h1);
     }
-    /* Détruit (5 essais, faible de l'audit) : l'illustration au-dessus du titre, qui garde la
+    /* Détruit (5 essais) : l'illustration au-dessus du titre, qui garde la
        largeur de l'écran au lieu de s'écraser à côté. */
     .capsule[data-state="destroyed"]:not(.spent) {
       flex-direction: column;

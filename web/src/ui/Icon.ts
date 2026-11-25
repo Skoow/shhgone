@@ -1,4 +1,4 @@
-// Jeu fermé d'icônes MAISON (retours UI8, UI §6) : dessins dans icons/glyphs.ts, aucun paquet ni
+// Jeu fermé d'icônes MAISON (UI §6) : dessins dans icons/glyphs.ts, aucun paquet ni
 // fichier extérieur. Toute icône ajoutée passe en revue (et dans tokens.test.ts).
 export { default as Paperclip } from "./icons/Paperclip.svelte";
 export { default as Camera } from "./icons/Camera.svelte";

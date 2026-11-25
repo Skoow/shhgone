@@ -6,7 +6,7 @@ import { MEM_WINDOW, findIn, needle, scanProcessMemory, scanRegions } from "./sc
 
 const W = MEM_WINDOW;
 
-// Relecture C-2 Task 17 : chaque forme d'une aiguille est trouvée dans une meule qui ne
+// Relecture C-2 : chaque forme d'une aiguille est trouvée dans une meule qui ne
 // contient qu'elle (brut, base64url, base64, hex minuscules et majuscules ; texte : UTF-16LE
 // et UTF-16BE).
 describe("needle : formes cherchées", () => {
@@ -109,7 +109,7 @@ describe("scanProcessMemory (processus réel)", () => {
     } finally {
       child.kill("SIGKILL");
     }
-    // Délai explicite (revue finale C-2, mineur j) : démarrage d'un processus enfant puis
+    // Délai explicite : démarrage d'un processus enfant puis
     // lecture de toute sa mémoire, indépendant du délai global de la suite.
   }, 30_000);
 });

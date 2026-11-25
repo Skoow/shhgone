@@ -1,5 +1,4 @@
-// File de téléchargements du destinataire (UI §9.8.6, §9.9 ; décisions du propriétaire du
-// 7 novembre) : un fichier, une catégorie ou tout, et l'archive .zip ; pause, reprise, arrêt
+// File de téléchargements du destinataire (UI §9.8.6, §9.9) : un fichier, une catégorie ou tout, et l'archive .zip ; pause, reprise, arrêt
 // et nouvel essai à chaque niveau ; état de chaque ligne.
 //
 // Règles :
@@ -13,7 +12,7 @@
 //   lecture reprend à l'octet déjà écrit (`from`) ; elle n'est proposée que si le budget de
 //   lecture estimé le permet (read-meter.ts). Le client actuel relit l'élément depuis son début
 //   et jette ce qui est déjà écrit ; une reprise au segment demande une option du client
-//   (`saveItem(i, sink, { from })`), demandée à la Task M2.
+//   (`saveItem(i, sink, { from })`), demandée à la.
 // - **Arrêt** : fichier partiel supprimé (abort), la ligne revient à son état de départ.
 // - **Partage disparu** (spec §41.8) : seul le fichier en cours de lecture continue ; ce qui
 //   attend, est en pause ou garde un partiel est arrêté (le serveur ne reprend pas une pause
@@ -92,10 +91,10 @@ export function classify(e: unknown): { reason: FailReason; retryable: boolean; 
   // Limite de téléchargement du partage (403 egress_limit) : définitive ; arrêt, partiel supprimé.
   if (n === "EgressLimitError") return { reason: "egress", retryable: false, keepPartial: false };
   if (n === "NotFoundError" || n === "GoneError") return { reason: "gone", retryable: false, keepPartial: false };
-  // Contenu modifié en route (audit web D3) : refusé, le fichier partiel est supprimé ; relire ne changerait rien.
+  // Contenu modifié en route : refusé, le fichier partiel est supprimé ; relire ne changerait rien.
   if (n === "CorruptError") return { reason: "corrupt", retryable: false, keepPartial: false };
   if (n === "LimitError" || n === "ServerError") return { reason: "limit", retryable: true, keepPartial: true };
-  // « Enregistrer sous » ouvert hors d'un appui (élément arrivé à son tour dans la file, audit M3).
+  // « Enregistrer sous » ouvert hors d'un appui (élément arrivé à son tour dans la file).
   if (n === "SecurityError" || n === "NotAllowedError") return { reason: "activation", retryable: true, keepPartial: false };
   if (n === "QuotaExceededError") return { reason: "disk_full", retryable: true, keepPartial: false };
   if (isNetwork(e)) return { reason: "network", retryable: true, keepPartial: true };
@@ -125,7 +124,7 @@ export function readSkipping(
 const IDLE = (total: number): Row => ({ state: "idle", done: 0, total, rate: 0, retryable: false });
 /** Intervalle minimal entre deux mises à jour de progression (ms) : pas une par tranche. */
 const TICK_MS = 120;
-/** Lecture réelle nécessaire avant d'afficher une estimation fondée sur le débit (retours UI4). */
+/** Lecture réelle nécessaire avant d'afficher une estimation fondée sur le débit. */
 export const MEASURE_MIN_MS = 2000;
 
 export function createDownloads(totals: readonly number[], deps: DownloadDeps) {
@@ -133,7 +132,7 @@ export function createDownloads(totals: readonly number[], deps: DownloadDeps) {
   let zip = $state.raw<Row | null>(null);
   /**
    * Débit mesuré (octets/s, moyenne lissée) ; null tant que moins de MEASURE_MIN_MS de lecture
-   * réelle (retours UI4 : aucune estimation sur un débit supposé ni sur les premiers instants).
+   * réelle (aucune estimation sur un débit supposé ni sur les premiers instants).
    */
   let measured = $state<number | null>(null);
   let smoothed: number | null = null;

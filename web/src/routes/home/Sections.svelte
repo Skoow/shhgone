@@ -22,7 +22,7 @@
 </script>
 
 <script lang="ts">
-  // Accueil, sous le héros (refonte du 19 novembre, 3 et 4, maquette « La trame ») : sections sombres
+  // Accueil, sous le héros (maquette « La trame ») : sections sombres
   // sur le fond de la page (.soft) et plaques en relief à texture (.slab, ui/base.css). « Comment ça marche » : trois
   // illustrations fixes (document, document en trame fermé à clé, document qui part en points),
   // aucune animation (l'infographie du héros suffit). « Pensé pour la confidentialité » : fond
@@ -89,7 +89,7 @@
   </ol>
 </section>
 
-<!-- L'animation en grand (propriétaire, 19 novembre, 3) : la scène et le journal (deux lignes) à
+<!-- L'animation en grand : la scène et le journal (deux lignes) à
      gauche, les étapes cochées au fil de l'animation à droite, « étape n sur 7 » et la pause en haut. -->
 <section class="sec demo-sec soft" aria-labelledby="demo-title">
   <div class="head rv" {@attach reveal}>
@@ -119,7 +119,7 @@
       </li>
     {/each}
   </ul>
-  <!-- Le lien en deux (propriétaire, 19 novembre, 3 ; remplace la décision du 16 novembre de ne plus
+  <!-- Le lien en deux (remplace la de ne plus
        le montrer ici) : l'adresse va au serveur ; tout ce qui suit le « # » reste dans le navigateur.
        Exemple de la longueur réelle (43 caractères : la clé de 32 octets en base64url), jamais une
        vraie clé. -->
@@ -152,7 +152,7 @@
       padding-block: 136px 144px;
     }
   }
-  /* Titres et sous-titres centrés (propriétaire, 20 novembre). */
+  /* Titres et sous-titres centrés. */
   .head {
     display: grid;
     justify-items: center;
@@ -199,7 +199,7 @@
      200 %) ; ordinateur : quatre, reliées par un pointillé. Chaque illustration a la même hauteur. */
   .steps3 {
     display: grid;
-    /* Deux étapes par ligne au plus, partout (propriétaire, 20 novembre) ; une seule colonne
+    /* Deux étapes par ligne au plus, partout ; une seule colonne
        quand le texte est agrandi (9 rem = 288 px à 200 %). */
     grid-template-columns: repeat(auto-fit, minmax(max(min(100%, 9rem), 40%), 1fr));
     gap: var(--sp-7) var(--sp-5);
@@ -207,7 +207,7 @@
     padding: 0;
     list-style: none;
   }
-  /* 20 novembre (propriétaire : « revoir la grandeur des images pour mieux les centrer ») :
+  /* (« revoir la grandeur des images pour mieux les centrer ») :
      chaque étape est une colonne centrée ; toutes les illustrations ont la même hauteur (--ih),
      leur largeur suit leur dessin, le texte est centré dessous. */
   .st {
@@ -240,7 +240,7 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    /* Même bleu doux (--info) que les ronds de « hors de notre portée » (propriétaire, 21 novembre). */
+    /* Même bleu doux (--info) que les ronds de « hors de notre portée ». */
     background: radial-gradient(circle at 50% 30%, rgb(141 178 255 / 0.2), rgb(141 178 255 / 0.05));
     box-shadow: inset 0 0 0 1px rgb(141 178 255 / 0.35);
     color: var(--info);
@@ -268,7 +268,7 @@
     }
   }
 
-  /* ---------- Confidentialité : plaque en relief aux pictos (19 novembre, 5) ---------- */
+  /* ---------- Confidentialité : plaque en relief aux pictos ---------- */
   .priv .head p {
     color: #aab6d3;
   }
@@ -280,7 +280,7 @@
     padding: 0;
     list-style: none;
   }
-  /* 20 novembre (propriétaire) : texte centré, pictogramme plus gros, centré au-dessus. */
+  /* Texte centré, pictogramme plus gros, centré au-dessus. */
   .prow {
     display: grid;
     justify-items: center;
@@ -297,7 +297,7 @@
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    /* Bleu doux (--info), plus le vert d'accent (propriétaire, 21 novembre). */
+    /* Bleu doux (--info), plus le vert d'accent. */
     background: radial-gradient(circle at 50% 30%, rgb(141 178 255 / 0.2), rgb(141 178 255 / 0.05));
     box-shadow: inset 0 0 0 1px rgb(141 178 255 / 0.35);
     color: var(--info);
@@ -399,7 +399,7 @@
     color: var(--accent);
     font-weight: 600;
   }
-  /* Sous le lien, en petit, sur toute la largeur (19 novembre, 5). */
+  /* Sous le lien, en petit, sur toute la largeur. */
   .link figcaption {
     color: #8f9cbd;
     font-size: var(--fs-micro);

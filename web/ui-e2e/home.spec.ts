@@ -1,4 +1,4 @@
-// Accueil (UI §9.1, §20.4 ; refonte du 12 novembre, UI §25) : titre mot par mot, cases cochées,
+// Accueil (UI §9.1, §20.4 ; UI §25) : titre mot par mot, cases cochées,
 // infographie, boutons du héros (qui mènent à la page d'envoi « /envoyer » ; Photo ou
 // vidéo, Vocal, Note), voile de dépôt pleine page, sections sous le pli (Comment ça marche,
 // Pensé pour la confidentialité, Offres, questions), révélations au défilement.
@@ -34,7 +34,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator("[data-lede]")).toHaveText(/^Vos fichiers, mais aussi des messages vocaux, des notes et bientôt un salon de discussion/);
     const certs = page.getByRole("list", { name: "En bref" }).getByRole("listitem");
     await expect(certs).toHaveCount(3);
-    // Cadre d'envoi (19 novembre) : « Choisir des fichiers », puis Photo ou vidéo, Vocal, Salon. Plus de « Parcourir ».
+    // Cadre d'envoi : « Choisir des fichiers », puis Photo ou vidéo, Vocal, Salon. Plus de « Parcourir ».
     await expect(page.getByRole("button", { name: /^Choisir des fichiers/ })).toBeVisible();
     await expect(page.getByRole("group", { name: "Ou créer sur place" }).getByRole("button")).toHaveText([/Photo ou vidéo/, /Vocal/, /Salon/]);
     await expect(page.getByRole("button", { name: "Parcourir les fichiers" })).toHaveCount(0);
@@ -58,7 +58,7 @@ test.describe("fr-FR", () => {
     await expect(page).toHaveURL(shh.origin + "/securite");
   });
 
-  test("téléphone 390 × 844 : « Choisir des fichiers » et « Créer sur place » dans le cadre, au premier écran ; infographie dessous ; plus de carte de dépôt (retours du 15 novembre)", async ({ page, shh, isMobile }) => {
+  test("téléphone 390 × 844 : « Choisir des fichiers » et « Créer sur place » dans le cadre, au premier écran ; infographie dessous ; plus de carte de dépôt", async ({ page, shh, isMobile }) => {
     test.skip(!isMobile, "projets téléphone seulement");
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(shh.origin + "/");
@@ -75,7 +75,7 @@ test.describe("fr-FR", () => {
     expect(pick.width).toBeGreaterThan(drop.width - 40);
     expect(make.y).toBeGreaterThan(pick.y);
     expect(make.y + make.height).toBeLessThanOrEqual(844);
-    // Tout le cadre est visible au premier écran, même sous les barres de Safari (19 novembre, 2) :
+    // Tout le cadre est visible au premier écran, même sous les barres de Safari :
     // 700 px laissent la place de la barre d'adresse et des onglets d'un iPhone.
     expect(frame.y + frame.height).toBeLessThanOrEqual(700);
     expect(await page.evaluate(() => scrollY)).toBe(0);
@@ -87,7 +87,7 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("dialog", { name: "Ajouter" })).toBeVisible();
   });
 
-  test("ordinateur : la légende de l'animation est centrée dans son cadre (21 novembre)", async ({ page, shh }) => {
+  test("ordinateur : la légende de l'animation est centrée dans son cadre", async ({ page, shh }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(shh.origin + "/");
     const cadre = page.locator("[data-demo-now]");
@@ -117,15 +117,15 @@ test.describe("fr-FR", () => {
     expect(await noHScroll(page)).toBe(true);
     // Plus strict que la page : aucune section ne déborde de sa colonne. Dans Chromium, un mot trop
     // long (« s'autodétruit », question de la FAQ) débordait de 14 px dans la marge sans créer de
-    // défilement ; dans WebKit, aux métriques un peu plus larges, il en créait un (CI b155911).
+    // défilement ; dans WebKit, aux métriques un peu plus larges, il en créait un.
     // Le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi. Les sections en
-    // bande (.band, .sect) débordent exprès par leur décor (couture et halo d'un bord à l'autre de l'écran,
-    // 19 novembre, 2 ; coupés par #app) : leur contenu, lui, est vérifié. Les dessins SVG (mis à
+    // bande (.soft, .slab) débordent exprès par leur décor (halo d'un bord à l'autre de l'écran,
+    // coupé par #app) : leur contenu, lui, est vérifié. Les dessins SVG (mis à
     // l'échelle, sans texte de page) et la copie décorative du titre (.words, ses points qui partent
     // vers la droite, coupés par le titre) n'entrent pas dans cette mesure.
     const overflow = await page.evaluate(() =>
       [document.querySelector(".home")!, ...document.querySelectorAll(".home > *, .home section *")]
-        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".band, .soft, .slab, .home"))
+        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".soft, .slab, .home"))
         .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0)
         .map((e) => `${e.tagName}.${(e as HTMLElement).className} ${e.scrollWidth} > ${e.clientWidth}`),
     );
@@ -138,7 +138,7 @@ test.describe("fr-FR", () => {
     await capture(page, "home-320-200pct-securite");
   });
 
-  test("K1 : aucune animation d'entrée (accueil écrit au build, 18 novembre) ; seule l'ambiance boucle", async ({ page, shh }) => {
+  test("K1 : aucune animation d'entrée (accueil écrit au build) ; seule l'ambiance boucle", async ({ page, shh }) => {
     await page.addInitScript(() => {
       const names: string[] = [];
       (window as unknown as { __anims: string[] }).__anims = names;
@@ -187,7 +187,7 @@ test.describe("fr-FR", () => {
       if (typeof MediaDevices !== "undefined")
         Object.defineProperty(MediaDevices.prototype, "getUserMedia", { configurable: true, value: () => Promise.reject(new DOMException("aucune", "NotFoundError")) });
     });
-    await page.goto(shh.origin + "/envoyer"); // « Créer sur place » : sur la page d'envoi (17 novembre)
+    await page.goto(shh.origin + "/envoyer"); // « Créer sur place » : sur la page d'envoi
     await page.waitForTimeout(900);
     // Compte les événements « close » des boîtes de dialogue (écouteur en phase de capture : il passe avant le
     // site) : on attend l'événement lui-même, qui remet `open` à faux, au lieu d'un délai fixe.
@@ -200,7 +200,7 @@ test.describe("fr-FR", () => {
     // Bascule « Vidéo » seulement si le navigateur sait enregistrer une vidéo (captureSupport,
     // media/capture.ts). Le WebKit Linux des tests n'en enregistre aucune (comme pour le vocal,
     // compose.spec.ts) : le site masque alors la bascule, et le tour Vidéo attendait en vain
-    // (CI du 11 et du 12 novembre, webkit-desktop ; ce test ne tourne pas sur téléphone).
+    // (CI du 11, webkit-desktop ; ce test ne tourne pas sur téléphone).
     const canVideo = await page.evaluate(
       (list) => typeof MediaRecorder !== "undefined" && list.some((m) => MediaRecorder.isTypeSupported(m)),
       MIMES.video.map(([m]) => m),
@@ -323,7 +323,7 @@ test.describe("fr-FR", () => {
   test("fond : nuit et pictogrammes, plus de trame de croix, sans défilement horizontal, sous le plafond de luminance K5", async ({ page, shh, browserName }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(shh.origin + "/");
-    // Un seul motif (18 novembre) : les pictogrammes ; plus de trame de croix.
+    // Un seul motif : les pictogrammes ; plus de trame de croix.
     await expect(page.locator("[data-trame]")).toHaveCount(0);
     expect(await noHScroll(page)).toBe(true);
     test.skip(browserName !== "chromium", "luminance mesurée sur la capture Chromium");
@@ -361,7 +361,7 @@ test.describe("fr-FR", () => {
         }
         return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...new Set(v)].sort().join(",")]));
       });
-    // Haut de page : plus rien ne boucle (titre figé, 19 novembre, 4) ; l'infographie (sa section,
+    // Haut de page : plus rien ne boucle (titre figé) ; l'infographie (sa section,
     // sous « Comment ça marche ») tourne quand elle est à l'écran et s'arrête hors écran.
     await expect.poll(async () => (await state()).other).toBeUndefined();
     const demo = page.locator("[data-demo]");
@@ -388,7 +388,7 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/");
     await page.waitForTimeout(100);
     expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
-    // (m6, contour de la carte de dépôt : la carte n'est plus sur l'accueil, 18 novembre.)
+    // (m6, contour de la carte de dépôt : la carte n'est plus sur l'accueil, .)
     await capture(page, "home-v3-reduced");
     await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(200);
@@ -441,7 +441,7 @@ test.describe("fr-FR", () => {
       const b = page.getByRole("button", { name: new RegExp(`^${name}`) }).filter({ visible: true }).first();
       expect(await b.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe("solid");
     }
-    // Le cadre d'envoi est la zone de dépôt : pointillé (19 novembre).
+    // Le cadre d'envoi est la zone de dépôt : pointillé.
     expect(await page.locator("[data-ctas]").evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe("dashed");
     await page.waitForTimeout(900);
     await capture(page, "home-v3-forced");
@@ -471,7 +471,7 @@ test.describe("en-US", () => {
 
   test("titre, infographie, sections en anglais ; axe ; capture", async ({ page, shh, isMobile }) => {
     await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1280, height: 900 });
-    // Version anglaise de l'accueil : « /en » (pages bilingues, 20 novembre).
+    // Version anglaise de l'accueil : « /en » (pages bilingues).
     await page.goto(shh.origin + "/en");
     await expect(page.getByRole("heading", { level: 1, name: "One link, one password, then it's gone." })).toBeVisible();
     await expect(page.locator("[data-demo-steps] li").nth(1)).toContainText("Encrypted on your device");

@@ -1,12 +1,12 @@
-// Enregistrements du WebSocket du salon (« Protocole » du plan C-2,
-// docs/superpowers/plans/2026-11-12-salon-c2-serveur.md) : lecture des enregistrements du
+// Enregistrements du WebSocket du salon (docs/conception/specs/2026-11-11-salon-v3-design.md
+// §17) : lecture des enregistrements du
 // serveur, taille exacte par type, et construction des messages du client. Pur : aucun réseau,
 // aucun moteur. Entiers gros-boutistes ; un enregistrement de taille inexacte ou de type
 // inconnu est refusé (null) : le client le note et l'ignore, il ne devine jamais.
 
 /** Taille d'une trame (moteur : `TAILLE_TRAME`). */
 export const TAILLE_TRAME = 4140;
-/** `depuis` d'une reprise (nouvelle identité, aucun rattrapage ; plan C-2, point 5). */
+/** `depuis` d'une reprise (nouvelle identité, aucun rattrapage). */
 export const DEPUIS_REPRISE = 0xffffffffffffffffn;
 
 /** Enregistrement du serveur, lu. `seq` : rang (pris ou porté, selon le type). */
@@ -153,5 +153,5 @@ export function ping(n: Uint8Array): Octets {
   return b;
 }
 
-/** Raisons du `0x05` de fin (plan C-2) ; 3 réservé, jamais émis. */
+/** Raisons du `0x05` de fin ; 3 réservé, jamais émis. */
 export const RAISONS_FIN = { expire: 1, detruit: 2, remplace: 4, exclu: 5, lent: 6, interrompu: 7 } as const;

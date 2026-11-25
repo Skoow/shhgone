@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Gestion par l'expéditeur (UI §9.6), version minimale de la Task 19 : état, ouvertures,
+  // Gestion par l'expéditeur (UI §9.6), version minimale : état, ouvertures,
   // compte à rebours, Supprimer maintenant. Le lien de gestion (S_gestion) est pris une fois
   // (take, qui nettoie aussi la barre d'adresse) et ne vit que dans cette fermeture.
   // Relecture toutes les 60 s tant que la page est visible ; « Actualiser » à la demande.
@@ -29,7 +29,7 @@
 
   const got = untrack(() => take());
   let secret: string | null = got?.kind === "m" ? got.link : null;
-  // Historique local (test d'intrusion du 11 novembre) : relectures et destruction reportées
+  // Historique local : relectures et destruction reportées
   // sur l'entrée du même partage si elle existe (syncManaged : aucune entrée créée).
   let managed = secret;
   const sync = (r: ManagedResult) => {
@@ -44,9 +44,9 @@
   let pausedUntil = 0;
   let reads = $state(0); // nouvelle lecture → nouveau compte à rebours
 
-  // Heure de la dernière lecture réussie (UI §9.6.5, audit M13).
+  // Heure de la dernière lecture réussie (UI §9.6.5).
   let readAt = $state<number | null>(null);
-  // Suppression en cours ou faite : une relecture encore en vol ne réaffiche rien (audit, faible).
+  // Suppression en cours ou faite : une relecture encore en vol ne réaffiche rien.
   let deleting = false;
   const over = () => secret === null || phase === "gone" || deleting;
   async function refresh() {
@@ -190,7 +190,7 @@
 {/if}
 
 <style>
-  /* Échéance en deux lignes (Deadline, retours UI4). */
+  /* Échéance en deux lignes (Deadline). */
   .when {
     margin: 0;
     font-size: var(--fs-small);

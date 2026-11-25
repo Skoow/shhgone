@@ -1,4 +1,4 @@
-// Task 9c : nettoyage en place des MP4, MOV et M4A (spec §35.2) sur les fichiers d'essai de
+// Nettoyage en place des MP4, MOV et M4A (spec §35.2) sur les fichiers d'essai de
 // scripts/gen-media-fixtures.sh (ffmpeg, repères fictifs « Reper… »).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -115,7 +115,7 @@ describe("MP4, MOV, M4A : nettoyage en place", () => {
   });
 });
 
-describe("MP4 : nom du gestionnaire de piste (revue du 10 novembre)", () => {
+describe("MP4 : nom du gestionnaire de piste", () => {
   // hdlr porte un nom libre écrit par l'appareil ou le logiciel (« GoPro AVC », « Core Media
   // Video », « VideoHandler ») : l'écran dit « appareil retiré », il doit donc partir.
   const names = (b: Uint8Array) =>
@@ -140,7 +140,7 @@ describe("MP4 : nom du gestionnaire de piste (revue du 10 novembre)", () => {
   });
 });
 
-describe("MP4 : nom de l'encodeur vidéo (revue du 10 novembre)", () => {
+describe("MP4 : nom de l'encodeur vidéo", () => {
   /** Les 32 octets « compressorname » de chaque entrée vidéo de stsd. */
   const compressors = (b: Uint8Array) =>
     find(b, ["moov", "trak", "mdia"]).flatMap((mdia) => {

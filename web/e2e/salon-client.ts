@@ -1,27 +1,27 @@
-// Client de test du salon (plan C-2, Task 16) : création, entrée, WebSocket et moteur du salon
+// Client de test du salon : création, entrée, WebSocket et moteur du salon
 // (module wasm du crate shhdrop-salon, web/src/salon/engine.ts) contre le vrai binaire Go.
-// Il suit le « Protocole » du plan C-2 à la lettre et vérifie chaque enregistrement reçu (taille
+// Il suit le « Protocole » à la lettre et vérifie chaque enregistrement reçu (taille
 // exacte par type, rangs strictement croissants) : un écart est noté dans `erreurs`, que le test
 // exige vide. Rien n'est contourné ici : un écart entre le serveur et le moteur doit faire
 // échouer le test.
 //
 // Rôles du client (contrat de l'appelant, engine/salon/src/groupe.rs) : `0x0D` →
 // `remplacerAnnonces` avant toute trame ; `0x02`/`0x0A` → `annoncer` ; `0x03` → `marquerParti` ;
-// `0x09` → `marquerExclu(siège ou undefined si 0xFF, r)` (relecture du 13 novembre) ; `0x01` → `recevoirTrame(trame, seq, siège)` ; événement `keyPackage` →
+// `0x09` → `marquerExclu(siège ou undefined si 0xFF, r)` (relecture) ; `0x01` → `recevoirTrame(trame, seq, siège)` ; événement `keyPackage` →
 // `ajouter` par le plus petit siège en ligne du groupe ; `commitAccepte { welcome }` → envoi du
-// Welcome. Envoi refusé par le moteur (audit adverse du 13 novembre, spec salon v3 §15) :
+// Welcome. Envoi refusé par le moteur (spec salon v3 §15) :
 // `commit_en_cours` → le message attend l'écho du Commit ; `retrait_en_attente` → le plus petit
 // siège en ligne retire les sièges partis ou exclus (`aRetirer`), le message part ensuite. Rien
 // n'est contourné : un message ne part jamais tant que le moteur le refuse.
 // Les trames montantes partent une à une : chacune attend son accusé `0x0F` (son
-// rang ; revue finale C-2, I1 : il arrive même en rattrapage, quand l'écho ne viendra jamais)
+// rang ; il arrive même en rattrapage, quand l'écho ne viendra jamais)
 // ou un refus (`0x0B` : attente puis nouvel envoi des mêmes octets ; `0x0C` : échec).
 import { webcrypto } from "node:crypto";
 import { passwordKey, type KdfParams } from "../src/engine";
 import { loadSalonEngine, type ClesSalon, type EnveloppeEnvoi, type Evenement, type Salon, type SalonEngine } from "../src/salon/engine";
 import { solveAltcha } from "./altcha";
 
-/** Paramètres Argon2id du salon (Global Constraints du plan C-2). */
+/** Paramètres Argon2id du salon (Global Constraints). */
 export const KDF: KdfParams = { ops: 3, mem: 67108864 };
 /** Mot de passe de la forme générée (D41-15). */
 export const MDP = "Kq7!mP2#x?a";
@@ -42,7 +42,7 @@ const TAILLES: Record<number, number> = {
   0x02: 9 + 17,
   0x03: 9 + 1,
   0x05: 9 + 1,
-  0x07: 9 + 1 + 1 + 8, // 19 (Task 9b)
+  0x07: 9 + 1 + 1 + 8, // 19
   0x08: 9 + 8,
   0x09: 9 + 1 + 16 + 4,
   0x0a: 9 + 17,
@@ -128,7 +128,7 @@ export class ClientSalon {
   /** KeyPackage de cette identité déjà publié. */
   #kpPublie = false;
   /**
-   * Secret de gestion du créateur (`S_gestion`, 14 novembre) : sa clé de rôle en est tirée à
+   * Secret de gestion du créateur (`S_gestion`) : sa clé de rôle en est tirée à
    * chaque `Salon.creer` (création, reprise) ; jamais envoyé au serveur (`J_gestion` seulement).
    */
   #secretGestion: Uint8Array | undefined;
@@ -149,7 +149,7 @@ export class ClientSalon {
    * Crée un salon (1 h, `max_members`), puis y entre comme créateur (siège 0). `secretGestion` :
    * `S_gestion` (lien de gestion), d'où viennent la clé de rôle du créateur et le jeton montré
    * au serveur. `sGestion` garde son nom pour les tests qui appellent les routes de gestion à
-   * la main, mais c'est **ce que le serveur reçoit** (`X-Shh-Manage`) : depuis le 14 novembre,
+   * la main, mais c'est **ce que le serveur reçoit** (`X-Shh-Manage`) :,
    * `J_gestion` = `jetonGestion(S_gestion)`, jamais `S_gestion` (spec salon v3 §15.2).
    */
   /** `session` : jeton du compte (SHH_COMPTES=1), envoyé en X-Shh-Session sur POST /api/salons seulement. */

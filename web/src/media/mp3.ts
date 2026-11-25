@@ -1,5 +1,5 @@
 // MP3 (et AAC ADTS) : les étiquettes sont coupées, les trames audio gardées octet pour octet
-// (spec §35.2, Task 9c, technique 3). Retirés : toutes les ID3v2 du début (pied de page compris),
+// (spec §35.2). Retirés : toutes les ID3v2 du début (pied de page compris),
 // ID3v2.4 de fin (« 3DI »), ID3v1 (« TAG ») et son extension « TAG+ », APEv2 (« APETAGEX »),
 // Lyrics3 v2. Gardée : la trame Xing/Info/LAME (lecture à débit variable), première trame audio.
 import { Malformed, startsWith } from "./bytes";

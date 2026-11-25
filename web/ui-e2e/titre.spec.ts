@@ -1,4 +1,4 @@
-// Nom du partage (demande du propriétaire du 19 novembre), sur le vrai serveur : champ des options,
+// Nom du partage, sur le vrai serveur : champ des options,
 // « Lien prêt » (en tête des informations), page d'ouverture puis de contenu du destinataire (titre,
 // texte brut isolé, jamais dans l'onglet), « Mes partages » (sur la carte, chiffré dans IndexedDB,
 // rien dans localStorage, renommé sur l'appareil sans changer ce que voit le destinataire).

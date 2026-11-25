@@ -1,4 +1,4 @@
-// FLAC (spec §35.2, Task 9c, technique 3) : blocs de métadonnées VORBIS_COMMENT, PICTURE,
+// FLAC (spec §35.2) : blocs de métadonnées VORBIS_COMMENT, PICTURE,
 // APPLICATION, PADDING et ID3v2 de tête retirés ; STREAMINFO, SEEKTABLE, CUESHEET et les trames
 // gardés octet pour octet, drapeau « dernier bloc » reposé. Bloc hors fichier → `Malformed`.
 import { Malformed, concat, startsWith } from "./bytes";

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-// Signalement avec catégories (conception compte §21.10, §21.15.7 ; plan du compte, lot 14 ;
-// décision du propriétaire du 14 novembre : catégorie facultative, « Autre » par défaut).
+// Signalement avec catégories (conception compte §21.10, §21.15.7) :
+// catégorie facultative, « Autre » par défaut).
 // Dix catégories dans l'ordre fixe des codes 1 à 10, en boutons radio natifs d'un même groupe
 // (flèches du clavier données par le navigateur) ; aucune requête avant « Signaler » ;
 // PHAROS en bandeau pour les codes 1 et 2 ; focus sur « Annuler » à l'étape de confirmation.

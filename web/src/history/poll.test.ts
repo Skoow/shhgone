@@ -175,7 +175,7 @@ describe("pollHistory", () => {
 
 void (undefined as unknown as History);
 
-// Conception compte §21.7 (plan, lots 11 et 12) : un partage reçu n'a pas de lien de gestion ; il
+// Conception compte §21.7 : un partage reçu n'a pas de lien de gestion ; il
 // n'est relu (meta, aucune ouverture consommée) que sur demande (« Actualiser »), au plus une fois
 // toutes les 5 min, après la même gigue ; jamais par la relecture d'affichage de « Vos envois ».
 describe("pollHistory : partages reçus", () => {

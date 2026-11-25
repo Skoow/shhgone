@@ -10,7 +10,7 @@
 
   /**
    * `whole` : valeur montrée en entier, sur plusieurs lignes au besoin (mot de passe : ce qu'on lit = ce qu'on copie).
-   * `secret` : masquée à l'arrivée (propriétaire, 19 novembre), bouton œil pour l'afficher ou la
+   * `secret` : masquée à l'arrivée, bouton œil pour l'afficher ou la
    * masquer ; « Copier » copie toujours la vraie valeur, même masquée. Masquée, elle n'est pas
    * lue par les lecteurs d'écran non plus (le bouton dit qu'elle est masquée).
    */
@@ -75,7 +75,7 @@
       />
     {:else}
       {#if secret}
-        <!-- Œil dans le rectangle de la valeur (propriétaire, 19 novembre). -->
+        <!-- Œil dans le rectangle de la valeur. -->
         <span class="box">
           {#if hidden}
             <span class="val vis whole masked" translate="no" aria-hidden="true" data-masked>{dots}</span>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Menu du téléphone (< 768 px ; retours du propriétaire du 15 novembre) : remplace la barre
+  // Menu du téléphone (< 768 px) : remplace la barre
   // d'onglets du bas sur le site. Motif disclosure (bouton aria-expanded qui montre une liste de
   // liens, pas un role="menu"), comme les menus de TopNav. Échap ferme et rend le focus au bouton ;
   // un clic ailleurs ou un changement d'écran le ferme. « Téléchargements » n'y figure qu'avec un
@@ -20,21 +20,21 @@
   let button: HTMLButtonElement | undefined = $state();
   const uid = $props.id();
 
-  // Retours du 18 novembre : un menu plus complet et plus soigné. « Nouveau partage » en tête ;
+  // Un menu plus complet et plus soigné. « Nouveau partage » en tête ;
   // puis les écrans du site, chacun avec son icône ; puis le compte (seulement avec __COMPTES__) :
-  // « Se connecter » et « Créer un compte », ou, connecté, « Mon compte », « Paramètres » et
+  // « Se connecter » et « Créer un compte », connecté, « Mon compte », « Paramètres » et
   // « Se déconnecter ». Confidentialité, Conditions, Signaler… restent dans le pied de page.
   type Link = { label: string; path: string; icon: Component; soon?: string };
   const links = $derived<Link[]>([
-    // « Mes partages » seulement s'il y a des partages sur cet appareil (17 novembre).
+    // « Mes partages » seulement s'il y a des partages sur cet appareil.
     ...(accountFlag.connected ? [{ label: t("nav.home"), path: "/", icon: Share2 }] : presence.any ? [{ label: t("nav.shares"), path: "/envois", icon: Share2 }] : []),
-    // « Téléchargements » sans compte seulement si l'historique est activé ici (22 novembre).
+    // « Téléchargements » sans compte seulement si l'historique est activé ici.
     ...(accountFlag.connected || presence.downloads ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
-    // Salon (plan C-3) : la création ; « bientôt » seulement sans __SALONS__ (démo, site sans compte).
+    // Salon : la création ; « bientôt » seulement sans __SALONS__ (démo, site sans compte).
     __SALONS__ ? { label: t("nav.room"), path: "/salon/nouveau", icon: MessagesSquare } : { label: t("nav.room"), path: "", icon: MessagesSquare, soon: t("tabs.soon.chat") },
     { label: t("nav.security"), path: "/securite", icon: ShieldCheck },
     { label: t("nav.offers"), path: "/offres", icon: Tag },
-    // Compte pas encore ouvert (D8) : « Se connecter » visible, bientôt (19 novembre, 4).
+    // Compte pas encore ouvert (D8) : « Se connecter » visible, bientôt.
     ...(__COMPTES__ ? [] : [{ label: t("account.login.title"), path: "", icon: User, soon: t("nav.login.soon") }]),
   ]);
   const account = $derived<Link[]>(
@@ -71,7 +71,7 @@
     const down = (e: Event) => {
       if (!wrap?.contains(e.target as Node)) open = false;
     };
-    // Clavier (revue du 20 novembre) : le focus qui sort du menu le ferme (la page derrière est
+    // Clavier : le focus qui sort du menu le ferme (la page derrière est
     // voilée : on n'y tabule pas à l'aveugle), et Échap le ferme où que soit le focus.
     const sorti = (e: FocusEvent) => {
       const vers = e.relatedTarget as Node | null;
@@ -115,10 +115,10 @@
     }}
     data-menu-button
   >
-    <!-- Trois traits qui deviennent une croix (propriétaire, 20 novembre). -->
+    <!-- Trois traits qui deviennent une croix. -->
     <span class="burger" aria-hidden="true"><span></span><span></span><span></span></span>
   </button>
-  <!-- Voile sous le menu ouvert (18 novembre) : la page s'assombrit ; un appui dessus ferme. -->
+  <!-- Voile sous le menu ouvert : la page s'assombrit ; un appui dessus ferme. -->
   {#if open}<div class="mm-scrim" aria-hidden="true"></div>{/if}
   <nav class="mm-p" id="{uid}-menu" aria-label={t("nav.label")} hidden={!open} data-menu>
     <a
@@ -159,7 +159,7 @@
       {/each}
     </ul>
     {#if __COMPTES__}
-      <!-- Compte (18 novembre) : seulement si le compte est construit (__COMPTES__). -->
+      <!-- Compte : seulement si le compte est construit (__COMPTES__). -->
       <div class="mm-acct" style:--i={links.length + 1}>
         <p class="mm-h">{t("nav.menu.account")}</p>
         {#if accountFlag.connected}
@@ -301,7 +301,7 @@
     outline-offset: 2px;
   }
   /* Panneau sous l'en-tête, pleine largeur, fond plein : rien ne transparaît dessous. Ouverture
-     (18 novembre) : le panneau glisse et s'éclaire, les entrées arrivent l'une après l'autre. */
+      : le panneau glisse et s'éclaire, les entrées arrivent l'une après l'autre. */
   .mm-p {
     position: absolute;
     inset-inline: 0;

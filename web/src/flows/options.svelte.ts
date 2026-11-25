@@ -1,4 +1,4 @@
-// Options de l'envoi (UI §9.3, spec §31, §34) : nom du partage (19 novembre), durée,
+// Options de l'envoi (UI §9.3, spec §31, §34) : nom du partage, durée,
 // ouvertures, mot de passe, droits du destinataire. En mémoire seulement : le mot de passe
 // n'est jamais rangé ni journalisé.
 // Le mot de passe est toujours généré (D41-15) : aucune saisie, donc aucun contrôle ici.
@@ -23,10 +23,10 @@ export function createOptions(deps: OptionsDeps) {
   let formules = $state<readonly Formule[]>([]);
   const lim = $derived(limitesDe(formule));
   let generated = $state(deps.generate());
-  // Nom du partage (19 novembre) : texte libre, nettoyé par le moteur au scellement (cleanTitle).
+  // Nom du partage : texte libre, nettoyé par le moteur au scellement (cleanTitle).
   let title = $state("");
-  // Droits (spec §34, simplifiés par le propriétaire le 5 novembre) : un interrupteur
-  // « Autoriser le téléchargement » (activé par défaut) et, seulement s'il est activé et là où
+  // Droits (spec §34, simplifiés) : un interrupteur
+  // « Autoriser le téléchargement » (activé par défaut), seulement s'il est activé et là où
   // le coffre existe, la sous-option « Garder une copie chiffrée dans l'app du destinataire ».
   let download = $state(true);
   let vault = $state(false);
@@ -142,8 +142,7 @@ type Viewable = { kind: "file" | "text"; base: string; ext: string; mime: string
 /**
  * Le destinataire peut-il ouvrir cet élément dans le navigateur, sans le télécharger ? Même règle
  * que sa visionneuse (previewKindOf, transfer/safety.ts) : images, sons, vidéos, textes et PDF
- * (cadre isolé, Task 22). Une seule liste, pour que l'avertissement ne dérive plus (revue du
- * 19 novembre : les PDF étaient encore annoncés « impossibles à ouvrir »).
+ * (cadre isolé). Une seule liste, pour que l'avertissement ne dérive plus (les PDF étaient encore annoncés « impossibles à ouvrir »).
  */
 export function viewableInBrowser(i: Viewable): boolean {
   return previewKindOf({ kind: i.kind, mime: i.mime.trim(), size: i.size } as Parameters<typeof previewKindOf>[0]) !== "none";

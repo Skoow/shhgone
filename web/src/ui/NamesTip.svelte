@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Petite icône maison à côté du titre d'une liste (composeur, destinataire ; retours UI6) :
+  // Petite icône maison à côté du titre d'une liste (composeur, destinataire) :
   // une étiquette de nom fermée d'un cadenas. Bulle au survol, au focus ou à l'appui (Tip) :
   // « Les noms de fichiers sont chiffrés aussi : nous ne pouvons pas les lire. »
   import { t } from "../i18n/i18n.svelte";

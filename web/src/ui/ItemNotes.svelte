@@ -1,6 +1,6 @@
 <script lang="ts">
   // Badges et avertissements d'un élément : doublon, programme à risque, illisible sans
-  // téléchargement. Une ligne chacun. L'état du nettoyage n'est plus ici (D41-34, retours UI7) :
+  // téléchargement. Une ligne chacun. L'état du nettoyage n'est plus ici (D41-34) :
   // il est dans la bulle du cadenas, avec une petite marque à côté du type (ItemRow).
   import type { ComposeItem } from "../flows/compose.svelte";
   import { t } from "../i18n/i18n.svelte";

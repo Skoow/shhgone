@@ -1,6 +1,5 @@
 <script lang="ts">
-  // Pages d'information servies par leur propre fichier HTML (pages séparées, conception du
-  // 16 novembre) : Sécurité, Confidentialité, Offres, Conditions, Mentions légales, Signaler.
+  // Pages d'information servies par leur propre fichier HTML (pages séparées) : Sécurité, Confidentialité, Offres, Conditions, Mentions légales, Signaler.
   // Seulement la coque (en-tête, menu, pied) et la page : ni composeur, ni moteur de chiffrement,
   // ni compte, ni salon. Le même composant sert au rendu du build (contenu déjà écrit dans le
   // HTML, pour les moteurs de recherche et l'affichage avant le script) et au navigateur.

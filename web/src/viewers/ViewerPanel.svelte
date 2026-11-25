@@ -1,10 +1,10 @@
 <script module lang="ts">
-  /** `noSave` : jamais téléchargeable (vocal, 17 novembre), même si l'expéditeur l'autorise. */
+  /** `noSave` : jamais téléchargeable (vocal), même si l'expéditeur l'autorise. */
   export type ViewItem = { i: number; name: string; kind: "image" | "video" | "audio" | "pdf" | "text"; size: number; text?: string; noSave?: boolean };
 </script>
 
 <script lang="ts">
-  // Visionneuse en panneau (décision du 7 novembre : un panneau, jamais toute la page) :
+  // Visionneuse en panneau (un panneau, jamais toute la page) :
   // <dialog> natif (showModal : focus piégé, Échap), précédent / suivant, ← → Début Fin,
   // balayage horizontal au doigt (48 px), balayage vers le bas pour fermer. Images, vidéos,
   // sons et textes seulement (previewKind) ; SVG, HTML et PDF n'arrivent jamais ici.
@@ -101,7 +101,7 @@
         phase = "shown";
       },
       (e: unknown) => {
-        // Contenu modifié en route (audit web D3) : texte fixe, distinct d'une coupure ; limite de
+        // Contenu modifié en route : texte fixe, distinct d'une coupure ; limite de
         // téléchargement du partage (403 egress_limit) : définitive, dite telle quelle.
         const name = e instanceof Error ? e.name : "";
         if (!ctl.signal.aborted) phase = name === "CorruptError" ? "corrupt" : name === "EgressLimitError" ? "egress" : "error";
@@ -288,7 +288,7 @@
     padding: var(--sp-4);
     overflow: auto;
     background: var(--bg-deep);
-    touch-action: pan-y; /* zoom bloqué partout (18 novembre) */
+    touch-action: pan-y; /* zoom bloqué partout */
   }
   .stage[data-kind="text"] {
     place-items: start center;

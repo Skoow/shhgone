@@ -1,5 +1,5 @@
 // Icônes PNG et ICO du site (marque « S qui s'efface », scripts/gen-logo.mjs), rendues localement par Chromium.
-// Aucune image générée par IA : le SVG construit est rastérisé tel quel.
+// Aucune image issue d'un générateur d'images : le SVG construit est rastérisé tel quel.
 //   node scripts/gen-icons.mjs      (PW_LOCAL_CHROMIUM=1 sur le poste de développement)
 // Sorties : public/apple-touch-icon.png (180, plein cadre), public/icon-192.png et public/icon-512.png
 // (marge de sécurité « maskable » : la marque tient dans 80 % du côté), public/favicon.ico (16, variante
@@ -53,7 +53,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   await browser.close();
   for (const name of ["apple-touch-icon.png", "icon-192.png", "icon-512.png"]) writeFileSync(join(web, "public", name), out[name]);
-  // PNG 32 px à part (22 novembre) : des navigateurs mobiles (Firefox sur iPhone) ne lisent ni
+  // PNG 32 px à part : des navigateurs mobiles (Firefox sur iPhone) ne lisent ni
   // l'ICO ni le SVG d'un lien « icon » et montraient une lettre à la place de l'icône.
   writeFileSync(join(web, "public", "favicon-32.png"), out["favicon-32"]);
   writeFileSync(join(web, "public", "favicon.ico"), ico([{ size: 16, data: out["favicon-16"] }, { size: 32, data: out["favicon-32"] }]));

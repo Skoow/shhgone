@@ -1,4 +1,4 @@
-// Faux serveur du COMPTE de la démo GitHub Pages (propriétaire, 19 novembre : « démo essayable » ;
+// Faux serveur du COMPTE de la démo GitHub Pages (« démo essayable » ;
 // conception du compte par passkey §11, Q8) : mêmes routes et mêmes réponses que
 // server/internal/api/handlers_passkey.go, handlers_passkeys_compte.go et handlers_compte.go, en
 // mémoire, pour cet onglet seulement. Il voit ce que verrait le vrai serveur : identifiants des

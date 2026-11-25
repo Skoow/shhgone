@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Capsule de scellement (UI §7.3, §20.4 ; refonte du 19 novembre, direction « La trame ») :
+  // Capsule de scellement (UI §7.3, §20.4 ; direction « La trame ») :
   // verre statique, encoche au milieu du bord haut, trait qui part de l'encoche et suit les
   // octets envoyés, noms brouillés en proportion (couche aria-hidden, vrais noms en liste
   // masquée, K9), trame de points (Trame.svelte) qui suit les mêmes octets, pourcentage.
@@ -75,8 +75,8 @@
   const animates = () => !!root && !reducedMotion() && typeof root.animate === "function";
 
   /**
-   * Fermeture, première partie (640 ms, K3), jouée PENDANT la finalisation (décision du
-   * propriétaire du 13 novembre, D2) : une lumière fait le tour du trait, qui s'épaissit. Rien
+   * Fermeture, première partie (640 ms, K3), jouée PENDANT la finalisation :
+   * une lumière fait le tour du trait, qui s'épaissit. Rien
    * n'y dit « prêt » : cadenas ouvert, aucun mot. Un échec l'arrête (`stop`).
    */
   let playing: Promise<void> | undefined;

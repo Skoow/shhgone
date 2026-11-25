@@ -1,4 +1,4 @@
-// Corrections de l'audit du 11 novembre, vérifiées dans le navigateur : garde du bouton Retour (I2), en-tête et pied pendant l'envoi.
+// Corrections de l', vérifiées dans le navigateur : garde du bouton Retour (I2), en-tête et pied pendant l'envoi.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { freshPage, sendShare, settle, unlock, pwField, unlockButton } from "./open-helpers";
@@ -117,7 +117,7 @@ test("M20 : page du mot de passe : coût d'ouverture en une ligne ; dernier essa
   const title = page.getByRole("heading", { name: "Mot de passe incorrect. Le partage a été détruit." });
   await expect(title).toBeVisible({ timeout: 20_000 });
   await expect(title).toBeFocused();
-  // Téléphone : l'illustration au-dessus, le titre garde la largeur (faible de l'audit).
+  // Téléphone : l'illustration au-dessus, le titre garde la largeur.
   if (isMobile) {
     const w = (await title.boundingBox())!.width;
     expect(w).toBeGreaterThan(280);
@@ -125,15 +125,15 @@ test("M20 : page du mot de passe : coût d'ouverture en une ligne ; dernier essa
   await shot(page, "faible-detruit-5-essais", isMobile);
 });
 
-test("M17, M18, coffre : bloc des offres (12 novembre, remplace la ligne Plus et Pro), aucune option verrouillée ni copie chiffrée ; barre d'onglets sur téléphone seulement (deux onglets utiles) ; captures", async ({ page, shh, isMobile }) => {
+test("M17, M18, coffre : bloc des offres (remplace la ligne Plus et Pro), aucune option verrouillée ni copie chiffrée ; barre d'onglets sur téléphone seulement (deux onglets utiles) ; captures", async ({ page, shh, isMobile }) => {
   test.setTimeout(90_000);
   await page.goto(shh.origin + "/");
-  // M18 (règle du 11 novembre) : visible dès deux onglets utiles ; sans compte, il n'en reste
-  // qu'un (Mes partages, retours du 15 novembre) : plus de barre, le menu ☰ la remplace.
+  // M18 (règle) : visible dès deux onglets utiles ; sans compte, il n'en reste
+  // qu'un (Mes partages) : plus de barre, le menu ☰ la remplace.
   await expect(page.getByRole("navigation", { name: "Navigation principale" })).toHaveCount(0);
   await shot(page, "m18-accueil-onglets", isMobile);
   await addText(page, "Le code de la porte est 4471.");
-  // Offre en cours (décision du 16 novembre) : un petit cadre « Votre offre : Gratuit », plus la bande Gratuit / Plus / Pro.
+  // Offre en cours : un petit cadre « Votre offre : Gratuit », plus la bande Gratuit / Plus / Pro.
   await expect(page.locator("[data-current-offer]").filter({ visible: true })).toContainText("Gratuit");
   await expect(page.locator("[data-offer-strip]")).toHaveCount(0);
   await expect(page.locator("[data-locked], [data-paid-space]")).toHaveCount(0);
@@ -168,8 +168,7 @@ test("M16, M22, I2 : « Lien prêt » : heure de fin seule et arrondi dit ; h1 ;
   await shot(page, "m22-pied-lien-pret", isMobile, true);
 });
 
-// M19 (pied : « Nettoyage automatique » et son « En savoir plus ») : réglage retiré par décision
-// du propriétaire du 12 novembre ; son explication est dans la bulle du balai (envoi.spec.ts).
+// M19 (pied : « Nettoyage automatique » et son « En savoir plus ») : réglage retiré ; son explication est dans la bulle du balai (envoi.spec.ts).
 test("M15 : Signaler indique le vrai bouton ; plus de « Nettoyage automatique » dans le pied ; captures", async ({ page, shh, isMobile }) => {
   await page.goto(shh.origin + "/signaler");
   await expect(page.getByText(/En bas du contenu, choisissez «[\s\u202f]?Signaler ce partage[\s\u202f]?»/)).toBeVisible();

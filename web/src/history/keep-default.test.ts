@@ -30,7 +30,7 @@ describe("keepReceivedDefault", () => {
   });
 });
 
-describe("keepSentDefault : historique des envois (24 novembre)", () => {
+describe("keepSentDefault : historique des envois", () => {
   it("sans compte, appareil neuf : désactivé, et la lecture ne crée aucune base", async () => {
     expect(live.shares.enabled).toBe(false);
     await live.loadHistory(true);
@@ -56,7 +56,7 @@ describe("keepSentDefault : historique des envois (24 novembre)", () => {
     expect(live.shares.enabled).toBe(false);
     expect(live.keepSentDefault()).toBe(false);
   });
-  it("avec un compte aussi : désactivé par défaut (24 novembre, B) ; activé par la personne, activé", async () => {
+  it("avec un compte aussi : désactivé par défaut (B) ; activé par la personne, activé", async () => {
     for (const keepReceived of [false, true]) {
       live.setAccountPrefs({ keepReceived });
       expect(live.keepSentDefault()).toBe(false);

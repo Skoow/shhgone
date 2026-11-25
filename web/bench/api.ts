@@ -1,8 +1,8 @@
-// Seul point d'entrée du moteur pour le banc : la Task 13 ne réécrit que ce fichier (et
+// Seul point d'entrée du moteur pour le banc : la ne réécrit que ce fichier (et
 // vite.config.ts si le chargement du moteur change). bench.ts ne connaît que l'interface neutre
 // ci-dessous ; tout l'assemblage propre au moteur actuel (pièces, segments, en-tête, manifeste)
 // vit ici.
-// Moteur Rust (WebAssembly) depuis la Task 11 : mêmes fonctions, par web/src/engine (la graine
+// Moteur Rust (WebAssembly) : mêmes fonctions, par web/src/engine (la graine
 // de l'élément reste dans le moteur : sealFinal reçoit le scelleur).
 import { CHUNK_CT, HEADER, KDF_CREATE, SEG_CHUNKS, contentKeys, elementSealer, newSeed, openStream, passwordKey, sealFinal, segmentSize, type ContentKeys } from "../src/engine";
 

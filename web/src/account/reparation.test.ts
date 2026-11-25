@@ -1,4 +1,4 @@
-// Réparation des enveloppes PRF (décision du propriétaire du 22 novembre ; conception du compte par
+// Réparation des enveloppes PRF (conception du compte par
 // passkey §17, R6, R10) : enveloppe posée seulement si elle s'ouvre avec la sortie PRF actuelle,
 // rien si une enveloppe s'ouvre déjà, réauthentification sur recent ou sans_passkey (avec la passkey
 // qui a signé), enveloppes_max ignoré, jamais d'erreur remontée.

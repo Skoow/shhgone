@@ -8,7 +8,7 @@
 //   clé, aucun lien : le serveur peut l'ouvrir). JSON strict `v: 1` ; une version inconnue n'est
 //   ni lue ni réécrite (coffre_version : on n'écrase pas un format plus récent).
 // - Coffre privé : listes salons, recus, rejoints, envois (entrées à `id` unique ; leur contenu
-//   est fixé avec l'historique de l'appareil, lot 11).
+//   est fixé avec l'historique de l'appareil).
 // - Écriture : `if_gen` = gen connu, coffre scellé avec gen + 1 ; 409 → relecture du coffre du
 //   serveur, les modifications en attente sont rejouées dessus (fusion), nouvel essai (3 au plus).
 //   Un gen plus petit que le plus grand vu est refusé (coffre_recule : retour en arrière du
@@ -76,7 +76,7 @@ export async function ouvrir(sorte: Sorte, cle: CryptoKey, h: Uint8Array, blob: 
 
 /**
  * Réglages du compte (§21.15.4 ; ceux de l'appareil seul, comme « Rester connecté », n'y sont pas).
- * `garder_salons` (« Garder les salons que je rejoins ») retiré le 24 novembre : il n'était lu nulle
+ * `garder_salons` (« Garder les salons que je rejoins ») retiré : il n'était lu nulle
  * part (aucun salon rejoint n'est gardé) ; un coffre ancien qui le porte est lu sans erreur (champ
  * inconnu ignoré) et réécrit sans lui. L'historique des envois et des salons créés suit le seul
  * réglage de l'appareil, « Garder dans mon historique » (history/live.svelte.ts).
@@ -86,7 +86,7 @@ export const REGLAGES_DEFAUT: Reglages = { proposerProfil: true, garderRecus: tr
 
 export type Profil = { pseudo: string; photo: Uint8Array | null; langue: string; reglages: Reglages; pass: string | null };
 
-/** Entrée d'une liste du coffre privé ; son contenu est fixé au lot 11 (historique). */
+/** Entrée d'une liste du coffre privé ; son contenu est fixé (historique). */
 export type EntreePrivee = { id: string } & Record<string, unknown>;
 /**
  * `pass` (conception du paiement §6.2, DP-8) : pass des offres payantes, dans le coffre PRIVÉ

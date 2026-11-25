@@ -77,7 +77,7 @@ describe("startWatch", () => {
     expect(poll).toHaveBeenCalledTimes(4); // 30 min de plus depuis l'activité, puis arrêt
   });
 
-  it("audit adverse 3, F2 : un échec passager n'arrête rien ; la disparition est vue ensuite", async () => {
+  it("3, F2 : un échec passager n'arrête rien ; la disparition est vue ensuite", async () => {
     const h = deps();
     const answers = ["retry", "alive", "gone"] as const;
     let n = 0;
@@ -130,7 +130,7 @@ describe("startWatch", () => {
   });
 });
 
-describe("audit (faible) : aller-retour d'onglet rapide", () => {
+describe("aller-retour d'onglet rapide", () => {
   it("page cachée puis réaffichée avant la fin du rejet de la requête relâchée : la surveillance repart", async () => {
     let visible = true;
     let wake!: (a: boolean) => void;

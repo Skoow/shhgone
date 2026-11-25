@@ -84,7 +84,7 @@ export async function formulesDisponibles(idb: IDBFactory, n: Net = netParDefaut
     if (e?.etat === "payee" && g.enAttente) {
       // Paiement confirmé alors que la page de retour a été fermée avant (crypto, webhook
       // tardif) : la commande n'est plus en attente, sans quoi ni jeton (reapprovisionner), ni
-      // appel, ni rangement dans le compte ne la prendraient (revue du 25 novembre). garder()
+      // appel, ni rangement dans le compte ne la prendraient. garder()
       // oublie l'état gardé : il est rangé de nouveau.
       await garder(idb, { ...g, enAttente: false }).catch(() => undefined);
       await garderEtat(idb, g.id, e).catch(() => undefined);

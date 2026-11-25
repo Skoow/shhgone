@@ -1,8 +1,7 @@
 <script lang="ts">
-  // Supprimer le compte (conception compte §21.12, §21.15.4 point 12 ; décision du propriétaire du
-  // 14 novembre, suppression simplifiée ; plan, lot 13). Monté seulement avec __COMPTES__, depuis
+  // Supprimer le compte (conception compte §21.12, §21.15.4 point 12 ; suppression simplifiée). Monté seulement avec __COMPTES__, depuis
   // les paramètres. Avant de confirmer, l'écran dit ce qui sera supprimé (salons créés, partages
-  // connus, compte) et, honnêtement, ce qui ne peut pas être garanti (messages dans les salons
+  // connus, compte), honnêtement, ce qui ne peut pas être garanti (messages dans les salons
   // d'autrui, partages oubliés qui s'effacent à leur échéance, ce que d'autres ont reçu, copies de
   // sauvegarde) ; un pass en cours est annoncé perdu. Geste de passkey (session « récente »,
   // conception du compte par passkey §3.6), confirmation sur place, progression annoncée, puis la

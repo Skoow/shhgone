@@ -1,4 +1,4 @@
-// Son de nouveau message et mode silencieux (spec v3 §14.4 ; plan C-3). Son original synthétisé
+// Son de nouveau message et mode silencieux (spec v3 §14.4). Son original synthétisé
 // dans l'appareil (Web Audio : oscillateur en balayage descendant, enveloppe courte, environ
 // 150 ms, volume modéré) : aucun fichier son, aucune ressource tierce, aucun son existant repris.
 

@@ -1,6 +1,6 @@
-// Page d'essai du chargement vérifié du moteur (spec moteur §7, Task 10), pour
+// Page d'essai du chargement vérifié du moteur (spec moteur §7), pour
 // ui-e2e/hygiene.spec.ts seulement : jamais livrée (construite par global-setup.ts dans
-// ui-e2e/engine-page/dist*, hors de web/dist). Le site n'appelle pas encore le moteur (Task 11) ;
+// ui-e2e/engine-page/dist*, hors de web/dist). Le site n'appelle pas encore le moteur ;
 // cette page appelle les modules du site tels quels (load.ts, argon2.ts, sources remplacées par
 // le greffon shh-engine), sans code propre aux tests dans le build de production.
 // Un clic : loadEngine(), puis K_mdp du vecteur « mot de passe généré » (engine/vectors/v2.json).

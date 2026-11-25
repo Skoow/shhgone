@@ -1,7 +1,7 @@
 <script lang="ts">
-  // « Salon prêt » (spec §39.6, plan C-3 points 1 et 2) : lien d'invitation (Copier, QR), mot de
+  // « Salon prêt » (spec §39.6) : lien d'invitation (Copier, QR), mot de
   // passe (Copier) à donner par un autre moyen, lien de gestion derrière un bouton avec
-  // l'avertissement de l'exigence C-3 36, puis « Entrer dans le salon ». Les liens sont
+  // l'avertissement de l'36, puis « Entrer dans le salon ». Les liens sont
   // affichés, jamais placés dans la barre d'adresse.
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatDuration } from "../../i18n/format";
@@ -24,7 +24,7 @@
       <CopyField label={t("salon.ready.password")} value={vue.pret.mdp} whole />
       <p class="note">{t("salon.ready.password.hint")}</p>
     </div>
-    <!-- Historique désactivé (par défaut, avec ou sans compte : 24 novembre, B) ou indisponible :
+    <!-- Historique désactivé (par défaut, avec ou sans compte :, B) ou indisponible :
          le lien de gestion n'est gardé nulle part, il est montré d'emblée pour être gardé à la main.
          Gardé dans l'historique : derrière un bouton, comme avant. -->
     {#if gestion || !vue.pret.garde}

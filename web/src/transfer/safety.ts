@@ -1,5 +1,4 @@
-// Réception : nom de fichier nettoyé, aperçu sur liste blanche, types dangereux (spec §12,
-// audit M4). Le manifeste vient de l'expéditeur : son nom et son type MIME sont hostiles.
+// Réception : nom de fichier nettoyé, aperçu sur liste blanche, types dangereux (spec §12). Le manifeste vient de l'expéditeur : son nom et son type MIME sont hostiles.
 import { PREVIEW_MAX, type ManifestEntry } from "../engine/pure";
 
 export type PreviewKind = "image" | "audio" | "video" | "text" | "pdf" | "none";
@@ -90,12 +89,12 @@ const PREVIEW: Record<string, PreviewKind> = {
  * ≤ 200 Mio ; sinon « none » (téléchargement seulement). Le contenu peut mentir sur son
  * type : l'écran doit encore traiter un échec de décodage comme « none ».
  */
-// SVG retiré de la liste (scan de sécurité du 7 novembre) : même dans <img>, où son script ne
+// SVG retiré de la liste (scan de sécurité) : même dans <img>, où son script ne
 // s'exécute pas, rien qui puisse en porter un n'est affiché ; HTML, XML et archives web non plus.
 /**
  * Aperçu au plus sur un appareil à petite mémoire (moins de 4 Go, iPhone, iPad) : l'aperçu
  * tient le fichier entier en mémoire, et l'image ou la vidéo décodée à peu près autant.
- * Au-delà : « Télécharger » seulement (revue du 10 novembre).
+ * Au-delà : « Télécharger » seulement.
  */
 export const PREVIEW_MAX_SMALL = 50 * 1048576;
 
@@ -108,15 +107,15 @@ export function previewKindOf(e: ManifestEntry, small = false): PreviewKind {
 }
 
 const RISKY = new Set(["exe", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "jar", "apk", "app", "dmg", "pkg", "sh", "html", "htm", "hta", "lnk", "iso", "msix", "appx", "reg", "wsf", "cpl", "pif", "url", "command", "desktop", "svg", "svgz", "xhtml", "xht", "mht", "mhtml",
-  // Audit F4 (7 novembre) : images disque (contournent la marque « provenant d'Internet »),
+  // Images disque (contournent la marque « provenant d'Internet »),
   // OneNote, aide compilée, macros Office, requêtes web Excel, raccourcis et scripts Windows.
   "img", "vhd", "vhdx", "one", "chm", "xlsm", "docm", "pptm", "xlam", "ppam", "iqy", "slk", "scf", "jse", "vbe", "psm1",
   "appref-ms", "application", "gadget", "msc", "settingcontent-ms",
-  // Revue du 10 novembre : bibliothèques et compléments, modèles et classeurs à macros,
+  // Bibliothèques et compléments, modèles et classeurs à macros,
   // installeurs et correctifs, scripts, raccourcis de recherche.
   "dll", "xll", "wsh", "msp", "cab", "dotm", "xltm", "potm", "ppsm", "sldm", "xlsb", "py", "jnlp", "diagcab",
   "library-ms", "search-ms", "inetloc", "deb", "rpm", "appimage",
-  // Décision du 24 novembre (spec §12, D41-13) : formats PowerShell et informations d'installation Windows.
+  // (spec §12, D41-13) : formats PowerShell et informations d'installation Windows.
   "ps1xml", "inf"]);
 
 /** Extension exécutable ou interprétée : avertir avant l'enregistrement (spec §12). À appeler sur un nom passé par safeName. */

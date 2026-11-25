@@ -1,4 +1,4 @@
-// Retours DROP du propriétaire, sur le vrai serveur : une note part dès sa validation comme un
+// Retours DROP, sur le vrai serveur : une note part dès sa validation comme un
 // fichier (D41-36 : son texte est la donnée d'un élément chiffré, plus dans le manifeste) ;
 // cadenas vert « Chiffré, prêt à partir » avant le clic ; modifiée → renvoyée, le destinataire lit
 // la nouvelle version. La ligne d'une note ne montre que son titre (jamais le contenu), chez
@@ -12,7 +12,7 @@ import { captureOf, expect, test } from "./fixtures";
 import { file, freshPage, unlock } from "./open-helpers";
 import { addText, closeAddSheet, noViewTransition, openFilePicker, readyHeading, sendButton } from "./send-helpers";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-DROP/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/DROP/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
 
 const noteRow = (page: Page, name = "Note") => page.locator("[data-row]").filter({ has: page.locator(`.nm[title="${name}"]`) });
@@ -54,7 +54,7 @@ test("note : cadenas vert avant le clic ; modifiée → renvoyée, nouvelle vers
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   expect(puts.length).toBe(2); // rien de plus au clic : la note était déjà partie
   const read = async (name: string) => {
-    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    // Mot de passe masqué à l'arrivée : l'œil l'affiche d'abord.
     const g = page.getByRole("group", { name });
     const eye = g.locator("[data-reveal]");
     if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
@@ -103,7 +103,7 @@ test("ordinateur : filigrane de dépôt dans la liste (texte entier, clic → ch
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const read = async (name: string) => {
-    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    // Mot de passe masqué à l'arrivée : l'œil l'affiche d'abord.
     const g = page.getByRole("group", { name });
     const eye = g.locator("[data-reveal]");
     if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
@@ -122,7 +122,7 @@ test("ordinateur : filigrane de dépôt dans la liste (texte entier, clic → ch
   await ctx.close();
 });
 
-test("page d'envoi vide « /envoyer » : atteinte par « Commencer » ou directement ; cadre compact en tête de liste (ordinateur, retours du 12 novembre), « Ajouter » (téléphone) ; captures", async ({ page, shh, isMobile }) => {
+test("page d'envoi vide « /envoyer » : atteinte par « Commencer » ou directement ; cadre compact en tête de liste (ordinateur), « Ajouter » (téléphone) ; captures", async ({ page, shh, isMobile }) => {
   await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 });
   await page.goto(shh.origin + "/");
   await page.locator('[data-make="room"]').click();
@@ -140,7 +140,7 @@ test("page d'envoi vide « /envoyer » : atteinte par « Commencer » ou directe
     await expect(page.getByRole("dialog", { name: "Ajouter" })).toBeVisible();
     await page.keyboard.press("Escape");
   } else {
-    // Toute la largeur de la liste, compact (il prenait tout l'écran, retours du 12 novembre),
+    // Toute la largeur de la liste, compact (il prenait tout l'écran),
     // texte blanc entier, jamais tronqué.
     const [list, z] = [await page.locator(".lc-scroll").boundingBox(), await zone.boundingBox()];
     expect(Math.abs(z!.x + z!.width / 2 - (list!.x + list!.width / 2))).toBeLessThan(12);

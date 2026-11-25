@@ -111,7 +111,7 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   await shot(page, "07-lien-pret");
   await shot(page, "07b-lien-pret-page", true);
   const read = async (n: string) => {
-    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    // Mot de passe masqué à l'arrivée : l'œil l'affiche d'abord.
     const g = page.getByRole("group", { name: n });
     const eye = g.locator("[data-reveal]");
     if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
@@ -119,7 +119,7 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   };
   const link = await read("Lien");
   const password = await read("Mot de passe");
-  // Lien de gestion : montré seulement sans historique (19 novembre), désactivé par défaut (24 novembre).
+  // Lien de gestion : montré seulement sans historique, désactivé par défaut.
   await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveAttribute("aria-checked", "false");
   const manage = (await page.locator("[data-manage] .sr-only").first().textContent()) ?? "";
 

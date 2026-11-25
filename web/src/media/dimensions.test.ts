@@ -1,4 +1,4 @@
-// Garde de l'aperçu (test d'intrusion du 11 novembre) : dimensions lues dans l'en-tête, sans
+// Garde de l'aperçu : dimensions lues dans l'en-tête, sans
 // décoder l'image ; au-delà de 50 mégapixels, ou dimensions introuvables, pas d'aperçu.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

@@ -1,4 +1,4 @@
-// Cadre PDF isolé (UI §13, Task 22, retours CLEAN5). Chargé par /pdf-frame.html dans un
+// Cadre PDF isolé (UI §13, retours CLEAN5). Chargé par /pdf-frame.html dans un
 // <iframe sandbox="allow-scripts"> SANS allow-same-origin : origine opaque, aucun accès aux
 // clés, au stockage ni aux cookies de l'application. pdf.js tourne ici, sur le fil principal
 // (pas de Worker : `globalThis.pdfjsWorker`), sans WebAssembly, sans XFA, sans scripts du PDF,
@@ -62,7 +62,7 @@ async function open(m: Msg): Promise<void> {
     button(m.labels.zoomIn, "+", () => setZoom(zoom * 1.25)),
   );
   // Pas d'« Enregistrer l'image » des pages (clic droit, appui long, glisser) : le PDF ne se
-  // télécharge que par le bouton « Télécharger », quand l'expéditeur l'autorise (17 novembre).
+  // télécharge que par le bouton « Télécharger », quand l'expéditeur l'autorise.
   document.addEventListener("contextmenu", (e) => e.preventDefault());
   document.addEventListener("dragstart", (e) => e.preventDefault());
   const pages = document.createElement("div");

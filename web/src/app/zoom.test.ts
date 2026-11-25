@@ -1,5 +1,5 @@
-// Zoom permis sur téléphone (WCAG 1.4.4 ; rétabli le 20 novembre, décision du propriétaire, qui
-// remplace le blocage du 18 novembre) : aucune page ne limite l'agrandissement, aucun script ne
+// Zoom permis sur téléphone (WCAG 1.4.4 ; rétabli, qui
+// remplace le blocage) : aucune page ne limite l'agrandissement, aucun script ne
 // refuse le pincement.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -13,7 +13,7 @@ function sources(dir: string): string[] {
   });
 }
 
-describe("zoom permis (20 novembre)", () => {
+describe("zoom permis", () => {
   it("les trois pages : viewport sans maximum-scale ni user-scalable", () => {
     for (const f of ["index.html", "page.html", "s.html"]) {
       const html = readFileSync(join(process.cwd(), f), "utf8");

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Marque à bulle (retours UI4) : le libellé d'un état n'est plus écrit sur la ligne ; il
+  // Marque à bulle : le libellé d'un état n'est plus écrit sur la ligne ; il
   // s'affiche dans une bulle au survol (souris), au focus clavier, ou à l'appui (tactile,
   // bascule). Fermeture : appui ailleurs, Échap, défilement. Accessible : bouton nommé
   // (`label`), bulle `role="tooltip"` liée par `aria-describedby` (lue même cachée).

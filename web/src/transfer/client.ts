@@ -63,7 +63,7 @@ export class NotFoundError extends Error {
 }
 
 /**
- * Contenu refusé parce qu'il a été modifié en route (audit web D3) : enveloppe, en-tête, palier,
+ * Contenu refusé parce qu'il a été modifié en route : enveloppe, en-tête, palier,
  * manifeste ou segment qui ne s'authentifie pas, segment tronqué. Rien n'a été affiché. Texte
  * fixe, choisi par le client : jamais confondu avec « ce lien n'existe pas ».
  */
@@ -82,7 +82,7 @@ export class BadPasswordError extends Error {
 }
 
 /**
- * L'ouverture a lu tout son budget d'octets (429 « budget », spec §24 et audit M1) : il ne
+ * L'ouverture a lu tout son budget d'octets (429 « budget », spec §24) : il ne
  * se recharge pas. Seul un nouveau déverrouillage (qui consomme une ouverture) relit le contenu.
  */
 export class ReadBudgetError extends Error {
@@ -116,7 +116,7 @@ export class GrantInvalidError extends Error {
 }
 
 /**
- * Destruction par un destinataire refusée (409 still_open, 20 novembre) : d'autres ouvertures
+ * Destruction par un destinataire refusée (409 still_open) : d'autres ouvertures
  * restent possibles ; seul le dernier destinataire, ou l'expéditeur, peut détruire. Signaler
  * reste possible (une voix).
  */
@@ -162,7 +162,7 @@ const isNetwork = (e: unknown) => e instanceof Error && e.message === "reseau";
 // sans nouvel essai) ; 403 « egress_limit » → EgressLimitError (définitif) ; autre 429 →
 // LimitError ; mauvais mot de passe →
 // BadPasswordError ; 5xx → ServerError (texte fixe) ; contenu modifié (paquet corrompu, segment
-// tronqué) → CorruptError (audit web D3) ; tout le reste (404, paramètres KDF refusés, réponse
+// tronqué) → CorruptError ; tout le reste (404, paramètres KDF refusés, réponse
 // invalide, autre code) → NotFoundError : rien d'exploitable
 // n'est montré, et un serveur malveillant ne peut pas faire afficher un message choisi par lui.
 function readerError(e: unknown): Error {
@@ -194,8 +194,8 @@ function readerError(e: unknown): Error {
 
 // Destruction et état (destroyShare, shareStatus, Opened.destroy) : comme readerError, sauf
 // qu'un refus HTTP autre que 404 ou 410 (403 d'un pare-feu, 400, 405, 413…) n'est pas
-// « introuvable ». Sinon l'écran dirait « supprimé » alors que le partage existe encore
-// (revue du 10 novembre). Texte fixe (ServerError) : l'écran propose de réessayer.
+// « introuvable ». Sinon l'écran dirait « supprimé » alors que le partage existe encore.
+// Texte fixe (ServerError) : l'écran propose de réessayer.
 function destroyError(e: unknown): Error {
   if (e instanceof api.HttpError && e.status === 409 && e.code === "still_open") return new StillOpenError();
   const mapped = readerError(e);
@@ -226,7 +226,7 @@ export async function guarded<T>(f: () => Promise<T>, map: (e: unknown) => unkno
 /**
  * Analyse un lien et vérifie qu'il vise l'origine attendue (celle du site, en pratique
  * location.origin) : un lien vers une autre origine, ou avec identifiants, enverrait
- * K_accès, K_preuve ou S_gestion à un autre serveur (audit F1) → Error("lien_invalide").
+ * K_accès, K_preuve ou S_gestion à un autre serveur → Error("lien_invalide").
  * Une origine attendue mal formée → Error("origine_invalide").
  */
 async function parseFor(link: string, expectedOrigin: string): Promise<ParsedLink> {
@@ -240,7 +240,7 @@ async function parseFor(link: string, expectedOrigin: string): Promise<ParsedLin
  * Base de l'application (« / », « /shhgone/ » en démo), lue à l'appel. createShare rend des
  * liens qui la portent (option `base`) : les fonctions de lecture les acceptent donc, en plus
  * de la racine (forme rendue par app/link.ts:readLink). Aucun autre chemin : l'ancien format
- * « /s/<id>#… » reste refusé (scan de sécurité du 7 novembre, F2).
+ * « /s/<id>#… » reste refusé (scan de sécurité, F2).
  */
 function appBase(): string {
   const b = import.meta.env?.BASE_URL;
@@ -266,7 +266,7 @@ async function parseShare(link: string, expectedOrigin: string): Promise<ShareLi
 }
 
 
-/** Preuve anti-robot : preuve de travail ALTCHA (charge utile base64), la seule (24 novembre : le repli reCAPTCHA, jamais construit, est retiré). */
+/** Preuve anti-robot : preuve de travail ALTCHA (charge utile base64), la seule (le repli reCAPTCHA, jamais construit, est retiré). */
 export type CaptchaProof = { kind: "pow"; payload: string };
 
 export type CreateOpts = api.Net & {
@@ -285,7 +285,7 @@ export type CreateOpts = api.Net & {
   /** Durée de garde dans le coffre, obligatoire avec rights « coffre » et seulement avec lui. */
   keepTtlH?: KeepTtl;
   /**
-   * Nom du partage (19 novembre), facultatif : dans le manifeste chiffré, nettoyé par le moteur
+   * Nom du partage, facultatif : dans le manifeste chiffré, nettoyé par le moteur
    * (cleanTitle) ; « titre_trop_long » au-delà de TITLE_MAX points de code après nettoyage.
    */
   title?: string;
@@ -527,7 +527,7 @@ export type Opened = {
   /**
    * Manifeste tel que l'expéditeur l'a écrit : name et mime sont BRUTS et hostiles ; ne
    * jamais les afficher ni s'en servir pour un Blob. Utiliser safeName, previewKind,
-   * isRiskyFile (audit M4).
+   * isRiskyFile.
    */
   manifest: Manifest;
   /** Nom nettoyé de l'élément i (voir safety.safeName) ; Error("element_inexistant") si i est invalide. */
@@ -553,11 +553,11 @@ export type Opened = {
   readonly grant: string;
   /**
    * Ouvertures encore possibles après celle-ci, rendues par unlock (0 : c'était la dernière
-   * permise ; le lecteur n'offre « Détruire ce partage » qu'alors, retours UI4).
+   * permise ; le lecteur n'offre « Détruire ce partage » qu'alors).
    */
   readonly opensLeft: number;
   /**
-   * Cette ouverture est la dernière permise (rendu par unlock, revue D42-22) : seule elle se
+   * Cette ouverture est la dernière permise (rendu par unlock, D42-22) : seule elle se
    * voit proposer « Détruire ». Une personne qui revient sans être la dernière : faux.
    */
   readonly lastOpen: boolean;
@@ -576,7 +576,7 @@ export type Opened = {
   /**
    * Signale le partage (catégorie, conception compte §21.10.2) avec l'octroi de cette
    * ouverture : une voix. Rend vrai si elle l'a effacé (la moitié des ouvertures permises
-   * l'ont signalé, 20 novembre) ; faux sinon, et la lecture continue.
+   * l'ont signalé) ; faux sinon, et la lecture continue.
    */
   report(categorie: api.Categorie): Promise<boolean>;
   /**
@@ -621,8 +621,8 @@ export async function openShare(
   const onProgress = o.onProgress;
   const grant = o.grant;
   const p = await parseShare(link, expectedOrigin);
-  // K_lien et id effacés sur tous les chemins, y compris un refus avant toute requête (audit
-  // F3) ; K_lien n'est plus utile une fois K_accès, K_env et K_preuve dérivées.
+  // K_lien et id effacés sur tous les chemins, y compris un refus avant toute requête ;
+  // K_lien n'est plus utile une fois K_accès, K_env et K_preuve dérivées.
   let idBytes: Uint8Array<ArrayBuffer> | undefined;
   try {
     // Avant toute requête et toute dérivation (coûteuse) : un champ vide, ou fait seulement des
@@ -826,7 +826,7 @@ export const FOLD_BYTES = 64 * 1048576;
 
 /**
  * Assemble l'élément i dans un Blob, toujours de type application/octet-stream (jamais le
- * type du manifeste : un Blob text/html sur l'origine du site serait dangereux ; audit M4),
+ * type du manifeste : un Blob text/html sur l'origine du site serait dangereux),
  * quand showSaveFilePicker n'existe pas. Tous les
  * `foldBytes` (64 Mio ; paramètre réglable pour les tests), les tranches déchiffrées sont
  * repliées dans le Blob puis mises à zéro : au plus ~64 Mio de tranches en mémoire JS.

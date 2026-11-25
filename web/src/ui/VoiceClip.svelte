@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Réécoute d'un vocal en mémoire (Task 12) : lecture / pause, onde qui se colore avec la
+  // Réécoute d'un vocal en mémoire : lecture / pause, onde qui se colore avec la
   // progression, toucher ou glisser sur l'onde pour se déplacer, durée. L'URL blob n'existe que
   // pendant la lecture du composant et est révoquée à sa sortie. Rien n'est écrit sur l'appareil.
   // Vitesse : 1× → 1,5× → 2× → 1×, hauteur de la voix conservée.

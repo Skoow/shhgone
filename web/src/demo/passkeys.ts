@@ -76,5 +76,4 @@ export function passkeysSimulees(o: { restore?: PasskeySimulee[] | null; onChang
   };
 }
 
-export type PasskeysSimulees = ReturnType<typeof passkeysSimulees>;
 export type { PasskeySimulee };

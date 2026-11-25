@@ -79,7 +79,7 @@ async function removeItem(page: Page, name: string) {
   await page.getByRole("button", { name: `Actions pour ${name}` }).click();
   await page.getByRole("dialog", { name }).getByRole("button", { name: "Supprimer" }).click();
 }
-/** Aucun paragraphe de plus de deux lignes (demande du propriétaire, téléphone). */
+/** Aucun paragraphe de plus de deux lignes (téléphone). */
 const longParagraphs = (scope: Locator) =>
   scope.locator("p, .h, .line").evaluateAll((els) =>
     els
@@ -120,9 +120,9 @@ test.describe("fr-FR", () => {
     await expect(rows(page)).toHaveCount(10);
 
     // Capacité en tête, à côté de « Votre envoi ».
-    // Le nombre d'éléments n'apparaît qu'à l'approche de la limite (décision du 16 novembre).
+    // Le nombre d'éléments n'apparaît qu'à l'approche de la limite.
     await expect(page.locator(".top .ht")).toHaveText(/^[\d,]+\s(?:Ko|Mo) \/ 2\sGo$/);
-    // Loin de la limite (10 sur 200) : pas de compteur d'éléments (décision du 16 novembre).
+    // Loin de la limite (10 sur 200) : pas de compteur d'éléments.
     await expect(page.getByRole("meter", { name: "Nombre d'éléments" })).toHaveCount(0);
     expect(await page.locator(".top .gh").evaluate((e) => getComputedStyle(e).fontVariantNumeric)).toContain("tabular-nums");
     expect(await page.locator(".group h3").allTextContents()).toEqual(["Texte", "Photos", "Vidéos", "Documents", "Archives"]);
@@ -133,7 +133,7 @@ test.describe("fr-FR", () => {
     // Archive : catégorie, laissée intacte (D41-27) : rien sur la ligne, « Fichier tel quel » dans la bulle (D41-34).
     await expect(rows(page).filter({ hasText: "archive.zip" }).locator("[data-clean]")).toHaveCount(0);
     await expect(rows(page).filter({ hasText: "archive.zip" }).locator("[data-lock] button")).toHaveAccessibleName(/\. Fichier tel quel \(non modifié\)$/);
-    // Rien n'est nettoyé à l'ajout (12 novembre, plus de réglage) : la photo part telle quelle,
+    // Rien n'est nettoyé à l'ajout (plus de réglage) : la photo part telle quelle,
     // sans marque sur la ligne, avec son balai ; « Tout nettoyer » en tête (pas l'ancien bouton).
     await expect(rows(page).filter({ hasText: "plage-nuit.jpg" }).locator("[data-clean]")).toHaveCount(0);
     await expect(rows(page).filter({ hasText: "plage-nuit.jpg" }).locator("[data-lock] button")).toHaveAccessibleName(/\. Fichier tel quel \(non modifié\)$/);
@@ -141,14 +141,14 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("button", { name: "Tout nettoyer" })).toBeVisible();
     await expect(rows(page).filter({ hasText: "plage-nuit.jpg" }).getByRole("button", { name: "Nettoyer ce fichier" })).toBeVisible();
     await expect(page.locator("[data-row]").getByText(/^(Original|Nettoyé|Non nettoyé|Nettoyer)$/)).toHaveCount(0);
-    // Listes compactes (décision du 7 novembre) : aucune vignette, une icône de format par ligne,
-    // type, taille, durée ; plus d'estimation par fichier ni par catégorie (décision du 8 novembre).
+    // Listes compactes : aucune vignette, une icône de format par ligne,
+    // type, taille, durée ; plus d'estimation par fichier ni par catégorie.
     await expect(page.locator("[data-row] img")).toHaveCount(0);
     await expect(rows(page).filter({ hasText: "plage-nuit.jpg" }).locator("svg.fi")).toHaveAttribute("data-format", "JPG");
     await expect(rows(page).filter({ hasText: "archive.zip" }).locator("svg.fi")).toHaveAttribute("data-format", "ZIP");
     await expect(rows(page).filter({ hasText: "contrat.pdf" })).toContainText(/Document PDF.*octets/);
     await expect(page.locator("[data-row], .group .meta").filter({ hasText: /env\.\s/ })).toHaveCount(0);
-    // « Tout supprimer » : petite icône (corbeille) dans l'en-tête de la liste, au-dessus des tailles (16 novembre).
+    // « Tout supprimer » : petite icône (corbeille) dans l'en-tête de la liste, au-dessus des tailles.
     const clear = page.getByRole("button", { name: "Tout supprimer" });
     await expect(clear.locator("svg")).toHaveCount(1);
     expect((await clear.boundingBox())!.width).toBeLessThanOrEqual(44);
@@ -169,11 +169,11 @@ test.describe("fr-FR", () => {
       // Ordinateur : une seule présentation (ni grille ni tableau) ; « Créer sur place » sans Photo ni Vidéo.
       await expect(page.locator(".groups .grid, .groups table, .groups .tile")).toHaveCount(0);
       // Même liste d'actions que la feuille du téléphone ; la zone de dépôt tient lieu de « Fichiers ».
-      // Salon avec les autres actions (17 novembre), « bientôt ».
+      // Salon avec les autres actions, « bientôt ».
       const made = (await canVoice(page)) ? ["Photo ou vidéo", "Vocal", "Note", "Salonbientôt"] : ["Photo ou vidéo", "Note", "Salonbientôt"];
       await expect(page.getByRole("group", { name: "Créer sur place" }).getByRole("button")).toHaveText(made);
       await expect(page.getByRole("button", { name: /^Déposez des fichiers n'importe où sur la page/ })).toBeVisible();
-      // Exigence du propriétaire : tout le composeur tient dans l'écran (le pied de page est dessous) ; le bouton
+      // Tout le composeur tient dans l'écran (le pied de page est dessous) ; le bouton
       // d'envoi est entièrement visible (1440 × 900 puis 1920 × 1080).
       for (const size of [{ width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
         await page.setViewportSize(size);
@@ -198,7 +198,7 @@ test.describe("fr-FR", () => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.waitForTimeout(500);
     }
-    // Task 17 : l'appui ouvre l'écran d'envoi (détail dans send.spec.ts).
+    // L'appui ouvre l'écran d'envoi (détail dans send.spec.ts).
     await send(page).click();
     await expect(page.locator("#seal-title")).toBeVisible();
   });
@@ -243,7 +243,7 @@ test.describe("fr-FR", () => {
     expect(await axe(page)).toEqual([]);
   });
 
-  test("mot de passe : plus dans les options (17 novembre) ; aucune saisie (D41-15)", async ({ page, shh, isMobile }) => {
+  test("mot de passe : plus dans les options ; aucune saisie (D41-15)", async ({ page, shh, isMobile }) => {
     await open(page, shh.origin);
     await browse(page, [f("contrat.pdf")]);
     const opts = await options(page, isMobile);
@@ -252,7 +252,7 @@ test.describe("fr-FR", () => {
     await expect(opts.getByRole("button", { name: "Générer un autre" })).toHaveCount(0);
     await expect(opts.getByRole("heading", { name: "Mot de passe", exact: true })).toHaveCount(0);
     // D41-15 : aucune saisie de mot de passe, nulle part (ordinateur et feuille du téléphone) ;
-    // seul champ de texte : le nom du partage (19 novembre).
+    // seul champ de texte : le nom du partage.
     await expect(opts.locator("input[type=password]")).toHaveCount(0);
     await expect(opts.locator("input[type=text], input:not([type])")).toHaveCount(1);
     await expect(opts.getByLabel("Nom du partage (facultatif)")).toBeVisible();
@@ -262,21 +262,21 @@ test.describe("fr-FR", () => {
     await expect(send(page)).toBeEnabled();
   });
 
-  // Décision du propriétaire du 11 novembre (audit M17), revue le 12 novembre : un bloc compact
+  // Un bloc compact
   // Gratuit, Plus, Pro (limites lues dans les constantes) remplace la ligne discrète ; Plus et Pro
   // ouvrent la feuille d'information, qui dit « Bientôt disponible » en tête.
-  test("limites gratuites en clair : « Votre offre : Gratuit » dans un petit cadre, lien vers les offres (décision du 16 novembre)", async ({ page, shh, isMobile }) => {
+  test("limites gratuites en clair : « Votre offre : Gratuit » dans un petit cadre, lien vers les offres", async ({ page, shh, isMobile }) => {
     await open(page, shh.origin);
     await browse(page, [f("contrat.pdf")]);
     const cur = page.locator("[data-current-offer]").filter({ visible: true });
     await expect(cur).toHaveText(/^Votre offre\u202f:\s*Gratuit\s*2\u202fGo · 24\u202fh · 5\u202fouvertures\s*Voir les offres/);
     await expect(page.locator("[data-offer-strip], [data-locked], [data-paid-space]")).toHaveCount(0);
-    // Empreinte SHA-256 du fichier sur sa ligne (16 novembre) : exactement celle de node:crypto.
+    // Empreinte SHA-256 du fichier sur sa ligne : exactement celle de node:crypto.
     const want = createHash("sha256").update(readFileSync(f("contrat.pdf"))).digest("hex");
     await expect(page.locator(`[data-sha256="${want}"]`).filter({ visible: true })).toHaveCount(1);
     // Liste non vide : /offres s'ouvre dans un nouvel onglet (la liste resterait sinon perdue).
     await expect(cur.getByRole("link", { name: /^Voir les offres/ })).toHaveAttribute("target", "_blank");
-    expect((await cur.getByRole("link", { name: /^Voir les offres/ }).boundingBox())!.height).toBeGreaterThanOrEqual(44); // cible d'appui (audit M21)
+    expect((await cur.getByRole("link", { name: /^Voir les offres/ }).boundingBox())!.height).toBeGreaterThanOrEqual(44); // cible d'appui
     const opts = await options(page, isMobile);
     await expect(opts.getByRole("radio", { name: "12 h" })).toBeChecked();
     if (isMobile) await page.keyboard.press("Escape");
@@ -284,7 +284,7 @@ test.describe("fr-FR", () => {
     expect(await axe(page)).toEqual([]);
   });
 
-  test("options : 12 h et 1 ouverture par défaut, flèches, phrase à jour ; téléchargement (interrupteur), plus de coffre (décision du 11 novembre)", async ({ page, shh, isMobile }) => {
+  test("options : 12 h et 1 ouverture par défaut, flèches, phrase à jour ; téléchargement (interrupteur), plus de coffre", async ({ page, shh, isMobile }) => {
     await open(page, shh.origin);
     await browse(page, [f("plage-nuit.jpg")]);
     let opts = await options(page, isMobile);
@@ -430,7 +430,7 @@ test.describe("fr-FR", () => {
     await page.getByRole("button", { name: "Actions pour plage-nuit.jpg" }).click();
     const menu = page.getByRole("dialog", { name: "plage-nuit.jpg" });
     // « Nettoyer » : le fichier part tel quel par défaut, il peut être nettoyé d'ici (même
-    // confirmation que le balai de la ligne, retours du 12 novembre).
+    // confirmation que le balai de la ligne).
     await expect(menu.locator(".mi")).toHaveText(["Aperçu", "Renommer", "Nettoyer", "Supprimer"]);
     await settle(page);
     await capture(page, "compose-item-menu");
@@ -499,7 +499,7 @@ test.describe("fr-FR", () => {
       expect(await page.locator(".top .fill").evaluate((e) => getComputedStyle(e).backgroundColor)).toBe("rgb(255, 138, 128)");
       await expect(send(page)).toBeDisabled();
       await expect(page.locator("#send-reason")).toHaveText("Le total dépasse 2 Go. Supprimez des éléments.");
-      // Plus de ligne « Avec Plus » en doublon : le bloc des offres de l'en-tête suffit (audit M17).
+      // Plus de ligne « Avec Plus » en doublon : le bloc des offres de l'en-tête suffit.
       await expect(page.locator(".top [data-upsell]")).toHaveCount(0);
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await page.waitForTimeout(6500);
@@ -609,8 +609,8 @@ test.describe("fr-FR", () => {
         });
         await capture(page, `compose-mix9-${size.width}`);
         expect(heads.map((h) => h.t)).toEqual(["Texte", "Photos", "Vidéos", "Documents", "Archives"]);
-        // Listes compactes (décision du 7 novembre) : la liste défile en elle-même, jamais la page.
-        // Depuis le 19 novembre, l'empreinte SHA-256 a sa propre ligne : à 1920 × 1080 aussi, neuf
+        // Listes compactes : la liste défile en elle-même, jamais la page.
+        // L'empreinte SHA-256 a sa propre ligne : à 1920 × 1080 aussi, neuf
         // éléments dépassent la zone ; chaque catégorie y reste atteignable.
         for (const cat of ["Texte", "Archives"]) {
           await page.locator(".group h3", { hasText: cat }).scrollIntoViewIfNeeded();
@@ -668,7 +668,7 @@ test.describe("en-US", () => {
 
   test("composer in English ; capture", async ({ page, shh, isMobile }) => {
     if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
-    // Accueil anglais : « /en » (pages bilingues, 20 novembre : « / » reste en français).
+    // Accueil anglais : « /en » (pages bilingues : « / » reste en français).
     await page.goto(shh.origin + "/en");
     // « Get started » mène à la page d'envoi (D41-37) ; puis « Add » (téléphone) ou la zone de dépôt.
     await page.locator('[data-make="room"]').click();

@@ -1,9 +1,9 @@
 <script lang="ts">
-  // Appel audio ou vidéo du salon (conception des appels, 20 novembre ; logique : salon/appel.ts).
+  // Appel audio ou vidéo du salon (conception des appels, ; logique : salon/appel.ts).
   // Bandeau « Appel en cours » pour qui n'y est pas, puis, dans l'appel : une tuile par
   // participant (image, ou initiale quand la caméra est éteinte), micro, caméra, raccrocher. La
   // conversation reste utilisable dessous. Chaque <video> distant porte aussi le son.
-  // Ajouts du 21 novembre : la tuile de qui parle s'allume (salon/parole.ts, mesure locale) ;
+  // La tuile de qui parle s'allume (salon/parole.ts, mesure locale) ;
   // caméra de face ou de dos quand l'appareil en a deux ; écran gardé allumé pendant l'appel.
   import { t } from "../../i18n/i18n.svelte";
   import { href } from "../../app/router.svelte";
@@ -96,7 +96,7 @@
 </script>
 
 {#if reserve}
-  <!-- Appels réservés aux offres Plus et Pro (24 novembre) : les offres s'ouvrent dans un autre
+  <!-- Appels réservés aux offres Plus et Pro : les offres s'ouvrent dans un autre
        onglet, pour que le salon reste ouvert dans celui-ci. -->
   <p class="appel-err reserve" role="alert" data-appel-reserve>
     <span>{t("salon.appel.err.offre")}</span>

@@ -1,4 +1,4 @@
-// Audit web D2 (13 novembre) : l'entrée de l'onglet (shh.og, qui contient K_lien) est effacée après
+// L'entrée de l'onglet (shh.og, qui contient K_lien) est effacée après
 // 30 min sans activité même une fois l'écran de contenu quitté (garde de l'application).
 import { expect, test } from "./fixtures";
 import { freshPage, noteRow, sendShare, unlock } from "./open-helpers";
@@ -19,7 +19,7 @@ test("contenu ouvert, retour à l'accueil, 31 min sans activité : shh.og effac�
   await page.locator("header a.logo").click();
   await expect(noteRow(page)).toHaveCount(0);
   // L'accueil est une page à part (prérendue) : attendre qu'elle soit chargée, sinon WebKit
-  // peut encore être en pleine navigation (« Execution context was destroyed », run CI 44666763368).
+  // peut encore être en pleine navigation (« Execution context was destroyed », run).
   await page.waitForURL(shh.origin + "/");
   await page.waitForLoadState("load");
   expect(await page.evaluate(() => sessionStorage.getItem("shh.og") ?? "")).toContain(key); // pas encore

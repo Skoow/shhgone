@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Lumière d'ambiance gardée au montage (20 novembre) : les calques écrits au build restent (mêmes
+// Lumière d'ambiance gardée au montage : les calques écrits au build restent (mêmes
 // éléments), Aurora les reprend sans en dessiner d'autres et leur pose échelles et pause.
 import { flushSync, mount, unmount } from "svelte";
 import { describe, expect, it } from "vitest";

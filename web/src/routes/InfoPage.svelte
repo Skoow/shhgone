@@ -1,9 +1,9 @@
 <script lang="ts">
   // Page d'information (Sécurité, Confidentialité, Conditions, Mentions légales, Signaler un
-  // abus ; retours UI5) : lecture d'abord, colonne de texte étroite, titres ancrés par id (sans
+  // abus) : lecture d'abord, colonne de texte étroite, titres ancrés par id (sans
   // « # » dans l'adresse : le « # » est réservé aux clés). Bandeau « En cours de rédaction »
-  // pour les pages juridiques que le propriétaire doit compléter.
-  // Refonte (propriétaire, 19 novembre, 2 : « ancien, trop serré, pavé ») : plus de carte ni de
+  // pour les pages juridiques que doit compléter.
+  // Refonte (« ancien, trop serré, pavé ») : plus de carte ni de
   // cadre ; un grand en-tête sur le fond du site, fermé par une couture en demi-teinte ; sur
   // ordinateur, le sommaire reste à gauche pendant la lecture et suit la section lue ; sur
   // téléphone, il devient une rangée de pastilles. Sections espacées, texte plus grand.
@@ -82,7 +82,7 @@
         </section>
       {/each}
       {#if page.tech}
-        <!-- Détails techniques (retours UI6) : repliés, en bas ; le corps reste sans jargon. -->
+        <!-- Détails techniques : repliés, en bas ; le corps reste sans jargon. -->
         <details class="tech" id="details-techniques" data-tech>
           <summary><span class="tp" aria-hidden="true">$</span>{page.tech.h}</summary>
           <div class="tech-in">
@@ -106,7 +106,7 @@
     margin-inline: auto;
     padding-block: 0 var(--sp-7);
   }
-  /* En-tête : carte de titre commune (.page-card, ui/base.css ; 20 novembre). */
+  /* En-tête : carte de titre commune (.page-card, ui/base.css). */
   .hd {
     margin-block-start: clamp(16px, 3vw, 32px);
   }
@@ -152,7 +152,7 @@
   .toc li {
     flex: none;
   }
-  /* 44 px (revue du 20 novembre, U20). */
+  /* 44 px. */
   .toc button {
     min-height: 44px;
     padding: var(--sp-2) var(--sp-4);

@@ -108,7 +108,7 @@ describe("runTransition (UI §20.2 K2)", () => {
     await expect(p).rejects.toThrow("boom");
   });
 
-  it("transition sautée (skipTransition) : `ready` rejeté n'est jamais une promesse non traitée (audit D1)", async () => {
+  it("transition sautée (skipTransition) : `ready` rejeté n'est jamais une promesse non traitée", async () => {
     const skipped = () => new DOMException("Transition was skipped", "AbortError");
     const seen = await unhandledDuring(() => {
       (document as unknown as Doc).startViewTransition = vi.fn((cb: () => void) => {

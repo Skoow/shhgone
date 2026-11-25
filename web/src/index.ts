@@ -1,6 +1,6 @@
 // Interface publique du client Shhdrop (pour l'interface du Plan 2). Seules les fonctions
 // sûres sont exportées : la couche HTTP (transfer/api) et les dérivations de clés restent
-// internes, pour qu'aucun écran ne puisse envoyer un secret au serveur par erreur (audit M1).
+// internes, pour qu'aucun écran ne puisse envoyer un secret au serveur par erreur.
 export {
   BadPasswordError,
   CAPTCHA_MIN_MS,
@@ -57,9 +57,9 @@ export {
   type TtlHours,
 } from "./limits";
 export { PASSWORD_ALPHABET, PASSWORD_LEN, generatePassword, isGeneratedPassword, type GeneratedPassword } from "./engine";
-// Empreinte SHA-256 d'un fichier, affichée sur sa ligne avant l'envoi (16 novembre).
+// Empreinte SHA-256 d'un fichier, affichée sur sa ligne avant l'envoi.
 export { fileSha256 } from "./engine";
-// Nom du partage (19 novembre) : nettoyage du moteur, celui que verra le destinataire.
+// Nom du partage : nettoyage du moteur, celui que verra le destinataire.
 export { cleanTitle } from "./engine";
 export {
   MANAGE_FRAGMENT,

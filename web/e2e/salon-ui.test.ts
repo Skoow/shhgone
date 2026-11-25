@@ -1,4 +1,4 @@
-// Client de PRODUCTION du salon (web/src/salon/client.ts, plan C-3 Task 3) contre le vrai binaire
+// Client de PRODUCTION du salon (web/src/salon/client.ts) contre le vrai binaire
 // Go (SHH_SALONS=1) et le vrai module du salon, sous Node : création (preparer), entrée, trois
 // membres qui échangent des messages chiffrés dans les deux sens, accusés, reconnexion avec
 // `depuis` sans perte ni doublon, reprise (nouvelle identité au même siège), départ. Les
@@ -122,7 +122,7 @@ describe("salon : client de production, vrai serveur", () => {
     await attendre(a, (e) => e.k === "message" && e.enveloppe.message.k === "vu" && e.siege === 1, 10_000);
   });
 
-  it("pièce (plan C-4) : fichier chiffré par le moteur, lié à sa trame, relu octet pour octet ; vocal", async () => {
+  it("pièce : fichier chiffré par le moteur, lié à sa trame, relu octet pour octet ; vocal", async () => {
     const [a, b] = membres;
     const net = { origin: srv.origin, fetch: (...x: Parameters<typeof fetch>) => fetch(...x) };
     // 70 000 octets : deux morceaux, palier 16 ; nom et type dans le message chiffré seulement.
@@ -137,7 +137,7 @@ describe("salon : client de production, vrai serveur", () => {
     const lu = new Uint8Array(await (await lirePiece(net, b!.c.jeton, p)).arrayBuffer());
     expect(lu).toEqual(contenu);
     // Vocal : le plus petit vocal non vide prend le palier 16 (1 048 880 o) ; la réserve de départ
-    // d'un participant (décision du 19 novembre) le fait passer tout de suite, sans attendre.
+    // d'un participant le fait passer tout de suite, sans attendre.
     const voix = new Uint8Array(4000).fill(7);
     const rv = await envoyerPiece(net, a!.c.jeton, new Blob([voix]), { nom: "vocal.webm", mime: "audio/webm", vocal: true });
     expect(rv.palier).toBe(16);
@@ -183,7 +183,7 @@ describe("salon : client de production, vrai serveur", () => {
   });
 });
 
-describe("salon : renouvellement (exigence C-3 22)", () => {
+describe("salon : renouvellement (22)", () => {
   let srv: TestServer;
   let eng: SalonEngine;
   const fermer: ClientSalon[] = [];
@@ -250,7 +250,7 @@ describe("salon : renouvellement (exigence C-3 22)", () => {
   });
 });
 
-describe("salon : exclusion et nouvelle invitation (exigences 24, 25)", () => {
+describe("salon : exclusion et nouvelle invitation", () => {
   let srv: TestServer;
   let eng: SalonEngine;
   const fermer: ClientSalon[] = [];
@@ -331,7 +331,7 @@ describe("salon : exclusion et nouvelle invitation (exigences 24, 25)", () => {
 
 const secret: { sGestion: Uint8Array } = { sGestion: new Uint8Array(32) };
 
-describe("salon : lien de gestion collé dans la conversation (exigence C-3 32)", () => {
+describe("salon : lien de gestion collé dans la conversation (32)", () => {
   let srv: TestServer;
   let eng: SalonEngine;
   const fermer: ClientSalon[] = [];

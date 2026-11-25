@@ -18,7 +18,7 @@ afterEach(() => {
 
 const esc = (s: string) => s.replace(/'/g, "&#39;");
 const PROD_INDEX = `<!doctype html><html><head>\n<meta charset="utf-8" />\n<script type="module" crossorigin src="/assets/index-a.js"></script>\n</head><body></body></html>`;
-/** Démo : le moteur WebAssembly est intégré à un script (base64 du module, Task 11), avec la phrase de l'hébergeur (24 novembre). */
+/** Démo : le moteur WebAssembly est intégré à un script (base64 du module), avec la phrase de l'hébergeur. */
 const DEMO_ENGINE = 'const wasm="AGFzbQEAAAAB";const host="Demo hosted by GitHub, which sees your IP address.";';
 const DEMO_INDEX = `<!doctype html><html><head>
     <meta http-equiv="Content-Security-Policy" content="${esc(DEMO_CSP)}">
@@ -62,13 +62,13 @@ function run(args: string[]): { code: number; err: string } {
 }
 
 describe("check-dist.mjs, production", () => {
-  // Pages séparées (conception du 16 novembre) : exigées par le vrai build (INFO_PAGES).
+  // Pages séparées : exigées par le vrai build (INFO_PAGES).
   it("pages séparées : chaque page existe, a ses empreintes, son contenu écrit, aucun style en ligne, et ne charge pas le moteur", () => {
     const PAGE = (body: string, js = "page-a.js") =>
       `<!doctype html><html><head>\n<script type="module" crossorigin src="/assets/${js}"></script>\n</head><body><div id="app">${body}</div></body></html>`;
     const S = (robots = '<meta name="robots" content="noindex" />', js = "s-a.js") =>
       `<!doctype html><html><head>\n${robots}\n<script type="module" crossorigin src="/assets/${js}"></script>\n</head><body><div id="app"></div></body></html>`;
-    // Accueil écrit au build (18 novembre) : index.html avec son contenu entre repères, app.html sans.
+    // Accueil écrit au build : index.html avec son contenu entre repères, app.html sans.
     const HOME = (body: string) => PROD_INDEX.replace("<body></body>", `<body><div id="app"><!--shh-home-->${body}<!--/shh-home--></div></body>`);
     const APP = PROD_INDEX.replace("<body></body>", '<body><div id="app"><!--shh-home--></div></body>');
     const ok = { "index.html": HOME("<h1>Un lien</h1>"), "app.html": APP, "assets/index-a.js": "console.info(1)", "securite.html": PAGE("<h1>Sécurité</h1><p>…</p>"), "assets/page-a.js": "console.info(2)", "s.html": S(), "assets/s-a.js": "console.info(3)" };
@@ -103,7 +103,7 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(site({ ...ok, "securite.html": PAGE(cmd('x <img src="https://pistage.example/p.png"> y')) }), false, false, ["securite.html"]).join("\n")).toMatch(/securite\.html : adresse externe « https:\/\/pistage\.example/);
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>V</h1><pre class="cmd"><code>https://evil.example/x</code></pre>') }), false, false, ["securite.html"]).join("\n")).toMatch(/adresse externe « https:\/\/evil\.example/);
     expect(checkDist(site({ ...ok, "s.html": S().replace("</body>", '<pre data-cmd=""><code>https://evil.example/s</code></pre></body>') }), false, false, ["securite.html"]).join("\n")).toMatch(/s\.html : adresse externe/);
-    // Versions anglaises (20 novembre) : <html lang="en">, accueil anglais écrit.
+    // Versions anglaises : <html lang="en">, accueil anglais écrit.
     const EN_HOME = HOME("<h1>One link</h1>").replace("<html", '<html lang="en"');
     const EN_PAGE = PAGE("<h1>Security</h1>").replace("<html", '<html lang="en"');
     const en = { ...ok, "en.html": EN_HOME, "en-securite.html": EN_PAGE };
@@ -116,7 +116,7 @@ describe("check-dist.mjs, production", () => {
     const alt = '<link rel="alternate" hreflang="en" href="https://shhgone.com/en/securite" />';
     expect(checkDist(site({ ...en, "securite.html": PAGE("<h1>S</h1>").replace("</head>", alt + "</head>") }), false, false, P)).toEqual([]);
     expect(checkDist(site({ ...en, "securite.html": PAGE("<h1>S</h1>").replace("</head>", alt.replace("shhgone.com", "evil.example") + "</head>") }), false, false, P).join("\n")).toMatch(/adresse externe/);
-    // Page « /s » (16 novembre) : présente, jamais indexée, sans le script de l'application d'envoi.
+    // Page « /s » : présente, jamais indexée, sans le script de l'application d'envoi.
     const { "s.html": _s, ...noS } = ok;
     expect(checkDist(site(noS), false, false, ["securite.html"])).toContain("s.html : page d'ouverture absente");
     expect(checkDist(site({ ...ok, "s.html": S("") }), false, false, ["securite.html"])).toContain("s.html : sans « noindex »");
@@ -162,7 +162,7 @@ describe("check-dist.mjs, production", () => {
     expect(run([d])).toEqual({ code: 0, err: "" });
   });
 
-  it("compte (plan du compte, lot 9) : sans --comptes, aucune trace du module de compte (/api/compte, shhdrop-compte) ; avec --comptes, admise", () => {
+  it("compte : sans --comptes, aucune trace du module de compte (/api/compte, shhdrop-compte) ; avec --comptes, admise", () => {
     for (const trace of ['fetch(o+"/api/compte/connexion")', 'indexedDB.open("shhdrop-compte")']) {
       const d = site({ "index.html": PROD_INDEX, "assets/index-a.js": trace });
       const r = run([d]);
@@ -192,7 +192,7 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(site({ "index.html": PROD_INDEX, "404.html": PROD_INDEX }), false)).toEqual(["404.html : propre à la démo"]);
   });
 
-  it("échoue sur un import() dynamique dans un script (spec §28.3, audit F1) ; import.meta reste permis", () => {
+  it("échoue sur un import() dynamique dans un script (spec §28.3) ; import.meta reste permis", () => {
     const d = site({
       "index.html": PROD_INDEX,
       "assets/index-a.js": "const u=import.meta.url;a(()=>import(`./QrCode-x.js`));b(()=>import ('./y.js'))",
@@ -259,7 +259,7 @@ describe("check-dist.mjs, production", () => {
     expect(run([site({ "index.html": `<!doctype html><html><head><script>1</script></head></html>` }, false)]).err).toContain("index.html : script en ligne");
   });
 
-  it("Argon2id hors du script principal (10 novembre ; moteur WebAssembly depuis la Task 11, libsodium supprimé) : le moteur absent de index-*.js ; ses fichiers portent l'empreinte inscrite dans le script ; aucun orphelin", () => {
+  it("Argon2id hors du script principal (moteur WebAssembly depuis la, libsodium supprimé) : le moteur absent de index-*.js ; ses fichiers portent l'empreinte inscrite dans le script ; aucun orphelin", () => {
     const wasm = String.fromCharCode(0, 97, 115, 109, 1, 0, 0, 0);
     const kdf = "self.onmessage=1";
     const files = { "assets/engine-AbCd1234.wasm": wasm, "assets/engine-kdf-EfGh5678.js": kdf };
@@ -309,7 +309,7 @@ describe("check-dist.mjs, production", () => {
     expect(prod(`const w="/assets/engine-kdf-AbCd1234.js";const i="${sha384(Buffer.from(w))}";`, { "assets/engine-kdf-AbCd1234.js": w })).toEqual([]);
   });
 
-  it("W3 (audit du 20 novembre) : le Worker anti-robot, comme tout script de Worker, est cité avec son empreinte SHA-384, jamais orphelin", () => {
+  it("W3 : le Worker anti-robot, comme tout script de Worker, est cité avec son empreinte SHA-384, jamais orphelin", () => {
     const prod = (main: string, extra: Record<string, string> = {}) => checkDist(site({ "index.html": PROD_INDEX, "assets/index-a.js": main, ...extra }), false);
     const w = "self.onmessage=1";
     const hash = sha384(Buffer.from(w));
@@ -332,7 +332,7 @@ describe("check-dist.mjs, production", () => {
   it("moteur WebAssembly : en production, tout .wasm de plus de 1 Kio a ses variantes .br et .gz (servies par static.go), qui redonnent le fichier", () => {
     const wasm = String.fromCharCode(0, 97, 115, 109, 1, 0, 0, 0) + "\x01".repeat(2000);
     const w = "assets/engine-AbCd1234.wasm";
-    // Le script principal cite les .wasm avec leur empreinte (sinon : orphelins, règle de la Task 11).
+    // Le script principal cite les .wasm avec leur empreinte.
     const small = "\0asm";
     const main = `const a="/${w}",i="${sha384(Buffer.from(wasm, "latin1"))}";`;
     const prod = (extra: Record<string, string | Buffer>) => checkDist(site({ "index.html": PROD_INDEX, "assets/index-a.js": main, [w]: wasm, ...(extra as Record<string, string>) }), false);
@@ -347,7 +347,7 @@ describe("check-dist.mjs, production", () => {
     expect(prod({ "assets/index-a.js": both, "assets/petit-AbCd1234.wasm": small }).filter((p) => p.includes("petit"))).toEqual([]);
   });
 
-  it("module du salon (Task 9) : assets/salon-*.wasm d'au plus 430 Ko en brotli ; cité avec son empreinte comme le moteur", () => {
+  it("module du salon : assets/salon-*.wasm d'au plus 430 Ko en brotli ; cité avec son empreinte comme le moteur", () => {
     // Octets peu compressibles (xorshift32) : la variante brotli garde presque toute leur taille.
     const bruit = (n: number) => {
       const b = Buffer.alloc(n);
@@ -438,12 +438,12 @@ describe("check-dist.mjs --demo", () => {
     ]);
   });
 
-  it("compte : admis dans la démo (compte essayable, faux serveur de l'onglet, 19 novembre)", () => {
+  it("compte : admis dans la démo (compte essayable, faux serveur de l'onglet)", () => {
     const r = run(["--demo", site({ ...good(), "assets/install-a.js": good()["assets/install-a.js"] + 'x="/api/compte"' })]);
     expect(r.code).toBe(0);
   });
 
-  it("échoue sans la phrase visible de l'hébergeur (24 novembre) ; la phrase est interdite en production", () => {
+  it("échoue sans la phrase visible de l'hébergeur ; la phrase est interdite en production", () => {
     const sans = { ...good(), "assets/install-a.js": 'const MARK="__SHH_DEMO__";const wasm="AGFzbQEAAAAB";' };
     expect(checkDist(site(sans), true)).toEqual(["phrase de l'hébergeur absente des scripts de la démo (« hosted by GitHub, which sees your IP address »)"]);
     for (const s of ['x="Demo hosted by GitHub, which sees your IP address."', 'x="Démo hébergée par GitHub, qui voit votre adresse IP."'])
@@ -484,7 +484,7 @@ describe("check-dist.mjs --demo", () => {
     ]);
   });
 
-  it("moteur WebAssembly présent dans un script de la démo (Task 11) : sinon elle ne pourrait ni chiffrer ni ouvrir", () => {
+  it("moteur WebAssembly présent dans un script de la démo : sinon elle ne pourrait ni chiffrer ni ouvrir", () => {
     expect(checkDist(site({ ...good(), "assets/install-a.js": 'const MARK="__SHH_DEMO__";x="Demo hosted by GitHub, which sees your IP address."' }), true)).toEqual([
       "moteur WebAssembly absent des scripts de la démo (base64 « AGFzbQEAAAA ») : elle ne pourrait ni chiffrer ni ouvrir",
     ]);

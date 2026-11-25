@@ -1,4 +1,4 @@
-// Enregistreur vocal (Task 12) : faux MediaRecorder, faux flux, fausse horloge.
+// Enregistreur vocal : faux MediaRecorder, faux flux, fausse horloge.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MINI_BARS, RATES, WAVE_BARS, WAVE_CAP, WaveAccumulator, nextRate, rateLabel, resample, seekRatio, startVoice, type AudioCtxCtor, type VoiceRecorderCtor } from "./recorder";
 

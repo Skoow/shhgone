@@ -11,9 +11,9 @@ import { addText, capturePutBodies, openFilePicker, readyHeading, sendButton } f
 
 const TEXT = "MOT-REPERE-NAVIGATEUR-5d1e : le code de la porte est 4471";
 // Aucune fenêtre de 8 caractères du nom ne doit exister dans un en-tête ordinaire : « navigate »
-// (Sec-Fetch-Mode, envoyé par WebKit) donnait un faux positif sur « GET / » (CI du 10 novembre).
+// (Sec-Fetch-Mode, envoyé par WebKit) donnait un faux positif sur « GET / » (CI).
 const NAME = "nom-repere-fureteur-a83f.pdf";
-// Nom du partage (19 novembre) : saisi dans les options, chiffré dans le manifeste.
+// Nom du partage : saisi dans les options, chiffré dans le manifeste.
 const TITLE = "titre-repere-fureteur-6c1d Dossier";
 const CONTENT = "CONTENU-REPERE-NAVIGATEUR-0c6b ".repeat(4000);
 const windows = (label: string, s: string) => Array.from({ length: s.length - 7 }, (_, i) => needle(`${label}[${i}]`, s.slice(i, i + 8)));
@@ -73,12 +73,12 @@ test.describe("fr-FR", () => {
     ];
 
     // Témoin : la capture voit bien les en-têtes et les corps (S_gestion part, par conception, en en-tête).
-    // Lien de gestion : montré seulement sans historique (19 novembre), désactivé par défaut (24 novembre).
+    // Lien de gestion : montré seulement sans historique, désactivé par défaut.
     await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveAttribute("aria-checked", "false");
     const manage = (await page.locator("[data-manage] .sr-only").first().textContent()) ?? "";
     const sGestion = new Uint8Array(Buffer.from(manage.slice(manage.indexOf("#m") + 2), "base64url"));
     expect(findIn(Buffer.concat(sent.map((s) => s.data)), [needle("témoin S_gestion", sGestion as Uint8Array<ArrayBuffer>)])).toEqual(["témoin S_gestion"]);
-    // Chemin d'ouverture (Tasks 20, 21, 23) : le destinataire ouvre le lien dans cet onglet,
+    // Chemin d'ouverture : le destinataire ouvre le lien dans cet onglet,
     // tape le mot de passe (une fois faux, puis juste), lit le texte et enregistre le fichier
     // (faux sélecteur de fichier). Les mêmes captures couvrent ses requêtes et leurs réponses.
     await page.addInitScript(() => {

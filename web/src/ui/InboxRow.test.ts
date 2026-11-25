@@ -95,7 +95,7 @@ describe("InboxRow", () => {
     expect(a.li.querySelector("[data-sent]")).not.toBeNull();
     unmount(c!);
     document.body.innerHTML = "";
-    // Titre du partage (19 novembre) : à la place du nombre d'éléments, en texte brut (bdi).
+    // Titre du partage : à la place du nombre d'éléments, en texte brut (bdi).
     const t = render(entry({ sorte: "envoi", link: "", format: "", manage: "https://x.example/#m" + "m".repeat(43), itemsCount: 3, maxOpens: 1, label: "<b>Contrat</b>" }));
     expect(t.li.querySelector("bdi")!.textContent).toBe("<b>Contrat</b>");
     expect(t.li.querySelector("b")).toBeNull();

@@ -1,19 +1,19 @@
-// Fil de la conversation (plan C-3, Task 4), calculé sur l'appareil à partir des événements du
+// Fil de la conversation, calculé sur l'appareil à partir des événements du
 // client (client.ts) : rien n'est demandé au serveur. Pur : aucun réseau, aucun moteur (la clé
 // d'unicité des pseudonymes est donnée par l'appelant : `cleUnicite` du moteur). Règles (spec
-// salon v3 §3.6.1, exigences C-3 9, 10, 11, 34 ; §4, §6, §7.1, §14.1, §14.2) :
+// salon v3 §3.6.1, 9, 10, 11, 34 ; §4, §6, §7.1, §14.1, §14.2) :
 // - un identifiant de message déjà vu : le premier en ordre `seq` gagne, les doublons sont
 //   ignorés ; `modif` et `retrait` ne valent que de l'auteur du message visé ;
 // - accusés `recu`/`vu` comptés une fois par siège, parmi les lecteurs attendus (membres du
 //   groupe à la réception, expéditeur exclu) ;
 // - pseudonymes : unicité par `cleUnicite` ; en double, le premier en ordre `seq` le garde,
 //   l'autre siège est affiché « Participant N » ; si c'est soi, `pseudoRefuse` le dit à l'écran ;
-//   sauf entre deux membres déjà là à notre arrivée (audit du 21 novembre, P1) : leurs profils
+//   sauf entre deux membres déjà là à notre arrivée : leurs profils
 //   nous sont redits dans un ordre que nous n'avons pas vu naître, un tricheur pourrait parler
 //   avant le vrai titulaire ; aucun des deux ne garde alors le pseudonyme (ligne « en double ») ;
 // - un siège à la fois ajouté et retiré par le même Commit (reprise, ou clé substituée) : « le
 //   code de vérification de X a changé », sauf pour le créateur revenu (même clé de rôle) ;
-// - réponse : la citation est lue du message local, sinon « indisponible » (Ruling 7).
+// - réponse : la citation est lue du message local, sinon « indisponible ».
 import type { Regle } from "./engine";
 import type { EnveloppeRecue } from "./client";
 
@@ -60,7 +60,7 @@ export type Bulle = {
   envoyeMs: number | null;
   /** Réactions : émoji → sièges, dans l'ordre d'arrivée. */
   reactions: { emoji: string; sieges: number[] }[];
-  /** Pièce (plan C-4) : fichier, image, vidéo ou vocal ; null pour un texte. */
+  /** Pièce : fichier, image, vidéo ou vocal ; null pour un texte. */
   piece: PieceInfo | null;
 };
 
@@ -87,6 +87,7 @@ export type Systeme = { fige?: Fige } & (
   | { k: "sys"; cle: string; quoi: "pseudo"; siege: number; avant: string; apres: string }
   | { k: "sys"; cle: string; quoi: "regle"; siege: number; regle: Regle }
   | { k: "sys"; cle: string; quoi: "renouvellement" | "invitation"; siege: number }
+  | { k: "sys"; cle: string; quoi: "fermeture"; siege: number; minutes: number }
 );
 
 export type Element = Bulle | Systeme;
@@ -151,7 +152,7 @@ export class Conversation {
   couleurDe(e: Element): number {
     return e.fige?.couleur ?? this.couleur(e.siege);
   }
-  // Écart entre le groupe et le serveur (v3 exigence 27) : un siège encore dans le groupe chiffré
+  // Écart entre le groupe et le serveur (v3) : un siège encore dans le groupe chiffré
   // (`membres`) mais absent de la liste du serveur depuis plus de ECART_MS. Le nom gardé est celui
   // de l'ancien occupant (son profil est oublié à son départ).
   readonly #ecart = new Map<number, { depuis: number; pseudo: string | null }>();
@@ -224,7 +225,7 @@ export class Conversation {
     this.#change();
   }
   /**
-   * Notre siège change (nouvelle entrée ; créateur qui retrouve ses droits, exigence C-3 32) :
+   * Notre siège change (nouvelle entrée ; créateur qui retrouve ses droits, 32) :
    * l'ancien est rendu sans ligne (le départ annoncé ensuite n'en ajoute pas), son profil oublié
    * (notre pseudonyme n'y est plus « pris ») ; les messages de l'ancien occupant du nouveau siège
    * gardent son nom et sa couleur (figés). Notre profil est renvoyé par l'appelant.
@@ -244,7 +245,7 @@ export class Conversation {
     this.#change();
   }
 
-  /** Commit fusionné : arrivées, départs, reprises (exigence 9), créateur revenu (34). */
+  /** Commit fusionné : arrivées, départs, reprises, créateur revenu (34). */
   groupe(e: { ajoutes: number[]; retires: number[]; createurRevenu: boolean; membres: number[] }): void {
     this.membres = e.membres;
     this.#suivreEcart();
@@ -401,7 +402,7 @@ export class Conversation {
       }
       case "modif": {
         const b = this.#parId.get(hex(m.cible));
-        if (!b || b.siege !== siege || b.retire) return null; // auteur seul (exigence 10)
+        if (!b || b.siege !== siege || b.retire) return null; // auteur seul
         b.texte = m.x;
         b.modifie = true;
         this.#change();
@@ -484,7 +485,7 @@ export class Conversation {
   }
 
   /**
-   * Règle d'effacement des prochains messages (plan C-5 point 1) : celle du dernier message
+   * Règle d'effacement des prochains messages : celle du dernier message
    * `regle` lu, sinon celle du dernier message reçu, sinon 5 min (défaut de l'écran).
    */
   regle: Regle = 2;
@@ -509,12 +510,18 @@ export class Conversation {
   #anciens: Set<number> | null = null;
   readonly #contestes = new Set<string>();
 
-  /** Codes de vérification comparés ici (siège → code vérifié), annulés quand le code change (exigences 9, 29). */
+  /** Codes de vérification comparés ici (siège → code vérifié), annulés quand le code change. */
   readonly verifies = new Map<number, string>();
 
-  /** Invitation changée (rotation, exigence 24) : ligne chez tous ; les codes restent (refonder). */
+  /** Invitation changée (rotation) : ligne chez tous ; les codes restent (refonder). */
   invitationChangee(): void {
     this.#sys({ k: "sys", quoi: "invitation", siege: this.createurSiege });
+    this.#change();
+  }
+
+  /** Alerte du salon lui-même avant sa fin (calculée sur l'appareil, fermeture.ts). */
+  fermeture(minutes: number): void {
+    this.#sys({ k: "sys", quoi: "fermeture", siege: this.moi, minutes });
     this.#change();
   }
 
@@ -636,7 +643,7 @@ export class Conversation {
     } catch {
       return;
     }
-    // Unicité (exigence 11) : déjà pris par un autre siège présent, annoncé avant → refusé.
+    // Unicité : déjà pris par un autre siège présent, annoncé avant → refusé.
     let pris = false;
     let titulaire = -1;
     for (const [s, p] of this.profils)
@@ -694,7 +701,7 @@ const DECOUPES_MAX = 2000;
 
 /**
  * Morceaux d'un texte : liens `https?://` cliquables, le reste en texte (aucun Markdown, §39.5).
- * Coût linéaire et résultat gardé (revue du 21 novembre : une longue ponctuation finale coûtait
+ * Coût linéaire et résultat gardé (une longue ponctuation finale coûtait
  * un temps quadratique, recalculé pour chaque bulle à chaque changement du fil).
  */
 export function morceaux(texte: string): readonly { lien: boolean; t: string }[] {

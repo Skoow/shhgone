@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Passkeys (conception du compte par passkey §3.5 ; plan, lot W2 ; monté seulement avec
+  // Passkeys (conception du compte par passkey §3.5 ; monté seulement avec
   // __COMPTES__). Liste : libellé déchiffré sur cet appareil (jamais lu par le serveur), mois
   // d'ajout, « liée à cet appareil » (non synchronisable), « ouvre vos données » (enveloppe PRF),
   // « cette passkey » (celle de la session). Ajouter (3 actions : « Ajouter », « Créer la passkey »,

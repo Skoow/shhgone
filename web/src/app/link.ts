@@ -15,7 +15,7 @@ const INCOMPLETE: LinkState = Object.freeze({ kind: "incomplete" });
 
 /**
  * Lit le lien de l'adresse courante (spec §32 : `${base}s#<clé>` ou `${base}s#m<clé>` ; l'ancienne
- * forme à la racine est refusée depuis le 18 novembre).
+ * forme à la racine est refusée).
  * Seule la forme est vérifiée (linkForm, mêmes refus que parseLink du moteur) : la clé n'est pas
  * décodée ici, mais par le moteur au moment de l'utiliser (transfer/client.ts). Le chemin
  * doit être « /s » sous la base (« /s », ou « /shhgone/s » en démo) ; la requête est
@@ -44,7 +44,7 @@ const BARE_PATH = /^\/(?!\/)[^\\#?]*$/;
  * ajoutée, état nul). Rend `false` sans rien écrire si `pathname` n'est pas un chemin nu ;
  * ne lève jamais (appelée dans un effet).
  *
- * Résidu assumé (audit adverse du 13 novembre, Si1, même classe que D9) : l'entrée
+ * Résidu assumé (Si1, même classe que D9) : l'entrée
  * PerformanceNavigationTiming (`performance.getEntriesByType("navigation")[0].name`) garde
  * l'URL d'origine, fragment compris, et aucune API ne l'efface (elle est figée au chargement).
  * `replaceState` ne nettoie que la barre d'adresse et l'historique. Seul un script de MÊME

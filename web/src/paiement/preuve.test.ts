@@ -1,4 +1,4 @@
-// Preuve d'une commande sans le moteur (revue du 21 novembre) : défi lu par paiement/api,
+// Preuve d'une commande sans le moteur : défi lu par paiement/api,
 // champs rendus au plus tôt 3,1 s après la réception, 429 → LimiteDefi.
 import { afterEach, describe, expect, it, vi } from "vitest";
 

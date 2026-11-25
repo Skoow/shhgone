@@ -34,7 +34,7 @@ function fakeWindow(path = "/envoyer") {
   return { w, stack, travel, pops, at: () => at };
 }
 
-describe("garde de sortie (audit I2)", () => {
+describe("garde de sortie", () => {
   it("armée : une entrée de garde est ajoutée ; Retour → confirmation ; refus → on reste (entrée remise)", () => {
     const f = fakeWindow();
     const g = createLeaveGuard(f.w);

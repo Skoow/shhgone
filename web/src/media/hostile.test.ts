@@ -1,4 +1,4 @@
-// Entrées hostiles (revue du 10 novembre, spec §35.2) : un fichier piégé ne doit ni geler la
+// Entrées hostiles (spec §35.2) : un fichier piégé ne doit ni geler la
 // page (boucle sans borne, recherche quadratique) ni tout charger en mémoire ; le nettoyage
 // échoue proprement (`Malformed`, donc `echec`) ou réussit vite.
 import { createHash } from "node:crypto";
@@ -109,7 +109,7 @@ describe("FLAC et WAV piégés", () => {
 
 describe("Ogg : pages renumérotées repliées dans le Blob", () => {
   afterEach(() => vi.unstubAllGlobals());
-  /** Empreintes des sorties avant le repli (même code de nettoyage, 10 novembre). */
+  /** Empreintes des sorties avant le repli (même code de nettoyage). */
   const BEFORE: Record<string, string> = {
     "meta.opus": "156c095d6fb02ea733a8054de21de0b2ec4168b08e8eddeb3b80f5df6289d45e",
     "meta.ogg": "ad285f8ea7a002596be985e1ed8031047ea80df808af932bd9a46199fb8f46db",
@@ -153,7 +153,7 @@ describe("Ogg : pages renumérotées repliées dans le Blob", () => {
   });
 });
 
-describe("Ogg piégé : nombre de pages borné (10 novembre)", () => {
+describe("Ogg piégé : nombre de pages borné", () => {
   it("au-delà du plafond de pages, refus net (sinon des millions de pages de 27 octets figent l'onglet)", async () => {
     const file = new Blob([fx("long.opus")]);
     // Le fichier d'essai a bien plus de 5 pages : avec un plafond de 5, il doit être refusé.

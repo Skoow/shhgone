@@ -115,7 +115,7 @@ describe("open-grant (spec §41.4)", () => {
   });
 });
 
-describe("garde au niveau de l'application (audit web D2 du 13 novembre)", () => {
+describe("garde au niveau de l'application", () => {
   function setup() {
     let t = 1_000_000;
     const ticks: (() => void)[] = [];

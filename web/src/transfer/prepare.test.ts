@@ -56,8 +56,7 @@ describe("prepareCaptcha", () => {
   });
 });
 
-// Routes du compte (inscription/debut, oubli/debut, connexion après 5 échecs ; plan du compte,
-// lot 10) : mêmes champs anti-robot que POST /api/shares, rendus au plus tôt 3,1 s après la
+// Routes du compte (inscription/debut, oubli/debut, connexion après 5 échecs) : mêmes champs anti-robot que POST /api/shares, rendus au plus tôt 3,1 s après la
 // réception du défi (le serveur refuse avant 3 s), et une seule fois par défi.
 describe("proofForm", () => {
   it("champs { altcha, hp, shown_at } ; attend CAPTCHA_MIN_MS depuis la réception ; usage unique", async () => {

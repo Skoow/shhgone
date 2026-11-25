@@ -24,7 +24,7 @@
   --warn: #F2C46D;
   --warn-tint: #2A2312;
   --info: #8DB2FF;
-  /* Formules payantes (retours UI4, deux bleus depuis BLUE) : jamais le vert de l'action ni le
+  /* Formules payantes (deux bleus depuis BLUE) : jamais le vert de l'action ni le
      violet. Plus = bleu ciel, Pro = bleu profond, plus intense ; chaque élément prend le jeu de
      SON offre. Texte (--plus, --pro) ≥ 4,5:1 sur tous les fonds ; --*-line (pointillés,
      bordures) ≥ 3:1 (tokens.test.ts). */
@@ -34,10 +34,10 @@
   --pro: #5C80FF;
   --pro-tint: #121B40;
   --pro-line: #3461FF;
-  /* Refonte de l'accueil (12 novembre) : bleu vif des boutons pleins (texte blanc ≥ 4,5:1). */
+  /* Refonte de l'accueil : bleu vif des boutons pleins (texte blanc ≥ 4,5:1). */
   --sig-blue: #3366FF;
   --sig-blue-hover: #2A55E8;
-  /* Icônes de format (retours UI6) : une pastille de couleur par famille, libellé toujours
+  /* Icônes de format : une pastille de couleur par famille, libellé toujours
      écrit en --on-fmt (≥ 4,5:1 sur chacune). Teintes écartées du vert « vérifié » (--accent)
      et des bleus Plus et Pro : 12° au moins sur la roue, plus clair (tokens.test.ts). */
   --fmt-pdf: #F87171;

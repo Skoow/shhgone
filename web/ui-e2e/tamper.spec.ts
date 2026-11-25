@@ -1,4 +1,4 @@
-// Audit web D3 (13 novembre) : un contenu modifié par le serveur est refusé avec un texte fixe,
+// Un contenu modifié par le serveur est refusé avec un texte fixe,
 // choisi par le client, jamais « Ce lien n'existe pas ».
 import { expect, test } from "./fixtures";
 import { freshPage, noteRow, pwField, sendShare, unlockButton } from "./open-helpers";

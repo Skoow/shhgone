@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Infographie de l'accueil (refonte du 12 novembre) : boucle d'étapes, pause (bouton, survol,
+// Infographie de l'accueil : boucle d'étapes, pause (bouton, survol,
 // focus : WCAG 2.2.2), storyboard statique en mouvement réduit, étapes lisibles au lecteur
 // d'écran, textes vrais (jamais « 100 % sécurisé », ni « inviolable », « aucune donnée »…).
 import { flushSync, mount, unmount } from "svelte";
@@ -71,7 +71,7 @@ describe("SecureDemo", () => {
     expect(step()).toBe(1);
   });
 
-  it("durée d'une étape selon son texte (20 novembre) : plus longue pour plus de texte, bornée", () => {
+  it("durée d'une étape selon son texte : plus longue pour plus de texte, bornée", () => {
     const d = (n: number) => dureeEtape(fr[`demo.s${n}.t` as keyof typeof fr] + fr[`demo.s${n}.d` as keyof typeof fr]);
     expect(d(4)).toBeGreaterThan(d(3)); // « Rien de lisible sur le serveur » : la plus longue description
     for (const n of STEPS) {
@@ -100,7 +100,7 @@ describe("SecureDemo", () => {
     }
   });
 
-  it("repères (24 novembre) : l'attaquant entre avec sa ligne ; la description arrive avec le dernier état", () => {
+  it("repères : l'attaquant entre avec sa ligne ; la description arrive avec le dernier état", () => {
     const tr = (k: string) => fr[k as keyof typeof fr];
     // Étape 3 : « envoi chiffré au serveur » + « ✓ ok », pause, puis la ligne de l'attaquant.
     const s3 = reperesEtape(3, tr);
@@ -217,7 +217,7 @@ describe("SecureDemo", () => {
   });
 });
 
-describe("journal tapé (18 novembre) : un seul curseur, mots entiers", () => {
+describe("journal tapé : un seul curseur, mots entiers", () => {
   it("à chaque étape : jamais plus d'un curseur ; tout est tapé en entier avant l'étape suivante", () => {
     show();
     for (let n = 1; n <= STEPS.length; n++) {

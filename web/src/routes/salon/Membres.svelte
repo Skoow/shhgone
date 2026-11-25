@@ -1,7 +1,7 @@
 <script lang="ts">
   // Participants (spec §39.5, v3 §14.1) : couleur, pseudonyme (jamais la couleur seule), « vous »,
   // créateur, en ligne ou dernière connexion (heure de cet appareil, à la minute), puis « Quitter
-  // le salon ». Codes de vérification, exclusion (créateur) et réglages : plan C-5.
+  // le salon ». Codes de vérification, exclusion (créateur) et réglages :.
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatClock } from "../../i18n/format";
   import * as S from "../../salon/salon.svelte";
@@ -24,7 +24,7 @@
     for (const s of conv.presents) if (conv.avatars.get(s)) void S.avatarDe(s);
   });
 
-  // Exclusion (spec §39.5, v3 exigences 24, 25 et 29) : réservée au créateur, jamais sur lui-même.
+  // Exclusion (spec §39.5, v3) : réservée au créateur, jamais sur lui-même.
   let exclusion = $state("");
   async function exclureMembre(siege: number, qui: string): Promise<void> {
     const e = await S.exclureSiege(siege);
@@ -135,7 +135,7 @@
     color: var(--on-fmt);
     font-weight: 700;
   }
-  /* Zones tactiles de 44 px (revue du 20 novembre, U20). */
+  /* Zones tactiles de 44 px. */
   .code summary {
     min-height: 44px;
     padding-block: 12px;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Icônes maison de la barre d'onglets (24 × 24, trait 1,8, retours UI7) ; « chat » sert aussi
+  // Icônes maison de la barre d'onglets (24 × 24, trait 1,8) ; « chat » sert aussi
   // au bouton Salon de l'accueil.
   import type { TabId } from "../app/tabbar";
   let { id, size = 22 }: { id: TabId; size?: number } = $props();

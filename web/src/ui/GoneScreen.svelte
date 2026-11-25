@@ -1,7 +1,7 @@
 <script lang="ts">
   // Écran de fin quand le partage disparaît pendant la lecture (spec §41.8, UI §9.8.9 ; E1).
   // L'interface est déjà fermée : seuls restent les enregistrements en cours au moment de la
-  // fermeture, avec leur nom nettoyé (décision du propriétaire du 7 novembre), leur
+  // fermeture, avec leur nom nettoyé, leur
   // progression et leur fin (« Terminé » ou « Téléchargement interrompu. »). Sans
   // enregistrement en cours : la page de fin ordinaire.
   import { followLink, href } from "../app/router.svelte";

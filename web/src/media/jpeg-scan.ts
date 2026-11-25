@@ -25,15 +25,14 @@ export function scanEnd(b: Uint8Array, o: number): number {
 }
 
 /**
- * Vignette EXIF nettoyée (audit du 20 novembre, W7 ; décision du propriétaire du 22 novembre :
- * la vignette est gardée, ses métadonnées partent). Rend un JPEG neuf : SOI, puis seulement ce
+ * Vignette EXIF nettoyée (* la vignette est gardée, ses métadonnées partent). Rend un JPEG neuf : SOI, puis seulement ce
  * qui sert à l'afficher, octets inchangés et dans l'ordre (tables et trames de `keptTable`, APP14
  * Adobe comme pour l'image principale, SOS et données compressées), puis EOI. Tout autre segment
  * est retiré sans toucher au reste : APP0 à APP15 (EXIF, XMP, IPTC…), COM, et les marqueurs
  * réservés ou rares qui peuvent porter n'importe quoi (0xC8, 0xDE, 0xDF, 0xF0 à 0xFD).
  * Ce qui suit le premier EOI, dans la longueur déclarée par l'IFD1, n'est jamais gardé.
  * null seulement si la vignette est mal formée : pas de SOI, pas d'EOI, segment qui déborde,
- * marqueur seul hors norme (comme avant le 22 novembre).
+ * marqueur seul hors norme (comme).
  */
 export function cleanThumbnail(j: Uint8Array): Uint8Array<ArrayBuffer> | null {
   try {

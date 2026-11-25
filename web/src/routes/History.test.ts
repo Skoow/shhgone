@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// « Mes partages » (/envois) sans compte (plan du compte, lot 12) : filtre « Reçus » ajouté aux
+// « Mes partages » (/envois) sans compte : filtre « Reçus » ajouté aux
 // filtres existants, mêmes lignes que l'accueil (InboxRow) ; aucune requête au chargement pour
 // les reçus ; les envois gardent leurs cartes et leurs compteurs.
 import { flushSync, mount, unmount } from "svelte";
@@ -67,7 +67,7 @@ describe("Mes partages : filtre « Reçus »", () => {
   });
 });
 
-describe("Mes partages : historique des envois désactivé par défaut (24 novembre)", () => {
+describe("Mes partages : historique des envois désactivé par défaut", () => {
   it("sans compte ni choix : « L'historique est désactivé » ; « L'activer » le garde pour les envois suivants", async () => {
     await live.setHistoryEnabled(false);
     app = mount(History as never, { target: document.body }) as Record<string, unknown>;
@@ -81,7 +81,7 @@ describe("Mes partages : historique des envois désactivé par défaut (24 novem
     expect(document.querySelector("[data-history-empty] h2")!.textContent).toBe("Aucun partage pour l'instant");
     await live.setHistoryEnabled(false);
   });
-  it("avec un compte aussi (24 novembre, B) : « désactivé » tant que la personne ne l'active pas", async () => {
+  it("avec un compte aussi (B) : « désactivé » tant que la personne ne l'active pas", async () => {
     await live.setHistoryEnabled(false);
     live.setAccountPrefs({ keepReceived: true });
     app = mount(History as never, { target: document.body }) as Record<string, unknown>;

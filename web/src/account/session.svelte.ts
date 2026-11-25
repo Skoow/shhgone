@@ -1,5 +1,5 @@
 // Le compte sur cet appareil (conception 2026-11-22-compte-passkey-design.md §3, §5, §9 ;
-// conception du compte §9, §10, §21.2 pour ce qu'elle ne remplace pas ; plan, lot W1). Seul
+// conception du compte §9, §10, §21.2 pour ce qu'elle ne remplace pas). Seul
 // détenteur du jeton de session et de K_compte (règle de §37.3, source-rules.test.ts) ; les
 // écrans n'importent que ce module, derrière __COMPTES__.
 // - Passkey : navigator.credentials seulement dans navigateur.ts (via webauthn.ts), avec des options chargées AVANT
@@ -753,8 +753,7 @@ export async function pseudoLibre(p: string): Promise<boolean> {
 
 /**
  * Pseudo pris pour un salon hors du compte (invité, ou compte sans « Proposer mon pseudo ») :
- * libre si aucun AUTRE compte ne l'a et qu'il n'est ni réservé ni interdit (décision du
- * propriétaire, 22 novembre). Le sien est toujours permis. Requête sans session ni salon.
+ * libre si aucun AUTRE compte ne l'a et qu'il n'est ni réservé ni interdit. Le sien est toujours permis. Requête sans session ni salon.
  */
 export async function pseudoLibreSalon(p: string): Promise<boolean> {
   let canon: string;

@@ -2,11 +2,11 @@
 // puis extension. Un nom ou un type menteur ne fait jamais sauter un analyseur.
 import { ascii, startsWith } from "./bytes";
 
-/** Images : nettoyées ici (Task 9a). */
+/** Images : nettoyées ici. */
 export const IMAGE_FORMATS = ["jpeg", "png", "webp", "gif", "heif"] as const;
-/** Documents : nettoyés ici (Task 9b). */
+/** Documents : nettoyés ici. */
 export const DOC_FORMATS = ["pdf", "ooxml", "odf"] as const;
-/** Vidéo et audio : nettoyés ici (Task 9c). */
+/** Vidéo et audio : nettoyés ici. */
 export const AV_FORMATS = ["mp4", "webm", "mp3", "ogg", "flac", "wav"] as const;
 export type Format = (typeof IMAGE_FORMATS)[number] | (typeof DOC_FORMATS)[number] | (typeof AV_FORMATS)[number] | "texte" | "inconnu";
 

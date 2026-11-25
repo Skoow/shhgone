@@ -1,5 +1,4 @@
-// Page de contenu « 2027 » en listes compactes (Task R2 ; décisions du propriétaire du
-// 7 novembre) : une ligne par élément (icône de format, nom, type, taille, temps estimé,
+// Page de contenu « 2027 » en listes compactes : une ligne par élément (icône de format, nom, type, taille, temps estimé,
 // actions), groupes par catégorie avec nombre et taille ; téléchargement d'un fichier, d'une
 // catégorie, de tout ; pause, reprise, arrêt ; visionneuse en panneau ; archive .zip ;
 // « voir seulement ». Captures fr-FR à 1440 et 390 px.
@@ -17,7 +16,7 @@ test.use({ locale: "fr-FR" });
 const TEXT = "Bonjour,\nvoici les documents de la réunion.";
 const NAMES = ["foret-brume.jpg", "lac-gele.jpg", "schema.png", "vocal.ogg", "anniversaire-lou.webm", "contrat.pdf", "budget-2026.xlsx", "archive.zip", "installer.exe", "trap.svg"];
 const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
-/** Octets partis : les photos sont nettoyées à l'ajout (Task 9a), le reste part tel quel. */
+/** Octets partis : les photos sont nettoyées à l'ajout, le reste part tel quel. */
 /** Octets envoyés : le fichier tel quel (nettoyage automatique désactivé par défaut, CLEAN4). */
 async function sentBytes(n: string): Promise<Buffer> {
   return readFileSync(file(n));
@@ -54,19 +53,19 @@ test("listes compactes : groupes, icônes par format, types, tailles, temps esti
   expect(await fmt("vocal.ogg")).toBe("OGG");
   expect(await fmt("trap.svg")).toBe("SVG");
   await expect(row(page, "contrat.pdf")).toContainText("Document PDF");
-  // Empreinte SHA-256 (16 novembre) : au même endroit que chez l'expéditeur, celle des octets
+  // Empreinte SHA-256 : au même endroit que chez l'expéditeur, celle des octets
   // envoyés, lue dans le manifeste chiffré ; aucune pour la note.
   for (const n of NAMES) await expect(row(page, n).locator(`[data-sha256="${sha(await sentBytes(n))}"]`)).toHaveCount(1);
   await expect(page.locator('[data-group="texte"] [data-sha256]')).toHaveCount(0);
-  // Aucune estimation avant un débit mesuré dans cette session (retours UI4).
+  // Aucune estimation avant un débit mesuré dans cette session.
   await expect(row(page, "contrat.pdf")).not.toContainText(/env\.\s/);
   await expect(page.locator(".sum")).not.toContainText("(estimation)");
   await expect(page.locator(".gm.eta")).toHaveCount(0);
-  // « Voir » sur image, vidéo, texte et PDF (cadre isolé, CLEAN5), « Écouter » sur le son
-  // (audit D2) ; jamais sur SVG, programme, archive : seulement « Télécharger ».
+  // « Voir » sur image, vidéo, texte et PDF (cadre isolé, CLEAN5), « Écouter » sur le son ;
+  // jamais sur SVG, programme, archive : seulement « Télécharger ».
   for (const n of ["foret-brume.jpg", "anniversaire-lou.webm", "contrat.pdf"]) await expect(row(page, n).getByRole("button", { name: `Voir ${n}` })).toBeVisible();
   await expect(row(page, "vocal.ogg").getByRole("button", { name: "Écouter vocal.ogg" })).toHaveText("Écouter");
-  // Icône de haut-parleur maison, pas l'œil de « Voir » (retours du 12 novembre).
+  // Icône de haut-parleur maison, pas l'œil de « Voir ».
   await expect(row(page, "vocal.ogg").getByRole("button", { name: "Écouter vocal.ogg" }).locator("svg.ic-volume")).toHaveCount(1);
   await expect(row(page, "vocal.ogg").getByRole("button", { name: "Écouter vocal.ogg" }).locator("svg.ic-eye")).toHaveCount(0);
   for (const n of ["trap.svg", "installer.exe", "archive.zip"]) {
@@ -294,7 +293,7 @@ test("archive .zip sans sélecteur : confirmation des fichiers à risque, archiv
     execFileSync("python3", ["-I", "-c", "import sys,zipfile,hashlib,json;z=zipfile.ZipFile(sys.argv[1]);assert z.testzip() is None;print(json.dumps({i.filename:hashlib.sha256(z.read(i)).hexdigest() for i in z.infolist()}))", p]).toString(),
   ) as Record<string, string>;
   for (const n of NAMES) expect(out[n], n).toBe(sha(await sentBytes(n)));
-  // La note n'est jamais téléchargée (décision du propriétaire du 17 novembre) : pas dans l'archive.
+  // La note n'est jamais téléchargée : pas dans l'archive.
   expect(Object.keys(out)).toHaveLength(NAMES.length);
   expect(Object.keys(out).some((k) => k.endsWith(".txt"))).toBe(false);
 });
@@ -359,7 +358,7 @@ test.describe("mouvement réduit", () => {
   });
 });
 
-test("mémo vocal WebM (audio/webm) : « Audio » chez l'expéditeur et chez le destinataire, action « Écouter » (audit D2)", async ({ page, shh, browser }) => {
+test("mémo vocal WebM (audio/webm) : « Audio » chez l'expéditeur et chez le destinataire, action « Écouter »", async ({ page, shh, browser }) => {
   test.setTimeout(120_000);
   const memo = { name: "Mémo vocal 1.webm", mimeType: "audio/webm", buffer: readFileSync(new URL("../src/media/fixtures/chromium-audio.webm", import.meta.url)) };
   const s = await freshPage(browser);

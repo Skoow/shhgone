@@ -97,7 +97,7 @@ export async function lireOffre(n: Net = netParDefaut()): Promise<OffreServeur |
 
 export type Demande = { offre: OffrePayante; jours: 30 | 365; renouvelle: boolean; moyen: Moyen; pays: string; renonciation: boolean };
 export type ErreurCommande = "refus" | "conflit" | "limite" | "occupe" | "prestataire" | "reseau";
-/** Preuve anti-robot ALTCHA (GET /api/captcha résolu), exigée par la commande (audit du 20 novembre, S2). */
+/** Preuve anti-robot ALTCHA (GET /api/captcha résolu), exigée par la commande. */
 export type Preuve = { altcha: string; hp: string; shown_at: string };
 
 const entetePass = (pass: Uint8Array<ArrayBuffer>) => {
@@ -228,7 +228,7 @@ export async function emettre(pass: Uint8Array<ArrayBuffer>, requetes: Uint8Arra
 export type Defi = { challenge: Record<string, unknown>; shownAt: string; receivedAt: number };
 
 /**
- * Lit un défi pour `commander` (revue du 21 novembre : la page Offres est une page
+ * Lit un défi pour `commander` (la page Offres est une page
  * d'information, elle ne doit pas tirer le moteur de chiffrement par transfer/). Sans cookie,
  * sans redirection. « limite » : 429 ; null : autre échec (réseau, réponse mal formée).
  */

@@ -1,8 +1,8 @@
-// Retours TABLE du propriétaire : « Votre envoi » en un seul tableau sobre (un contenant, une
+// Retours TABLE : « Votre envoi » en un seul tableau sobre (un contenant, une
 // catégorie = un sous-en-tête, jamais un cadre par type), icône recollée au bord gauche ; le nom
 // de l'offre (Plus, Pro) plus écrit, en bulle au survol (retours CLEAN2) ; pied : « Offres … et »
 // couleur des liens du pied, Plus et Pro au bleu de leur offre (jamais le vert d'accent).
-// Captures fr-FR ×2 à 390 et 1440 px : .superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-TABLE/.
+// Captures fr-FR ×2 à 390 et 1440 px : web/test-results/captures/TABLE/.
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
@@ -10,7 +10,7 @@ import { axe, captureOf, expect, test } from "./fixtures";
 import { file, settle } from "./open-helpers";
 import { cleanAll, enterComposer, openFilePicker } from "./send-helpers";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-TABLE/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/TABLE/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
 const w = (m: boolean) => (m ? 390 : 1440);
 async function shot(page: Page, name: string, isMobile: boolean, full = false) {
@@ -49,7 +49,7 @@ test("Votre envoi : un seul tableau, sous-en-têtes de catégorie, icône au bor
     const h3 = (await g.locator(":scope > .head h3").boundingBox())!.x;
     for (const fi of await g.locator("[data-row] svg.fi").all()) expect(Math.abs((await fi.boundingBox())!.x - h3)).toBeLessThanOrEqual(1);
   }
-  // Ligne du type et de la taille (au-dessus du nom depuis le 19 novembre) alignée sur le début du nom.
+  // Ligne du type et de la taille (au-dessus du nom) alignée sur le début du nom.
   for (const r of await page.locator("[data-row]").all()) {
     const [nm, meta] = [(await r.locator(".nm").boundingBox())!.x, (await r.locator(".kind").boundingBox())!];
     const first = await r.locator(".kind > *").first().boundingBox();
@@ -62,7 +62,7 @@ test("Votre envoi : un seul tableau, sous-en-têtes de catégorie, icône au bor
   const before = await page.locator("[data-row]").first().evaluate((li) => li.querySelector("[data-clean]")!.getBoundingClientRect().right <= li.querySelector(".nm")!.getBoundingClientRect().left);
   expect(before).toBe(true);
 
-  // Plus de pastilles d'espace ni de choix verrouillés (décision du 11 novembre, audit M17).
+  // Plus de pastilles d'espace ni de choix verrouillés.
   await expect(page.locator("[data-paid-space], [data-locked]")).toHaveCount(0);
   await shot(page, "composeur", isMobile);
 
@@ -76,7 +76,7 @@ test("Votre envoi : un seul tableau, sous-en-têtes de catégorie, icône au bor
   await shot(page, "options", isMobile);
 });
 
-test("pied : plus de lien « Offres » (17 novembre : l'en-tête et le menu y mènent), jamais le vert hors page courante ; capture", async ({ page, shh, isMobile }) => {
+test("pied : plus de lien « Offres » (l'en-tête et le menu y mènent), jamais le vert hors page courante ; capture", async ({ page, shh, isMobile }) => {
   await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 });
   await page.goto(shh.origin + "/offres");
   const foot = page.locator("footer[data-foot]");

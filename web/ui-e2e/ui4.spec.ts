@@ -1,4 +1,4 @@
-// Retours UI4 du propriétaire, sur le vrai serveur : bulle du cadenas, groupes délimités,
+// Retours UI4, sur le vrai serveur : bulle du cadenas, groupes délimités,
 // « Détruire » à la dernière ouverture seulement, échéance en deux lignes, Plus en bleu ;
 // captures fr-FR à 390 et 1440 px.
 import { fileURLToPath } from "node:url";
@@ -6,7 +6,7 @@ import { axe, expect, test } from "./fixtures";
 import { file, freshPage, noteRow, sendShare, settle, unlock } from "./open-helpers";
 import { addText, readyHeading, sendButton } from "./send-helpers";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-UI4/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/UI4/", import.meta.url));
 const TEXT = "Code de la porte : 4512B";
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
@@ -72,7 +72,7 @@ test("Lien prêt : échéance en deux lignes", async ({ page, shh, isMobile }) =
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const dl = page.locator("[data-deadline]");
   await expect(dl.locator(".ends")).toHaveText(/^Se termine le \d+\s\S+ à \d+\sh\s\d{2}$/);
-  // Heure de fin seule (audit M16) ; l'arrondi est dit dans la phrase.
+  // Heure de fin seule ; l'arrondi est dit dans la phrase.
   await expect(dl.locator(".left")).toHaveCount(0);
   await expect(page.getByText(/arrondie au quart d'heure supérieur/)).toBeVisible();
   await settle(page);

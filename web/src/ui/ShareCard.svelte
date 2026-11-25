@@ -1,6 +1,6 @@
 <script lang="ts">
   // Carte d'un partage de l'historique (UI §9.6.3) : état (mot + icône), création locale,
-  // ouvertures, échéance, taille, nombre d'éléments, titre du partage (19 novembre, renommable
+  // ouvertures, échéance, taille, nombre d'éléments, titre du partage (renommable
   // ici seulement) ; jamais un nom d'élément (spec §33).
   // Données locales seulement ; ouvertures et état relus du serveur sur demande (Actualiser,
   // Détails), par le parent. `compact` : accueil (une ligne de mesures).
@@ -39,7 +39,7 @@
   const shown = $derived(effectiveState(entry, now));
   const active = $derived(shown === "ready" || shown === "draining");
   const leftS = $derived(Math.max(0, (entry.expiresAt - now) / 1000));
-  // Audit R3 : l'heure réelle de la dernière lecture du serveur et le rythme des relectures
+  // L'heure réelle de la dernière lecture du serveur et le rythme des relectures
   // (REFRESH_MIN_MS), jamais « à l'instant » à côté d'un compteur qui peut dater de 5 min.
   const seen = $derived(
     new Date(entry.lastSeenAt).toDateString() === new Date(now).toDateString()
@@ -76,7 +76,7 @@
     // Carte ouverte : une relecture (au plus une fois toutes les 5 min, après une gigue).
     if (open && active) void onrefresh();
   }
-  // ---------- Renommer (19 novembre) : sur cet appareil seulement ----------
+  // ---------- Renommer : sur cet appareil seulement ----------
   let renaming = $state(false);
   let draft = $state("");
   let renameError = $state(false);

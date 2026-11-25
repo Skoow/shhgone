@@ -1,7 +1,7 @@
 // Preuve de travail anti-robot (UI §9.4.2), version minimale : un Worker dédié neuf cherche la
 // solution ; arrêt par `signal`. Son script est lu avec son empreinte et lancé depuis un Blob en
-// production (pow-source.verified.ts, spec §28.3, audit du 20 novembre W3).
-// Aucun repli (le repli reCAPTCHA, jamais construit, est retiré le 24 novembre) : le calcul va
+// production (pow-source.verified.ts, spec §28.3).
+// Aucun repli (le repli reCAPTCHA, jamais construit, est retiré) : le calcul va
 // jusqu'au bout, comme le prévoit la spécification.
 import type { CaptchaProof } from "../index";
 import { parseChallenge, payload } from "./search";

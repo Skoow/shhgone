@@ -1,7 +1,7 @@
-// Retours UI7 du propriétaire, sur le vrai serveur : libellé de format toujours DANS l'icône,
+// Retours UI7, sur le vrai serveur : libellé de format toujours DANS l'icône,
 // état de nettoyage dans la bulle du cadenas (étincelle, pastille ambre, rien), « Signaler »
 // seulement dans le pied de page (confirmation du partage ouvert), pied de page refait, Offres
-// (mensuel par abonnement, annuel au choix, carte bancaire ; crypto-monnaies retirées le 16 novembre). Captures fr-FR ×2 à 390 et 1440 px.
+// (mensuel par abonnement, annuel au choix, carte bancaire ; crypto-monnaies retirées). Captures fr-FR ×2 à 390 et 1440 px.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { axe, captureOf, expect, test } from "./fixtures";
@@ -9,7 +9,7 @@ import { file, freshPage, sendShare, settle, unlock } from "./open-helpers";
 import { cleanAll, openFilePicker } from "./send-helpers";
 import type { Page } from "@playwright/test";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-UI7/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/UI7/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 const row = (page: Page, name: string) => page.locator("[data-row]").filter({ hasText: name });
@@ -71,7 +71,7 @@ test("composeur : libellés dans l'icône, bulle du cadenas à deux lignes, éti
   await expect(row(page, "archive.zip").locator("[data-clean]")).toHaveCount(0);
   await expect(page.locator("[data-row]").getByText(/^(Original|Nettoyé|Non nettoyé|Archive laissée intacte)$/)).toHaveCount(0);
   // abime.jpg, budget-2026.xlsx (factice, 8 octets) : échecs ; image.webp (faux WebP) : format
-  // non pris en charge, dit dès l'ajout, compté à part (audit D5).
+  // non pris en charge, dit dès l'ajout, compté à part.
   await expect(page.locator("[data-unclean-sum]").filter({ visible: true }).locator("span")).toHaveText(["2\u202ffichiers n'ont pas pu être nettoyés", "1\u202ffichier ne peut pas être nettoyé (format non pris en charge)"]);
   await expect(row(page, "budget-2026.xlsx").locator('[data-clean="echec"]')).toBeVisible();
   // Tout reste dans les libellés : le nom du cadenas porte les deux lignes.
@@ -99,7 +99,7 @@ test("destinataire : plus de « Signaler » en haut ; le lien du pied ouvre la c
   await page.goto(sent.link);
   await unlock(page, sent.password);
   await expect(page.locator("li.row").filter({ hasText: "foret-brume.jpg" })).toBeVisible();
-  // 20 novembre : « Signaler ce partage » aussi sous le contenu, bien visible.
+  // « Signaler ce partage » aussi sous le contenu, bien visible.
   await expect(page.locator("main [data-report-visible]")).toBeVisible();
   const foot = page.locator("footer[data-foot]");
   await expect(foot).toBeVisible(); // téléphone compris : sinon plus aucun moyen de signaler
@@ -124,7 +124,7 @@ test("pied de page : logo au bord intérieur de l'en-tête, liens sans soulignem
   const foot = page.locator("footer[data-foot]");
   await foot.scrollIntoViewIfNeeded();
   const [fl, hl] = [await foot.locator(".foot-logo").boundingBox(), await page.locator("header a.logo").boundingBox()];
-  // Téléphone (< 900 px, retours du 15 novembre) : pied d'un seul bloc centré, logo au centre.
+  // Téléphone (< 900 px) : pied d'un seul bloc centré, logo au centre.
   if (w(isMobile) < 900) {
     const fb = (await foot.boundingBox())!;
     expect(Math.abs(fl!.x + fl!.width / 2 - (fb.x + fb.width / 2))).toBeLessThanOrEqual(1);

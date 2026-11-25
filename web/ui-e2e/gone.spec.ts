@@ -3,7 +3,7 @@
 //     fichier en cours est nommé et se termine (octets identiques), « Terminé » ;
 // (b) rien en cours : la page de fin ordinaire, sans nom ;
 // (c) destruction faite ici pendant un enregistrement : l'ouverture active garde sa grâce
-//     (Task M2) → le fichier se termine, octets identiques ;
+// → le fichier se termine, octets identiques ;
 // (d) suppression par l'expéditeur (lien de gestion) pendant un enregistrement : fermeture par
 //     la surveillance (410) en moins d'une seconde, le fichier se termine ; le lien ne s'ouvre plus ;
 // (e) grâce perdue : enregistrement en pause plus de 120 s après la suppression, puis repris

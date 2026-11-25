@@ -1,4 +1,4 @@
-// Build du cadre PDF isolé (UI §13, Task 22) : un script classique (IIFE) pdf-frame.js et
+// Build du cadre PDF isolé (UI §13) : un script classique (IIFE) pdf-frame.js et
 // pdf-frame.css, SANS empreinte dans le nom (servis avec CORP cross-origin par une liste fermée,
 // static.go), écrits à côté du site déjà construit (dist ou dist-demo).
 import { defineConfig } from "vite";

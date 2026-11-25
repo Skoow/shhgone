@@ -276,7 +276,7 @@ export const en = {
   "options.opens.count.other": "{n}\u00a0opens",
   "options.ttl.label": "Duration",
   "options.formule.label": "Plan for this share",
-  "options.formule.hint": "Plus and Pro use an anonymous token from your plan. Changing plan restarts the upload of files already added.",
+  "options.formule.hint": "Plus and Pro use one of the shares included in your plan. Changing plan restarts the upload of files already added.",
   "options.opens.label": "Opens",
   "options.pw.lead": "A password on top of the link.",
   "options.tries.one": "{n}\u00a0failed attempt and the share is destroyed.",
@@ -414,7 +414,7 @@ export const en = {
   "content.risky":
     "“{name}” can run code on your device. Only open it if you trust the sender.",
 
-  // Compte : profil, paramètres, suppression (lot 13).
+  // Compte : profil, paramètres, suppression.
   "account.settings.title": "Settings",
   "account.section.profile": "Profile",
   "account.section.devices": "Devices",
@@ -529,7 +529,7 @@ export const en = {
     "This share has been destroyed. It has been erased from the server. Anything you already saved on this device is not affected.",
 
   "err.limit": "Upload limit reached. Try again in {duration}.",
-  "err.limit.day": "Daily limit reached: {n}\u00a0shares per day from your connection. Try again in {duration}.",
+  "err.limit.day": "Daily limit reached: {n}\u00a0free shares per day from your connection. Try again in {duration}.",
   "err.limit.pending": "Another upload is already being prepared from your connection, in another tab for example ({n}\u00a0at most at a time). Finish or close it, then try again in {duration}.",
   "err.full": "The service is full right now. Try again later.",
   "err.interrupted": "The transfer was interrupted (the server may have restarted). Try again.",
@@ -539,8 +539,9 @@ export const en = {
   "err.captcha.local": "The bot check couldn't run on this device. Try again, or try from another browser.",
   "err.changed": "“{name}” was changed or moved during the upload. Delete it and add it again.",
   "err.element": "“{name}” could not be sent. Try again; if it happens again, remove it from this send.",
+  "err.included": "No share included in your plan is available right now (all used for this period, or the plan has ended). Try again later, or choose the free option for this share.",
   "err.unexpected": "An unexpected error stopped the upload. Try again.",
-  // ---------- Recipient (Tasks 20, 21, 23, 24) ----------
+  // ---------- Recipient ----------
   "open.title": "An encrypted share is waiting for you",
   "open.loading": "Reading the share…",
   "open.oneOpen.one": "Last open left; afterwards, coming back from this browser usually does not count another one, until it expires.",
@@ -662,7 +663,7 @@ export const en = {
   "gone.item.state": "File in progress allowed to finish",
   "gone.item.done": "Done",
   "gone.item.failed": "Download interrupted.",
-  // Page de contenu et listes compactes (Task R2).
+  // Page de contenu et listes compactes.
   "content.summary.one": "{n} item · {size} · about {time} to download (estimate)",
   "content.summary.other": "{n} items · {size} · about {time} to download (estimate)",
   "content.summary.view.one": "{n} item · {size}",
@@ -937,7 +938,7 @@ export const en = {
   "offers.means.crypto.sub": "One payment for the period",
   "offers.means.note": "You pay on the provider's secure page, never on Shhgone: we never see your card number.",
   "offers.account.body": "Your plan is kept in an optional account (no phone number), or set aside on this device. The account never sees your shares.",
-  "offers.summary.reserve": "Includes {n}\u00a0paid shares per 30\u00a0day period (opening calls in a room counts as one), reserve renewed at the start of each period: unused shares do not carry over.",
+  "offers.summary.reserve": "{n}\u00a0shares included per 30-day period (opening calls in a room counts as one), renewed at the start of each period: unused shares do not carry over.",
   "offers.summary.total": "Total",
   "offers.summary.crypto": "One payment for the chosen period; renew it yourself when it ends.",
   "offers.summary.pick": "Choose Plus or Pro to see the summary.",
@@ -997,7 +998,7 @@ export const en = {
   "offers.ret.none": "No order on this device",
   "offers.ret.none.body": "This page shows the result of a payment started on this device.",
   "offers.ret.back": "Back to plans",
-  "offers.keys.mismatch": "Warning: our server gave this device a token key different from the one it had announced to it for the same day. This could be used to recognise your paid shares: this device no longer creates any under that key. Your free shares are not affected. If this goes on, report it (contact in the legal notice).",
+  "offers.keys.mismatch": "Warning: our server gave this device a signing key different from the one it had announced to it for the same day. This could be used to recognise your paid shares: this device no longer creates any under that key. Your free shares are not affected. If this goes on, report it (contact in the legal notice).",
   "offers.ret.forget": "Forget this order",
   "offers.mine": "A plan is saved on this device.",
   "offers.mine.link": "See its status, stop renewal or download the sales receipt",
@@ -1186,7 +1187,7 @@ export const en = {
   "downloads.notice.on": "Keep them for 30\u00a0days",
   "downloads.keep.hint": "Off by default. When on, it keeps the name, size and time of saved files for 30\u00a0days, on this device only. Turning it off erases it all.",
   "downloads.until": "Available until {date}, then erased from the server",
-  // Compte (plan du compte, lot 10) : pages présentes seulement si __COMPTES__.
+  // Compte : pages présentes seulement si __COMPTES__.
   "title.compte": "Account",
   "title.inscription": "Create an account",
   "title.connexion": "Sign in",
@@ -1258,7 +1259,7 @@ export const en = {
   "report.cat.7.help": "Viruses, phishing, account theft",
   "report.cat.8.help": "Fraud, fake payment, impersonation",
   "report.cat.9.help": "Address, identity documents, private photos of someone else",
-  // Chat room (plan C-3)
+  // Chat room
   "title.salon": "Chat room",
   "title.salonnouveau": "Create a chat room",
   "salon.new.title": "Create a chat room",
@@ -1472,6 +1473,9 @@ export const en = {
   "salon.room.toolong.txt": "Send as a .txt file",
   "salon.room.toolong.json": "This message is too long once encrypted.",
   "salon.room.sys.invitation": "The invitation changed: new keys for everyone. The old link and the old password no longer work.",
+  "salon.fin.alerte.one": "The room closes in {n} minute. Everything in it will be erased.",
+  "salon.fin.alerte.other": "The room closes in {n} minutes. Everything in it will be erased.",
+  "salon.fin.rebours": "The room closes in {n} s",
   "salon.exclure": "Remove",
   "salon.exclure.nom": "Remove {nom}",
   "salon.exclure.confirm": "Remove {nom}? They keep what they have already seen, but will not be able to read the following messages. The invitation changes: the old link and the old password stop working.",
@@ -1547,7 +1551,7 @@ export const en = {
   "salon.piece.annuler": "Don't send",
   "salon.piece.err.indisponible": "File unavailable: it was removed or erased.",
   "salon.piece.err.lecture": "The file could not be opened. Try again.",
-  "salon.piece.err.relu": "You have reached your read limit for this file: the server no longer sends it to you. Ask the sender to send it again.",
+  "salon.piece.err.relu": "You have already downloaded this file: each participant can download it only once. Ask the sender to send it again.",
   "salon.piece.err.sortie": "This file has reached its download limit: the server no longer sends it. Ask the sender to send it again.",
   "salon.piece.err.trop_gros": "File too large: 500 MB at most per file.",
   "salon.piece.err.limite": "Slow down: try again in {duree}.",

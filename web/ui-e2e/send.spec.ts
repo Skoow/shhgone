@@ -6,7 +6,7 @@ import { NotFoundError, shareStatus } from "../src/index";
 import { capture, expect, test } from "./fixtures";
 import { addFile, addRealFile, addText, armed, noHScroll, readyHeading, sendButton, sleep } from "./send-helpers";
 
-const SEG = /\/api\/shares\/segments\/\d+(\?from=\d+)?$/; // plage de morceaux : ?from (audit H-2)
+const SEG = /\/api\/shares\/segments\/\d+(\?from=\d+)?$/; // plage de morceaux : ?from
 const MIB = 1048576;
 
 const stepItem = (page: Page, name: string) => page.getByRole("list", { name: "Étapes confirmées" }).getByRole("listitem").filter({ hasText: name });
@@ -55,10 +55,10 @@ test.describe("fr-FR", () => {
     test.setTimeout(120_000);
     // Premier PUT libre, les suivants retenus, puis finalize retenu : chaque phase reste affichée
     // jusqu'à ce que le test l'ait vue (des délais fixes laissaient WebKit, lent en CI, manquer
-    // la fenêtre de « Chiffrement et envoi » : CI du 11 novembre, 45 s au lieu de 15 à 20 s).
+    // la fenêtre de « Chiffrement et envoi » : CI s au lieu de 15 à 20 s).
     // Barrières posées AVANT les ajouts : le brouillon envoie chaque fichier dès son ajout
     // (spec §41.14) ; posées après, tout pouvait être déjà parti au clic, et l'écran passait
-    // directement à « Finalisation », à juste titre (CI du 12 novembre, webkit-desktop ;
+    // directement à « Finalisation », à juste titre (CI, webkit-desktop ;
     // reproduit sous Chromium avec 6 s d'attente entre les ajouts et les barrières).
     let openSegments!: () => void;
     const segmentsGate = new Promise<void>((r) => (openSegments = r));
@@ -117,7 +117,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator(".sealing")).not.toContainText("palier");
     openSegments();
 
-    // Finalisation retardée : « Envoyé » attend le lien (audit M12), « Prêt » (ancien « Scellé », 18 novembre) aussi ; aucun lien nulle part.
+    // Finalisation retardée : « Envoyé » attend le lien, « Prêt » (ancien « Scellé ») aussi ; aucun lien nulle part.
     await expect.poll(() => finalizing, { timeout: 30_000 }).toBe(true);
     await expect(page.getByRole("heading", { name: "Finalisation" })).toBeVisible();
     await expect(stepItem(page, "Chiffré sur cet appareil")).toHaveCount(1);
@@ -128,7 +128,7 @@ test.describe("fr-FR", () => {
     expect(await page.evaluate(() => location.hash)).toBe("");
     expect(await page.evaluate(() => document.body.innerText.includes("/#"))).toBe(false);
     await expect(readyHeading(page)).toHaveCount(0);
-    // Fermeture du sceau jouée PENDANT la finalisation (D2, décision du 13 novembre) : animations
+    // Fermeture du sceau jouée PENDANT la finalisation (D2) : animations
     // du trait lancées ; ni le mot « Scellé » ni le cadenas fermé avant le lien.
     await expect.poll(() => capsule.evaluate((e) => e.getAnimations({ subtree: true }).some((a) => ((a.effect as KeyframeEffect).target as Element | null)?.classList.contains("bar") === true))).toBe(true);
     await expect(capsule.locator(".sealed-word")).toHaveCount(0);
@@ -361,8 +361,8 @@ test.describe("fr-FR", () => {
         : route.continue(),
     );
     await sendButton(page).click();
-    // La règle d'abord (audit M14) : refus à la création au-delà de 60 s → quota du jour.
-    await expect(page.getByRole("alert")).toHaveText(/^Limite du jour atteinte\s: 10\spartages par jour depuis votre connexion\. Réessayez dans 2\smin\.$/, { timeout: 30_000 });
+    // La règle d'abord : refus à la création au-delà de 60 s → quota du jour.
+    await expect(page.getByRole("alert")).toHaveText(/^Limite du jour atteinte\s: 3\spartages gratuits par jour depuis votre connexion\. Réessayez dans 2\smin\.$/, { timeout: 30_000 });
     const retry = page.getByRole("button", { name: /^Réessayer dans \d/ });
     await expect(retry).toBeDisabled();
   });

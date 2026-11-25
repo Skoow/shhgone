@@ -1,4 +1,4 @@
-// Fin de vie chez le destinataire (Task 24, UI §9.8 pied, §9.10 ; benchmark M10, S4, M6) et
+// Fin de vie chez le destinataire (UI §9.8 pied, §9.10 ; benchmark M10, S4, M6) et
 // gestion minimale par l'expéditeur (UI §9.6), sur le vrai serveur.
 import { NotFoundError, fetchMeta } from "../src/index";
 import { axe, capture, expect, test } from "./fixtures";
@@ -26,9 +26,9 @@ test("Détruire (dernière ouverture permise) : pied séparé par un filet, conf
   expect(await eol.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe("solid");
   const destroy = page.getByRole("button", { name: "Détruire ce partage", exact: true });
   await expect(destroy).toHaveClass(/ghost/);
-  // Texte exact (audit I5 ; D42-22 : retour possible jusqu'à l'échéance, plus de suppression au départ).
+  // Texte exact (D42-22 : retour possible jusqu'à l'échéance, plus de suppression au départ).
   await expect(page.getByText("Personne d'autre ne pourra ouvrir ce partage. En général, vous pouvez y revenir depuis ce navigateur jusqu'à son échéance, puis il sera effacé du serveur. Vous pouvez aussi le détruire maintenant.")).toBeVisible();
-  // Dit aussi en haut de la page (audit I5).
+  // Dit aussi en haut de la page.
   await expect(page.locator("[data-last-top]")).toHaveText("Dernière ouverture\u202f: personne d'autre ne pourra l'ouvrir. En général, vous pouvez y revenir depuis ce navigateur jusqu'à l'échéance.");
 
   let release!: () => void;
@@ -103,13 +103,13 @@ test("Signaler : bouton visible sous le contenu, dix catégories, « Autre » pa
   page.on("request", (r) => {
     if (new URL(r.url()).pathname === "/api/shares/destroy") bodies.push(r.postData() ?? "");
   });
-  // 20 novembre : « Signaler ce partage » visible sous le contenu (et toujours dans le pied).
+  // « Signaler ce partage » visible sous le contenu (et toujours dans le pied).
   const visible = page.locator("[data-report-visible]");
   await expect(visible).toBeVisible();
   await visible.click();
   const sheet = page.getByRole("dialog", { name: "Signaler ce contenu" });
   await expect(sheet).toBeVisible();
-  // Lot 14 du compte : dix catégories en boutons radio, aucun champ libre ; « Autre » choisi d'avance.
+  // Dix catégories en boutons radio, aucun champ libre ; « Autre » choisi d'avance.
   expect(await sheet.getByRole("radio").count()).toBe(10);
   expect(await sheet.locator("textarea, select, input:not([type=radio])").count()).toBe(0);
   await expect(sheet.getByRole("radio", { name: /^Autre/ })).toBeChecked();

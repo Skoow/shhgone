@@ -2,7 +2,7 @@
 // toucher sessionStorage (source-rules.test.ts). Exception écrite à « aucun stockage
 // navigateur » : l'entrée est propre à l'onglet. Elle ne disparaît PAS forcément à sa
 // fermeture : Chromium l'écrit sur le disque du profil (« Session Storage ») et la rend à
-// l'onglet restauré (audit M2, constaté par persist.spec.ts) ; d'où RESTORE_MS. Elle contient
+// l'onglet restauré (constaté par persist.spec.ts) ; d'où RESTORE_MS. Elle contient
 // que K_lien (43 caractères, déjà dans le « # » du lien) et l'octroi : JAMAIS le mot de passe,
 // R, une clé de contenu ni le clair. Sans mot de passe, elle n'ouvre rien ; elle évite
 // seulement qu'un rechargement compte une ouverture de plus.
@@ -11,7 +11,7 @@ export const OPEN_GRANT_KEY = "shh.og";
 /** 30 min sans activité (clic, touche, défilement, visibilité) : l'entrée est effacée. */
 export const INACTIVITY_MS = 30 * 60_000;
 /**
- * Audit M2 : hors rechargement (onglet fermé puis restauré, retour arrière), l'entrée ne vaut que
+ * hors rechargement (onglet fermé puis restauré, retour arrière), l'entrée ne vaut que
  * 2 min après la dernière sortie de page (`last`, posé à pagehide) : un rechargement prend
  * moins, une réouverture plus tardive redemande une ouverture.
  */
@@ -122,7 +122,7 @@ export function startInactivityGuard(
 type Events = { addEventListener(ev: string, f: () => void, o?: AddEventListenerOptions): void; removeEventListener(ev: string, f: () => void, o?: AddEventListenerOptions): void };
 
 /**
- * Garde au niveau de l'application (audit web D2 du 13 novembre) : l'entrée de l'onglet, qui
+ * Garde au niveau de l'application : l'entrée de l'onglet, qui
  * contient K_lien, est effacée après INACTIVITY_MS sans activité, quel que soit l'écran (la garde
  * de l'écran de contenu s'arrête quand on le quitte). Une activité après l'échéance ne sauve pas
  * l'entrée. Tourne toute la vie de la page ; rend de quoi l'arrêter.

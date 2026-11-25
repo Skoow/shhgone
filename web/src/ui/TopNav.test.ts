@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Barre du haut (refonte du 12 novembre), ordinateur et tablette : menus déroulants en motif
+// Barre du haut, ordinateur et tablette : menus déroulants en motif
 // « disclosure » (bouton aria-expanded, liste de liens ou boutons), clavier (Entrée, Échap,
 // flèches, Tab), fermeture au clic extérieur ; « Envoyer ▾ » ouvre les gestes du composeur.
 import { presence } from "../history/presence.svelte";
@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("TopNav", () => {
-  it("menus, Salon bientôt, Offres, Mes partages (s'il y a des partages) ; plus de bouton « Partager » (17 novembre)", () => {
+  it("menus, Salon bientôt, Offres, Mes partages (s'il y a des partages) ; plus de bouton « Partager »", () => {
     presence.any = true;
     show();
     const nav = document.querySelector("nav")!;
@@ -151,7 +151,7 @@ describe("TopNav", () => {
   });
 });
 
-// Conception compte §21.15.1 (plan, lot 12) : connecté, « Mes partages » devient « Accueil » ;
+// Conception compte §21.15.1 : connecté, « Mes partages » devient « Accueil » ;
 // sans compte, rien ne change.
 describe("TopNav connecté", () => {
   it("« Accueil » (vers /) à la place de « Mes partages » tant qu'un compte est ouvert", async () => {

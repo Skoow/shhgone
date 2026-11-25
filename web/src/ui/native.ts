@@ -1,5 +1,5 @@
 // Gestes natifs du téléphone, toujours avec repli : vibration brève et feuille de partage.
-// D41-29 (décision du propriétaire, 9 novembre) : le partage natif reçoit le lien ET le mot de
+// D41-29 : le partage natif reçoit le lien ET le mot de
 // passe dans un même texte ; l'ouverture unique par défaut rend un vol visible (spec D41-29).
 
 type Nav = { vibrate?: (p: number) => boolean; share?: (d: { text: string }) => Promise<void> } | undefined;

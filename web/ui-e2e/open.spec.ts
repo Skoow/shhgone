@@ -1,4 +1,4 @@
-// Ouverture (Task 20, UI §9.7, §9.11, S4 ; benchmark M6, M9) sur le vrai serveur. L'expéditeur
+// Ouverture (UI §9.7, §9.11, S4 ; benchmark M6, M9) sur le vrai serveur. L'expéditeur
 // envoie dans un contexte à part ; le destinataire ouvre le lien dans la page gardée (CSP,
 // aucune requête hors de l'origine).
 import type { Page } from "@playwright/test";
@@ -41,8 +41,8 @@ test("mauvais mot de passe deux fois → « 3 essais restants », bon → conten
   await capsule.evaluate((el) => ((window as unknown as { __cap: Element }).__cap = el));
 
   // M9 : le geste irréversible annoncé avant, relié au bouton ; textes de confiance.
-  // Ruling 5 : ouvertures restantes lues par fetchMeta (partage à 3 ouvertures).
-  // Une ligne (audit M20).
+  // Ouvertures restantes lues par fetchMeta (partage à 3 ouvertures).
+  // Une ligne.
   const cost = "Ouvrir compte 1\u00a0ouverture sur les 3\u00a0restantes\u202f; ensuite, revenir depuis ce navigateur n'en compte en général pas d'autre, jusqu'à l'échéance.";
   await expect(page.getByText(cost)).toBeVisible();
   await expect(unlockButton(page)).toHaveAccessibleDescription(cost);
@@ -60,7 +60,7 @@ test("mauvais mot de passe deux fois → « 3 essais restants », bon → conten
   await expect(f).toHaveAttribute("autocapitalize", "off");
   await expect(f).toHaveAttribute("enterkeyhint", "go");
   expect(await page.locator("form").count()).toBe(0);
-  // Navigation privée (demande du propriétaire) : repliée, Safari, Chrome, Firefox.
+  // Navigation privée : repliée, Safari, Chrome, Firefox.
   await page.getByText("Pour laisser moins de traces, ouvrez ce lien en navigation privée").click();
   for (const b of ["Safari", "Chrome", "Firefox"]) await expect(page.getByText(new RegExp(`^${b}\\s:`))).toBeVisible();
   await settle(page);
@@ -116,7 +116,7 @@ test("cinq mauvais mots de passe → « Le partage a été détruit. », partage
     await unlockButton(page).click();
     if (k > 1) await expect(page.locator("#open-err").getByText(new RegExp(`Mot de passe incorrect · ${k}\\s(essai|essais) restants?`))).toBeVisible({ timeout: 20_000 });
   }
-  // Dernier essai : une seule ligne d'erreur (audit M20).
+  // Dernier essai : une seule ligne d'erreur.
   await expect(page.locator("#open-err p")).toHaveText(["Mot de passe incorrect · dernier essai\u202f: au prochain échec, le partage sera détruit."]);
   await pwField(page).fill("faux-0");
   await unlockButton(page).click();

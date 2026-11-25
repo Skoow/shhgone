@@ -143,7 +143,7 @@ export function engineWasm(base: string, demo: boolean): Plugin {
 }
 
 /**
- * Worker de la preuve de travail anti-robot (spec §28.3, audit du 20 novembre W3) : new Worker(url)
+ * Worker de la preuve de travail anti-robot (spec §28.3) : new Worker(url)
  * n'a pas de contrôle d'intégrité. ./pow-source, importé par un module de src/captcha/, est
  * remplacé par pow-source.verified.ts (production) ou pow-source.demo.ts (démo : preuve factice,
  * aucun Worker) ; tout autre chemin vers src/captcha/pow-source.ts arrête le build (son Worker
@@ -187,13 +187,13 @@ export function powWorker(base: string, demo: boolean): Plugin {
 }
 
 /**
- * Module WebAssembly du salon (engine/salon-wasm, Task 9 du salon), à part du moteur des partages.
+ * Module WebAssembly du salon (engine/salon-wasm, du salon), à part du moteur des partages.
  * ./source, importé par un module de src/salon/, est remplacé par source.verified.ts (production)
  * ou source.demo.ts (démo : seulement les règles du pseudo, pour le compte essayable) ; tout autre chemin vers src/salon/source.ts arrête le
  * build. Production : au premier import du module virtuel virtual:shh-salon (donc seulement si
- * une page importe src/salon/engine.ts), le .wasm est écrit sous assets/salon-EMPREINTE.wasm ;
+ * une page importe src/salon/engine.ts), .wasm est écrit sous assets/salon-EMPREINTE.wasm ;
  * son adresse et son empreinte SHA-384 vont dans le script, jamais ses octets (lu par fetch avec
- * `integrity` au premier besoin du salon). La colle de wasm-bindgen ne lit jamais le .wasm voisin
+ * `integrity` au premier besoin du salon). La colle de wasm-bindgen ne lit jamais .wasm voisin
  * (chemin par défaut remplacé par une erreur, comme pour le moteur). Contrôle : check-dist.mjs
  * (cité avec son empreinte, absent du script principal, au plus 430 000 octets en brotli).
  */
@@ -215,7 +215,7 @@ export function salonWasm(base: string, demo: boolean): Plugin {
       if (id.replace(/\\/g, "/").endsWith("/src/salon/source.ts")) this.error("shh-salon : src/salon/source.ts (lecture sans empreinte) n'entre jamais dans un build");
       if (id !== "\0" + VIRTUAL) return null;
       const wasm = readFileSync(join(here, "src/salon/pkg/shhdrop_salon_wasm_bg.wasm"));
-      // Démo (compte essayable, 19 novembre) : sa CSP (connect-src 'none') interdit de lire un
+      // Démo (compte essayable) : sa CSP (connect-src 'none') interdit de lire un
       // .wasm ; le module est donc en base64, dans un morceau que source.demo.ts charge à part,
       // au premier besoin (le pseudo de l'inscription), jamais avec les pages de partage.
       if (demo) return `export const wasm = ${JSON.stringify(wasm.toString("base64"))};`;
@@ -352,7 +352,7 @@ export function demoMeta(): Plugin {
 }
 
 /**
- * Pages séparées (conception du 16 novembre) : chaque page d'information a son propre fichier
+ * Pages séparées : chaque page d'information a son propre fichier
  * HTML (securite.html, offres.html…), copié du gabarit page.html, avec son titre, sa description,
  * son adresse canonique et son contenu déjà écrits (rendu Svelte côté serveur, en français, par
  * src/pages/prerender.ts). Le script de ces pages (src/pages/main.ts) ne contient ni composeur,
@@ -383,7 +383,7 @@ export function infoPages(base: string, demo: boolean): Plugin {
         const sansEn = rest === "/en" ? "/" : rest.startsWith("/en/") ? rest.slice(3) : rest;
         if ((PAGE_PATHS as readonly string[]).includes(sansEn.replace(/\.html$/, ""))) req.url = base + "page.html";
         else if (rest === "/en") req.url = base;
-        // Liens sous « /s » (16 novembre) : la page d'ouverture et de gestion.
+        // Liens sous « /s » : la page d'ouverture et de gestion.
         else if (rest === "/s") req.url = base + "s.html";
         next();
       });
@@ -420,7 +420,7 @@ export function infoPages(base: string, demo: boolean): Plugin {
             if (/\b(?:href|src)="[^"]*\/src\//.test(body)) throw new Error(`pages séparées : ${file} cite encore /src/`);
             return body;
           };
-          // Pages bilingues (20 novembre, app/langues.ts) : hors démo, chaque page indexée a sa
+          // Pages bilingues (app/langues.ts) : hors démo, chaque page indexée a sa
           // version anglaise « /en… » ; les deux se citent (hreflang fr, en, x-default = fr).
           const enPath = (path: string) => (path === "/" ? "/en" : "/en" + path);
           const robots = (path: string | undefined, lang: "fr" | "en" = "fr") =>
@@ -440,14 +440,14 @@ export function infoPages(base: string, demo: boolean): Plugin {
             if (!out.includes(`<html lang="${lang}"`)) throw new Error("pages séparées : <html lang> introuvable");
             return out;
           };
-          // Accueil (18 novembre, référencement) : son contenu écrit dans index.html, entre deux
+          // Accueil (référencement) : son contenu écrit dans index.html, entre deux
           // repères (le 404, copié d'index.html, les retire : shh-404).
           {
             const indexFile = join(outDir, "index.html");
             // app.html : la même page sans l'accueil écrit, servie pour les autres adresses de
             // l'application (« /envoyer », « /envois »…) et le 404 (serveur Go, static.go) :
             // l'accueil ne s'y affiche jamais avant le script.
-            // « noindex » (audit du 20 novembre) : ni l'envoi, ni un partage, ni le 404 ne sont des pages à indexer.
+            // « noindex » : ni l'envoi, ni un partage, ni le 404 ne sont des pages à indexer.
             // Squelette (U13) : la coque sans contenu (ambiance et logo visibles, le reste caché par
             // base.css tant que #app porte data-squelette), au lieu d'un écran vide avant le script.
             const appHtml = readFileSync(indexFile, "utf8");
@@ -493,12 +493,11 @@ export function infoPages(base: string, demo: boolean): Plugin {
 }
 
 /**
- * Version du site affichée dans le pied de page (retours UI5) : hash court du commit, sans
+ * Version du site affichée dans le pied de page : hash court du commit, sans
  * secret. SHH_BUILD_ID (CI, image Docker) sinon `git rev-parse --short=7 HEAD` ; 7 à 40 chiffres
  * hexadécimaux, ramenés à 7. Même commit, même valeur : la construction reste reproductible
  * (spec §28).
- * Build (`vite build`, production comme démo) : sans identifiant valide, le build ÉCHOUE (audit du
- * 11 novembre, I6 : une image marquée « dev » ne pourrait jamais correspondre au build public).
+ * Build (`vite build`, production comme démo) : sans identifiant valide, le build ÉCHOUE (une image marquée « dev » ne pourrait jamais correspondre au build public).
  * « dev » seulement pour `vite dev` et les tests (command « serve »).
  */
 export function buildId(command: "build" | "serve"): string {
@@ -551,21 +550,21 @@ export function precompress(): Plugin {
 }
 
 /**
- * Compte par e-mail (plan du compte, lot 9) : drapeau de construction __COMPTES__, `false` par
+ * Compte par e-mail : drapeau de construction __COMPTES__, `false` par
  * défaut en production. Vrai si SHH_SITE_COMPTES vaut exactement « 1 » au build de production, et
- * toujours dans la démo (19 novembre : son faux serveur du compte répond dans l'onglet). Faux, aucun écran n'importe src/account/ (source-rules.test.ts) :
+ * toujours dans la démo (son faux serveur du compte répond dans l'onglet). Faux, aucun écran n'importe src/account/ (source-rules.test.ts) :
  * aucun code du compte dans le site (contrôle : scripts/check-dist.mjs sans --comptes).
- * Activation publique : décision D8 du propriétaire (conception du compte §20), avec SHH_COMPTES=1
+ * Activation publique : décision D8 (conception du compte §20), avec SHH_COMPTES=1
  * côté serveur.
  */
 export function comptesActifs(demo: boolean): boolean {
-  // Démo : toujours (propriétaire, 19 novembre : connexion essayable ; faux serveur du compte de
+  // Démo : toujours (connexion essayable ; faux serveur du compte de
   // l'onglet, src/demo/fake-compte.ts, aucun e-mail envoyé).
   return demo || process.env.SHH_SITE_COMPTES === "1";
 }
 
 /**
- * Pages du compte (plan du compte, lot 10) : App.svelte ne les voit que par
+ * Pages du compte : App.svelte ne les voit que par
  * src/routes/compte/pages.ts. Sans __COMPTES__ (défaut, démo), ce module est remplacé par
  * pages.off.ts (aucune page, aucun import) : ni le module de compte, ni le moteur du salon qu'il
  * charge n'entrent dans le graphe du site (check-dist.mjs : aucune trace du compte ; la démo
@@ -585,7 +584,7 @@ export function comptesPages(actifs: boolean): Plugin {
 }
 
 /**
- * Salon (plan C-3) : drapeau de construction __SALONS__. Vrai en production avec le compte
+ * Salon : drapeau de construction __SALONS__. Vrai en production avec le compte
  * (SHH_SITE_COMPTES=1 : créer un salon exige un compte, D42-26) ; toujours faux dans la démo
  * (GitHub Pages n'a pas de serveur du salon : le salon y reste « bientôt », sans faux serveur).
  */
@@ -594,7 +593,7 @@ export function salonsActifs(demo: boolean): boolean {
 }
 
 /**
- * Écrans du salon (plan C-3) : App.svelte ne les voit que par src/routes/salon/pages.ts. Sans
+ * Écrans du salon : App.svelte ne les voit que par src/routes/salon/pages.ts. Sans
  * __SALONS__, ce module est remplacé par pages.off.ts : ni écran, ni client, ni WebSocket.
  */
 export function salonPages(actifs: boolean): Plugin {

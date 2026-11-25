@@ -1,6 +1,6 @@
 <script lang="ts">
   // Feuille « Ajouter » (téléphone) : une liste façon app native : Photo ou vidéo (caméra
-  // intégrée, qui mène aussi à la galerie), Vocal, Note, Fichiers, et Salon (bientôt, 17 novembre). Icône maison, action,
+  // intégrée, qui mène aussi à la galerie), Vocal, Note, Fichiers, et Salon (bientôt). Icône maison, action,
   // précision honnête. Rien n'est en double.
   import { flushSync } from "svelte";
   import type { AddAction, AddId } from "../flows/add-actions";
@@ -44,7 +44,7 @@
       </li>
     {/each}
   </ul>
-  <!-- Limites gratuites, aussi sur téléphone (retours UI5) : la zone de dépôt ne s'y affiche pas. -->
+  <!-- Limites gratuites, aussi sur téléphone : la zone de dépôt ne s'y affiche pas. -->
   <p class="lim num" data-limits>{t("compose.drop.limit", limitParams(getLang()))}</p>
 </Sheet>
 

@@ -1,5 +1,5 @@
-// Suppression totale du compte (conception compte §21.12 ; décision du propriétaire du 14 novembre,
-// « suppression simplifiée » ; plan, lot 13). On supprime ce dont la personne est l'auteur ou
+// Suppression totale du compte (conception compte §21.12 ;
+// « suppression simplifiée »). On supprime ce dont la personne est l'auteur ou
 // l'admin, et rien de plus n'est promis :
 // (1) partages créés : chaque secret de gestion connu (coffre privé ET historique de l'appareil)
 //     est rejoué par POST /api/manage/destroy, un par un, SANS le jeton de session (aucun lien

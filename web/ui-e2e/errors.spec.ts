@@ -39,10 +39,10 @@ test.describe("pages d'erreur", () => {
   test("hors ligne : aucune requête, puis relance d'office au retour du réseau", async ({ page, shh, context }) => {
     const api: string[] = [];
     page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/api/") && api.push(r.url())));
-    // Page d'ouverture « /s » déjà chargée (16 novembre) ; le lien y est collé hors ligne.
+    // Page d'ouverture « /s » déjà chargée ; le lien y est collé hors ligne.
     await page.goto(shh.origin + "/s");
     await context.setOffline(true);
-    // La page montre « / » (adresse montrée, 17 novembre) : le lien est collé sous « /s ».
+    // La page montre « / » (adresse montrée) : le lien est collé sous « /s ».
     await page.evaluate((k) => {
       history.replaceState(null, "", "/s");
       location.hash = k;

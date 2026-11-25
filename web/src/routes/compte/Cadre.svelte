@@ -1,6 +1,6 @@
 <script lang="ts">
   // Cadre des pages du compte (conception compte §12, §21.15) : colonne centrée de 28 rem au plus,
-  // titre de l'écran (focus à l'arrivée), sous-titre, contenu. 20 novembre (propriétaire : « une
+  // titre de l'écran (focus à l'arrivée), sous-titre, contenu. (« une
   // forme jolie ») : une carte arrondie, lueur menthe en haut, titre et sous-titre centrés.
   // Démo : la phrase de la démo (aucune passkey créée, compte de cet onglet seulement) sous le titre.
   import { untrack, type Snippet } from "svelte";
@@ -77,7 +77,7 @@
   .cadre :global(.liens.split) {
     justify-content: space-between;
   }
-  /* Liens en blanc, sans soulignement (propriétaire, 20 novembre) ; menthe au survol et au focus. */
+  /* Liens en blanc, sans soulignement ; menthe au survol et au focus. */
   .cadre :global(.liens a),
   .cadre :global(a.lien),
   .cadre :global(a.lien-t) {
@@ -101,7 +101,7 @@
     outline-offset: 2px;
     border-radius: 4px;
   }
-  /* Lien dans une phrase (« conditions d'utilisation ») : blanc et souligné (20 novembre) ;
+  /* Lien dans une phrase (« conditions d'utilisation ») : blanc et souligné ;
      hauteur de la ligne, pas de cible de 44 px qui décale le texte. */
   .cadre :global(a.lien-t) {
     position: relative;
@@ -111,7 +111,7 @@
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
   }
-  /* Zone tactile de 44 px de haut (revue du 20 novembre, U20) sans décaler le texte : un
+  /* Zone tactile de 44 px de haut sans décaler le texte : un
      pseudo-élément transparent déborde de la ligne, au-dessus et au-dessous. */
   .cadre :global(a.lien-t::after) {
     content: "";

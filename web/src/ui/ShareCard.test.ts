@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Carte de « Mes partages » (audit R3) : l'heure de la dernière lecture du serveur est dite telle
+// Carte de « Mes partages » : l'heure de la dernière lecture du serveur est dite telle
 // quelle, avec le rythme des relectures ; jamais « à l'instant » à côté d'un compteur qui peut
 // dater de 5 minutes.
 import { flushSync, mount, unmount } from "svelte";
@@ -43,7 +43,7 @@ const render = (e: HistoryEntry, now: number, compact: boolean) => {
   return document.querySelector("[data-seen]")?.textContent ?? "";
 };
 
-describe("ShareCard : dernière lecture (audit R3)", () => {
+describe("ShareCard : dernière lecture", () => {
   it("heure réelle de la lecture et rythme des relectures, en français et en anglais ; jamais « à l'instant »", () => {
     setLang("fr");
     const fr = render(entry(), T, true);
@@ -62,7 +62,7 @@ describe("ShareCard : dernière lecture (audit R3)", () => {
   });
 });
 
-// Titre du partage (19 novembre) : en tête de la carte, texte brut isolé ; renommer sur cet appareil
+// Titre du partage : en tête de la carte, texte brut isolé ; renommer sur cet appareil
 // seulement (l'écran le dit) ; sans `onrename` (accueil), pas de renommage.
 describe("ShareCard : titre du partage", () => {
   const mountCard = (e: HistoryEntry, onrename?: (s: string) => Promise<boolean>, compact = false) => {

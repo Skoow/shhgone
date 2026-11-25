@@ -277,7 +277,7 @@ export const fr = {
   "options.opens.count.other": "{n}\u202fouvertures",
   "options.ttl.label": "Durée",
   "options.formule.label": "Formule de ce partage",
-  "options.formule.hint": "Plus et Pro utilisent un jeton anonyme de votre offre. Changer de formule recommence l'envoi des fichiers déjà ajoutés.",
+  "options.formule.hint": "Plus et Pro utilisent un des partages inclus dans votre offre. Changer de formule recommence l'envoi des fichiers déjà ajoutés.",
   "options.opens.label": "Ouvertures",
   "options.pw.lead": "Un mot de passe en plus du lien.",
   "options.tries.one": "{n}\u202fessai raté, et le partage est détruit.",
@@ -416,7 +416,7 @@ export const fr = {
   "content.risky":
     "«\u00a0{name}\u00a0» peut exécuter du code sur votre appareil. N'ouvrez ce fichier que si vous faites confiance à l'expéditeur.",
 
-  // Compte : profil, paramètres, suppression (lot 13).
+  // Compte : profil, paramètres, suppression.
   "account.settings.title": "Paramètres",
   "account.section.profile": "Profil",
   "account.section.devices": "Appareils",
@@ -492,7 +492,7 @@ export const fr = {
   "account.delete.failed.other": "{n} partages n'ont pas pu être détruits : ils s'effaceront à leur échéance.",
   "account.delete.back": "Retour aux paramètres",
   "account.delete.home": "Retour à l'accueil",
-  // Signalement par catégorie (conception compte §21.10, §21.15.7 ; lot 14).
+  // Signalement par catégorie (conception compte §21.10, §21.15.7).
   "report.question": "Que se passe-t-il\u202f?",
   "report.continue": "Continuer",
   "report.change": "Modifier",
@@ -531,7 +531,7 @@ export const fr = {
     "Ce partage a été détruit. Il a été effacé du serveur. Ce que vous avez déjà enregistré sur cet appareil n'est pas concerné.",
 
   "err.limit": "Limite d'envois atteinte. Réessayez dans {duration}.",
-  "err.limit.day": "Limite du jour atteinte\u202f: {n}\u202fpartages par jour depuis votre connexion. Réessayez dans {duration}.",
+  "err.limit.day": "Limite du jour atteinte\u202f: {n}\u202fpartages gratuits par jour depuis votre connexion. Réessayez dans {duration}.",
   "err.limit.pending": "Un autre envoi est déjà en préparation depuis votre connexion, dans un autre onglet par exemple ({n}\u202fau plus à la fois). Terminez-le ou fermez-le, puis réessayez dans {duration}.",
   "err.full": "Le service est plein pour le moment. Réessayez plus tard.",
   "err.interrupted": "Le transfert a été interrompu (le serveur a peut-être redémarré). Réessayez.",
@@ -541,8 +541,9 @@ export const fr = {
   "err.captcha.local": "La vérification anti-robot n'a pas pu se faire sur cet appareil. Réessayez, ou essayez depuis un autre navigateur.",
   "err.changed": "« {name} » a été modifié ou déplacé pendant l'envoi. Supprimez-le et ajoutez-le à nouveau.",
   "err.element": "« {name} » n'a pas pu être envoyé. Réessayez\u202f; si cela recommence, retirez-le de l'envoi.",
+  "err.included": "Aucun partage inclus dans votre offre n'est disponible pour le moment (tous utilisés pour cette période, ou offre arrêtée). Réessayez plus tard, ou choisissez la formule gratuite pour ce partage.",
   "err.unexpected": "Une erreur inattendue a interrompu l'envoi. Réessayez.",
-  // ---------- Destinataire (Tasks 20, 21, 23, 24) ----------
+  // ---------- Destinataire ----------
   "open.title": "Un partage chiffré vous attend",
   "open.loading": "Lecture du partage…",
   "open.oneOpen.one": "Dernière ouverture possible\u202f; ensuite, revenir depuis ce navigateur n'en compte en général pas d'autre, jusqu'à l'échéance.",
@@ -665,7 +666,7 @@ export const fr = {
   "gone.item.state": "Fichier en cours autorisé à se terminer",
   "gone.item.done": "Terminé",
   "gone.item.failed": "Téléchargement interrompu.",
-  // Page de contenu et listes compactes (Task R2).
+  // Page de contenu et listes compactes.
   "content.summary.one": "{n}\u202félément · {size} · environ {time} à télécharger (estimation)",
   "content.summary.other": "{n}\u202féléments · {size} · environ {time} à télécharger (estimation)",
   "content.summary.view.one": "{n}\u202félément · {size}",
@@ -941,7 +942,7 @@ export const fr = {
   "offers.means.note": "Le paiement se fait sur la page sécurisée du prestataire, jamais sur Shhgone\u202f: nous ne voyons jamais votre numéro de carte.",
   "offers.account.body": "Votre offre se range dans un compte facultatif (sans numéro de téléphone), ou se garde à part sur cet appareil. Le compte ne voit jamais vos partages.",
   "offers.summary.total": "Total",
-  "offers.summary.reserve": "Comprend {n}\u202fpartages payants par période de 30\u202fjours (ouvrir les appels d'un salon en compte un), réserve remise à neuf au début de chaque période\u202f: les partages non utilisés ne se reportent pas.",
+  "offers.summary.reserve": "{n}\u202fpartages inclus par période de 30\u202fjours (ouvrir les appels d'un salon en compte un), remis à neuf au début de chaque période\u202f: les partages non utilisés ne se reportent pas.",
   "offers.summary.crypto": "Paiement unique pour la période choisie\u202f; à renouveler vous-même à l'échéance.",
   "offers.summary.pick": "Choisissez Plus ou Pro pour voir le récapitulatif.",
   "offers.summary.label": "Récapitulatif",
@@ -1000,7 +1001,7 @@ export const fr = {
   "offers.ret.none": "Aucune commande sur cet appareil",
   "offers.ret.none.body": "Cette page affiche le résultat d'un paiement commencé sur cet appareil.",
   "offers.ret.back": "Revenir aux offres",
-  "offers.keys.mismatch": "Attention : notre serveur a donné à cet appareil une clé de jetons différente de celle qu'il lui avait annoncée pour le même jour. Cela peut servir à reconnaître vos partages payants : cet appareil n'en crée plus sous cette clé. Vos partages gratuits ne sont pas touchés. Si cela dure, signalez-le (contact des mentions légales).",
+  "offers.keys.mismatch": "Attention : notre serveur a donné à cet appareil une clé de signature différente de celle qu'il lui avait annoncée pour le même jour. Cela peut servir à reconnaître vos partages payants : cet appareil n'en crée plus sous cette clé. Vos partages gratuits ne sont pas touchés. Si cela dure, signalez-le (contact des mentions légales).",
   "offers.ret.forget": "Oublier cette commande",
   "offers.mine": "Une offre est gardée sur cet appareil.",
   "offers.mine.link": "Voir son état, arrêter le renouvellement ou télécharger la note de vente",
@@ -1189,7 +1190,7 @@ export const fr = {
   "downloads.notice.on": "Les garder 30\u202fjours",
   "downloads.keep.hint": "Désactivé par défaut. Activé, il garde 30\u202fjours le nom, la taille et l'heure des fichiers enregistrés, sur cet appareil seulement. Le désactiver efface tout.",
   "downloads.until": "Disponible jusqu'au {date}, puis effacé du serveur",
-  // Compte (plan du compte, lot 10 ; conception compte §12, §21.3, §21.15) : pages présentes
+  // Compte (conception compte §12, §21.3, §21.15) : pages présentes
   // seulement si __COMPTES__. Textes d'erreur exacts de §12.1, §12.2, §21.2.4, §21.3, §21.15.
   "title.compte": "Compte",
   "title.inscription": "Créer un compte",
@@ -1262,7 +1263,7 @@ export const fr = {
   "report.cat.7.help": "Virus, hameçonnage, vol de comptes",
   "report.cat.8.help": "Escroquerie, faux paiement, usurpation",
   "report.cat.9.help": "Adresse, documents d'identité, photos privées d'un tiers",
-  // Salon (plan C-3 : création, entrée, explication, conversation)
+  // Salon (création, entrée, explication, conversation)
   "title.salon": "Salon",
   "title.salonnouveau": "Créer un salon",
   "salon.new.title": "Créer un salon",
@@ -1476,6 +1477,9 @@ export const fr = {
   "salon.room.toolong.txt": "Envoyer en fichier .txt",
   "salon.room.toolong.json": "Ce message est trop long une fois chiffré.",
   "salon.room.sys.invitation": "L'invitation a changé : nouvelles clés pour tous. L'ancien lien et l'ancien mot de passe ne fonctionnent plus.",
+  "salon.fin.alerte.one": "Le salon se ferme dans {n} minute. Tout ce qu'il contient sera effacé.",
+  "salon.fin.alerte.other": "Le salon se ferme dans {n} minutes. Tout ce qu'il contient sera effacé.",
+  "salon.fin.rebours": "Le salon se ferme dans {n} s",
   "salon.exclure": "Exclure",
   "salon.exclure.nom": "Exclure {nom}",
   "salon.exclure.confirm": "Exclure {nom} ? Elle ou il garde ce qui a déjà été vu, mais ne pourra plus lire les messages suivants. L'invitation change : l'ancien lien et l'ancien mot de passe ne marchent plus.",
@@ -1552,7 +1556,7 @@ export const fr = {
   "salon.piece.err.indisponible": "Fichier indisponible\u202f: il a été retiré ou effacé.",
   "salon.piece.err.lecture": "Le fichier n'a pas pu être ouvert. Réessayez.",
   "salon.piece.err.sortie": "Ce fichier a atteint sa limite de téléchargement\u202f: le serveur n'en envoie plus rien. Demandez à l'expéditeur de l'envoyer à nouveau.",
-  "salon.piece.err.relu": "Vous avez atteint votre limite de lecture pour ce fichier\u202f: le serveur ne vous l'envoie plus. Demandez à l'expéditeur de l'envoyer à nouveau.",
+  "salon.piece.err.relu": "Vous avez déjà téléchargé ce fichier\u202f: chaque participant ne peut le télécharger qu'une fois. Demandez à l'expéditeur de l'envoyer à nouveau.",
   "salon.piece.err.trop_gros": "Fichier trop lourd : 500 Mo au plus par fichier.",
   "salon.piece.err.limite": "Doucement : réessayez dans {duree}.",
   "salon.piece.err.budget": "Le salon est plein : 2 Go atteints.",

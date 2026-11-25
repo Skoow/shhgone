@@ -225,7 +225,7 @@ describe("S16 : émission en avance, à une heure aléatoire", () => {
   });
 });
 
-// État du pass gardé sur l'appareil (signalement du 22 novembre, S16 suite) : POST /etat (avec P)
+// État du pass gardé sur l'appareil (signalement, S16 suite) : POST /etat (avec P)
 // une fois par jour UTC et par pass, ou après un événement qui le change, pas à chaque chargement.
 describe("état du pass gardé jusqu'au lendemain UTC", () => {
   const etats = (appels: string[]) => appels.filter((a) => a.endsWith("/api/paiement/etat")).length;

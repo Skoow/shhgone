@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Pièce d'un message (spec §39.5, v3 §4.4 ; plan C-4) : image et vocal de 16 Mo au plus
+  // Pièce d'un message (spec §39.5, v3 §4.4) : image et vocal de 16 Mo au plus
   // affichés d'office, vidéo au clic, tout fichier « Enregistrer » (octets bruts, nom nettoyé par
   // le moteur). Jamais de SVG ni de type hors liste dans la page ; adresses blob: révoquées à
   // l'effacement, au retrait et à la fin du salon (salon.svelte.ts).
@@ -67,10 +67,10 @@
   {#if erreur}<p class="err" role="status">{t(`salon.piece.err.${erreur === "indisponible" || erreur === "sortie" || erreur === "relu" ? erreur : "lecture"}`)}</p>{/if}
   <div class="acts">
     {#if p.sorte === "video" && !url && p.ref}
-      <Button variant="secondary" dense onpress={() => S.afficherPiece(b)}>{t("salon.piece.lire")}</Button>
+      <Button variant="secondary" dense busy={S.pieces.lecture[b.cle] === true} onpress={() => S.afficherPiece(b)}>{t("salon.piece.lire")}</Button>
     {/if}
     {#if p.ref || b.moi}
-      <Button variant="ghost" dense onpress={() => S.enregistrerPiece(b)}>{t("salon.piece.enregistrer")}</Button>
+      <Button variant="ghost" dense busy={S.pieces.lecture[b.cle] === true} onpress={() => S.enregistrerPiece(b)}>{t("salon.piece.enregistrer")}</Button>
     {/if}
   </div>
 </div>

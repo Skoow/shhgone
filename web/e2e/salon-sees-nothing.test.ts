@@ -1,4 +1,4 @@
-// « Le serveur ne voit rien », étendu au salon (plan C-2 Task 17, spec §14, §39.3.8, v3 §5.1) —
+// « Le serveur ne voit rien », étendu au salon (spec §14, §39.3.8, v3 §5.1) —
 // CE TEST BLOQUE TOUTE MISE EN LIGNE.
 // Trois clients (vrai moteur du salon, vrai binaire Go) échangent un profil (pseudonyme et
 // avatar), un texte, un fichier, un vocal et une réaction, tous porteurs de repères. On fouille
@@ -109,7 +109,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
   // Clés SFrame (exportées de l'état MLS) de chaque époque traversée, par client. Le moteur
   // n'expose ni la clé privée de signature ni la clé HPKE de la feuille (aucune API, même en
   // test) : elles ne sont donc pas cherchées ici ; seule la clé exportée de chaque époque l'est,
-  // comme témoin de l'état MLS. Limite du test, notée dans le rapport de la Task 17.
+  // comme témoin de l'état MLS. Limite du test, notée dans le rapport de la.
   const sframes = new Map<string, { label: string; cle: Uint8Array }>();
   function releverSframe(moment: string) {
     for (const x of clients) {
@@ -326,7 +326,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
     const taille = conversations[0]!.length;
     expect(taille).toBeGreaterThan(0);
     // Le fichier grandit par paliers de 64 emplacements de 4 168 octets, remplis d'aléa à leur
-    // création (audit adverse du 13 novembre, stockage, F4) : sa taille ne donne plus le nombre
+    // création (stockage, F4) : sa taille ne donne plus le nombre
     // de trames, seulement le nombre de paliers entamés.
     expect(taille % PALIER).toBe(0);
     expect(fenetresCommunes(trames(), conversations)).toBe(0);
@@ -370,7 +370,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
     expect(findIn(Buffer.concat([Buffer.alloc(5), be]), [heure("témoin", ms)])).toEqual(["témoin"]);
   });
 
-  it("base : salons n'a que les colonnes de §39.3.5, sqlite_master que les noms de la Task 4", () => {
+  it("base : salons n'a que les colonnes de §39.3.5, sqlite_master que les noms de la", () => {
     const s = instantanes["salon vivant"]!;
     expect(s.master).toEqual([
       "index:salon_pieces_salon",
@@ -477,7 +477,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
   });
 });
 
-// Renouvellement (spec 2026-11-13, révision du 13 novembre) : « prolonger = renouveler », toute la
+// Renouvellement (spec 2026-11-13, révision) : « prolonger = renouveler », toute la
 // conversation est effacée, les membres restent. Après lui, aucun repère d'avant ne reste sur le
 // disque : ni fenêtre de 32 octets de l'ancien fichier de conversation (chiffré sous l'ancienne
 // clé), ni contenu chiffré d'une pièce, ni ligne de pièce, ni budget ; témoins : ces mêmes

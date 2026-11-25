@@ -1,4 +1,4 @@
-// Réparation des enveloppes PRF (décision du propriétaire, 22 novembre ; conception du compte par
+// Réparation des enveloppes PRF (conception du compte par
 // passkey §5.3, §17, R6, R10). Une même passkey peut rendre une autre sortie PRF selon le chemin
 // (QR hybride), la version d'iOS ou après un changement de gestionnaire : aucune de ses
 // enveloppes ne s'ouvre alors. Quand K_compte a été obtenue autrement (clé locale de l'appareil,

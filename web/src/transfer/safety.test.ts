@@ -1,4 +1,4 @@
-// Audit M4 : nom et type MIME du manifeste rendus bruts.
+// Nom et type MIME du manifeste rendus bruts.
 import { describe, expect, it } from "vitest";
 import type { ManifestEntry } from "../engine/pure";
 import { isRiskyName, previewKindOf, safeName } from "./safety";
@@ -58,7 +58,7 @@ describe("safeName", () => {
     expect(safeName("👩\u200Db")).toBe("👩b"); // après : pas un emoji
     expect(safeName("👩\u200D\u200D👧")).toBe("👩👧"); // deux ZWJ de suite
   });
-  it("retire tout caractère ignorable par défaut ; U+FE0F gardé seulement après un emoji (revue M, m1)", () => {
+  it("retire tout caractère ignorable par défaut ; U+FE0F gardé seulement après un emoji", () => {
     expect(safeName("x.ex\uFE00e")).toBe("x.exe");
     expect(safeName("x.ex\uFE0Fe")).toBe("x.exe"); // sélecteur de variante après une lettre
     expect(safeName("doc\u3164\u3164\uFFA0\u115F\u1160.pdf")).toBe("doc.pdf"); // remplissages hangul
@@ -67,7 +67,7 @@ describe("safeName", () => {
     expect(safeName(family)).toBe(family);
     expect(safeName("❤\uFE0F.txt")).toBe("❤\uFE0F.txt");
   });
-  it("jamais de point initial après la coupe : repli « fichier » devant l'extension (revue M, I1)", () => {
+  it("jamais de point initial après la coupe : repli « fichier » devant l'extension", () => {
     const hostile = "a" + "\u0301".repeat(200) + ".exe"; // un seul graphème de 201 points de code
     expect(safeName(hostile)).toBe("fichier.exe");
     expect(isRiskyName(safeName(hostile))).toBe(true);
@@ -101,7 +101,7 @@ describe("previewKindOf", () => {
     for (const m of ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/heic"]) {
       expect(previewKindOf(file("x", m)), m).toBe("image");
     }
-    // Scan de sécurité du 7 novembre : rien qui puisse porter un script n'est jamais affiché
+    // Scan de sécurité : rien qui puisse porter un script n'est jamais affiché
     // (SVG, HTML, XML et variantes) : téléchargement seulement.
     for (const m of ["image/svg+xml", "IMAGE/SVG+XML", "image/svg+xml; charset=utf-8", "text/xml", "application/xml", "image/svg", "text/xsl", "application/xslt+xml", "message/rfc822", "multipart/related", "application/x-mimearchive"]) {
       expect(previewKindOf(file("x", m)), m).toBe("none");
@@ -122,7 +122,7 @@ describe("previewKindOf", () => {
   });
 });
 
-describe("aperçu sur un appareil à petite mémoire (revue du 10 novembre)", () => {
+describe("aperçu sur un appareil à petite mémoire", () => {
   const MIB = 1048576;
   it("au-delà de 50 Mio : téléchargement seulement ; jusqu'à 50 Mio : aperçu ; texte toujours", () => {
     expect(previewKindOf(file("x", "video/mp4", 50 * MIB), true)).toBe("video");
@@ -138,16 +138,16 @@ describe("isRiskyName", () => {
       expect(isRiskyName(`f.${e}`), e).toBe(true);
       expect(isRiskyName(`f.${e.toUpperCase()}`), e).toBe(true);
     }
-    // Ouverts localement dans un navigateur, leur script s'exécute (scan du 7 novembre, F4 en partie).
+    // Ouverts localement dans un navigateur, leur script s'exécute (scan, F4 en partie).
     for (const e of ["svg", "svgz", "xhtml", "xht", "mht", "mhtml"]) expect(isRiskyName(`f.${e}`), e).toBe(true);
-    // Revue du 10 novembre : bibliothèques et compléments, modèles à macros, installeurs, scripts.
+    // Bibliothèques et compléments, modèles à macros, installeurs, scripts.
     for (const e of ["dll", "xll", "wsh", "msp", "cab", "dotm", "xltm", "potm", "ppsm", "sldm", "xlsb", "py", "jnlp", "diagcab", "library-ms", "search-ms", "inetloc", "deb", "rpm", "appimage"]) expect(isRiskyName(`f.${e}`), e).toBe(true);
-    // Images disque, OneNote, aide compilée, macros Office, raccourcis et scripts Windows (audit F4).
+    // Images disque, OneNote, aide compilée, macros Office, raccourcis et scripts Windows.
     for (const e of ["img", "vhd", "vhdx", "one", "chm", "mht", "mhtml", "svg", "xlsm", "docm", "pptm", "xlam", "ppam", "iqy", "slk", "lnk", "scf", "hta", "jse", "vbe", "ps1", "psm1", "appref-ms", "application", "gadget", "msc", "settingcontent-ms"]) {
       expect(isRiskyName(`facture.${e}`), e).toBe(true);
       expect(isRiskyName(`facture.${e.toUpperCase()}`), e).toBe(true);
     }
-    // Spec §12, D41-13 (code du 24 novembre) : formats PowerShell, informations d'installation Windows.
+    // Spec §12, D41-13 (code) : formats PowerShell, informations d'installation Windows.
     for (const e of ["ps1xml", "inf"]) {
       expect(isRiskyName(`pilote.${e}`), e).toBe(true);
       expect(isRiskyName(`pilote.${e.toUpperCase()}`), e).toBe(true);

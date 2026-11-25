@@ -1,4 +1,4 @@
-// Retours UI6 du propriétaire, sur le vrai serveur : menu « … » du composeur (Aperçu, Renommer,
+// Retours UI6, sur le vrai serveur : menu « … » du composeur (Aperçu, Renommer,
 // Nettoyer ou Réessayer seulement si utile, Supprimer ; ni Monter ni Descendre), aperçu par
 // l'icône, icônes de format en couleur, icône « noms chiffrés » à côté du titre des listes,
 // pastille « Téléchargé » au coin de l'icône chez le destinataire. Captures fr-FR à 390 et 1440 px.
@@ -8,7 +8,7 @@ import { file, freshPage, sendShare, settle, unlock } from "./open-helpers";
 import { addText, openFilePicker } from "./send-helpers";
 import type { Page } from "@playwright/test";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-UI6/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/UI6/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 const row = (page: Page, name: string) => page.locator("[data-row]").filter({ hasText: name });
@@ -54,7 +54,7 @@ test("composeur : icônes en couleur, menu « … », aperçu par l'icône, Nett
     await expect(menu.locator(".mi")).toHaveText(["Aperçu", "Renommer", "Nettoyer", "Supprimer"]);
     await settle(page);
     await page.screenshot({ path: `${SHOTS}composeur-menu-${w(isMobile)}.png` });
-    // « Nettoyer » du menu : même confirmation que le balai (retours du 12 novembre).
+    // « Nettoyer » du menu : même confirmation que le balai.
     await menu.getByRole("button", { name: "Nettoyer" }).click();
     await expect(menu).toBeHidden();
   } else {

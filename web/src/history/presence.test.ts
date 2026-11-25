@@ -35,8 +35,8 @@ function fake(names: string[], count: number, opts: { created?: boolean; stores?
   return { factory: factory as unknown as Pick<IDBFactory, "databases" | "open">, log };
 }
 
-describe("« Mes partages » seulement s'il y a des partages (17 novembre)", () => {
-  it("pages d'information : vrai seulement si la base existe ET contient une entrée (18 novembre)", async () => {
+describe("« Mes partages » seulement s'il y a des partages", () => {
+  it("pages d'information : vrai seulement si la base existe ET contient une entrée", async () => {
     presence.any = false;
     await probeHistory(fake(["autre"], 3).factory);
     expect(presence.any).toBe(false);
@@ -64,7 +64,7 @@ describe("« Mes partages » seulement s'il y a des partages (17 novembre)", () 
   });
 });
 
-describe("« Téléchargements » sans compte seulement si l'historique est activé (22 novembre)", () => {
+describe("« Téléchargements » sans compte seulement si l'historique est activé", () => {
   it("pages d'information : base absente, ou stockage refusé : rien à montrer, rien de créé", async () => {
     presence.downloads = false;
     const f = fake(["shhdrop-history"], 3);

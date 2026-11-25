@@ -18,7 +18,7 @@ export async function noViewTransition(page: Page) {
 }
 
 /**
- * Accueil (19 novembre) : le bouton « Salon » du cadre d'envoi mène à la page d'envoi « /envoyer »
+ * Accueil : le bouton « Salon » du cadre d'envoi mène à la page d'envoi « /envoyer »
  * sans rien lancer (salon : bientôt ; sur téléphone, il ouvre la feuille « Ajouter », refermée ici
  * pour partir du composeur vide) ; ailleurs (déjà dans le composeur), rien à faire.
  */
@@ -107,7 +107,7 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * « Tout nettoyer » puis « Nettoyer » dans la confirmation (remplace l'interrupteur « Nettoyage
- * automatique », retiré le 12 novembre) : à appeler APRÈS l'ajout des fichiers. Rend quand plus
+ * automatique », retiré) : à appeler APRÈS l'ajout des fichiers. Rend quand plus
  * rien n'est à nettoyer (le nettoyage peut finir après : attendre la marque voulue).
  */
 export async function cleanAll(page: Page) {
@@ -119,7 +119,7 @@ export async function cleanAll(page: Page) {
 
 /**
  * Ordinateur : l'écran d'envoi tient entier dans la hauteur de l'écran (page en haut) et le pied
- * de page vient juste dessous, sans le tasser (exigence du propriétaire ; retours du 11 novembre).
+ * de page vient juste dessous, sans le tasser.
  * Remplace l'ancienne vérification « la page ne défile pas » (le pied est désormais affiché).
  */
 export const composerFits = (page: Page) =>
@@ -164,7 +164,7 @@ export async function capturePutBodies(page: Page): Promise<{ url: string; body:
   return out;
 }
 
-/** « Tout supprimer » (icône) puis « Supprimer » dans sa confirmation (16 novembre). */
+/** « Tout supprimer » (icône) puis « Supprimer » dans sa confirmation. */
 export async function clearAll(page: Page) {
   await page.getByRole("button", { name: "Tout supprimer" }).click();
   await page.getByRole("dialog", { name: /^Supprimer/ }).getByRole("button", { name: "Supprimer", exact: true }).click();

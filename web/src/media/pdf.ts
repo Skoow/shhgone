@@ -1,13 +1,13 @@
-// Nettoyage des PDF (spec §35.2, Task 9b), neutralisation en place à longueur constante :
-// seules les propriétés du document, celles que montrent les détails du fichier, sont retirées
-// (décision du propriétaire, 11 novembre) : le dictionnaire /Info de chaque révision (chaîne
+// Nettoyage des PDF (spec §35.2), neutralisation en place à longueur constante :
+// seules les propriétés du document, celles que montrent les détails du fichier, sont retirées :
+// le dictionnaire /Info de chaque révision (chaîne
 // des /Prev, tables xref classiques et flux xref) et le XMP du document (/Metadata du
 // catalogue, qui en porte la copie) deviennent « N G obj null … endobj » : aucun octet ne
 // bouge, les tables xref restent justes. Rien d'autre n'est touché : pages (et leur XMP),
 // miniatures de pages /Thumb, images intégrées, polices, annotations. Refus :
 // /Encrypt ou signature (/ByteRange) → protégé ; /Info dans un flux d'objets, xref illisible,
 // objet qui ne commence pas là où la table l'annonce → `Malformed` (→ `echec`).
-// Images intégrées : jamais modifiées (décision du propriétaire, 10 novembre).
+// Images intégrées : jamais modifiées.
 // Lecture par fenêtres de 4 Mio ; les flux xref et d'objets sont décompressés
 // en lecture seule (`DecompressionStream('deflate')`), 50 Mio par flux et INFLATE_BUDGET en
 // tout (fichier hostile : l'onglet ne doit pas se figer).
@@ -288,7 +288,7 @@ async function xrefStream(src: Src, off: number, budget: Budget): Promise<Sectio
   const entries = new Map<number, Ent>();
   const rec = w0 + w1 + w2;
   // Entrée de largeur nulle : la boucle tournerait /Index fois sans lire un octet (fichier
-  // hostile, revue du 10 novembre). Le nombre d'entrées est aussi borné par les octets du flux.
+  // hostile). Le nombre d'entrées est aussi borné par les octets du flux.
   if (rec === 0) throw new Malformed("pdf_xref_w");
   let o = 0;
   for (let s = 0; s < index.length; s += 2) {

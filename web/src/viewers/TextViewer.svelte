@@ -25,7 +25,7 @@
     border: 1px solid var(--hair-2);
     border-radius: var(--r-lg);
     /* Pleine largeur de lecture (72 signes au plus), calée en haut : plus de petite bulle
-       perdue au milieu de la visionneuse (faible de l'audit du 11 novembre). */
+       perdue au milieu de la visionneuse. */
     box-sizing: border-box;
     width: min(100%, 72ch);
     max-width: 72ch;

@@ -126,7 +126,7 @@ test("retour impossible : octroi gardé, partage supprimé entre-temps → écra
   await settle(other);
   expect(await axe(other)).toEqual([]);
   await shot(other, "retour-impossible", isMobile);
-  // Déjà oublié sur cet appareil, base comprise (audit R2) : aucun lien « Oublier » n'y servirait.
+  // Déjà oublié sur cet appareil, base comprise : aucun lien « Oublier » n'y servirait.
   await expect.poll(() => storedReturns(other).then((x) => x.dbs), { timeout: 10_000 }).not.toContain("shhdrop-returns");
   await expect(other.getByRole("button", { name: "Oublier ce partage sur cet appareil" })).toHaveCount(0);
   // Le retour gardé est oublié : la fois suivante, l'écran ordinaire du lien invalide.
@@ -134,7 +134,7 @@ test("retour impossible : octroi gardé, partage supprimé entre-temps → écra
   await expect(other.getByRole("heading", { name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible({ timeout: 30_000 });
 });
 
-test("revue D42-22 : la première personne revient après la dernière : ni « dernière personne » ni Détruire ; « Toutes les ouvertures sont prises. »", async ({ page, shh, browser }) => {
+test("D42-22 : la première personne revient après la dernière : ni « dernière personne » ni Détruire ; « Toutes les ouvertures sont prises. »", async ({ page, shh, browser }) => {
   test.setTimeout(180_000);
   const s = await freshPage(browser);
   const sent = await sendShare(s.page, shh.origin + "/", { text: TEXT, opens: 2 });
@@ -155,7 +155,7 @@ test("revue D42-22 : la première personne revient après la dernière : ni « d
   await expect(other.getByRole("button", { name: /^Détruire/ })).toHaveCount(0);
 });
 
-test("revue D42-22 : limite des retours atteinte sur un partage sans ouverture restante → « Impossible de revenir », cause dite", async ({ page, shh, browser }) => {
+test("D42-22 : limite des retours atteinte sur un partage sans ouverture restante → « Impossible de revenir », cause dite", async ({ page, shh, browser }) => {
   test.setTimeout(180_000);
   const s = await freshPage(browser);
   const sent = await sendShare(s.page, shh.origin + "/", { text: TEXT, opens: 1 });
@@ -218,7 +218,7 @@ test("relecture (A) : deux onglets ; B tient la base des retours, A efface l'his
   await b.close();
 });
 
-test("audit R2 : « Oublier ce partage sur cet appareil » efface le retour gardé (base supprimée) et l'entrée de l'onglet ; le contenu reste affiché ; rouvrir le lien demande une nouvelle ouverture", async ({ page, shh, browser }) => {
+test("« Oublier ce partage sur cet appareil » efface le retour gardé (base supprimée) et l'entrée de l'onglet ; le contenu reste affiché ; rouvrir le lien demande une nouvelle ouverture", async ({ page, shh, browser }) => {
   test.setTimeout(180_000);
   const s = await freshPage(browser);
   const sent = await sendShare(s.page, shh.origin + "/", { text: TEXT, opens: 3 });

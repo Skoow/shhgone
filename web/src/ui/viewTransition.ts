@@ -42,7 +42,7 @@ export async function runTransition(update: () => void, opts: { reduced?: boolea
     update();
   });
   // skipTransition() (appui, touche, délai) rejette `ready` (AbortError « Transition was
-  // skipped ») : sans gestionnaire, une exception non attrapée par clic (audit D1). Une
+  // skipped ») : sans gestionnaire, une exception non attrapée par clic. Une
   // exception du rappel rejette `updateCallbackDone` avant la fin de `finished` : marquée
   // traitée ici, elle remonte quand même par l'`await` final.
   void vt.ready.catch(() => undefined);

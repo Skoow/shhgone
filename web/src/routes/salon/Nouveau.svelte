@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Création d'un salon (« /salon/nouveau », spec §39.6 ; plan C-3) : durée, places, bascule
+  // Création d'un salon (« /salon/nouveau », spec §39.6) : durée, places, bascule
   // « Les participants peuvent détruire le salon », « Garder dans mon historique ». Compte exigé
   // (D42-26, conception compte §10.4) : sans session, l'écran mène à la connexion
   // (« ?suite=salon »). Le mot de passe est tiré sur l'appareil (forme générée seulement).
@@ -38,7 +38,7 @@
   });
   let detruire = $state(false);
   // « Garder dans mon historique » : le réglage de l'appareil (history/live.svelte.ts,
-  // keepSentDefault), désactivé par défaut même avec un compte (décision du 24 novembre, B) ; la
+  // keepSentDefault), désactivé par défaut même avec un compte (B) ; la
   // personne l'active. Changé ici, il vaut aussi pour les envois suivants, comme sur « Lien prêt ».
   // Décochée : « Salon prêt » montre le lien de gestion d'emblée, pour qu'il soit gardé à la main.
   let garder = $state(false);
@@ -96,7 +96,7 @@
 <Cadre titre={t("salon.new.title")} sous={t("salon.new.sub")}>
   {#if !connecte}
     <p class="note">{t("salon.new.login")}</p>
-    <!-- Seule action de l'écran (revue du 20 novembre, U19) : de vrais boutons, « Se connecter »
+    <!-- Seule action de l'écran : de vrais boutons, « Se connecter »
          en principal. Liens de navigation : l'élément reste <a>. -->
     <div class="entrer">
       <a class="b-entrer principal" href={href("/compte/connexion?suite=salon")} onclick={(e) => followLink(e, "/compte/connexion?suite=salon")}>{t("account.login.title")}</a>

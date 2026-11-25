@@ -1,11 +1,10 @@
 // Nettoyage des documents Office (OOXML : .docx, .xlsx, .pptx et variantes) et ODF (.odt,
-// .ods, .odp…) (spec §35.2, Task 9b) : propriétés du document remplacées par des versions
+// .ods, .odp…) (spec §35.2) : propriétés du document remplacées par des versions
 // minimales de même nom, miniatures retirées (et leurs références), métadonnées des images
 // intégrées retirées (pixels inchangés), chemins locaux retirés (modèle attaché de Word et sa
-// relation, x15ac:absPath d'Excel), ZIP réécrit (zip.ts). Paramètres d'imprimante gardés
-// (décision du propriétaire, 10 novembre). customXml/ est gardé : il porte des données liées au
-// document (bibliographie, contrôles de contenu liés), le retirer altérerait le document. Règle du propriétaire (8
-// novembre, D41-27) : on ne retire que ce qui n'altère pas le document lui-même ; commentaires,
+// relation, x15ac:absPath d'Excel), ZIP réécrit (zip.ts). Paramètres d'imprimante gardés.
+// customXml/ est gardé : il porte des données liées au
+// document (bibliographie, contrôles de contenu liés), le retirer altérerait le document. Règle (D41-27) : on ne retire que ce qui n'altère pas le document lui-même ; commentaires,
 // personnes et suivi des modifications restent intacts (auteurs et dates compris). Le résultat est relu par le même analyseur : il ne doit
 // plus rien demander, sinon `Malformed` (→ `echec`).
 import { STRIP_MAX } from "../limits";

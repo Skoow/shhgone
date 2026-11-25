@@ -1,9 +1,9 @@
-// K_mdp = Argon2id(mot de passe NFC, sel) par le moteur (décision du contrôleur, Task 4 : Rust
+// K_mdp = Argon2id(mot de passe NFC, sel) par le moteur (décision du contrôleur : Rust
 // plus rapide que libsodium dans ce mode). Production : un Worker NEUF par calcul (argon2.worker.ts),
 // arrêté après : les 64 Mio ne restent pas dans la mémoire du moteur de la page, qui ne rétrécit
 // jamais. `start` crée ce Worker ; par défaut celui du moteur (engine.start : script lu avec son
 // empreinte, lancé depuis un Blob par la politique Trusted Types, source.verified.ts).
-// Repli, comme l'ancien Argon2id (libsodium, supprimé en Task 11) : si le Worker ne se crée pas
+// Repli, comme l'ancien Argon2id (libsodium, supprimé en) : si le Worker ne se crée pas
 // (navigateur sans Worker depuis un Blob, script refusé), ne démarre pas, ne peut pas recevoir le
 // calcul (DataCloneError : module ou tableau non clonable) ou ne répond pas dans le délai
 // WORKER_TIMEOUT_MS (il est alors arrêté), le calcul a lieu dans la page, avec le même moteur
@@ -22,7 +22,7 @@ export type StartWorker = () => Promise<Worker>;
 const NO_WORKER = "argon2_worker";
 
 /**
- * Délai maximal d'un calcul dans le Worker (décision du contrôleur, Task 11) : environ 0,25 s
+ * Délai maximal d'un calcul dans le Worker (décision du contrôleur) : environ 0,25 s
  * sur un ordinateur, quelques secondes sur un petit téléphone. Au-delà (Worker bloqué), il est
  * arrêté et le calcul refait dans la page avec le moteur déjà vérifié.
  */

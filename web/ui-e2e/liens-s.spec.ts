@@ -1,7 +1,6 @@
-// Liens sous « /s » et page d'ouverture séparée (décision du propriétaire du 16 novembre,
-// docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md) : le lien rendu est « /s#… » ;
+// Liens sous « /s » et page d'ouverture séparée (docs/conception/specs/2026-11-16-liens-s-et-pages-design.md) : le lien rendu est « /s#… » ;
 // la page /s ne charge pas le script de l'application d'envoi ; l'ancienne forme à la racine est
-// refusée (18 novembre : l'accueil, la clé retirée de l'adresse) ; la clé est retirée de l'adresse
+// refusée (l'accueil, la clé retirée de l'adresse) ; la clé est retirée de l'adresse
 // après lecture, comme avant.
 import { expect, test } from "./fixtures";
 import { file, freshPage, sendShare, unlock } from "./open-helpers";
@@ -25,7 +24,7 @@ test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancienne
   await a.page.goto(sent.link);
   await expect(a.page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ })).toBeVisible({ timeout: 30_000 });
   await unlock(a.page, sent.password);
-  // « /s » n'est plus montré une fois le lien lu (17 novembre).
+  // « /s » n'est plus montré une fois le lien lu.
   expect(new URL(a.page.url()).pathname).toBe("/");
   expect(new URL(a.page.url()).hash).toBe("");
   expect(scripts.some((p) => /\/assets\/s-[^/]+\.js$/.test(p))).toBe(true);
@@ -37,7 +36,7 @@ test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancienne
   await expect.poll(() => new URL(a.page.url()).pathname).toBe("/");
   await a.ctx.close();
 
-  // Ancienne forme à la racine (refusée, 18 novembre) : l'accueil, la clé retirée, aucune requête.
+  // Ancienne forme à la racine (refusée) : l'accueil, la clé retirée, aucune requête.
   const b = await freshPage(browser);
   const api: string[] = [];
   b.page.on("request", (r) => {

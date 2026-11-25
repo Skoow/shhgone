@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Vos données (conception compte §12.4, §21.15.4 point 10 ; plan, lot 13 ; monté seulement avec
+  // Vos données (conception compte §12.4, §21.15.4 point 10 ; monté seulement avec
   // __COMPTES__). « Exporter mes données » : fichier JSON fait SUR L'APPAREIL (account/
   // session.svelte.ts : données du serveur, profil, listes sans leurs secrets, jamais l'adresse),
   // enregistré par un lien blob: local. « Effacer les données de cet appareil » : historique et

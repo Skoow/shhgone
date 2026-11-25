@@ -3,7 +3,7 @@
   // D'abord l'état LOCAL (lecture d'IndexedDB, aucune requête) ; puis, page visible, une relecture
   // des partages actifs dont l'état date de plus de 5 min, l'un après l'autre, chacun après une
   // gigue de 0,5 à 4 s (history/poll.ts). Jamais en arrière-plan, aucune boucle.
-  // Filtre « Reçus » (plan du compte, lot 12 ; conception §21.7) : les partages ouverts sur cet
+  // Filtre « Reçus » (conception §21.7) : les partages ouverts sur cet
   // appareil avec « Garder » coché, mêmes lignes que l'accueil connecté (InboxRow) ; jamais relus
   // au chargement (seulement « Actualiser » dans leur détail). Les compteurs restent ceux des envois.
   import { untrack } from "svelte";

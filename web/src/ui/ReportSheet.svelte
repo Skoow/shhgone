@@ -1,12 +1,12 @@
 <script lang="ts">
-  // Signaler (UI §9.10 ; conception compte §21.10, §21.15.7 ; plan du compte, lot 14). Deux étapes,
+  // Signaler (UI §9.10 ; conception compte §21.10, §21.15.7). Deux étapes,
   // sans aucun texte libre, pièce ni adresse :
   // 1. « Que se passe-t-il ? » : dix catégories (codes fixes 1 à 10, mêmes dans les apps), vrais
   //    boutons radio d'un seul groupe (flèches, tabulation unique, lecteurs d'écran : le
-  //    navigateur). Catégorie facultative (décision du propriétaire du 14 novembre) : « Autre »
+  //    navigateur). Catégorie facultative : « Autre »
   //    est choisi d'avance, « Continuer » n'est jamais bloqué.
   // 2. Rappel de la catégorie (« Modifier »), ce qui va se passer, PHAROS en bandeau pour les codes
-  //    1 et 2 (la phrase des autorités reste pour les autres), « Signaler » (partage, une voix : 20 novembre)
+  //    1 et 2 (la phrase des autorités reste pour les autres), « Signaler » (partage, une voix :)
   //    ou « Quitter et signaler » (salon, avec ses écrans C-5) ; focus sur « Annuler ».
   // Rien ne part avant le bouton de l'étape 2 : `onconfirm(catégorie)` fait la requête.
   import { tick } from "svelte";

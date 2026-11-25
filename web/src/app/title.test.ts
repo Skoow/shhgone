@@ -23,7 +23,7 @@ describe("titre de l'onglet", () => {
     expect(routeTitle("open")).toBe("Open a share · Shhgone");
     expect(routeTitle("confidentialite")).toBe("Privacy · Shhgone");
   });
-  it("pages du compte (lot 10) : titres fixes, jamais d'adresse ni de pseudo", () => {
+  it("pages du compte : titres fixes, jamais d'adresse ni de pseudo", () => {
     setLang("fr");
     expect(routeTitle("inscription")).toBe("Créer un compte · Shhgone");
     expect(routeTitle("connexion")).toBe("Se connecter · Shhgone");

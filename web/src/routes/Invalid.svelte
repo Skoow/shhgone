@@ -1,6 +1,6 @@
 <script lang="ts">
   // Lien invalide, lien incomplet, retour impossible (UI §9.11, D42-22), contenu modifié en route
-  // (audit web D3 : texte fixe choisi par le client), limite de téléchargement du partage
+  // (texte fixe choisi par le client), limite de téléchargement du partage
   // (403 egress_limit) : message unique pour
   // un lien inconnu (spec §5.2, avec la limite des retours : même navigateur seulement), retour à l'envoi,
   // dans la facture commune des pages d'état (StatusPage, tâche UP). En démo seulement, une

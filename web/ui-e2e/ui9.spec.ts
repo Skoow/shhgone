@@ -1,4 +1,4 @@
-// Retours UI9 du propriétaire, sur le vrai serveur : bouclier de nettoyage juste avant le nom (retours CLEAN2)
+// Retours UI9, sur le vrai serveur : bouclier de nettoyage juste avant le nom (retours CLEAN2)
 // (composeur et destinataire, ellipse du nom préservée), pied de page signé « Shhgone © 2026 »
 // en bas à gauche, papier peint de pictos sur les côtés de la page. Captures fr-FR ×2, 390 et 1440 px.
 import { readFileSync } from "node:fs";
@@ -8,7 +8,7 @@ import { file, freshPage, sendShare, settle, unlock } from "./open-helpers";
 import { cleanAll, openFilePicker } from "./send-helpers";
 import type { Locator, Page } from "@playwright/test";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-UI9/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/UI9/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 
@@ -71,7 +71,7 @@ test("destinataire : bouclier juste avant le nom ; capture", async ({ page, shh,
   await page.screenshot({ path: `${SHOTS}destinataire-${w(isMobile)}.png` });
 });
 
-/** Pictos du pied (::after) : seul endroit du papier peint depuis le 19 novembre (3). */
+/** Pictos du pied (after) : seul endroit du papier peint (3). */
 async function footPictos(page: Page) {
   return page.locator("footer[data-foot]").evaluate((e) => {
     const c = getComputedStyle(e, "::after");
@@ -90,10 +90,10 @@ test("pied : « Shhgone © 2026 » en bas à gauche, plus de « publicité » ; 
   const sig = foot.locator(".base .sig");
   await expect(sig).toHaveText(/^Shhgone\s*©\s2026$/);
   const [sb, base] = [await sig.boundingBox(), await foot.locator(".base").boundingBox()];
-  // Nom à gauche, version à droite, sur téléphone comme sur ordinateur (pied de page du 17 novembre ;
-  // remplace la signature centrée sur téléphone du 15 novembre).
+  // Nom à gauche, version à droite, sur téléphone comme sur ordinateur (pied de page ;
+  // remplace la signature centrée sur téléphone).
   expect(Math.abs(sb!.x - base!.x)).toBeLessThanOrEqual(1);
-  // Papier peint : au pied seulement (plus sur les côtés de la page, 19 novembre, 3) ; fichier
+  // Papier peint : au pied seulement (plus sur les côtés de la page) ; fichier
   // statique (pas de data:), nom à empreinte (A7, cache d'un an).
   await expect(page.locator("[data-sides]")).toHaveCount(0);
   const st = await footPictos(page);

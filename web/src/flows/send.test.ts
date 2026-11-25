@@ -102,7 +102,7 @@ describe("createSender : phases (UI §9.4.1)", () => {
     expect(t.createShare).toHaveBeenCalledTimes(1);
   });
 
-  it("étapes : chiffré (tous les octets partis), puis envoyé et scellé à la résolution seulement (audit M12) ; une par étape, dans l'ordre", async () => {
+  it("étapes : chiffré (tous les octets partis), puis envoyé et scellé à la résolution seulement ; une par étape, dans l'ordre", async () => {
     const t = setup();
     void t.s.start(ITEMS, OPTS);
     const o = await toUpload(t, 2, 200);
@@ -321,7 +321,7 @@ describe("createSender : erreurs (UI §9.4.6)", () => {
     expect(t.s.limitKind).toBe("jour"); // refus à la création, jusqu'à minuit UTC : quota du jour
   });
 
-  it("audit M14 : la règle derrière la limite — en cours (≤ 60 s à la création), du jour, pendant l'envoi", async () => {
+  it("la règle derrière la limite — en cours (≤ 60 s à la création), du jour, pendant l'envoi", async () => {
     const t = setup();
     void t.s.start(ITEMS, OPTS);
     t.last().reject(new LimitError(60));
@@ -353,7 +353,7 @@ describe("createSender : erreurs (UI §9.4.6)", () => {
     expect(take).toHaveBeenCalledTimes(1);
   });
 
-  it("audit M1 : bad_request d'un élément (PUT refusé) : pas d'essai anti-robot, erreur dite, ligne désignée", async () => {
+  it("bad_request d'un élément (PUT refusé) : pas d'essai anti-robot, erreur dite, ligne désignée", async () => {
     const t = setup();
     void t.s.start(ITEMS, OPTS);
     t.calls[0]!.reject(markElementFailure(0, new Error("bad_request")));
@@ -366,7 +366,7 @@ describe("createSender : erreurs (UI §9.4.6)", () => {
     expect(t.createShare).toHaveBeenCalledTimes(2);
   });
 
-  it("audit M1 : erreur réseau d'un élément : « reseau », ligne désignée ; fichier illisible : « fichier_modifie »", async () => {
+  it("erreur réseau d'un élément : « reseau », ligne désignée ; fichier illisible : « fichier_modifie »", async () => {
     const t = setup();
     void t.s.start(ITEMS, OPTS);
     t.calls[0]!.reject(markElementFailure(0, new Error("reseau")));
@@ -379,7 +379,7 @@ describe("createSender : erreurs (UI §9.4.6)", () => {
     expect(t.s.error).toBe("fichier_modifie");
   });
 
-  it("bad_request deux fois : jamais de troisième essai (repli reCAPTCHA retiré, 24 novembre) ; la preuve est demandée avec le défi seul", async () => {
+  it("bad_request deux fois : jamais de troisième essai (repli reCAPTCHA retiré) ; la preuve est demandée avec le défi seul", async () => {
     const t = setup();
     void t.s.start(ITEMS, OPTS);
     const p = t.calls[0]!.opts.solveCaptcha({});

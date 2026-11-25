@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Nom du partage (demande du propriétaire du 19 novembre) : champ des options, « Lien prêt »,
+// Nom du partage : champ des options, « Lien prêt »,
 // page de contenu du destinataire (dans la page d'ouverture). Texte de l'expéditeur, hostile :
 // toujours en texte brut, isolé par <bdi>, jamais dans le titre de l'onglet.
 import { flushSync, mount, unmount } from "svelte";

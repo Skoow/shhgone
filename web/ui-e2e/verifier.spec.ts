@@ -1,4 +1,4 @@
-// Page « Vérifier cette version » (spec §28.4, 24 novembre) : en français et en anglais, liée
+// Page « Vérifier cette version » (spec §28.) : en français et en anglais, liée
 // depuis le pied de page et la page Sécurité ; commandes à recopier avec l'identité exacte du
 // signataire ; limites honnêtes ; aucune empreinte affichée par la page elle-même ; aucune
 // ressource tierce (gardes de fixtures.ts : aucune requête hors de l'origine, aucune violation
@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { axe, expect, test } from "./fixtures";
 
 test.use({ locale: "fr-FR" });
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-verifier/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/verifier/", import.meta.url));
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 const IDENTITE = "https://github.com/Skoow/shhgone/.github/workflows/release.yml@refs/tags/web-v$v";
 

@@ -1,5 +1,4 @@
-// Appels des salons réservés aux offres Plus et Pro (décision du propriétaire, 24 novembre ;
-// conception des appels §5.1) : ce que le portefeuille de cet appareil en sait. Le serveur ouvre
+// Appels des salons réservés aux offres Plus et Pro (conception des appels §5.1) : ce que le portefeuille de cet appareil en sait. Le serveur ouvre
 // les appels d'un salon, pour tous ses membres et jusqu'à sa fin, contre un jeton anonyme
 // (Privacy Pass, jetons.ts) : jamais le pass, jamais un compte. Utilisé par salon/appel-offre.ts.
 //

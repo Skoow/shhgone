@@ -21,7 +21,7 @@ xmp = b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.or
 im.save("meta.avif", exif=ex.tobytes(), xmp=xmp, quality=60)
 PY
 
-# ---------- Vidéo et audio (Task 9c) : ffmpeg 6.1.1, libx264, aac, libopus, libvorbis, flac,
+# ---------- Vidéo et audio : ffmpeg 6.1.1, libx264, aac, libopus, libvorbis, flac,
 # libmp3lame, libvpx-vp9. Repères fictifs « Reper… » ; date de prise repère 2001-02-03.
 F=(ffmpeg -hide_banner -loglevel error -y)
 V=(-f lavfi -i testsrc=size=64x48:rate=10:duration=2)

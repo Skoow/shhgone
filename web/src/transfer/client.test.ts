@@ -248,7 +248,7 @@ describe("openShare : correspondance des erreurs", () => {
     ["403 sans attempts_left", (_, p) => (p.endsWith("/unlock") ? j(403, { error: "bad_password" }) : undefined)],
     ["KDF trop faible", (_, p) => (p.endsWith("/meta") ? j(200, { ...META, kdf: { ops: 1, mem: 8192 } }) : undefined)],
     ["KDF trop forte", (_, p) => (p.endsWith("/meta") ? j(200, { ...META, kdf: { ops: 3, mem: 2 ** 30 } }) : undefined)],
-    // Audit F4 : rien au-delà des paramètres de création (3 passes, 64 Mio).
+    // Rien au-delà des paramètres de création (3 passes, 64 Mio).
     ["KDF 4 passes", (_, p) => (p.endsWith("/meta") ? j(200, { ...META, kdf: { ops: 4, mem: 67108864 } }) : undefined)],
     ["KDF 256 Mio, 10 passes", (_, p) => (p.endsWith("/meta") ? j(200, { ...META, kdf: { ops: 10, mem: 268435456 } }) : undefined)],
     ["meta sans sel", (_, p) => (p.endsWith("/meta") ? j(200, { ...META, salt: undefined }) : undefined)],
@@ -263,7 +263,7 @@ describe("openShare : correspondance des erreurs", () => {
     const s = server(route);
     expect(await reject(openShare(LINK, PW, ORIGIN, undefined, s.net))).toBeInstanceOf(NotFoundError);
   });
-  // Audit web D3 : contenu refusé parce qu'il a été modifié (enveloppe, en-tête, palier, segment
+  // Contenu refusé parce qu'il a été modifié (enveloppe, en-tête, palier, segment
   // tronqué) → CorruptError, texte fixe choisi par le client, jamais « n'existe pas ».
   const corrupt: [string, Route][] = [
     ["palier 1 annoncé, paquet invalide", (_, p) => (p.endsWith("/meta") ? j(200, { ...META, bucket: 1 }) : undefined)],
@@ -309,7 +309,7 @@ describe("openShare : correspondance des erreurs", () => {
     expect(s.calls).toEqual([]);
     expect(captured.buffers.length).toBe(before); // aucune dérivation de clé non plus
   });
-  it("mot de passe vide ou fait de blancs : K_lien effacée quand même (audit F3)", async () => {
+  it("mot de passe vide ou fait de blancs : K_lien effacée quand même", async () => {
     for (const pw of ["", " ", "\t\r\n "]) {
       const s = server(() => undefined);
       const n = captured.kLien.length;
@@ -319,7 +319,7 @@ describe("openShare : correspondance des erreurs", () => {
       expect(captured.kLien.at(-1)!.every((b) => b === 0)).toBe(true);
     }
   });
-  it("échec au premier appel au serveur : K_lien et id effacés (audit F3)", async () => {
+  it("échec au premier appel au serveur : K_lien et id effacés", async () => {
     const s = server(() => j(404, { error: "not_found" }));
     expect(await reject(openShare(LINK, PW, ORIGIN, undefined, s.net))).toBeInstanceOf(NotFoundError);
     expect(captured.kLien.at(-1)!.every((b) => b === 0)).toBe(true);
@@ -383,7 +383,7 @@ describe("fetchMeta, shareStatus, destroyShare : correspondance des erreurs", ()
     expect(await reject(destroyShare(MANAGE, ORIGIN, server(() => j(404, { error: "not_found" })).net))).toBeInstanceOf(NotFoundError);
     expect(await reject(destroyShare(MANAGE, ORIGIN, server(() => j(429, { error: "limit", retry_after_s: 9 })).net))).toBeInstanceOf(LimitError);
     expect(await reject(destroyShare(MANAGE, ORIGIN, server(() => "net").net))).toEqual(new Error("reseau"));
-    // Revue du 10 novembre : seul 404 ou 410 vaut « disparu ». Un refus d'un intermédiaire
+    // Seul 404 ou 410 vaut « disparu ». Un refus d'un intermédiaire
     // (403 d'un pare-feu, 400, 405, 413) ne doit pas faire afficher « supprimé ».
     for (const code of [400, 401, 403, 405, 413]) {
       const e = await reject(destroyShare(MANAGE, ORIGIN, server(() => j(code, { error: "nope" })).net));
@@ -553,7 +553,7 @@ describe("openShare en flux : segments à la demande, saveItem, collectToBlob", 
     expect(same(new Uint8Array(await blob.arrayBuffer()), a)).toBe(true);
   });
 
-  it("segment corrompu pendant saveItem → CorruptError (audit web D3) ; erreur du sink transmise telle quelle", async () => {
+  it("segment corrompu pendant saveItem → CorruptError ; erreur du sink transmise telle quelle", async () => {
     const s = server(route((n, seg) => (n === 1 ? (seg[5]! ^= 1, seg) : seg)));
     const o = await openShare(LINK, PW, ORIGIN, undefined, s.net);
     expect(await reject(o.saveItem(2, () => undefined))).toBeInstanceOf(CorruptError);
@@ -658,13 +658,13 @@ describe("createShare en flux", () => {
     expect(puts).toEqual([
       ["/api/shares/segments/0", segmentSize(400, 0)],
       ["/api/shares/segments/1", segmentSize(400, 1)],
-      ["/api/shares/segments/2?from=0", 16 * 65552], // fin du fichier seulement (audit H-2)
+      ["/api/shares/segments/2?from=0", 16 * 65552], // fin du fichier seulement
     ]);
     expect(prog).toEqual([[0, 3], [1, 3], [2, 3], [3, 3]]);
   }, 20_000);
 });
 
-describe("origine attendue (audit F1)", () => {
+describe("origine attendue", () => {
   const k = LINK.slice(LINK.indexOf("#"));
   const evil = `https://evil.example:8443/${k}`;
   const creds = `https://user:pw@srv.test/${k}`;
@@ -699,7 +699,7 @@ describe("origine attendue (audit F1)", () => {
   });
 });
 
-describe("noms, aperçu et types dangereux à la réception (audit M4)", () => {
+describe("noms, aperçu et types dangereux à la réception", () => {
   it("cas de l'audit : « ../../facture‮fdp.exe\\u0000 » en text/html", async () => {
     const pk = await pack([
       { kind: "text", name: "", mime: "text/plain", data: utf8("<b>salut</b>") },
@@ -762,7 +762,7 @@ describe("Opened.destroy et done en keepalive (S1)", () => {
     expect(Object.keys(b)).toEqual(["proof", "reason", "categorie", "grant"]);
     expect(b.reason).toBe("report");
     expect(b.categorie).toBe(9);
-    expect(b.grant).toBe(GRANT0); // l'octroi de cette ouverture porte la voix (20 novembre)
+    expect(b.grant).toBe(GRANT0); // l'octroi de cette ouverture porte la voix
     expect(typeof b.proof).toBe("string");
     expect(headers[0]).toMatch(/^[A-Za-z0-9_-]{43}$/);
     await o.destroy();
@@ -776,7 +776,7 @@ describe("Opened.destroy et done en keepalive (S1)", () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// Task 0 (Plan 2) : annulation, octets envoyés, pause, reprise sur coupure, preuve typée,
+// (Plan 2) : annulation, octets envoyés, pause, reprise sur coupure, preuve typée,
 // défi préparé. Horloge simulée (setTimeout et Date) ; le chiffrement tourne en vrai.
 // ---------------------------------------------------------------------------------------
 
@@ -858,7 +858,7 @@ function sender(o: {
 
 // Petit fichier : un segment de données (0) ; un texte seul ne fait aucun PUT (spec §41.14).
 const SMALL = [{ kind: "file" as const, name: "a", mime: "text/plain", data: new Uint8Array([97]) }];
-// 9 Mio : 2 segments pleins puis 16 morceaux du segment 2 (audit H-2 : aucun bourrage envoyé) ;
+// 9 Mio : 2 segments pleins puis 16 morceaux du segment 2 (aucun bourrage envoyé) ;
 // le manifeste part avec finalize (tail).
 const BIG_DATA = pseudo(9 * 1048576, 7);
 const BIG = [{ kind: "file" as const, name: "x", mime: "x/y", data: new Blob([BIG_DATA]) }];
@@ -1215,7 +1215,7 @@ describe("createShare : preuve anti-robot typée et défi préparé", () => {
     expect(s.finals[0]!.salt).toBe(kdfSalt());
   });
 
-  it("seule la preuve de travail passe (repli reCAPTCHA retiré, 24 novembre) : une autre sorte de preuve → preuve_invalide, rien n'est créé", async () => {
+  it("seule la preuve de travail passe (repli reCAPTCHA retiré) : une autre sorte de preuve → preuve_invalide, rien n'est créé", async () => {
     const s = sender({ segments: 1 });
     const o = { ...base(s), solveCaptcha: vi.fn(async () => ({ kind: "recaptcha", token: "tok" }) as unknown as CaptchaProof) };
     const r = createShare(ORIGIN, SMALL, o).catch((e: unknown) => e);
@@ -1322,7 +1322,7 @@ describe("createShare : preuve anti-robot typée et défi préparé", () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// Task K1 : chiffrement v2 (clé de contenu aléatoire enveloppée, paquet SHH2, spec §29).
+// Chiffrement v2 (clé de contenu aléatoire enveloppée, paquet SHH2, spec §29).
 // ---------------------------------------------------------------------------------------
 
 describe("createShare v2 : création, envoi sans le bourrage, finalisation", () => {
@@ -1507,7 +1507,7 @@ describe("openShare v2 : enveloppe, engagement, rejeu", () => {
 
   const bad = async (route: Route) => {
     const s = server(route);
-    expect(await reject(openShare(LINK, PW, ORIGIN, undefined, s.net))).toBeInstanceOf(CorruptError); // audit web D3
+    expect(await reject(openShare(LINK, PW, ORIGIN, undefined, s.net))).toBeInstanceOf(CorruptError);
     expect(s.calls.at(-1)).toBe("POST /api/shares/done"); // done() d'office
     return s;
   };
@@ -1560,7 +1560,7 @@ describe("openShare v2 : enveloppe, engagement, rejeu", () => {
   });
 });
 
-describe("budget de lecture par ouverture (audit M1, spec §24)", () => {
+describe("budget de lecture par ouverture (spec §24)", () => {
   // Même formule que share.ReadBudget (Go) : ouverture complète v2 (fichier + segment 0 +
   // dernier segment) plus un nouvel essai de chaque segment (fichier).
   const readBudget = (bucket: number) => {
@@ -1626,7 +1626,7 @@ describe("budget de lecture par ouverture (audit M1, spec §24)", () => {
   }, 30_000);
 });
 
-describe("limite de téléchargement du partage (403 egress_limit, 24 novembre)", () => {
+describe("limite de téléchargement du partage (403 egress_limit)", () => {
   it("au déverrouillage : EgressLimitError, une seule requête ; sur un segment : EgressLimitError, aucun nouvel essai", async () => {
     const pk = await pack([{ kind: "file", name: "a", mime: "x/y", data: new Blob([pseudo(5.5 * 1048576, 4)]) }]);
     let unlocks = 0;
@@ -1658,7 +1658,7 @@ describe("limite de téléchargement du partage (403 egress_limit, 24 novembre)"
   }, 30_000);
 });
 
-describe("base de l'application (scan de sécurité du 7 novembre, F2)", () => {
+describe("base de l'application (scan de sécurité, F2)", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("démo (/shhdrop/) : les liens rendus par createShare, avec la base, sont acceptés ; la racine aussi", async () => {

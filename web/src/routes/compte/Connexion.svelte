@@ -154,7 +154,7 @@
     <p class="note" data-sans-passkey>{t("account.nopasskey")}</p>
     <ul class="liens"><li><a href={href(versCle)} onclick={(e) => followLink(e, versCle)}>{t("account.login.key")}</a></li></ul>
   {:else}
-    <!-- 24 novembre (propriétaire) : « Rester connecté » sous le bouton ; les deux autres chemins
+    <!-- « Rester connecté » sous le bouton ; les deux autres chemins
          en boutons secondaires, après un séparateur « ou ». -->
     <form novalidate class="connexion" onsubmit={(e) => e.preventDefault()}>
       <Button type="submit" onpress={connecter}>{envoi ? t("account.verifying") : t("account.login.passkey")}</Button>
@@ -169,7 +169,7 @@
 </Cadre>
 
 <style>
-  /* « Rester connecté » centré sous le bouton (24 novembre). */
+  /* « Rester connecté » centré sous le bouton. */
   .connexion {
     gap: var(--sp-3);
   }

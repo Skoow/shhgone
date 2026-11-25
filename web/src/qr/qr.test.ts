@@ -18,7 +18,7 @@ describe("qrPath (UI §9.5)", () => {
   });
 });
 
-describe("uqr recopié (audit F3)", () => {
+describe("uqr recopié", () => {
   // Fichiers de uqr 0.1.3 recopiés tels quels depuis l'archive npm (intégrité sha512 du verrou :
   // 0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==).
   // Toute modification doit être relue puis changer ces empreintes.

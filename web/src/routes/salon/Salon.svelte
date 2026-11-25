@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Page « /salon » (plan C-3) : lien d'invitation « #c… » lu une fois puis retiré de la barre
+  // Page « /salon » : lien d'invitation « #c… » lu une fois puis retiré de la barre
   // (spec §5.3), mot de passe, page d'explication et pseudonyme, salon prêt (créateur),
   // conversation, fin. Aucun secret dans l'adresse ni dans le titre de l'onglet.
   import { onMount, untrack } from "svelte";
@@ -134,7 +134,7 @@
     <div class="actions"><Button variant="secondary" onpress={() => navigate("/")}>{t("salon.end.home")}</Button></div>
   </Cadre>
 {:else if vue.etape === "gestion" && vue.gestionSeule}
-  <!-- Lien de gestion ouvert seul : il ne fait entrer personne (v3 §15.2, exigence C-3 32). -->
+  <!-- Lien de gestion ouvert seul : il ne fait entrer personne (v3 §15.2, 32). -->
   <Cadre titre={t("salon.gestionseule.title")} sous={t("salon.gestionseule.sub", { n: vue.gestionSeule.present, duree: formatDuration(reste, lang, { coarse: true }) })}>
     <p class="note">{t("salon.gestionseule.entrer")}</p>
     <div class="actions">

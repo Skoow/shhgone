@@ -43,7 +43,7 @@
   let note = $state("");
 
   // Démo : preuve factice acceptée par le faux serveur seulement. Production : preuve de travail
-  // dans un Worker (aucun repli : le repli reCAPTCHA, jamais construit, est retiré le 24 novembre).
+  // dans un Worker (aucun repli : le repli reCAPTCHA, jamais construit, est retiré).
   const demo = getDemo();
   let powAbort: AbortController | undefined;
   function solveCaptcha(challenge: unknown) {
@@ -165,7 +165,7 @@
 
   // Démontage (autre route, démo « Ouvrir comme destinataire ») : plus d'envoi en cours. L'envoi
   // est annulé (le partage créé est détruit), la preuve de travail arrêtée, le brouillon abandonné
-  // (une finalisation qui attend échoue aussitôt) et les secrets oubliés (audit I2).
+  // (une finalisation qui attend échoue aussitôt) et les secrets oubliés.
   $effect(() => () => {
     onbusy?.(false);
     stop();
@@ -174,7 +174,7 @@
     void draft.abandon();
   });
 
-  // Bouton Retour pendant l'envoi et sur « Lien prêt » (audit I2) : confirmation, sinon on reste.
+  // Bouton Retour pendant l'envoi et sur « Lien prêt » : confirmation, sinon on reste.
   let disarm: (() => void) | undefined;
   function guard() {
     disarm?.();
@@ -348,7 +348,7 @@
 
 <svelte:window onpagehide={onPageHide} onpageshow={onPageShow} onoffline={onOffline} />
 
-<!-- Inerte dès l'appui sur Envoyer (audit I1) : la transition de vue arrive plus tard. -->
+<!-- Inerte dès l'appui sur Envoyer : la transition de vue arrive plus tard. -->
 <div class="compose-host" hidden={view !== "compose"} inert={view !== "compose" || sender !== null}>
   {#if note && view === "compose"}
     <div class="note"><Banner kind="info" action={{ label: t("common.close"), onpress: () => {

@@ -4,7 +4,7 @@
 // partage disparu (onGone, une fois), "stop" (route absente, ou fin faite ici), ou stop().
 // Une réponse ou une erreur passagère ("retry", exception : réseau coupé, 429, 5xx) ne
 // l'arrête PAS : nouvel essai après une attente croissante (1 s, 2 s, 4 s… 30 s au plus),
-// remise à zéro au premier succès (audit adverse 3, F2 : une seule requête perdue désarmait
+// remise à zéro au premier succès (3, F2 : une seule requête perdue désarmait
 // la révocation jusqu'à la fermeture de la page). Aucun secret ici : `poll` porte lui-même
 // le jeton de téléchargement (Opened.watch).
 export type WatchPoll = (signal: AbortSignal) => Promise<"alive" | "gone" | "stop" | "retry">;

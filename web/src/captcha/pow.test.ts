@@ -1,4 +1,4 @@
-// Worker de la preuve de travail (audit du 20 novembre, W3) : en production, son script est lu
+// Worker de la preuve de travail : en production, son script est lu
 // avec son empreinte SHA-384 et lancé depuis un Blob de l'origine (pow-source.verified.ts) ; la
 // démo n'en lance aucun. Le chemin réel (navigateur, CSP) : ui-e2e/hygiene.spec.ts.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -1,4 +1,4 @@
-// Vocal enregistré dans l'interface (spec §35.3, Task 12) : MediaRecorder avec pause et reprise,
+// Vocal enregistré dans l'interface (spec §35.3) : MediaRecorder avec pause et reprise,
 // minuteur qui exclut les pauses, arrêt propre à la durée maximale (limits.ts), niveau du micro
 // lu par un AnalyserNode (onde vivante) et forme d'onde de la réécoute calculée EN CONTINU depuis
 // ce même analyseur (WaveAccumulator, mémoire bornée) : l'audio n'est jamais décodé en entier. Tout reste en mémoire ; à l'arrêt ou à l'annulation, chaque piste du micro est

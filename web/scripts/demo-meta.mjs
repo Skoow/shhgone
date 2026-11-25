@@ -4,8 +4,7 @@
 // connect-src 'none' (production : 'self') : le faux serveur répond dans la page, sans réseau ;
 // si un envoi contournait un jour le détournement, le navigateur le refuserait au lieu de le
 // transmettre à skoow.github.io (défaut fermé).
-// Trusted Types et worker-src : comme la production (test d'intrusion du 11 novembre ;
-// demo-meta.test.ts compare les deux CSP directive par directive).
+// Trusted Types et worker-src : comme la production (demo-meta.test.ts compare les deux CSP directive par directive).
 // frame-ancestors : sans effet dans une balise meta, et Pages ne pose aucun en-tête : la démo
 // reste cadrable par un autre site (détournement de clic). Risque accepté : la démo ne détient
 // aucun secret réel (UI §14.3, A43).

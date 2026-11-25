@@ -69,7 +69,7 @@
   }
 
   // Lien désactivé pendant l'envoi : annoncé comme tel, avec sa raison, et GARDÉ dans le parcours
-  // clavier comme la langue et le nettoyage (audit M22 : sur « Lien prêt », Tab sautait les liens
+  // clavier comme la langue et le nettoyage (sur « Lien prêt », Tab sautait les liens
   // mais pas les boutons ; un élément désactivé reste trouvable, sa raison se lit).
   const off = $derived(busy ? { "aria-disabled": "true" as const, "aria-describedby": "foot-busy", title: t("foot.busy") } : {});
 
@@ -77,16 +77,15 @@
   // secondaires de l'expéditeur, et le grand titre de l'écran qui se réduit dans la barre une
   // fois défilé (titre marqué data-large-title, sinon le h1 de l'écran). Sur ordinateur, rien ne change.
   // Pages d'information : leur propre fichier HTML (pages séparées) ; en-tête ordinaire (logo,
-  // menu), pas de « Retour » comme un écran de l'application (retours du 16 novembre).
+  // menu), pas de « Retour » comme un écran de l'application.
   const BACK: ReadonlySet<string> = new Set(["notfound", "manage", "envois", "telechargements"]);
-  // Pied de page sur toutes les pages, ordinateur et téléphone, composeur compris (retours du
-  // 11 novembre) ; sur ordinateur, le composeur tient dans l'écran et le pied est juste dessous.
+  // Pied de page sur toutes les pages, ordinateur et téléphone, composeur compris ; sur ordinateur, le composeur tient dans l'écran et le pied est juste dessous.
   type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean };
   const footCols = $derived<{ id: string; title: string; links: FootLink[] }[]>([
-    // Plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » (retours du 16 novembre) ;
-    // plus d'« Offres » (17 novembre : l'en-tête et le menu y mènent). Colonne « Produit »
-    // seulement avec un compte (Téléchargements, retours du 15 novembre, comme le menu ☰), ou sans
-    // compte si l'historique des téléchargements est activé sur cet appareil (22 novembre).
+    // Plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » ;
+    // plus d'« Offres » (l'en-tête et le menu y mènent). Colonne « Produit »
+    // seulement avec un compte (Téléchargements, comme le menu ☰), ou sans
+    // compte si l'historique des téléchargements est activé sur cet appareil.
     ...(accountFlag.connected || presence.downloads ? [{ id: "product", title: t("foot.product"), links: [{ label: t("foot.downloads"), path: "/telechargements" }] }] : []),
     {
       id: "trust",
@@ -94,8 +93,7 @@
       links: [
         { label: t("shell.security"), path: "/securite" },
         { label: t("shell.privacy"), path: "/confidentialite" },
-        // « Open source sur GitHub » ; la licence (AGPL-3.0) est dite sur GitHub, plus dans le pied
-        // (décision du propriétaire du 17 novembre).
+        // « Open source sur GitHub » ; la licence (AGPL-3.0) est dite sur GitHub, plus dans le pied.
         { label: t("foot.source"), url: SOURCE_URL },
         // « Vérifier cette version » (spec §28.4) : liée depuis le pied de page et la page Sécurité.
         { label: t("foot.verify"), path: "/verifier" },
@@ -161,14 +159,14 @@
       <button type="button" class="back" onclick={goBack}><ChevronLeft size={24} strokeWidth={2} aria-hidden="true" /><span class="back-t">{t("shell.back")}</span></button>
     {/if}
     <p class={["small", { on: small !== "" }]} aria-hidden="true">{small}</p>
-    <!-- Pendant un envoi et sur « Lien prêt » : désactivé comme le pied (audit I2). -->
+    <!-- Pendant un envoi et sur « Lien prêt » : désactivé comme le pied. -->
     <a class="logo" href={href("/")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/"))} aria-label={t("shell.home")} {...off}>
       <!-- Logo « Trame » (scripts/gen-logo.mjs) ; l'introduction ne se joue que sur l'accueil, une fois par chargement. -->
       <Logo />
     </a>
-    <!-- Ordinateur et tablette (≥ 768 px, refonte du 12 novembre) : menus et actions. -->
+    <!-- Ordinateur et tablette (≥ 768 px) : menus et actions. -->
     <TopNav {busy} />
-    <!-- Téléphone (< 768 px, retours du 15 novembre) : menu ☰ à la place de la barre d'onglets. -->
+    <!-- Téléphone (< 768 px) : menu ☰ à la place de la barre d'onglets. -->
     <MobileMenu {busy} />
   </div>
 </header>
@@ -181,7 +179,7 @@
   <div class="wrap foot-in">
     {#if busy}
       <!-- Envoi en cours : la raison des liens désactivés, lue par les lecteurs d'écran (aria-describedby)
-           et en bulle au survol ; plus de bandeau visible (propriétaire, 21 novembre). -->
+           et en bulle au survol ; plus de bandeau visible. -->
       <p id="foot-busy" class="sr-only" data-foot-busy>{t("foot.busy")}</p>
     {/if}
     <div class="brand">
@@ -198,7 +196,7 @@
                 {#if l.soon}
                   <span class="off">{l.label} <span class="soon">{t("foot.soon")}</span></span>
                 {:else if busy}
-                  <!-- Envoi en cours : lien aria-disabled, raison lue (foot-busy), toujours atteignable au clavier (audit M22) ; clic et Entrée sans effet (preventDefault), pointeur neutralisé en CSS. -->
+                  <!-- Envoi en cours : lien aria-disabled, raison lue (foot-busy), toujours atteignable au clavier ; clic et Entrée sans effet (preventDefault), pointeur neutralisé en CSS. -->
                   <a class="fl" href={l.url ?? href(l.path ?? "/")} {...off} onclick={(e) => e.preventDefault()}>{l.report && chrome.report ? t("content.report") : l.label}</a>
                 {:else if l.report && chrome.report}
                   <!-- Partage ouvert : la confirmation de signalement de CE partage (même action qu'avant). -->
@@ -214,7 +212,7 @@
         </div>
       {/each}
     </nav>
-    <!-- Proposition B2 retenue (propriétaire, 18 novembre) : trois colonnes resserrées, sans le
+    <!-- Proposition B2 retenue : trois colonnes resserrées, sans le
          bloc « À propos » (la phrase de la marque le dit déjà). -->
     <div class="base">
       <!-- Retours UI9 : le nom en bas à gauche, « © 2026 » à côté (plus de mention « aucune publicité »). -->
@@ -315,7 +313,7 @@
     backdrop-filter: blur(20px) saturate(1.2);
     box-shadow: 0 1px 0 var(--hair);
   }
-  /* Téléphone (retours du 15 novembre) : le texte de la page se lisait encore sous le logo et
+  /* Téléphone : le texte de la page se lisait encore sous le logo et
      sous « Retour » ; fond presque plein, le flou ne sert plus qu'au bord. */
   @media (max-width: 899px) {
     .top.scrolled {
@@ -362,7 +360,7 @@
     cursor: not-allowed;
   }
   /* Page courte : le pied de page descend en bas de l'écran au lieu de laisser une bande vide
-     dessous (propriétaire, 21 novembre). */
+     dessous. */
   :global(#app:has(> footer[data-foot])) {
     display: flex;
     flex-direction: column;
@@ -377,7 +375,7 @@
     outline: none;
   }
   /* Accueil : sa dernière section (la FAQ, plaque en relief) touche le pied de page ; sinon une
-     bande du fond de page restait entre les deux, comme une couture ratée (revue du 19 novembre). */
+     bande du fond de page restait entre les deux, comme une couture ratée. */
   main:has(> :global(.home)) {
     padding-block-end: 0;
   }
@@ -385,15 +383,15 @@
     margin-block-start: 0;
   }
 
-  /* Pied de page (retours UI7) : lueur discrète de la DA sous un filet supérieur lumineux (le
+  /* Pied de page : lueur discrète de la DA sous un filet supérieur lumineux (le
      grain de l'aurore passe dessous), marque à gauche au même bord intérieur que l'en-tête,
-     colonnes hiérarchisées, liens JAMAIS soulignés (retours UI8) : survol et focus par la couleur,
+     colonnes hiérarchisées, liens JAMAIS soulignés : survol et focus par la couleur,
      anneau de focus au clavier. */
-  /* Pied de page : bord droit, sans filet (propriétaire, 19 novembre, 4 : ni coins arrondis ni
+  /* Pied de page : bord droit, sans filet (ni coins arrondis ni
      filet menthe). */
   .foot {
     position: relative;
-    /* Son propre fond seulement (décision du propriétaire du 16 novembre) : le fond de la page
+    /* Son propre fond seulement : le fond de la page
        (aurore, trame) ne se mélange plus à son papier peint ; la lueur et les pictos restent. */
     z-index: 1;
     isolation: isolate;
@@ -405,7 +403,7 @@
       linear-gradient(to bottom, rgb(255 255 255 / 0.025), rgb(7 8 12 / 0.55))
       var(--bg);
   }
-  /* Papier peint maison (retours UI7) : petits pictos Shhgone répétés (cadenas, clé, fichier,
+  /* Papier peint maison : petits pictos Shhgone répétés (cadenas, clé, fichier,
      onde, points de la Trame), fichier statique mis en cache (CSP : ni data: ni style inline),
      à très faible contraste et fondu vers le haut ; retiré en contraste renforcé ou forcé. */
   .foot::after {
@@ -491,7 +489,7 @@
       color var(--dur-fast) var(--ease-out),
       translate var(--dur-base) var(--ease-out);
   }
-  /* Cible d'appui de 44 px (audit M21) : 40 px dessinés, 2 px de plus de chaque côté, invisibles. */
+  /* Cible d'appui de 44 px : 40 px dessinés, 2 px de plus de chaque côté, invisibles. */
   .fl::after {
     content: "";
     position: absolute;
@@ -510,7 +508,7 @@
       translate: 2px 0;
     }
   }
-  /* Clavier : anneau net autour du lien (jamais de soulignement, retours UI8). */
+  /* Clavier : anneau net autour du lien (jamais de soulignement). */
   .fl:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -536,7 +534,7 @@
   .foot a[aria-disabled="true"] {
     pointer-events: none;
   }
-  /* Bas du pied (17 novembre) : plus bas, le nom à gauche plus gros que la version, à droite. */
+  /* Bas du pied : plus bas, le nom à gauche plus gros que la version, à droite. */
   .base {
     grid-column: 1 / -1;
     display: flex;
@@ -544,7 +542,7 @@
     align-items: baseline;
     justify-content: space-between;
     gap: var(--sp-1) var(--sp-4);
-    /* Ligne au plus près du nom et de la version (propriétaire, 18 novembre). */
+    /* Ligne au plus près du nom et de la version. */
     padding-block-start: var(--sp-2);
     border-block-start: 1px solid var(--hair);
     color: var(--text-3);
@@ -572,7 +570,7 @@
     font-size: var(--fs-body);
     font-weight: 650;
   }
-  /* Téléphone et tablette (retours du propriétaire du 15 novembre) : un seul bloc centré, plus
+  /* Téléphone et tablette : un seul bloc centré, plus
      de colonnes. Marque et phrase, puis tous les liens à la suite ; les intitulés de colonne
      restent pour les lecteurs d'écran (chaque liste garde son nom) ; « À propos » redisait la
      phrase de la marque : retiré ici. */
@@ -593,7 +591,7 @@
       max-width: 34ch;
     }
     /* Une seule grille de deux colonnes, chaque lien centré dans la sienne, comme la marque et la
-       phrase au-dessus (17 novembre) ; les listes partagent les mêmes colonnes. */
+       phrase au-dessus ; les listes partagent les mêmes colonnes. */
     .cols,
     .cols.two {
       display: grid;

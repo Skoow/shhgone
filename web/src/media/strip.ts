@@ -54,7 +54,7 @@ async function run(file: Blob, mime: string, fmt: Format, opts: StripOpts): Prom
     if ((await cleanHeif(data)).length > 0) return { state: "echec", reason: "verification" };
     return { state: "nettoye", data, family: "image" };
   }
-  // PDF (D41-31, décision du propriétaire du 11 novembre) : seules les propriétés du document
+  // PDF (D41-31) : seules les propriétés du document
   // (/Info et le XMP du catalogue) deviennent « null » à longueur constante ; pages, miniatures,
   // images, polices et texte intacts ; résultat relu.
   if (fmt === "pdf") {
@@ -78,7 +78,7 @@ async function run(file: Blob, mime: string, fmt: Format, opts: StripOpts): Prom
     if (!r.stripped) return { state: "echec", reason: "capture" };
     return { state: "nettoye", data: r.blob, family: type.startsWith("audio/") ? "vocal" : "video" };
   }
-  // Vidéo et audio importés (Task 9c, spec §35.2) : sans réencodage ; résultat relu par le même
+  // Vidéo et audio importés (spec §35.2) : sans réencodage ; résultat relu par le même
   // analyseur, qui ne doit plus rien trouver à changer.
   const av: CleanFamily = type.startsWith("audio/") || fmt === "mp3" || fmt === "ogg" || fmt === "flac" || fmt === "wav" ? "audio" : "video";
   if (fmt === "mp4" || fmt === "webm") {

@@ -3,7 +3,7 @@
 // compte activé : port choisi avant, voir StartOpts.salons et StartOpts.comptes),
 // stdout et stderr capturés en octets bruts (fouillés par le test « le serveur ne voit rien »).
 // SHH_STORAGE_MAX = 4 Gio : le serveur refuse de démarrer si le plafond dépasse l'espace
-// disque libre moins 1 Gio (audit F6), et le défaut de 200 Gio dépasse souvent un poste de test.
+// disque libre moins 1 Gio, et le défaut de 200 Gio dépasse souvent un poste de test.
 import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -128,7 +128,7 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
   const dataDir = mkdtempSync(join(tmpdir(), "shh-e2e-"));
   const env: Record<string, string> = {};
   // SHH_DISABLE_DUMPABLE_HARDENING : le test « le serveur ne voit rien » lit /proc/<pid>/mem du
-  // serveur ; PR_SET_DUMPABLE(0) (audit adverse, Z2) l'en empêcherait. Éteint pour les tests
+  // serveur ; PR_SET_DUMPABLE(0) (Z2) l'en empêcherait. Éteint pour les tests
   // seulement ; la production garde le durcissement (compose.yaml ne pose pas cette variable).
   for (const [k, v] of Object.entries({ PATH: process.env.PATH ?? "", SHH_DATA_DIR: dataDir, SHH_LISTEN: "127.0.0.1:0", SHH_STORAGE_MAX: "4294967296", SHH_DISABLE_DUMPABLE_HARDENING: "1", ...salons, ...opts.env })) {
     if (v !== undefined) env[k] = v;

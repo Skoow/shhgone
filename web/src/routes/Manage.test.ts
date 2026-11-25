@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Suivi de l'expéditeur (UI §9.6.4, §9.6.5) : relecture toutes les 60 s page visible, heure de
-// la dernière lecture (audit M13) ; une relecture en vol ne fait pas réapparaître un partage
-// supprimé (audit, faible).
+// la dernière lecture ; une relecture en vol ne fait pas réapparaître un partage
+// supprimé.
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../i18n/i18n.svelte";

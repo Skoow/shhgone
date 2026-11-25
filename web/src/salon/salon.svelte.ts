@@ -1,8 +1,8 @@
-// État du salon pour les écrans (plan C-3, Task 6) : relie le client (client.ts), le fil
+// État du salon pour les écrans : relie le client (client.ts), le fil
 // (conversation.ts) et les étapes de l'interface (lien, mot de passe, explication, salon prêt,
 // conversation, fin). Une seule session de salon par page, en mémoire seulement : rien n'est
 // gardé dans le stockage du navigateur (hors l'historique local chiffré, sur demande : lien
-// d'invitation et, pour le créateur, lien de gestion, jamais le mot de passe). Les secrets
+// d'invitation, pour le créateur, lien de gestion, jamais le mot de passe). Les secrets
 // (K_lien, S_gestion, clés) sont effacés à `oublier` (fin, départ, exclusion, page quittée).
 import { generatePassword, passwordKey } from "../engine/index";
 import { loadSalonEngine, type ClesSalon, type Regle, type SalonEngine } from "./engine";
@@ -28,13 +28,13 @@ import { lireFragment } from "./liens";
 import { exclure } from "./exclusion";
 import * as preuve from "./preuve";
 import { finSilence } from "./son";
+import { MEME_FIN_MS, seuilAAfficher, type Averti } from "./fermeture";
 import { createZip, zipName, ZIP_BLOB_MAX_SMALL } from "../zip/store-zip";
 import { cleMembreLocal, indexMembre } from "../engine/index";
 import { KDF_CREATE } from "../engine/pure";
 
 /**
- * Lien de gestion gardé dans l'historique local pour ce lien d'invitation (entrée `salon_cree`,
- * plan C-5 point 6) : S_gestion, ou undefined. Jamais ailleurs dans le stockage du navigateur.
+ * Lien de gestion gardé dans l'historique local pour ce lien d'invitation (entrée `salon_cree`) : S_gestion, ou undefined. Jamais ailleurs dans le stockage du navigateur.
  */
 async function gestionGardee(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer> | undefined> {
   const frag = "#c" + b64u(kLien as Uint8Array<ArrayBuffer>);
@@ -71,7 +71,7 @@ export const vue = $state({
   silence: 0,
   connexion: "connexion" as "connexion" | "ouvert" | "coupe",
   dansLeGroupe: false,
-  /** Envoi retenu par le moteur depuis cet instant (exigence 23), ou null. */
+  /** Envoi retenu par le moteur depuis cet instant, ou null. */
   attenteDepuis: null as number | null,
   /** Limite de trames du serveur (0x0B) : heure où l'envoi en attente repart (affichage seulement). */
   ralentiJusqua: null as number | null,
@@ -82,7 +82,7 @@ export const vue = $state({
   /** Le serveur offre les appels audio et vidéo (relais TURN configuré et paiement ouvert). */
   appels: false,
   /**
-   * Appels réservés aux offres Plus et Pro (24 novembre) : un pass payé est gardé sur cet appareil
+   * Appels réservés aux offres Plus et Pro : un pass payé est gardé sur cet appareil
    * (lecture locale, salon/appel-offre.ts). Faux : lancer un appel explique « Réservé aux offres
    * Plus et Pro » sans rien demander ; rejoindre un appel en cours reste ouvert à tous.
    */
@@ -90,7 +90,7 @@ export const vue = $state({
   /** « Appel audio » ou « Appel vidéo » touché sans offre sur cet appareil : l'explication est affichée. */
   appelReserve: false,
   /**
-   * Lien de gestion collé dans la conversation (exigence C-3 32), jamais envoyé : « proposee »
+   * Lien de gestion collé dans la conversation (32), jamais envoyé : « proposee »
    * (membre : retrouver les droits ?), « deja » (déjà créateur), « autre » (pas ce salon),
    * « horsligne », « fait », ou null. Le secret lui-même n'est jamais dans cet état.
    */
@@ -101,6 +101,8 @@ export const vue = $state({
    * rouvrir le lien de gestion) ; null hors de ce cas.
    */
   detruireFin: null as "possible" | "lien" | null,
+  /** Alerte de fin en cours (minutes restantes), aussi montrée dans l'appel ; null sinon. */
+  alerteFin: null as number | null,
 });
 
 /**
@@ -117,7 +119,7 @@ async function gestionLocale(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer>
 }
 
 /**
- * Créateur délogé (exigence C-3 35) : « Détruire le salon » depuis l'écran de fin, avec le lien de
+ * Créateur délogé (35) : « Détruire le salon » depuis l'écran de fin, avec le lien de
  * gestion encore sur l'appareil (relu à la demande, jamais gardé pour cela) ; seul J_gestion part.
  * Rend vrai si le salon est détruit.
  */
@@ -179,6 +181,12 @@ type Session = {
   preuve?: { index: Uint8Array<ArrayBuffer>; cle: CryptoKey | null; sel: Uint8Array<ArrayBuffer> | null };
   /** K_maître_s courante (réécrite à chaque rotation) : seulement pour la preuve de membre. */
   kMaitre?: Uint8Array<ArrayBuffer>;
+  /** Dernière alerte de fin affichée (gardée dans la preuve de membre : pas de doublon au rechargement). */
+  averti?: Averti | null;
+  /** Heure où l'alerte de fin quitte l'appel (ms). */
+  alerteJusqua?: number;
+  /** Arrête la minuterie des alertes de fin. */
+  arretAlerte?: () => void;
   stop: (() => void)[];
 };
 let s: Session | undefined;
@@ -209,7 +217,7 @@ export function oublier(): void {
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, ralentiJusqua: null, createur: false, reprise: false, appels: false, offreAppel: false, appelReserve: false, gestionCollee: null, detruireFin: null });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, ralentiJusqua: null, createur: false, reprise: false, appels: false, offreAppel: false, appelReserve: false, gestionCollee: null, detruireFin: null, alerteFin: null });
   lienReprise = null;
   oublierGestionCollee();
 }
@@ -231,7 +239,7 @@ export async function ouvrirInvitation(kLien: Uint8Array<ArrayBuffer>): Promise<
   try {
     s.meta = await api.meta(net(), acces.k);
     s.sGestion = await gestionGardee(kLien);
-    // Lien de gestion ouvert juste avant dans cet onglet (« #s » seul, exigence C-3 32).
+    // Lien de gestion ouvert juste avant dans cet onglet (« #s » seul, 32).
     if (!s.sGestion && gestionColle) {
       s.sGestion = gestionColle.slice();
       s.gestionColle = true;
@@ -274,7 +282,7 @@ export async function deverrouiller(mdp: string): Promise<boolean> {
     // Preuve de membre (D41-26) : même place, même pseudonyme, sans `rejoindre`.
     if (x.preuve?.sel && (await reprendreParLaPreuve(x, mdp, x.preuve.sel))) return true;
     x.kMaitre = x.eng.cleMaitre(x.kLien, kMdp) as Uint8Array<ArrayBuffer>;
-    // Créateur revenu (exigence C-3 32) : siège 0 avec J_gestion, rôle rendu dès le Commit qui
+    // Créateur revenu (32) : siège 0 avec J_gestion, rôle rendu dès le Commit qui
     // l'ajoute ; il ne fonde pas de groupe (les membres en ligne l'ajoutent ; sinon, groupe orphelin).
     const o = { kLien: x.kLien, cles: x.cles, sGestion: x.sGestion };
     let entree;
@@ -305,7 +313,7 @@ export async function deverrouiller(mdp: string): Promise<boolean> {
   }
 }
 
-// --- Lien de gestion seul (« #s… », exigence C-3 32) ------------------------------------------------
+// --- Lien de gestion seul (« #s… », 32) ------------------------------------------------
 
 /** S_gestion d'un lien de gestion ouvert seul, gardé en mémoire pour l'invitation ouverte ensuite. */
 let gestionColle: Uint8Array<ArrayBuffer> | undefined;
@@ -469,6 +477,31 @@ function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
   x.appel?.fermer();
   x.appel = nouvelAppel(x, c);
   x.stop.push(c.ecouter((ev) => surEvenement(x, ev)));
+  x.arretAlerte?.();
+  const minuterie = setInterval(() => alerteFin(x), 1000);
+  x.arretAlerte = () => clearInterval(minuterie);
+  x.stop.push(x.arretAlerte);
+  alerteFin(x);
+}
+
+/** Durée de l'alerte de fin dans l'appel (elle reste dans la conversation). */
+const ALERTE_APPEL_MS = 60_000;
+
+/**
+ * Alerte avant la fin (30, 15, 5 et 1 min) : ligne du salon dans la conversation et rappel dans
+ * l'appel, calculés sur l'appareil (aucune trame).
+ */
+function alerteFin(x: Session): void {
+  if (s !== x || !x.client || !x.conv) return;
+  const maintenant = Date.now();
+  if (vue.alerteFin !== null && (maintenant >= (x.alerteJusqua ?? 0) || !x.averti || Math.abs(x.averti.finMs - vue.finMs) > MEME_FIN_MS)) vue.alerteFin = null;
+  const m = seuilAAfficher(vue.finMs, maintenant, x.averti ?? null);
+  if (m === null) return;
+  x.averti = { finMs: Math.round(vue.finMs), seuil: m };
+  x.alerteJusqua = maintenant + ALERTE_APPEL_MS;
+  vue.alerteFin = m;
+  x.conv.fermeture(m);
+  ecrirePreuve(x);
 }
 
 /**
@@ -562,7 +595,7 @@ function surEvenement(x: Session, ev: EvClient): void {
       }
       const r = conv.message(ev.seq, ev.siege, ev.epoque, ev.enveloppe);
       if (r) c.accuser("recu", [r.recu]);
-      // Notre pseudonyme pris par un siège arrivé avant : retour au champ (exigence 11).
+      // Notre pseudonyme pris par un siège arrivé avant : retour au champ.
       if (conv.pseudoRefuse && vue.etape === "conversation") {
         vue.monPseudo = null;
         vue.etape = "explication";
@@ -624,11 +657,11 @@ function surEvenement(x: Session, ev: EvClient): void {
       vue.fin = ev.raison;
       vue.etape = "fin";
       x.appel?.fermer();
-      // Créateur délogé (exigence C-3 35) : pas de reconnexion d'elle-même ; « Reprendre la main ici »
+      // Créateur délogé (35) : pas de reconnexion d'elle-même ; « Reprendre la main ici »
       // rouvre le lien d'invitation (mot de passe redemandé, lien de gestion relu dans l'historique).
       lienReprise = ev.raison === "remplace" && x.sGestion ? lienSalon(location.origin, "c", x.kLien, import.meta.env.BASE_URL) : null;
       vue.reprise = lienReprise !== null;
-      // « Détruire le salon » proposé si le lien de gestion est encore sur l'appareil (restes, point 3).
+      // « Détruire le salon » proposé si le lien de gestion est encore sur l'appareil.
       vue.detruireFin = null;
       if (lienReprise) {
         const k = x.kLien.slice();
@@ -708,7 +741,7 @@ function origineLien(x: Session): Uint8Array {
 function ecrirePreuve(x: Session): void {
   const c = x.client;
   if (!x.preuve?.cle || !x.preuve.sel || !c || !vue.monPseudo || !x.kMaitre) return;
-  void preuve.ecrire(x.preuve.index, x.preuve.cle, x.preuve.sel, { jeton: c.jeton, siege: c.siege, pseudo: vue.monPseudo, couleur: x.couleur ?? 0, kMaitre: x.kMaitre, sGestion: x.sGestion, silence: vue.silence, appels: vue.appels }, vue.finMs);
+  void preuve.ecrire(x.preuve.index, x.preuve.cle, x.preuve.sel, { jeton: c.jeton, siege: c.siege, pseudo: vue.monPseudo, couleur: x.couleur ?? 0, kMaitre: x.kMaitre, sGestion: x.sGestion, silence: vue.silence, appels: vue.appels, averti: x.averti ?? null }, vue.finMs);
 }
 
 /** Mode silencieux (v3 §14.4) : « toujours », 1 h, 8 h, ou null pour réactiver le son. */
@@ -731,6 +764,7 @@ async function reprendreParLaPreuve(x: Session, mdp: string, sel: Uint8Array<Arr
   x.preuve!.cle = cle;
   x.kMaitre = c.kMaitre as Uint8Array<ArrayBuffer>;
   x.couleur = c.couleur;
+  x.averti = c.averti ?? null;
   if (c.sGestion) x.sGestion = c.sGestion as Uint8Array<ArrayBuffer>;
   const cles = x.eng.clesDepuisMaitre(c.kMaitre);
   x.cles?.free();
@@ -781,7 +815,7 @@ export function effacement(b: Bulle, maintenantMs: number): { etat: "visible" } 
   }
 }
 
-// --- Lien de gestion collé dans la conversation (exigence C-3 32) -----------------------------------
+// --- Lien de gestion collé dans la conversation (32) -----------------------------------
 
 /** Secret du lien de gestion collé, en attente du choix de la personne (mémoire seulement). */
 let gestionEnAttente: Uint8Array<ArrayBuffer> | undefined;
@@ -794,7 +828,7 @@ function oublierGestionCollee(): void {
  * Texte tapé ou collé dans la saisie : s'il contient un lien de gestion, rien ne part (ni message,
  * ni « écrit ») ; le secret reste en mémoire le temps que la personne choisisse, la saisie est
  * vidée par l'écran. Rend vrai si le texte a été intercepté. Jamais gardé ailleurs : ni historique,
- * ni stockage ; la preuve de membre ne le reçoit que si les droits sont rendus (exigence 31).
+ * ni stockage ; la preuve de membre ne le reçoit que si les droits sont rendus.
  */
 export function intercepterLienGestion(texte: string): boolean {
   const cle = lienGestionDans(texte);
@@ -874,21 +908,48 @@ export function retirer(b: Bulle): void {
   x.conv.retirerLocal(b.id);
 }
 
-// --- Pièces (plan C-4) -------------------------------------------------------------------------
+// --- Pièces -------------------------------------------------------------------------
 
 /** Fichiers ouverts ou enregistrés ici (écran « Fichiers » : « Nouveau » sinon), en mémoire seulement. */
 export const fichiersOuverts = new SvelteSet<string>();
 /** Avatars masqués pour soi (v3 §7.2 : une photo peut être choquante), en mémoire seulement. */
 export const masques = new SvelteSet<number>();
 /** Adresses blob: des pièces affichées (clé de la bulle → URL), révoquées à l'effacement. */
-export const pieces = $state({ urls: {} as Record<string, string>, erreurs: {} as Record<string, string>, aConfirmer: [] as File[], avertissement: "" });
+export const pieces = $state({ urls: {} as Record<string, string>, erreurs: {} as Record<string, string>, lecture: {} as Record<string, true>, aConfirmer: [] as File[], avertissement: "" });
 /**
- * Pièces déjà en clair en mémoire (clé de bulle) : nos fichiers d'origine et les pièces affichées
- * (image, vocal, vidéo). « Enregistrer » et « Télécharger (N) » s'en servent sans relire le
- * serveur, ce qui ménage le budget de lecture du membre (2 lectures complètes par pièce : 429
- * budget au-delà, définitif). Oubliées avec l'adresse blob: (`liberer`).
+ * Pièces déjà en clair en mémoire (clé de bulle) : nos fichiers d'origine et chaque pièce lue
+ * (affichée ou enregistrée). « Enregistrer » et « Télécharger (N) » s'en servent sans relire le
+ * serveur : chaque membre ne télécharge une pièce qu'une fois (429 budget au-delà, définitif).
+ * Oubliées avec l'adresse blob: (`liberer`).
  */
 const originaux = new Map<string, Blob>();
+/** Lectures en cours (clé de bulle) : un second clic attend la même lecture au lieu d'en lancer une autre. */
+const lectures = new Map<string, Promise<Blob>>();
+
+/** Pièce en clair : déjà en mémoire, lecture en cours, ou lue du serveur (puis gardée). */
+function lire(x: Session, b: Bulle, max: number): Promise<Blob> {
+  const deja = originaux.get(b.cle);
+  if (deja) return Promise.resolve(deja);
+  const enCours = lectures.get(b.cle);
+  if (enCours) return enCours;
+  const l: Promise<Blob> = lirePiece(net(), x.client!.jeton, b.piece!.ref!, max)
+    .then((blob) => {
+      // Pièce retirée ou effacée pendant la lecture (liberer) : rien n'est gardé.
+      if (s === x && lectures.get(b.cle) === l) {
+        originaux.set(b.cle, blob);
+        delete pieces.erreurs[b.cle];
+      }
+      return blob;
+    })
+    .finally(() => {
+      if (lectures.get(b.cle) !== l) return;
+      lectures.delete(b.cle);
+      delete pieces.lecture[b.cle];
+    });
+  lectures.set(b.cle, l);
+  pieces.lecture[b.cle] = true;
+  return l;
+}
 let pieceLocale = 0;
 let fileDesEnvois: Promise<void> = Promise.resolve();
 
@@ -899,10 +960,14 @@ function liberer(cle: string): void {
   if (u) URL.revokeObjectURL(u);
   delete pieces.urls[cle];
   originaux.delete(cle);
+  lectures.delete(cle);
+  delete pieces.lecture[cle];
 }
 function oublierPieces(): void {
   for (const k of Object.keys(pieces.urls)) liberer(k);
   originaux.clear();
+  lectures.clear();
+  pieces.lecture = {};
   accusesPiece.clear();
   pieces.aConfirmer = [];
   pieces.erreurs = {};
@@ -999,15 +1064,15 @@ export async function afficherPiece(b: Bulle): Promise<void> {
   if (!mime || p.taille > (p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX)) return;
   if (lectureDefinitive(pieces.erreurs[b.cle])) return; // plafond de sortie ou budget de lecture : aucun nouvel essai
   try {
-    const blob = await lirePiece(net(), x.client.jeton, p.ref, p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX);
+    const blob = await lire(x, b, p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX);
     if (s !== x) return;
     // Image aux dimensions démesurées (bombe de décompression) : jamais décodée d'office.
     if (p.sorte === "image" && !(await previewable(blob))) {
       pieces.erreurs[b.cle] = "lecture";
       return;
     }
-    if (s !== x) return;
-    originaux.set(b.cle, blob);
+    // Deux appels pour la même lecture : une seule adresse blob:.
+    if (s !== x || pieces.urls[b.cle] || !originaux.has(b.cle)) return;
     pieces.urls[b.cle] = URL.createObjectURL(new Blob([blob], { type: mime }));
   } catch (e) {
     pieces.erreurs[b.cle] = causeLecture(e);
@@ -1021,7 +1086,7 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
   if (!x?.client || !p) return;
   if (lectureDefinitive(pieces.erreurs[b.cle]) && !originaux.has(b.cle)) return; // refus définitif : aucun nouvel essai
   try {
-    const blob = originaux.get(b.cle) ?? (p.ref ? await lirePiece(net(), x.client.jeton, p.ref) : null);
+    const blob = originaux.get(b.cle) ?? (p.ref ? await lire(x, b, PIECE_MAX) : null);
     if (!blob) return;
     const url = URL.createObjectURL(new Blob([blob], { type: "application/octet-stream" }));
     let nom = "fichier";
@@ -1064,7 +1129,7 @@ export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "le
     for (const b of choisies) {
       courante = b;
       const p = b.piece!;
-      const blob = originaux.get(b.cle) ?? (await lirePiece(net(), x.client.jeton, p.ref!));
+      const blob = await lire(x, b, PIECE_MAX);
       const octets = new Uint8Array(await blob.arrayBuffer());
       let nom = "fichier";
       try {
@@ -1134,7 +1199,7 @@ export function estVu(b: Bulle): boolean {
 /** Accusés de pièce déjà envoyés (clé de bulle + sorte) : une fois chacun. */
 const accusesPiece = new Set<string>();
 /**
- * Accusé « Ouvert » ou « Téléchargé » d'une pièce reçue (v3 §14.2). Décision par défaut, à valider :
+ * Accusé « Ouvert » ou « Téléchargé » d'une pièce reçue (v3 §14.2) :
  * « Ouvert » = contenu affiché ou lu dans l'application (image affichée dans un message vu, vocal ou
  * vidéo lancés) ; le site n'a pas de visionneuse de documents (seulement « Enregistrer »).
  */
@@ -1157,7 +1222,7 @@ export function vu(b: Bulle): void {
   if (b.regle !== 0 && b.seq !== null) x.client.lu(b.seq);
 }
 
-// --- Codes, gestion, fin (plan C-5) ---------------------------------------------------------------
+// --- Codes, gestion, fin ---------------------------------------------------------------
 
 /** Code de vérification d'un siège (5 groupes de 5 chiffres), ou null hors du groupe. */
 export function code(siege: number): string | null {
@@ -1270,7 +1335,7 @@ export async function renouveler(h: Duree): Promise<string | null> {
 }
 
 let dernierEcrit = 0;
-/** « En train d'écrire » : au plus toutes les 4 s pendant la frappe (plan C-3, point 8). */
+/** « En train d'écrire » : au plus toutes les 4 s pendant la frappe. */
 export function ecrit(): void {
   const t = Date.now();
   if (t - dernierEcrit < 4_000) return;

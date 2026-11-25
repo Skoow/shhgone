@@ -1,15 +1,15 @@
 <script module lang="ts">
-  // Plus d'entrée animée (18 novembre) : l'accueil est écrit au build et affiché avant le
-  // script (référencement) ; le titre s'affiche d'emblée dans son état final (17 novembre).
+  // Plus d'entrée animée : l'accueil est écrit au build et affiché avant le
+  // script (référencement) ; le titre s'affiche d'emblée dans son état final.
 
-  /** D'où viennent les fichiers remis à `onfiles` (composer.add, Task 10). */
+  /** D'où viennent les fichiers remis à `onfiles` (composer.add). */
   export type Source = "fichiers" | "photo" | "video" | "depot";
-  /** Actions qui ouvrent une interface dans la page (Tasks 10 à 12). */
+  /** Actions qui ouvrent une interface dans la page. */
   export type Action = "media" | "vocal" | "texte";
 </script>
 
 <script lang="ts">
-  // Accueil, refonte du 12 novembre (décision du propriétaire) : sur-titre, titre, phrase, deux
+  // Accueil : sur-titre, titre, phrase, deux
   // boutons (« Choisir des fichiers » ouvre le sélecteur du composeur ; « Ouvrir un salon »,
   // bientôt), ligne de méta lue dans limits.ts ; l'infographie animée à côté (ordinateur) ou
   // dessous (téléphone) ; puis « Comment ça marche », « Pensé pour la
@@ -31,7 +31,7 @@
   type Props = {
     /** Vrai dès qu'un élément est ajouté : le titre se replie (UI §9.1), le reste de l'accueil part. */
     compact?: boolean;
-    /** Le composeur (Task 10), posé dans le réceptacle. Sans lui, le réceptacle vide. */
+    /** Le composeur, posé dans le réceptacle. Sans lui, le réceptacle vide. */
     children?: Snippet;
     /** Fichiers choisis ou déposés (composer.add) ; `folders` : dossiers déposés, refusés. */
     onfiles?: (files: File[], source: Source, folders: string[]) => void;
@@ -39,20 +39,19 @@
     active?: boolean;
     /** « Choisir des fichiers » (héros) : ouvre directement le sélecteur de fichiers du composeur. */
     onpick?: () => void;
-    /** « Ou créez sur place » (héros, 19 novembre) : page d'envoi, ce geste déjà choisi. */
+    /** « Ou créez sur place » (héros) : page d'envoi, ce geste déjà choisi. */
     onmake?: (g: "media" | "vocal" | "room") => void;
   };
   let { compact = false, children, onfiles, active = true, onpick, onmake }: Props = $props();
   // Onglet caché : les boucles d'ambiance de l'accueil (titre en trame, panneau chiffré) s'arrêtent.
 
-  // « puis plus rien. » effacé vers la dernière lettre (proposition G du 16 novembre) : affiché
-  // d'emblée dans cet état, sans entrée ni extinction animée (décision du propriétaire du
-  // 17 novembre) ; chaque lettre plus pâle que la précédente, le point final invisible. La phrase
+  // « puis plus rien. » effacé vers la dernière lettre (proposition G) : affiché
+  // d'emblée dans cet état, sans entrée ni extinction animée ; chaque lettre plus pâle que la précédente, le point final invisible. La phrase
   // entière reste lue d'un bloc (copie sr-only, K8).
 
   /**
    * Seconde ligne du titre (après la dernière virgule, « puis », « then ») : chaque lettre et son
-   * rang (`k`), qui décale son effacement en trame (19 novembre).
+   * rang (`k`), qui décale son effacement en trame.
    */
   const words = $derived.by(() => {
     const list = t("hero.title").split(/ +/);
@@ -60,10 +59,10 @@
     list.forEach((w, i) => {
       if (w.endsWith(",") && i < list.length - 1) breath = i;
     });
-    // « puis » reste plein, seuls « plus rien. » se défont (maquette « La trame », 19 novembre, 3).
+    // « puis » reste plein, seuls « plus rien. » se défont (maquette « La trame »).
     const hl = (i: number) => breath >= 0 && i > breath + 1;
     let seen = 0;
-    // Seconde ligne colorée (référence du propriétaire, 12 novembre) : « puis plus rien. ».
+    // Seconde ligne colorée (référence) : « puis plus rien. ».
     return list.map((w, i) => ({
       w,
       hl: hl(i),
@@ -79,7 +78,7 @@
 
   const nLetters = $derived(words.reduce((n, w) => n + w.letters.length, 0));
   /**
-   * État figé de chaque lettre de « plus rien. » (propriétaire, 19 novembre, 4 : plus d'animation,
+   * État figé de chaque lettre de « plus rien. » (plus d'animation,
    * le titre reste effacé) : du début à la fin, points blancs serrés, points blancs, points menthe,
    * puis points qui s'envolent (maquette « La trame »). Calculé sur la position, toute langue.
    */
@@ -91,14 +90,14 @@
   // Accroche coupée autour des mots mis en avant (sans HTML dans les textes).
   const lede = $derived.by(() => {
     const marks: Record<string, string> = { "\u0000": t("hero.lede.voice"), "\u0001": t("hero.lede.notes"), "\u0002": t("hero.lede.room") };
-    // Salon en service (__SALONS__) : plus de « bientôt » (revue du 20 novembre).
+    // Salon en service (__SALONS__) : plus de « bientôt ».
     return t(__SALONS__ ? "hero.lede2.salon" : "hero.lede2", { voice: "\u0000", notes: "\u0001", room: "\u0002" })
       .split(/(\u0000|\u0001|\u0002)/)
       .map((p) => (p in marks ? { b: marks[p]! } : { s: p }));
   });
 
   // Ligne de méta : la limite gratuite vient de limits.ts (jamais écrite dans les textes).
-  // « 2 Go » n'est écrit qu'une fois, sous le bouton du cadre (propriétaire, 19 novembre, 3).
+  // « 2 Go » n'est écrit qu'une fois, sous le bouton du cadre.
   const meta = $derived([t("hero.meta.free"), t("home.fact.account"), t("hero.meta.erase")]);
 
   function give(list: File[], source: Source, folders: string[] = []) {
@@ -148,7 +147,7 @@
 <div class={["home", { compact }]}>
   <section class="hero" aria-labelledby="hero-title">
     {#if compact}
-      <!-- Page d'envoi (retours du propriétaire du 17 novembre) : un titre pour les lecteurs
+      <!-- Page d'envoi : un titre pour les lecteurs
            d'écran (« Votre envoi » est le titre visible) ; les trois assurances sont dans le cadre
            de dépôt du composeur (ui/Assurances.svelte). -->
       <h1 id="hero-title" tabindex="-1" class="sr-only">{t("send.h1")}</h1>
@@ -163,17 +162,17 @@
                 >{" "}{/each}
             </span>
           </h1>
-          <!-- Accroche (17 novembre) : « fichiers » en général, et ce qu'on ne devine pas sans bouton
+          <!-- Accroche : « fichiers » en général, et ce qu'on ne devine pas sans bouton
                exprès mis en avant : vocaux, notes, salon de discussion. -->
           <p class="lede" data-lede>
             {#each lede as p, i (i)}{#if "b" in p}<b class="hl">{p.b}</b>{:else}{p.s}{/if}{/each}
           </p>
         </div>
-        <!-- Cadre d'envoi (19 novembre) : la zone de dépôt (titre, « Choisir des fichiers ») puis
+        <!-- Cadre d'envoi : la zone de dépôt (titre, « Choisir des fichiers ») puis
              « Ou créez sur place » : Photo ou vidéo, Vocal, Salon, sur une ligne. Chaque bouton mène à
              la page d'envoi avec son geste déjà choisi (Salon : bientôt, mis en avant là-bas). -->
       <div class={["ctas", "box", { over }]} data-ctas>
-        <!-- Zone de dépôt (19 novembre, 3) : pointillé menthe autour du titre et du bouton. -->
+        <!-- Zone de dépôt : pointillé menthe autour du titre et du bouton. -->
         <div class="drop">
           <span class="up" aria-hidden="true"><Upload size={22} strokeWidth={2.2} /></span>
           <p class="bx-t" aria-hidden="true">{t("hero.box.title")}</p>
@@ -188,7 +187,7 @@
           <div class="mk3">
             <button type="button" class="mk" data-make="media" onclick={() => onmake?.("media")}><Camera size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.share.media.t")}</span></button>
             <button type="button" class="mk" data-make="vocal" onclick={() => onmake?.("vocal")}><Mic size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.share.vocal.t")}</span></button>
-            <!-- Salon (plan C-3) : création avec __SALONS__ ; « bientôt » sinon (démo, site sans compte). -->
+            <!-- Salon : création avec __SALONS__ ; « bientôt » sinon (démo, site sans compte). -->
             <button type="button" class={["mk", { soon: !__SALONS__ }]} data-make="room" aria-describedby={__SALONS__ ? undefined : "hero-room-soon"} onclick={() => onmake?.("room")}
               ><MessagesSquare size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.room")}</span>{#if !__SALONS__}<span class="pill">{t("foot.soon")}</span>{/if}</button
             >
@@ -199,19 +198,19 @@
         <ul class="meta" aria-label={t("home.facts.label")} data-meta>
           {#each meta as m, i (i)}<li>{m}</li>{/each}
         </ul>
-      <!-- L'infographie animée a sa propre section, avec ses étapes (19 novembre, 3) ; le cadre
+      <!-- L'infographie animée a sa propre section, avec ses étapes ; le cadre
            d'envoi est à droite du titre (maquette « La trame »). -->
     {/if}
   </section>
 
-  <!-- Plus de bande d'engagements (17 novembre) : la sécurité et la confidentialité sont dites
+  <!-- Plus de bande d'engagements : la sécurité et la confidentialité sont dites
        dans leurs pages. -->
 
   <!-- « Vos partages actifs » (spec §33.1, UI §9.6.1) : lecture locale seulement, rien sans partage actif. -->
   {#if !compact}<div class="shares"><ActiveSharesStrip /></div>{/if}
 
   <!-- Le composeur (page d'envoi) seulement : plus de carte de dépôt « Glissez vos fichiers ici »
-       sur l'accueil (18 novembre, doublon de « Choisir des fichiers » ; le dépôt sur toute la page
+       sur l'accueil (doublon de « Choisir des fichiers » ; le dépôt sur toute la page
        reste possible). -->
   {#if children}
     <div class="compose" data-slot="compose">
@@ -299,7 +298,7 @@
     line-height: 1.55;
     text-wrap: pretty;
   }
-  /* Cadre d'envoi (19 novembre, 3) : la zone de dépôt, en pointillé menthe, entoure le titre et le
+  /* Cadre d'envoi : la zone de dépôt, en pointillé menthe, entoure le titre et le
      bouton ; les trois gestes « Ou créez sur place » sur une ligne dessous. */
   .box {
     display: grid;
@@ -390,7 +389,7 @@
     outline: 2px solid var(--text);
     outline-offset: 3px;
   }
-  /* Toujours trois colonnes : Photo ou vidéo, Vocal, Salon côte à côte (19 novembre, 3). */
+  /* Toujours trois colonnes : Photo ou vidéo, Vocal, Salon côte à côte. */
   .mk3 {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -469,13 +468,13 @@
       display: none;
     }
   }
-  /* Tuile « Choisir des fichiers » (16 novembre) : verre sombre, contour en pointillé menthe (une
+  /* Tuile « Choisir des fichiers » : verre sombre, contour en pointillé menthe (une
      zone de dépôt), pastille d'icône menthe, titre et « ou glissez-les ici », flèche. */
-  /* Les trois assurances sur une seule ligne (propriétaire, 20 novembre) : une capsule discrète,
+  /* Les trois assurances sur une seule ligne : une capsule discrète,
      séparées par un point menthe ; plus de cases cochées. */
   .meta {
     display: inline-flex;
-    /* Toujours une seule ligne (propriétaire, 20 novembre : « plus petit, sur une ligne »). */
+    /* Toujours une seule ligne (« plus petit, sur une ligne »). */
     flex-wrap: nowrap;
     justify-content: center;
     align-items: center;
@@ -508,7 +507,7 @@
     transform: translateY(-1px);
   }
   
-  /* Page d'envoi (retours du 12 novembre) : le titre visible, plus petit, à gauche ; trois
+  /* Page d'envoi : le titre visible, plus petit, à gauche ; trois
      assurances dessous ; le Salon à droite (ordinateur) ou dessous (téléphone). */
   .home.compact .hero {
     padding-top: 0;
@@ -521,7 +520,7 @@
   /* Salon (bientôt) : à part des actions d'envoi, désactivé mais lisible. */
 
 
-  /* « Commencer » (page d'envoi) : bouton contour ; le blanc plein reste au héros (refonte du 12 novembre). */
+  /* « Commencer » (page d'envoi) : bouton contour ; le blanc plein reste au héros. */
 
   
 
@@ -545,7 +544,7 @@
       display: none;
     }
   }
-  /* Composeur sur ordinateur (retours du 12 novembre) : la carte a un contour entier ; l'ouverture
+  /* Composeur sur ordinateur : la carte a un contour entier ; l'ouverture
      de la capsule (motif du logo) laissait le haut sans bord, de la gauche jusqu'au milieu. Le
      dépôt garde son ouverture resserrée. */
   .home.compact .compose :global(.vessel:not(.drop) .track) {
@@ -599,7 +598,7 @@
     margin-inline: auto;
   }
 
-  /* « plus rien. » figé dans son effacement (propriétaire, 19 novembre, 4 : aucune animation) :
+  /* « plus rien. » figé dans son effacement (aucune animation) :
      trame de points de plus en plus fine, blanche puis menthe ; les deux dernières lettres partent
      en points vers la droite (deux copies de la lettre, data-c, hors du masque). Masques CSS seuls. */
   .l {
@@ -614,9 +613,9 @@
     -webkit-mask-size: 5px 5px;
     mask-size: 5px 5px;
   }
-  /* Plus effacé (19 novembre, 5) : la trame s'affine plus vite, « rie » commence à partir en
+  /* Plus effacé : la trame s'affine plus vite, « rie » commence à partir en
      points, « n. » n'est presque plus que poussière. */
-  /* Plus lisible (propriétaire, 20 novembre : « qu'on voie mieux le mot ») : trame plus pleine,
+  /* Plus lisible (« qu'on voie mieux le mot ») : trame plus pleine,
      menthe franche ; seule la dernière lettre part vraiment en poussière. */
   .s1 .g {
     --r: 2.6px;
@@ -717,7 +716,7 @@
     }
   }
   /* Ordinateur : titre, phrase et assurances à gauche ; le cadre d'envoi à droite (maquette « La
-     trame ») ; toute la largeur utile (19 novembre, 3 : « trop compressé »). */
+     trame ») ; toute la largeur utile (« trop compressé »). */
   @media (min-width: 1024px) {
     .home:not(.compact) .hero {
       grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
@@ -778,7 +777,7 @@
       border: 1px solid ButtonText;
       box-shadow: none;
     }
-    /* Le cadre d'envoi est la zone de dépôt : pointillé (19 novembre). */
+    /* Le cadre d'envoi est la zone de dépôt : pointillé. */
     .box {
       border: 1px dashed CanvasText;
       box-shadow: none;

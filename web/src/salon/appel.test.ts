@@ -107,7 +107,7 @@ class Monde {
   pcs = new Map<number, FauxPC[]>();
   refuseMedia = new Set<number>();
   refuseRelais = new Set<number>();
-  /** Sièges sans offre Plus ou Pro alors que les appels du salon sont fermés (24 novembre). */
+  /** Sièges sans offre Plus ou Pro alors que les appels du salon sont fermés. */
   sansOffre = new Set<number>();
   refuseFace = new Set<string>();
   moteurOccupe = false;
@@ -185,7 +185,7 @@ describe("filtre des candidats", () => {
     expect(candidatRelais(RELAIS)).toBe(true);
     expect(candidatRelais(HOTE)).toBe(false);
     expect(candidatRelais("candidate:1 1 udp 1 10.0.0.1 1 typ relayed")).toBe(false);
-    // « typ relay » glissé ailleurs dans la ligne : refusé (revue du 21 novembre).
+    // « typ relay » glissé ailleurs dans la ligne : refusé.
     expect(candidatRelais("candidate:1 1 udp 1 10.0.0.5 9 typ host x typ relay")).toBe(false);
     expect(filtrerSdp("v=0\r\na=candidate:1 1 udp 1 10.0.0.5 9 typ host x typ relay\r\n")).toBe("v=0\r\n");
   });
@@ -288,7 +288,7 @@ describe("appel à deux", () => {
   });
 });
 
-describe("appareils (ajouts du 21 novembre)", () => {
+describe("appareils", () => {
   async function deux() {
     const w = new Monde();
     const a = w.membre(0);
@@ -505,7 +505,7 @@ describe("cas limites", () => {
   });
 });
 
-describe("membre malveillant (revue du 21 novembre)", () => {
+describe("membre malveillant", () => {
   /** Monde à trois en appel et connectés : A (0), V (1), H (2). */
   async function aTrois() {
     const w = new Monde();

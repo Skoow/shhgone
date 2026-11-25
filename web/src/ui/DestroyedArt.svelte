@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Illustration de l'état « partage détruit » (UI §9.10.1, décision du 7 novembre) : un
+  // Illustration de l'état « partage détruit » (UI §9.10.1) : un
   // document géométrique (rayon 12, coin plié, trois lignes) dont le bord droit et bas se défait
   // en points carrés de la Trame qui dérivent vers le haut et la droite. Remplace le cadenas
   // ouvert. Mouvement composé seulement (transform, opacity), joué une fois ; mouvement réduit :

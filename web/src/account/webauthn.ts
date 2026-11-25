@@ -1,5 +1,4 @@
-// Passkeys dans le navigateur (conception 2026-11-22-compte-passkey-design.md §3, §5, §9 ; plan,
-// lot W1). Seul module qui parle au navigateur pour les passkeys, par navigateur.ts (seul fichier
+// Passkeys dans le navigateur (conception 2026-11-22-compte-passkey-design.md §3, §5, §9). Seul module qui parle au navigateur pour les passkeys, par navigateur.ts (seul fichier
 // qui touche navigator.credentials ; dans la démo, navigateur.demo.ts : passkey simulée).
 // - Options : le JSON de WebAuthn niveau 3 rendu par le serveur, converti ici (base64url →
 //   octets : challenge, user.id, identifiants des passkeys, entrées PRF). Conversion locale

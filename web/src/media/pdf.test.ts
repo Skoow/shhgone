@@ -1,7 +1,7 @@
-// Nettoyage des PDF (spec §35.2, Task 9b) sur les fichiers d'essai de scripts/gen-fixtures.mjs.
+// Nettoyage des PDF (spec §35.2) sur les fichiers d'essai de scripts/gen-fixtures.mjs.
 // La lisibilité se vérifie par la structure (chaque entrée de chaque table xref pointe toujours
 // sur « N G obj », même longueur, texte de page intact) ; les images intégrées restent octet pour
-// octet (décision du propriétaire, 10 novembre).
+// octet.
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
@@ -12,7 +12,7 @@ import { found } from "./test-markers";
 const fx = (n: string) => new Uint8Array(readFileSync(new URL(`./fixtures/${n}`, import.meta.url)));
 /** Propriétés du document (/Info des révisions, XMP du catalogue) : retirées. */
 const MARKERS = ["ReperAuteur", "ReperAncien", "ReperCreateur", "ReperLogiciel", "20010203", "FEFF005200650070"];
-/** Contenu du document (miniature de page, XMP d'une page) : jamais touché (décision du 11 novembre). */
+/** Contenu du document (miniature de page, XMP d'une page) : jamais touché. */
 const KEPT = ["ReperThumb", "ReperXMPPage", "ReperModel"];
 const latin1 = (b: Uint8Array) => new TextDecoder("latin1").decode(b);
 
@@ -108,7 +108,7 @@ describe("PDF (spec §35.2)", () => {
   });
 });
 
-describe("PDF hostile (revue du 10 novembre)", () => {
+describe("PDF hostile", () => {
   it("table de références en flux avec /W [0 0 0] : refusée tout de suite, sans boucle sur /Index", async () => {
     const pdf = "%PDF-1.5\n1 0 obj\n<< /Type /XRef /W [0 0 0] /Size 4000000 /Index [0 4000000] /Length 0 >>\nstream\n\nendstream\nendobj\nstartxref\n9\n%%EOF\n";
     const { r } = await clean("hostile.pdf", new TextEncoder().encode(pdf));
@@ -147,10 +147,10 @@ function imagePdf(filter: string, img: Uint8Array, extra: [number, string, Uint8
   for (const p of parts) (out.set(p, o), (o += p.length));
   return out;
 }
-describe("PDF : images intégrées (revue du 10 novembre)", () => {
+describe("PDF : images intégrées", () => {
   const photo = fx("iphone-like.jpg");
 
-  it("images intégrées jamais modifiées, quel que soit leur format (décision du propriétaire, 10 novembre)", async () => {
+  it("images intégrées jamais modifiées, quel que soit leur format", async () => {
     const box = (t: string, body: number[]) => [0, 0, 0, 8 + body.length, ...[...t].map((c) => c.charCodeAt(0)), ...body];
     const jp2 = new Uint8Array([...box("jP  ", [13, 10, 135, 10]), ...box("ftyp", [...Buffer.from("jp2 \0\0\0\0jp2 ")]), ...box("xml ", [...Buffer.from("<x>ReperXMP</x>")]), ...box("jp2c", [0xff, 0x4f, 0xff, 0x51])]);
     for (const [filter, data] of [["/DCTDecode", photo], ["[/FlateDecode /DCTDecode]", deflateSync(photo)], ["/JPXDecode", jp2]] as const) {

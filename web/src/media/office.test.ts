@@ -1,4 +1,4 @@
-// Nettoyage des documents Office et ODF (spec §35.2, Task 9b) sur les fichiers d'essai de
+// Nettoyage des documents Office et ODF (spec §35.2) sur les fichiers d'essai de
 // scripts/gen-fixtures.mjs (repères fictifs).
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -42,7 +42,7 @@ describe("bureautique (spec §35.2)", () => {
     for (const e of z.entries) m.set(e.name, await entryData(blob, e, 1 << 26));
     return m;
   }
-  /** Règle du propriétaire (D41-27) : seules ces parties changent ; tout le reste (commentaires,
+  /** Règle (D41-27) : seules ces parties changent ; tout le reste (commentaires,
    *  personnes, suivi des modifications, corps du document) est recopié octet pour octet. */
   const TOUCHED = /^(docProps\/|meta\.xml$|_rels\/\.rels$|\[Content_Types\]\.xml$|META-INF\/manifest\.xml$|Thumbnails\/|(word|xl|ppt)\/media\/|Pictures\/)/u;
   async function untouched(name: string, parts: Map<string, Uint8Array>) {
@@ -155,7 +155,7 @@ describe("bureautique (spec §35.2)", () => {
   const RELS = (body: string) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${body}</Relationships>`;
   const PRINTER = new Uint8Array([...new TextEncoder().encode("ReperImprimante"), 0, ...[..."ReperImprimante"].flatMap((c) => [c.charCodeAt(0), 0])]);
 
-  it("DOCX : modèle attaché (chemin local) retiré ; paramètres d'imprimante gardés (décision du 10 novembre) ; paquet cohérent", async () => {
+  it("DOCX : modèle attaché (chemin local) retiré ; paramètres d'imprimante gardés ; paquet cohérent", async () => {
     const src = await sourceParts("meta.docx");
     const ct = dec.decode(src.get("[Content_Types].xml")).replace("</Types>", '<Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.printerSettings"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>');
     const docRels = dec.decode(src.get("word/_rels/document.xml.rels")).replace("</Relationships>", `<Relationship Id="rId20" Type="${R}/settings" Target="settings.xml"/><Relationship Id="rId21" Type="${R}/printerSettings" Target="printerSettings/printerSettings1.bin"/></Relationships>`);
@@ -194,7 +194,7 @@ describe("bureautique (spec §35.2)", () => {
     consistent(parts, await sourceParts("", bytes));
   });
 
-  it("ODT : settings.xml gardé tel quel, imprimante comprise (décision du 10 novembre)", async () => {
+  it("ODT : settings.xml gardé tel quel, imprimante comprise", async () => {
     const C = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0"';
     const settings = `<?xml version="1.0" encoding="UTF-8"?>\n<office:document-settings ${C} office:version="1.3"><office:settings><config:config-item-set config:name="ooo:configuration-settings"><config:config-item config:name="PrinterName" config:type="string">ReperImprimante</config:config-item><config:config-item config:name="PrinterSetup" config:type="base64Binary">UmVwZXJJbXByaW1hbnRl</config:config-item><config:config-item config:name="PrinterIndependentLayout" config:type="string">high-resolution</config:config-item></config:config-item-set></office:settings></office:document-settings>`;
     const src = await sourceParts("meta.odt");

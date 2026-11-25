@@ -1,7 +1,7 @@
-// Retours du propriétaire du 11 novembre : plus de roue ni de panneau Réglages ; le pied de page
+// Plus de roue ni de panneau Réglages ; le pied de page
 // est sur toutes les pages (accueil, composeur, pages d'information, partage ouvert), ordinateur
-// et téléphone, et porte « À propos » (plus de choix de langue ni de « Nettoyage automatique »
-// depuis le 12 novembre : la langue suit le navigateur, chaque fichier a son balai). Pendant un
+// et téléphone, et porte « À propos » (plus de choix de langue ni de « Nettoyage automatique » :
+// la langue suit le navigateur, chaque fichier a son balai). Pendant un
 // envoi, ses liens sont désactivés (aucun clic ne quitte la page). Salon « bientôt » sur
 // l'accueil, à part des actions d'envoi (spec §39).
 import type { Page } from "@playwright/test";
@@ -16,11 +16,11 @@ const SEG = /\/api\/shares\/segments\/\d+(\?from=\d+)?$/;
 async function noSettings(page: Page) {
   await expect(page.getByRole("button", { name: /^(Réglages|Settings)$/ })).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: /^(Réglages|Settings)$/ })).toHaveCount(0);
-  // En-tête : ni roue ni langue ; ses seuls boutons sont les menus de la barre du haut (12 novembre).
+  // En-tête : ni roue ni langue ; ses seuls boutons sont les menus de la barre du haut.
   await expect(page.getByRole("banner").getByRole("button", { name: /Réglages|Settings|Langue|Language|Français|English/ })).toHaveCount(0);
 }
 
-/** Pied présent, avec ses liens et « À propos » ; ni langue ni nettoyage automatique (12 novembre). */
+/** Pied présent, avec ses liens et « À propos » ; ni langue ni nettoyage automatique. */
 async function fullFoot(page: Page) {
   const f = foot(page);
   await f.scrollIntoViewIfNeeded();
@@ -29,7 +29,7 @@ async function fullFoot(page: Page) {
   await expect(footLink(page, "Conditions d'utilisation")).toBeVisible();
   await expect(f.getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0);
   await expect(f.getByRole("switch")).toHaveCount(0);
-  // Plus de « À propos » (pied B2, 18 novembre) : la phrase de la marque le dit déjà.
+  // Plus de « À propos » (pied B) : la phrase de la marque le dit déjà.
   await expect(f.getByText("À propos", { exact: true })).toHaveCount(0);
   await page.evaluate(() => scrollTo(0, 0));
 }
@@ -63,7 +63,7 @@ test.describe("fr-FR", () => {
   });
 
   // Ancien test « langue et nettoyage automatique changés depuis le pied de page » : les deux
-  // réglages sont retirés (décision du propriétaire du 12 novembre). La langue suit le
+  // réglages sont retirés. La langue suit le
   // navigateur (i18n.spec.ts) ; le nettoyage se fait au balai (envoi.spec.ts).
 
   test("pendant un envoi : pied affiché, liens désactivés avec leur raison", async ({ page, shh }) => {
@@ -80,10 +80,10 @@ test.describe("fr-FR", () => {
     await expect(f).toBeAttached();
     const reason = f.locator("[data-foot-busy]");
     await expect(reason).toContainText("désactivés pendant l'envoi");
-    // Plus de bandeau visible (21 novembre) : la raison est lue par les lecteurs d'écran et en bulle.
+    // Plus de bandeau visible : la raison est lue par les lecteurs d'écran et en bulle.
     await expect(reason).toHaveClass(/sr-only/);
     await expect(footLink(page, "Sécurité")).toHaveAttribute("title", /désactivés pendant l'envoi/);
-    // Liens : désactivés, décrits par la raison, gardés au clavier (audit M22) ; un clic ne quitte pas la page.
+    // Liens : désactivés, décrits par la raison, gardés au clavier ; un clic ne quitte pas la page.
     const sec = footLink(page, "Sécurité");
     await expect(sec).toHaveAttribute("aria-disabled", "true");
     await expect(sec).toHaveAccessibleDescription(/désactivés pendant l'envoi/);
@@ -100,9 +100,9 @@ test.describe("fr-FR", () => {
 
   test("Salon : plus de bouton à part sur l'accueil ; avec les autres actions de « Créer sur place », « bientôt », désactivé avec sa raison", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/");
-    // Retours du 17 novembre : deux boutons seulement dans le héros (fichiers, créer sur place).
+    // Deux boutons seulement dans le héros (fichiers, créer sur place).
     await expect(page.locator("[data-room]")).toHaveCount(0);
-    // Cadre d'envoi (19 novembre) : Choisir des fichiers, Photo ou vidéo, Vocal, Salon (bientôt).
+    // Cadre d'envoi : Choisir des fichiers, Photo ou vidéo, Vocal, Salon (bientôt).
     await expect(page.locator("[data-ctas] button")).toHaveCount(4);
     await expect(page.locator('[data-make="room"]')).toContainText("bientôt");
     await page.locator('[data-make="room"]').click();
@@ -121,7 +121,7 @@ test.describe("fr-FR", () => {
   test("ordinateur : plus de lumière au pointeur (contour lumineux gardé) ; « Créer sur place » en haut ; flèche sous le texte", async ({ page, shh, isMobile }) => {
     test.skip(isMobile, "ordinateur seulement (téléphone : feuille « Ajouter », inchangée)");
     // Le réceptacle n'est plus que sur la page d'envoi (carte de l'accueil, avec sa lumière
-    // ambiante, retirée le 18 novembre) : aucun projecteur au pointeur.
+    // ambiante, retirée) : aucun projecteur au pointeur.
     await page.goto(shh.origin + "/envoyer");
     await expect(page.locator(".vessel .spot, .vessel .spot-clip")).toHaveCount(0);
     await page.mouse.move(1000, 500);
@@ -146,7 +146,7 @@ test.describe("fr-FR", () => {
   });
 });
 
-test("page courte sur grand écran : le pied de page touche le bas de l'écran, sans bande vide dessous (21 novembre)", async ({ page, shh }) => {
+test("page courte sur grand écran : le pied de page touche le bas de l'écran, sans bande vide dessous", async ({ page, shh }) => {
   await page.setViewportSize({ width: 2000, height: 1300 });
   await page.goto(shh.origin + "/envois");
   const f = foot(page);

@@ -1,4 +1,4 @@
-// buildId (vite.config.ts) : un build sans identifiant valide échoue (audit du 11 novembre, I6) ;
+// buildId (vite.config.ts) : un build sans identifiant valide échoue ;
 // « dev » reste possible pour vite dev et les tests.
 import { afterEach, describe, expect, it } from "vitest";
 import { buildId } from "../vite.config";

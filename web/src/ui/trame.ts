@@ -1,4 +1,4 @@
-// Trame de points de l'écran d'envoi (refonte du 19 novembre, direction « La trame » de
+// Trame de points de l'écran d'envoi (direction « La trame » de
 // l'accueil) : calculs purs, sans DOM, sans données réelles. La trame ne dit que ce que dit
 // l'envoi : la part allumée suit la part des octets confirmés envoyés, jamais plus loin ;
 // le mouvement ne vit que si des octets passent vraiment. Le dessin est dans Trame.svelte.

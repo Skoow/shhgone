@@ -1,4 +1,4 @@
-// Page d'envoi « /envoyer », retours du propriétaire du 12 novembre : défilement à la molette
+// Page d'envoi « /envoyer » : défilement à la molette
 // partout sur la page, zone de dépôt compacte, titre et trois assurances, bloc des offres,
 // entrée « Salon », nettoyage par le balai (bulle, confirmation, « Tout nettoyer »), plus
 // d'interrupteur « Nettoyage automatique » ni de langues dans le pied de page.
@@ -51,7 +51,7 @@ test("ordinateur : la carte du composeur a un contour entier (pas d'ouverture en
 
 test("premier écran : titre, trois assurances, zone de dépôt compacte, offres et Salon, sans défiler", async ({ page, shh, isMobile }) => {
   await openSend(page, shh.origin);
-  // Plus le slogan de l'accueil (17 novembre) : h1 « Nouveau partage » pour les lecteurs d'écran ;
+  // Plus le slogan de l'accueil : h1 « Nouveau partage » pour les lecteurs d'écran ;
   // « Votre envoi » est le titre visible. Les assurances sont dans le cadre de dépôt.
   await expect(page.getByRole("heading", { level: 1, name: "Nouveau partage" })).toHaveCount(1);
   await expect(page.locator("[data-dz-box] [data-assure]")).toBeVisible();
@@ -69,7 +69,7 @@ test("premier écran : titre, trois assurances, zone de dépôt compacte, offres
   await expect(dz).toBeInViewport({ ratio: 1 });
   const h = await dz.evaluate((e) => e.getBoundingClientRect().height);
   expect(h).toBeGreaterThanOrEqual(88); // facile à viser au doigt
-  // Téléphone (18 novembre) : le cadre grandit pour que la barre d'envoi tombe en bas de l'écran.
+  // Téléphone : le cadre grandit pour que la barre d'envoi tombe en bas de l'écran.
   if (!isMobile) expect(h).toBeLessThanOrEqual(220);
   else {
     const bar = (await page.locator(".sendbar.m").boundingBox())!;
@@ -77,14 +77,14 @@ test("premier écran : titre, trois assurances, zone de dépôt compacte, offres
     expect(bar.y + bar.height).toBeGreaterThan(vh - 40);
     expect(bar.y + bar.height).toBeLessThanOrEqual(vh + 1);
   }
-  // Offre en cours (décision du 16 novembre) : petit cadre, limites lues dans les constantes, lien vers /offres.
+  // Offre en cours : petit cadre, limites lues dans les constantes, lien vers /offres.
   const offers = page.locator("[data-current-offer]");
   await expect(offers).toBeInViewport({ ratio: 1 });
   const norm = (s: string) => s.replace(/[\u202f\u00a0]/g, " ");
   expect(norm(await offers.innerText())).toMatch(/Votre offre :[\s\S]*Gratuit[\s\S]*2 Go · 24 h · 5 ouvertures/);
   await expect(offers.getByRole("link", { name: /^Voir les offres/ })).toHaveAttribute("href", "/offres");
   await expect(offers.locator("input, form, button")).toHaveCount(0);
-  // Salon (17 novembre) : plus en haut de la page ; avec les autres actions (rangée sur
+  // Salon : plus en haut de la page ; avec les autres actions (rangée sur
   // ordinateur, menu « + » sur téléphone), « bientôt », désactivé avec sa raison.
   await expect(page.locator("[data-room]")).toHaveCount(0);
   if (!isMobile) {
@@ -199,11 +199,11 @@ test("photo, vidéo ou son d'un format que le nettoyage ne lit pas : « format n
   await expect(row.locator('[data-clean="echec"] button')).toHaveAccessibleName(/^Nettoyage impossible\s: format non pris en charge$/);
   await expect(row.getByRole("button", { name: /^Nettoyer ce fichier/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Tout nettoyer" })).toHaveCount(0);
-  // Rien n'a été tenté : jamais « n'a pas pu » (audit D5).
+  // Rien n'a été tenté : jamais « n'a pas pu ».
   await expect(page.locator("[data-unclean-sum]").filter({ visible: true })).toHaveText("1\u202ffichier ne peut pas être nettoyé (format non pris en charge)");
 });
 
-test("balai au clavier : Entrée, Tab, Entrée nettoie ; le focus va sur un bouton sûr de la ligne, jamais « Supprimer » (audit D3)", async ({ page, shh, isMobile }) => {
+test("balai au clavier : Entrée, Tab, Entrée nettoie ; le focus va sur un bouton sûr de la ligne, jamais « Supprimer »", async ({ page, shh, isMobile }) => {
   await openSend(page, shh.origin);
   await addPdfAndPhoto(page);
   const photoRow = rows(page).filter({ hasText: "foret-brume" });
@@ -226,7 +226,7 @@ test("balai au clavier : Entrée, Tab, Entrée nettoie ; le focus va sur un bout
   await expect(rows(page)).toHaveCount(2);
 });
 
-test("confirmation du balai : Tab au-delà de la bulle la ferme ; Échap la ferme et rend le focus au balai (audit D4)", async ({ page, shh }) => {
+test("confirmation du balai : Tab au-delà de la bulle la ferme ; Échap la ferme et rend le focus au balai", async ({ page, shh }) => {
   await openSend(page, shh.origin);
   await addPdfAndPhoto(page);
   const photoRow = rows(page).filter({ hasText: "foret-brume" });
@@ -257,10 +257,10 @@ test("confirmation du balai : Tab au-delà de la bulle la ferme ; Échap la ferm
   await expect(photoRow.locator('[data-clean="nettoye"]')).toHaveCount(0);
 });
 
-// Audit R4 : à 720 px (zoom 200 %) et sur téléphone, les offres ne coupent jamais la carte
+// À 720 px (zoom 200 %) et sur téléphone, les offres ne coupent jamais la carte
 // « Votre envoi » entre ses boutons et son compteur : avant la carte entière.
 for (const vp of [null, { width: 720, height: 450 }]) {
-  test(`offres hors de la carte « Votre envoi » (${vp ? "720 px" : "projet"}), liste vide puis remplie (audit R4)`, async ({ page, shh, isMobile }) => {
+  test(`offres hors de la carte « Votre envoi » (${vp ? "720 px" : "projet"}), liste vide puis remplie`, async ({ page, shh, isMobile }) => {
     if (vp) {
       test.skip(isMobile, "720 px : projet ordinateur");
       await page.setViewportSize(vp);
@@ -276,7 +276,7 @@ for (const vp of [null, { width: 720, height: 450 }]) {
       expect(o.y + o.height).toBeLessThanOrEqual(h.y);
       expect(h.y).toBeLessThan(c.y);
     };
-    // Liste vide, téléphone (retours du 16 novembre) : le cadre passe sous « Ajouter », qui tient
+    // Liste vide, téléphone : le cadre passe sous « Ajouter », qui tient
     // au-dessus de la barre d'envoi.
     {
       const add = (await page.locator(".dropzone.empty").filter({ visible: true }).boundingBox())!;

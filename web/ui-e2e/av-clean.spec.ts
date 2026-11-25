@@ -1,4 +1,4 @@
-// Task 9c (spec §35.2) : vidéos et sons importés nettoyés sans réencodage. Chaque sortie se lit
+// (spec §35.2) : vidéos et sons importés nettoyés sans réencodage. Chaque sortie se lit
 // dans <video> ou <audio> (loadedmetadata) avec la même durée (0,1 s près) et les mêmes
 // dimensions que l'original ; un format que le navigateur ne lit pas du tout est sauté (WebKit :
 // WebM, Ogg, MKV). Dépôt d'un MOV de téléphone dans le composeur : « Nettoyé » sur la ligne.

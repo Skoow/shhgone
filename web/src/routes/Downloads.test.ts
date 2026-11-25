@@ -50,7 +50,7 @@ describe("Téléchargements", () => {
     expect(text()).toContain(`Les entrées de plus de 30${NNBSP}jours sont effacées.`);
   });
 
-  it("groupes par jour (Aujourd'hui, Hier, 12 novembre) ; ligne : nom, taille, source, heure, Retirer", async () => {
+  it("groupes par jour (Aujourd'hui, Hier) ; ligne : nom, taille, source, heure, Retirer", async () => {
     await live.recordDownload({ name: "rapport annuel 2026.pdf", sizeBytes: 148_897_792, format: { family: "pdf", label: "PDF" }, source: "partage", savedAt: at(14, 9, 41) });
     await live.recordDownload({ name: "photo.jpg", sizeBytes: 2048, format: { family: "image", label: "JPG" }, source: "salon", savedAt: at(13, 22, 5) });
     await live.recordDownload({ name: "notes.txt", sizeBytes: 10, format: { family: "text", label: "TXT" }, source: "partage", savedAt: at(12, 8, 0) });

@@ -73,7 +73,7 @@ export function erreur(e: unknown, moment: Moment): Erreur {
   return { texte: t("account.err.autre") };
 }
 
-/** « 2026-11-21 » → « 21 novembre » (année ajoutée si ce n'est pas l'année en cours). */
+/** « 2026-11-21 » → « 2 » (année ajoutée si ce n'est pas l'année en cours). */
 export function jourLong(iso: string, now = new Date()): string {
   const d = new Date(`${iso}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return iso;

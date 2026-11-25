@@ -1,4 +1,4 @@
-// Task 9c : nettoyage en place des WebM et MKV (spec §35.2) sur les fichiers d'essai de
+// Nettoyage en place des WebM et MKV (spec §35.2) sur les fichiers d'essai de
 // scripts/gen-media-fixtures.sh, et sur les enregistrements de Chromium (tailles inconnues).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";

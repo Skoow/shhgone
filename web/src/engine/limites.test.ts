@@ -1,4 +1,4 @@
-// Cas limites (audit M7) : engine/vectors/v2-limites.json, produit par le moteur Rust
+// Cas limites : engine/vectors/v2-limites.json, produit par le moteur Rust
 // (engine/core/tests/limites.rs), rejoué ici par le build WebAssembly avec le fournisseur
 // WebCrypto du site, et pour les liens par la partie TypeScript (pure.ts) : mêmes sorties,
 // mêmes messages d'erreur, à partir des seules entrées du fichier.

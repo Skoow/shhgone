@@ -1,4 +1,4 @@
-// Preuve anti-robot d'une commande (revue du 20 novembre, S2 ; serveur : antiRobot de
+// Preuve anti-robot d'une commande (serveur : antiRobot de
 // handlers_paiement.go) : défi lu dès que la commande peut servir, preuve de travail dans son
 // Worker vérifié (captcha/pow), champs { altcha, hp, shown_at } rendus au plus tôt 3,1 s après
 // la réception (le serveur refuse avant 3 s). Un défi sert une fois. Ne passe ni par transfer/

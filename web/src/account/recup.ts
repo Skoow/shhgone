@@ -1,5 +1,5 @@
 // Clé de récupération sur l'appareil (conception 2026-11-22-compte-passkey-design.md §2.2, §3.1,
-// §5.1, §5.4 ; plan, lot W1). R (16 octets) tirée par crypto.getRandomValues ; codage, contrôle,
+// §5.1, §5.4). R (16 octets) tirée par crypto.getRandomValues ; codage, contrôle,
 // saisie tolérante et dérivations (A_r, v_r, KEK_r) par le moteur Rust (vecteurs
 // engine/vectors/compte-v3.json). R ne part jamais : seul A_r part, à la route recup, et v_r à
 // l'inscription ou au renouvellement.

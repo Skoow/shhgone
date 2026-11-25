@@ -1,4 +1,4 @@
-// Visionneuse PDF isolée (UI §13, Task 22, retours CLEAN5), contre le serveur Go (en-têtes
+// Visionneuse PDF isolée (UI §13, retours CLEAN5), contre le serveur Go (en-têtes
 // réels : CORP cross-origin et frame-ancestors 'self' sur le cadre seulement) : pdf.js dans
 // <iframe sandbox="allow-scripts">, origine opaque ; pages dessinées ; un PDF qui tente du
 // JavaScript à l'ouverture n'ouvre aucune boîte, ne navigue nulle part, n'envoie rien ;
@@ -16,7 +16,7 @@ test("PDF : affiché dans le cadre isolé (2 pages), JavaScript du PDF jamais ex
   const foreign: string[] = [];
   const dialogs: string[] = [];
   // Violations CSP : relevées par la garde de fixtures.ts (page et cadre), qui ignore le seul
-  // style injecté par Playwright pendant une capture sous WebKit (CI du 10 novembre).
+  // style injecté par Playwright pendant une capture sous WebKit (CI).
   page.on("request", (r) => !r.url().startsWith(shh.origin) && !r.url().startsWith("blob:") && !r.url().startsWith("data:") && foreign.push(r.url()));
   page.on("dialog", (d) => {
     dialogs.push(d.message());

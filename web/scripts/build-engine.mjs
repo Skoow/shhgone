@@ -1,7 +1,7 @@
 // Construit les deux modules WebAssembly et leur colle JavaScript, chacun dans son pkg/ (ignoré
 // par git, refait à chaque build) :
 //   - le moteur des partages (engine/wasm, crate shhdrop-wasm) dans web/src/engine/pkg/ ;
-//   - le moteur du salon (engine/salon-wasm, crate shhdrop-salon-wasm, Task 9 du salon) dans
+//   - le moteur du salon (engine/salon-wasm, crate shhdrop-salon-wasm, du salon) dans
 //     web/src/salon/pkg/ : module à part, que seules les pages du salon chargent.
 // Pour chacun :
 //   1. cargo build --profile <profil> --target wasm32-unknown-unknown -p <crate> --locked
@@ -16,12 +16,12 @@
 //      `--experimental-reset-state-function` : __wbg_reset_state() refait une instance neuve du
 //      même module après une panique (spec moteur §7 ; web/src/engine/index.ts, web/src/salon/engine.ts).
 // Les chemins de ~/.cargo (sources des crates, cités par les messages de panique) sont réécrits
-// en /cargo : le .wasm ne porte ni le dossier personnel de qui le construit, ni rien qui change
+// en /cargo : .wasm ne porte ni le dossier personnel de qui le construit, ni rien qui change
 // d'une machine à l'autre (build reproductible, web/scripts/repro.sh). L'option passe par
 // CARGO_ENCODED_RUSTFLAGS (options séparées par 0x1f) : un CARGO_HOME qui contient une espace
 // reste une seule option, alors que RUSTFLAGS couperait le chemin en deux.
 // Refusés s'ils sont hérités de l'environnement : RUSTFLAGS et CARGO_ENCODED_RUSTFLAGS, qui
-// changeraient le .wasm sans laisser de trace ; CARGO_TARGET_DIR et CARGO_BUILD_TARGET_DIR, qui
+// changeraient .wasm sans laisser de trace ; CARGO_TARGET_DIR et CARGO_BUILD_TARGET_DIR, qui
 // feraient passer à wasm-bindgen un ancien .wasm resté dans engine/target.
 //
 // SHH_ENGINE_PREBUILT=1 : pkg/ a déjà été construit par la même commande dans une autre étape

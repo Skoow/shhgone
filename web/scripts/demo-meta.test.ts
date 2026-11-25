@@ -1,4 +1,4 @@
-// CSP de la démo (test d'intrusion du 11 novembre) : mêmes directives que la production
+// CSP de la démo : mêmes directives que la production
 // (server/internal/api/headers.go), sauf les écarts écrits dans demo-meta.mjs.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

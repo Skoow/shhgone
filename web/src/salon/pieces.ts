@@ -1,10 +1,10 @@
-// Pièces jointes du salon (spec salon v3 §3.4, §4.4 ; plan C-4) : chaque pièce est un paquet SHH2
+// Pièces jointes du salon (spec salon v3 §3.4, §4.4) : chaque pièce est un paquet SHH2
 // d'un seul élément sous une graine R neuve, tirée par le moteur des partages ; R (32 octets)
 // voyage dans le message MLS `piece`, chiffré de bout en bout : le serveur ne reçoit que le
 // conteneur chiffré, de la taille exacte de son palier. Ni le nom, ni le type, ni le contenu ne
 // lui parviennent en clair (le nom et le type sont dans le message chiffré et le manifeste).
 // Assemblage : chaque segment entier (en-tête, morceaux de l'élément, morceau du manifeste,
-// aléa ailleurs) est fait ici, dans un tampon de 4 Mio au plus, puis envoyé (plan C-4 point 2).
+// aléa ailleurs) est fait ici, dans un tampon de 4 Mio au plus, puis envoyé.
 import { CHUNK_CT, HEADER, SEG_CHUNKS } from "../engine/pure";
 import { contentKeys, contentKeysChecked, elementSealer, forget, newSeed, openStream, readHeader, sealFinal, seedBytes, seedFromBytes } from "../engine/index";
 import * as api from "./api";
@@ -21,8 +21,8 @@ export type RefPiece = { r: Uint8Array; piece: Uint8Array; palier: number };
 /**
  * Cause d'une lecture de pièce ratée, pour le message : « indisponible » (404 : retirée ou
  * effacée), « sortie » (403 egress_limit : plafond de sortie de la pièce atteint sur le serveur),
- * « relu » (429 budget : budget de lecture de ce membre pour cette pièce épuisé, 2 lectures
- * complètes ; il ne se recharge jamais pour ce jeton), sinon « lecture » (réessayable).
+ * « relu » (429 budget : ce membre a déjà téléchargé la pièce ; une lecture par membre, avec
+ * une marge de reprise), sinon « lecture » (réessayable).
  * « sortie » et « relu » sont définitifs : jamais réessayés (`lectureDefinitive`).
  */
 export function causeLecture(e: unknown): "indisponible" | "sortie" | "relu" | "lecture" {
@@ -34,6 +34,26 @@ export function causeLecture(e: unknown): "indisponible" | "sortie" | "relu" | "
 
 /** Refus du serveur qu'aucun nouvel essai ne lèverait (plafond de sortie, budget de lecture). */
 export const lectureDefinitive = (c: string | undefined): boolean => c === "sortie" || c === "relu";
+
+/** Attentes avant chaque nouvel essai d'un segment coupé (réseau ou erreur 5xx du serveur). */
+export const REPRISES_MS = [1000, 3000, 8000] as const;
+
+/**
+ * Lit un segment, repris sur place après une coupure : le téléchargement continue au segment
+ * coupé au lieu de tout relire depuis le début (le serveur compte chaque octet envoyé à un
+ * membre). Un refus du serveur (4xx) n'est jamais réessayé.
+ */
+export async function avecReprise<T>(f: () => Promise<T>, attendre: (ms: number) => Promise<void> = (ms) => new Promise((ok) => setTimeout(ok, ms))): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await f();
+    } catch (e) {
+      const refus = e instanceof api.SalonError && e.status < 500;
+      if (refus || i >= REPRISES_MS.length) throw e;
+      await attendre(REPRISES_MS[i]!);
+    }
+  }
+}
 
 const segments = (bucket: number) => Math.ceil(bucket / SEG_CHUNKS);
 const chunksDuSegment = (bucket: number, n: number) => Math.min(SEG_CHUNKS, bucket - n * SEG_CHUNKS);
@@ -89,7 +109,7 @@ export async function envoyerPiece(n: api.Net, jeton: string, blob: Blob, o: { n
 const LOT = 8 * 1048576;
 
 /**
- * Assemble un fichier déchiffré par lots (restes du salon, point 6) : la page ne garde que le lot
+ * Assemble un fichier déchiffré par lots : la page ne garde que le lot
  * en cours (8 Mio au plus) ; chaque lot plein devient un Blob, que le navigateur peut garder hors
  * de la mémoire de la page (Chromium écrit les gros Blobs sur le disque). Avant : tous les
  * morceaux, puis leur copie dans le Blob final, soit deux fois la taille du fichier au pic.
@@ -121,13 +141,16 @@ export class Lots {
 
 /**
  * Lit une pièce reçue (`ref` du message `piece` ou de l'avatar d'un profil) : octets du fichier.
- * Le segment 0 n'est lu qu'une fois (budget de lecture du serveur, plan C-2 Task 13).
+ * Chaque segment n'est demandé qu'une fois (une lecture par membre sur le serveur) : le premier
+ * et le dernier (manifeste) sont gardés pendant la lecture, un segment coupé est repris sur place.
  * `max` : octets acceptés au plus ; une pièce plus grosse lève « trop_gros » dès le manifeste lu
  * (premier et dernier segments), sans lire le contenu (un membre ne peut pas faire télécharger 500 Mo à tous par une photo ou un avatar).
  */
 export async function lirePiece(n: api.Net, jeton: string, ref: RefPiece, max: number = PIECE_MAX): Promise<Blob> {
-  const seg0 = await api.lireSegment(n, jeton, ref.piece, 0);
+  const seg0 = await avecReprise(() => api.lireSegment(n, jeton, ref.piece, 0));
   const premier = seg0;
+  const dernier = segments(ref.palier) - 1;
+  let fin: Uint8Array<ArrayBuffer> | undefined;
   const { engagement } = await readHeader(seg0);
   const seed = await seedFromBytes(ref.r);
   try {
@@ -135,16 +158,18 @@ export async function lirePiece(n: api.Net, jeton: string, ref: RefPiece, max: n
     try {
       const rd = await openStream(
         async (s) => {
-          // Segment 0 (4 Mio au plus) gardé pendant la lecture : le lecteur peut le redemander.
+          // Premier et dernier segments (4 Mio au plus chacun) gardés pendant la lecture : le
+          // lecteur les redemande (en-tête, puis manifeste avant le contenu).
           if (s === 0) return premier.slice();
-          return api.lireSegment(n, jeton, ref.piece, s);
+          if (s === dernier) return (fin ??= await avecReprise(() => api.lireSegment(n, jeton, ref.piece, s))).slice();
+          return avecReprise(() => api.lireSegment(n, jeton, ref.piece, s));
         },
         ref.palier,
         keys,
       );
       try {
         // Taille réelle (manifeste chiffré) : la taille annoncée par le message
-        // ne lie personne (audit du 20 novembre). Au-delà de `max`, rien d'autre n'est demandé.
+        // ne lie personne. Au-delà de `max`, rien d'autre n'est demandé.
         const e = rd.manifest.items[0];
         if (!e || e.size > max) throw new Error("trop_gros");
         const lots = new Lots();

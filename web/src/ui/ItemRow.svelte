@@ -172,7 +172,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div bind:this={el} class={["row", { editing, moving, compact, danger }]} onkeydown={key} {@attach compact && !editing ? swipeToRemove(onremove, { reduced: reducedMotion() }) : null}>
   {#if compact}
-    <!-- Téléphone : ni poignée ni déplacement (décision du propriétaire, retours UI6). -->
+    <!-- Téléphone : ni poignée ni déplacement. -->
   {:else if movable}
     <span class="grip-slot" bind:this={grip}>
       <ReorderHandle {name} describedby={helpId} onactivate={() => (moving ? closeMove() : openMove())} onstart={ondragstart} onmove={ondragmove} onend={ondragend} />
@@ -225,16 +225,16 @@
           <span class="b">{mid.head}</span><span class="e">{mid.tail}{shownExt}</span>
         </bdi>
       </span>
-      <!-- Ordre affiché (propriétaire, 19 novembre) : le type et la taille, puis le nom, puis
+      <!-- Ordre affiché : le type et la taille, puis le nom, puis
            l'empreinte ; dans le DOM, le nom reste en premier (lecteurs d'écran : « nom, type »). -->
       <span class="kind">
-        <!-- Une note ne montre que son titre, jamais son contenu (retour propriétaire). -->
+        <!-- Une note ne montre que son titre, jamais son contenu (retour). -->
         <span class="ty">{t(item.kind === "text" ? "compose.cat.text" : typeKey(format))}</span><span class="sep" aria-hidden="true">·</span>
         <span class="num">{formatBytes(item.size, getLang())}</span>
         {#if duration !== null}<span class="sep" aria-hidden="true">·</span><span class="num">{formatClock(duration)}</span>{/if}
       </span>
       {#if item.kind === "file"}
-        <!-- Empreinte SHA-256 (16 novembre) : sur sa propre ligne, sous le nom (19 novembre) ;
+        <!-- Empreinte SHA-256 : sur sa propre ligne, sous le nom ;
              sélectionnée d'un toucher pour la copier, entière au survol. Elle change si le
              fichier est nettoyé. -->
         <span class="sumline"><HashLine sum={digestOf(item.data)} /></span>
@@ -263,7 +263,7 @@
   </div>
 
   {#snippet broom()}
-    <!-- Balai (retours du 12 novembre) : la bulle dit ce que le nettoyage retire (survol, focus) ;
+    <!-- Balai : la bulle dit ce que le nettoyage retire (survol, focus) ;
          l'appui ouvre la confirmation du parent, rien n'est nettoyé avant « Nettoyer ». -->
     {#if fix === "nettoyer" && onclean && !cleaning}
       <Tip label={t("compose.clean.button", { name })} tip={t(cleanWhatKey(item.category))} class="broom" onpress={onclean} data-fix="nettoyer"><Broom size={18} strokeWidth={1.75} /></Tip>
@@ -295,8 +295,7 @@
 </div>
 
 <style>
-  /* Lecteur du mémo vocal aligné à gauche avec le nom, comme le reste de la ligne (retours du
-     12 novembre ; il était centré). */
+  /* Lecteur du mémo vocal aligné à gauche avec le nom, comme le reste de la ligne (il était centré). */
   .voice {
     grid-column: 2 / -1;
     justify-self: start;
@@ -500,7 +499,7 @@
     padding: 0;
     cursor: pointer;
   }
-  /* Cible d'appui de 44 px de haut (audit M21) sans rien changer au dessin. */
+  /* Cible d'appui de 44 px de haut sans rien changer au dessin. */
   .retry::after {
     content: "";
     position: absolute;

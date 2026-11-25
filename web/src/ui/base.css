@@ -10,7 +10,7 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   /* Pas de zoom au double-toucher (réponse immédiate au toucher) ; le pincement reste permis
-     (WCAG 1.4.4 : zoom rétabli le 20 novembre, décision du propriétaire). */
+     (WCAG 1.4.4 : zoom rétabli). */
   touch-action: manipulation;
 }
 
@@ -183,7 +183,7 @@ html.vt-reduced::view-transition-new(root) {
 
 /* Téléphone (< 900 px), façon app (jusqu'à la vraie version mobile) : ni rebond ni « tirer pour
    rafraîchir » seulement quand une actualisation ferait perdre quelque chose (classe no-pull :
-   composeur ouvert, envoi, page d'un partage ; décision du propriétaire du 17 novembre),
+   composeur ouvert, envoi, page d'un partage),
    aucun défilement horizontal, pas de délai ni de surlignage gris au toucher
    (chaque élément touchable a son propre état :active), champs à 16 px au moins (iOS ne zoome
    pas), place réservée à la barre d'onglets. */
@@ -220,7 +220,7 @@ html.vt-reduced::view-transition-new(root) {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }
-/* Tablette (768 à 899 px, refonte du 12 novembre) : la barre du haut remplace la barre d'onglets. */
+/* Tablette (768 à 899 px) : la barre du haut remplace la barre d'onglets. */
 @media (min-width: 768px) {
   html.has-tabbar body {
     padding-bottom: 0;
@@ -256,7 +256,7 @@ html.kbd-open .dock {
   border: 0;
 }
 
-/* Listes compactes (Task R2) : libellé de bouton visible sur ordinateur, réservé aux lecteurs
+/* Listes compactes : libellé de bouton visible sur ordinateur, réservé aux lecteurs
    d'écran sur téléphone (l'icône reste ; le nom accessible du bouton ne change pas). */
 @media (max-width: 560px) {
   .hide-narrow {
@@ -287,7 +287,7 @@ html.kbd-open .dock {
     transition:
       opacity 640ms var(--ease-out),
       transform 720ms var(--ease-settle);
-    /* Cartes d'une même rangée : légèrement décalées (--i, refonte du 12 novembre). */
+    /* Cartes d'une même rangée : légèrement décalées (--i). */
     transition-delay: var(--i, 0ms);
   }
   .rv-wait:not(.in) {
@@ -302,84 +302,7 @@ html.kbd-open .dock {
   }
 }
 
-/* Bandes des sections de l'accueil (propriétaire, 18 novembre) : chaque section se fond dans la
-   suivante (aucun bord net), un filet de lumière qui s'éclaire vers le centre avec un point
-   lumineux, un arc de lueur dessous et une brume légère dans la teinte de la section (--tone,
-   en « r g b »). Pleine largeur (100cqw du conteneur #app) ; rien ne bouge. */
-.band {
-  --tone: 95 227 181;
-  position: relative;
-  isolation: isolate;
-}
-.band::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset-block: 0;
-  left: 50%;
-  width: 100cqw;
-  translate: -50% 0;
-  pointer-events: none;
-  background:
-    radial-gradient(38% 200px at 50% 0, rgb(var(--tone) / 0.13), transparent 72%),
-    radial-gradient(70% 50% at 50% 50%, rgb(var(--tone) / 0.045), transparent 80%),
-    linear-gradient(180deg, transparent, rgb(255 255 255 / 0.014) 160px, rgb(255 255 255 / 0.008) 65%, transparent);
-  -webkit-mask-image: linear-gradient(180deg, #000, #000 calc(100% - 160px), transparent);
-  mask-image: linear-gradient(180deg, #000, #000 calc(100% - 160px), transparent);
-}
-/* Couture en demi-teinte (reprise de « La trame », 19 novembre) : une bande de points qui
-   grossissent vers le milieu puis rapetissent, dans la teinte de la section ; ses bords se fondent
-   dans le noir (masque). Dessinée en CSS : 11 rangées de points, aucune image. */
-.band::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset-block-start: -44px;
-  left: 50%;
-  width: 100cqw;
-  height: 88px;
-  translate: -50% 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 0.5px, transparent 1.1px) 0 0px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 0.9px, transparent 1.5px) 0 8px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 1.4px, transparent 2.0px) 0 16px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 2.0px, transparent 2.6px) 0 24px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 2.6px, transparent 3.2px) 0 32px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 3.1px, transparent 3.7px) 0 40px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 2.6px, transparent 3.2px) 0 48px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 2.0px, transparent 2.6px) 0 56px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 1.4px, transparent 2.0px) 0 64px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 0.9px, transparent 1.5px) 0 72px / 8px 8px repeat-x,
-    radial-gradient(circle, rgb(var(--tone) / 0.55) 0.5px, transparent 1.1px) 0 80px / 8px 8px repeat-x;
-  -webkit-mask-image: radial-gradient(60% 100% at 50% 50%, #000 30%, transparent 100%);
-  mask-image: radial-gradient(60% 100% at 50% 50%, #000 30%, transparent 100%);
-}
-@media (max-width: 599px) {
-  /* Téléphone (19 novembre, 2 ; maquette « La trame », version 2) : la couture va d'un bord à
-     l'autre de l'écran (#app coupe tout débordement horizontal) ; elle ne se fond que sur les
-     bords, sinon le fondu rond l'effaçait presque. Les sections laissent 60 px entre elle et le
-     titre (Sections.svelte). */
-  .band::after {
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-  }
-  .band::before {
-    background:
-      radial-gradient(80% 160px at 50% 0, rgb(var(--tone) / 0.14), transparent 72%),
-      radial-gradient(90% 50% at 50% 50%, rgb(var(--tone) / 0.04), transparent 80%);
-  }
-}
-@media (prefers-contrast: more), (forced-colors: active) {
-  .band::before {
-    display: none;
-  }
-  .band::after {
-    display: none;
-  }
-}
-
-/* Sections de l'accueil (propriétaire, 19 novembre, 4 et 5 : couleurs uniformisées, transitions
+/* Sections de l'accueil (couleurs uniformisées, transitions
    douces, sections rectangulaires d'un bord à l'autre). `.soft` : section sombre posée sur le fond de la page, une
    lueur menthe très légère en haut, sans bord. `.slab` : plaque en relief, plus bas. */
 .soft,
@@ -398,8 +321,8 @@ html.kbd-open .dock {
   pointer-events: none;
   background: radial-gradient(50% 260px at 50% 0, rgb(95 227 181 / 0.06), transparent 75%);
 }
-/* Plaque en relief (19 novembre, 5 : « relief, matière, pictos ») : un peu plus claire que la
-   page, rectangulaire, d'un bord à l'autre de la fenêtre (propriétaire : aucun bord arrondi qui
+/* Plaque en relief (« relief, matière, pictos ») : un peu plus claire que la
+   page, rectangulaire, d'un bord à l'autre de la fenêtre (aucun bord arrondi qui
    laisse voir le fond) ; filet clair en haut, ombre portée dessous ; une matière par plaque (.dots
    trame de points, .pictos papier peint maison, .fine trame fine). */
 .slab::before {
@@ -445,7 +368,7 @@ html.kbd-open .dock {
   }
 }
 
-/* Carte de titre des pages (propriétaire, 20 novembre : « faire ressortir le titre et le
+/* Carte de titre des pages (« faire ressortir le titre et le
    sous-titre, un carré de titre en gros, travaillé ») : grand cadre arrondi, titre et
    sous-titre centrés, lueur menthe et bleue, trame de points en demi-teinte sur le bas.
    Rien ne bouge. Utilisée par InfoPage (Sécurité, Confidentialité, Conditions, Mentions,

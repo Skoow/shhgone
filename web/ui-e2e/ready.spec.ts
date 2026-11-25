@@ -40,7 +40,7 @@ test.describe("fr-FR", () => {
     await toReady(page, context, shh.origin);
     await expect(readyHeading(page)).toBeFocused();
 
-    // Ordre du DOM (19 novembre) : avertissement → un seul cadre (lien, mot de passe, infos) →
+    // Ordre du DOM : avertissement → un seul cadre (lien, mot de passe, infos) →
     // Supprimer → Terminé ; plus de « Gérer ce partage ».
     const order = await page.evaluate(() => {
       const els = [...document.querySelectorAll(".ready p.never, .ready [data-ready-card] [role=group][aria-label], .ready [data-ready-facts], .ready .danger-zone, .ready .done")];
@@ -56,7 +56,7 @@ test.describe("fr-FR", () => {
     await expect(pwCard(page).locator("[data-masked]")).toBeVisible();
     await expect(pwCard(page).locator("[data-reveal]")).toHaveAttribute("aria-pressed", "false");
     // Lien de gestion : montré sans l'historique (seul moyen de suivre le partage), caché avec lui.
-    // Sans compte, l'historique est désactivé par défaut (24 novembre).
+    // Sans compte, l'historique est désactivé par défaut.
     const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
     await expect(keep).toHaveAttribute("aria-checked", "false");
     await expect(page.locator("[data-manage] .sr-only").first()).toHaveText(/#m[A-Za-z0-9_-]{43}$/);
@@ -65,7 +65,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator("[data-manage]")).toHaveCount(0);
     await keep.click();
     await expect(page.locator("[data-manage] .sr-only").first()).toHaveText(/#m[A-Za-z0-9_-]{43}$/);
-    // Plus d'avertissement « par un autre moyen » (décision du propriétaire du 8 novembre).
+    // Plus d'avertissement « par un autre moyen ».
     await expect(page.locator(".ready").getByText("autre moyen", { exact: false })).toHaveCount(0);
 
     const link = await valueOf(page, linkCard(page));
@@ -154,7 +154,7 @@ test.describe("fr-FR", () => {
     await toReady(page, context, shh.origin);
     const gen = await valueOf(page, pwCard(page));
     expect(gen).toHaveLength(11);
-    // Affiché tout collé, sans groupe ni séparateur (décision du 8 novembre) : ce qu'on lit = la copie.
+    // Affiché tout collé, sans groupe ni séparateur : ce qu'on lit = la copie.
     await expect(pwCard(page).locator(".val.vis")).toHaveText(gen);
     await pwCard(page).getByRole("button", { name: /^Copier/ }).click();
     expect(await clip(page)).toBe(gen);
@@ -175,7 +175,7 @@ test.describe("fr-FR", () => {
     await toReady(page, context, shh.origin);
     await expect(page.getByText("Actif", { exact: true })).toBeVisible();
     await expect(page.locator("[data-deadline] .ends")).toHaveText(/^Se termine le 6\snov\. à 9\sh\s41$/);
-    await expect(page.locator("[data-deadline] .left")).toHaveCount(0); // heure de fin seule (audit M16)
+    await expect(page.locator("[data-deadline] .left")).toHaveCount(0); // heure de fin seule
     await expect(page.getByText(/^S'efface tout seul\s: après 1\souverture, ou à cette heure \(12\sh après l'envoi, arrondie au quart d'heure supérieur\)\.$/)).toBeVisible();
     await expect(page.getByText(/disparaît de partout/)).toHaveCount(0);
 
@@ -255,7 +255,7 @@ test.describe("390 × 844", () => {
     const done = page.getByRole("button", { name: "Terminé" });
     const del = page.getByRole("button", { name: "Supprimer ce partage" });
     await expect(done).toBeInViewport();
-    // (Plus court depuis le 8 novembre : Supprimer peut être visible d'emblée ; il reste dans le fil.)
+    // (Plus court : Supprimer peut être visible d'emblée ; il reste dans le fil.)
     await page.evaluate(() => window.scrollTo(0, 300));
     await expect(done).toBeInViewport();
     expect(await del.evaluate((e) => getComputedStyle(e.closest(".danger-zone")!).position)).toBe("static");

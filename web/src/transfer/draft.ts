@@ -84,17 +84,17 @@ export type ElementStatus = { phase: ElementPhase; sent: number; total: number; 
 export type DraftOpts = api.Net & {
   /** Défi anti-robot résolu en arrière-plan à la création du brouillon (Worker). */
   solveCaptcha?: (challenge: unknown) => Promise<CaptchaProof>;
-  /** Défi déjà récupéré et sa preuve en cours (Task 14). */
+  /** Défi déjà récupéré et sa preuve en cours. */
   prepared?: () => { cap: PreparedCaptcha; proof: Promise<CaptchaProof> } | undefined;
   /**
-   * Point d'accroche du nettoyage des métadonnées (Task 9, non codé ici) : appelé avant
+   * Point d'accroche du nettoyage des métadonnées (non codé ici) : appelé avant
    * l'attribution de la place et le chiffrement ; rend le contenu à chiffrer (sa taille fixe
    * la place). Par défaut, le contenu tel quel.
    */
   prepare?: (data: Blob) => Promise<Blob>;
   /**
    * Empreinte SHA-256 (hexadécimal minuscule) du contenu chiffré d'un fichier, écrite dans le
-   * manifeste (16 novembre). Par défaut, calculée par le moteur ; l'écran d'envoi réutilise
+   * manifeste. Par défaut, calculée par le moteur ; l'écran d'envoi réutilise
    * celle déjà affichée. Un échec n'empêche pas l'envoi : le fichier part sans empreinte.
    */
   sha256?: (data: Blob) => Promise<string>;
@@ -120,7 +120,7 @@ type El = {
   src: Blob;
   data?: Blob;
   first: number; // premier morceau ; -1 : pas encore placé
-  chunks: number; // emprise en morceaux : les seuls nécessaires (audit H-2, D41-38)
+  chunks: number; // emprise en morceaux : les seuls nécessaires (D41-38)
   /**
    * Fin (morceau exclu) de la dernière plage dont l'envoi est parti ; 0 : aucune. Au-delà,
    * rien n'existe sur le serveur : un élément retiré ou en erreur y rend sa place (D42-6).
@@ -164,7 +164,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   /** Effacements qui ont échoué : réessayés avant la finalisation, qui échoue sinon. */
   const stuck = new Set<Hold>();
   /**
-   * Morceaux [début, fin) de petits éléments retirés après un envoi (audit H-2) : jamais
+   * Morceaux [début, fin) de petits éléments retirés après un envoi : jamais
    * effacés sur le disque tout de suite (clé oubliée, indéchiffrables), jamais réutilisés,
    * remplacés par de l'aléa par le serveur à finalize (`void`).
    */
@@ -180,13 +180,13 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   let deadline = 0;
   let losses = 0;
   /**
-   * Finalisation en cours (audit I1) : liste et contenus figés jusqu'à son issue. Un `sync`
+   * Finalisation en cours : liste et contenus figés jusqu'à son issue. Un `sync`
    * reçu entre-temps (un « Nettoyer » qui se termine) est gardé et appliqué après un échec ;
    * après un succès, le brouillon est clos et il ne sert plus. `retry` est ignoré.
    */
   let finalizing = false;
   let deferred: { id: string; data: Blob }[] | null = null;
-  /** Réveille une finalisation qui attend (abandon : elle échoue sur `closed`, audit I2). */
+  /** Réveille une finalisation qui attend (abandon : elle échoue sur `closed`). */
   let wake: (() => void) | undefined;
 
   // --- K_mdp pendant la composition (spec §29.1, §29.4.4 ; A5) -------------------------------
@@ -386,7 +386,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   }
 
   // --- place --------------------------------------------------------------------------
-  // Audit H-2 : un élément d'un segment ou plus occupe seul des segments entiers à partir d'une
+  // un élément d'un segment ou plus occupe seul des segments entiers à partir d'une
   // frontière (la fin de son dernier segment n'est pas envoyée : le serveur la remplit) ; un
   // petit élément prend ses morceaux dans un segment partagé (premier ajustement, sans
   // déborder de son segment) ; places de grands éléments en cours d'effacement et morceaux
@@ -469,7 +469,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       e.sealer = sealer;
       e.parts = sealer.pieces.length;
       // A13 : PUT_IN_FLIGHT envois au plus en même temps (le serveur accepte 2 segments au-delà du
-      // dernier reçu, audit H1, et 4 envois par jeton) ; chiffrement toujours dans l'ordre, une
+      // dernier reçu, et 4 envois par jeton) ; chiffrement toujours dans l'ordre, une
       // fois par plage. Le premier échec arrête l'élément ; les envois partis sont attendus.
       const sending = new Map<number, number>(); // plage → octets partis de cet essai
       const flying = new Set<Promise<void>>();
@@ -486,7 +486,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
           throwIfAborted(signal);
           if (failure.hit) throw failure.e;
           // Réservation agrandie au fil de l'envoi (le serveur n'accepte que 2 segments
-          // au-delà du dernier reçu, audit H1).
+          // au-delà du dernier reçu).
           const n = p.seg;
           if ((n + 1) * SEG_CHUNKS + 1 > cr.bucket) {
             const need = reservationFor(n + 1, palier);
@@ -495,7 +495,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
           }
           const data = await sealer.piece(j);
           // Le chiffrement ne s'interrompt pas : brouillon perdu ou élément retiré entre-temps →
-          // on s'arrête ici, sans remettre l'élément en « envoi » (revue du 10 novembre).
+          // on s'arrête ici, sans remettre l'élément en « envoi ».
           throwIfAborted(signal);
           if (failure.hit) throw failure.e;
           e.phase = "envoi";
@@ -546,7 +546,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   }
 
   /**
-   * Efface sur le serveur les segments d'un élément retiré (audit M4) : un effacement à la
+   * Efface sur le serveur les segments d'un élément retiré : un effacement à la
    * fois (le serveur répond 503 « busy » à deux opérations simultanées), nouveaux essais
    * 1, 2, 4… 30 s jusqu'à l'échéance SERVER_STALL_MS ; 404 : brouillon déjà effacé. Rend
    * faux si l'effacement n'a pas pu se faire.
@@ -572,7 +572,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   async function drop(e: El) {
     e.ac.abort();
     els.delete(e.id);
-    // Petit élément (audit H-2) : place rendue tout de suite ; si un envoi est parti, ses
+    // Petit élément : place rendue tout de suite ; si un envoi est parti, ses
     // morceaux restent exclus et sont remplacés par le serveur à finalize (void).
     const small = e.first >= 0 && e.chunks > 0 && e.data !== undefined && isSmall(e.data.size);
     const big = e.first >= 0 && e.chunks > 0 && !small;
@@ -730,11 +730,11 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     if (finalizing) throw new Error("finalisation_en_cours");
     finalizing = true;
     const stopped = () => {
-      if (closed) throw new NotFoundError(); // abandon pendant l'attente (audit I2)
+      if (closed) throw new NotFoundError(); // abandon pendant l'attente
     };
     try {
       hooks = { pause: f.pause, onRetry: f.onRetry };
-      // « Réessayer » (audit M1) : un élément en erreur relançable repart (clé et place neuves)
+      // « Réessayer » : un élément en erreur relançable repart (clé et place neuves)
       // avant l'attente ; un fichier devenu illisible ne le serait pas davantage.
       for (const { id } of list) {
         const e = els.get(id);
@@ -830,7 +830,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   }
 
   /**
-   * Morceaux de petits éléments retirés à remplacer (audit H-2), dans le palier final hors
+   * Morceaux de petits éléments retirés à remplacer, dans le palier final hors
    * morceau du manifeste, triés et fusionnés ; au plus MAX_VOID plages (au-delà, ils restent
    * chiffrés sous une clé oubliée, indéchiffrables).
    */
@@ -866,7 +866,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
           entries.push({ kind: "file", name: item.name, mime: item.mime, size: e.data!.size, first: e.first, sealer: e.sealer!, ...(item.clean ? { clean: item.clean } : {}), ...(sum && /^[0-9a-f]{64}$/.test(sum) ? { sha256: sum } : {}) });
         }
       }
-      // Nom du partage (19 novembre) : tel que saisi au moteur, qui le nettoie et refuse un nom
+      // Nom du partage : tel que saisi au moteur, qui le nettoie et refuse un nom
       // trop long (« titre_trop_long ») ; sa forme nettoyée, celle que lira le destinataire, est
       // rendue avec le lien pour « Lien prêt » et l'historique.
       const opts = { rights: f.rights as Rights | undefined, keepTtlH: f.keepTtlH as KeepTtl | undefined, title: f.title, palier };
@@ -953,7 +953,7 @@ export async function textBlob(data: Uint8Array<ArrayBuffer> | Blob): Promise<Bl
 export type Draft = ReturnType<typeof createDraft>;
 
 /**
- * Un élément de la liste n'a pas pu être envoyé (audit M1) : finalize rejette avec l'erreur de
+ * Un élément de la liste n'a pas pu être envoyé : finalize rejette avec l'erreur de
  * son envoi, telle quelle (contrat de createShare), et `failedElement` en donne le rang dans la
  * liste finalisée. Sert à ne jamais prendre un refus d'envoi (`bad_request` d'un PUT) pour un
  * échec anti-robot, et à désigner la ligne en cause.

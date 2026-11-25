@@ -1,5 +1,5 @@
 // Interface du moteur pour le site (spec moteur §6) : mêmes noms, signatures et erreurs que
-// l'ancien moteur TypeScript (web/src/crypto/, web/src/transfer/link.ts, supprimés en Task 11).
+// l'ancien moteur TypeScript (web/src/crypto/, web/src/transfer/link.ts, supprimés en).
 // Changements de types inévitables (spec §6) : K_contenu, K_env, la graine R et la graine k d'un
 // élément sont des poignées opaques du moteur, jamais des octets en JavaScript.
 //
@@ -135,7 +135,7 @@ export function forget(x: { free(): void } | null | undefined): void {
   }
 }
 
-// --- Empreinte d'un fichier (16 novembre) --------------------------------------------------------
+// --- Empreinte d'un fichier --------------------------------------------------------
 
 /** Tranche lue à la fois : un fichier de 2 Go n'est jamais entier en mémoire. */
 const HASH_CHUNK = 4 * 1024 * 1024;
@@ -273,7 +273,7 @@ export function newSeed(): Promise<Seed> {
 }
 
 /**
- * Pièces du salon seulement (spec salon v3 §3.4, plan C-4) : R en clair (32 octets) pour le
+ * Pièces du salon seulement (spec salon v3 §3.4) : R en clair (32 octets) pour le
  * message MLS qui l'accompagne. SECRET : copie que l'appelant met à zéro. Jamais pour un partage.
  */
 export function seedBytes(r: Seed): Promise<Uint8Array<ArrayBuffer>> {
@@ -286,7 +286,7 @@ export function seedFromBytes(r: Uint8Array): Promise<Seed> {
 }
 
 /**
- * Preuve de membre du salon (spec §39.13.3, D41-26 ; plan C-5) : clé locale K_m =
+ * Preuve de membre du salon (spec §39.13.3, D41-26) : clé locale K_m =
  * HKDF(Argon2id(mot de passe, sel_m) ‖ K_lien, « shhdrop/v2/salon/membre-local »), 32 octets, et
  * index de l'entrée = HKDF(K_lien, « shhdrop/v2/salon/membre-index »), 16 octets (le stockage ne
  * montre ni le salon ni son lien). HKDF du moteur (RustCrypto) ; copies que l'appelant efface.
@@ -474,7 +474,7 @@ export async function elementSealer(blob: Blob, first: number, palier: Palier = 
 }
 
 /**
- * Nom du partage tel que le moteur l'écrit dans le manifeste et le relit (19 novembre) : nettoyé
+ * Nom du partage tel que le moteur l'écrit dans le manifeste et le relit : nettoyé
  * (blancs regroupés, commandes, inversions de sens et invisibles retirés, NFC), ou undefined s'il
  * ne reste rien ou s'il dépasse TITLE_MAX points de code.
  */
@@ -488,7 +488,7 @@ export function cleanTitle(raw: string): Promise<string | undefined> {
  */
 export type FinalEntry =
   | { kind: "text"; name: string; mime: string; size: number; /** premier morceau */ first: number; sealer: ElementSealer }
-  | { kind: "file"; name: string; mime: string; size: number; /** premier morceau */ first: number; sealer: ElementSealer; clean?: ManifestClean; /** SHA-256 du fichier envoyé, hexadécimal minuscule (16 novembre) */ sha256?: string };
+  | { kind: "file"; name: string; mime: string; size: number; /** premier morceau */ first: number; sealer: ElementSealer; clean?: ManifestClean; /** SHA-256 du fichier envoyé, hexadécimal minuscule */ sha256?: string };
 
 /**
  * Manifeste des éléments gardés, dans l'ordre donné, palier final, en-tête et morceau chiffré du
@@ -501,7 +501,7 @@ export type FinalEntry =
 export function sealFinal(
   entries: FinalEntry[],
   keys: ContentKeys,
-  opts: { rights?: Rights; keepTtlH?: KeepTtl; /** Nom du partage (19 novembre), nettoyé par le moteur ; « titre_trop_long » au-delà de TITLE_MAX. */ title?: string; palier?: Palier },
+  opts: { rights?: Rights; keepTtlH?: KeepTtl; /** Nom du partage, nettoyé par le moteur ; « titre_trop_long » au-delà de TITLE_MAX. */ title?: string; palier?: Palier },
 ): Promise<{ bucket: number; header: Uint8Array<ArrayBuffer>; tail: Uint8Array<ArrayBuffer> }> {
   return run(async (e) => {
     for (const x of entries) {

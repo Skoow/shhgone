@@ -88,7 +88,7 @@ export type FormatInput = {
 
 /** Conteneurs qui portent aussi bien du son seul que de la vidéo : l'extension ne tranche pas. */
 const AV_CONTAINER = new Set(["webm", "mp4"]);
-/** Un mémo vocal WebM ou MP4 est du son (audit D2) : type MIME, catégorie ou visionneuse le disent. */
+/** Un mémo vocal WebM ou MP4 est du son : type MIME, catégorie ou visionneuse le disent. */
 function saysAudio(x: FormatInput): boolean {
   return (x.mime ?? "").trim().toLowerCase().startsWith("audio/") || x.category === "audio" || x.preview === "audio";
 }

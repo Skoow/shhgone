@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Page « /s » (décision du propriétaire du 16 novembre) : ouverture et gestion d'un partage,
+  // Page « /s » : ouverture et gestion d'un partage,
   // reprises telles quelles de l'application (App.svelte) : le lien est lu par l'écran au moment
   // où il se monte, puis le « # » est retiré de l'adresse et de l'historique (UI §12.1, spec §32).
   import { getDemo } from "../app/demo-hooks";
@@ -25,15 +25,15 @@
   reloadIfRestored(window);
   // « Mes partages » dans l'en-tête seulement s'il y a des partages (lecture seule).
   if (supported) void loadHistory().catch(() => undefined);
-  // « Téléchargements » sans compte seulement si l'historique est activé (22 novembre) : lecture seule.
+  // « Téléchargements » sans compte seulement si l'historique est activé : lecture seule.
   if (supported) void loadDownloads().catch(() => undefined);
   // Page d'un partage : la clé est déjà retirée de l'adresse, une actualisation par le geste
-  // « tirer vers le bas » perdrait l'écran verrouillé (base.css : no-pull, 17 novembre).
+  // « tirer vers le bas » perdrait l'écran verrouillé (base.css : no-pull).
   if (typeof document !== "undefined") document.documentElement.classList.add("no-pull");
 
   const inApp = () => inAppBrowser(navigator.userAgent, isStandalone(window)) !== null;
   function scrubHere(): void {
-    // « /s » n'est plus montré une fois le lien lu (17 novembre) : l'adresse devient « / ».
+    // « /s » n'est plus montré une fois le lien lu : l'adresse devient « / ».
     if (!scrubAddressBar(history, shownPath(location.pathname))) scrubAddressBar(history, href("/"));
   }
   const takeShare = (): ShareTake => readShare(location.href);
@@ -64,7 +64,7 @@
     applySeo(supported ? name : "unsupported");
   });
   $effect(() => watchKeyboard(window, (open) => document.documentElement.classList.toggle("kbd-open", open)));
-  // Entrée d'onglet (K_lien) effacée après 30 min sans activité (audit web D2).
+  // Entrée d'onglet (K_lien) effacée après 30 min sans activité.
   $effect(() => watchOpenGrant(window));
 </script>
 

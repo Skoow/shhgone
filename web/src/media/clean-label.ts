@@ -1,5 +1,5 @@
 // Le seul endroit qui choisit le texte d'état du nettoyage d'un élément (spec §35.2, D41-23 ;
-// présentation D41-34, retours UI7) : un seul endroit d'état par fichier, la bulle du cadenas,
+// présentation D41-34) : un seul endroit d'état par fichier, la bulle du cadenas,
 // dont la 2ᵉ ligne dit le nettoyage. Sur la ligne : une étincelle discrète si le fichier est
 // nettoyé, rien s'il part tel quel, une pastille ambre seulement si le nettoyage a échoué.
 import type { ManifestClean } from "../index";
@@ -28,7 +28,7 @@ export function isCleanFailure(i: ItemClean): boolean {
   return i.clean === "echec" || i.clean === "protege";
 }
 
-/** Photo, vidéo ou son d'un format que le nettoyage ne lit pas : rien n'a été tenté (audit D5).
+/** Photo, vidéo ou son d'un format que le nettoyage ne lit pas : rien n'a été tenté.
  *  Compté à part : « N fichiers ne peuvent pas être nettoyés (format non pris en charge) ». */
 export function isUnsupportedFormat(i: ItemClean): boolean {
   return i.clean === "echec" && i.cleanFormat !== undefined;
@@ -51,7 +51,7 @@ export function cleanLineKey(i: ItemClean) {
   }
 }
 
-/** Marque de la ligne (retours UI8) : bouclier coché (nettoyé), bouclier ambre « ! » (échec), rien sinon. */
+/** Marque de la ligne : bouclier coché (nettoyé), bouclier ambre « ! » (échec), rien sinon. */
 export function cleanMark(i: ItemClean): "done" | "fail" | null {
   if (i.clean === "nettoye") return "done";
   return isCleanFailure(i) ? "fail" : null;
@@ -84,7 +84,7 @@ export function receivedClean(c: ManifestClean | undefined): { key: Key; mark: "
 
 /**
  * Ce que le nettoyage retirerait d'un fichier, selon sa catégorie (bulle du balai et
- * confirmation, retours du propriétaire du 12 novembre) : dit AVANT de nettoyer.
+ * confirmation) : dit AVANT de nettoyer.
  */
 export function cleanWhatKey(category: string): "clean.what.photos" | "clean.what.videos" | "clean.what.audio" | "clean.what.documents" | "clean.what.misc" {
   return category === "photos" || category === "videos" || category === "audio" || category === "documents" ? `clean.what.${category}` : "clean.what.misc";

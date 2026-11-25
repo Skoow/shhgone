@@ -1,4 +1,4 @@
-// « Aucune statistique » côté navigateur (spec §35.1, Task M2), bloquant : la liste de §35.1,
+// « Aucune statistique » côté navigateur (spec §35.1), bloquant : la liste de §35.1,
 // sans tenir compte de la casse, dans web/src, web/scripts, web/*.html et les noms de paquets
 // de package-lock.json ; aucun écouteur global d'erreurs (liste blanche vide). Le même
 // contrôle tourne sur dist/, dist-verif/ et dist-demo/ (scripts/check-dist.mjs).

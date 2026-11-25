@@ -4,12 +4,12 @@ import { currentTab, tabBarVisible, tabBarUseful, tabPath, tabsFor, TABS } from 
 const base = { supported: true, sending: false, composing: false };
 
 describe("barre d'onglets (téléphone)", () => {
-  it("règle du 11 novembre (audit M18) : visible dès deux onglets utiles ; Mes partages actif, donc visible", () => {
+  it("règle : visible dès deux onglets utiles ; Mes partages actif, donc visible", () => {
     expect(tabBarUseful([{ id: "send", soon: false }, { id: "shares", soon: true }, { id: "chat", soon: true }])).toBe(false);
     expect(tabBarUseful([{ id: "send", soon: false }, { id: "shares", soon: false }, { id: "chat", soon: true }])).toBe(true);
     expect(tabBarUseful(tabsFor(true))).toBe(true);
   });
-  // Retours du propriétaire du 15 novembre : sans compte, plus de barre d'onglets (menu ☰).
+  // Sans compte, plus de barre d'onglets (menu ☰).
   it("sans compte : un seul onglet (Mes partages), donc aucune barre, sur aucun écran", () => {
     expect(TABS.map((t) => t.id)).toEqual(["shares"]);
     expect(tabBarUseful(TABS)).toBe(false);
@@ -36,8 +36,8 @@ describe("barre d'onglets (téléphone)", () => {
     expect(currentTab("notfound")).toBeNull();
   });
 
-  // Conception compte §21.15.1 (plan, lot 12) : connecté, quatre onglets Accueil, Envoyer,
-  // Téléchargements, Profil ; sans compte, un seul onglet (aucune barre, retours du 15 novembre).
+  // Conception compte §21.15.1 : connecté, quatre onglets Accueil, Envoyer,
+  // Téléchargements, Profil ; sans compte, un seul onglet (aucune barre).
   it("connecté : quatre onglets (Accueil, Envoyer, Téléchargements, Profil), chemins et onglet courant ; sans compte inchangé", () => {
     expect(tabsFor(true).map((t) => `${t.id}${t.soon ? "*" : ""}`)).toEqual(["home", "send", "downloads", "profile"]);
     expect(tabsFor(false)).toBe(TABS);

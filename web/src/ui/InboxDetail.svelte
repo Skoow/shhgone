@@ -26,7 +26,7 @@
     onrefresh: () => Promise<void>;
     ondestroy: () => Promise<boolean>;
     onremove: () => void;
-    /** Renommer un envoi sur cet appareil (19 novembre). */
+    /** Renommer un envoi sur cet appareil. */
     onrename?: (title: string) => Promise<boolean>;
   };
   let { entry, now, info = {}, split = true, onback, onrefresh, ondestroy, onremove, onrename }: Props = $props();
@@ -99,7 +99,7 @@
       {:else}
         <p class="sub">{entry.sorte === "salon_cree" ? t("home.inbox.created", { date }) : t("home.inbox.joined", { date })}</p>
         {#if __SALONS__}
-          <!-- Salon (plan C-3) : le lien d'invitation gardé ouvre la page du salon (le mot de passe reste demandé). -->
+          <!-- Salon : le lien d'invitation gardé ouvre la page du salon (le mot de passe reste demandé). -->
           <div class="acts"><Button variant="primary" onpress={() => location.assign(lienDuSalon(entry.link))}>{t("home.inbox.room.open")}</Button></div>
         {:else}
           <p class="sub">{t("home.inbox.room.later")}</p>

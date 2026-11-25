@@ -1,5 +1,5 @@
-// Rechargement et onglets multiples sans ouverture de plus (spec §41.4, UI §9.7.1 ; plan,
-// amendement v2.9) sur le vrai serveur. Le décompte vient de shareStatus en Node.
+// Rechargement et onglets multiples sans ouverture de plus (spec §41.4, UI §9.7.1)
+// sur le vrai serveur. Le décompte vient de shareStatus en Node.
 import type { Page } from "@playwright/test";
 import { shareStatus } from "../src/index";
 import { axe, capture, expect, test } from "./fixtures";
@@ -74,7 +74,7 @@ test("recharger rouvre sans consommer (1 / 3 avant et après), vingt fois (D42-2
   await expect(page.getByText("Ouvrir compte 1\u00a0ouverture sur les 2\u00a0restantes", { exact: false })).toBeVisible();
 
   // Nouvelle ouverture (comptée) : le pied dit combien d'ouvertures restent (plus de bouton
-  // « Terminer et effacer », retours UI4).
+  // « Terminer et effacer »).
   await page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ }).click();
   await expect(noteRow(page)).toBeVisible({ timeout: 30_000 });
   expect((await shareStatus(sent.manage, shh.origin)).opensUsed).toBe(2);

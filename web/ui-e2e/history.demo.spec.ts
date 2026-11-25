@@ -1,4 +1,4 @@
-// Démo GitHub Pages (UI §14.3) et historique (Task H) : l'historique marche, en mémoire de
+// Démo GitHub Pages (UI §14.3) et historique : l'historique marche, en mémoire de
 // l'onglet seulement ; aucune base « shhdrop-history » sur l'origine partagée de Pages.
 import { expect, test } from "./fixtures";
 import { addText, readyHeading, sendButton } from "./send-helpers";
@@ -11,7 +11,7 @@ test("démo : envoi → « Vos envois » (en mémoire), aucune base IndexedDB d'
   await addText(page, "Démo");
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
-  // Désactivé par défaut (24 novembre) : la personne l'active.
+  // Désactivé par défaut : la personne l'active.
   const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
   await expect(keep).toHaveAttribute("aria-checked", "false");
   await expect(keep).toBeEnabled();
@@ -22,7 +22,7 @@ test("démo : envoi → « Vos envois » (en mémoire), aucune base IndexedDB d'
   await page.getByRole("dialog").getByRole("button", { name: "Terminer" }).or(page.locator(".ready").getByRole("button", { name: "Terminer" })).filter({ visible: true }).first().click();
   await expect(readyHeading(page)).toBeHidden();
   // Navigation dans l'application (aucun rechargement : la démo garde l'historique en mémoire) ;
-  // « Mes partages » est dans l'en-tête, ou dans le menu ☰ sur téléphone (16 novembre).
+  // « Mes partages » est dans l'en-tête, ou dans le menu ☰ sur téléphone.
   const menu = page.locator("[data-menu-button]");
   if (await menu.isVisible()) await menu.click();
   await page.getByRole(await menu.isVisible() ? "navigation" : "banner").getByRole("link", { name: "Mes partages", exact: true }).first().click();

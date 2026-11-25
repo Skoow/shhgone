@@ -43,7 +43,7 @@ function dump(v: unknown): string {
 }
 
 describe("historique chiffré (IndexedDB simulé)", () => {
-  // Retours du 15 novembre : stockage persistant demandé à la première entrée gardée, une fois,
+  // Stockage persistant demandé à la première entrée gardée, une fois,
   // jamais à la simple ouverture ; un refus ou une erreur ne gêne rien.
   it("stockage persistant : demandé une fois, au premier ajout seulement ; une erreur ne casse rien", async () => {
     let asked = 0;
@@ -89,7 +89,7 @@ describe("historique chiffré (IndexedDB simulé)", () => {
   it("nonce aléatoire à chaque écriture (même contenu → deux chiffrés différents)", async () => {
     const b = memoryBackend();
     // Horloge fixée (comme les autres tests) : à l'heure réelle, l'entrée de T0 serait terminée
-    // depuis 7 jours depuis le 13 novembre 2026 à 08 h 14 UTC, donc retirée (test daté).
+    // depuis 7 jours à 08 h 14 UTC, donc retirée (test daté).
     const h = (await openHistory({ backend: b, now: () => T0 }))!;
     const e = await h.add(fresh());
     const first = [...b.raw().values()][0]!;
@@ -171,7 +171,7 @@ describe("historique chiffré (IndexedDB simulé)", () => {
     expect(await h.list()).toEqual([]);
   });
 
-  it("préférence « Garder dans mon historique » : désactivée par défaut (24 novembre), activée par un geste, gardée", async () => {
+  it("préférence « Garder dans mon historique » : désactivée par défaut, activée par un geste, gardée", async () => {
     const idb = fakeIndexedDB();
     const h = (await openHistory({ backend: idbBackend(idb) }))!;
     expect(await h.enabled()).toBe(false);
@@ -181,7 +181,7 @@ describe("historique chiffré (IndexedDB simulé)", () => {
     expect(await (await openHistory({ backend: idbBackend(idb) }))!.enabled()).toBe(false);
   });
 
-  it("ancien drapeau « off » absent (activé par défaut avant le 24 novembre) : ne vaut plus activation ; entrées gardées", async () => {
+  it("ancien drapeau « off » absent (activé par défaut) : ne vaut plus activation ; entrées gardées", async () => {
     const b = memoryBackend();
     const h = (await openHistory({ backend: b, now: () => T0 }))!;
     const a = await h.add(fresh());
@@ -272,11 +272,11 @@ describe("état affiché et tri (UI §9.6.2)", () => {
   });
 });
 
-// Conception compte §21.7, §21.8 (plan, lot 11) : quatre sortes d'entrées (envoi, reçu, salon
+// Conception compte §21.7, §21.8 : quatre sortes d'entrées (envoi, reçu, salon
 // créé, salon rejoint) et leur origine (cet appareil ou le compte). Exception écrite à §33 : un
 // partage reçu ou un salon garde son lien (K_lien), chiffré comme le reste ; jamais un mot de
 // passe, un nom d'élément ni un contenu ; un envoi ne garde jamais de lien de partage.
-describe("historique de l'appareil : quatre sortes (lot 11)", () => {
+describe("historique de l'appareil : quatre sortes", () => {
   const LINK = "https://shhdrop.example/#" + "k".repeat(43);
   const LINK2 = "https://shhdrop.example/#" + "q".repeat(43);
   const ROOM = "https://shhdrop.example/#c" + "r".repeat(43);
@@ -333,7 +333,7 @@ describe("historique de l'appareil : quatre sortes (lot 11)", () => {
     await expect(h.add({ sorte: "salon_cree", manage: "", link: LINK2, createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 })).rejects.toThrow();
     await expect(h.add({ sorte: "salon_cree", manage: "", link: ROOM.replace("r", "s"), label: "x".repeat(65), createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 })).rejects.toThrow();
     await expect(h.add({ ...fresh(), sorte: "autre" } as unknown as NewEntry)).rejects.toThrow();
-    // Salon créé (plan C-3, point 2) : lien de gestion « #s » seulement ; jamais pour un salon rejoint.
+    // Salon créé : lien de gestion « #s » seulement ; jamais pour un salon rejoint.
     const GESTION = "https://shhgone.com/salon#s" + "G".repeat(43);
     const c = await h.add({ sorte: "salon_cree", manage: GESTION, link: ROOM.replace(/.{8}$/, "Zzzzzzzz"), label: "", createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 });
     expect(c.manage).toBe(GESTION);
@@ -368,7 +368,7 @@ describe("historique de l'appareil : quatre sortes (lot 11)", () => {
   });
 });
 
-// Nom du partage (demande du propriétaire du 19 novembre) : `label` d'un envoi, chiffré au repos
+// Nom du partage : `label` d'un envoi, chiffré au repos
 // comme le reste de l'entrée, renommable sur l'appareil.
 describe("historique : titre d'un envoi", () => {
   it("gardé chiffré (aucun octet en clair sur disque), relu, renommé ; 80 points de code au plus, aucune commande", async () => {

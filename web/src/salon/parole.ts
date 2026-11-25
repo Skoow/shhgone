@@ -1,4 +1,4 @@
-// « Qui parle » pendant un appel (conception des appels §1, ajout du 21 novembre) : la tuile de
+// « Qui parle » pendant un appel (conception des appels §1) : la tuile de
 // celui qui parle s'allume. Tout se passe dans ce navigateur, sur le son déjà reçu ou capté :
 // rien n'est envoyé, rien n'est gardé, aucun message de plus dans le salon.
 //

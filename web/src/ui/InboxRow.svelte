@@ -39,7 +39,7 @@
       ? t(`home.inbox.row.${entry.sorte}` as Key, { label: entry.label || t("home.inbox.room"), date: day(entry.createdAt) })
       : entry.sorte === "recu"
         ? t("home.inbox.row.recu", { items, size: formatBytes(entry.sizeBytes, lang) })
-        : // Envoi : son titre (19 novembre), sinon le nombre d'éléments.
+        : // Envoi : son titre, sinon le nombre d'éléments.
           entry.label || t("home.inbox.row.envoi", { items }),
   );
   const leftS = $derived(Math.max(0, Math.ceil((entry.expiresAt - now) / 1000)));

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Trame de l'envoi (refonte du 19 novembre) : bande de points dessinée sur un <canvas>, dans la
+  // Trame de l'envoi : bande de points dessinée sur un <canvas>, dans la
   // direction « La trame » de l'accueil. Colonnes encore sur l'appareil : points pâles ; rampe
   // derrière le front : points menthe qui se brouillent (chaque bloc est chiffré juste avant
   // d'être envoyé) ; colonnes envoyées : trame menthe qui coule vers la droite tant que des

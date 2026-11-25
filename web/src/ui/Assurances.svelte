@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Trois assurances de la page d'envoi (décisions du propriétaire du 17 novembre) : dans le cadre
+  // Trois assurances de la page d'envoi : dans le cadre
   // de dépôt de « Votre envoi », sous « Déposez des fichiers ». Trois pastilles égales, sur une
   // ligne : libellé complet si la rangée est large, libellé court en dessous de 800 px, et sur
   // téléphone (rangée de 420 px au plus) l'icône au-dessus du libellé court. Le libellé complet
@@ -59,7 +59,7 @@
   .as {
     display: none;
   }
-  /* Libellé complet seulement s'il tient entier (revue du 19 novembre : « Chiffré dans votre navigat… »
+  /* Libellé complet seulement s'il tient entier (« Chiffré dans votre navigat… »
      était coupé vers 680 px de large) : trois pastilles de 250 px environ. */
   @container assure (max-width: 800px) {
     .al {

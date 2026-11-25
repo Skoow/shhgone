@@ -1,7 +1,6 @@
 // HEIC / HEIF / AVIF (spec §35.2, Q-MD2) : nettoyage en place, à longueur constante (aucun
 // octet ne bouge, donc `iloc` reste juste). Données de l'élément `Exif` : EXIF vide valide
-// (18 octets ; avec la seule vignette IFD1 intacte s'il y en a une, décision du propriétaire du
-// 11 novembre ; l'orientation de HEIF n'est pas dans l'EXIF) puis zéros ; élément XMP : paquet XMP vide puis espaces ; propriété `udes`
+// (18 octets ; avec la seule vignette IFD1 intacte s'il y en a une, ; l'orientation de HEIF n'est pas dans l'EXIF) puis zéros ; élément XMP : paquet XMP vide puis espaces ; propriété `udes`
 // (titre, description, mots-clés) et boîtes hors liste renommées `free` et mises à zéro ;
 // contenu des `free`/`skip` mis à zéro. L'orientation de HEIF est dans `irot`/`imir` (gardés).
 // `iloc` méthode 2, extent hors fichier ou partagé avec une image, `moov` (suites d'images,

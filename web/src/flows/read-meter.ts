@@ -4,7 +4,7 @@
 // proposer un nouvel essai, un redémarrage ou un aperçu que s'il tient dans ce qui reste.
 //
 // Majorant volontaire (jamais moins que la réalité) :
-// - le lecteur actuel ne garde qu'un segment en cache, la lecture monotone de la Task M2
+// - le lecteur actuel ne garde qu'un segment en cache, la lecture monotone de la
 //   (spec §36 S9) lit en plus les segments sautés : on compte donc, pour un élément plus loin
 //   que tout ce qui a été lu, tous les segments depuis le dernier lu ;
 // - sans reprise au segment (`resumable` faux, client actuel), un nouvel essai relit

@@ -25,14 +25,13 @@ const EN_PROBE = "One link, one password, then it's gone.";
 const PASSKEY_PROBE = /navigator\??\.credentials/;
 
 /**
- * Poids maximal du module WebAssembly du salon, en brotli (plan salon C-1, Global Constraints ;
- * décision du 11 novembre 2026 : 400 000 → 430 000). Mesuré le 11 novembre 2026 : 422 572 o en
+ * Poids maximal du module WebAssembly du salon, en brotli (400 000 → 430 000). Mesuré : 422 572 o en
  * brotli (profil wasm-salon, opt-level "z"), dont OpenMLS et hpke-rs avec `experimental` toujours
  * actif par openmls_rust_crypto (ML-KEM, X-Wing, P-256/384, k256 compilés), et les tables Unicode
  * du texte (~96 Ko). Un fournisseur crypto limité à la suite 0x0001 pourrait le réduire plus tard.
- * 14 novembre 2026 : 429 684 o avec le pseudo du compte (pseudoValide, pseudoReserve), 316 o sous
+ * 429 684 o avec le pseudo du compte (pseudoValide, pseudoReserve), 316 o sous
  * le plafond : la prochaine fonction du salon le dépassera probablement (décision à prendre).
- * 19 novembre 2026 (version finale du salon, consigne du propriétaire : relever le plafond avec une
+ *  (version finale du salon : relever le plafond avec une
  * justification écrite) : 430 211 o avec les accusés de pièce `piece_ouverte` et
  * `piece_telechargee` (v3 §14.2 ; deux sortes de message, leurs vecteurs communs). 430 000 → 435 000 :
  * environ 4,8 Ko de marge pour les corrections, pas pour de nouvelles fonctions ; toute fonction
@@ -43,11 +42,11 @@ const SALON_BROTLI_MAX = 435_000;
 
 /**
  * Poids maximal du moteur des partages (assets/engine-*.wasm), en brotli : il est chargé par
- * toutes les pages de partage. Mesuré le 14 novembre 2026 : 141 559 o avant le compte, 191 466 o
+ * toutes les pages de partage. Mesuré : 141 559 o avant le compte, 191 466 o
  * avec la règle du pseudo (tables Unicode : unicode-segmentation, -script, -security), 148 300 o
  * une fois le pseudo exposé par le module du salon à la place (dérivations du compte gardées).
  * Le plafond laisse ~5 % de marge : une table Unicode ou une bibliothèque entrée par erreur se voit.
- * 22 novembre 2026 : 154 958 o avec le compte par passkey ajouté au compte par e-mail, 147 481 o
+ * 154 958 o avec le compte par passkey ajouté au compte par e-mail, 147 481 o
  * une fois le compte par e-mail retiré (adresse, mot de passe, Argon2id du compte). Plafond gardé
  * (le baisser est une décision).
  */
@@ -64,7 +63,7 @@ const FORBIDDEN_IN_PROD = [
   'http-equiv="Content-Security-Policy"',
   "le lien ne marche que dans cet onglet",
   "the link only works in this tab",
-  // Phrase de l'hébergeur de la démo (pied de page, 24 novembre).
+  // Phrase de l'hébergeur de la démo (pied de page).
   "hébergée par GitHub, qui voit",
   HOST_NOTE_EN,
   `${DEMO_BASE}assets/`, // base de la démo dans un build de production
@@ -75,11 +74,11 @@ const FORBIDDEN_IN_PROD = [
  * (SVG en ligne), de simples identifiants qu'aucun navigateur ne télécharge.
  */
 // « https://shhgone.com/s » : notre propre adresse, écrite en texte dans l'exemple du lien en
-// deux de l'accueil (propriétaire, 20 novembre : « affiche https devant ») ; jamais chargée.
+// deux de l'accueil (« affiche https devant ») ; jamais chargée.
 const ALLOWED_URLS = new Set(["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xlink", "http://www.w3.org/1999/xhtml", "https://shhgone.com/s"]);
 
 /**
- * Aucune ressource tierce (CLAUDE.md, spec §10) : rend chaque adresse http(s):// absolue, et
+ * Aucune ressource tierce (règles du projet, spec §10) : rend chaque adresse http(s):// absolue, et
  * chaque adresse « //hôte » sans schéma dans un attribut src, href, action ou dans url(…) /
  * @import, hors ALLOWED_URLS. La CSP de production (default-src 'self') les bloquerait, pas
  * celle d'un cadre ou d'une copie servie ailleurs : le contrôle ne dépend pas d'elle.
@@ -111,14 +110,14 @@ const metaRe = (attrs) => {
 
 /**
  * Traces du module de compte (web/src/account/ : routes et base IndexedDB) : interdites dans un
- * build sans __COMPTES__ (plan du compte, lot 9 : le site public ne change pas) et dans la démo.
+ * build sans __COMPTES__ (le site public ne change pas) et dans la démo.
  */
 const ACCOUNT_TRACES = ["/api/compte", "shhdrop-compte"];
 
 /** Rend la liste des problèmes (vide si tout va bien). `comptes` : build de production avec __COMPTES__ (la démo l'a toujours). */
 /** Pages d'information servies par leur propre fichier (vite.config.ts, PAGE_PATHS). */
 export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html", "conditions.html", "mentions-legales.html", "signaler.html", "verifier.html"];
-/** Versions anglaises (pages bilingues du 20 novembre, src/app/langues.ts), production seulement : accueil et pages d'information. */
+/** Versions anglaises (pages bilingues, src/app/langues.ts), production seulement : accueil et pages d'information. */
 export const EN_PAGES = ["en.html", ...INFO_PAGES.map((p) => "en-" + p)];
 
 /** `pages` : pages d'information exigées (le vrai build : INFO_PAGES ; les petits sites des tests : aucune). */
@@ -148,10 +147,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   // Spec §28.3 : chaque script et feuille de style de index.html porte une empreinte exacte
   // (production et démo). Le cadre PDF (pdf-frame.html) en est exempté pour l'instant : il vit
   // dans une origine opaque, où une empreinte exigerait des en-têtes CORS sur ses deux fichiers
-  // (serveur Go, headers.go). Il reçoit pourtant le PDF déchiffré (audit web D7) : à faire.
+  // (serveur Go, headers.go). Il reçoit pourtant le PDF déchiffré : à faire.
   problems.push(...checkSri("index.html", index, (rel) => byRel.get(rel) ?? null, demo ? DEMO_BASE : "/"));
 
-  // Pages séparées (conception du 16 novembre) : chaque page d'information a son fichier, ses
+  // Pages séparées : chaque page d'information a son fichier, ses
   // empreintes SRI, son contenu déjà écrit (titre h1) avant tout script, son titre d'onglet, et
   // ne charge ni le moteur ni le client d'envoi (aucun script qu'elle cite ne les cite).
   for (const page of pages) {
@@ -183,7 +182,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     }
   }
 
-  // Accueil écrit au build (18 novembre, référencement) : index.html porte le contenu de
+  // Accueil écrit au build (référencement) : index.html porte le contenu de
   // l'accueil (titre h1) avant le script, sans attribut style ni adresse de développement ;
   // app.html (autres adresses de l'application, 404) est la même page sans ce contenu : au plus
   // le squelette (U13, coque sans contenu entre <!--shh-shell--> et <!--/shh-shell-->, sous
@@ -212,7 +211,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     }
   }
 
-  // Page « /s » (16 novembre) : ouverture et gestion d'un partage, son propre fichier, ses
+  // Page « /s » : ouverture et gestion d'un partage, son propre fichier, ses
   // empreintes SRI, jamais indexée, sans le script de l'application d'envoi (assets/index-*.js).
   if (pages.length > 0) {
     const sHtml = byRel.get("s.html")?.toString("utf8");
@@ -232,7 +231,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     }
   }
 
-  // Aucune ressource tierce (CLAUDE.md) : ni dans les pages (index.html, 404.html de la démo,
+  // Aucune ressource tierce (règles du projet) : ni dans les pages (index.html, 404.html de la démo,
   // pdf-frame.html), ni dans les feuilles de style (polices, images). Production et démo.
   for (const f of all) {
     if (!/\.html$|\.css$/.test(f.rel)) continue;
@@ -251,7 +250,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     for (const url of findExternalUrls(text)) problems.push(`${f.rel} : adresse externe « ${url} » (aucune ressource tierce)`);
   }
 
-  // Spec §35.1 (Task M2) : aucune statistique, aucun écouteur global d'erreurs, dans tout build.
+  // Spec §35.1 : aucune statistique, aucun écouteur global d'erreurs, dans tout build.
   for (const f of all) {
     if (/\.(woff2?|png|jpe?g|gif|ico|webp|avif|wasm)$/i.test(f.rel)) continue;
     const text = f.data.toString("utf8");
@@ -260,7 +259,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   }
 
   // Compte : jamais en production sans --comptes ; toujours dans la démo (compte essayable, faux
-  // serveur de l'onglet, 19 novembre).
+  // serveur de l'onglet).
   if (!demo && !comptes)
     for (const f of all) {
       if (/\.(woff2?|png|jpe?g|gif|ico|webp|avif|wasm)$/i.test(f.rel)) continue;
@@ -278,7 +277,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   if (!demo) {
     for (const f of all)
       for (const s of FORBIDDEN_IN_PROD) if (f.data.includes(s)) problems.push(`${f.rel} : trace de démo « ${s} »`);
-    // Spec §28.3 (audit F1) : aucun import() dynamique, que l'empreinte SRI de index.html ne
+    // Spec §28.3 : aucun import() dynamique, que l'empreinte SRI de index.html ne
     // couvrirait pas. La démo en garde un (son faux serveur, chargé à part).
     for (const f of all) {
       if (!/\.m?js$/.test(f.rel)) continue;
@@ -286,23 +285,21 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
       // des chemins que nos options n'empruntent pas (useWasm: false, worker sur le fil
       // principal). Hors SRI (script classique, origine opaque : une empreinte exigerait
       // Access-Control-Allow-Origin sur pdf-frame.js et pdf-frame.css). Attention : le cadre
-      // REÇOIT le PDF déchiffré (audit web D7) ; seuls la CSP du cadre (scripts du site
+      // REÇOIT le PDF déchiffré ; seuls la CSP du cadre (scripts du site
       // seulement) et le manifeste de version (§28.2) couvrent ce fichier. Exempté, lui seul.
       if (f.rel === "pdf-frame.js") continue;
       const n = f.data.toString("utf8").match(/(?<![\w$.])import\s*\(/g)?.length ?? 0;
       if (n > 0) problems.push(`${f.rel} : import() dynamique (${n} fois), interdit en production`);
     }
-    // Moteur WebAssembly (spec moteur §7 ; il remplace libsodium et l'ancien moteur TypeScript,
-    // Task 11) : le .wasm et le script du Worker d'Argon2id (assets/engine-*.js) vivent dans leurs
+    // Moteur WebAssembly (spec moteur §7 ; il remplace libsodium et l'ancien moteur TypeScript) : .wasm et le script du Worker d'Argon2id (assets/engine-*.js) vivent dans leurs
     // propres fichiers, chargés à la demande avec contrôle d'intégrité (fetch + integrity, puis
     // Worker ; repli : calcul dans la page avec le moteur déjà vérifié). Le script principal ne
-    // contient aucun octet du .wasm (magie « \0asm » version 1, en base64 ou en tableau de
+    // contient aucun octet .wasm (magie « \0asm » version 1, en base64 ou en tableau de
     // nombres), ne cite aucun de ces fichiers sans son empreinte SHA-384, et aucun n'est orphelin.
     // Scripts du site (points d'entrée et morceaux partagés des pages séparées) : tout script
     // sous assets/ sauf les scripts lus avec leur empreinte : Worker du moteur, dictionnaire
     // anglais (données lues par fetch), et tout script de Worker
-    // (« worker » dans le nom : le Worker anti-robot, assets/pow-worker-*.js, audit du 20 novembre
-    // W3 ; ou un Worker émis par Vite, ?worker). new Worker(url) n'ayant pas de contrôle
+    // (« worker » dans le nom : le Worker anti-robot, assets/pow-worker-*.js, ; ou un Worker émis par Vite, ?worker). new Worker(url) n'ayant pas de contrôle
     // d'intégrité, chacun doit être cité avec son empreinte SHA-384 (lu par fetch avec
     // `integrity`, puis lancé depuis un Blob).
     const WORKER = /^assets\/[^/]*worker[^/]*\.js$/i;
@@ -333,7 +330,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
       const missing = [".br", ".gz"].filter((e) => !byRel.has(f.rel + e));
       if (missing.length) problems.push(`${f.rel} : sans variante ${missing.join(" ni ")} : le moteur serait téléchargé sans compression`);
     }
-    // Module du salon (Task 9) : à part du moteur (assets/salon-*.wasm, cité avec son empreinte
+    // Module du salon : à part du moteur (assets/salon-*.wasm, cité avec son empreinte
     // ci-dessus, jamais en ligne), au plus SALON_BROTLI_MAX octets transférés (variante brotli) ;
     // moteur des partages (assets/engine-*.wasm), au plus ENGINE_BROTLI_MAX.
     for (const f of all) {
@@ -367,7 +364,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   // son faux serveur n'exige aucune preuve de travail ; new Worker(url) le lancerait sans contrôle.
   for (const f of all)
     if (/^assets\/[^/]*worker[^/]*\.js$/i.test(f.rel)) problems.push(`${f.rel} : script de Worker dans la démo (lancé sans contrôle d'intégrité)`);
-  // Décision du 24 novembre : la démo dit, visiblement, que GitHub l'héberge et voit l'adresse IP.
+  // La démo dit, visiblement, que GitHub l'héberge et voit l'adresse IP.
   if (!all.some((f) => /\.m?js$/.test(f.rel) && f.data.includes(HOST_NOTE_EN)))
     problems.push(`phrase de l'hébergeur absente des scripts de la démo (« ${HOST_NOTE_EN} »)`);
   if (!all.some((f) => /\.m?js$/.test(f.rel) && f.data.includes("AGFzbQEAAAA")))
@@ -384,7 +381,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     rest = rest.slice(m[0].length).trimStart();
   }
   if (!existsSync(join(dir, "404.html"))) problems.push("404.html absent (adresses profondes sur Pages)");
-  // 404.html = app.html : index.html sans l'accueil écrit au build (18 novembre).
+  // 404.html = app.html : index.html sans l'accueil écrit au build.
   else if (readFileSync(join(dir, "404.html"), "utf8") !== (existsSync(join(dir, "app.html")) ? readFileSync(join(dir, "app.html"), "utf8") : index))
     problems.push("404.html différent de app.html");
   for (const [, url] of index.matchAll(/(?:src|href)="(\/[^"]*)"/g))

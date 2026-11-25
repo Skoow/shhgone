@@ -5,7 +5,7 @@
 import type { PreviewKind } from "../index";
 
 /**
- * Types sûrs par visionneuse. SVG absent : jamais affiché (scan de sécurité du 7 novembre),
+ * Types sûrs par visionneuse. SVG absent : jamais affiché (scan de sécurité),
  * comme HTML et XML. Un type de vidéo ou d'audio inconnu prend le type par défaut de la
  * visionneuse (le navigateur reconnaît le conteneur au contenu).
  */

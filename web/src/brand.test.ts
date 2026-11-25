@@ -1,4 +1,4 @@
-// Nom affiché : Shhgone (décision du propriétaire, 12 novembre ; spec D42-24, UI P9). Tout ce qu'un
+// Nom affiché : Shhgone (spec D42-24, UI P9). Tout ce qu'un
 // visiteur voit porte ce nom ; l'interne (dépôt, paquets, bases locales, étiquettes HKDF,
 // en-têtes X-Shh-*, base /shhgone/ de la démo) garde « shhdrop » pour ne rien casser.
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -38,7 +38,7 @@ describe("nom affiché : Shhgone", () => {
     const html = code(read("index.html"));
     expect(html).toContain("<title>Shhgone · Partagez en secret, puis ça s'efface</title>");
     expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Shhgone" />');
-    // Sans JavaScript : un paragraphe, pas un second h1 (l'accueil écrit au build porte le seul h1, audit SEO du 20 novembre).
+    // Sans JavaScript : un paragraphe, pas un second h1 (l'accueil écrit au build porte le seul h1, audit SEO).
     expect(html).toContain("<p><strong>Shhgone : ");
     expect(html.match(/<h1[ >]/g) ?? []).toHaveLength(0);
     expect(html).not.toMatch(/shhdrop/i);

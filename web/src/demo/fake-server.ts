@@ -112,7 +112,7 @@ export type FakeServerOpts = {
   /** Segment reçu ou bourrage tiré (à garder avec l'état). */
   onSegment?: (id: string, n: number, data: Uint8Array) => void;
   /**
-   * Plafond d'octets servis par partage (comme le vrai serveur, 24 novembre) : 403
+   * Plafond d'octets servis par partage (comme le vrai serveur) : 403
    * {"error":"egress_limit"}, sans Retry-After, pour un segment qui le dépasserait, et au
    * déverrouillage une fois le plafond atteint. Absent : aucun plafond.
    */
@@ -179,7 +179,7 @@ function equal(a: Uint8Array, b: Uint8Array): boolean {
   return d === 0;
 }
 
-/** sha256(x) == vérificateur ; un secret fait toujours 32 octets (audit F4). */
+/** sha256(x) == vérificateur ; un secret fait toujours 32 octets. */
 async function matches(x: Uint8Array | undefined, stored: Uint8Array): Promise<boolean> {
   return x !== undefined && x.length === 32 && equal(await sha256(x), stored);
 }
@@ -474,7 +474,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     if (s.state !== "uploading" || s.uploadDeadline <= now()) throw notFound();
     const q = new URL(req.url).searchParams;
     if (q.has("from")) {
-      // Plage de morceaux (audit H-2, comme PutChunks du vrai serveur) : morceaux jamais reçus
+      // Plage de morceaux (comme PutChunks du vrai serveur) : morceaux jamais reçus
       // déjà en aléa ici, comme après finalize.
       const from = segNum(q.get("from")!);
       const size = n < s.segments.length ? segmentSize(s.bucket, n) : 0;
@@ -574,7 +574,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     if (
       ![1, 6, 12, 24].includes(ttl) ||
       !(maxOpens >= 1 && maxOpens <= MAX_OPENS) ||
-      ops !== 3 || // audit F4 : seuls paramètres de création, comme le vrai serveur
+      ops !== 3 || // seuls paramètres de création, comme le vrai serveur
       mem !== 67108864 ||
       equal(proofV, emptyHash)
     )
@@ -585,7 +585,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     const hdr = decodeB64(b.header, HEADER), tail = decodeB64(b.tail, CHUNK_CT);
     if (!(BUCKETS as readonly number[]).includes(fb) || fb > s.bucket || fb > growLimit(s.top ?? 0)) throw badRequest();
     const segs = segmentCount(fb);
-    // Morceaux de petits éléments retirés (audit H-2) : vérifiés, puis remplacés par de l'aléa.
+    // Morceaux de petits éléments retirés : vérifiés, puis remplacés par de l'aléa.
     const voids = b.void === undefined ? [] : b.void;
     if (!Array.isArray(voids) || voids.length > 512) throw badRequest();
     for (const v of voids as unknown[])
@@ -694,7 +694,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
         envelope: b64(s.envelope!),
         grant: grant(id, openN, s.expiresAt),
         opens_left: s.opensLeft,
-        // Entier 0 ou 1, comme le vrai serveur (audit D2 : même longueur de réponse).
+        // Entier 0 ou 1, comme le vrai serveur (même longueur de réponse).
         last_open: s.opensLeft === 0 && openN === s.opensIssued ? 1 : 0,
       });
     }
@@ -813,7 +813,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
   /**
    * Destinataire : K_accès en en-tête, K_preuve dans le corps (POST /api/shares/destroy). Sans
    * motif : destruction, seulement quand plus aucune ouverture n'est possible (409 still_open).
-   * Signalement (20 novembre) : une voix par ouverture, prouvée par son octroi (`grant`) ;
+   * Signalement : une voix par ouverture, prouvée par son octroi (`grant`) ;
    * effacé quand les voix atteignent la moitié des ouvertures permises. Comme le serveur.
    */
   async function destroy(req: Request): Promise<Response> {
@@ -821,7 +821,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     // Motif fermé (spec §36 S14) : absent, ou exactement "report" ; catégorie (conception compte
     // §21.10.2) : entier 1 à 10, seulement avec "report" ; absente : « Autre ». Comme le serveur.
     const report = "reason" in b;
-    // Octroi toujours exigé (audit du 20 novembre) : vote ou destruction par la dernière ouverture.
+    // Octroi toujours exigé : vote ou destruction par la dernière ouverture.
     if (typeof b.grant !== "string" || (report && b.reason !== "report")) throw badRequest();
     if ("categorie" in b && (!report || !Number.isInteger(b.categorie) || (b.categorie as number) < 1 || (b.categorie as number) > 10)) throw badRequest();
     const ka = headerSecret(req, "X-Shh-Access");

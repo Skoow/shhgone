@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Carte « Votre compte » (conception compte §11, §21.15.3 ; plan, lot 13 ; monté seulement avec
-  // __COMPTES__) : ancienneté (« Membre depuis le 14 novembre 2026 »), palier et limites (du
+  // Carte « Votre compte » (conception compte §11, §21.15.3 ; monté seulement avec
+  // __COMPTES__) : ancienneté (« Membre »), palier et limites (du
   // serveur, GET /api/compte), abonnement, bannissement avec sa date et son motif. Les limites du
   // palier confirmé (3 salons, 10 places) sont celles du serveur (conception §11), rappelées ici
   // pour un compte récent, qui ne les reçoit pas encore.
@@ -13,7 +13,7 @@
   type Props = { etat: EtatServeur | null };
   let { etat }: Props = $props();
 
-  /** « 2026-11-14 » → « 14 novembre 2026 » (toujours avec l'année). */
+  /** « 2026-11-14 » → « 1 » (toujours avec l'année). */
   function jourAvecAnnee(iso: string): string {
     const d = new Date(`${iso}T00:00:00Z`);
     return Number.isNaN(d.getTime()) ? iso : new Intl.DateTimeFormat(getLang(), { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(d);

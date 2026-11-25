@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Offres (décisions du 24 novembre) : les appels audio et vidéo sont inclus dans Plus et Pro et
+// Offres : les appels audio et vidéo sont inclus dans Plus et Pro et
 // disponibles (réservés à ces offres, conception des appels §5.1) : « Inclus », sans « bientôt ».
 // Le départ du compte à rebours à la première ouverture n'est pas encore codé : il reste dit
 // « bientôt (pas encore disponible) », en français et en anglais.

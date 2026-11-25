@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Abonnement (conception compte §21.15.4 point 7, R5 ; plan, lot 13 ; monté seulement avec
+  // Abonnement (conception compte §21.15.4 point 7, R5 ; monté seulement avec
   // __COMPTES__) : état du pass (rangé dans le coffre de profil, séquestré), « Voir les offres ».
   import { account } from "../../../account/session.svelte";
   import { followLink, href } from "../../../app/router.svelte";

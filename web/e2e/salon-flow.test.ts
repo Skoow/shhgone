@@ -1,7 +1,7 @@
-// Salon (plan C-2, Task 16) : conversation de bout en bout entre trois clients, avec le vrai
+// Salon : conversation de bout en bout entre trois clients, avec le vrai
 // moteur du salon (module wasm, sous Node) contre le vrai binaire Go. Un échec désigne un écart
 // entre le serveur et le moteur (tailles, ordre, annonces, Welcome, KeyPackages) : il se corrige
-// du côté qui contredit la spécification et le « Protocole » du plan C-2, jamais dans ce test.
+// du côté qui contredit la spécification et le « Protocole », jamais dans ce test.
 // Les parcours dans de vrais navigateurs restent pour C-3.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Enveloppe, EnveloppeEnvoi, Evenement } from "../src/salon/engine";
@@ -31,7 +31,7 @@ async function lit(c: ClientSalon, e: Envoi, siege: number): Promise<number> {
 }
 
 describe("salon : trois clients, vrai moteur", () => {
-  // Étapes dans l'ordre du cahier des charges (Task 16), en `it` successifs qui partagent l'état
+  // Étapes dans l'ordre du cahier des charges, en `it` successifs qui partagent l'état
   // ci-dessous : Vitest les exécute dans l'ordre d'écriture, l'un après l'autre (aucun
   // `concurrent`) ; un échec fait échouer les étapes qui en dépendent, nommées.
   let srv: TestServer;
@@ -82,7 +82,7 @@ describe("salon : trois clients, vrai moteur", () => {
     await lit(c, e1, 0);
   });
 
-  // Règle 1 (« vu par tous + délai », décision du 13 novembre) : effacée 60 s après la dernière
+  // Règle 1 (« vu par tous + délai ») : effacée 60 s après la dernière
   // lecture (0x05), pas avant ; 0x0E chez les trois.
   it("règle 1 lue (0x05) par les deux autres → 0x0E chez les trois 60 s après, pas avant", async () => {
     const inst = texte("Lu une fois", 1);

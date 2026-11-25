@@ -1,7 +1,7 @@
-// Routeur interne (UI §9). Il lit le chemin et, sous « /s » seulement, la FORME du « # »
+// Routeur interne (UI §9). Il lit le chemin, sous « /s » seulement, la FORME du « # »
 // (spec §32 : « #m<43> » gestion, sinon ouverture) sans jamais en garder le contenu : la clé est
 // lue une fois par readLink (app/link.ts), puis retirée de l'adresse. Un « # » à la racine (ancienne
-// forme, refusée depuis le 18 novembre) n'ouvre rien : l'accueil le retire de l'adresse.
+// forme, refusée) n'ouvre rien : l'accueil le retire de l'adresse.
 import { flushSync } from "svelte";
 import { MANAGE_FRAGMENT } from "../engine/pure";
 import type { Lang } from "../i18n/format";
@@ -22,7 +22,7 @@ export function markReopen(h: History): void {
 }
 
 /**
- * Adresse affichée une fois le lien lu (décision du propriétaire du 17 novembre : « /s » n'est
+ * Adresse affichée une fois le lien lu (« /s » n'est
  * montré que quand il sert) : la page « /s » remplace son adresse par l'accueil (« / ») après
  * avoir lu et retiré le « # ». Un rechargement de « / » marqué (markReopen) repart vers « /s »
  * (moveToLinkPage), où l'écran d'ouverture retrouve l'octroi de l'onglet (spec §41.4). Toute
@@ -35,7 +35,7 @@ export function shownPath(pathname: string): string {
 const reopenHere = () =>
   typeof history !== "undefined" && (history.state as Record<string, unknown> | null)?.[REOPEN_MARK] === true;
 
-/** Pages d'information (pied de page, retours UI5) : chemin → route. */
+/** Pages d'information (pied de page) : chemin → route. */
 export type InfoRoute = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler" | "verifier";
 export const INFO_PATHS: Readonly<Record<string, InfoRoute>> = {
   "/securite": "securite",
@@ -43,15 +43,15 @@ export const INFO_PATHS: Readonly<Record<string, InfoRoute>> = {
   "/conditions": "conditions",
   "/mentions-legales": "mentions",
   "/signaler": "signaler",
-  // « Vérifier cette version » (spec §28.4, 24 novembre).
+  // « Vérifier cette version » (spec §28.).
   "/verifier": "verifier",
 };
 
-/** Pages du compte (plan du compte, lot 10), seulement si __COMPTES__ : chemin → route. */
+/** Pages du compte, seulement si __COMPTES__ : chemin → route. */
 export type CompteRoute = "compte" | "inscription" | "connexion" | "recuperation" | "profil";
 
 /**
- * Pages du salon (plan C-3), seulement si __SALONS__ (site avec compte, hors démo) : « /salon »
+ * Pages du salon, seulement si __SALONS__ (site avec compte, hors démo) : « /salon »
  * (lien d'invitation « #c… », salon prêt, conversation ; aucun secret dans le chemin) et
  * « /salon/nouveau » (création, compte exigé). Relue par TestAppRoutesMatchClientRouter
  * (server/cmd/shhdrop), comparée à salonRoutes, servies en 200 avec SHH_SALONS=1 et SHH_COMPTES=1.
@@ -105,7 +105,7 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
     if (hash === "" && reopen) return { name: "open" };
     return { name: "home" };
   }
-  // Liens sous « /s » (décision du propriétaire du 16 novembre) : ouverture et gestion, dans leur
+  // Liens sous « /s » : ouverture et gestion, dans leur
   // propre page (s.html). Sans fragment de la bonne forme : l'écran d'ouverture dit « Lien
   // incomplet » (ou rouvre, après un rechargement de l'ouverture déverrouillée).
   if (p === "/s" || p === "/s.html") {
@@ -129,7 +129,7 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
   // Pages du compte : sans __COMPTES__ (défaut, démo), la même 404 qu'une adresse inconnue.
   const compte = comptes && Object.hasOwn(COMPTE_PATHS, p) ? COMPTE_PATHS[p] : undefined;
   if (compte !== undefined) return { name: compte };
-  // Salon (plan C-3) : sans __SALONS__ (démo, site sans compte), la même 404.
+  // Salon : sans __SALONS__ (démo, site sans compte), la même 404.
   const salon = salons && Object.hasOwn(SALON_PATHS, p) ? SALON_PATHS[p] : undefined;
   if (salon !== undefined) return { name: salon };
   // « /s/ » reste réservé aux futurs liens universels (spec §16) : aucune route aujourd'hui.
@@ -147,7 +147,7 @@ function sync(): void {
   if (next.name !== router.current.name) router.current = next;
 }
 
-/** Garde du bouton Retour pendant un envoi et sur « Lien prêt » (app/leave-guard.ts, audit I2). */
+/** Garde du bouton Retour pendant un envoi et sur « Lien prêt » (app/leave-guard.ts). */
 export const leaveGuard = typeof window === "undefined" ? null : createLeaveGuard(window);
 
 // Retour du système (geste, bouton) : même glissement, vers la droite, sur téléphone.
@@ -164,13 +164,13 @@ if (typeof window !== "undefined")
 const base = () => import.meta.env.BASE_URL;
 
 /**
- * Pages servies par leur propre fichier HTML (pages séparées, conception du 16 novembre) : le
+ * Pages servies par leur propre fichier HTML (pages séparées) : le
  * serveur répond « securite.html » à « /securite ». Entre l'application (index.html) et ces
  * pages, un lien charge l'autre page (navigation complète) ; à l'intérieur de l'une ou de
  * l'autre, rien ne change.
  */
 export const PAGE_ROUTES: ReadonlySet<Route["name"]> = new Set<Route["name"]>(["securite", "confidentialite", "conditions", "mentions", "signaler", "verifier", "offres"]);
-/** Écrans de la page « /s » (s.html, 16 novembre) : ouverture et gestion d'un partage. */
+/** Écrans de la page « /s » (s.html) : ouverture et gestion d'un partage. */
 export const LINK_ROUTES: ReadonlySet<Route["name"]> = new Set<Route["name"]>(["open", "manage"]);
 type Entry = "app" | "pages" | "s";
 let entry: Entry = "app";
@@ -185,7 +185,7 @@ export function otherEntry(path: string): boolean {
 }
 
 /**
- * Entrée « / » d'une ouverture déverrouillée (markReopen, 17 novembre), rechargée : remplacée,
+ * Entrée « / » d'une ouverture déverrouillée (markReopen), rechargée : remplacée,
  * sans nouvelle entrée d'historique, par « /s » (où l'écran d'ouverture retrouve l'octroi de
  * l'onglet). Rend vrai si la page part ; l'appelant n'affiche alors rien.
  */

@@ -1,5 +1,5 @@
 // Synchronisation de l'historique de l'appareil avec le coffre privé (conception compte §21.8,
-// §37.11 A-G2 et A-G8 ; plan, lot 11) contre le faux serveur du compte par passkey
+// §37.11 A-G2 et A-G8) contre le faux serveur du compte par passkey
 // (passkey.test-helper.ts) : fusion à l'ouverture, écriture différée de 2 à 12 min après un
 // événement, entrées « compte » retirées à la déconnexion (celles de l'appareil restent).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -145,7 +145,7 @@ describe("format des entrées du coffre privé", () => {
     expect(deCoffre("recus", { id: "x".repeat(22), lien: "https://shh.test/#" + "a".repeat(43), cree: 1, expire: 2, taille: 1, elements: 1, format: "image", mot_de_passe: "x" }, T0)).not.toHaveProperty("mot_de_passe");
   });
 
-  // Nom du partage (19 novembre) : `libelle` d'un envoi, seulement s'il y en a un ; entrée d'avant
+  // Nom du partage : `libelle` d'un envoi, seulement s'il y en a un ; entrée d'avant
   // (sans libellé) relue sans titre ; renommage : seul le libellé de l'entrée du même lien change.
   it("envoi : titre du partage dans le coffre (libelle), aller-retour, renommage", () => {
     const e = entree({ sorte: "envoi", label: "Contrat Dupont" });

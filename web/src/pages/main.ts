@@ -1,4 +1,4 @@
-// Point d'entrée des pages d'information (pages séparées, conception du 16 novembre). Le HTML
+// Point d'entrée des pages d'information (pages séparées). Le HTML
 // arrive déjà rempli (rendu au build, en français) ; le script le remplace par la page vivante
 // (même texte, ou la langue du navigateur). Les liens vers l'application (accueil, envoi, Mes
 // partages) chargent sa page (router.svelte.ts, setEntry).
@@ -11,11 +11,11 @@ import { viderSaufAmbiance } from "../ui/ambiance";
 import PagesApp from "./PagesApp.svelte";
 
 setEntry("pages");
-// « Mes partages » dans l'en-tête seulement si l'historique existe sur cet appareil (17 novembre).
+// « Mes partages » dans l'en-tête seulement si l'historique existe sur cet appareil.
 void probeHistory();
-// « Téléchargements » sans compte seulement si l'historique des téléchargements est activé (22 novembre).
+// « Téléchargements » sans compte seulement si l'historique des téléchargements est activé.
 void probeDownloads();
-// Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau ; titres du site, sans « Démo · » depuis le 22 novembre).
+// Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau ; titres du site, sans « Démo · »).
 if (import.meta.env.MODE === "demo") await (await import("../demo/install")).installDemo(window);
 await langReady;
 

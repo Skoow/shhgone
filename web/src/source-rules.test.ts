@@ -68,11 +68,11 @@ describe("règles de sources", () => {
     expect(offenders(RE_STYLE_ATTR, (r) => r.endsWith(".svelte"))).toEqual([]));
   it("pas d'eval ni de new Function", () =>
     expect(offenders(/\beval\s*\(|new\s+Function\b/)).toEqual([]));
-  // Moteur (Task 11) : les écrans n'en voient que la partie sans clé (engine/pure.ts) ; le reste
+  // Moteur : les écrans n'en voient que la partie sans clé (engine/pure.ts) ; le reste
   // passe par l'interface publique (index.ts).
   it("pas d'import de transfer/, crypto/ ni engine/ (hors engine/pure) dans les écrans", () =>
     expect(offenders(RE_FORBIDDEN_IMPORT, inUiDir)).toEqual([]));
-  // Exception écrite (audit du 20 novembre, W3) : captcha/pow-source.verified.ts lit le script du
+  // Exception écrite : captcha/pow-source.verified.ts lit le script du
   // Worker anti-robot avec son empreinte (fetch + integrity, comme engine/source.verified.ts), et
   // aucune adresse de l'API.
   it("pas de fetch( ni XMLHttpRequest dans les écrans", () => {
@@ -117,7 +117,7 @@ describe("règles de sources", () => {
     expect(live.text).toMatch(/indexedDB/);
     expect(live.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
     expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("downloads/"))).toEqual([]);
-    // downloads/probe.ts (pages d'information, 22 novembre) : lecture seule du drapeau « on »,
+    // downloads/probe.ts (pages d'information) : lecture seule du drapeau « on »,
     // jamais d'écriture ni d'entrée lue.
     const probe = files.find((f) => f.rel === "downloads/probe.ts")!.text;
     expect(probe).toMatch(/"readonly"/);
@@ -127,7 +127,7 @@ describe("règles de sources", () => {
     const type = store.text.match(/export type DownloadEntry = \{([\s\S]*?)\n\};/)![1]!;
     expect([...type.matchAll(/^\s+(\w+):/gm)].map((m) => m[1])).toEqual(["id", "name", "sizeBytes", "format", "source", "savedAt"]);
   });
-  // Conception compte §8.5, §9, §15 (plan, lot 9) : web/src/account/ est le seul détenteur du jeton
+  // Conception compte §8.5, §9, §15 : web/src/account/ est le seul détenteur du jeton
   // de session, de K_compte et de s_profil. Une seule couche réseau (account/api.ts) : X-Shh-Session
   // n'est écrit que là ; la base `shhdrop-compte` (« Rester connecté », exception écrite, chiffrée
   // par une clé non extractible) n'est nommée et lue que par account/persist.ts ; aucun cookie.
@@ -136,7 +136,7 @@ describe("règles de sources", () => {
     expect(files.find((f) => f.rel === "account/api.ts")?.text).toMatch(/X-Shh-Session/);
     expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("account/") && r !== "account/api.ts")).toEqual([]);
     expect(offenders(/XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r === "account/api.ts")).toEqual([]);
-    // keepalive (audit du 18 novembre) : seulement pour la déconnexion, pour qu'elle parte même si
+    // keepalive : seulement pour la déconnexion, pour qu'elle parte même si
     // l'onglet se ferme aussitôt ; aucune autre requête ne survit à la page.
     const apiTs = files.find((f) => f.rel === "account/api.ts")!.text;
     expect([...apiTs.matchAll(/keepalive: true/g)]).toHaveLength(2); // l'option d'appel, et son seul usage
@@ -157,11 +157,11 @@ describe("règles de sources", () => {
     expect(files.find((f) => f.rel === "paiement/pass.ts")?.text).toMatch(/indexedDB/);
     expect(offenders(/localStorage|sessionStorage|document\.cookie/, (r) => r.startsWith("paiement/"))).toEqual([]);
   });
-  // Conception du compte par passkey §9, §14 (plan, lot W1) : navigator.credentials seulement dans
+  // Conception du compte par passkey §9, §14 : navigator.credentials seulement dans
   // account/navigateur.ts (la démo le remplace par une passkey simulée), utilisé par account/webauthn.ts ;
   // ni l'un ni l'autre ne fait de requête ; et aucune requête entre le geste et l'appel
   // au navigateur (Safari annule la cérémonie) : dans les fonctions de session appelées par un
-  // geste, rien de api.* avant creer( / obtenir( / prfApresCreation(, sauf le rechargement d'une
+  // geste, rien de api.* avant creer(/ obtenir(/ prfApresCreation(sauf le rechargement d'une
   // cérémonie échue (« if (!fraiche(c)) »), qui n'arrive que si l'écran ne l'a pas chargée.
   it("compte : navigator.credentials seulement dans account/navigateur.ts ; aucune requête entre le geste et la cérémonie", () => {
     const sansCommentaires = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
@@ -208,10 +208,9 @@ describe("règles de sources", () => {
       expect(f.text, f.rel).toMatch(/__COMPTES__/);
     }
   });
-  // Conception compte §21.7, §21.8 (plan, lot 11) : exception écrite, une entrée reçue ou de salon
+  // Conception compte §21.7, §21.8 : exception écrite, une entrée reçue ou de salon
   // garde son lien (`link`, K_lien) ; un envoi jamais (cleanEntry, history/store.test.ts). Toujours
-  // aucun mot de passe, nom d'élément ni contenu : la liste des champs reste fermée. Seul ajout du
-  // 19 novembre : `label` d'un envoi porte le titre du partage (manifeste), pas un nom d'élément.
+  // aucun mot de passe, nom d'élément ni contenu : la liste des champs reste fermée. Seul : `label` d'un envoi porte le titre du partage (manifeste), pas un nom d'élément.
   it("historique : liste fermée des champs de HistoryEntry (lien seulement pour un reçu ou un salon), aucun mot de passe ni nom", () => {
     const store = files.find((f) => f.rel === "history/store.ts")!;
     const type = store.text.match(/export type HistoryEntry = \{([\s\S]*?)\n\};/)![1]!;
@@ -221,7 +220,7 @@ describe("règles de sources", () => {
   });
   // Spec §41.4 : exception écrite, l'octroi d'ouverture de l'onglet (session/open-grant.ts),
   // et plus tard le salon (chat/session.ts, §39.13.3). Nulle part ailleurs.
-  // Salon (plan C-3) : une seule couche réseau par sorte. Requêtes HTTP du salon seulement dans
+  // Salon : une seule couche réseau par sorte. Requêtes HTTP du salon seulement dans
   // salon/api.ts (la création avec session : account/api.ts) ; le WebSocket du salon seulement dans
   // salon/client.ts, nulle part ailleurs dans le site ; aucun stockage navigateur dans salon/.
   it("salon : fetch seulement dans salon/api.ts, WebSocket seulement dans salon/client.ts (et salon.svelte.ts qui le crée)", () => {
@@ -236,7 +235,7 @@ describe("règles de sources", () => {
     expect(pv.text).not.toMatch(/localStorage|sessionStorage|document\.cookie|\bmdp\b|motDePasse/);
     expect(offenders(/shhdrop-salon"/, (r) => r !== "salon/preuve.ts")).toEqual([]);
   });
-  // Plan C-4, point 1 : la graine R en clair (seedBytes, seedFromBytes) ne sert qu'aux pièces du
+  // La graine R en clair (seedBytes, seedFromBytes) ne sert qu'aux pièces du
   // salon, où elle voyage dans un message MLS ; jamais dans un partage (R y reste dans l'enveloppe).
   it("salon : seedBytes et seedFromBytes seulement dans salon/pieces.ts (et engine/)", () =>
     expect(offenders(/\bseed(?:Bytes|FromBytes)\b/, (r) => r !== "salon/pieces.ts" && !r.startsWith("engine/"))).toEqual([]));
@@ -278,7 +277,7 @@ describe("règles de sources", () => {
       everySource.filter((f) => !f.rel.startsWith("viewers/") && /getImageData/.test(f.text)).map((f) => f.rel),
     ).toEqual([]));
 
-  // Empreinte de l'appareil (décision du 24 novembre) : aucune API qui sert surtout à reconnaître
+  // Empreinte de l'appareil : aucune API qui sert surtout à reconnaître
   // un navigateur, dans tout src/ (démo comprise). Seuls les usages de cette liste, relus un par
   // un, sont admis, chacun pour sa raison ; une entrée qui ne sert plus fait échouer le test.
   // Les commentaires de ligne entière sont ignorés ; tout le reste compte (chaînes comprises).
@@ -322,7 +321,7 @@ describe("règles de sources", () => {
     for (const s of ["// navigator.deviceMemory dans un commentaire", "/** canvas.toBlob */", "blob.arrayBuffer()", "cfg.plugins"]) expect(hit(s), s).toBe(false);
   });
 
-  // Task R2 (spec §28.3, §41.6) : l'écrivain .zip, les visionneuses et les écrans sont importés
+  // (spec §28.3, §41.6) : l'écrivain .zip, les visionneuses et les écrans sont importés
   // statiquement ; aucun import() dynamique hors de main.ts (démo).
   it("aucun import() dynamique dans zip/, viewers/, flows/, ui/, routes/", () =>
     expect(
@@ -337,7 +336,7 @@ describe("règles de sources", () => {
       if (f.rel === "main.ts") {
         for (const m of found) expect(m).toBe('import("./demo/install")');
       } else if (f.rel === "pages/main.ts" || f.rel === "open/main.ts") {
-        // Pages séparées et page « /s » (16 novembre) : même installation de la démo, même condition.
+        // Pages séparées et page « /s » : même installation de la démo, même condition.
         for (const m of found) expect(m).toBe('import("../demo/install")');
       } else {
         expect({ file: f.rel, found }).toEqual({ file: f.rel, found: [] });
@@ -444,7 +443,7 @@ describe("vite.config.ts résolu", () => {
     expect(names).not.toContain("shh-demo-meta");
   });
 
-  // Plan du compte, lot 9 : drapeau de construction __COMPTES__, faux par défaut et toujours faux
+  // Drapeau de construction __COMPTES__, faux par défaut et toujours faux
   // dans la démo (aucun serveur) ; vrai seulement si SHH_SITE_COMPTES=1 au build de production.
   it("__COMPTES__ : false par défaut en production, true avec SHH_SITE_COMPTES=1, toujours dans la démo (compte essayable)", async () => {
     const define = async (mode: string | undefined, env: string | undefined) => {
@@ -466,7 +465,7 @@ describe("vite.config.ts résolu", () => {
     expect(await define("demo", "1")).toBe("true");
   });
 
-  // Plan du compte, lot 10 : App.svelte ne voit les pages du compte que par routes/compte/pages.ts,
+  // App.svelte ne voit les pages du compte que par routes/compte/pages.ts,
   // remplacé par pages.off.ts (aucun import) sans __COMPTES__ : ni le module de compte ni le moteur
   // du salon n'entrent alors dans le graphe du site.
   it("pages du compte : App.svelte → routes/compte/pages seulement ; pages.off.ts sans __COMPTES__", () => {

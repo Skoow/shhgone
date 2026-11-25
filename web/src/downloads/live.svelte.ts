@@ -1,7 +1,7 @@
 // État partagé de l'historique des téléchargements pour les écrans (contenu reçu, page
 // /telechargements). Ouvre le stockage une fois : IndexedDB en production, mémoire dans la
 // démo (origine partagée de GitHub Pages : rien n'y est écrit) ; indisponible → `status:
-// "unavailable"`. Désactivé par défaut (décision du propriétaire du 22 novembre 2026) : tant que
+// "unavailable"`. Désactivé par défaut : tant que
 // la personne ne l'a pas activé, rien n'est créé ni écrit (ni base, ni clé, ni entrée) ; une
 // simple visite ou un fichier enregistré n'écrivent rien. Aucune requête réseau.
 import { getDemo } from "../app/demo-hooks";
@@ -12,7 +12,7 @@ import { downloadsIdb, openDownloads, type DownloadEntry, type Downloads, type N
 export const downloads = $state({
   status: "idle" as "idle" | "loading" | "ready" | "unavailable",
   entries: [] as DownloadEntry[],
-  /** « Garder l'historique » : désactivé par défaut (22 novembre 2026, remplace l'« activé » de R12). */
+  /** « Garder l'historique » : désactivé par défaut (remplace l'« activé » de R12). */
   enabled: false,
 });
 
@@ -54,7 +54,7 @@ export async function loadDownloads(): Promise<void> {
     if (!d) return void (downloads.status = "unavailable");
     const [list, enabled] = await Promise.all([d.list(), d.enabled()]);
     downloads.entries = list;
-    // « Téléchargements » dans le menu et le pied de page sans compte : seulement activé (22 novembre).
+    // « Téléchargements » dans le menu et le pied de page sans compte : seulement activé.
     downloads.enabled = presence.downloads = enabled;
     downloads.status = "ready";
   } catch {

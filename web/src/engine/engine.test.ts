@@ -1,7 +1,7 @@
 // Le moteur WebAssembly, avec le fournisseur WebCrypto, redonne TOUS les vecteurs de
 // engine/vectors/v2.json (produits par l'ancien moteur TypeScript), comme les tests Rust
 // (engine/core/tests/vectors.rs) avec le fournisseur RustCrypto : WebCrypto ≡ RustCrypto
-// (spec §9). Plus : règles du fournisseur et des frontières (Task 9).
+// (spec §9). Plus : règles du fournisseur et des frontières.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -93,7 +93,7 @@ let E: Engine;
 let W: Wasm;
 
 beforeAll(async () => {
-  // Le site lit le .wasm par fetch (Task 10 : avec son empreinte) ; ici, depuis le disque.
+  // Le site lit .wasm par fetch (avec son empreinte) ; ici, depuis le disque.
   vi.stubGlobal("fetch", async () => new Response(readFileSync(WASM)));
   E = await loadEngine();
   W = E.wasm;
@@ -112,7 +112,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
       if (k === "ELEMENT_AD") expect(hex(c[k] as Uint8Array), k).toBe(v);
       else expect(c[k], k).toEqual(v);
     }
-    // Constantes des formules payantes (19 novembre) : hors de v2.json (figé), vérifiées contre
+    // Constantes des formules payantes : hors de v2.json (figé), vérifiées contre
     // engine/vectors/v5-paliers.json par paiement.test.ts ; exactement celles-ci en plus.
     const payantes = ["CONTENT_MAX_PLUS", "CONTENT_MAX_PRO", "PAID_BUCKETS"];
     expect(payantes.filter((k) => k in c)).toEqual(payantes);
@@ -200,7 +200,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     for (const c of V.sha256) expect(hex(W.sha256(unhex(c.input)))).toBe(c.digest);
   });
 
-  // Empreinte d'un fichier (16 novembre) : par tranches, même résultat que d'un bloc et que
+  // Empreinte d'un fichier : par tranches, même résultat que d'un bloc et que
   // node:crypto, quelle que soit la découpe ; un hacheur fini refuse toute suite.
   it("FileHasher : SHA-256 par tranches = d'un bloc = node:crypto", () => {
     for (const c of V.sha256) {
@@ -393,7 +393,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
         refused++;
       } else {
         const el = await W.elementSealer(t.p, c.size, c.first);
-        // La graine ne sort pas du moteur (décision Task 11) : vérifiée par la clé importée.
+        // La graine ne sort pas du moteur (décision) : vérifiée par la clé importée.
         expect("k" in el).toBe(false);
         expect(el.pieces()).toEqual(c.pieces);
         expect(t.imports.map((i) => hex(i.raw))).toEqual([hex(W.hkdf(unhex(c.k), "shhdrop/v2/element", 32))]);
@@ -453,7 +453,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     expect(refused).toBe(7);
   });
 
-  // Nom du partage (19 novembre) : engine/vectors/v2-titre.json, produit par le moteur Rust.
+  // Nom du partage : engine/vectors/v2-titre.json, produit par le moteur Rust.
   it("v2-titre.json : nettoyage (cleanTitle) et scellement avec titre (JSON exact, refus)", async () => {
     const T = JSON.parse(readFileSync(join(here, "../../../engine/vectors/v2-titre.json"), "utf8"));
     const str = (h: string | null) => (h === null ? undefined : new TextDecoder().decode(unhex(h)));
@@ -541,7 +541,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     for (const [n, w] of sh.segments.entries()) expect(sha(segs[n]!), `segment ${n}`).toBe(w.sha256_zero_filled);
     // Lien, lien de gestion, lien du QR, mot de passe, enveloppe (nonce du vecteur).
     const kLien = unhex(sh.k_lien);
-    // Lien écrit sous /s depuis le 16 novembre (v3-liens.json) ; la forme racine reste lue.
+    // Lien écrit sous /s (v3-liens.json) ; la forme racine reste lue.
     expect(String(W.shareLink(sh.origin, kLien, "/"))).toBe(toS(sh.link));
     expect(String(W.manageLink(sh.origin, unhex(sh.s_gestion), "/"))).toBe(toS(sh.manage_link));
     expect(String(W.shareLinkWithPassword(utf8(sh.link), utf8(sh.password)))).toBe(sh.link_with_password);
@@ -555,7 +555,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     expect([hex(da.kAcces), hex(da.vAcces), hex(W.shareId(kLien))]).toEqual([sh.k_acces, sh.v_acces, sh.id]);
 
     // Ouverture (Review Focus 2) : lien → Argon2id → enveloppe → engagement → manifeste.
-    const parsed = W.parseLink(utf8(toS(sh.link)), "/"); // seule la forme sous /s est lue (18 novembre)
+    const parsed = W.parseLink(utf8(toS(sh.link)), "/"); // seule la forme sous /s est lue
     expect(parsed.kind).toBe("s");
     if (parsed.kind !== "s") return;
     expect(parsed.origin).toBe(sh.origin);
@@ -569,7 +569,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     const fetched: number[] = [];
     const rd = await W.openReader(ck, async (n: number) => (fetched.push(n), segs[n] ?? new Uint8Array()), sh.bucket);
     expect(fetched).toEqual([0, 6, 0]);
-    // Manifeste rendu sans les graines `k` (décision Task 11 : le lecteur garde les clés).
+    // Manifeste rendu sans les graines `k` (décision : le lecteur garde les clés).
     const want = { ...sh.opened.manifest, items: sh.opened.manifest.items.map(({ k: _k, ...e }: { k?: string }) => e) };
     expect(rd.manifest()).toEqual(want);
     expect(rd.manifest().items.some((e) => "k" in e)).toBe(false);
@@ -720,7 +720,7 @@ describe("fournisseur WebCrypto et frontières du moteur", () => {
     expect(await errorOf(() => W.contentKeysChecked(seed, keys.engagement)), "R neuve : pas de clés d'ouverture").toBe("cle_deja_utilisee");
     const el0 = await W.elementSealer(testProvider([new Uint8Array(32)]).p, 1, 0);
     const entry: FinalEntry[] = [{ kind: "text", name: "n", mime: "text/plain", size: 1, first: 0, sealer: el0.id }];
-    expect(await errorOf(() => W.sealFinal(entry, keys, undefined, undefined)), "note pas encore chiffrée (audit M6)").toBe("texte_invalide");
+    expect(await errorOf(() => W.sealFinal(entry, keys, undefined, undefined)), "note pas encore chiffrée").toBe("texte_invalide");
     await el0.piece(0, utf8("a"));
     await W.sealFinal(entry, keys, undefined, undefined);
     expect(await errorOf(() => W.sealFinal(entry, keys, undefined, undefined)), "un seul manifeste").toBe("cle_deja_utilisee");
@@ -1021,7 +1021,7 @@ describe("Argon2id : Worker neuf par appel (couche TypeScript)", () => {
     expect(workers.at(-1)!.terminated).toBe(true);
   });
 
-  it("sans `start` explicite : celui du moteur (chargement vérifié, Task 10)", async () => {
+  it("sans `start` explicite : celui du moteur (chargement vérifié)", async () => {
     const want = hex(W.passwordKeyForCreate(utf8(PW), salt));
     let n = 0;
     const engine: Engine = { ...E, start: async () => (n++, fakeWorker((job) => handle(job))) };
@@ -1071,7 +1071,7 @@ describe("Argon2id : Worker neuf par appel (couche TypeScript)", () => {
   });
 });
 
-describe("Argon2id : Worker bloqué ou calcul non transmissible (décisions Task 11)", () => {
+describe("Argon2id : Worker bloqué ou calcul non transmissible (décisions)", () => {
   const PW = "aC3!cD5?#Fg";
   const salt = new Uint8Array(16).fill(1);
 

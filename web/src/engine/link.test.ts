@@ -1,4 +1,4 @@
-// Liens (spec §32), portés de l'ancien transfer/link.test.ts (Task 11) : parseLink, shareLink et
+// Liens (spec §32), portés de l'ancien transfer/link.test.ts : parseLink, shareLink et
 // manageLink sont ceux du moteur (clé lue et écrite par le moteur, asynchrones) ; les formes, origine
 // et mot de passe du QR code ceux de pure.ts. Mêmes cas, mêmes attentes.
 import { describe, expect, it } from "vitest";
@@ -6,7 +6,7 @@ import { MANAGE_FRAGMENT, SHARE_FRAGMENT, SHARE_LINK_SHAPE, SHARE_PW_FRAGMENT, b
 
 const K = b64u(new Uint8Array(32).fill(1)); // 43 caractères
 
-describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", () => {
+describe("liens (spec §32, sous /s : secret après #)", () => {
   it("aller-retour shareLink → parseLink ; longueur = origine + 46", async () => {
     const k = newKLien();
     const link = await shareLink("https://shhdrop.example", k);
@@ -115,7 +115,7 @@ describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", (
     expect(link.slice("https://shhdrop.app/s#".length)).toBe(b64u(k));
   });
 
-  it("ancienne forme à la racine refusée (propriétaire, 18 novembre) ; seule la forme sous /s est lue", async () => {
+  it("ancienne forme à la racine refusée ; seule la forme sous /s est lue", async () => {
     for (const [u, b] of [
       [`https://x.test/#${K}`, "/"],
       [`https://x.test/#m${K}`, "/"],
@@ -135,7 +135,7 @@ describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", (
   });
 });
 
-describe("origine (audit F1)", () => {
+describe("origine", () => {
   it("parseLink rend l'origine et refuse les identifiants dans l'URL", async () => {
     expect((await parseLink(`https://srv.test:8443/s#${K}`)).origin).toBe("https://srv.test:8443");
     for (const u of [`https://user:pw@srv.test/s#${K}`, `https://user@srv.test/s#${K}`, `https://:pw@srv.test/s#${K}`]) {

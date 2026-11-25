@@ -75,7 +75,7 @@ describe("contenu du coffre de profil", () => {
     expect(profilDeJson(profilEnJson(p))).toEqual(p);
   });
 
-  it("« garder_salons » retiré (24 novembre) : un coffre ancien qui le porte se lit, et se réécrit sans lui", () => {
+  it("« garder_salons » retiré : un coffre ancien qui le porte se lit, et se réécrit sans lui", () => {
     const ancien = new TextEncoder().encode(JSON.stringify({ v: 1, pseudo: "Léa", photo: null, langue: "fr", reglages: { proposer_profil: true, garder_recus: false, garder_salons: true }, pass: null }));
     const p = profilDeJson(ancien);
     expect(p.reglages).toEqual({ proposerProfil: true, garderRecus: false });

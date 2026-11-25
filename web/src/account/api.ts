@@ -3,7 +3,7 @@
 // écrit l'en-tête X-Shh-Session (source-rules.test.ts) :
 // - toutes les routes sont sous /api/compte/ ; le jeton de session ne part vers aucune autre route
 //   (ni /api/shares, ni /api/manage, ni les autres routes du salon), sauf POST /api/salons, la
-//   création d'un salon (creerSalon, conception §10.4 ; écrans du salon, plan C-3) ;
+//   création d'un salon (creerSalon, conception §10.4 ; écrans du salon) ;
 // - JSON strict : clés exactes, jamais `null` (le serveur le refuse), secrets en base64url sans
 //   bourrage ; rien dans l'URL ; sans cookie (credentials: "omit"), sans redirection ;
 // - un seul essai : aucune route du compte n'est rejouée d'elle-même (une écriture de
@@ -350,7 +350,7 @@ export async function pseudoVerifier(n: Net, par: { jeton: string } | { etape: s
   return o.libre;
 }
 
-/** Invité d'un salon (22 novembre) : pseudo ni pris par un compte, ni réservé, ni interdit ? Sans session ni salon. */
+/** Invité d'un salon : pseudo ni pris par un compte, ni réservé, ni interdit ? Sans session ni salon. */
 export async function pseudoLibreInvite(n: Net, pCanon: string): Promise<boolean> {
   const o = await appel(n, "POST", "pseudo/libre", { body: { p_canon: pCanon } });
   if (typeof o.libre !== "boolean") throw invalide();
@@ -369,7 +369,7 @@ export async function etiquetterSession(n: Net, session: string, etiquette: Byte
   await appel(n, "POST", "sessions/etiquette", { session, body: { etiquette: b64u(etiquette) } });
 }
 
-/** Déconnexion : `keepalive` (audit du 18 novembre) pour qu'elle parte même si l'onglet se ferme aussitôt. */
+/** Déconnexion : `keepalive` pour qu'elle parte même si l'onglet se ferme aussitôt. */
 export async function deconnexion(n: Net, session: string): Promise<void> {
   await appel(n, "POST", "deconnexion", { session, body: {}, keepalive: true });
 }

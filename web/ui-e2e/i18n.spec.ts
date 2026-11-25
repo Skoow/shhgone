@@ -12,7 +12,7 @@ async function openSecurity(page: Page) {
 test.describe("français par défaut", () => {
   test.use({ locale: "fr-FR" });
 
-  // Plus de bascule dans le pied de page (décision du propriétaire du 12 novembre) : la langue du
+  // Plus de bascule dans le pied de page : la langue du
   // navigateur décide ; un onglet en anglais montre les textes et titres anglais.
   test("la langue du navigateur décide <html lang>, les textes et les titres ; rien n'est stocké", async ({ page, shh, browser }) => {
     await page.goto(shh.origin + "/inconnu");
@@ -28,12 +28,12 @@ test.describe("français par défaut", () => {
     // Titre par route (scan UX B9) : Sécurité, puis l'accueil.
     await openSecurity(en.page);
     await expect(en.page).toHaveTitle("Security and encryption · Shhgone");
-    // Pages bilingues (20 novembre) : l'adresse donne la langue ; « / » reste en français et
+    // Pages bilingues : l'adresse donne la langue ; « / » reste en français et
     // propose « English version » vers « /en ».
     await expect(en.page).toHaveURL(shh.origin + "/en/securite");
     await en.page.goto(shh.origin + "/");
     await expect(en.page.locator("html")).toHaveAttribute("lang", "fr");
-    // Revue du 20 novembre (U10) : bandeau en haut de page (≥ 44 px), au-dessus de la barre du
+    // Bandeau en haut de page (≥ 44 px), au-dessus de la barre du
     // site et sans la recouvrir ; fermable (il ne revient pas en changeant d'écran).
     const bar = en.page.locator("[data-english-bar]");
     await expect(bar).toBeVisible();
@@ -81,7 +81,7 @@ test.describe("français par défaut", () => {
     expect(new URL(page.url()).hash).toBe("");
   });
 
-  // Pages d'information séparées (16 novembre) : « Sécurité » charge sa page ; la navigation
+  // Pages d'information séparées : « Sécurité » charge sa page ; la navigation
   // interne sans rechargement se vérifie donc dans l'application, de la page d'envoi vers l'accueil.
   test("navigation interne sans rechargement, focus sur le contenu, retour arrière", async ({ page, shh, isMobile }) => {
     // De la page d'envoi à l'accueil par le logo (lien de l'application, toujours présent).
@@ -132,7 +132,7 @@ test("le verre de l'en-tête apparaît au défilement et pas avant", async ({ pa
   await expect(header).not.toHaveClass(/scrolled/);
 });
 
-test("ni en-tête ni pied de page ne proposent de langue : elle suit le navigateur (12 novembre)", async ({ page, shh }) => {
+test("ni en-tête ni pied de page ne proposent de langue : elle suit le navigateur", async ({ page, shh }) => {
   await page.goto(shh.origin + "/inconnu");
   await expect(page.getByRole("button", { name: /^(English|Français)$/ })).toHaveCount(0);
   await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0);

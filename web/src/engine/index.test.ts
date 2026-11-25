@@ -26,7 +26,7 @@ describe("panique du moteur (spec moteur §7)", () => {
     expect(reset).toHaveBeenCalledTimes(1);
     // Scelleur de l'instance remplacée : refusé (objet périmé), jamais un autre message.
     expect(await errorOf(el.piece(0))).toBe("paquet_corrompu");
-    // Revue Task 11 : les numéros repartent à 1 dans l'instance neuve. Un scelleur d'avant la
+    // Revue : les numéros repartent à 1 dans l'instance neuve. Un scelleur d'avant la
     // panique, de même numéro qu'un neuf, n'entre jamais dans un manifeste (sa graine est perdue :
     // le manifeste désignerait celle de l'autre élément, et le partage serait illisible).
     const fresh = await F.elementSealer(new Blob([new Uint8Array(10)]), 0);
@@ -74,7 +74,7 @@ describe("panique du moteur (spec moteur §7)", () => {
   });
 });
 
-describe("note vérifiée par le moteur au scellement (audit M6)", () => {
+describe("note vérifiée par le moteur au scellement", () => {
   it("UTF-8 strict et TEXT_MAX points de code, comme le lecteur ; un fichier n'est pas vérifié", async () => {
     const seal = async (raw: Uint8Array, kind: "text" | "file" = "text") => {
       const el = await F.elementSealer(new Blob([raw as Uint8Array<ArrayBuffer>]), 0);
@@ -95,7 +95,7 @@ describe("note vérifiée par le moteur au scellement (audit M6)", () => {
   });
 });
 
-describe("mémoire après une panique (audit F4)", () => {
+describe("mémoire après une panique", () => {
   it("la mémoire de l'instance arrêtée est mise à zéro avant l'instance neuve", async () => {
     const e = await loadEngine();
     await F.shareId(new Uint8Array(32).fill(9) as F.KLien);

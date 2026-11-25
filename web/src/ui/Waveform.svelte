@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Forme d'onde en barres DOM (Task 12) : hauteur par transform (scaleY), jamais d'attribut style
+  // Forme d'onde en barres DOM : hauteur par transform (scaleY), jamais d'attribut style
   // (la directive style: passe par le CSSOM). `onseek` : l'onde devient un curseur (toucher,
   // glisser, flèches) ; les barres déjà lues prennent la couleur d'accent.
   import { seekRatio } from "../media/recorder";

@@ -1,9 +1,9 @@
-// Module WebAssembly du salon (Task 9), dans Chromium, servi par le vrai serveur Go (CSP de
+// Module WebAssembly du salon, dans Chromium, servi par le vrai serveur Go (CSP de
 // production) depuis la page d'essai ui-e2e/salon-page/ (construite par global-setup.ts avec les
 // greffons du site, passée à check-dist, jamais livrée) :
 // - chargement à part : assets/salon-EMPREINTE.wasm lu une fois, en brotli, avec `integrity` ;
 //   un octet modifié en route est refusé (erreur « reseau »), sans module partiel gardé ;
-// - scénario de 10 membres de la Task 6 (9 arrivées, 100 messages, chacun dans sa trame), en
+// - scénario de 10 membres de la (9 arrivées, 100 messages, chacun dans sa trame), en
 //   moins de 2 s ;
 // - test croisé natif ↔ WebAssembly : Welcome, Commit et messages produits par le moteur natif
 //   (test Rust `croise_natif`, engine/salon/tests/croise.rs, lancé ici) lus par le module, et
@@ -75,7 +75,7 @@ test("chargé à part : assets/salon-EMPREINTE.wasm lu une fois, en brotli, avec
   for (const p of wasm) expect(p).toMatch(/^\/assets\/salon-[A-Za-z0-9_-]{8}\.wasm$/);
 });
 
-test("10 membres (scénario de la Task 6) : 9 arrivées et 100 messages en trames, en moins de 2 s", async ({ page, shh }) => {
+test("10 membres : 9 arrivées et 100 messages en trames, en moins de 2 s", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   expect(await charger(page)).toBe("ok");
   const r = await page.evaluate(() => {

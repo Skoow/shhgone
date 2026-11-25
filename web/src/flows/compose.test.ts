@@ -48,7 +48,7 @@ describe("catégories (UI §9.2.4)", () => {
 });
 
 describe("createComposer : ajout", () => {
-  // Rien n'est nettoyé à l'ajout (décision du propriétaire du 12 novembre) : chaque cas ajoute,
+  // Rien n'est nettoyé à l'ajout : chaque cas ajoute,
   // puis nettoie par `clean` (le balai, après confirmation). `head` : vrais premiers octets.
   const head = async (f: Blob) => new Uint8Array(await f.slice(0, 64).arrayBuffer());
   const realJpeg = (name = "IMG_20261104.jpg") => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2])], name, { type: "image/jpeg" });
@@ -78,7 +78,7 @@ describe("createComposer : ajout", () => {
     expect(c.items.map((i) => cleanMark(i))).toEqual(["fail", "fail"]);
     expect(c.blockReason()).toBeNull();
     expect(c.uncleanedCount).toBe(2);
-    expect(c.unsupportedCount).toBe(0); // tenté et raté : « n'ont pas pu », jamais « format » (audit D5)
+    expect(c.unsupportedCount).toBe(0); // tenté et raté : « n'ont pas pu », jamais « format »
     await expect(gate(f)).resolves.toBe(f);
     c.remove(c.items[1]!.id);
     expect(c.uncleanedCount).toBe(1);
@@ -104,7 +104,7 @@ describe("createComposer : ajout", () => {
       expect(cleanMark(by(b)), b).toBeNull();
     }
     expect(seen).toEqual([]); // rien n'est analysé à l'ajout
-    // Décompte à part (audit D5) : rien n'a été tenté, ce n'est pas un échec du nettoyage.
+    // Décompte à part : rien n'a été tenté, ce n'est pas un échec du nettoyage.
     expect(c.unsupportedCount).toBe(4);
     expect(c.uncleanedCount).toBe(0);
     // Format lu par le nettoyage, mais qui dit « non pris en charge » au balai : même marque.
@@ -121,7 +121,7 @@ describe("createComposer : ajout", () => {
     await expect(gate(new Blob(["jamais vu"]))).rejects.toThrow("non_nettoye");
   });
 
-  it("ajout : rien n'est nettoyé ni analysé sans le balai (décision du propriétaire du 12 novembre, plus de réglage), marque « Original », envoi libre", async () => {
+  it("ajout : rien n'est nettoyé ni analysé sans le balai (plus de réglage), marque « Original », envoi libre", async () => {
     const strip = vi.fn(async () => nettoye(new Blob(["x"])));
     const c = make({ strip, probe: head });
     const f = realJpeg();
@@ -145,7 +145,7 @@ describe("createComposer : ajout", () => {
     expect(img).toMatchObject({ clean: "nettoye" });
     expect(img.size).toBeLessThan(src.length);
     const out = new TextDecoder("latin1").decode(await (img.data as Blob).arrayBuffer());
-    // Seule la vignette EXIF reste (décision du propriétaire du 11 novembre) : aucun autre repère.
+    // Seule la vignette EXIF reste : aucun autre repère.
     expect(out.replace("ReperThumb", "")).not.toMatch(/Reper|2001:02:03/);
     expect(out).toContain("ReperThumb");
     expect(txt.clean).toBe("original");
@@ -153,7 +153,7 @@ describe("createComposer : ajout", () => {
     expect(c.blockReason()).toBeNull();
   });
 
-  it("vrai nettoyage d'un .docx et d'un PDF (Task 9b, D41-31) : « Nettoyé » bureautique et PDF, même longueur ; PDF signé → protégé", async () => {
+  it("vrai nettoyage d'un .docx et d'un PDF (-31) : « Nettoyé » bureautique et PDF, même longueur ; PDF signé → protégé", async () => {
     const c = createComposer({ online: () => true });
     const fx = (n: string) => new Uint8Array(readFileSync(new URL(`../media/fixtures/${n}`, import.meta.url)));
     const pdfFile = new File([fx("meta.pdf")], "devis.pdf", { type: "application/pdf" });
@@ -170,7 +170,7 @@ describe("createComposer : ajout", () => {
     expect((pdf.data as Blob).size).toBe(pdfFile.size);
     const out = new TextDecoder("latin1").decode(await (pdf.data as Blob).arrayBuffer());
     expect(out).not.toMatch(/ReperAuteur|ReperLogiciel/); // propriétés du document
-    expect(out).toContain("ReperThumb"); // miniature de page gardée (décision du 11 novembre)
+    expect(out).toContain("ReperThumb"); // miniature de page gardée
     expect(out).toContain("(Bonjour Shhdrop) Tj");
     const signed = c.items.find((i) => i.base === "signe")!;
     expect(signed.clean).toBe("protege");
@@ -228,7 +228,7 @@ describe("createComposer : ajout", () => {
     expect(c.blockReason()).toBe("trop_gros");
   });
 
-  it("place (spec §41.14, audit H-2) : 512 segments de 4 Mio au plus, petits fichiers empaquetés ; au-delà, « segments » même sous 2 Gio", async () => {
+  it("place (spec §41.14) : 512 segments de 4 Mio au plus, petits fichiers empaquetés ; au-delà, « segments » même sous 2 Gio", async () => {
     const c = make();
     const MIB = 1048576;
     await c.add([big("a.bin", 400 * 4 * MIB)], "fichiers"); // 400 segments
@@ -505,7 +505,7 @@ describe("blocages et textes de raison", () => {
     expect(fr["clean.done.image"]).toBe("Nettoyé\u202f: position, appareil et dates retirés, vignette d'aperçu gardée");
     expect(fr["clean.asis"]).toBe("Fichier tel quel (non modifié)");
     for (const k of ["clean.mark", "clean.mark.not", "clean.original", "clean.original.hint"]) expect(k in fr, k).toBe(false);
-    // Deux décomptes distincts (audit D5) : format jamais lu ≠ nettoyage tenté et raté.
+    // Deux décomptes distincts : format jamais lu ≠ nettoyage tenté et raté.
     expect(fr["compose.unsupported.one"]).toBe("{n}\u202ffichier ne peut pas être nettoyé (format non pris en charge)");
     expect(fr["compose.unsupported.other"]).toBe("{n}\u202ffichiers ne peuvent pas être nettoyés (format non pris en charge)");
     expect(fr["compose.uncleaned.one"]).toBe("{n}\u202ffichier n'a pas pu être nettoyé");
@@ -594,7 +594,7 @@ describe("pris dans l'interface (caméra maison, Q-REC1)", () => {
     expect(c.blockReason()).toBeNull();
     expect(c.addVoice(new Blob(["v"]), "audio/webm")).not.toBeNull();
     expect(c.items.find((i) => i.category === "audio")).toMatchObject({ clean: "nettoye", cleanFamily: "vocal" });
-    // Task 12 : forme d'onde et durée gardées pour la réécoute dans la liste, jamais dans le manifeste.
+    // Forme d'onde et durée gardées pour la réécoute dans la liste, jamais dans le manifeste.
     const id = c.addVoice(new Blob(["w"]), "audio/mp4", true, { peaks: [0.2, 1], ms: 4200 })!;
     const v = c.items.find((i) => i.id === id)!;
     expect(v).toMatchObject({ ext: ".m4a", voice: { peaks: [0.2, 1], ms: 4200 } });
@@ -654,7 +654,7 @@ describe("nettoyage à la demande (menu « … » : Nettoyer, Réessayer)", () =
     expect(v.items[0]).toMatchObject({ clean: "nettoye", cleanFamily: "vocal" });
     expect(vs.mock.calls[0]![3]).toEqual({ recorded: true });
     expect(canClean({ kind: "file", clean: "original", category: "archives", cleanable: false })).toBeNull();
-    // Vidéo importée : le nettoyage la traite (§35.2) ; sans réglage automatique (12 novembre),
+    // Vidéo importée : le nettoyage la traite (§35.2) ; sans réglage automatique,
     // le balai est le seul moyen de la nettoyer, il lui est donc proposé. Format inconnu : rien.
     const o = make({ probe: head });
     await o.add([new File([new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0])], "film.webm", { type: "video/webm" }), realJpeg(), file("x.bin", 3)], "fichiers");
@@ -663,7 +663,7 @@ describe("nettoyage à la demande (menu « … » : Nettoyer, Réessayer)", () =
     expect(canClean({ kind: "file", clean: "protege", category: "documents" })).toBeNull();
     expect(canClean({ kind: "file", clean: "non_pris_en_charge", category: "videos" })).toBeNull();
   });
-  it("audit I1 : « Nettoyer » en cours → l'envoi est bloqué (raison dite), débloqué à la fin", async () => {
+  it("« Nettoyer » en cours → l'envoi est bloqué (raison dite), débloqué à la fin", async () => {
     let release!: () => void;
     const c = make({ probe: head, strip: () => new Promise((r) => (release = () => r(nettoye(new Blob(["x"]))))) });
     await c.add([realJpeg()], "fichiers");

@@ -6,7 +6,7 @@ const KEY = Buffer.from(Uint8Array.from({ length: 32 }, (_, i) => 255 - i * 3)).
 const O = "https://shhdrop.example";
 
 describe("readLink (spec §32 : lien sous /s)", () => {
-  it("ancienne forme à la racine (refusée depuis le 18 novembre) → incomplet", () => {
+  it("ancienne forme à la racine (refusée) → incomplet", () => {
     for (const h of [`${O}/#${KEY}`, `${O}/#m${KEY}`, `${O}#${KEY}`]) expect(readLink(h, h.includes("#m") ? "m" : "s", "/"), h).toEqual({ kind: "incomplete" });
   });
 

@@ -85,7 +85,7 @@ describe("blobDownloads", () => {
   });
 });
 
-describe("avertissement mémoire (UI §9.2.5, spec §18.7 ; revue du 10 novembre)", () => {
+describe("avertissement mémoire (UI §9.2.5, spec §18.7)", () => {
   const MiB = 1048576;
   const IOS = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15", maxTouchPoints: 5 } as Navigator;
   const DESKTOP = { userAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0", maxTouchPoints: 0 } as Navigator;
@@ -101,7 +101,7 @@ describe("avertissement mémoire (UI §9.2.5, spec §18.7 ; revue du 10 novembre
   });
 });
 
-describe("audit (faible) : URL du repli révoquées à la fin de lecture", () => {
+describe("URL du repli révoquées à la fin de lecture", () => {
   it("l'URL d'un téléchargement du repli est suivie : revokeAll la révoque sans attendre 60 s", async () => {
     const { liveUrls, revokeAll } = await import("./blobs");
     revokeAll();

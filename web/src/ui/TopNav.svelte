@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Barre du haut, ordinateur et tablette (refonte du 12 novembre) : menus « Partager » et
+  // Barre du haut, ordinateur et tablette : menus « Partager » et
   // « Sécurité » en motif disclosure (bouton aria-expanded qui montre une liste de liens ou de
   // boutons, pas un role="menu"), « Salon » bientôt, « Offres » ; à droite « Mes partages » et
   // « Partager ». Clavier : Entrée et Espace ouvrent, flèches haut et bas parcourent, Échap ferme
@@ -188,7 +188,7 @@
     <li>{@render menu("share", t("nav.share"), shareItems)}</li>
     <li>
       {#if __SALONS__}
-        <!-- Salon (plan C-3) : création, compte exigé (la page mène à la connexion sans session). -->
+        <!-- Salon : création, compte exigé (la page mène à la connexion sans session). -->
         <a class="nl room" href={href("/salon/nouveau")} aria-current={here("/salon/nouveau")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/salon/nouveau"))} {...off}>{t("nav.room")}</a>
       {:else}
         <button type="button" class="nl room" aria-disabled="true" aria-describedby="{uid}-room" onclick={() => announce(t("tabs.soon.chat"))}>
@@ -207,11 +207,11 @@
     {#if accountFlag.connected}
       <a class="btn ghost" href={href("/")} aria-current={here("/")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/"))} {...off}>{t("nav.home")}</a>
     {:else if presence.any}
-      <!-- Seulement s'il y a des partages sur cet appareil (décision du propriétaire du 17 novembre). -->
+      <!-- Seulement s'il y a des partages sur cet appareil. -->
       <a class="btn ghost" href={href("/envois")} aria-current={here("/envois")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/envois"))} {...off}>{t("nav.shares")}</a>
     {/if}
     {#if __COMPTES__}
-      <!-- Compte (18 novembre) : « Se connecter », ou « Mon compte » une fois connecté. -->
+      <!-- Compte : « Se connecter », ou « Mon compte » une fois connecté. -->
       {#if accountFlag.connected}
         <a class="btn ghost" href={href("/compte/profil")} aria-current={here("/compte/profil")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte/profil"))} {...off}>{t("nav.menu.myAccount")}</a>
       {:else}
@@ -219,13 +219,13 @@
       {/if}
     {:else}
       <!-- Compte pas encore ouvert (décision D8) : « Se connecter » visible, bientôt, comme le Salon
-           (propriétaire, 19 novembre, 4) ; un clic l'annonce, rien ne s'ouvre. -->
+            ; un clic l'annonce, rien ne s'ouvre. -->
       <button type="button" class="btn ghost login-soon" aria-disabled="true" aria-describedby="{uid}-login" data-login-soon onclick={() => announce(t("nav.login.soon"))}>
         {t("account.login.title")}<span class="soon">{t("foot.soon")}</span>
       </button>
       <span id="{uid}-login" class="sr-only">{t("nav.login.soon")}</span>
     {/if}
-    <!-- Plus de bouton « Partager » (décision du propriétaire du 17 novembre) : le lien se partage
+    <!-- Plus de bouton « Partager » : le lien se partage
          depuis « Lien prêt », où il est créé ; la page d'envoi reste dans « Envoyer ». -->
   </div>
 </nav>

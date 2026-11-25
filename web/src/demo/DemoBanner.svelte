@@ -5,7 +5,7 @@
 <script lang="ts">
   // Bandeau permanent de la démo (UI §14.3) : en haut de toutes les pages, non fermable.
   // Le texte vit ici, pas dans le dictionnaire de production (check-dist.mjs l'y interdit).
-  // « Rien de réel » (audit F5) : les partages de la démo restent chiffrés dans ce navigateur,
+  // « Rien de réel » : les partages de la démo restent chiffrés dans ce navigateur,
   // sur une origine (github.io) partagée par tous les sites GitHub Pages du compte.
   import { getLang } from "../i18n/i18n.svelte";
 
@@ -15,7 +15,7 @@
   } as const;
 </script>
 
-<!-- Décision du propriétaire du 16 novembre : une ligne orange fine, sans texte visible ; le texte
+<!-- Une ligne orange fine, sans texte visible ; le texte
      reste lu par les lecteurs d'écran, et « Lien prêt » le redit sous le lien (readyNote). -->
 <div class="demo-banner" role="note" data-demo={MARK}>
   <p class="sr-only">{TEXT[getLang()]}</p>

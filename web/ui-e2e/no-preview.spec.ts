@@ -38,7 +38,7 @@ test("FLAC et MKV : « Écouter », « Voir » et lecture dans la page (Chromium
   await page.goto(sent.link);
   await unlock(page, sent.password);
   const viewer = page.getByRole("dialog");
-  await page.getByRole("button", { name: "Écouter concert.flac" }).click(); // son : « Écouter » (audit D2)
+  await page.getByRole("button", { name: "Écouter concert.flac" }).click(); // son : « Écouter »
   await expect.poll(() => viewer.locator("audio").evaluate((a: HTMLAudioElement) => a.readyState), { timeout: 20_000 }).toBeGreaterThanOrEqual(1);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Voir film.mkv" }).click();
@@ -67,7 +67,7 @@ test("lecteur bloqué (ni lecture ni erreur, WebKit sans décodeur) : après 10 
   await expect(viewer.getByRole("button", { name: "Télécharger film.mov" })).toBeVisible();
 });
 
-/** JPEG du dépôt dont le SOF annonce 60000 × 60000 (bombe de décompression, test d'intrusion du 11 novembre). */
+/** JPEG du dépôt dont le SOF annonce 60000 × 60000 (bombe de décompression). */
 function bombJpeg(): Buffer {
   const b = Buffer.from(readFileSync(file("foret-brume.jpg")));
   for (let o = 2; o < b.length; ) {

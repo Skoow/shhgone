@@ -32,8 +32,7 @@ export type Sent = { link: string; password: string; manage: string };
 /**
  * Envoi par l'interface (bureau : options dans la colonne ; téléphone : feuille « Options »).
  * `files` : chemins de ui-e2e/files ou fichiers en mémoire ; ordre d'ajout = ordre du composeur.
- * `keep` : active « Garder dans mon historique » (désactivé par défaut sans compte depuis le
- * 24 novembre) et attend l'entrée réellement écrite.
+ * `keep` : active « Garder dans mon historique » (désactivé par défaut sans compte) et attend l'entrée réellement écrite.
  */
 export async function sendShare(
   page: Page,
@@ -46,7 +45,7 @@ export async function sendShare(
     const chooser = openFilePicker(page);
     await (await chooser).setFiles(o.files.map(upload));
     await expect(page.locator("[data-row]")).toHaveCount(o.files.length + (o.text !== undefined ? 1 : 0));
-    // Rien n'est nettoyé sans le balai (12 novembre) : « Tout nettoyer » pour l'éprouver.
+    // Rien n'est nettoyé sans le balai : « Tout nettoyer » pour l'éprouver.
     if (o.clean) await cleanAll(page);
   }
   if (o.opens !== undefined || o.download === false || o.title !== undefined) {
@@ -55,7 +54,7 @@ export async function sendShare(
       await page.getByRole("button", { name: /^Options · / }).click();
       opts = page.getByRole("dialog", { name: "Options" });
     }
-    // Nom du partage (19 novembre) : premier champ des options.
+    // Nom du partage : premier champ des options.
     if (o.title !== undefined) await opts.getByLabel("Nom du partage (facultatif)").fill(o.title);
     if (o.opens !== undefined) {
       // Contrôle segmenté : au clavier, comme une personne (flèches depuis le choix courant).
@@ -76,12 +75,12 @@ export async function sendShare(
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const read = async (l: ReturnType<Page["locator"]>) => (await l.locator(".sr-only").first().textContent()) ?? "";
   const link = await read(page.getByRole("group", { name: "Lien", exact: true }));
-  // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche, puis le remasque.
+  // Mot de passe masqué à l'arrivée : l'œil l'affiche, puis le remasque.
   const pw = page.getByRole("group", { name: "Mot de passe", exact: true });
   await pw.locator("[data-reveal]").click();
   const password = await read(pw);
   await pw.locator("[data-reveal]").click();
-  // Lien de gestion : montré seulement sans historique (19 novembre). Historique coupé le temps
+  // Lien de gestion : montré seulement sans historique. Historique coupé le temps
   // de le lire, puis remis (l'entrée est gardée de nouveau, comme avant) ; `keep` l'active.
   const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
   await expect(keep.or(page.locator("[data-keep-unavailable]"))).toBeEnabled();
@@ -92,7 +91,7 @@ export async function sendShare(
     await keep.click();
     await expect(keep).toHaveAttribute("aria-checked", "true");
     // Entrée réellement réécrite (IndexedDB) avant de rendre la main : un onglet fermé aussitôt
-    // la perdait (CI du 20 novembre, return.spec).
+    // la perdait (CI, return.spec).
     await expect(page.locator("[data-keep][data-kept]")).toHaveCount(1, { timeout: 10_000 });
   }
   expect(link).toMatch(/#[A-Za-z0-9_-]{43}$/);
@@ -110,7 +109,7 @@ export const pwField = (page: Page) => page.getByLabel("Mot de passe", { exact: 
 
 /**
  * Saisit le mot de passe et déverrouille ; attend l'écran de contenu (titré « Contenu », ou du nom
- * du partage, précédé de « Contenu, » pour les lecteurs d'écran : 19 novembre).
+ * du partage, précédé de « Contenu, » pour les lecteurs d'écran :).
  */
 export async function unlock(page: Page, password: string): Promise<void> {
   await pwField(page).fill(password);
@@ -135,7 +134,7 @@ export const noteRow = (page: Page, title = "Note") => page.locator('li.row[data
 
 /** Aller à la page Sécurité : lien du pied de page s'il est visible, sinon Réglages (onglet ou en-tête). */
 export async function goSecurity(page: Page) {
-  // Pied de page sur toutes les pages, ordinateur et téléphone (retours du 11 novembre).
+  // Pied de page sur toutes les pages, ordinateur et téléphone.
   const foot = page.locator("footer.foot").getByRole("link", { name: "Sécurité", exact: true });
   await foot.scrollIntoViewIfNeeded();
   await foot.click();

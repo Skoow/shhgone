@@ -70,7 +70,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator("[data-row]")).toHaveCount(1);
     await expect.poll(() => erases.length, { timeout: 20_000 }).toBe(1);
     // 9 Mio (segments 1 à 3), retiré pendant l'envoi de ses premiers segments : seul ce qui est
-    // parti est effacé (revue du 10 novembre, D42-6). Deux envois en vol (A13) : les segments 1 et 2
+    // parti est effacé (D42-6). Deux envois en vol (A13) : les segments 1 et 2
     // sont partis, le segment 3 jamais.
     expect(puts.filter((n) => n >= 1)).toEqual([1, 2]);
     expect(erases[0]).toEqual({ from: 1, to: 3 });
@@ -87,7 +87,7 @@ test.describe("fr-FR", () => {
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     const read = async (name: string) => {
-    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    // Mot de passe masqué à l'arrivée : l'œil l'affiche d'abord.
     const g = page.getByRole("group", { name });
     const eye = g.locator("[data-reveal]");
     if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
@@ -102,7 +102,7 @@ test.describe("fr-FR", () => {
     expect(errors).toEqual([]);
   });
 
-  // Audit H-2 : 20 photos de 1 Mo envoient ≈ 20 Mo (et non 80 Mio de segments à moitié
+  // 20 photos de 1 Mo envoient ≈ 20 Mo (et non 80 Mio de segments à moitié
   // vides) ; un petit élément retiré n'est pas effacé tout de suite (clé oubliée), ses morceaux
   // sont remplacés à finalize ; le destinataire ne le voit pas.
   test("petits fichiers empaquetés : octets envoyés ≈ somme des tailles ; petit retiré invisible pour le destinataire", async ({ page, shh }) => {
@@ -132,7 +132,7 @@ test.describe("fr-FR", () => {
     expect(erases).toEqual([]);
     expect(finalize?.void).toEqual([[0, 16]]);
     const read = async (name: string) => {
-    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    // Mot de passe masqué à l'arrivée : l'œil l'affiche d'abord.
     const g = page.getByRole("group", { name });
     const eye = g.locator("[data-reveal]");
     if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();

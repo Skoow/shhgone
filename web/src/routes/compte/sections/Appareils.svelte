@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Appareils connectés (conception compte §8.5, §21.15.4 point 5 ; plan, lot 13 ; monté seulement
+  // Appareils connectés (conception compte §8.5, §21.15.4 point 5 ; monté seulement
   // avec __COMPTES__) : nom d'appareil déchiffré sur cet appareil (le serveur ne le voit jamais en
   // clair), mois d'ajout, « Cet appareil », « Reste connecté » ; ni adresse IP, ni lieu, ni heure.
   // « Déconnecter » par ligne et « Déconnecter tous les autres appareils ».

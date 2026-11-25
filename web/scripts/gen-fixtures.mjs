@@ -1,10 +1,10 @@
-// Fichiers d'essai du nettoyage des images et des documents (spec §35.2, Tasks 9a et 9b), construits octet par octet,
+// Fichiers d'essai du nettoyage des images et des documents (spec §35.2), construits octet par octet,
 // sans dépendance. Repères fictifs seulement (jamais une vraie photo) : GPS 12° 34′ 56″ N,
 // 65° 43′ 21″ O, « ReperMake », « ReperModel », dates 2001:02:03 04:05:06. Les flux d'image
 // (JPEG 16 × 8, PNG, WebP, GIF à 2 images) et le profil sRGB viennent de Pillow 12.3.0, une
 // fois, recopiés ici en base64 : le script se relance partout et donne les mêmes octets
 // (gen-fixtures.test.ts compare aux fichiers commités).
-//   node scripts/gen-fixtures.mjs   → écrit src/media/fixtures/*
+//   node scripts/gen-fixtures.mjs → écrit src/media/fixtures/*
 import { writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
@@ -93,7 +93,7 @@ function exifTiff({ orientation, make = "ReperMake", thumb = true, extra = [] })
   if (!thumb) return tiff(ifds);
   ifds.push({ entries: [ptr(0x0201, "thumb"), { tag: 0x0202, type: LONG, count: 1, ref: "len:thumb" }] });
   // Vignette JPEG bien formée (SOI, un segment, EOI) : le nettoyage la coupe à son EOI et retire
-  // une vignette sans structure lisible (audit du 20 novembre, W7).
+  // une vignette sans structure lisible.
   return tiff(ifds, { thumb: cat(new Uint8Array([0xff, 0xd8]), seg(0xdb, str("ReperThumb")), new Uint8Array([0xff, 0xd9])) });
 }
 
@@ -229,7 +229,7 @@ function metaHeic() {
   return cat(head, box("mdat", image, exif));
 }
 
-// ---------- Documents (Task 9b) : ZIP, OOXML, ODF, PDF ----------
+// ---------- Documents : ZIP, OOXML, ODF, PDF ----------
 // Deflate en blocs « stockés » (valides, sans compression) : mêmes octets partout, quelle
 // que soit la version de zlib, et la décompression est quand même exercée.
 const le16 = (n) => new Uint8Array([n & 255, (n >> 8) & 255]);

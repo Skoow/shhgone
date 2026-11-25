@@ -1,4 +1,4 @@
-// Type du Blob d'une pièce du salon montrée dans la page (audit du 20 novembre) : jamais le type
+// Type du Blob d'une pièce du salon montrée dans la page : jamais le type
 // annoncé par l'expéditeur tel quel. Une adresse blob: hérite de l'origine du site ; un
 // « video/… » qui serait en fait text/html ou image/svg+xml, ouvert dans un onglet, s'y
 // exécuterait. Mêmes tables que les partages (viewers/blobs.ts, TYPE_SUR).

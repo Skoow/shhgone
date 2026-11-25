@@ -1,5 +1,4 @@
-// Passkeys dans le navigateur (conception du compte par passkey §5, §9 ; décisions du propriétaire
-// du 22 novembre) : options converties ici avec E_prf du moteur (jamais l'entrée du serveur), sortie
+// Passkeys dans le navigateur (conception du compte par passkey §5, §9) : options converties ici avec E_prf du moteur (jamais l'entrée du serveur), sortie
 // PRF lue de façon tolérante (1Password : ArrayBuffer, vues, base64url ; 32 octets exactement sinon
 // absente), et JAMAIS envoyée : clientExtensionResults en liste blanche.
 import { describe, expect, it } from "vitest";

@@ -33,8 +33,8 @@
 <svelte:document onvisibilitychange={() => (hidden = document.hidden)} />
 
 {#if !garde}
-<!-- Refonte du 12 novembre : nuit bleue sous l'aurore. Plus de trame de petites croix
-     (propriétaire, 18 novembre : un seul motif, les pictogrammes). -->
+<!-- Nuit bleue sous l'aurore. Plus de trame de petites croix
+     (un seul motif, les pictogrammes). -->
 <div class="night" aria-hidden="true"></div>
 <div class={["aurora", { paused: hidden }]} aria-hidden="true" data-ambient style:--kx={k.x} style:--ky={k.y}>
   <img class="aur ink" src={inkUrl} alt="" width="128" height="128" decoding="async" />
@@ -47,7 +47,7 @@
 
 <style>
   .aurora {
-    /* Échelles par défaut (performance, 20 novembre) : la page écrite au build n'a pas les
+    /* Échelles par défaut (performance) : la page écrite au build n'a pas les
        --kx/--ky du script (la CSP refuse les styles en ligne) ; sans elles, les nappes restaient
        à 128 px puis s'agrandissaient au montage, et le navigateur comptait ce grand affichage
        tardif comme « plus grand élément » (LCP de 4,6 s sur mobile). Valeurs d'un grand
@@ -184,7 +184,7 @@
   :global(body[data-screen="destroyed"]) .aurora {
     opacity: 0.55;
   }
-  /* Posé à la fermeture du sceau (Task 17) : 560 → 2 160 ms après son début. */
+  /* Posé à la fermeture du sceau : 560 → 2 160 ms après son début. */
   :global(body[data-burst]) .bloom {
     animation: aurora-burst 1600ms linear 560ms both;
   }

@@ -23,7 +23,7 @@ const SLOW_RATE = 1_000_000;
 const OUTAGE = { atFraction: 0.5, ms: 20_000 };
 
 
-/** Sous le lien de « Lien prêt » (décision du propriétaire du 16 novembre : le bandeau devient
+/** Sous le lien de « Lien prêt » (le bandeau devient
  *  une ligne fine, l'avertissement reste là où il compte, avant d'envoyer un lien). */
 const READY_NOTE = {
   fr: "Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.",
@@ -34,12 +34,12 @@ const COMPTE_NOTE = {
   fr: "Dans la démo, aucune passkey n'est créée (la feuille du système est simulée)\u202f; ce compte n'existe que dans cet onglet et disparaît à sa fermeture.",
   en: "In the demo, no passkey is created (the system sheet is simulated); this account only exists in this tab and disappears when it closes.",
 } as const;
-/** Bouton de l'inscription : la démo ne crée aucune vraie passkey (22 novembre). */
+/** Bouton de l'inscription : la démo ne crée aucune vraie passkey. */
 const SIGNUP_PASSKEY = {
   fr: "Simuler la passkey",
   en: "Simulate the passkey",
 } as const;
-/** Pied de toutes les pages, visible (décision du propriétaire du 24 novembre) : l'hébergeur de la démo voit l'adresse IP. */
+/** Pied de toutes les pages, visible : l'hébergeur de la démo voit l'adresse IP. */
 const HOST_NOTE = {
   fr: "Démo hébergée par GitHub, qui voit votre adresse IP.",
   en: "Demo hosted by GitHub, which sees your IP address.",
@@ -94,7 +94,7 @@ export async function installDemo(w: Window): Promise<void> {
     onSegment: store ? (id, n, d) => store.saveSegment(id, n, d) : undefined,
   });
   store?.release();
-  // Compte essayable (19 novembre) : faux serveur du compte de cet onglet et passkey simulée
+  // Compte essayable : faux serveur du compte de cet onglet et passkey simulée
   // (conception du compte par passkey §11, Q8 : aucune passkey de démo dans le gestionnaire).
   const compte = createFauxCompte({ restore: loadCompte(w), onChange: (s) => saveCompte(w, s) });
   const passkeys = passkeysSimulees({ restore: loadPasskeys(w), onChange: (l) => savePasskeys(w, l) });
@@ -111,14 +111,14 @@ export async function installDemo(w: Window): Promise<void> {
   const g = w as Window & { XMLHttpRequest: typeof XMLHttpRequest };
   g.XMLHttpRequest = fakeXHRClass(g.XMLHttpRequest, isApi, (r) => fake.handle(r), rate);
 
-  // Titre des onglets : le même que le site (22 novembre, propriétaire : plus de « Démo · ») ;
+  // Titre des onglets : le même que le site (plus de « Démo · ») ;
   // le bandeau permanent de la page dit que c'est une démo.
   w.document.documentElement.setAttribute("data-shh-demo", MARK);
 
   setDemo({
     solveCaptcha: async (): Promise<CaptchaProof> => ({ kind: "pow", payload: "demo" }),
     openAsRecipient(link: string) {
-      // Lien de partage de cet onglet (`${origin}${base}/s#<43>`, 16 novembre) : la page « /s »
+      // Lien de partage de cet onglet (`${origin}${base}/s#<43>`) : la page « /s »
       // se charge dans le même onglet ; le faux serveur y retrouve les partages de l'onglet
       // (demo/persist.ts) et l'écran d'ouverture lit puis retire le « # » comme pour tout lien.
       const u = new URL(link);

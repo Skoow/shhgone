@@ -1,5 +1,5 @@
 // « Téléchargements » sans compte (menu, pied de page) seulement si l'historique des
-// téléchargements est activé sur cet appareil (décision du propriétaire du 22 novembre, UI §26).
+// téléchargements est activé sur cet appareil (UI §26).
 // Module léger pour les pages d'information : ni clé, ni store.ts, ni moteur. Rien n'est créé ni
 // écrit ; aucune requête réseau.
 import { presence } from "../history/presence.svelte";

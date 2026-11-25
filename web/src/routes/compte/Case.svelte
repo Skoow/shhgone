@@ -1,7 +1,7 @@
 <script lang="ts">
   // Case à cocher des pages du compte (« Rester connecté », « Garder ce partage… ») : vraie
   // case du navigateur (clavier, lecteurs d'écran), indice et erreur reliés. Toute la ligne est
-  // l'étiquette (revue du 20 novembre, U20) : la case dessinée fait 22 px, mais la zone cliquable
+  // l'étiquette : la case dessinée fait 22 px, mais la zone cliquable
   // couvre la case, l'écart et le texte, sur 44 px de haut au moins.
   type Props = { label: string; checked?: boolean; hint?: string; error?: string; el?: HTMLInputElement | undefined };
   let { label, checked = $bindable(false), hint, error, el = $bindable() }: Props = $props();

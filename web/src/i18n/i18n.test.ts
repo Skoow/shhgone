@@ -16,7 +16,7 @@ describe("dictionnaires", () => {
     for (const [k, v] of Object.entries(en)) expect(v.trim(), `en ${k}`).not.toBe("");
   });
 
-  it("fenêtre d'envoi : durée tirée de UPLOAD_WINDOW_MS, jamais écrite en dur (test d'intrusion du 11 novembre)", () => {
+  it("fenêtre d'envoi : durée tirée de UPLOAD_WINDOW_MS, jamais écrite en dur", () => {
     const h = UPLOAD_WINDOW_MS / 3600_000;
     for (const k of ["seal.pause.refused", "seal.tooSlow"] as const)
       for (const [lang, d] of [["fr", fr], ["en", en]] as const) {
@@ -45,10 +45,10 @@ describe("dictionnaires", () => {
       expect(technical.test(bad), bad).toBe(true);
     for (const ok of ["a bit longer", "Préparation des clés", "chiffré de bout en bout"])
       expect(technical.test(ok), ok).toBe(false);
-    // pages.fr.ts et pages.en.ts (Task 25) rejoindront cette liste.
+    // pages.fr.ts et pages.en.ts rejoindront cette liste.
     for (const [lang, d] of [["fr", fr], ["en", en]] as const)
       for (const [k, v] of Object.entries(d)) {
-        // Seule exception, voulue par le propriétaire (16 novembre) : le nom de l'empreinte
+        // Seule exception : le nom de l'empreinte
         // (SHA-256) dans l'avertissement du nettoyage, pour la comparer avec ses propres outils.
         if (k === "clean.confirm.local") {
           expect(v.replace(/SHA-256/g, ""), `${lang} ${k}`).not.toMatch(technical);
@@ -71,7 +71,7 @@ describe("dictionnaires", () => {
     expect(en["hero.title"]).toBe("One link, one password, then it's gone.");
   });
 
-  // Plan du compte, lot 10 : textes exacts de la conception (§12.1, §12.2, §21.2.4, §21.3, §21.15).
+  // Textes exacts de la conception (§12.1, §12.2, §21.2.4, §21.3, §21.15).
   it("compte : textes exacts de la conception", () => {
     const N = NNBSP;
     const exacts: Record<string, string> = {
@@ -111,12 +111,12 @@ describe("dictionnaires", () => {
       "account.err.coffre": "Vos données chiffrées ne s'ouvrent pas sur cet appareil. Reconnectez-vous.",
     };
     for (const [k, v] of Object.entries(exacts)) expect((fr as Record<string, string>)[k], k).toBe(v);
-    // Aucune étape ni promesse de code de secours (décision 1 du propriétaire, §21.2).
+    // Aucune étape ni promesse de code de secours (décision 1, §21.2).
     for (const [k, v] of Object.entries(fr)) if (k.startsWith("account.")) expect(v, k).not.toMatch(/secours/i);
   });
 
-  // Plan du compte, lots 13 et 14 : textes exacts de la conception (§21.10, §21.15.3, §21.15.4,
-  // §21.15.7) et des décisions du propriétaire du 14 novembre.
+  // Textes exacts de la conception (§21.10, §21.15.3, §21.15.4,
+  // §21.15.7).
   it("profil, paramètres, suppression et signalement : textes exacts", () => {
     const N = NNBSP;
     const exacts: Record<string, string> = {
@@ -145,7 +145,7 @@ describe("dictionnaires", () => {
       "report.cat.9.help": "Adresse, documents d'identité, photos privées d'un tiers",
     };
     for (const [k, v] of Object.entries(exacts)) expect((fr as Record<string, string>)[k], k).toBe(v);
-    // Plus de case « Déconnecter mes autres appareils » (décision du propriétaire) ; plus de
+    // Plus de case « Déconnecter mes autres appareils » ; plus de
     // promesse « aucune trace » du signalement (la catégorie est comptée en mémoire).
     for (const [k, v] of Object.entries(fr)) {
       expect(v, k).not.toMatch(/Déconnecter mes autres appareils/);
@@ -182,7 +182,7 @@ describe("dictionnaires", () => {
         expect(v, `${lang} ${k}`).not.toMatch(re);
       }
     // Chiffres lus dans les constantes (benchmark M5). Le nombre d'éléments n'est plus annoncé
-    // d'avance (décision du propriétaire du 16 novembre) : seulement la taille.
+    // d'avance : seulement la taille.
     expect(fr["compose.gauge.empty"]).toContain("{size} maximum");
     expect(en["compose.gauge.empty"]).toContain("up to {size}");
     for (const d of [fr, en]) for (const k of ["compose.gauge.empty", "compose.drop.limit"] as const) expect(d[k], k).not.toContain("{n}");
@@ -231,7 +231,7 @@ describe("t et langue", () => {
     expect(document.cookie).toBe("");
   });
 
-  it("plus de liste de langues à choisir (décision du propriétaire du 12 novembre) : la langue suit le navigateur", () => {
+  it("plus de liste de langues à choisir : la langue suit le navigateur", () => {
     expect("LANGS" in i18n).toBe(false);
   });
 
@@ -380,7 +380,7 @@ describe("annonces", () => {
   });
 });
 
-describe("décompte et échéance (retours UI4 : deux lignes, date et heure exactes puis décompte)", () => {
+describe("décompte et échéance (deux lignes, date et heure exactes puis décompte)", () => {
   it("formatCountdown : heures et minutes au-dessus d'une heure, minutes et secondes en dessous", async () => {
     const { formatCountdown } = await import("./format");
     const n = " ";
@@ -429,7 +429,7 @@ describe("heures de l'historique (spec §33, UI §9.6.3)", () => {
   });
 });
 
-describe("audit web D3 : contenu modifié en route", () => {
+describe("contenu modifié en route", () => {
   it("texte fixe demandé, distinct de « ce lien n'existe pas »", () => {
     expect(fr["corrupt"]).toBe("Le contenu a été modifié en route ; il n'a pas été ouvert.");
     expect(fr["dl.fail.corrupt"]).toBe(fr["corrupt"]);

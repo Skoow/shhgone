@@ -2,9 +2,8 @@
   // Réceptacle (UI §20.1, §20.4 « Accueil et composeur ») : la capsule ouverte du logo, en grand.
   // Verre statique (--vessel, sans backdrop-filter : K6), contour SVG sur la forme exacte (rayon 32)
   // qui part du milieu du bord haut, ouverture de 60° ; lumière qui parcourt le contour vide
-  // (ambiance, arrêtée hors écran et onglet caché). Plus de projecteur au pointeur (retours du
-  // propriétaire du 11 novembre). Contenu : `children`.
-  // Le dépôt (`drop`) et les catégories viennent en Task 10–11.
+  // (ambiance, arrêtée hors écran et onglet caché). Plus de projecteur au pointeur. Contenu : `children`.
+  // Le dépôt (`drop`) et les catégories viennent en –11.
   import type { Snippet } from "svelte";
   import type { HTMLAttributes } from "svelte/elements";
   import { capPath } from "./motion";
@@ -13,7 +12,7 @@
     children: Snippet;
     /** Réceptacle vide : la lumière parcourt le contour. */
     empty?: boolean;
-    /** Cible de dépôt active : fond menthe, ouverture resserrée de 60° à 14° (Task 11). */
+    /** Cible de dépôt active : fond menthe, ouverture resserrée de 60° à 14°. */
     drop?: boolean;
     el?: HTMLDivElement | undefined;
   };

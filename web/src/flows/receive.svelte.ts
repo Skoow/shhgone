@@ -18,7 +18,7 @@
 // fermé l'onglet, passe à l'état « reopen » (mot de passe ressaisi, aucune ouverture de plus).
 // Octroi gardé mais partage introuvable : « return_lost » (retour impossible, dit clairement).
 //
-// Partage reçu gardé (conception compte §21.7, lot 11) : case « Garder » (`keep`, cochée selon
+// Partage reçu gardé (conception compte §21.7) : case « Garder » (`keep`, cochée selon
 // le réglage) ; après une ouverture réussie, le lien et l'échéance sont remis par valeur à
 // `keepReceived` (historique de l'appareil, chiffré) ; jamais le mot de passe.
 import type { LinkState } from "../app/link";
@@ -48,7 +48,7 @@ import {
 } from "../session/open-grant";
 import { answerOtherTabs, askOtherTabs } from "../session/tabs";
 
-/** Délai maximal de l'écriture du retour avant d'afficher le contenu (relecture du 12 novembre). */
+/** Délai maximal de l'écriture du retour avant d'afficher le contenu (relecture). */
 export const SAVE_WAIT_MS = 2000;
 
 export type ReceiveState =
@@ -61,7 +61,7 @@ export type ReceiveState =
   | "invalid"
   | "destroyed_by_password"
   | "incomplete"
-  | "corrupt" // contenu modifié en route (audit web D3) : refusé, rien n'a été affiché
+  | "corrupt" // contenu modifié en route : refusé, rien n'a été affiché
   | "egress" // limite de téléchargement du partage atteinte (403 egress_limit) : définitif
   | "return_lost" // octroi gardé ici, mais le serveur ne connaît plus le partage (D42-22)
   | "error"; // fetchMeta impossible (réseau, limite, serveur, maintenance) : page d'erreur, Réessayer
@@ -153,7 +153,7 @@ export type Receiver = {
    */
   forget(): void;
   /**
-   * « Oublier ce partage sur cet appareil » (audit R2), contenu affiché : retour gardé
+   * « Oublier ce partage sur cet appareil », contenu affiché : retour gardé
    * (IndexedDB, base supprimée si vide) et entrée de l'onglet effacés, plus de réponse aux
    * autres onglets. Le contenu reste affiché jusqu'à la sortie de la page ; y revenir comptera
    * une ouverture (ou sera impossible si toutes sont prises). Rien n'est demandé au serveur.
@@ -221,7 +221,7 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
   const stored = d.grants.load();
   if (secret !== null && stored !== null && stored.link !== keyOf(secret)) d.grants.clear(); // autre partage
   else if (stored !== null && d.now() - stored.last >= INACTIVITY_MS) d.grants.clear();
-  // Audit M2 : le navigateur écrit le stockage de l'onglet sur le disque et le rend avec un onglet
+  // Le navigateur écrit le stockage de l'onglet sur le disque et le rend avec un onglet
   // restauré (Ctrl+Maj+T, reprise après panne ; Chromium : navigation « back_forward »).
   // Hors rechargement, l'entrée ne vaut que RESTORE_MS après la dernière sortie de page.
   else if (stored !== null && d.navType() !== "reload" && d.now() - stored.last >= RESTORE_MS) d.grants.clear();
@@ -239,7 +239,7 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
   let expiresAt = 0;
   let limitedUntil = 0;
   let inflight = false;
-  /** Écran quitté (forget) : un déverrouillage qui aboutit ensuite est effacé, jamais gardé (audit M2). */
+  /** Écran quitté (forget) : un déverrouillage qui aboutit ensuite est effacé, jamais gardé. */
   let disposed = false;
 
   const s = $state({
@@ -468,7 +468,7 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     dispose() {
       // Contenu déjà affiché : son entrée d'onglet et son retour gardé restent (spec §41.4,
       // D42-22 : un retour ou un rechargement rouvre la même ouverture jusqu'à l'échéance), mais
-      // plus rien ne tourne ici (réponses aux autres onglets). Sinon : comme forget (audit M2).
+      // plus rien ne tourne ici (réponses aux autres onglets). Sinon : comme forget.
       if (s.state !== "open") return this.forget();
       disposed = true;
       secret = null;
@@ -527,7 +527,7 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
         } else if (e instanceof ReopenLimitError) {
           grantRefused("reopen_limit");
         } else if (e instanceof CorruptError) {
-          // Audit web D3 : texte fixe, jamais « ce lien n'existe pas ».
+          // Texte fixe, jamais « ce lien n'existe pas ».
           end("corrupt");
         } else if (e instanceof EgressLimitError) {
           // Limite de téléchargement du partage : définitive, aucun nouvel essai proposé.

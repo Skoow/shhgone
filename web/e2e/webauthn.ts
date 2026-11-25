@@ -1,5 +1,4 @@
-// Authentificateur logiciel des e2e du compte par passkey (plan 2026-11-22-compte-passkey.md,
-// lot T1 ; écrit au lot S5 pour « le serveur ne voit rien »). Il joue navigator.credentials
+// Authentificateur logiciel des e2e du compte par passkey (écrit pour « le serveur ne voit rien »). Il joue navigator.credentials
 // (create, get) et l'authentificateur sous Node : il lit les options JSON de WebAuthn niveau 3
 // que rend le serveur et rend les réponses JSON telles que le navigateur les donne au script
 // (PublicKeyCredential.toJSON) : la sortie PRF y est, dans clientExtensionResults.prf.results,

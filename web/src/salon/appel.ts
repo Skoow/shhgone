@@ -1,4 +1,4 @@
-// Appels audio et vidéo du salon (conception : docs/superpowers/specs/2026-11-20-appels-design.md).
+// Appels audio et vidéo du salon (conception : docs/conception/specs/2026-11-20-appels-design.md).
 //
 // - Maillage : une connexion WebRTC par paire de participants (6 au plus), sans serveur de
 //   média. Entre deux sièges, le plus petit numéro propose (offre), l'autre répond : jamais deux
@@ -58,7 +58,7 @@ export type DepsAppel = {
 export type Participant = { siege: number; video: boolean; flux: MediaStream | null; lien: "connexion" | "lie" | "coupe" };
 /**
  * « perdu » : le micro s'est arrêté en cours d'appel (débranché, autorisation retirée) ; « offre » :
- * appels fermés dans le salon et aucun jeton d'offre Plus ou Pro sur cet appareil (24 novembre).
+ * appels fermés dans le salon et aucun jeton d'offre Plus ou Pro sur cet appareil.
  */
 export type ErreurAppel = "micro" | "relais" | "complet" | "perdu" | "offre";
 export type Face = "user" | "environment";
@@ -94,13 +94,13 @@ export function filtrerSdp(sdp: string): string {
 /**
  * Vrai pour un candidat ICE du relais seulement : le type lu à sa place (8e champ :
  * « candidate:<fondation> <composante> <transport> <priorité> <adresse> <port> typ relay »),
- * jamais « typ relay » glissé ailleurs dans la ligne (revue du 21 novembre).
+ * jamais « typ relay » glissé ailleurs dans la ligne.
  */
 export function candidatRelais(c: string): boolean {
   return /^candidate:\S+ \d+ \S+ \d+ \S+ \d+ typ relay( |$)/.test(c);
 }
 
-/** Offre acceptable : exactement une ligne m=audio et une m=video, rien d'autre (revue du 21 novembre). */
+/** Offre acceptable : exactement une ligne m=audio et une m=video, rien d'autre. */
 export function offreSaine(sdp: string): boolean {
   const m = sdp.split(/\r?\n/).filter((l) => l.startsWith("m="));
   return m.length === 2 && m.filter((l) => l.startsWith("m=audio ")).length === 1 && m.filter((l) => l.startsWith("m=video ")).length === 1;
@@ -362,7 +362,7 @@ export class Appel {
     this.#morceaux.delete(cle);
     const sdp = filtrerSdp(a.parts.join(""));
     if (m.sorte === "offre") {
-      // Offres en rafale (revue du 21 novembre) : une connexion établie ou trop récente n'est pas
+      // Offres en rafale : une connexion établie ou trop récente n'est pas
       // refaite ; sinon chaque offre remplaçait la précédente et saturait notre file d'envoi.
       const p = this.#paires.get(siege);
       if (p && (p.lien === "lie" || this.#d.maintenant() - p.debut < OFFRE_INTERVALLE_MS)) return;
@@ -376,7 +376,7 @@ export class Appel {
     if (this.#id === null) this.#adopter(id);
     else if (id !== this.#id) {
       // Deux appels lancés en même temps : le plus petit identifiant l'emporte. Seulement tant
-      // qu'aucune connexion n'est établie, et une fois par siège (revue du 21 novembre : des
+      // qu'aucune connexion n'est établie, et une fois par siège (des
       // identifiants toujours plus petits démontaient sinon toutes les connexions de tous, en
       // boucle) ; ensuite, l'appel concurrent est ignoré.
       const lie = [...this.#paires.values()].some((p) => p.lien === "lie");
@@ -616,7 +616,7 @@ export class Appel {
     if (!force && t - this.#dernierePresence < 1_000) return;
     this.#dernierePresence = t;
     // Une présence en file suffit : la plus récente remplace l'ancienne, en tête de file (elle
-    // dit que nous sommes là : jamais retardée derrière la signalisation, revue du 21 novembre).
+    // dit que nous sommes là : jamais retardée derrière la signalisation).
     this.#file = this.#file.filter((f) => f.m.k !== "appel_present");
     this.#file.unshift({ m: { k: "appel_present", appel: deHex(this.#id), video: this.camera }, depuis: t });
     this.#pousser();

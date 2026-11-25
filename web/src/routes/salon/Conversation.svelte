@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Conversation du salon (spec §39.6, v3 §4, §6, §14.1, §14.2 ; plan C-3) : en-tête (en ligne,
+  // Conversation du salon (spec §39.6, v3 §4, §6, §14.1, §14.2) : en-tête (en ligne,
   // places libres, échéance), fil en role="log", bulles (les siennes à droite), réponses,
   // réactions, modifier, retirer, coches envoyé / reçu / vu, « écrit », participants, saisie.
   // Tout le texte affiché vient du fil local (conversation.ts) : aucune interpolation HTML, liens
@@ -11,6 +11,7 @@
   import { routeTitle } from "../../app/title";
   import { morceaux, type Bulle, type Element } from "../../salon/conversation";
   import { ralentiRestant } from "../../salon/affichage";
+  import { palierAnnonce, rebours } from "../../salon/fermeture";
   import * as S from "../../salon/salon.svelte";
   import Button from "../../ui/Button.svelte";
   import InlineConfirm from "../../ui/InlineConfirm.svelte";
@@ -63,6 +64,14 @@
   const libres = $derived((void vue.rev, Math.max(0, vue.places - conv.presents.size)));
   const reste = $derived(Math.max(0, (vue.finMs - maintenant) / 1000));
   const etatAppel = $derived((void vue.rev, S.appel()?.etat ?? "aucun"));
+  // Fin proche : compte à rebours visible à la seconde pendant la dernière minute ; l'alerte des
+  // minutes reste affichée ici pendant un appel (le fil, lui, peut être hors de vue). Le lecteur
+  // d'écran n'entend que les alertes et, à la fin, 30 s et 10 s.
+  const secondesFin = $derived(rebours(vue.finMs, maintenant));
+  const annonceFin = $derived(
+    secondesFin !== null && palierAnnonce(secondesFin) !== 60 ? t("salon.fin.rebours", { n: palierAnnonce(secondesFin) }) : vue.alerteFin !== null ? t("salon.fin.alerte", { n: vue.alerteFin }) : "",
+  );
+  $effect(() => announce(annonceFin));
 
   function nom(siege: number): string {
     const n = conv.nom(siege);
@@ -89,7 +98,7 @@
 
   const QUICK = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-  // --- Pièces (plan C-4) -------------------------------------------------------------------------
+  // --- Pièces -------------------------------------------------------------------------
   let fichiers = $state(false);
   let vocal = $state(false);
   let joindre: HTMLInputElement | undefined = $state();
@@ -137,13 +146,13 @@
     tropLong = null;
     erreur = "";
     texte = "";
-    if (S.intercepterLienGestion(x)) return; // exigence C-3 32 : jamais envoyé, même en .txt
+    if (S.intercepterLienGestion(x)) return; // 32 : jamais envoyé, même en .txt
     void S.envoyerFichiers([new File([x], "message.txt", { type: "text/plain" })]);
   }
   /** Silencieux (v3 §14.4) : choix ouvert (toujours, 1 h, 8 h). */
   let choixSilence = $state(false);
   const silencieux = $derived(vue.silence === SILENCE_TOUJOURS || vue.silence > maintenant);
-  // Écart groupe / serveur (exigence 27).
+  // Écart groupe / serveur.
   const fantomes = $derived((void vue.rev, void maintenant, conv.encoreDansLeGroupe()));
 
   function envoyer(): void {
@@ -479,6 +488,7 @@
   function ligne(e: Extract<Element, { k: "sys" }>): string {
     if (e.quoi === "pseudo") return t("salon.room.sys.pseudo", { avant: e.avant, apres: e.apres });
     if (e.quoi === "createur") return t("salon.room.sys.createur");
+    if (e.quoi === "fermeture") return t("salon.fin.alerte", { n: e.minutes });
     if (e.quoi === "regle") return t("salon.room.sys.regle", { nom: nomDe(e), regle: t(`salon.regle.${e.regle as 1 | 2 | 3}`) });
     return t(`salon.room.sys.${e.quoi}`, { nom: nomDe(e) });
   }
@@ -492,7 +502,7 @@
     mqLarge.addEventListener("change", suivre);
     return () => mqLarge.removeEventListener("change", suivre);
   });
-  /** Échap, où que soit le focus dans le salon : ferme le sélecteur d'émojis ou le menu d'un message (revue du 20 novembre). */
+  /** Échap, où que soit le focus dans le salon : ferme le sélecteur d'émojis ou le menu d'un message. */
   function echappe(e: KeyboardEvent): void {
     if (e.key !== "Escape" || e.defaultPrevented) return;
     if (emojis) {
@@ -519,7 +529,7 @@
         <IconButton label={t("salon.appel.audio")} variant="secondary" onpress={() => void S.lancerAppel(false)}><Phone size={20} /></IconButton>
         <IconButton label={t("salon.appel.video")} variant="secondary" onpress={() => void S.lancerAppel(true)}><Video size={20} /></IconButton>
       {/if}
-      <!-- Revue du 20 novembre (U8) : sur téléphone, boutons à icône de 44 px sur une ligne (le
+      <!-- Sur téléphone, boutons à icône de 44 px sur une ligne (le
            libellé reste le nom accessible) ; ailleurs, icône et libellé. -->
       {#if silencieux}
         <button type="button" class="bt coupe" aria-label={t("salon.son.reactiver")} onclick={() => S.silencieux(null)}><VolumeX size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.son.reactiver")}</span></button>
@@ -633,6 +643,11 @@
       {/if}
 
       <div class="saisie">
+        {#if secondesFin !== null}
+          <p class="fin-proche" data-alerte-fin="rebours">{t("salon.fin.rebours", { n: secondesFin })}</p>
+        {:else if vue.alerteFin !== null && etatAppel === "dans"}
+          <p class="fin-proche" data-alerte-fin="minutes">{t("salon.fin.alerte", { n: vue.alerteFin })}</p>
+        {/if}
         {#if attente}<p class="note" role="status">{attente}</p>{/if}
         {#if S.pieces.avertissement}<p class="err" role="status">{t("salon.piece.err.trop_gros")}</p>{/if}
         {#if S.pieces.aConfirmer.length > 0}
@@ -863,7 +878,7 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  /* Téléphone (revue du 20 novembre, U8 : en-tête de ~170 px) : titre et boutons à icône seule
+  /* Téléphone (en-tête de ~170 px) : titre et boutons à icône seule
      de 44 px sur une ligne, l'état du salon sur une ligne dessous. */
   @media (max-width: 600px) {
     .tete {
@@ -933,7 +948,7 @@
     flex-direction: column;
     gap: var(--sp-2);
   }
-  /* Le panneau ne dicte plus la hauteur de la page (revue du 20 novembre : 850 px de vide entre
+  /* Le panneau ne dicte plus la hauteur de la page (850 px de vide entre
      le dernier message et la saisie) : il reste sous la barre du site et défile en lui-même. */
   .panneau {
     position: sticky;
@@ -950,6 +965,15 @@
     border-radius: 10px;
     background: var(--warn-tint);
     color: var(--warn);
+  }
+  .fin-proche {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: 10px;
+    background: var(--warn-tint);
+    color: var(--warn);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
   .fil {
     list-style: none;
@@ -1203,7 +1227,7 @@
     align-items: flex-end;
     gap: var(--sp-2);
   }
-  /* Téléphone (revue du 20 novembre : le champ ne faisait plus que 93 px) : le message prend
+  /* Téléphone (le champ ne faisait plus que 93 px) : le message prend
      toute la largeur, les outils et « Envoyer » passent dessous. */
   @media (max-width: 600px) {
     .ligne {

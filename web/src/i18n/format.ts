@@ -72,7 +72,7 @@ export function formatRate(bytesPerS: number, lang: Lang): string {
 }
 
 /**
- * Décompte vivant (retours UI4) : « 23 h 50 min » à partir d'une heure (minutes arrondies vers
+ * Décompte vivant : « 23 h 50 min » à partir d'une heure (minutes arrondies vers
  * le haut), « 12 min 05 s » en dessous (à la seconde). Jamais négatif.
  */
 export function formatCountdown(seconds: number, lang: Lang): string {
@@ -90,12 +90,12 @@ export function formatCountdown(seconds: number, lang: Lang): string {
   return m === 0 ? `${s}${x}s` : `${m}${x}min${x}${two(s)}${x}s`;
 }
 
-/** Date et heure exactes de fin (retours UI4) : « Se termine le 9 nov. à 14 h 32 » ; « Ends Nov 9 at 2:32 PM ». */
+/** Date et heure exactes de fin : « Se termine le 9 nov. à 14 h 32 » ; « Ends Nov 9 at 2:32 PM ». */
 export function formatEndsAt(epochMs: number, lang: Lang): string {
   return lang === "fr" ? `Se termine le ${formatDayTime(epochMs, lang)}` : `Ends ${formatDayTime(epochMs, lang)}`;
 }
 
-/** Heure seule (dernière lecture d'un état, audit M13) : « 9 h 41 » ; « 9:41 AM ». */
+/** Heure seule (dernière lecture d'un état) : « 9 h 41 » ; « 9:41 AM ». */
 export function formatClock(epochMs: number, lang: Lang): string {
   const d = new Date(epochMs);
   if (lang === "fr") return `${d.getHours()}${sp(lang)}h${sp(lang)}${String(d.getMinutes()).padStart(2, "0")}`;
@@ -103,7 +103,7 @@ export function formatClock(epochMs: number, lang: Lang): string {
 }
 
 /**
- * Date et heure, format unique du site (revue du 20 novembre, U15 : fin d'un lien, historique,
+ * Date et heure, format unique du site (fin d'un lien, historique,
  * état lu) : « 5 nov. à 21 h 14 » ; « Nov 5 at 9:14 PM ». Insécable entre le jour et le mois.
  */
 export function formatDayTime(epochMs: number, lang: Lang): string {

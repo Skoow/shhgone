@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-// Historique des téléchargements DÉSACTIVÉ PAR DÉFAUT (décision du propriétaire du 22 novembre
-// 2026, remplace l'« activé » de R12 ; audit du 20 novembre W4, P3). Tant que la personne ne l'a
+// Historique des téléchargements DÉSACTIVÉ PAR DÉFAUT (
+// 2026, remplace l'« activé » de R12 ; P3). Tant que la personne ne l'a
 // pas activé elle-même, rien n'est créé sur l'appareil (ni base, ni clé, ni entrée), même après
 // des fichiers enregistrés. L'écran du contenu reçu (seul écran où l'on enregistre, avec ou sans
 // compte) le dit et propose « Les garder 30 jours » ; activé, « Ne pas garder » le désactive et
@@ -65,7 +65,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("historique des téléchargements : désactivé par défaut (22 novembre)", () => {
+describe("historique des téléchargements : désactivé par défaut", () => {
   it("jamais activé : fichiers enregistrés, lecture, désactivation, effacement : aucune base n'est créée sur l'appareil", async () => {
     await live.loadDownloads();
     expect(live.downloads.enabled).toBe(false);

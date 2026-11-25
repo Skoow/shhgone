@@ -1,4 +1,4 @@
-// Profil persistant de Chromium (audit M2, M3) : ce que le navigateur écrit sur le disque et
+// Profil persistant de Chromium (M3) : ce que le navigateur écrit sur le disque et
 // restaure après la fermeture. Établit le comportement réel, puis vérifie la parade de §41.4.
 import { chromium, type BrowserContext, type Page } from "@playwright/test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -10,7 +10,7 @@ import { freshPage, noteRow, pwField, sendShare, unlock } from "./open-helpers";
 
 const TEXT = "Le code du portail est 2208.";
 // Chromium complet (nouveau mode sans tête) : le « headless shell » par défaut n'écrit pas
-// Default/Preferences et ne restaure pas les sessions (CI rouge du 10 novembre).
+// Default/Preferences et ne restaure pas les sessions (CI rouge).
 const exe = process.env.PW_LOCAL_CHROMIUM === "1" ? { executablePath: "/opt/pw-browsers/chromium" } : { channel: "chromium" };
 
 /** Fichiers du profil qui contiennent `needle` (UTF-8 ou UTF-16LE, octets bruts). */
@@ -94,7 +94,7 @@ for (const late of [false, true]) {
       // Ce que le profil garde sur le disque (rapport : M2 « Session Storage », M3 « History »).
       const onDisk = filesWith(dir, key);
       test.info().annotations.push({ type: "fichiers du profil contenant K_lien", description: onDisk.join(", ") || "aucun" });
-      // Constat (8 novembre, Chromium de Playwright) : K_lien est écrit dans Default/History,
+      // Constat (Chromium de Playwright) : K_lien est écrit dans Default/History,
       // Favicons, Sessions/* et « Session Storage » ; replaceState n'y change rien. Hors de notre
       // contrôle (spec §5.3, §41.4) : noté, non exigé, pour ne pas lier le test à une version.
 
@@ -103,9 +103,9 @@ for (const late of [false, true]) {
       ctx = await step("relance avec restauration", () => launch(dir));
       const back = await restoredPage(ctx, shh.origin);
       test.info().annotations.push({ type: "onglet restauré", description: back ? back.url() : "aucun" });
-      expect(back, "Chromium restaure l'onglet (constaté le 8 novembre)").toBeDefined();
+      expect(back, "Chromium restaure l'onglet").toBeDefined();
       if (back) {
-        // « / » marqué repart vers « /s » ; rouvert, l'adresse redevient « / » (17 novembre).
+        // « / » marqué repart vers « /s » ; rouvert, l'adresse redevient « / ».
         expect(back.url()).toMatch(new RegExp(`^${shh.origin.replace(/\./g, "\\.")}/s?$`));
         if (late) {
           // Entrée effacée et plus de « # » (retiré par replaceState) : la clé est perdue.
@@ -121,7 +121,7 @@ for (const late of [false, true]) {
           await expect(back.getByRole("heading", { name: "Lien incomplet", exact: true })).toBeVisible();
         }
         // Lu après l'écran final : « / » marqué repart vers « /s » (navigation), une lecture plus
-        // tôt pouvait tomber pendant ce départ (« Execution context was destroyed », CI du 20 novembre).
+        // tôt pouvait tomber pendant ce départ (« Execution context was destroyed », CI).
         const nav = await back.evaluate(() => (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type ?? "");
         test.info().annotations.push({ type: "type de navigation restaurée", description: nav });
       }

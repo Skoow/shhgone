@@ -3,8 +3,7 @@
 // `addVoice` : lecture d'essai → limite de nombre → doublons → insertion à la fin de sa
 // catégorie. L'ordre de `items` est l'ordre du manifeste.
 //
-// Nettoyage (spec §35.2 ; D41-23) : jamais à l'ajout (décision du propriétaire du 12 novembre,
-// plus de réglage automatique) ; un fichier ajouté part tel quel (« Original ») tant que la
+// Nettoyage (spec §35.2 ; D41-23) : jamais à l'ajout (plus de réglage automatique) ; un fichier ajouté part tel quel (« Original ») tant que la
 // personne ne le nettoie pas (`clean`, balai ou « Tout nettoyer », après confirmation). Échec,
 // format non pris en charge : l'élément part sans clic, marqué « Non nettoyé » avec sa raison.
 import { CONTENT_MAX, DATA_SEGMENTS, MANIFEST_MAX, MAX_ITEMS, NAME_MAX, TEXT_MAX, TITLE_MAX, cleanName, isRiskyName, segmentsNeeded, type Item } from "../index";
@@ -90,7 +89,7 @@ export type ComposeDeps = {
   strip?: (file: Blob, mime: string, name: string, opts?: { recorded?: boolean }) => Promise<StripResult>;
   /** Lecture d'essai (UI §9.2.8) ; par défaut le premier octet. Rejet → « illisible ». */
   probe?: (f: Blob) => Promise<Uint8Array | void>;
-  /** La liste passe de 0 à 1 élément (déclencheur du pré-calcul anti-robot, Task 14). */
+  /** La liste passe de 0 à 1 élément (déclencheur du pré-calcul anti-robot). */
   onFirstItem?: () => void;
   /** La liste redevient vide. */
   onEmpty?: () => void;
@@ -206,7 +205,7 @@ export function createComposer(deps: ComposeDeps = {}) {
    * Format que le nettoyage ne sait pas lire. Une photo, une vidéo ou un son (TIFF, RAW, AVI,
    * AAC…) peut porter une position ou le nom de l'appareil : c'est un nettoyage qui n'a pas
    * abouti (marque ambre, compté, dit au destinataire), pas un fichier « non concerné »
-   * (décision du propriétaire, 10 novembre ; précise D41-34). L'envoi reste libre.
+   * (précise D41-34). L'envoi reste libre.
    */
   function unsupported(category: Category, format: CleanFields["cleanFormat"]): CleanFields {
     if (category === "photos" || category === "videos" || category === "audio") return { clean: "echec", cleanFormat: format };
@@ -214,8 +213,8 @@ export function createComposer(deps: ComposeDeps = {}) {
   }
 
   /**
-   * État d'un fichier à l'ajout. Rien n'est nettoyé ni analysé à l'ajout (décision du
-   * propriétaire du 12 novembre : plus de réglage « Nettoyage automatique ») : le balai de la ligne
+   * État d'un fichier à l'ajout. Rien n'est nettoyé ni analysé à l'ajout (plus de
+   * réglage « Nettoyage automatique ») : le balai de la ligne
    * ou « Tout nettoyer » lance `clean` après confirmation. Seuls les contenus pris dans
    * l'interface sont déjà sans informations cachées.
    */
@@ -289,12 +288,12 @@ export function createComposer(deps: ComposeDeps = {}) {
         const added = cleanOf(f, source, category, captureStripped);
         const data = added.data;
         const recorded = source === "video-ici";
-        // Images, documents, vidéos et sons que le nettoyage lit (§35.2). Sans réglage automatique
-        // (12 novembre), le balai est le seul moyen de nettoyer une vidéo ou un son importés.
+        // Images, documents, vidéos et sons que le nettoyage lit (§35.2). Sans réglage automatique,
+        // le balai est le seul moyen de nettoyer une vidéo ou un son importés.
         const cleanable = ([...IMAGE_FORMATS, ...DOC_FORMATS, ...AV_FORMATS] as readonly string[]).includes(fmt);
         // Photo, vidéo ou son d'un format que le nettoyage ne lit pas (TIFF, SVG, AVI…) : dit dès
         // l'ajout (« format non pris en charge », marque ambre, décompte), rien n'est modifié ni
-        // analysé (retours du 12 novembre ; même état qu'un nettoyage qui n'a pas abouti, 10 novembre).
+        // analysé (même état qu'un nettoyage qui n'a pas abouti).
         const av = category === "photos" || category === "videos" || category === "audio";
         const c = added.c.clean === "original" && av && !cleanable ? unsupported(category, fmt) : added.c;
         ready.push(cleared({ id: nextId(), kind: "file", category, base, ext, mime, size: data.size, data, ...c, duplicate: false, sniffed, risky, mismatch, cleanable, ...(recorded ? { recorded } : {}) }));
@@ -511,13 +510,13 @@ export function createComposer(deps: ComposeDeps = {}) {
 
   const totalBytes = $derived(items.reduce((s, i) => s + i.size, 0));
   // Envoi dès l'ajout (spec §41.14) : un fichier d'au moins 4 Mio occupe des segments entiers,
-  // les petits se partagent des segments (audit H-2).
+  // les petits se partagent des segments.
   const segments = $derived(segmentsNeeded(items.map((i) => i.size)));
   // Taille du manifeste, majorée (D41-17) : mêmes noms et textes que toApiItems, tailles et
   // positions à leur plus grand nombre de chiffres, droit le plus long. Au-delà de
   // MANIFEST_MAX, sealFinal refuserait (« manifeste_trop_gros ») : on bloque avant. Chaque
   // fichier porte sa graine `k` (43 caractères, spec §41.14) et son nettoyage (valeur la plus
-  // longue, D41-35). Nom du partage (19 novembre) : compté à sa plus grande taille (TITLE_MAX
+  // longue, D41-35). Nom du partage : compté à sa plus grande taille (TITLE_MAX
   // caractères de 4 octets), qu'il soit saisi ou non.
   const manifestBytes = $derived(
     new TextEncoder().encode(
@@ -542,7 +541,7 @@ export function createComposer(deps: ComposeDeps = {}) {
     if (items.some((i) => i.kind === "text" && codePoints(i.text ?? "") > TEXT_MAX)) return "texte_trop_long";
     if (manifestBytes > MANIFEST_MAX) return "manifeste";
     if (pending > 0) return "nettoyage";
-    // « Nettoyer » à la demande en cours (audit I1) : son contenu va remplacer celui déjà envoyé.
+    // « Nettoyer » à la demande en cours : son contenu va remplacer celui déjà envoyé.
     if (cleaning.size > 0) return "nettoyage_en_cours";
     if (!online()) return "hors_ligne";
     return null;
@@ -606,7 +605,7 @@ export function createComposer(deps: ComposeDeps = {}) {
     get uncleanedCount() {
       return items.filter((i) => isCleanFailure(i) && !isUnsupportedFormat(i)).length;
     },
-    /** Photos, vidéos, sons d'un format que le nettoyage ne lit pas (décompte à part, audit D5). */
+    /** Photos, vidéos, sons d'un format que le nettoyage ne lit pas (décompte à part). */
     get unsupportedCount() {
       return items.filter(isUnsupportedFormat).length;
     },

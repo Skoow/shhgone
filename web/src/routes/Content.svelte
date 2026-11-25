@@ -1,6 +1,5 @@
 <script lang="ts">
-  // Contenu d'un partage ouvert (UI §9.8, §9.8.6, §9.10 ; décisions du propriétaire du
-  // 7 novembre : listes compactes, icône par format, temps estimés, téléchargements contrôlés,
+  // Contenu d'un partage ouvert (UI §9.8, §9.8.6, §9.10 ; : listes compactes, icône par format, temps estimés, téléchargements contrôlés,
   // « Voir » vers un panneau). Éléments regroupés comme à l'envoi, dans l'ordre du manifeste.
   // Noms par safeName, visionneuse par previewKind ; rien n'est écrit dans la console, le
   // titre, l'adresse ni un stockage. « Voir seulement » : aucune action de téléchargement ni de
@@ -49,7 +48,7 @@
     onend: (kind: "destroyed" | "gone") => void;
     /** Fermeture « partage disparu » (spec §41.8) : suit les enregistrements en cours. */
     gone: Gone;
-    /** « Oublier ce partage sur cet appareil » (audit R2) : retour gardé et entrée de l'onglet effacés. */
+    /** « Oublier ce partage sur cet appareil » : retour gardé et entrée de l'onglet effacés. */
     onforget?: () => Promise<void>;
     /** Échéance du partage (ms, horloge locale) : « Disponible jusqu'au … » (conception compte §21.9). */
     endsAt?: number;
@@ -62,7 +61,7 @@
   const o = opened;
   const viewOnly = o.manifest.rights === "voir";
   const entries = o.manifest.items;
-  // Nom du partage (19 novembre) : texte de l'expéditeur, déjà nettoyé par le moteur, hostile
+  // Nom du partage : texte de l'expéditeur, déjà nettoyé par le moteur, hostile
   // quand même : affiché en texte brut (jamais en HTML), isolé (bdi), jamais dans le titre de
   // l'onglet (il entrerait dans l'historique du navigateur).
   const shareTitle = typeof o.manifest.title === "string" && o.manifest.title !== "" ? o.manifest.title : null;
@@ -97,7 +96,7 @@
     return CATEGORY_ORDER.filter((c) => by.has(c)).map((c) => ({ c, items: by.get(c)! }));
   })();
   const all = entries.map((_, i) => i);
-  // Vocaux et notes : jamais téléchargés (décision du propriétaire du 17 novembre) ; le vocal
+  // Vocaux et notes : jamais téléchargés ; le vocal
   // s'écoute, la note se lit (et se copie si l'expéditeur autorise le téléchargement). Ni l'un
   // ni l'autre dans « Tout télécharger » ni dans l'archive .zip. Vocal : nettoyage « vocal » dit
   // par le manifeste (un vocal dont le nettoyage a échoué reste un fichier audio ordinaire).
@@ -190,7 +189,7 @@
   const blobTarget = async (name: string) => series(name);
   /**
    * Un fichier : avec « Enregistrer sous » (Chrome), le sélecteur s'ouvre AU CLIC, même si un
-   * autre fichier est en cours (audit M3) : le navigateur le refuse hors d'un appui récent. Le
+   * autre fichier est en cours : le navigateur le refuse hors d'un appui récent. Le
    * fichier choisi attend son tour dans la file ; un clic sans effet (déjà en file) n'ouvre rien.
    */
   function saveOne(i: number) {
@@ -280,7 +279,7 @@
   $effect(() => setProgressTitle(dlPct, lang));
   $effect(() => () => setProgressTitle(null, getLang()));
   const totalBytes = totals.reduce((a, n) => a + n, 0);
-  // Revue D42-22 : rendu par le serveur (n = opens_issued et plus aucune ouverture) ; une
+  // D42-22 : rendu par le serveur (n = opens_issued et plus aucune ouverture) ; une
   // personne qui revient sans être la dernière ne l'a pas, même à 0 ouverture restante.
   const lastOpen = o.lastOpen;
   const risky = entries.flatMap((_, i) => (o.isRiskyFile(i) ? [names[i]!] : []));
@@ -310,7 +309,7 @@
   }
   $effect(() => () => leave());
 
-  // Spec §41.8 : surveillance de la disparition (route serveur de la Task M2 ; drapeau).
+  // Spec §41.8 : surveillance de la disparition (route serveur ; drapeau).
   $effect(() => {
     if (!WATCH_READY) return;
     const wt = startWatch((s) => o.watch(s), () => closer.closeToGone("watch410"), browserWatchDeps());
@@ -358,7 +357,7 @@
       if (report === null) destroyError = msg;
       return msg;
     }
-    // Signalement compté sans effacer (moins de la moitié des ouvertures, 20 novembre) : la
+    // Signalement compté sans effacer (moins de la moitié des ouvertures) : la
     // lecture continue ; un seul signalement par ouverture (le bouton disparaît).
     if (out === "reported") {
       reported = true;
@@ -384,7 +383,7 @@
   }
   let reportOpen = $state(false);
   let reported = $state(false);
-  // Audit R2 : le destinataire efface la trace du partage dans ce navigateur, sans attendre l'échéance.
+  // Le destinataire efface la trace du partage dans ce navigateur, sans attendre l'échéance.
   let forgotten = $state(false);
   let forgetting = false;
   async function forgetHere() {
@@ -397,7 +396,7 @@
       forgetting = false;
     }
   }
-  // Signaler (retours UI7) : plus de bouton en haut ; le lien « Signaler » du pied de page ouvre
+  // Signaler : plus de bouton en haut ; le lien « Signaler » du pied de page ouvre
   // la confirmation de CE partage tant qu'il est ouvert (AppShell lit chrome.report).
   $effect(() => {
     if (closer.closed || wiped || ended !== null || reported) return;
@@ -409,10 +408,10 @@
   });
 
   // ---------- Historique des téléchargements : réglage sur place ----------
-  // Désactivé par défaut (décision du propriétaire du 22 novembre 2026, remplace l'« activé » de
+  // Désactivé par défaut (remplace l'« activé » de
   // R12) : une ligne le dit près des téléchargements, avec « Les garder 30 jours » ; activé, elle
   // dit qu'ils sont gardés, avec « Ne pas garder » (désactive et efface). Ici parce que c'est le
-  // seul écran où l'on enregistre des fichiers, avec ou sans compte (audit, P3). Lecture seule à
+  // seul écran où l'on enregistre des fichiers, avec ou sans compte. Lecture seule à
   // l'ouverture : rien n'est créé tant que la personne n'active pas.
   void loadDownloads().catch(() => undefined);
   let erased = $state(false);
@@ -451,13 +450,13 @@
         : t("content.summary", { n: entries.length, size: formatBytes(totalBytes, lang), time: formatDuration(transferSeconds(totalBytes, rate), lang) })}
     </p>
   </header>
-  <!-- Dernière ouverture : dit aussi en haut (audit I5), le détail et « Détruire » restent en bas. -->
+  <!-- Dernière ouverture : dit aussi en haut, le détail et « Détruire » restent en bas. -->
   {#if lastOpen && !closer.closed}
     <p class="notice" data-last-top><Clock size={18} aria-hidden="true" /> <span>{t("content.lastOpen.top")}</span></p>
   {/if}
   {#if !viewOnly && savable.length > 0}
     <!-- « À télécharger » (conception compte §21.9) : nombre, taille et échéance du serveur ;
-         sans les vocaux ni les notes, jamais téléchargés (17 novembre). -->
+         sans les vocaux ni les notes, jamais téléchargés. -->
     <div class="todo" data-todo>
       <h2 class="todo-t num">{t("downloads.todo", { n: savable.length, size: formatBytes(savableBytes, lang) })}</h2>
       {#if endsAt !== undefined}<p class="todo-m num">{t("downloads.until", { date: formatDayTime(endsAt, lang) })}</p>{/if}
@@ -553,7 +552,7 @@
     </section>
   {/each}
 
-  <!-- Pied (retours UI4, revue D42-22) : « Détruire ce partage » seulement à la dernière
+  <!-- Pied (D42-22) : « Détruire ce partage » seulement à la dernière
        ouverture permise (last_open rendu par unlock) ; sinon, combien d'ouvertures restent, ou
        « Toutes les ouvertures sont prises. » ; puis les limites du retour. -->
   {#if !closer.closed}
@@ -575,7 +574,7 @@
         <p class="hint num">{o.opensLeft > 0 ? t("content.opensLeft", { n: o.opensLeft }) : t("content.allTaken")}</p>
       {/if}
       <p class="hint" data-return-limits>{t("content.return.limits")}</p>
-      <!-- Signaler, visible chez le destinataire (propriétaire, 20 novembre) : une voix par
+      <!-- Signaler, visible chez le destinataire : une voix par
            ouverture ; après, la confirmation à la place du bouton. -->
       {#if reported}
         <p class="hint" data-reported>{t("report.counted")}</p>
@@ -758,7 +757,7 @@
       color: var(--text);
     }
   }
-  /* Lien discret (audit R2) : texte souligné, cible d'appui de 44 px. */
+  /* Lien discret : texte souligné, cible d'appui de 44 px. */
   .forget {
     min-height: 44px;
     padding: 0;
@@ -812,7 +811,7 @@
       color: var(--text);
     }
   }
-  /* Téléphone : tout ce qui suit le contenu est centré (retours UI4). */
+  /* Téléphone : tout ce qui suit le contenu est centré. */
   @media (max-width: 559px) {
     .eol {
       justify-items: center;

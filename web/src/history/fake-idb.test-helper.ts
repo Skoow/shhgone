@@ -1,5 +1,5 @@
-// IndexedDB simulé en mémoire, pour les tests seulement (aucune dépendance, `fake-indexeddb`
-// refusé par le plan). Couvre le sous-ensemble utilisé par history/store.ts : open avec
+// IndexedDB simulé en mémoire, pour les tests seulement (aucune dépendance : pas de
+// `fake-indexeddb`). Couvre le sous-ensemble utilisé par history/store.ts : open avec
 // montée de version, objectStoreNames, transaction, objectStore, get, put, delete, clear,
 // getAllKeys, getAll. Les valeurs ne sont pas clonées (une CryptoKey reste telle quelle) ;
 // `raw()` rend tout ce qui est « sur disque », pour vérifier qu'aucun clair n'y est.

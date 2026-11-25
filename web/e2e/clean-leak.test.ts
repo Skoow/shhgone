@@ -1,4 +1,4 @@
-// Envoi dès l'ajout et nettoyage (spec §29.7, §35.2 ; retours du 12 novembre) : un fichier
+// Envoi dès l'ajout et nettoyage (spec §29.7, §35.2) : un fichier
 // déjà parti en envoi anticipé, puis nettoyé (contenu remplacé) ou retiré avant « Chiffrer et
 // envoyer », ne doit rien laisser de lisible au destinataire. Le destinataire a le lien et le
 // mot de passe ; un destinataire malveillant peut déchiffrer chaque morceau du flux stocké avec

@@ -1,4 +1,4 @@
-// Empreinte SHA-256 de chaque fichier du composeur (décision du propriétaire du 16 novembre) :
+// Empreinte SHA-256 de chaque fichier du composeur :
 // affichée en petit sur sa ligne, et écrite dans le manifeste chiffré pour que le destinataire
 // voie la même au même endroit. Calculée sur cet appareil seulement (moteur, par tranches), un
 // fichier à la fois, jamais envoyée en clair au serveur. Un fichier nettoyé est un autre Blob :

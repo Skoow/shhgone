@@ -58,6 +58,6 @@ export function applySeo(name: Route["name"] | "unsupported", doc: Document = do
     link.rel = "canonical";
     doc.head.append(link);
   }
-  // Version anglaise (« /en… ») : sa propre adresse canonique (20 novembre).
+  // Version anglaise (« /en… ») : sa propre adresse canonique.
   link.href = racine + (bilingue ? cheminEn(getLang(), path) : path);
 }

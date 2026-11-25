@@ -1,4 +1,4 @@
-// Rendu des pages d'information au build (pages séparées, conception du 16 novembre), côté
+// Rendu des pages d'information au build (pages séparées), côté
 // serveur de build seulement (vite.config.ts, infoPages) : jamais dans le navigateur. Le contenu
 // est rendu en français (langue par défaut) ; le script de la page le remplace au montage.
 import { render } from "svelte/server";
@@ -26,7 +26,7 @@ export type Rendered = { body: string; title: string; description: string; path:
 
 export function renderPage(name: Route["name"], lang: Lang = "fr"): Rendered {
   // Langue demandée (français par défaut), quelle que soit celle de l'outil de build (Node se dit
-  // anglais) ; l'anglais pour les pages « /en… » (app/langues.ts, 20 novembre).
+  // anglais) ; l'anglais pour les pages « /en… » (app/langues.ts).
   void setLang(lang);
   router.current = { name };
   const { body } = render(PagesApp);
@@ -39,7 +39,7 @@ export function renderPage(name: Route["name"], lang: Lang = "fr"): Rendered {
   };
 }
 
-/** Accueil (18 novembre, référencement) : contenu de « / » écrit dans index.html au build. */
+/** Accueil (référencement) : contenu de « / » écrit dans index.html au build. */
 export function renderHome(lang: Lang = "fr"): Rendered {
   void setLang(lang);
   router.current = { name: "home" };

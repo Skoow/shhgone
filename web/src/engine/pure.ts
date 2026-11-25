@@ -1,4 +1,4 @@
-// Partie du moteur gardée en TypeScript (décisions du contrôleur, Task 11) : ce que le site
+// Partie du moteur gardée en TypeScript (décisions du contrôleur) : ce que le site
 // appelle de façon synchrone, avant tout chargement du moteur (page d'accueil, routeur, lecture
 // de l'adresse), et qui ne déchiffre ni ne dérive rien :
 //   - constantes et géométrie du format (tailles, paliers, segments), sans secret ;
@@ -9,10 +9,10 @@
 // Chaque fonction est prouvée égale au moteur Rust sur les vecteurs communs (pure.test.ts) ;
 // tout ce qui touche une clé passe par le moteur après son chargement (index.ts).
 
-// --- Types marqués des secrets (audit M1) ----------------------------------------------------
+// --- Types marqués des secrets ----------------------------------------------------
 // Tous sont des Uint8Array de 32 octets, mais le
 // compilateur refuse de les confondre : K_lien ne peut pas être passé
-// là où le serveur attend K_accès ou K_preuve. Ils ne sont produits que par :
+// là où le serveur attend K_accès ou K_preuve. Ils ne sont produits que :
 //   - newKLien(), newSGestion() (tirage aléatoire, ici) ;
 //   - deriveAccess (K_accès), passwordKey / passwordKeyForCreate (K_mdp), accessKeys (K_preuve), dans engine/index.ts ;
 //   - parseLink (K_lien ou S_gestion lus dans le fragment du lien).
@@ -105,7 +105,7 @@ const TAIL = 4 + MANIFEST_MAX;
 /** Octets de données au plus (fichiers et notes, D41-36) : exactement 2 Gio (2 147 483 648). */
 export const CONTENT_MAX = BUCKETS[BUCKETS.length - 1] * CHUNK - TAIL;
 /**
- * Éléments par partage au plus, pour toutes les formules (décision du 7 novembre, D41-17 :
+ * Éléments par partage au plus, pour toutes les formules (D41-17 :
  * le nombre d'éléments n'est plus un critère de formule, une archive .zip le contourne).
  * Borne technique d'un manifeste d'un morceau (MANIFEST_MAX = 65 532 octets) : une entrée de
  * fichier au nom ASCII de 120 caractères et au type de 40 caractères fait environ 220 octets,
@@ -153,7 +153,7 @@ export type ManifestEntry = {
   clean?: ManifestClean;
   /**
    * Fichier seulement : empreinte SHA-256 du fichier envoyé, 64 chiffres hexadécimaux minuscules,
-   * calculée par l'expéditeur (16 novembre) ; absente des anciens partages ou si mal formée.
+   * calculée par l'expéditeur ; absente des anciens partages ou si mal formée.
    */
   sha256?: string;
 };
@@ -162,7 +162,7 @@ export type ManifestV2 = {
   v: 2;
   rights: Rights;
   keep_ttl_h?: KeepTtl;
-  /** Nom du partage (19 novembre), nettoyé par le moteur à la lecture ; texte de l'expéditeur, hostile : affiché en texte brut seulement. */
+  /** Nom du partage, nettoyé par le moteur à la lecture ; texte de l'expéditeur, hostile : affiché en texte brut seulement. */
   title?: string;
   items: ManifestEntry[];
 };
@@ -247,7 +247,7 @@ export function chunksFor(size: number): number {
 }
 
 /**
- * Petit élément (audit H-2) : moins d'un segment ; empaqueté avec d'autres dans un segment
+ * Petit élément : moins d'un segment ; empaqueté avec d'autres dans un segment
  * partagé, n'importe où sur une frontière de morceau, sans déborder de son segment. Un élément
  * d'un segment ou plus commence sur une frontière de segment et occupe ses segments seul.
  */
@@ -259,7 +259,7 @@ export function isSmall(size: number): boolean {
  * Emprise d'un élément, en morceaux : ses seuls morceaux nécessaires, ⌈taille / 64 Kio⌉
  * (D41-38, remplace l'arrondi en puissance de deux de D41-20 et D41-21) ; seule la fin de son
  * dernier morceau est faite de zéros chiffrés. Le serveur voit donc, pendant l'envoi, la taille
- * de chaque élément à 64 Kio près (fuite acceptée par le propriétaire).
+ * de chaque élément à 64 Kio près (fuite acceptée).
  */
 export function footprintFor(size: number): number {
   return chunksFor(size);
@@ -286,7 +286,7 @@ export type Piece = { seg: number; from: number; chunks: number };
 
 export const KDF_MIN = { ops: 3, mem: 67108864 } as const;
 /**
- * Plafond accepté du serveur (audit F4) : les paramètres de création, seuls utilisés. Plus haut,
+ * Plafond accepté du serveur : les paramètres de création, seuls utilisés. Plus haut,
  * un serveur compromis ferait allouer jusqu'à 256 Mio et planter l'onglet d'un petit téléphone.
  */
 export const KDF_MAX = { ops: 3, mem: 67108864 } as const;
@@ -326,13 +326,11 @@ export function newSGestion(): SGestion {
 
 // --- Mot de passe généré (spec §31) ------------------------------------------------------------
 
-// Mot de passe généré par défaut (spec §31, 11 caractères depuis le 8 novembre, décision du
-// propriétaire) : tirés uniformément dans un alphabet de 63 symboles : lettres et chiffres sans
+// Mot de passe généré par défaut (spec §31, 11 caractères) : tirés uniformément dans un alphabet de 63 symboles : lettres et chiffres sans
 // les ambigus ni les sosies (ni 0 O o 1 l I i j, ni les sosies S s Z z B ;
 // 5, 2 et 8 n'ont donc plus de sosie), 14 caractères spéciaux courants sur un clavier de téléphone, aucun espace.
 // Le mot de passe entier est recommencé tant que la contrainte n'est pas tenue (au moins une
-// minuscule, une majuscule, un chiffre et EXACTEMENT TROIS caractères spéciaux, décision du
-// propriétaire du 9 novembre) : chaque mot de passe valide a la même probabilité.
+// minuscule, une majuscule, un chiffre et EXACTEMENT TROIS caractères spéciaux) : chaque mot de passe valide a la même probabilité.
 // 11 062 464 629 113 497 600 possibilités, soit 2^63,26 (exigence : au moins 60 bits). Environ
 // 17,8 % des tirages bruts passent : un peu moins de six tirages en moyenne. Ce contrôle de forme ne sert qu'à la création ; à l'ouverture, tout mot de passe non
 // vide est accepté (anciens alphabets et longueurs compris).
@@ -394,7 +392,7 @@ export const MANAGE_FRAGMENT = /^#m[A-Za-z0-9_-]{43}$/;
 
 /**
  * Forme d'un lien de partage de production (benchmark M13, réutilisée par les tests de
- * pages) : `https://hôte/s#` + 43 caractères (16 novembre), rien d'autre (ni autre chemin, ni
+ * pages) : `https://hôte/s#` + 43 caractères, rien d'autre (ni autre chemin, ni
  * requête, ni mot de passe).
  */
 export const SHARE_LINK_SHAPE = /^https:\/\/[a-z0-9.-]+(?::\d+)?\/s#[A-Za-z0-9_-]{43}$/;
@@ -405,7 +403,7 @@ const LOCAL = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const allowedScheme = (u: URL) => u.protocol === "https:" || (u.protocol === "http:" && LOCAL.has(u.hostname));
 
 /**
- * Vérifie une origine (audit F1) : forme canonique exacte `https://hôte[:port]` (http
+ * Vérifie une origine : forme canonique exacte `https://hôte[:port]` (http
  * seulement pour localhost, 127.0.0.1, [::1]), sans chemin, requête, fragment ni
  * identifiants. Rend l'origine, ou lève Error("origine_invalide").
  */
@@ -441,13 +439,13 @@ const canonical = (key: string) => ALPHABET.indexOf(key[key.length - 1]!) % 4 ==
 
 /**
  * Vérifie la forme d'un lien comme parseLink (moteur), sans décoder la clé (décision B3 du
- * contrôleur, Task 11) : schéma, identifiants, chemin égal à `base` (« /shhdrop » sans barre
+ * contrôleur) : schéma, identifiants, chemin égal à `base` (« /shhdrop » sans barre
  * finale toléré pour la démo), requête ignorée, fragment « # » + 43 ou « #m » + 43 caractères
  * base64url d'encodage canonique. Rend l'origine normalisée et la clé en texte ; sinon
  * Error("lien_invalide") (Error("base_invalide") pour une base mal formée). La clé n'est lue en
  * octets que par le moteur (engine/index.ts : parseLink), au moment de l'utiliser.
  */
-/** Chemin des liens sous la base (décision du propriétaire du 16 novembre, moteur : LINK_PATH). */
+/** Chemin des liens sous la base (moteur : LINK_PATH). */
 export const LINK_PATH = "s";
 
 export function linkForm(url: string, base = "/"): LinkForm {
@@ -459,8 +457,8 @@ export function linkForm(url: string, base = "/"): LinkForm {
     throw invalid();
   }
   if (!allowedScheme(u) || u.username !== "" || u.password !== "") throw invalid();
-  // Forme écrite depuis le 16 novembre : « {base}s » ; ancienne forme à la racine encore lue.
-  // Sous « /s » seulement : l'ancienne forme à la racine est refusée (propriétaire, 18 novembre).
+  // Forme écrite : « {base}s » ; ancienne forme à la racine encore lue.
+  // Sous « /s » seulement : l'ancienne forme à la racine est refusée.
   if (u.pathname !== base + LINK_PATH) throw invalid();
   // Le genre vient de la forme entière (longueur), jamais du seul « m » de tête : une clé de
   // partage commence par « m » une fois sur 64 (« #m » + 42 caractères = partage).

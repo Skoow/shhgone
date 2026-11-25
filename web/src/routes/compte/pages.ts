@@ -1,4 +1,4 @@
-// Pages du compte vues par App.svelte (plan du compte, lot 10) : seul point d'entrée du compte
+// Pages du compte vues par App.svelte : seul point d'entrée du compte
 // dans le site. Avec __COMPTES__ seulement ; sans lui (défaut, démo), le greffon shh-comptes
 // (vite.config.ts) remplace ce module par pages.off.ts, et rien du compte n'est construit.
 export { default as Connexion } from "./Connexion.svelte";

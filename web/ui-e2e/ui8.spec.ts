@@ -1,4 +1,4 @@
-// Retours UI8 du propriétaire, sur le vrai serveur : fond sobre de « Comment ça marche », pied de
+// Retours UI8, sur le vrai serveur : fond sobre de « Comment ça marche », pied de
 // page sans aucun soulignement (couleur et anneau de focus), pastilles qui rentrent dans l'icône
 // de format (découpe de la couleur du fond), bouclier de nettoyage avec sa bulle, nettoyage dit au
 // destinataire par le manifeste chiffré, icônes maison. Captures fr-FR ×2 à 390 et 1440 px.
@@ -9,7 +9,7 @@ import { file, freshPage, sendShare, settle, unlock } from "./open-helpers";
 import { cleanAll, openFilePicker } from "./send-helpers";
 import type { Locator, Page } from "@playwright/test";
 
-const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-UI8/", import.meta.url));
+const SHOTS = fileURLToPath(new URL("../test-results/captures/UI8/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 
@@ -40,7 +40,7 @@ test("accueil : « Comment ça marche » sur un fond sobre (ni biais, ni réglur
   await page.goto(shh.origin + "/");
   const how = page.locator("#comment");
   await how.scrollIntoViewIfNeeded();
-  // Refonte du 12 novembre : plus de fond propre à la section, seul le fond de page (nuit, trame).
+  // Plus de fond propre à la section, seul le fond de page (nuit, trame).
   const st = await how.evaluate((e) => ({ clip: getComputedStyle(e).clipPath, tex: getComputedStyle(e).backgroundImage }));
   expect(st.clip).toBe("none");
   expect(st.tex).toBe("none");
@@ -99,7 +99,7 @@ test("composeur : bouclier de nettoyage avant le nom avec sa bulle, pastille cad
   await expect(row("archive.zip").locator("[data-clean]")).toHaveCount(0);
   // Bouclier : 15 px, juste AVANT le nom (retours CLEAN2), centré sur le texte ; bouton nommé par sa bulle.
   // Bouclier et nom mesurés dans la même image, la ligne immobile (après son entrée animée) :
-  // deux mesures séparées tombaient à des instants différents (CI du 20 novembre).
+  // deux mesures séparées tombaient à des instants différents (CI).
   const plage = row("plage-nuit.jpg");
   // Ligne immobile : deux images de suite avec la même position du nom.
   await expect

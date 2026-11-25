@@ -4,7 +4,7 @@
   // 1. Pseudo (vérifié pendant la saisie : « Disponible » / « Déjà pris », réservé à l'étape) ;
   //    la preuve anti-robot et inscription/debut partent dès l'ouverture : le clic sur « Créer
   //    avec une passkey » appelle navigator.credentials.create sans aucune requête avant (Safari).
-  //    La création vaut acceptation des conditions (phrase sous le bouton, décision du 20 novembre).
+  //    La création vaut acceptation des conditions (phrase sous le bouton).
   // 2. (seulement si le gestionnaire annonce PRF sans l'avoir rendu) deuxième confirmation.
   // 3. Clé de récupération : « Copier », « Télécharger (.txt) », « Je l'ai notée » ; rien n'est envoyé.
   // 4. Un groupe de la clé à retaper, « Terminer » : inscription/fin ; le compte n'existe qu'ici.

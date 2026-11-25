@@ -1,4 +1,4 @@
-// Télécharger (Task 23, UI §9.9 ; Task R2) sur le vrai serveur : en flux vers le sélecteur de
+// Télécharger (UI §9.9) sur le vrai serveur : en flux vers le sélecteur de
 // fichier (faux sélecteur, octets comparés), coupure → partiel gardé puis nouvel essai repris à
 // l'octet écrit, repli <a download> avec nom nettoyé et avertissement, « voir seulement » sans
 // Télécharger.
@@ -59,7 +59,7 @@ test("sélecteur de fichier : nom nettoyé, octets identiques, progression tabul
   await expect(progress).toBeVisible();
   await expect(progress).toHaveCSS("font-variant-numeric", "tabular-nums");
   await capture(page, "save-progress");
-  // Téléchargé : pastille verte au coin de l'icône, avec sa bulle (retours UI6).
+  // Téléchargé : pastille verte au coin de l'icône, avec sa bulle.
   await expect(page.locator('li.row[data-state="done"] [data-downloaded] button')).toHaveAccessibleName("Téléchargé", { timeout: 30_000 });
   expect(await win(page, "__name")).toBe("rapport.bin");
   expect(await win(page, "__closed")).toBe(true);

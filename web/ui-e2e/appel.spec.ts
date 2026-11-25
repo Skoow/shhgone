@@ -1,12 +1,11 @@
-// Appel audio et vidéo À TROIS, de bout en bout par l'interface (conception des appels,
-// 20 novembre) : vrai binaire Go (SHH_SALONS=1, SHH_COMPTES=1, relais configuré), vrai relais
+// Appel audio et vidéo À TROIS, de bout en bout par l'interface (conception des appels) : vrai binaire Go (SHH_SALONS=1, SHH_COMPTES=1, relais configuré), vrai relais
 // TURN de notre image (`shhcheck turn`, deploy/shhcheck/turn.go, construit ici depuis l'arbre :
 // exactement celui que compose.yaml lance en production), trois navigateurs Chromium avec micro
 // et caméra factices. Prouve : l'appel se lance, les deux autres le voient et le rejoignent,
 // chacun reçoit vraiment l'image et le son des autres, TOUT le média passe par le relais (aucune
 // connexion directe : paires de candidats « relay » des deux côtés), micro et caméra se coupent,
 // raccrocher retire la tuile chez les autres. Rien à installer : Go suffit (déjà exigé par les tests).
-// Appels réservés aux offres Plus et Pro (24 novembre) : sans pass, « Appel audio » explique
+// Appels réservés aux offres Plus et Pro : sans pass, « Appel audio » explique
 // « Réservé aux offres Plus et Pro » sans rien demander ; A, qui a un pass Plus payé (pass-helpers.ts),
 // lance l'appel avec un jeton anonyme (seule requête qui en porte un) ; B et C le rejoignent sans offre.
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
@@ -86,7 +85,7 @@ const test = base.extend<{ relais: Relais }, { site: string; shhcheck: string }>
     }
   },
   // Paiement activé (bacs à sable, aucun appel sortant) : les appels sont réservés aux offres
-  // Plus et Pro (24 novembre) ; sans paiement, le serveur ne les propose pas.
+  // Plus et Pro ; sans paiement, le serveur ne les propose pas.
   shhServer: async ({ site, relais }, use) =>
     use({
       comptes: { cle: new Uint8Array(randomBytes(32)) },
@@ -202,7 +201,7 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
   await bouton(page, "Continuer").click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
-  // Historique désactivé par défaut, même avec un compte (24 novembre, B) : le lien de gestion est
+  // Historique désactivé par défaut, même avec un compte (B) : le lien de gestion est
   // montré d'emblée, pour être gardé à la main.
   await expect(page.locator("[data-manage]")).toContainText("Il n'est pas gardé dans l'historique de cet appareil");
   await expect(bouton(page, "Afficher le lien de gestion")).toHaveCount(0);
@@ -285,7 +284,7 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
     // A voit l'image de B (caméra allumée) : la vidéo distante avance.
     const videoDeB = tuiles(page).filter({ hasText: `Hugo${r.slice(4, 8)}` }).locator("video");
     await expect.poll(() => videoDeB.evaluate((v: HTMLVideoElement) => v.videoWidth > 0 && v.currentTime > 0), { timeout: 30_000 }).toBe(true);
-    // Qui parle (21 novembre) : le son factice de Chromium (bips) allume la tuile de qui l'envoie.
+    // Qui parle : le son factice de Chromium (bips) allume la tuile de qui l'envoie.
     await expect.poll(() => tuiles(page).and(page.locator("[data-parle]")).count(), { timeout: 30_000 }).toBeGreaterThan(0);
     // Un seul appareil photo factice : pas de bouton pour changer de caméra.
     await expect(bouton(b.page, "Changer de caméra (face ou dos)")).toHaveCount(0);
@@ -305,7 +304,7 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
     await expect(appel(page)).toHaveCount(0);
     await expect(page.getByText("Appel en cours (2)")).toBeVisible({ timeout: 30_000 });
     for (const p of [b.page, c.page]) await expect(tuiles(p)).toHaveCount(2, { timeout: 30_000 });
-    // Onglet de C fermé sans raccrocher (21 novembre) : B le voit partir tout de suite, sans
+    // Onglet de C fermé sans raccrocher : B le voit partir tout de suite, sans
     // attendre les 40 s d'absence.
     await c.page.close();
     await expect(tuiles(b.page)).toHaveCount(1, { timeout: 10_000 });

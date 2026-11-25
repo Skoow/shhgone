@@ -1,5 +1,5 @@
 <script lang="ts">
-  // PDF reçu (UI §13, Task 22, retours CLEAN5) : affiché dans un cadre isolé, jamais par la page
+  // PDF reçu (UI §13, retours CLEAN5) : affiché dans un cadre isolé, jamais par la page
   // de l'application. <iframe sandbox="allow-scripts"> sans allow-same-origin (origine opaque :
   // le cadre ne voit ni les clés, ni le stockage, ni la page) ; pdf.js y dessine des <canvas>
   // sans exécuter le code du PDF. Les octets sont TRANSFÉRÉS au cadre (plus de copie ici) après

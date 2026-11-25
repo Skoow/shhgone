@@ -1,7 +1,7 @@
 <script lang="ts">
   // Cadenas d'état d'un élément (D41-25), icône maison : gris fermé (en cours, encore chiffré),
   // vert fermé avec coche (envoyé et confirmé), vert OUVERT (reçu, déchiffré et vérifié), rouge
-  // avec « ! » (échec). Le texte n'est pas écrit sur la ligne (retours UI4) : il est le nom du
+  // avec « ! » (échec). Le texte n'est pas écrit sur la ligne : il est le nom du
   // bouton et le contenu de sa bulle (Tip) ; la couleur n'est jamais la seule information (la
   // forme change aussi). Le vert n'arrive qu'à l'événement réel (lock.ts). `badge` (UI5) :
   // pastille posée sur le coin bas-droit de l'icône de format ; depuis UI6, son bouton ne couvre
@@ -10,7 +10,7 @@
   import type { LockTone } from "./lock";
   import Tip from "./Tip.svelte";
 
-  // `detail` (D41-34, retours UI7) : 2ᵉ ligne de la bulle, l'état du nettoyage du fichier ; elle
+  // `detail` (D41-34) : 2ᵉ ligne de la bulle, l'état du nettoyage du fichier ; elle
   // entre aussi dans le nom du bouton (tout reste dans les libellés).
   type Props = { tone: LockTone; text: string; detail?: string; role?: "alert"; badge?: boolean; children?: Snippet };
   let { tone, text, detail, role, badge = false, children }: Props = $props();
@@ -87,7 +87,7 @@
   /* Pastille (UI5) : disque de la surface sous le cadenas, posé sur le coin bas-droit de
      l'icône ; le bouton entier (icône comprise) fait 44 px. */
   /* Bouton de 24 px centré sur la pastille (18 px), qui RENTRE dans le coin bas-droit de la
-     feuille (retours UI8) : elle en mord le coin et s'en détache par une découpe de la couleur
+     feuille : elle en mord le coin et s'en détache par une découpe de la couleur
      du fond (--cut) ; le libellé et le pictogramme de l'icône restent libres. */
   .lock.badge {
     position: absolute;
@@ -115,7 +115,7 @@
     border-radius: 50%;
     color: inherit;
   }
-  /* Cible d'appui de 44 px (audit M21) : le bouton de 24 px s'agrandit seulement vers
+  /* Cible d'appui de 44 px : le bouton de 24 px s'agrandit seulement vers
      l'extérieur de l'icône (droite, bas), jamais sur le bouton d'aperçu ; le dessin ne change pas. */
   .badge :global(.pic-tip)::after {
     content: "";
