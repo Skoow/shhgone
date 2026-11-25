@@ -429,7 +429,7 @@ func lireLien(r io.Reader) ([]byte, error) {
 
 var (
 	errUneLigne    = errors.New("entrée standard : une seule ligne attendue (le lien)")
-	errLienAttendu = errors.New("lien invalide (attendu : https://…/#<clé de 43 caractères>, ou #c<clé> pour un salon)")
+	errLienAttendu = errors.New("lien invalide (attendu : https://…/#<clé de 43 caractères>, #l<clé> sans mot de passe, ou #c<clé> pour un salon)")
 )
 
 // cleAccesDuLien tire K_accès du lien signalé, traité en OCTETS de bout en bout (jamais de
@@ -453,8 +453,13 @@ func cleAccesDuLien(lien []byte) (k []byte, estSalon bool, err error) {
 		cle = ligne[i+1:]
 	}
 	info := "shhdrop/v2/acces"
-	if len(cle) == 44 && cle[0] == 'c' {
+	switch {
+	case len(cle) == 44 && cle[0] == 'c':
 		cle, estSalon, info = cle[1:], true, "shhdrop/v2/salon/acces"
+	case len(cle) == 44 && cle[0] == 'l':
+		// Partage sans mot de passe (« #l<43> », spec D42-27) : même K_accès, la marque « l »
+		// n'est qu'une indication pour le navigateur (le serveur ne la reçoit jamais en ligne).
+		cle = cle[1:]
 	}
 	var kLien [32]byte
 	defer clear(kLien[:])

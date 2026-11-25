@@ -35,6 +35,7 @@ func TestLienEnOctets(t *testing.T) {
 		"clé seule":                {cle, true, false},
 		"espaces et lignes vides":  {"\n  https://shhgone.com/#" + cle + " \r\n\n", true, false},
 		"salon":                    {"https://shhgone.com/#c" + cle, true, true},
+		"sans mot de passe":        {"https://shhgone.com/s#l" + cle, true, false},
 		"salon, clé seule":         {"c" + cle, true, true},
 		"gestion":                  {"https://shhgone.com/#m" + cle, false, false},
 		"vide":                     {"", false, false},

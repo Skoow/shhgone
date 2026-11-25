@@ -119,7 +119,11 @@ struct Parsed {
 
 fn parsed(p: ParsedLink) -> Parsed {
     match p {
-        ParsedLink::Share { origin, k_lien } => Parsed {
+        ParsedLink::Share {
+            origin,
+            k_lien,
+            no_password: false,
+        } => Parsed {
             kind: "s",
             origin,
             key: k_lien.as_bytes().to_vec(),
@@ -129,6 +133,7 @@ fn parsed(p: ParsedLink) -> Parsed {
             origin,
             key: s_gestion.as_bytes().to_vec(),
         },
+        ParsedLink::Share { .. } => panic!("aucun lien sans mot de passe dans v2.json"),
     }
 }
 
@@ -1027,7 +1032,11 @@ fn share_opened_cases() {
     let v = vectors();
     let sh = &v["share"];
     let files = ShareFiles(share_server_files(&v), Default::default());
-    let ParsedLink::Share { origin, k_lien } =
+    let ParsedLink::Share {
+        origin,
+        k_lien,
+        no_password: false,
+    } =
         // Lien de v2.json écrit à la racine : lu sous /s (seule forme lue).
         parse_link(&sh["link"].as_str().unwrap().replacen('#', "s#", 1), "/").unwrap()
     else {

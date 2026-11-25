@@ -1,0 +1,314 @@
+{
+  "about": "Partage sans mot de passe (D42-27), produit par le moteur Rust (engine/core/tests/sans_mdp.rs) ; voir engine/vectors/README.md.",
+  "constants": {
+    "ENVELOPE_LEN": 60,
+    "NO_PASSWORD_INFO": "shhdrop/v2/sans-mdp",
+    "NO_PASSWORD_MARK": "l"
+  },
+  "keys": [
+    {
+      "engagement": "5c4a7cc9a831c6ce1e734390453f6841227fa7e235862ae2c82433e4a9876302",
+      "envelope": "540c5a84ef03d8cac7645ac0533d0cf2a28a670486d573a780ebcbd599afb65ed912e234ed159749b6768a37e6b709e9a2628666d6f7d874d8dab911",
+      "envelope_nonce": "540c5a84ef03d8cac7645ac0",
+      "header": "534848320200000000000000000000005c4a7cc9a831c6ce1e734390453f6841227fa7e235862ae2c82433e4a9876302",
+      "id": "e505f5b64df719c9542765c24521f67f",
+      "k_acces": "e1fb42e26cd480e477a1e144e45139bbaf9ec294739ee8134fc25cfff761ba20",
+      "k_env": "6ed46f3392e0eb9f332752fbfea2ba0caa9aee1086b7a30e1c7747aa6901294f",
+      "k_lien": "b9d8efb9d88fc61c0c5d7c2eefc15b33f5ad944026a6a355ad9f130b8d3705fc",
+      "k_maitre": "985d2773b2a1d2a90c8846a728c1dc9315df684c8a4ea94780172b22f93817db",
+      "k_preuve": "8e0cd7ac624eed91f360a06ad562e3896110e88034874dddbedd0fd1c1685684",
+      "k_sans": "bf6dcfdcd05125342e3344ccac0ff2457002975d44af7de43221c6b129bc6002",
+      "label": "a",
+      "r": "c1ad066ff2a0b079e4755ba5db63c81f6059f00e1f1452b46af08dfbf7e2e3ac",
+      "v_acces": "1169e52957c3cf0d5ab9226c53598a721db7c8b34e4bfcb9abc888e2f4a9ac28",
+      "v_preuve": "23c27b243f9f7f6eb0532a694fe6c3da4f9735c1ee83e61d8f37300307f2150d"
+    },
+    {
+      "engagement": "5af25bff763f9048d598c7b05694b46a2fb392e5e2e378ab96256547c31f6a98",
+      "envelope": "5a121c2cef57bfb10cbc1d957edde00fd3388f260ab28b47621afd7cc286064a546faa6c1aa3bc927ae41147ebe1d0c6424f825c6b5cda298473227a",
+      "envelope_nonce": "5a121c2cef57bfb10cbc1d95",
+      "header": "534848320200000000000000000000005af25bff763f9048d598c7b05694b46a2fb392e5e2e378ab96256547c31f6a98",
+      "id": "f1bba4baae6c8f92414dbe3590d98a2a",
+      "k_acces": "34dca550228e07d213c760ad456260bc59e90243bc6ae9e2030241f07626ea29",
+      "k_env": "3f5c097c6d5cfc0bcbb955a0e84a2e0b3a9ff4bac39d56bf24e11e8ff10c7d94",
+      "k_lien": "c8932863f2aaa5468d13e4eb7b74a1f4fa3e564d1b8dbc96323a974f7329c95a",
+      "k_maitre": "11f2ade5264dc0d59df2ec2068efdfa100085151b3badd821a9b6c54dad26893",
+      "k_preuve": "10f1ef5f741f768e132352761be1ba290389b68dec42618893eb80321a4ce0d5",
+      "k_sans": "aad1f3c589d8f637df3c115a4ec385ed0627410d80c5760d08aa3152c41744fc",
+      "label": "b",
+      "r": "c9ba3846746acbe108dd2b47c27bd549e98401b05e2a28570c01db0cf0a8613a",
+      "v_acces": "a030ef2921775efab6a321c5157919f4a7c101879cda8e48b3e62d94f20194ac",
+      "v_preuve": "be2437f80bc76149dc2af39bb27c52a3fe24dac5220f1259b2c9e7b965f14eda"
+    },
+    {
+      "engagement": "b6fb112123a4f129973dd957bcfd19184419d42cd2a82003aa05954e073b3a29",
+      "envelope": "781c6107a0358e44498d9314ab1249b7fe868e78333f13474f705ce4e1a6e0670e226ff93e8af89ef5a181e64bd9ed43893127345d44c809b75ab2c1",
+      "envelope_nonce": "781c6107a0358e44498d9314",
+      "header": "53484832020000000000000000000000b6fb112123a4f129973dd957bcfd19184419d42cd2a82003aa05954e073b3a29",
+      "id": "60e5aef197045b1b8c8e0f9c615685ac",
+      "k_acces": "53ab25587bce43b711cef90eb22601ecbce1e9eebed9f13dabd7c5449deb84a3",
+      "k_env": "a09e8d0dc2495182a6c69c2110b0dfeb245cb7c1029f6009cf74571aca41e0e1",
+      "k_lien": "0000000000000000000000000000000000000000000000000000000000000000",
+      "k_maitre": "9c436be1a02f1f00d1c74cf0e9e7001b8c468e98d90b6f4b7d0d25c48a00d0b9",
+      "k_preuve": "125c351c1f8c65fc4935852490dca707790e991018cefabe50ae2dbc81c9bcc7",
+      "k_sans": "3c2014811ab24f9d3ecd5e49217b71a51a4f38c437e8c198a8aea2ba0c9701b5",
+      "label": "zero",
+      "r": "c9927e865c8226406e022d6aa911c12861610cc300a0b550b0888b763bef7018",
+      "v_acces": "81d4dc2740a102e877eafdf1cca31ae4362c5f9185c44cafd3aa66c8e58e1028",
+      "v_preuve": "44ad1f4989b0d8c39d3a0733c46d8ef2385db0ad9fca80af375852dccbbefafb"
+    }
+  ],
+  "links": {
+    "origin": "https://shhdrop.example",
+    "parse": [
+      {
+        "base": "/",
+        "label": "ancien_lien_avec_mdp",
+        "result": {
+          "key": "4104104104104104104104104104104104104104104104104104104104104104",
+          "kind": "s",
+          "no_password": false,
+          "origin": "https://shhdrop.example"
+        },
+        "url": "https://shhdrop.example/s#QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "ancien_lien_cle_en_l",
+        "result": {
+          "key": "9504104104104104104104104104104104104104104104104104104104104104",
+          "kind": "s",
+          "no_password": false,
+          "origin": "https://shhdrop.example"
+        },
+        "url": "https://shhdrop.example/s#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "gestion",
+        "result": {
+          "key": "4104104104104104104104104104104104104104104104104104104104104104",
+          "kind": "m",
+          "origin": "https://shhdrop.example"
+        },
+        "url": "https://shhdrop.example/s#mQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp",
+        "result": {
+          "key": "4104104104104104104104104104104104104104104104104104104104104104",
+          "kind": "s",
+          "no_password": true,
+          "origin": "https://shhdrop.example"
+        },
+        "url": "https://shhdrop.example/s#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_a_la_racine",
+        "result": {
+          "error": "lien_invalide"
+        },
+        "url": "https://shhdrop.example/#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_autre_chemin",
+        "result": {
+          "error": "lien_invalide"
+        },
+        "url": "https://shhdrop.example/x#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_avec_mot_de_passe",
+        "result": {
+          "error": "lien_invalide"
+        },
+        "url": "https://shhdrop.example/s#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ.YUMzIWNENT8jRmc"
+      },
+      {
+        "base": "/shhgone/",
+        "label": "sans_mdp_demo",
+        "result": {
+          "key": "4104104104104104104104104104104104104104104104104104104104104104",
+          "kind": "s",
+          "no_password": true,
+          "origin": "https://skoow.github.io"
+        },
+        "url": "https://skoow.github.io/shhgone/s#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_double_marque",
+        "result": {
+          "error": "lien_invalide"
+        },
+        "url": "https://shhdrop.example/s#llQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_majuscule",
+        "result": {
+          "error": "lien_invalide"
+        },
+        "url": "https://shhdrop.example/s#LQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_non_canonique",
+        "result": {
+          "error": "lien_invalide"
+        },
+        "url": "https://shhdrop.example/s#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQR"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_requete",
+        "result": {
+          "key": "4104104104104104104104104104104104104104104104104104104104104104",
+          "kind": "s",
+          "no_password": true,
+          "origin": "https://shhdrop.example"
+        },
+        "url": "https://shhdrop.example/s?fbclid=x#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_trop_court",
+        "result": {
+          "error": "lien_invalide"
+        },
+        "url": "https://shhdrop.example/s#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      },
+      {
+        "base": "/",
+        "label": "sans_mdp_trop_long",
+        "result": {
+          "error": "lien_invalide"
+        },
+        "url": "https://shhdrop.example/s#lQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQA"
+      }
+    ],
+    "qr": [
+      {
+        "label": "qr_sans_mdp",
+        "link": "https://shhdrop.example/s#lHLBdl9d6BphBl46RXQDzl98DNciMjJkzjydkDAEHNeQ",
+        "link_with_password": {
+          "error": "lien_invalide"
+        },
+        "password": "aC3!cD5?#Fg",
+        "split": {
+          "href": "https://shhdrop.example/s#lHLBdl9d6BphBl46RXQDzl98DNciMjJkzjydkDAEHNeQ",
+          "password": null
+        }
+      },
+      {
+        "label": "qr_sans_mdp_cle_en_l",
+        "link": "https://shhdrop.example/s#llNnGGDfEuTDfM-AdWUkw-_L4pqBwR6z12xSCxtyzpAs",
+        "link_with_password": {
+          "error": "lien_invalide"
+        },
+        "password": "aC3!cD5?#Fg",
+        "split": {
+          "href": "https://shhdrop.example/s#llNnGGDfEuTDfM-AdWUkw-_L4pqBwR6z12xSCxtyzpAs",
+          "password": null
+        }
+      }
+    ],
+    "written": [
+      {
+        "base": "/",
+        "fn": "shareLinkNoPassword",
+        "key": "1cb05d97d77a069841978e915d00f397df0335c88c8c99338f27640c010735e4",
+        "label": "sans_mdp",
+        "link": "https://shhdrop.example/s#lHLBdl9d6BphBl46RXQDzl98DNciMjJkzjydkDAEHNeQ",
+        "parsed": {
+          "key": "1cb05d97d77a069841978e915d00f397df0335c88c8c99338f27640c010735e4",
+          "kind": "s",
+          "no_password": true,
+          "origin": "https://shhdrop.example"
+        }
+      },
+      {
+        "base": "/shhgone/",
+        "fn": "shareLinkNoPassword",
+        "key": "2fdc718999e5da6b5b2af32a0e78b4f9f45f80a0c15d5646ea83e7c499fbe03b",
+        "label": "sans_mdp_base_demo",
+        "link": "https://shhdrop.example/shhgone/s#lL9xxiZnl2mtbKvMqDni0-fRfgKDBXVZG6oPnxJn74Ds",
+        "parsed": {
+          "key": "2fdc718999e5da6b5b2af32a0e78b4f9f45f80a0c15d5646ea83e7c499fbe03b",
+          "kind": "s",
+          "no_password": true,
+          "origin": "https://shhdrop.example"
+        }
+      },
+      {
+        "base": "/",
+        "fn": "shareLinkNoPassword",
+        "key": "94d9c61837c4b930df33e01d594930fbf2f8a6a07047acf5db1482c6dcb3a40b",
+        "label": "sans_mdp_cle_en_l",
+        "link": "https://shhdrop.example/s#llNnGGDfEuTDfM-AdWUkw-_L4pqBwR6z12xSCxtyzpAs",
+        "parsed": {
+          "key": "94d9c61837c4b930df33e01d594930fbf2f8a6a07047acf5db1482c6dcb3a40b",
+          "kind": "s",
+          "no_password": true,
+          "origin": "https://shhdrop.example"
+        }
+      },
+      {
+        "base": "/",
+        "fn": "shareLink",
+        "key": "94d9c61837c4b930df33e01d594930fbf2f8a6a07047acf5db1482c6dcb3a40b",
+        "label": "avec_mdp_cle_en_l",
+        "link": "https://shhdrop.example/s#lNnGGDfEuTDfM-AdWUkw-_L4pqBwR6z12xSCxtyzpAs",
+        "parsed": {
+          "key": "94d9c61837c4b930df33e01d594930fbf2f8a6a07047acf5db1482c6dcb3a40b",
+          "kind": "s",
+          "no_password": false,
+          "origin": "https://shhdrop.example"
+        }
+      },
+      {
+        "base": "/",
+        "fn": "shareLinkNoPassword",
+        "key": "98184366ca5adf3e6617cdaa1d67dd623b9ec8dab3482b91c8fec6ac0338cafc",
+        "label": "sans_mdp_cle_en_m",
+        "link": "https://shhdrop.example/s#lmBhDZspa3z5mF82qHWfdYjueyNqzSCuRyP7GrAM4yvw",
+        "parsed": {
+          "key": "98184366ca5adf3e6617cdaa1d67dd623b9ec8dab3482b91c8fec6ac0338cafc",
+          "kind": "s",
+          "no_password": true,
+          "origin": "https://shhdrop.example"
+        }
+      },
+      {
+        "base": "/",
+        "fn": "shareLinkNoPassword",
+        "key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "sans_mdp_cle_ff",
+        "link": "https://shhdrop.example/s#l__________________________________________8",
+        "parsed": {
+          "key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "kind": "s",
+          "no_password": true,
+          "origin": "https://shhdrop.example"
+        }
+      },
+      {
+        "base": "/",
+        "fn": "shareLink",
+        "key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "avec_mdp_cle_ff",
+        "link": "https://shhdrop.example/s#__________________________________________8",
+        "parsed": {
+          "key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "kind": "s",
+          "no_password": false,
+          "origin": "https://shhdrop.example"
+        }
+      }
+    ]
+  }
+}

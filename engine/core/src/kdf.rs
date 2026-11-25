@@ -152,6 +152,20 @@ pub fn password_key(pw: &str, salt: &[u8], ops: u32, mem: u32) -> Result<KMdp> {
     Ok(KMdp::from_bytes(*k))
 }
 
+/// Étiquette HKDF de la clé qui tient la place de K_mdp dans un partage sans mot de passe (D42-27).
+pub const NO_PASSWORD_INFO: &str = "shhdrop/v2/sans-mdp";
+
+/// Partage **sans mot de passe** (D42-27, spec §29.2) : K_sans = HKDF(K_lien,
+/// « shhdrop/v2/sans-mdp »), 32 octets, tient la place de K_mdp. Le reste de la chaîne est
+/// inchangé (K_maître = HKDF(K_lien ‖ K_sans, « shhdrop/v2/maitre »), K_env, K_preuve, E) :
+/// le serveur reçoit les mêmes champs, de mêmes tailles, qu'avec un mot de passe, et ne peut pas
+/// distinguer les deux sortes de partage. Aucun Argon2id : il n'y a rien à ralentir, le secret
+/// est K_lien (256 bits, aléatoire). L'information « sans mot de passe » ne vit que dans le
+/// fragment du lien (`#l…`, §32), jamais envoyé.
+pub fn no_password_key(k_lien: &KLien) -> KMdp {
+    KMdp::from_bytes(*hkdf::<32>(k_lien.as_bytes(), NO_PASSWORD_INFO))
+}
+
 /// K_mdp pour CRÉER un partage : seulement un mot de passe de la forme de `generate`
 /// (D41-15), paramètres imposés à KDF_CREATE.
 pub fn password_key_for_create(pw: &str, salt: &[u8]) -> Result<KMdp> {
@@ -251,6 +265,24 @@ mod tests {
         assert_eq!(b.k_acces.as_bytes(), a.k_acces.as_bytes());
         let c = derive_access(&KLien::from_bytes([2; 32]));
         assert_ne!(c.k_acces.as_bytes(), a.k_acces.as_bytes());
+    }
+
+    /// K_sans ne dépend que de K_lien, diffère de K_accès (autre étiquette) et vaut le HKDF écrit
+    /// à la main (étiquette exacte, sel vide).
+    #[test]
+    fn no_password_key_separee_par_etiquette() {
+        let kl = KLien::from_bytes([1; 32]);
+        let a = no_password_key(&kl);
+        assert_eq!(a.as_bytes(), &*hkdf::<32>(&[1; 32], "shhdrop/v2/sans-mdp"));
+        assert_eq!(
+            no_password_key(&KLien::from_bytes([1; 32])).as_bytes(),
+            a.as_bytes()
+        );
+        assert_ne!(
+            no_password_key(&KLien::from_bytes([2; 32])).as_bytes(),
+            a.as_bytes()
+        );
+        assert_ne!(derive_access(&kl).k_acces.as_bytes(), a.as_bytes());
     }
 
     #[test]

@@ -359,6 +359,40 @@ func TestSalonAccessKeyOfVecteurs(t *testing.T) {
 	}
 }
 
+// Vecteurs « keys » de engine/vectors/v6-sans-mdp.json (D42-27) : un lien sans mot de passe
+// (#l<43>) donne la même K_accès que #<43> de la même K_lien ; ce n'est pas un lien de salon.
+func TestAccessKeyOfSansMotDePasse(t *testing.T) {
+	raw, err := os.ReadFile("../../../engine/vectors/v6-sans-mdp.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v struct {
+		Keys []struct {
+			KLien  string `json:"k_lien"`
+			KAcces string `json:"k_acces"`
+			VAcces string `json:"v_acces"`
+		} `json:"keys"`
+	}
+	if err := json.Unmarshal(raw, &v); err != nil || len(v.Keys) == 0 {
+		t.Fatal("vecteurs illisibles :", err)
+	}
+	for _, c := range v.Keys {
+		kl, _ := hex.DecodeString(c.KLien)
+		key := b64.EncodeToString(kl)
+		for _, in := range []string{"l" + key, "https://shhgone.com/s#l" + key, "https://shhgone.com/s#" + key} {
+			ka, ok := accessKeyOf(in)
+			if !ok || hex.EncodeToString(ka) != c.KAcces || hex.EncodeToString(hash(ka)) != c.VAcces {
+				t.Fatalf("%s : %x %v", in, ka, ok)
+			}
+		}
+		for _, bad := range []string{"l" + key[:41], "l" + key + "A", "ll" + key, "L" + key} {
+			if _, ok := accessKeyOf(bad); ok {
+				t.Fatalf("%q accepté", bad)
+			}
+		}
+	}
+}
+
 // Sans serveur : destroy - d'un lien #c supprime ligne, pièces (fichier puis ligne) et
 // conversation ; une base d'une version antérieure est refusée (rien n'est fait).
 func TestAdminDestroySalonHorsLigne(t *testing.T) {

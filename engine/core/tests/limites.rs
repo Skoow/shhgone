@@ -84,12 +84,17 @@ fn err(e: Error) -> Value {
 
 fn parsed(r: Result<ParsedLink, Error>) -> Value {
     match r {
-        Ok(ParsedLink::Share { origin, k_lien }) => {
+        Ok(ParsedLink::Share {
+            origin,
+            k_lien,
+            no_password: false,
+        }) => {
             json!({ "kind": "s", "origin": origin, "key": hex(k_lien.as_bytes()) })
         }
         Ok(ParsedLink::Manage { origin, s_gestion }) => {
             json!({ "kind": "m", "origin": origin, "key": hex(s_gestion.as_bytes()) })
         }
+        Ok(ParsedLink::Share { .. }) => panic!("aucun lien sans mot de passe dans ce fichier"),
         Err(e) => err(e),
     }
 }

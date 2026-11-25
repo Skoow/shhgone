@@ -9,10 +9,20 @@ use crate::whatwg::Url;
 use zeroize::{Zeroize, Zeroizing};
 
 /// Lien analysé : K_lien pour un lien de partage, S_gestion pour un lien de gestion.
+/// `no_password` : lien d'un partage **sans mot de passe** (`#l…`, D42-27) ; K_mdp est alors
+/// remplacée par `kdf::no_password_key(K_lien)`. Un lien `#<43>` (forme d'avant D42-27, et de
+/// tout partage protégé) demande toujours le mot de passe.
 #[derive(Debug)]
 pub enum ParsedLink {
-    Share { origin: String, k_lien: KLien },
-    Manage { origin: String, s_gestion: SGestion },
+    Share {
+        origin: String,
+        k_lien: KLien,
+        no_password: bool,
+    },
+    Manage {
+        origin: String,
+        s_gestion: SGestion,
+    },
 }
 
 /// Secret de 32 octets en base64url sans bourrage : 43 caractères.
@@ -32,6 +42,17 @@ fn share_fragment(hash: &str) -> Option<&str> {
 /// diffèrent : aucun fragment n'a les deux formes.
 fn manage_fragment(hash: &str) -> Option<&str> {
     hash.strip_prefix("#m")
+        .filter(|k| k.len() == KEY_CHARS && k.bytes().all(is_b64u_char))
+}
+
+/// Marque du lien d'un partage sans mot de passe, juste après le « # » (D42-27).
+pub const NO_PASSWORD_MARK: char = 'l';
+
+/// `^#l[A-Za-z0-9_-]{43}$` (partage sans mot de passe, D42-27) : rend les 43 caractères. Même
+/// longueur que la gestion (45), autre lettre ; 44 pour un partage protégé : aucun fragment n'a
+/// deux formes.
+fn no_password_fragment(hash: &str) -> Option<&str> {
+    hash.strip_prefix("#l")
         .filter(|k| k.len() == KEY_CHARS && k.bytes().all(is_b64u_char))
 }
 
@@ -80,6 +101,17 @@ pub fn share_link(origin: &str, k_lien: &KLien, base: &str) -> Result<String> {
     ))
 }
 
+/// `{origine}{base}s#l{K_lien}` : lien d'un partage sans mot de passe (D42-27), un caractère de
+/// plus que `share_link`. La marque reste dans le fragment : le serveur ne la voit jamais.
+pub fn share_link_no_password(origin: &str, k_lien: &KLien, base: &str) -> Result<String> {
+    let origin = check_origin(origin)?;
+    let base = check_base(base)?;
+    Ok(format!(
+        "{origin}{base}{LINK_PATH}#{NO_PASSWORD_MARK}{}",
+        b64u(k_lien.as_bytes())
+    ))
+}
+
 /// `{origine}{base}s#m{S_gestion}`.
 pub fn manage_link(origin: &str, s_gestion: &SGestion, base: &str) -> Result<String> {
     let origin = check_origin(origin)?;
@@ -117,6 +149,15 @@ pub fn parse_link(url: &str, base: &str) -> Result<ParsedLink> {
         return Ok(ParsedLink::Share {
             origin: u.origin(),
             k_lien,
+            no_password: false,
+        });
+    }
+    if let Some(k) = no_password_fragment(&hash) {
+        let k_lien = KLien::from_bytes(strict(k)?);
+        return Ok(ParsedLink::Share {
+            origin: u.origin(),
+            k_lien,
+            no_password: true,
         });
     }
     if let Some(s) = manage_fragment(&hash) {
@@ -132,7 +173,8 @@ pub fn parse_link(url: &str, base: &str) -> Result<ParsedLink> {
 /// Lien de partage suivi du mot de passe (QR code, D41-29) : `{lien}.{base64url(UTF-8)}`. Le
 /// « . » n'est pas dans l'alphabet base64url : aucune ambiguïté avec un lien simple. Refuse
 /// (`lien_invalide`) tout lien qui n'est pas un lien de partage, un mot de passe vide ou un
-/// mot de passe encodé sur plus de 64 caractères.
+/// mot de passe encodé sur plus de 64 caractères. Un lien sans mot de passe (`#l…`, D42-27)
+/// est refusé aussi : son QR code est le lien seul.
 pub fn share_link_with_password(link: &str, password: &str) -> Result<String> {
     // JavaScript levait « Invalid URL » sur une adresse illisible : ici, `lien_invalide`.
     let u = Url::parse(link).ok_or(Error::LienInvalide)?;
@@ -268,6 +310,80 @@ mod tests {
         assert_eq!(kind(&p), 'm');
         assert_eq!(key(&p), [5; 32]);
         assert!(!production_shape(&link));
+    }
+
+    fn no_pw(p: &ParsedLink) -> bool {
+        matches!(
+            p,
+            ParsedLink::Share {
+                no_password: true,
+                ..
+            }
+        )
+    }
+
+    /// D42-27 : `#l` + 43 caractères, lu comme un partage sans mot de passe ; `#<43>` (ancienne
+    /// forme et partage protégé) toujours lu avec mot de passe.
+    #[test]
+    fn lien_sans_mot_de_passe() {
+        let kl = KLien::from_bytes([9; 32]);
+        let link = share_link_no_password("https://shhdrop.example", &kl, "/").unwrap();
+        assert_eq!(
+            link,
+            format!("https://shhdrop.example/s#l{}", b64u(&[9; 32]))
+        );
+        assert_eq!(
+            link.len(),
+            share_link("https://shhdrop.example", &kl, "/")
+                .unwrap()
+                .len()
+                + 1
+        );
+        let p = parse_link(&link, "/").unwrap();
+        assert_eq!((kind(&p), key(&p), no_pw(&p)), ('s', [9; 32], true));
+        let old = share_link("https://shhdrop.example", &kl, "/").unwrap();
+        let p = parse_link(&old, "/").unwrap();
+        assert_eq!((kind(&p), key(&p), no_pw(&p)), ('s', [9; 32], false));
+        // Démo, requête ignorée.
+        let d = share_link_no_password("https://skoow.github.io", &kl, "/shhgone/").unwrap();
+        assert!(d.starts_with("https://skoow.github.io/shhgone/s#l"));
+        assert!(no_pw(&parse_link(&d, "/shhgone/").unwrap()));
+        let q = format!("https://x.test/s?fbclid=1#l{}", k());
+        assert!(no_pw(&parse_link(&q, "/").unwrap()));
+        // Clé qui commence par « l » : lien protégé (44), jamais pris pour la marque.
+        let kl_l = format!("l{}", &k()[1..]);
+        let p = parse_link(&format!("https://x.test/s#{kl_l}"), "/").unwrap();
+        assert!(!no_pw(&p));
+        assert!(no_pw(
+            &parse_link(&format!("https://x.test/s#l{kl_l}"), "/").unwrap()
+        ));
+        // Formes abîmées : refusées.
+        let k = k();
+        for u in [
+            format!("https://x.test/s#l{}", &k[2..]),
+            format!("https://x.test/s#l{k}A"),
+            format!("https://x.test/s#L{k}"),
+            format!("https://x.test/s#ll{k}"),
+            format!("https://x.test/s#l{k}.YUMz"),
+            format!("https://x.test/#l{k}"),
+            format!("https://x.test/s#l{}B", &k[..42]), // non canonique
+        ] {
+            assert_eq!(err(parse_link(&u, "/")), Error::LienInvalide, "{u}");
+        }
+        // Pas de mot de passe dans le QR code d'un partage sans mot de passe.
+        assert_eq!(
+            share_link_with_password(&link, "aC3!cD5?#Fg"),
+            Err(Error::LienInvalide)
+        );
+        assert_eq!(split_password(&link), (link.clone(), None));
+        assert_eq!(
+            share_link_no_password("http://srv.test", &kl, "/"),
+            Err(Error::OrigineInvalide)
+        );
+        assert_eq!(
+            share_link_no_password("https://srv.test", &kl, "x"),
+            Err(Error::BaseInvalide)
+        );
     }
 
     #[test]
@@ -596,6 +712,7 @@ mod tests {
         let seeds = [
             format!("https://x.test/#{k}"),
             format!("http://[::1]:4000/shhdrop/#m{k}"),
+            format!("https://x.test/s?q#l{k}"),
             format!("https://u:p@[2001:db8::1]:8443/a/%2e/../?q#{k}.YUMz"),
             format!("HTTPS:\\\\0x7f.1:0443\\#{k}.w4k"),
         ];

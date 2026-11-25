@@ -93,6 +93,22 @@ Notes à l'usage des apps :
 - **Note (`kind: text`) au scellement** : le moteur refuse au manifeste une note que le lecteur refuserait (UTF-8 strict, au plus 100 000 points de code, `texte_invalide` / `texte_trop_long`). Le scelleur garde le verdict du texte qu'il a chiffré (`ElementSealer::check_note`) ; une app passe par `FinalEntry::note(&scelleur, nom, type)` et `FinalEntry::file(…)`, qui prennent aussi la taille, la place et la graine du scelleur. La couche WebAssembly fait la même vérification dans `sealFinal`.
 - **Mot de passe à l'ouverture** : blancs ASCII de bord (espace, tabulation, retour chariot, saut de ligne) retirés avant NFC et Argon2id (`kdf::trim_password`) ; rien d'autre n'est retiré.
 
+# Partage sans mot de passe (`v6-sans-mdp.json`, D42-27)
+
+**Produit par le moteur Rust** : `engine/core/tests/sans_mdp.rs` l'écrit (`SHH_GEN_SANS_MDP=1 cargo test -p shhdrop-core --test sans_mdp`), de façon déterministe, puis le relit ; sans la variable, le test échoue si le fichier n'est plus exactement celui que le moteur produit, et rejoue chaque cas à partir de ses seules entrées. `web/src/engine/sans-mdp.test.ts` rejoue les mêmes cas avec le build WebAssembly et le fournisseur WebCrypto du site (le HKDF de `K_sans` aussi par WebCrypto), et les liens avec `pure.ts` et `app/link.ts`. Le serveur Go en rejoue `keys` (`TestAccessKeyOfSansMotDePasse` : `K_accès` d'un lien `#l…`). Les apps devront le rejouer comme `v2.json`.
+
+Mêmes conventions que `v2-limites.json`. Aléa : flux SHA-256 en mode compteur à l'étiquette `shhdrop/vecteurs/v6-sans-mdp/` + étiquette.
+
+| Clé | Contenu |
+|---|---|
+| `constants` | `NO_PASSWORD_INFO` (« shhdrop/v2/sans-mdp »), `NO_PASSWORD_MARK` (« l »), `ENVELOPE_LEN` (60). |
+| `links.written` | `shareLinkNoPassword` (`{origine}{base}s#l<K_lien>`) et `shareLink` d'une même clé, dont une clé dont le base64url commence par « l » ou « m », base `/` et `/shhgone/` ; relecture : `parsed` avec `no_password`. |
+| `links.parse` | Lectures : lien sans mot de passe (requête, démo), **ancien lien** `#<43>` (toujours lu avec mot de passe, `no_password: false`), clé de 43 caractères qui commence par « l » (lien protégé), gestion ; refus `lien_invalide` : « L » majuscule, marque double, 42 ou 44 caractères, dernier caractère non canonique, `.mot de passe` ajouté, racine, autre chemin. |
+| `links.qr` | `shareLinkWithPassword` d'un lien `#l…` : refusé (`lien_invalide`) ; `splitPassword` le rend tel quel, sans mot de passe. |
+| `keys` | Partage complet sans mot de passe : `k_lien`, `r`, `envelope_nonce` (entrées) → `k_sans` = HKDF(`K_lien`, « shhdrop/v2/sans-mdp »), `k_acces`, `v_acces`, `id`, `k_maitre` = HKDF(`K_lien` ‖ `K_sans`, « shhdrop/v2/maitre »), `k_env`, `k_preuve`, `v_preuve`, `engagement`, `header`, `envelope` (E, 60 octets) ; E se rouvre avec le lien seul (R rendue). `K_env` n'est pas extractible : vérifiée par la clé importée et par E. |
+
+Règle : la **forme du lien** décide de la dérivation (`#l` → `K_sans`, `#<43>` → Argon2id du mot de passe), jamais une réponse du serveur ; le serveur reçoit les mêmes champs, de mêmes tailles, pour les deux sortes.
+
 # Vecteurs du salon (`salon-v3.json`)
 
 Référence octet pour octet du moteur du salon (`engine/salon`) : clés, trames, messages, texte, pseudonymes, effacement, codes de vérification. **Produit par le moteur Rust** : `engine/salon/tests/vecteurs.rs` l'écrit (`SHH_GEN_SALON=1 cargo test -p shhdrop-salon --test vecteurs`), de façon déterministe, puis le relit. Sans la variable, le test échoue si le fichier n'est plus exactement celui que le moteur produit, et rejoue chaque cas à partir de ses seules entrées. Le site (WebAssembly) et les apps doivent le rejouer. Un changement voulu du format demande un nouveau fichier (`salon-v4.json`) ; régénérer celui-ci n'est permis que pour ajouter des cas, après relecture du diff.
