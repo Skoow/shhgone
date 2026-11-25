@@ -94,6 +94,8 @@ func adminConfig(cfg config.Config, d adminDeps) adminui.Config {
 			Bannir: func(lien []byte, duree int, motif uint8) (adminui.Resultat, error) {
 				return adminBannir(d, lien, duree, motif)
 			},
+			SurMesure: &adminui.SurMesure{Chercher: d.cpt.CompteParPseudo, Liste: d.cpt.ListeSurMesure,
+				Poser: d.cpt.PoserSurMesure, Retirer: d.cpt.RetirerSurMesure},
 		}
 	}
 	if d.pai != nil {

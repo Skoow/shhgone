@@ -294,7 +294,8 @@ func TestRoutesBannissements(t *testing.T) {
 }
 
 // Toutes les réponses des comptes et la page : ni l'adresse tapée (ni sa forme normalisée), ni le
-// lien collé, ni l'identifiant interne d'un salon.
+// lien collé, ni l'identifiant interne d'un salon. (La recherche par pseudo exact des comptes sur
+// mesure, surmesure.go, est la seule recherche : jamais par adresse.)
 func TestPageSansIdentite(t *testing.T) {
 	b := nouveauBancComptes(true)
 	b.signales = []Signale{{Cle: cleSecrete, Categories: [10]int{0: 1}, Expire: b.clk.Add(time.Hour), Places: 2}}
@@ -310,7 +311,7 @@ func TestPageSansIdentite(t *testing.T) {
 	}
 	s := strings.ToLower(tout.String())
 	for _, interdit := range []string{strings.ToLower(cleSecrete), "dupont", "exemple.fr", "aaaaaaaaaaaa", "e_canon",
-		"p_empreinte", "pseudo\":", "\"h\":", "cred_id", "chercher", "recherche par adresse", "bannir par adresse",
+		"p_empreinte", "pseudo\":", "\"h\":", "cred_id", "chercher par adresse", "recherche par adresse", "bannir par adresse",
 		"adresse e-mail", "e-mails envoyés", "totp", "double auth"} {
 		if strings.Contains(s, interdit) {
 			t.Errorf("réponse ou page contient %q", interdit)

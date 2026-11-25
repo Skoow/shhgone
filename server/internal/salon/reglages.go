@@ -17,9 +17,11 @@ import (
 //
 //   - Places : N entre le besoin minimal (sièges occupés, plus le siège 0 du créateur s'il
 //     est vide, puisqu'il lui est toujours rendu) et SalonPlacesMax (et au moins 2, comme à
-//     la création) ; le plafond des arrivées suit (arriveesParMembre × N), les arrivées déjà
+//     la création ; jusqu'à SurMesurePlacesMax pour un salon de compte sur mesure, selon son
+//     palier) ; le plafond des arrivées suit (arriveesParMembre × N), les arrivées déjà
 //     comptées restent.
-//   - Renouvellement (« prolonger = renouveler ») : nouvelle durée de 1, 6, 12 ou 24 h comptée
+//   - Renouvellement (« prolonger = renouveler ») : nouvelle durée de 1, 6, 12 ou 24 h (ou une
+//     durée longue, HeuresLongues, si le palier du compte créateur la permet) comptée
 //     depuis maintenant (au quart d'heure supérieur), et toute la conversation effacée :
 //     trames, pièces, échéances, lectures attendues, 0x0E en attente. Restent le lien, le mot
 //     de passe, les membres à leur place (jetons, sièges, journal des annonces, seaux) et le
@@ -35,8 +37,9 @@ import (
 // seules porte le même départ que le précédent, 0 sans renouvellement), afficher l'échéance et
 // les places, et reprendre avec depuis ≥ départ.
 
-// SalonPlacesMax : places au plus d'un salon sans compte (sièges 0 à 9) ; plus tard, par offre.
-const SalonPlacesMax = nbSieges
+// SalonPlacesMax : places au plus d'un salon sans compte (sièges 0 à 9) ou d'un compte au palier
+// normal ; au-delà, jusqu'à SurMesurePlacesMax, pour un compte sur mesure seulement.
+const SalonPlacesMax = PlacesStandardMax
 
 // ErrOccupied : places demandées sous le nombre de sièges occupés (409 occupied).
 var ErrOccupied = errors.New("salon: places occupées")
@@ -56,14 +59,10 @@ func (r ReglagesReq) Valide() bool {
 	if r.Places == 0 && r.Heures == 0 {
 		return false
 	}
-	if r.Places != 0 && (r.Places < 2 || r.Places > SalonPlacesMax) {
+	if r.Places != 0 && (r.Places < 2 || r.Places > SurMesurePlacesMax) {
 		return false
 	}
-	switch r.Heures {
-	case 0, 1, 6, 12, 24:
-		return true
-	}
-	return false
+	return r.Heures == 0 || DureeValide(r.Heures)
 }
 
 // Reglages : réponse (max_members, expires_in_s, depuis = rang de départ du dernier
@@ -190,9 +189,14 @@ func (m *Manager) Regler(sGestion []byte, r ReglagesReq, avant func() error) (Re
 // compte §8.6, §11 ; lu par la ligne, sans session) : places après le réglage (demandées, ou
 // celles du salon pour un renouvellement seul : un compte revenu au palier neuf ne renouvelle
 // pas un salon de 10 places) et durée d'un renouvellement. Salon sans compte, ou sans crochet
-// (SHH_COMPTES=0) : rien.
+// (SHH_COMPTES=0) : bornes d'un salon ordinaire (ErrBadRequest au-delà : un salon d'un compte
+// sur mesure, lu sans crochet après un redémarrage, ne se règle ni ne se renouvelle plus
+// au-delà).
 func (m *Manager) palierReglages(compte *[16]byte, places, heures int) error {
 	if compte == nil || m.cfg.Palier == nil {
+		if !Standard(places, heures) {
+			return ErrBadRequest
+		}
 		return nil
 	}
 	p, err := m.cfg.Palier(*compte)

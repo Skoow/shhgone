@@ -17,8 +17,11 @@ import (
 // siège, heure ni drapeau. Un redémarrage l'oublie.
 
 const (
-	// nbSieges : sièges 0 à 9 ; le 0 est réservé au créateur.
-	nbSieges = 10
+	// nbSieges : sièges 0 à 49 (SurMesurePlacesMax) ; le 0 est réservé au créateur. Un salon
+	// ordinaire n'en ouvre que max_members (10 au plus, PlacesStandardMax) ; les sièges au-delà
+	// ne servent qu'aux salons d'un compte sur mesure (conception du compte §11, 25 novembre).
+	// Tableaux par salon de cette taille : quelques kilooctets par salon vivant.
+	nbSieges = SurMesurePlacesMax
 	// journalMax : annonces (0x02, 0x03, 0x09, 0x0A) gardées au plus par salon.
 	journalMax = 4096
 	// MemoireJournalMax : mémoire budgétée pour le journal plein d'un salon, à 64 o l'annonce

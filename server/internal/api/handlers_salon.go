@@ -172,6 +172,13 @@ func (a salonAPI) creer(w http.ResponseWriter, r *http.Request) {
 		}
 		req.Compte = &c.H
 	}
+	// Sans compte : jamais plus qu'un salon ordinaire (10 places, 24 h) ; refusé ici, avant
+	// l'anti-robot et le quota, comme toute requête invalide. Avec un compte, c'est le palier
+	// (sur mesure ou non) qui borne, dans Creer.
+	if req.Compte == nil && !salon.Standard(req.MaxMembers, req.TTLHours) {
+		failSalon(w, errBadRequest)
+		return
+	}
 	if err := a.antiRobot(b.Altcha, b.ShownAt, b.HP, ip); err != nil {
 		failSalon(w, err)
 		return

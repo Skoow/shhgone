@@ -18,7 +18,9 @@ import (
 // Tableau de bord finalisé (conception du compte §21.14) : salons signalés en
 // cours, désignés par une ref éphémère ; bannissements ; agrégats des comptes. Rien qui
 // désigne une personne ou un salon : ni adresse, ni empreinte, ni h, ni pseudo, ni lien, ni
-// identifiant interne. Tout passe par le corps JSON des requêtes, jamais par l'URL.
+// identifiant interne. Tout passe par le corps JSON des requêtes, jamais par l'URL. Seule
+// exception, voulue par le propriétaire (25 novembre) : les comptes sur mesure (surmesure.go)
+// portent le nom ou la note que l'exploitant leur a donnés, pour des personnes qu'il connaît.
 
 // Signale : un salon vivant signalé, tel que cmd/shhdrop le lit. Cle : identifiant interne,
 // gardé en mémoire derrière une ref, jamais rendu (aucune étiquette JSON, type non sérialisé).
@@ -71,6 +73,9 @@ type Comptes struct {
 	Action   func(id, action, jusqu string) (avant compte.BanVue, apres *compte.BanVue, err error)
 	// Bannir : le compte créateur du salon de ce lien d'invitation.
 	Bannir func(lien []byte, dureeJours int, motif uint8) (Resultat, error)
+	// SurMesure : recherche par pseudo et limites sur mesure (surmesure.go) ; nil : routes
+	// refusées comme inconnues.
+	SurMesure *SurMesure
 }
 
 // dureeRef : une ref de salon signalé vaut 10 min (conception §21.14.3).

@@ -142,6 +142,51 @@
     <dl class="chiffres" id="comptes-usage"></dl>
   </section>
 
+  <section class="carte large" aria-labelledby="t-surmesure" id="carte-surmesure" hidden>
+    <div class="entete">
+      <h3 class="titre" id="t-surmesure">Comptes sur mesure</h3>
+      <button class="discret" type="button" id="surmesure-actualiser">Actualiser</button>
+    </div>
+    <p class="note">Pour une personne que vous connaissez : des limites au-delà des paliers (jusqu’à 10 salons à la fois, 50 personnes par salon, 30 jours par salon) et un nom ou une note, gardés en clair sur le serveur avec le compte et effacés avec lui. Un bannissement l’emporte toujours. Le serveur ne garde pas les pseudos, seulement leur empreinte : aucune liste des pseudos n’existe, on retrouve un compte en tapant son pseudo exact (majuscules et sosies 0/o, 1/l/I, m/rn ne comptent pas).</p>
+    <form id="chercher" autocomplete="off">
+      <label for="chercher-pseudo">Pseudo exact du compte</label>
+      <div class="rangee">
+        <div><input id="chercher-pseudo" type="text" maxlength="24" autocomplete="off" spellcheck="false" required></div>
+        <button class="agir" type="submit" id="chercher-bouton">Chercher</button>
+      </div>
+    </form>
+    <p class="resultat" id="surmesure-resultat" role="status"></p>
+    <div id="compte-trouve" class="fiche" hidden>
+      <p class="tete" id="compte-titre"></p>
+      <dl class="faits" id="compte-faits"></dl>
+      <form id="surmesure" autocomplete="off">
+        <h4 class="sous-titre" id="surmesure-titre">Limites sur mesure</h4>
+        <div class="rangee">
+          <div>
+            <label for="sm-salons">Salons à la fois (1 à 10)</label>
+            <input id="sm-salons" type="number" min="1" max="10" step="1" required>
+          </div>
+          <div>
+            <label for="sm-places">Personnes par salon (2 à 50)</label>
+            <input id="sm-places" type="number" min="2" max="50" step="1" required>
+          </div>
+          <div>
+            <label for="sm-jours">Durée d’un salon, jours au plus (1 à 30)</label>
+            <input id="sm-jours" type="number" min="1" max="30" step="1" required>
+          </div>
+        </div>
+        <label for="sm-nom">Nom ou note (1 à 40 caractères, gardé sur le serveur)</label>
+        <input id="sm-nom" type="text" maxlength="40" autocomplete="off" spellcheck="false" required>
+        <div class="outils">
+          <button class="agir" type="submit" id="sm-enregistrer">Enregistrer</button>
+          <button class="attention" type="button" id="sm-retirer">Retirer le sur mesure</button>
+        </div>
+      </form>
+    </div>
+    <h4 class="sous-titre">Tous les comptes sur mesure</h4>
+    <ul class="liste" id="surmesure-liste"></ul>
+  </section>
+
   <h2 class="groupe" id="paiement" hidden>Paiement</h2>
   <section class="carte" aria-labelledby="t-pass" id="carte-pass" hidden>
     <h3 class="titre" id="t-pass">Pass et commandes</h3>

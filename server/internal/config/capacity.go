@@ -70,11 +70,12 @@ const (
 	defaultSegmentsPerMin = 1500
 	// defaultSalonFrames : salon.TramesMaxDefaut (≈ 417 Mo de disque par salon au plus).
 	defaultSalonFrames = 100000
-	// salonFrameMem : mémoire budgétée par trame rangée (index de 24 o, avec la marge de
-	// croissance des tranches et le doublement du ramasse-miettes : 48 o).
-	salonFrameMem = 48
+	// salonFrameMem : mémoire budgétée par trame rangée (index de 32 o depuis les 50 sièges des
+	// salons sur mesure, 24 avant ; avec la marge de
+	// croissance des tranches et le doublement du ramasse-miettes : 64 o).
+	salonFrameMem = 64
 	// defaultSalonFramesTotal : plafond global sans GOMEMLIMIT (aucune base de calcul) ; ≈
-	// 48 Mio d'index au plus, tous salons confondus.
+	// 64 Mio d'index au plus, tous salons confondus.
 	defaultSalonFramesTotal = 1000000
 	// capMax : plafond de toute valeur réglable (borne de bon sens, pas de capacité).
 	capMax = 1 << 20
@@ -177,8 +178,8 @@ func checkSalons(salonsMax int, c Capacity, mem int64) error {
 //   - Envois : 30 % de GOMEMLIMIT, à 4 Mio par envoi. Le ramasse-miettes peut doubler le tas
 //     vivant (GOGC=100) : 60 % au pire. 900 Mio → 67 places (64 avant).
 //   - Lectures : 10 % de GOMEMLIMIT à 256 Kio par lecture (900 Mio → 360).
-//   - Index des salons (SalonFramesTotal) : 10 % de GOMEMLIMIT à 48 o la trame, tous salons
-//     confondus (900 Mio → ≈ 1,97 M de trames). C'est le plafond GLOBAL : le plafond PAR salon
+//   - Index des salons (SalonFramesTotal) : 10 % de GOMEMLIMIT à 64 o la trame, tous salons
+//     confondus (900 Mio → ≈ 1,47 M de trames ; 1,97 M avant l'index de 32 o). C'est le plafond GLOBAL : le plafond PAR salon
 //     (SalonFrames) reste un garde-fou secondaire.
 //   - WebSocket du salon : 10 % de GOMEMLIMIT à 64 Kio par connexion (wsCost), 2 000 au plus
 //     (900 Mio → 1 440).

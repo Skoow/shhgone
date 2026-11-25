@@ -2,9 +2,11 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -52,18 +54,30 @@ CREATE UNIQUE INDEX IF NOT EXISTS shares_manage_v ON shares(manage_v)`
 // la dernière rotation de l'invitation (exclure, spec §39.13.1b ; 0 : aucune), en base pour qu'un
 // ancien exclure rejoué après un redémarrage ne fasse pas revivre une invitation morte (colonne
 // ajoutée au schéma 2 sans migration : jamais publié en production).
-const salonsSchema = `CREATE TABLE IF NOT EXISTS salons(
+//
+// max_members : 2 à 50 depuis le schéma 4 (comptes sur mesure, 25 novembre ; 2 à 10 avant) ; un
+// salon ordinaire reste à 10 au plus (salon.PlacesStandardMax, vérifié par le gestionnaire).
+const salonsDef = `(
   id TEXT PRIMARY KEY, access_v BLOB NOT NULL, manage_v BLOB NOT NULL, proof_v BLOB NOT NULL,
   salt BLOB NOT NULL, kdf_ops INTEGER NOT NULL, kdf_mem INTEGER NOT NULL, expires_at INTEGER NOT NULL,
-  max_members INTEGER NOT NULL CHECK(max_members BETWEEN 2 AND 10),
+  max_members INTEGER NOT NULL CHECK(max_members BETWEEN 2 AND 50),
   members_can_destroy INTEGER NOT NULL CHECK(members_can_destroy IN (0,1)),
   failed_attempts INTEGER NOT NULL DEFAULT 0,
   pieces_bytes INTEGER NOT NULL DEFAULT 0 CHECK(pieces_bytes BETWEEN 0 AND 2147483648),
   rotation_r INTEGER NOT NULL DEFAULT 0 CHECK(rotation_r BETWEEN 0 AND 4294967295),
   compte BLOB ` + compteCheck + `,
-  CHECK(length(access_v)=32 AND length(manage_v)=32 AND length(proof_v)=32 AND length(salt)=16)) WITHOUT ROWID;
-CREATE UNIQUE INDEX IF NOT EXISTS salons_access_v ON salons(access_v);
-CREATE UNIQUE INDEX IF NOT EXISTS salons_manage_v ON salons(manage_v);
+  CHECK(length(access_v)=32 AND length(manage_v)=32 AND length(proof_v)=32 AND length(salt)=16)) WITHOUT ROWID`
+
+// salonsColonnes : colonnes recopiées par la migration 3 → 4 (toutes celles de salonsDef).
+const salonsColonnes = `id,access_v,manage_v,proof_v,salt,kdf_ops,kdf_mem,expires_at,max_members,members_can_destroy,
+  failed_attempts,pieces_bytes,rotation_r,compte`
+
+// salonsIndexUniques : index de la table salons recréés par la migration 3 → 4.
+const salonsIndexUniques = `CREATE UNIQUE INDEX IF NOT EXISTS salons_access_v ON salons(access_v);
+CREATE UNIQUE INDEX IF NOT EXISTS salons_manage_v ON salons(manage_v)`
+
+const salonsSchema = `CREATE TABLE IF NOT EXISTS salons` + salonsDef + `;
+` + salonsIndexUniques + `;
 CREATE TABLE IF NOT EXISTS salon_pieces(
   id TEXT PRIMARY KEY, salon_id TEXT NOT NULL REFERENCES salons(id) ON DELETE CASCADE,
   bucket INTEGER NOT NULL CHECK(bucket BETWEEN 1 AND 8000), state TEXT NOT NULL CHECK(state IN ('uploading','ready')),
@@ -101,8 +115,9 @@ const busyTimeoutMs = "5000"
 // base d'une version plus récente (ErrNewerSchema) : un retour arrière ne réécrit jamais une
 // base qu'il ne connaît pas. À incrémenter avec toute migration.
 // 1 : partages ; 2 : tables salons et salon_pieces (tables neuves, aucune donnée migrée) ;
-// 3 : colonne salons.compte et index salons_compte (ajout en place, salons gardés, compte NULL).
-const SchemaVersion = 3
+// 3 : colonne salons.compte et index salons_compte (ajout en place, salons gardés, compte NULL) ;
+// 4 : salons.max_members de 2 à 50 (table salons reconstruite, salons et pièces gardés).
+const SchemaVersion = 4
 
 var (
 	// ErrNewerSchema : message fixe, sans chemin.
@@ -230,6 +245,10 @@ func Open(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, fmt.Errorf("migration du schéma (salons.compte) : %w", err)
 	}
+	if err := migratePlaces(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migration du schéma (salons.max_members) : %w", err)
+	}
 	if _, err := db.Exec(salonsIndexes); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("création des index du salon : %w", err)
@@ -255,6 +274,70 @@ func migrateCompte(db *sql.DB) error {
 	}
 	_, err := db.Exec(`ALTER TABLE salons ADD COLUMN compte BLOB ` + compteCheck)
 	return err
+}
+
+// migratePlaces : schéma 3 → 4, CHECK de salons.max_members élargi de 2..10 à 2..50 (salons
+// des comptes sur mesure). SQLite ne change pas un CHECK en place : la table est reconstruite
+// (procédure de la documentation de SQLite, « ALTER TABLE », 12 étapes), dans une transaction,
+// sur une connexion tenue, avec les clés étrangères coupées le temps de la copie (sinon le DROP
+// de l'ancienne table effacerait les pièces par ON DELETE CASCADE) puis vérifiées
+// (foreign_key_check) avant la validation. Déjà fait : rien.
+func migratePlaces(db *sql.DB) error {
+	var def string
+	if err := db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='salons'`).Scan(&def); err != nil {
+		return err
+	}
+	if !strings.Contains(def, "max_members BETWEEN 2 AND 10") {
+		return nil
+	}
+	if err := reconstruireSalons(db); err != nil {
+		return err
+	}
+	// Pages de l'ancienne table : effacées par secure_delete ; le WAL est vidé (après avoir
+	// rendu la connexion tenue : une seule connexion ouverte au plus).
+	return Checkpoint(db)
+}
+
+// reconstruireSalons : la reconstruction elle-même, sur une connexion tenue puis rendue.
+func reconstruireSalons(db *sql.DB) error {
+	ctx := context.Background()
+	c, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	if _, err := c.ExecContext(ctx, `PRAGMA foreign_keys=OFF`); err != nil {
+		return err
+	}
+	defer c.ExecContext(ctx, `PRAGMA foreign_keys=ON`)
+	tx, err := c.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, stmt := range []string{
+		`DROP TABLE IF EXISTS salons_m4`,
+		`CREATE TABLE salons_m4` + salonsDef,
+		`INSERT INTO salons_m4(` + salonsColonnes + `) SELECT ` + salonsColonnes + ` FROM salons`,
+		`DROP TABLE salons`, // ses index avec elle ; salon_pieces garde sa référence à « salons »
+		`ALTER TABLE salons_m4 RENAME TO salons`,
+		salonsIndexUniques,
+		salonsIndexes,
+	} {
+		if _, err := tx.ExecContext(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	rows, err := tx.QueryContext(ctx, `PRAGMA foreign_key_check`)
+	if err != nil {
+		return err
+	}
+	casse := rows.Next()
+	rows.Close()
+	if casse {
+		return errors.New("pièce sans salon après la reconstruction de la table salons")
+	}
+	return tx.Commit()
 }
 
 // migrate retire les colonnes de dates de l'ancien schéma v2 : copie dans une

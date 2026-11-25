@@ -43,10 +43,11 @@ func lignes(t *testing.T, db *sql.DB, q string, args ...any) []string {
 // index), rien d'autre ; aucune colonne texte ; aucune colonne d'adresse, de mot de passe, de
 // TOTP, de séquestre, d'AAGUID, de BS ni de date d'usage. Schéma 4 : sign_count, compteur de
 // signatures WebAuthn (refus d'un compteur qui recule, demande de l'audit du 25 novembre).
+// Schéma 5 : sur_mesure (limites et nom donnés par l'exploitant, décision du 25 novembre).
 func TestSchemaComptes(t *testing.T) {
 	db, _ := ouvrir(t)
 	const wantMaster = "index:bannis_h,index:comptes_p_empreinte,index:comptes_v_r,index:passkeys_h," +
-		"index:sessions_h,index:sessions_sid,table:bannis,table:comptes,table:enveloppes,table:passkeys,table:sessions"
+		"index:sessions_h,index:sessions_sid,table:bannis,table:comptes,table:enveloppes,table:passkeys,table:sessions,table:sur_mesure"
 	if got := strings.Join(lignes(t, db, `SELECT type || ':' || name FROM sqlite_master ORDER BY 1`), ","); got != wantMaster {
 		t.Fatalf("sqlite_master = %s\nattendu        %s", got, wantMaster)
 	}
@@ -57,7 +58,8 @@ func TestSchemaComptes(t *testing.T) {
 		"enveloppes": "cred_id:BLOB,n:INTEGER,env:BLOB",
 		"sessions": "t_v:BLOB,sid:BLOB,h:BLOB,etiquette:BLOB,cree_mois:INTEGER,expire_jour:INTEGER,persistante:INTEGER," +
 			"par_recup:INTEGER",
-		"bannis": "id:BLOB,h:BLOB,debut_jour:INTEGER,jusqu_jour:INTEGER,actif:INTEGER,motif:INTEGER,salons_fermes:INTEGER",
+		"bannis":     "id:BLOB,h:BLOB,debut_jour:INTEGER,jusqu_jour:INTEGER,actif:INTEGER,motif:INTEGER,salons_fermes:INTEGER",
+		"sur_mesure": "h:BLOB,salons:INTEGER,places:INTEGER,jours:INTEGER,nom:BLOB,depuis_jour:INTEGER",
 	}
 	interdits := []string{"e_", "email", "adresse", "mdp", "cle_profil", "totp", "recup_jour", "aaguid", "compteur",
 		"bs", "vu_jour", "transport", "attestation", "ip", "heure", "pseudo_canon", "p_canon"}
@@ -78,7 +80,7 @@ func TestSchemaComptes(t *testing.T) {
 			}
 		}
 	}
-	if v := lignes(t, db, `PRAGMA user_version`); len(v) != 1 || v[0] != "4" {
+	if v := lignes(t, db, `PRAGMA user_version`); len(v) != 1 || v[0] != "5" {
 		t.Fatalf("user_version = %v", v)
 	}
 	for p, w := range map[string]string{"secure_delete": "1", "journal_mode": "wal", "foreign_keys": "1", "temp_store": "2",
@@ -343,7 +345,7 @@ func TestBaseVersionEtDroits(t *testing.T) {
 			t.Errorf("%s : droits %o", filepath.Base(f), st.Mode().Perm())
 		}
 	}
-	if _, err := db.Exec(`PRAGMA user_version=5`); err != nil {
+	if _, err := db.Exec(`PRAGMA user_version=6`); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -416,7 +418,7 @@ func TestSchema2VideRecree(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "4" {
+	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "5" {
 		t.Fatal(v)
 	}
 	if c := lignes(t, db, `SELECT name FROM pragma_table_info('comptes') WHERE name='e_canon'`); len(c) != 0 {
@@ -469,7 +471,7 @@ func TestMigrationCompteur(t *testing.T) {
 		t.Fatal("migration 3 → 4 :", err)
 	}
 	defer db.Close()
-	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "4" {
+	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "5" {
 		t.Fatal(v)
 	}
 	var n int64

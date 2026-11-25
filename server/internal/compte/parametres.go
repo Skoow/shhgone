@@ -35,10 +35,13 @@ func palier(compteDes int64, now time.Time) (string, Limites, string) {
 // Plus de TOTP, d'attente de récupération ni de retrait de TOTP. BanniID :
 // l'identifiant B-… du bannissement, montré à la personne pour son recours (elle le donne à
 // l'adresse de contact ; le fondateur agit par lui, conception du compte par passkey §7.4).
+// SurMesure : l'exploitant a donné à ce compte des limites sur mesure (Limites ; Palier reste
+// le palier normal, rendu dès qu'il les retire). Ni le nom ni la note de l'exploitant n'y sont.
 type Etat struct {
 	H                          [16]byte
 	CreeLe, Palier, ConfirmeLe string
 	Limites                    Limites
+	SurMesure                  bool
 	SalonsActifs               int
 	Banni                      bool
 	BanniID, BanniJusqu        string
@@ -85,7 +88,11 @@ func (s *Service) Etat(c Courante) (Etat, error) {
 		return Etat{}, err
 	}
 	et := Etat{H: c.H, CreeLe: dateJour(l.cree), SalonsActifs: n, Banni: l.banni}
-	et.Palier, et.Limites, et.ConfirmeLe = palier(l.des, now)
+	var m *SurMesure
+	if et.Palier, et.Limites, et.ConfirmeLe, m, err = s.limitesEnVigueur(c.H, l.des, now); err != nil {
+		return Etat{}, err
+	}
+	et.SurMesure = m != nil
 	if l.banni {
 		et.BanniID, et.BanniJusqu, et.BanniMotif = idBan([8]byte(l.banniID)), dateJour(l.banniJusqu), uint8(l.banniMotif)
 	}

@@ -93,7 +93,10 @@ type admin struct {
 	files [3]file
 	frein frein
 	refs  refs
-	lents lents
+	// refsComptes : refs des comptes montrés par la recherche et la liste des comptes sur
+	// mesure (surmesure.go), à part de celles des salons signalés.
+	refsComptes refs
+	lents       lents
 }
 
 // Délai global après un jeton faux (variables : écourtées par les tests).
@@ -172,6 +175,10 @@ type file struct {
 //	POST /api/bannis/action         { id, action, jusqu? }
 //	POST /api/bannir                { lien, duree_jours, motif }
 //	GET  /api/comptes               agrégats des comptes
+//	POST /api/comptes/chercher      { pseudo } : compte de ce pseudo exact (ref, limites, ban)
+//	GET  /api/comptes/surmesure     comptes sur mesure (ref, nom, limites)
+//	POST /api/comptes/surmesure/poser   { ref, salons, places, jours, nom }
+//	POST /api/comptes/surmesure/retirer { ref } : retour au palier normal
 //	GET  /api/paiement              agrégats du paiement (SHH_PAIEMENT=1)
 //	POST /api/paiement/suspendre    ventes suspendues jusqu'au redémarrage (réversible)
 //	POST /api/paiement/retablir     ventes rétablies
@@ -323,6 +330,13 @@ func (a *admin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			a.comptes(w)
 		}
+	case "POST /api/comptes/chercher", "GET /api/comptes/surmesure", "POST /api/comptes/surmesure/poser",
+		"POST /api/comptes/surmesure/retirer":
+		if a.c.Comptes == nil || !a.c.Comptes.SurMesure.actif() {
+			refuse(w)
+			return
+		}
+		a.surMesure(w, r)
 	case "GET /api/paiement", "POST /api/paiement/suspendre", "POST /api/paiement/retablir":
 		if a.c.Paiement == nil {
 			refuse(w)

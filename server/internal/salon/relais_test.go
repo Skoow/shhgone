@@ -689,10 +689,10 @@ func TestRetirerApresReprise(t *testing.T) {
 	}
 }
 
-// I-1 : index de 24 octets par trame au plus.
+// I-1 : index de 32 octets par trame au plus (attendus sur 64 bits : 50 sièges).
 func TestTailleEntree(t *testing.T) {
-	if n := unsafe.Sizeof(entree{}); n > 24 {
-		t.Fatalf("entree : %d octets, 24 au plus", n)
+	if n := unsafe.Sizeof(entree{}); n > 32 {
+		t.Fatalf("entree : %d octets, 32 au plus", n)
 	}
 }
 

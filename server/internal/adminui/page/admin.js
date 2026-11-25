@@ -279,6 +279,7 @@ function fermer(message) {
   echecs = 0;
   if (minuterie) { clearInterval(minuterie); minuterie = 0; }
   oublierLienOffert();
+  oublierCompte();
   $('tableau').hidden = true;
   $('perdu').hidden = true;
   $('entree').hidden = false;
@@ -360,7 +361,7 @@ $('entree').addEventListener('submit', async (ev) => {
     $('tableau').hidden = false;
     minuterie = setInterval(relire, 5000);
     chargerSignales();
-    if (comptesActifs) chargerBannis();
+    if (comptesActifs) { chargerBannis(); chargerSurMesure(); }
     if (paiementActif) chargerOfferts();
   } else {
     fermer('Refusé : jeton faux, ou serveur injoignable.');
@@ -476,7 +477,7 @@ function sections(s) {
   salonsActifs = s.salon_actif;
   comptesActifs = !!s.comptes_actif;
   for (const id of ['onglet-bannissements', 'onglet-comptes', 'bannissements', 'comptes', 'carte-bannir',
-    'carte-bannis', 'carte-comptes']) {
+    'carte-bannis', 'carte-comptes', 'carte-surmesure']) {
     $(id).hidden = !comptesActifs;
   }
   $('carte-signales').hidden = !salonsActifs;
@@ -777,6 +778,122 @@ function afficherComptes(a) {
   chiffre(u, 'Récupérations par la clé', a.recuperations);
   chiffre(u, 'Suppressions de compte', a.suppressions);
 }
+
+// ----- Comptes sur mesure (décision du propriétaire, 25 novembre) -----
+// Un compte n'est désigné que par une ref de 10 minutes (jamais son identifiant interne) ; le
+// pseudo tapé part dans le corps de la demande et le champ est vidé aussitôt. La fiche ouverte
+// est oubliée à la fermeture de la session.
+
+let refCompte = '';
+
+function heures(h) {
+  if (h % 24 === 0) { const j = h / 24; return j === 1 ? '1 jour' : nombre.format(j) + ' jours'; }
+  return nombre.format(h) + ' h';
+}
+
+function limitesTexte(l) {
+  return l.salons + ' salon(s) à la fois · ' + l.places + ' personnes par salon · ' + heures(l.heures) + ' au plus';
+}
+
+function oublierCompte() {
+  refCompte = '';
+  $('compte-trouve').hidden = true;
+  vider($('compte-faits'));
+  $('compte-titre').textContent = '';
+  for (const id of ['sm-salons', 'sm-places', 'sm-jours', 'sm-nom']) $(id).value = '';
+}
+
+// ouvrirCompte : fiche du compte c (réponse du serveur), limites prêtes à changer.
+function ouvrirCompte(c) {
+  refCompte = c.ref;
+  const sm = c.sur_mesure;
+  $('compte-titre').textContent = (sm ? sm.nom + ' · ' : '') + 'compte ' + c.court;
+  const f = $('compte-faits');
+  vider(f);
+  fait(f, 'Identifiant court', c.court);
+  fait(f, 'Créé le', dateFr(c.cree_le));
+  fait(f, 'Palier', sm ? 'Sur mesure depuis le ' + dateFr(sm.depuis) + ' (palier normal : ' + palier(c.palier) + ')' : palier(c.palier));
+  fait(f, 'Salons actifs', nombre.format(c.salons_actifs));
+  fait(f, 'Limites en vigueur', limitesTexte(c.limites));
+  fait(f, 'Bannissement', c.ban ? ligneBan(c.ban) + (c.ban.actif ? ' : l’emporte sur le sur mesure' : '') : 'aucun');
+  $('sm-salons').value = String(sm ? sm.salons : c.limites.salons);
+  $('sm-places').value = String(sm ? sm.places : Math.max(2, c.limites.places));
+  $('sm-jours').value = String(sm ? sm.jours : Math.max(1, Math.floor(c.limites.heures / 24)));
+  $('sm-nom').value = sm ? sm.nom : '';
+  $('surmesure-titre').textContent = sm ? 'Limites sur mesure (en vigueur)' : 'Limites sur mesure (aucune pour l’instant)';
+  $('sm-retirer').hidden = !sm;
+  $('compte-trouve').hidden = false;
+}
+
+function reponseCompte(r, fait) {
+  const res = $('surmesure-resultat');
+  if (r.ok && r.json && r.json.compte) { ouvrirCompte(r.json.compte); res.textContent = fait; return true; }
+  if (r.ok && r.json && r.json.introuvable) {
+    oublierCompte();
+    res.textContent = 'Introuvable : aucun compte de ce pseudo, ou référence échue (plus de 10 minutes) : chercher de nouveau.';
+  } else if (r.statut === 400) res.textContent = 'Refusé : valeur hors des bornes, ou pseudo de forme impossible (2 à 24 lettres et chiffres). Rien n’a changé.';
+  else res.textContent = 'Échec : le serveur n’a pas confirmé. Relire la liste.';
+  return false;
+}
+
+$('chercher').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const champ = $('chercher-pseudo');
+  const pseudo = champ.value.trim();
+  champ.value = '';
+  if (!pseudo) return;
+  const r = await envoyer('POST', '/api/comptes/chercher', { pseudo });
+  if (!r) return;
+  reponseCompte(r, 'Compte trouvé.');
+});
+
+function entier(id) { return Number.parseInt($(id).value, 10); }
+
+$('surmesure').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  if (!refCompte) return;
+  const corps = { ref: refCompte, salons: entier('sm-salons'), places: entier('sm-places'), jours: entier('sm-jours'), nom: $('sm-nom').value.trim() };
+  if (!$('surmesure').reportValidity()) return;
+  const r = await envoyer('POST', '/api/comptes/surmesure/poser', corps);
+  if (!r) return;
+  if (reponseCompte(r, 'Limites sur mesure enregistrées : elles valent dès le prochain salon créé ou réglé.')) chargerSurMesure();
+});
+
+confirmer($('sm-retirer'), 'retirer (retour au palier normal)', async () => {
+  if (!refCompte) return;
+  const r = await envoyer('POST', '/api/comptes/surmesure/retirer', { ref: refCompte });
+  if (!r) return;
+  if (reponseCompte(r, 'Sur mesure retiré : palier normal. Les salons déjà ouverts gardent leurs places jusqu’à leur fin, sans pouvoir être renouvelés au-delà du palier.')) chargerSurMesure();
+});
+
+function ligneSurMesure(c) {
+  const li = el('li');
+  const tete = el('p', undefined, 'tete');
+  tete.append(el('span', c.sur_mesure.nom, 'nom'), document.createTextNode(' · '), el('span', c.court, 'code'));
+  if (c.ban && c.ban.actif) tete.append(document.createTextNode(' · '), el('span', 'banni', 'etat-actif'));
+  li.append(tete);
+  li.append(el('p', limitesTexte(c.limites) + ' · ' + nombre.format(c.salons_actifs) + ' salon(s) actif(s) · depuis le ' + dateFr(c.sur_mesure.depuis), 'meta'));
+  const outils = el('div', undefined, 'outils');
+  const modifier = el('button', 'Modifier', 'discret');
+  modifier.type = 'button';
+  modifier.addEventListener('click', () => { ouvrirCompte(c); $('surmesure-resultat').textContent = ''; $('sm-salons').focus(); });
+  outils.append(modifier);
+  li.append(outils);
+  return li;
+}
+
+async function chargerSurMesure() {
+  if (!comptesActifs) return;
+  const r = await envoyer('GET', '/api/comptes/surmesure');
+  if (!r) return;
+  const ul = $('surmesure-liste');
+  vider(ul);
+  if (!r.ok || !r.json || !Array.isArray(r.json.comptes)) { $('surmesure-resultat').textContent = 'Liste illisible : réessayer.'; return; }
+  if (r.json.comptes.length === 0) ul.append(el('li', 'Aucun compte sur mesure.', 'vide'));
+  for (const c of r.json.comptes) ul.append(ligneSurMesure(c));
+}
+
+$('surmesure-actualiser').addEventListener('click', () => chargerSurMesure());
 
 // ----- Accès offerts (conception du paiement, « Accès offerts ») -----
 // Le lien (qui porte le pass après « # ») n'est montré qu'une fois : gardé dans le seul champ

@@ -121,6 +121,10 @@ select, input[type=date] {
 .bandeau-local { margin: 0; padding: .625rem .875rem; border-radius: 10px; background: var(--warn-tint); color: var(--warn); border: 1px solid var(--warn); font-size: .9375rem; }
 #offert-champ { font: .875rem ui-monospace, SFMono-Regular, Menlo, monospace; }
 .etat-ok { color: var(--ok); }
+.fiche { background: var(--surface-2); border-radius: 10px; padding: .75rem .875rem; margin-top: .5rem; max-width: 46rem; }
+.fiche .tete { font-weight: 600; margin: 0 0 .5rem; overflow-wrap: anywhere; }
+.fiche .faits dd { white-space: normal; }
+.rangee > button { margin-top: 0; }
 .etat-echu { color: var(--text-2); }
 @media (max-width: 30rem) {
   .carte { padding: .875rem; }

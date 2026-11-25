@@ -384,8 +384,8 @@ func TestSchemaVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v := pragma(t, db, "user_version"); v != "3" {
-		t.Fatalf("user_version = %s, attendu 3 (colonne salons.compte)", v)
+	if v := pragma(t, db, "user_version"); v != "4" {
+		t.Fatalf("user_version = %s, attendu 4 (salons.max_members jusqu'à 50)", v)
 	}
 	if _, err := db.Exec(`PRAGMA user_version=0`); err != nil { // base d'avant la version
 		t.Fatal(err)
@@ -480,7 +480,7 @@ func TestSalonsContraintes(t *testing.T) {
 	}
 	bad := map[string]string{
 		"max_members 1":         `VALUES('b',randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,1,0)`,
-		"max_members 11":        `VALUES('b',randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,11,0)`,
+		"max_members 51":        `VALUES('b',randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,51,0)`,
 		"members_can_destroy 2": `VALUES('b',randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,10,2)`,
 		"access_v de 31":        `VALUES('b',randomblob(31),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,10,0)`,
 		"manage_v de 33":        `VALUES('b',randomblob(32),randomblob(33),randomblob(32),randomblob(16),3,67108864,900,10,0)`,
@@ -625,24 +625,24 @@ func TestMigreV1VersV2(t *testing.T) {
 	}
 }
 
-// Une base du schéma 4 (binaire plus récent) est refusée sans rien toucher : ni tables du
+// Une base du schéma 5 (binaire plus récent) est refusée sans rien toucher : ni tables du
 // salon créées, ni version réécrite.
-func TestRefuseV4(t *testing.T) {
+func TestRefuseV5(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")
-	baseV1(t, path, 4)
+	baseV1(t, path, 5)
 	db, err := Open(path)
 	if !errors.Is(err, ErrNewerSchema) {
 		if db != nil {
 			db.Close()
 		}
-		t.Fatal("base du schéma 4 acceptée :", err)
+		t.Fatal("base du schéma 5 acceptée :", err)
 	}
 	raw, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer raw.Close()
-	if v := pragma(t, raw, "user_version"); v != "4" {
+	if v := pragma(t, raw, "user_version"); v != "5" {
 		t.Fatal("version touchée", v)
 	}
 	if got := strings.Join(masterNames(t, raw), ","); got != "index:shares_access_v,index:shares_manage_v,table:shares" {
@@ -731,7 +731,7 @@ CREATE INDEX IF NOT EXISTS salon_pieces_salon ON salon_pieces(salon_id)`
 	}
 }
 
-// Une base du schéma 2 passe au schéma 3 en place (salon et pièce
+// Une base du schéma 2 passe au schéma courant en place (salon et pièce
 // gardés, compte NULL), avec le même sqlite_master et les mêmes colonnes qu'une base neuve.
 func TestMigreV2VersV3(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")
@@ -741,7 +741,7 @@ func TestMigreV2VersV3(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if v := pragma(t, db, "user_version"); v != "3" {
+	if v := pragma(t, db, "user_version"); v != strconv.Itoa(SchemaVersion) {
 		t.Fatalf("user_version = %s", v)
 	}
 	var n int
@@ -805,4 +805,76 @@ func TestSalonsCompte(t *testing.T) {
 	if _, err := db.Exec(`UPDATE salons SET compte=x'00112233445566778899aabbccddeeff'`); err != nil {
 		t.Fatal("deux salons du même compte refusés :", err)
 	}
+}
+
+// Schéma 3 → 4 : la table salons est reconstruite pour accepter 50 places (comptes sur
+// mesure) ; salon, compte et pièce gardés (aucune cascade pendant la copie), contraintes
+// et index identiques à ceux d'une base neuve ; clés étrangères de nouveau actives.
+func TestMigreV3VersV4(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "shares.db")
+	baseV2(t, path)
+	raw, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(ON)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{`ALTER TABLE salons ADD COLUMN compte BLOB ` + compteCheck, salonsIndexes,
+		`UPDATE salons SET compte=randomblob(16) WHERE id='s'`, `PRAGMA user_version=3`} {
+		if _, err := raw.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	raw.Close()
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if v := pragma(t, db, "user_version"); v != "4" {
+		t.Fatal("user_version", v)
+	}
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM salons WHERE id='s' AND length(compte)=16`).Scan(&n); err != nil || n != 1 {
+		t.Fatal("salon ou compte perdu :", n, err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM salon_pieces WHERE salon_id='s'`).Scan(&n); err != nil || n != 1 {
+		t.Fatal("pièce perdue par la reconstruction :", n, err)
+	}
+	if got := strings.Join(masterNames(t, db), ","); got != wantMaster {
+		t.Fatalf("sqlite_master = %s", got)
+	}
+	neuve, err := Open(filepath.Join(t.TempDir(), "n.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer neuve.Close()
+	def := func(d *sql.DB) string {
+		var x string
+		d.QueryRow(`SELECT sql FROM sqlite_master WHERE name='salons'`).Scan(&x)
+		return x
+	}
+	if a, b := def(db), def(neuve); !strings.Contains(a, "BETWEEN 2 AND 50") || strings.ReplaceAll(a, `"salons"`, "salons") != b &&
+		strings.ReplaceAll(a, "salons_m4", "salons") != b {
+		t.Fatalf("table migrée :\n%s\nneuve :\n%s", a, b)
+	}
+	if _, err := db.Exec(`UPDATE salons SET max_members=50 WHERE id='s'`); err != nil {
+		t.Fatal("50 places refusées :", err)
+	}
+	if _, err := db.Exec(`UPDATE salons SET max_members=51 WHERE id='s'`); err == nil {
+		t.Fatal("51 places acceptées")
+	}
+	if v := pragma(t, db, "foreign_keys"); v != "1" {
+		t.Fatal("clés étrangères coupées après la migration :", v)
+	}
+	if _, err := db.Exec(`DELETE FROM salons WHERE id='s'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM salon_pieces`).Scan(&n); err != nil || n != 0 {
+		t.Fatal("cascade perdue après la migration :", n, err)
+	}
+	db.Close()
+	db2, err := Open(path) // rien à refaire
+	if err != nil {
+		t.Fatal(err)
+	}
+	db2.Close()
 }

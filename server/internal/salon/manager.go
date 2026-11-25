@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,7 +50,9 @@ const (
 	// tuer le processus faute de mémoire, 24 o d'index par trame).
 	// 100 000 × 4 168 o ≈ 417 Mo sur le disque et 2,4 Mio d'index par salon ; c'est plus que
 	// les 1 200 messages par heure d'un siège actif pendant 24 h (28 800), sans couvrir le pire
-	// cas de 10 sièges au plafond (288 000). Réglable (Config.TramesMax).
+	// cas de 10 sièges au plafond (288 000), ni un salon sur mesure de 50 places et 30 jours
+	// (100 000 trames : environ 3 300 par jour ; au-delà, 0x0C jusqu'au renouvellement).
+	// Réglable (Config.TramesMax).
 	TramesMaxDefaut = 100000
 	// videMax : un salon où personne n'est entré est effacé ce délai après sa création (40
 	// adresses prenaient les SHH_SALONS_MAX places pour 24 h sans jamais y entrer).
@@ -102,6 +105,35 @@ type Config struct {
 // Palier : ce que le compte créateur permet (conception du compte §11) : salons vivants à la
 // fois, places (max_members, créateur compris), durée en heures au plus.
 type Palier struct{ Salons, Places, Heures int }
+
+// Bornes des salons (conception du compte §11 ; comptes sur mesure, décision du propriétaire du
+// 25 novembre). Un salon ordinaire (sans compte, ou d'un compte neuf ou confirmé) : 10 places au
+// plus, 1, 6, 12 ou 24 h. Un compte sur mesure peut aller jusqu'à 50 places et 30 jours
+// (720 h), par les durées longues de 3, 7, 14 et 30 jours. Les mêmes bornes côté compte :
+// compte.SurMesurePlacesMax, compte.SurMesureJoursMax (test commun dans api).
+const (
+	PlacesStandardMax  = 10
+	HeuresStandardMax  = 24
+	SurMesurePlacesMax = 50
+	HeuresSurMesureMax = 720
+)
+
+// HeuresStandard, HeuresLongues : durées proposées (création et renouvellement), en heures.
+var (
+	HeuresStandard = []int{1, 6, 12, 24}
+	HeuresLongues  = []int{72, 168, 336, HeuresSurMesureMax}
+)
+
+// DureeValide : h est une durée proposée (ordinaire ou longue).
+func DureeValide(h int) bool {
+	return slices.Contains(HeuresStandard, h) || slices.Contains(HeuresLongues, h)
+}
+
+// Standard : places et durée d'un salon ordinaire (0 : réglage inchangé) ; au-delà, seul le
+// palier d'un compte sur mesure les permet.
+func Standard(places, heures int) bool {
+	return places <= PlacesStandardMax && heures <= HeuresStandardMax
+}
 
 // PalierDepasse : création ou réglage au-delà du palier du compte (409 palier, avec les
 // limites).
@@ -397,10 +429,13 @@ type CreerReq struct {
 }
 
 // Valide : valeurs de la spécification (durée, membres, Argon2id, longueurs, vérificateurs
-// distincts et non vides). Vérifiée par la couche HTTP avant l'anti-robot et le quota.
+// distincts et non vides). Vérifiée par la couche HTTP avant l'anti-robot et le quota. Durées
+// longues (HeuresLongues) et places au-delà de PlacesStandardMax : formes valables, permises
+// seulement par le palier d'un compte sur mesure (Creer : refusées sans compte, et bornées par
+// Config.Palier avec un compte).
 func (r CreerReq) Valide() bool {
-	return (r.TTLHours == 1 || r.TTLHours == 6 || r.TTLHours == 12 || r.TTLHours == 24) &&
-		r.MaxMembers >= 2 && r.MaxMembers <= nbSieges && r.KdfOps == kdfOps && r.KdfMem == kdfMem &&
+	return DureeValide(r.TTLHours) &&
+		r.MaxMembers >= 2 && r.MaxMembers <= SurMesurePlacesMax && r.KdfOps == kdfOps && r.KdfMem == kdfMem &&
 		len(r.Salt) == 16 && len(r.AccessV) == 32 && len(r.ManageV) == 32 && len(r.ProofV) == 32 &&
 		share.NotEmptyHash(r.AccessV, r.ManageV, r.ProofV) && string(r.AccessV) != string(r.ManageV) &&
 		string(r.ProofV) != string(r.AccessV) && string(r.ProofV) != string(r.ManageV) && r.Bloc != [32]byte{}
@@ -436,6 +471,8 @@ func (m *Manager) Creer(r CreerReq) (time.Duration, error) {
 		if err := m.palierCreationLocked(r); err != nil {
 			return 0, err
 		}
+	} else if !Standard(r.MaxMembers, r.TTLHours) {
+		return 0, ErrBadRequest // sans compte : jamais au-delà d'un salon ordinaire
 	}
 	var vivants int
 	if err := m.cfg.DB.QueryRow(`SELECT count(*) FROM salons WHERE expires_at>? AND failed_attempts<?`,
