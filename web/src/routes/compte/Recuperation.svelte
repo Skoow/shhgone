@@ -16,6 +16,7 @@
   import TextField from "../../ui/TextField.svelte";
   import Cadre from "./Cadre.svelte";
   import Case from "./Case.svelte";
+  import NoteDemo from "./NoteDemo.svelte";
   import { annulee, erreur } from "./erreurs";
 
   const apres = suite(location.search);
@@ -91,6 +92,7 @@
       <TextField label={t("account.key.field")} hint={t("account.key.field.hint")} autocomplete="off" autocapitalize="characters" spellcheck="false" error={errCle || undefined} bind:value={cle} bind:el={elCle} oninput={() => (errCle = "")} />
       <Case label={t("account.stay")} bind:checked={rester} />
       <Button type="submit" onpress={ouvrir}>{envoi ? t("account.verifying") : t("account.key.open")}</Button>
+      <NoteDemo />
     </form>
   {:else if vue === "passkey"}
     <p class="note">{t("account.recover.passkey.body")}</p>

@@ -23,6 +23,7 @@
   import TextField from "../../ui/TextField.svelte";
   import Cadre from "./Cadre.svelte";
   import Case from "./Case.svelte";
+  import NoteDemo from "./NoteDemo.svelte";
   import CleRecup from "./CleRecup.svelte";
   import { annulee, codeDe, erreur } from "./erreurs";
   import { obtenirPreuve } from "./preuve";
@@ -202,6 +203,7 @@
            (région présente dès l'affichage, pour être annoncée). -->
       <p class="sr-only" role="status" data-dispo>{etatPseudo === "ok" ? t("account.pseudo.free") : ""}</p>
       <Button type="submit" busy={!pret} disabled={!pret} onpress={creer}>{pret ? (getDemo()?.signupPasskey ?? t("account.signup.passkey")) : t("account.preparing")}</Button>
+      <NoteDemo />
       <p class="legal" data-legal>
         {t("account.signup.legal.a")}<a class="lien-t" href={href("/conditions")} target="_blank" rel="noopener noreferrer">{t("account.signup.legal.link")}</a>{t("account.signup.legal.b")}
       </p>

@@ -19,6 +19,7 @@
   import TextField from "../../ui/TextField.svelte";
   import Cadre from "./Cadre.svelte";
   import Case from "./Case.svelte";
+  import NoteDemo from "./NoteDemo.svelte";
   import { annulee, erreur, jourLong } from "./erreurs";
 
   // Seul paramètre lu dans l'adresse : « ?suite=salon » (suite(), router.svelte.ts).
@@ -158,6 +159,7 @@
          en boutons secondaires, après un séparateur « ou ». -->
     <form novalidate class="connexion" onsubmit={(e) => e.preventDefault()}>
       <Button type="submit" onpress={connecter}>{envoi ? t("account.verifying") : t("account.login.passkey")}</Button>
+      <NoteDemo />
       <Case label={t("account.stay")} bind:checked={rester} />
     </form>
     <p class="ou" aria-hidden="true"><span>{t("account.login.or")}</span></p>

@@ -12,7 +12,8 @@
   //   `etape` (1 à 4) : barre d'étapes de l'inscription (direction C) en tête du formulaire.
   // - « large » (paramètres) : pleine largeur de la colonne de contenu, titre à gauche.
   // - « carte » (défaut ; profil, suppression, salon) : carte centrée de 30 rem.
-  // Démo : la phrase de la démo (aucune passkey créée, compte de cet onglet seulement) sous le titre.
+  // Démo : la phrase de la démo sous le titre pour la carte et les paramètres ; dans les panneaux,
+  // chaque écran la pose sous son bouton principal (NoteDemo.svelte).
   import { untrack, type Snippet } from "svelte";
   import { getDemo } from "../../app/demo-hooks";
   import { t } from "../../i18n/i18n.svelte";
@@ -48,7 +49,6 @@
             {/each}
           </ol>
         {/if}
-        {#if getDemo()}<p class="note demo" data-demo-note>{getDemo()!.compteNote}</p>{/if}
         {@render children()}
       </div>
     </section>
@@ -171,10 +171,6 @@
   }
   .panneau .sous {
     text-align: start;
-  }
-  /* Démo : une ligne courte, couleur d'avertissement, comme la maquette A. */
-  .panneau .note.demo {
-    color: var(--warn);
   }
 
   /* Barre d'étapes (direction C) : quatre traits, l'étape en cours en menthe, les faites pleines.
