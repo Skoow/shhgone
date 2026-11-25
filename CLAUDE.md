@@ -16,7 +16,8 @@ Spécification de référence : `docs/conception/specs/2026-11-03-shhdrop-design
 - ce qui **manque** et dont on n'a pas encore parlé ;
 - toute **erreur**, contradiction ou ambiguïté, y compris dans la spécification ou dans un choix déjà validé ;
 - ce qui est **inutile** ou trop complexe pour ce que ça apporte ;
-- tout **risque** de sécurité, de confidentialité, légal ou d'exploitation.
+- tout **risque** de sécurité, de confidentialité, légal ou d'exploitation ;
+- ce qui peut être **automatisé** pour que le propriétaire ait le moins possible à faire lui-même, sans jamais affaiblir la sécurité : un secret n'est jamais affiché par une session d'assistance ni collé dans une conversation ; le propriétaire ne tape un secret que dans sa propre fenêtre SSH, en saisie masquée.
 
 Chaque signalement donne la gravité, l'endroit, le problème et une correction concrète. On ne corrige pas en silence un choix validé : on le signale et on propose.
 
