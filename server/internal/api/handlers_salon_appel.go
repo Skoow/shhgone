@@ -118,6 +118,7 @@ func (a salonAPI) appel(w http.ResponseWriter, r *http.Request) {
 	}
 	ttl := min(turnTTL, reste).Truncate(time.Second)
 	nom, mdp := identifiantsTurn(a.turn.Secret, a.turn.now().Add(ttl), alea[:])
+	a.usage.IdentifiantsTurn()
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, struct {
 		URLs       []string `json:"urls"`
@@ -145,6 +146,8 @@ func (a salonAPI) ouvrirAppels(r *http.Request, mb salon.Membre) (time.Duration,
 	reste, deja, err := a.m.OuvrirAppels(mb)
 	if err != nil || deja {
 		a.rendreJeton(jp)
+	} else {
+		a.usage.AppelsOuverts()
 	}
 	return reste, err
 }

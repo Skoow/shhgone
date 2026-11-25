@@ -62,5 +62,6 @@ func (m *Manager) OuvrirAppels(mb Membre) (reste time.Duration, deja bool, err e
 		return r, true, nil
 	}
 	s.appelsJusqua = s.expires
+	s.appelsFin.Store(s.expires.Unix())
 	return s.expires.Sub(now), false, nil
 }

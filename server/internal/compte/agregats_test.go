@@ -49,9 +49,18 @@ func TestAgregatsQueDesEntiers(t *testing.T) {
 	}
 	want := AgregatsComptes{Comptes: 5, Max: 100, Neufs: 3, Confirmes: 2, Anciennete: [5]int{3, 0, 0, 2, 0},
 		Passkeys: 5, PasskeysPRF: 4, ComptesSansSynchro: 1, Sessions: 1, SessionsPersistantes: 1,
-		BannisActifs: 1, BannisSuspendus: 1, BannisBientot: 1}
+		BannisActifs: 1, BannisSuspendus: 1, BannisBientot: 1, InscritsJour: 3, Inscrits7Jours: 3}
 	if a != want {
 		t.Fatalf("\n%+v\nattendu\n%+v", a, want)
+	}
+	// Le lendemain, puis 7 jours après : plus « aujourd'hui », puis plus « ces 7 jours ».
+	b.clk.Add(24 * time.Hour)
+	if a, _ = b.s.Agregats(); a.InscritsJour != 0 || a.Inscrits7Jours != 3 {
+		t.Fatalf("lendemain : %+v", a)
+	}
+	b.clk.Add(6 * 24 * time.Hour)
+	if a, _ = b.s.Agregats(); a.InscritsJour != 0 || a.Inscrits7Jours != 0 {
+		t.Fatalf("7 jours après : %+v", a)
 	}
 	// Suppression, effacement des inactifs.
 	o, err := b.connecter(h3)

@@ -172,6 +172,10 @@ func TestPartagePayantParJeton(t *testing.T) {
 	if code, s := finaliser(e, c, 20, 168); code != 200 || s < 168*3600 {
 		t.Fatal("Pro : 20 ouvertures, 7 jours", code, s)
 	}
+	// Tableau de bord : partages payants par offre (4 Plus, 1 Pro), les gratuits à part.
+	if u := e.srv.usage.Snapshot(); u.PartagesPayants != [2]int64{4, 1} || u.PartagesCrees != 6 {
+		t.Fatalf("compteurs : payants %v, créés %d", u.PartagesPayants, u.PartagesCrees)
+	}
 }
 
 // TestJetonSansPaiement : un serveur sans paiement refuse un PrivateToken.

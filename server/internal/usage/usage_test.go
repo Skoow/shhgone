@@ -65,3 +65,21 @@ func TestCompteursParCategorie(t *testing.T) {
 		t.Fatal("un signalement n'est pas une destruction ici :", s.Destructions)
 	}
 }
+
+// Partages payants par offre, appels ouverts et identifiants du relais (tableau de bord
+// finalisé, 25 novembre) : un entier chacun ; une offre hors de 1 et 2 n'est pas comptée.
+func TestCompteursPaiementAppels(t *testing.T) {
+	var c Counters
+	c.PartagePayant(1)
+	c.PartagePayant(2)
+	c.PartagePayant(2)
+	c.PartagePayant(0)
+	c.PartagePayant(3)
+	c.AppelsOuverts()
+	c.IdentifiantsTurn()
+	c.IdentifiantsTurn()
+	s := c.Snapshot()
+	if s.PartagesPayants != [2]int64{1, 2} || s.AppelsOuverts != 1 || s.IdentifiantsTurn != 2 {
+		t.Fatalf("%+v", s)
+	}
+}

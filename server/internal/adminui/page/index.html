@@ -30,6 +30,7 @@
     <a href="#signalements" id="onglet-signalements">Signalements</a>
     <a href="#bannissements" id="onglet-bannissements" hidden>Bannissements</a>
     <a href="#comptes" id="onglet-comptes" hidden>Comptes</a>
+    <a href="#paiement" id="onglet-paiement" hidden>Paiement</a>
     <a href="#usage">Usage</a>
     <a href="#actions">Actions</a>
   </nav>
@@ -52,6 +53,13 @@
     <h3 class="titre" id="t-activite">Activité en ce moment</h3>
     <p class="note">Ce qui est vivant à l'instant.</p>
     <dl class="chiffres" id="activite"></dl>
+  </section>
+
+  <section class="carte" aria-labelledby="t-appels" id="carte-appels" hidden>
+    <h3 class="titre" id="t-appels">Appels audio et vidéo</h3>
+    <p class="note">Le serveur ne voit aucun appel (signalisation chiffrée, son et image par le relais) : seulement les salons où un jeton payant a ouvert les appels, et les identifiants du relais qu'il a donnés.</p>
+    <ul class="pastilles apres" id="appels-pastilles"></ul>
+    <dl class="faits" id="appels"></dl>
   </section>
 
   <section class="carte" aria-labelledby="t-charge">
@@ -134,6 +142,33 @@
     <dl class="chiffres" id="comptes-usage"></dl>
   </section>
 
+  <h2 class="groupe" id="paiement" hidden>Paiement</h2>
+  <section class="carte" aria-labelledby="t-pass" id="carte-pass" hidden>
+    <h3 class="titre" id="t-pass">Pass et commandes</h3>
+    <p class="note">Lus à l'instant dans paiements.db : des nombres, jamais un pass, une commande, un montant ni un pays. Le chiffre d'affaires se lit chez le prestataire.</p>
+    <dl class="chiffres" id="pass"></dl>
+    <div class="apres" id="commandes"></div>
+  </section>
+
+  <section class="carte" aria-labelledby="t-jetons" id="carte-jetons" hidden>
+    <h3 class="titre" id="t-jetons">Jetons anonymes, depuis le démarrage</h3>
+    <p class="note">Émis à un pass, dépensés pour un partage payant ou pour ouvrir les appels d'un salon. Rien ne relie un jeton dépensé au pass qui l'a reçu.</p>
+    <dl class="chiffres" id="jetons"></dl>
+    <dl class="faits apres" id="jetons-details"></dl>
+  </section>
+
+  <section class="carte large" aria-labelledby="t-prestataires" id="carte-prestataires" hidden>
+    <h3 class="titre" id="t-prestataires">Par prestataire, depuis le démarrage</h3>
+    <p class="note">En mémoire seulement, tout repart de zéro au redémarrage. « Webhooks refusés » : signature fausse ou commande inconnue ; s'il monte, quelqu'un essaie de forger des paiements, ou un secret de webhook est faux.</p>
+    <div class="defile">
+      <table>
+        <thead><tr><th scope="col">Prestataire</th><th scope="col">État</th><th scope="col" class="n">Pages créées</th><th scope="col" class="n">Payés, crédités</th><th scope="col" class="n">Anomalies</th><th scope="col" class="n">Remboursés, litiges</th><th scope="col" class="n">Webhooks refusés</th></tr></thead>
+        <tbody id="prestataires"></tbody>
+      </table>
+    </div>
+    <p class="note" id="revocations-main"></p>
+  </section>
+
   <h2 class="groupe" id="usage">Usage</h2>
   <section class="carte large" aria-labelledby="t-usage">
     <h3 class="titre" id="t-usage">Usage depuis le démarrage</h3>
@@ -144,7 +179,7 @@
 
   <h2 class="groupe" id="actions">Actions</h2>
   <section class="carte large" aria-labelledby="t-actions">
-    <h3 class="titre" id="t-actions">Créations et liens signalés</h3>
+    <h3 class="titre" id="t-actions">Créations, ventes et liens signalés</h3>
     <div class="action">
       <div>
         <h4 class="sous-titre">Créations</h4>
@@ -161,7 +196,15 @@
       <input id="lien" type="password" autocomplete="off" spellcheck="false" required>
       <button class="detruire" type="submit" id="detruire-bouton">Détruire ce lien</button>
     </form>
+    <div class="action" id="action-ventes" hidden>
+      <div>
+        <h4 class="sous-titre">Ventes des offres</h4>
+        <p class="note" id="ventes-etat"></p>
+      </div>
+      <button class="attention" type="button" id="ventes"></button>
+    </div>
     <p class="resultat" id="resultat" role="status"></p>
+    <p class="note">Couper les appels tout de suite : <code>sudo docker stop shhdrop-relais-turn-1</code> sur la machine, par SSH (le relais repart à la prochaine installation). Le serveur ne fait que donner des identifiants ; ceux déjà donnés valent jusqu'à 6 h : une coupure côté serveur n'arrêterait pas les appels en cours.</p>
     <p class="note">L'effacement d'urgence de tout le serveur n'est pas ici, volontairement : <code>shhdrop admin wipe --yes</code>, par SSH.</p>
   </section>
 </div>

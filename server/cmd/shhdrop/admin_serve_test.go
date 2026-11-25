@@ -143,8 +143,14 @@ func TestTableauDeBord(t *testing.T) {
 		st.Stockage.DisqueLibre == 0 || st.Stockage.DisqueTotal < st.Stockage.DisqueLibre ||
 		st.Sante.Gele || st.Sante.SalonActif || st.Salon != nil || st.Sante.AlerteSignalements ||
 		st.Memoire.Goroutines == 0 || st.Memoire.Utilisee == 0 ||
-		st.Capacite.EnvoisMax == 0 || st.Capacite.LecturesMax == 0 || st.Capacite.AppelsDisqueMax == 0 {
+		st.Capacite.EnvoisMax == 0 || st.Capacite.LecturesMax == 0 || st.Capacite.AppelsDisqueMax == 0 ||
+		st.Capacite.PlafondSortie != share.DefaultEgressMax || st.Sante.PaiementActif || st.Sante.RelaisTurn ||
+		st.Sante.AppelsOfferts {
 		t.Fatalf("état incohérent : %+v", st)
+	}
+	// Paiement désactivé : son onglet n'a pas de route (refus uniforme).
+	if c, _ := adminReq(t, "GET", "http://"+adm+"/api/paiement", jetonAdmin, ""); c != 404 {
+		t.Fatalf("/api/paiement sans paiement : %d", c)
 	}
 
 	// Usage : tout à zéro au départ ; une route publique inconnue ne compte rien, et les

@@ -192,7 +192,9 @@ func failPaiement(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusConflict, "conflit")
 	case errors.Is(err, paiement.ErrAucunAbonnement):
 		writeErr(w, http.StatusConflict, "aucun_abonnement")
-	case errors.Is(err, paiement.ErrOccupe):
+	case errors.Is(err, paiement.ErrOccupe), errors.Is(err, paiement.ErrSuspendu):
+		// Ventes suspendues par l'exploitant (tableau de bord) : la même réponse qu'un serveur
+		// occupé, que le site sait déjà dire (« réessayer plus tard »).
 		writeRetry(w, http.StatusServiceUnavailable, "busy", slotRetry)
 	case errors.Is(err, errInterne):
 		writeErr(w, http.StatusInternalServerError, "internal")

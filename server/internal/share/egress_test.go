@@ -69,6 +69,10 @@ func TestEgressLimitPerShare(t *testing.T) {
 	if !errors.Is(last, ErrEgressLimit) {
 		t.Fatal("au-delà du plafond :", last)
 	}
+	// Tableau de bord : deux refus comptés (l'ouverture, puis le segment), un entier sans partage.
+	if n := s.RefusSortie.Load(); n != 2 {
+		t.Fatal("refus du plafond comptés :", n)
+	}
 	// Le plafond est celui du partage : un autre partage n'est pas touché.
 	k2 := newKeys()
 	id2 := ready(t, s, k2, bucket, 1, 2)

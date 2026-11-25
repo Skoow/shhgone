@@ -166,6 +166,10 @@ func TestAppelOuvertParUnJeton(t *testing.T) {
 	if r := e.appel(avecJeton(tok2, jetons[1]), `{}`); r.code != 200 {
 		t.Fatalf("jeton non dépensé : %d %q", r.code, r.body)
 	}
+	// Tableau de bord : deux salons aux appels ouverts, cinq identifiants délivrés.
+	if u := e.srv.usage.Snapshot(); u.AppelsOuverts != 2 || u.IdentifiantsTurn != 5 {
+		t.Fatalf("compteurs : appels ouverts %d, identifiants %d", u.AppelsOuverts, u.IdentifiantsTurn)
+	}
 
 	// Salon échu : plus rien.
 	e.clk.Add(2 * time.Hour)

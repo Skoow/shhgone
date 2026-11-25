@@ -17,6 +17,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/config"
 	"github.com/skoow/shhdrop/server/internal/limits"
+	"github.com/skoow/shhdrop/server/internal/paiement"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
 	"github.com/skoow/shhdrop/server/internal/store"
@@ -34,6 +35,8 @@ type adminDeps struct {
 	start  time.Time  // démarrage du processus, en mémoire seulement
 	// Lot 7 : service du compte (SHH_COMPTES=1 ; nil sinon).
 	cpt *compte.Service
+	// pai : service du paiement (SHH_PAIEMENT=1 ; nil sinon).
+	pai *paiement.Service
 }
 
 // buildID : empreinte du commit compilé, posée à la compilation (-ldflags "-X main.buildID=…",
@@ -92,6 +95,9 @@ func adminConfig(cfg config.Config, d adminDeps) adminui.Config {
 				return adminBannir(d, lien, duree, motif)
 			},
 		}
+	}
+	if d.pai != nil {
+		c.Paiement = &adminui.Paiement{Agregats: d.pai.Agregats, Suspendre: d.pai.Suspendre}
 	}
 	return c
 }
@@ -235,7 +241,9 @@ func adminState(cfg config.Config, d adminDeps) (adminui.State, error) {
 	goVersion, rev := adminui.Build(buildID)
 	st.Sante = adminui.Sante{DepuisS: int64(time.Since(d.start) / time.Second), Go: goVersion, Revision: rev,
 		Gele: d.svc.Frozen(), SalonActif: d.sm != nil, ComptesActif: d.cpt != nil, Origine: cfg.Origin, AlerteSignalements: d.probes.Alert(),
-		VidagesRates: d.svc.Vidage.Rates()}
+		VidagesRates: d.svc.Vidage.Rates(), PaiementActif: d.pai != nil, RelaisTurn: len(cfg.TurnURLs) != 0}
+	// Appels offerts : relais ET jetons anonymes, comme salonAPI.appels (handlers_salon_appel.go).
+	st.Sante.AppelsOfferts = st.Sante.RelaisTurn && d.sm != nil && d.pai != nil && d.pai.Jetons() != nil
 
 	partages, err := d.svc.UsedShares()
 	if err != nil {
@@ -260,12 +268,12 @@ func adminState(cfg config.Config, d adminDeps) (adminui.State, error) {
 	c := capacityOf(cfg).WithDefaults()
 	st.Capacite = adminui.Capacite{EnvoisMax: c.Uploads, LecturesMax: c.Downloads, SurveillancesMax: c.Watches,
 		WebSocketMax: c.WebSockets, AppelsDisqueMax: d.gate.Cap(), Surveillances: d.svc.WatchCount(),
-		Octrois: d.svc.GrantCount(), Budgets: d.svc.BudgetCount(), AppelsDisque: d.gate.InUse()}
+		Octrois: d.svc.GrantCount(), Budgets: d.svc.BudgetCount(), AppelsDisque: d.gate.InUse(), PlafondSortie: d.svc.EgressMax()}
 
 	ul, ulPic := d.probes.Uploads()
 	dl, dlPic := d.probes.Downloads()
 	st.Usage = adminui.Usage{Snapshot: d.probes.Usage(), EffacesEntretien: d.svc.Effaces.Load(),
-		ExpediteursDuJour: d.lim.DistinctCreators(), EnvoisEnCours: ul, EnvoisPic: ulPic, LecturesEnCours: dl, LecturesPic: dlPic}
+		ExpediteursDuJour: d.lim.DistinctCreators(), RefusSortie: d.svc.RefusSortie.Load(), EnvoisEnCours: ul, EnvoisPic: ulPic, LecturesEnCours: dl, LecturesPic: dlPic}
 
 	if st.Partages, err = d.svc.CountByState(); err != nil {
 		return adminui.State{}, err

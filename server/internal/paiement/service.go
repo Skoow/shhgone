@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -48,6 +49,8 @@ var (
 	ErrFormule         = errors.New("formule invalide")
 	ErrRenonciation    = errors.New("renonciation au droit de rétractation non cochée")
 	ErrAucunAbonnement = errors.New("aucun abonnement à arrêter")
+	// ErrSuspendu : ventes suspendues par l'exploitant (tableau de bord) ; 503 comme ErrOccupe.
+	ErrSuspendu = errors.New("ventes suspendues par l'exploitant")
 )
 
 // Demande : ce que le prestataire reçoit pour créer sa page de paiement (rien de personnel).
@@ -145,6 +148,11 @@ type Service struct {
 	// redémarrage : le plafond repart de zéro, jamais une vente bloquée de plus).
 	mu       sync.Mutex
 	recentes [heuresRecentes]struct{ heure, n int64 }
+
+	// cpt : compteurs du tableau de bord depuis le démarrage (agregats.go) ; suspendu : ventes
+	// suspendues par l'exploitant (tableau de bord), en mémoire seulement.
+	cpt      compteurs
+	suspendu atomic.Bool
 }
 
 // compterRecente : d (+1 ou -1) commande créée dans l'heure de now.
@@ -240,6 +248,9 @@ func (s *Service) Commander(ctx context.Context, p Pass, f Formule, pays string,
 	if !s.vendable(f.Moyen) {
 		return "", ErrMoyen
 	}
+	if s.suspendu.Load() {
+		return "", ErrSuspendu
+	}
 	pr := s.prest[f.Moyen]
 	v, err := Ventiler(s.regime, pays, Prix(f.Offre, f.Jours))
 	if err != nil {
@@ -295,6 +306,7 @@ func (s *Service) Commander(ctx context.Context, p Pass, f Formule, pays string,
 			return "", err
 		}
 	}
+	s.cpt.par[f.Moyen].commandes.Add(1)
 	return ses.URL, nil
 }
 
@@ -418,11 +430,15 @@ func (s *Service) Webhook(ctx context.Context, pr Prestataire, h http.Header, co
 			return err
 		}
 		if !connu {
+			s.cpt.refuse(pr)
 			return ErrSignature // même réponse qu'une signature fausse (400), aucun appel sortant
 		}
 	}
 	evs, err := pr.Lire(ctx, h, corps)
 	if err != nil {
+		if errors.Is(err, ErrSignature) {
+			s.cpt.refuse(pr)
+		}
 		return err
 	}
 	for _, ev := range evs {
@@ -565,7 +581,7 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 					return err
 				}
 			}
-			return tx.Commit()
+			return s.valider(tx, pr, effetAnomalie)
 		}
 		fin, err := crediter(tx, l, auj)
 		if err != nil {
@@ -574,6 +590,7 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 		if _, err := tx.Exec(`UPDATE commandes SET etat=?, garde_jour=? WHERE id=?`, etatPayee, fin+gardeLitiges, l.id); err != nil {
 			return err
 		}
+		return s.valider(tx, pr, effetCredit)
 	case NonAbouti:
 		if l.etat == etatAttente {
 			if _, err := tx.Exec(`UPDATE commandes SET etat=? WHERE id=?`, etatNonAboutie, l.id); err != nil {
@@ -591,6 +608,9 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 		if _, err := tx.Exec(`UPDATE commandes SET etat=?, renouvelle=0, garde_jour=MAX(garde_jour, ?) WHERE id=?`,
 			etatRevoquee, auj+gardeLitiges, l.id); err != nil {
 			return err
+		}
+		if l.etat != etatRevoquee {
+			return s.valider(tx, pr, effetRevocation)
 		}
 	case PoseAbonnement:
 		if err := poserAbonnement(tx, l, ev.Abonnement); err != nil {

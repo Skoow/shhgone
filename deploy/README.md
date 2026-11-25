@@ -367,31 +367,65 @@ La destruction est **immédiate** : plus aucune ouverture, téléchargements en 
 
 ### Tableau de bord d'administration (désactivé par défaut)
 
-Une page qui réunit l'état du serveur (santé, stockage, mémoire, places, partages et salons vivants : des nombres seulement, jamais un identifiant, une adresse ni un contenu) et trois commandes : geler, dégeler, détruire un lien signalé. `wipe` n'y est pas, volontairement : il reste en ligne de commande. Conception : `docs/superpowers/specs/2026-11-13-tableau-de-bord-admin-design.md`.
+Une page qui réunit tout ce qu'un administrateur peut voir et faire sans SSH, **en nombres seulement** (jamais un identifiant, une adresse IP, un pseudo, un pass, une commande, un montant ni un contenu ; rien n'est enregistré, les compteurs « depuis le démarrage » repartent de zéro à chaque redémarrage). Conception : `docs/superpowers/specs/2026-11-13-tableau-de-bord-admin-design.md` (§ « Tableau de bord finalisé » et « Version finale, 25 novembre »).
 
-Elle est servie par un **écouteur à part**, jamais par Caddy, jamais sur le port public. Sans `SHH_ADMIN_LISTEN`, elle n'existe pas.
+- **État** : santé, stockage, activité, appels audio et vidéo (relais configuré, appels proposés, salons aux appels ouverts, identifiants du relais donnés), charge et places, mémoire.
+- **Signalements**, **Bannissements**, **Comptes** (nombre, inscrits aujourd'hui et ces 7 jours, ancienneté, passkeys, sessions, bannis).
+- **Paiement** (avec `SHH_PAIEMENT: "1"`) : pass Plus et Pro valables, abonnements, commandes en attente, anomalies ; par prestataire (Stripe, PayPal, NOWPayments) les pages créées, paiements crédités, remboursements et litiges, **webhooks refusés** ; jetons anonymes émis, dépensés, rendus.
+- **Usage** : partages et salons créés, partages payants par offre, volume chiffré reçu et servi, plafond de sortie par partage (`SHH_SHARE_EGRESS_MAX`) et refus à ce plafond.
+- **Actions** : geler et dégeler les créations ; **suspendre et rétablir les ventes** (jusqu'au prochain redémarrage ; les paiements en cours sont crédités, les pass payés gardent leurs droits) ; détruire un lien signalé. `wipe` n'y est pas, volontairement : il reste en ligne de commande. Couper les appels : `sudo docker stop shhdrop-relais-turn-1` par SSH (il repart à la prochaine installation).
 
-Pour l'activer (changement de `compose.yaml`, à relire et commiter comme les autres) :
+Elle est servie par un **écouteur à part**, jamais par Caddy, jamais sur le port public, et sur aucun port publié par Docker : l'adresse `172.30.53.2` est celle du conteneur sur le réseau interne (`internal: true`), que seule la machine elle-même peut joindre. On y arrive depuis son poste par un **tunnel SSH**. Sans `SHH_ADMIN_LISTEN`, elle n'existe pas.
 
-1. **Sur son poste** (pas sur le serveur), tirer un jeton et calculer son empreinte SHA-256 :
+**Prérequis dans `compose.yaml`** (service `shhdrop`, section `environment`) : les deux lignes ci-dessous doivent y être, sinon les réglages de `deploy/.env` ne parviennent pas au conteneur et rien ne se passe. Elles sont sans effet tant que `deploy/.env` ne pose pas `SHH_ADMIN_LISTEN` :
+
+```yaml
+      SHH_ADMIN_LISTEN: ${SHH_ADMIN_LISTEN:-}
+      SHH_ADMIN_TOKEN_SHA256: ${SHH_ADMIN_TOKEN_SHA256:-}
+```
+
+#### Mise en route depuis un poste Windows (PowerShell), préproduction ou production
+
+1. **Tirer le jeton, sur son poste** (jamais sur le serveur). Ouvrir PowerShell (pas en administrateur) et coller :
+
+   ```powershell
+   $b = New-Object byte[] 32
+   [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+   $jeton = -join ($b | ForEach-Object { $_.ToString('x2') })
+   $sha = [System.Security.Cryptography.SHA256]::Create()
+   $empreinte = -join ($sha.ComputeHash([Text.Encoding]::ASCII.GetBytes($jeton)) | ForEach-Object { $_.ToString('x2') })
+   "Jeton (à ranger, ne va jamais sur le serveur) : $jeton"
+   "Empreinte (va dans deploy/.env)              : $empreinte"
+   ```
+
+   Le jeton fait 64 caractères (0-9, a-f), l'empreinte aussi : ne pas les confondre. Commandes équivalentes sous Linux ou macOS : `JETON=$(openssl rand -hex 32)` puis `printf '%s' "$JETON" | sha256sum | cut -c1-64` (`printf '%s'`, jamais `echo`, qui ajouterait un saut de ligne et changerait l'empreinte).
+
+2. **Ranger le jeton dans Apple Mots de passe** (application « Mots de passe » d'iCloud pour Windows, ou sur l'iPhone) : nouvelle entrée, site `127.0.0.1`, identifiant `admin-preprod` ou `admin-prod`, mot de passe = le jeton. **Un jeton différent par serveur** (préproduction et production). Ne pas le laisser enregistrer par le navigateur. Puis effacer les variables : `Remove-Variable b, jeton, empreinte, sha`. Si on l'a copié avec Ctrl-C, l'historique du presse-papiers de Windows (Win+V) le garde : l'y effacer.
+
+3. **Mettre l'empreinte sur le serveur.** Se connecter (`ssh ubuntu@54.38.93.126`), puis ouvrir le fichier de réglages : `sudo nano /opt/shhdrop/deploy/.env`, et ajouter :
 
    ```sh
-   JETON=$(openssl rand -hex 32)
-   printf '%s\n' "$JETON"                       # à garder dans son gestionnaire de mots de passe
-   printf '%s' "$JETON" | sha256sum | cut -c1-64  # l'empreinte : 64 chiffres hexadécimaux
-   unset JETON
+   SHH_ADMIN_LISTEN=172.30.53.2:9191
+   SHH_ADMIN_TOKEN_SHA256=<l'empreinte, 64 caractères>
    ```
 
-   Mettre **l'empreinte seule** dans `deploy/.env` du serveur : `SHH_ADMIN_TOKEN_SHA256=<les 64 chiffres>`. Le jeton lui-même ne va jamais sur le serveur : ni dans `deploy/.env`, ni dans la configuration du conteneur (`docker inspect`), ni dans l'environnement du processus. Le serveur ne compare que des empreintes ; une empreinte ne permet pas de retrouver le jeton (audit adverse du 13 novembre, 3e campagne : tableau de bord F5, stockage F3). `printf '%s'`, sans retour à la ligne : avec `echo`, l'empreinte serait celle du jeton suivi d'un saut de ligne, et la page refuserait le jeton.
-2. Dans `compose.yaml`, service `shhdrop`, section `environment` :
+   Jamais le jeton lui-même : ni dans `deploy/.env`, ni dans `compose.yaml`, ni dans un message. Le serveur ne compare que des empreintes, dont on ne peut pas retrouver le jeton.
 
-   ```yaml
-   SHH_ADMIN_LISTEN: 172.30.53.2:9191
-   SHH_ADMIN_TOKEN_SHA256: ${SHH_ADMIN_TOKEN_SHA256:?SHH_ADMIN_TOKEN_SHA256 manquant}
+4. **Relancer** la version en service : `cd /opt/shhdrop && sudo deploy/deploy.sh status` (relever l'empreinte `sha256:…` en service), puis `sudo deploy/deploy.sh sha256:<cette empreinte>`. Contrôle : `sudo deploy/deploy.sh status` montre le serveur en bonne santé (une empreinte mal formée l'empêche de démarrer et l'installation revient en arrière ; lire la raison avec `sudo deploy/deploy.sh diagnose`). Le conteneur n'a aucun journal : la preuve que la page répond, c'est l'étape 6.
+
+5. **Ouvrir le tunnel, depuis PowerShell sur son poste** (OpenSSH est fourni avec Windows 10 et 11) :
+
+   ```powershell
+   ssh -N -L 127.0.0.1:9191:172.30.53.2:9191 ubuntu@54.38.93.126
    ```
 
-   `172.30.53.2` est l'adresse du conteneur sur le réseau interne : seule la machine peut la joindre (aucun port publié, aucune route depuis Internet). Le serveur ne répond qu'à la boucle locale et à `SHH_TRUSTED_PROXY` (la machine), et seulement sous les noms `localhost`, `127.0.0.1` ou `172.30.53.2` (en-tête `Host`, n'importe quel port) : un autre nom reçoit la même réponse qu'une route inconnue (protection contre le « DNS rebinding » et contre une ligne de Caddy qui relaierait le nom public vers ce port).
-3. `deploy/deploy.sh` relance le conteneur. Depuis son poste : `ssh -L 127.0.0.1:9191:172.30.53.2:9191 <machine>`, puis ouvrir `http://127.0.0.1:9191` et coller le jeton. `127.0.0.1` et non `localhost` : si `[::1]:9191` est déjà pris sur le poste, `ssh` n'ouvre que l'IPv4 et un navigateur qui essaie `::1` d'abord enverrait le jeton à l'autre programme.
+   La fenêtre reste ouverte sans rien afficher : c'est normal, le tunnel vit tant qu'elle est ouverte (Ctrl-C le ferme). `-N` : aucune commande sur le serveur. Si le port 9191 est déjà pris sur le poste, prendre un autre port à gauche (`127.0.0.1:9292:172.30.53.2:9191`) et l'ouvrir à l'étape suivante.
+
+6. **Ouvrir `http://127.0.0.1:9191`** dans le navigateur (exactement `127.0.0.1`, pas `localhost` : si `[::1]:9191` est pris sur le poste, un navigateur qui essaie `::1` d'abord enverrait le jeton à l'autre programme). Coller le jeton depuis Apple Mots de passe, « Ouvrir ». `http` est normal : le trafic passe chiffré dans le tunnel SSH.
+
+7. **Fermer** : fermer l'onglet (le jeton est oublié), puis Ctrl-C dans la fenêtre du tunnel.
+
+Le serveur ne répond qu'à la boucle locale et à la machine (`SHH_TRUSTED_PROXY`), et seulement sous les noms `localhost`, `127.0.0.1` ou `172.30.53.2` (en-tête `Host`, n'importe quel port) : un autre nom reçoit la même réponse qu'une route inconnue (protection contre le « DNS rebinding » et contre une ligne de Caddy qui relaierait le nom public vers ce port). Changer le jeton : en tirer un autre (étape 1), changer l'empreinte (étape 3) et relancer (étape 4). Le couper : retirer `SHH_ADMIN_LISTEN` de `deploy/.env` et relancer.
 
 **Variable refusée en production.** `SHH_ADMIN_TOKEN` (le jeton en clair) n'est accepté que pour le développement local (sans `SHH_BEHIND_PROXY`). Derrière le proxy déclaré, sa seule présence empêche le serveur de démarrer, tableau de bord activé ou non, avec un message qui donne la commande ci-dessus ; `shhdrop admin` refuse aussi (même configuration). Les deux variables ensemble : refusé. Une empreinte mal formée (pas 64 chiffres hexadécimaux en minuscules, ou celle d'un jeton vide) : refusé, sans afficher la valeur. Si l'écouteur d'administration ne s'ouvre pas (port pris), le site public démarre quand même. Contrepartie : le serveur ne peut plus vérifier la qualité du jeton (une empreinte ne dit rien de ce qu'elle résume) ; c'est la commande de tirage qui la garantit : n'en employer aucune autre.
 
