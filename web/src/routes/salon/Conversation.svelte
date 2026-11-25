@@ -10,6 +10,7 @@
   import { announce } from "../../ui/announce";
   import { routeTitle } from "../../app/title";
   import { morceaux, type Bulle, type Element } from "../../salon/conversation";
+  import { ralentiRestant } from "../../salon/affichage";
   import * as S from "../../salon/salon.svelte";
   import Button from "../../ui/Button.svelte";
   import InlineConfirm from "../../ui/InlineConfirm.svelte";
@@ -81,6 +82,8 @@
   let emojis = $state(false);
   let membres = $state(false);
   let erreur = $state("");
+  // Limite de trames du serveur (0x0B) : l'envoi repart tout seul ; on le dit au lieu de rester muet.
+  const ralenti = $derived(ralentiRestant(vue.ralentiJusqua, maintenant));
   let enBas = $state(true);
   let nonLus = $state(0);
 
@@ -264,7 +267,7 @@
     const e = await S.telechargerArchive(selectionnables.filter((b) => choix.has(b.cle)));
     selEnCours = false;
     if (e === null) finSelection();
-    else selMessage = t(e === "trop_gros" ? "salon.files.zip.gros" : e === "indisponible" ? "salon.piece.err.indisponible" : e === "sortie" ? "salon.piece.err.sortie" : "salon.piece.err.lecture");
+    else selMessage = t(e === "trop_gros" ? "salon.files.zip.gros" : e === "indisponible" ? "salon.piece.err.indisponible" : e === "sortie" ? "salon.piece.err.sortie" : e === "relu" ? "salon.piece.err.relu" : "salon.piece.err.lecture");
   }
   // Sélection : les pièces retirées ou effacées entre-temps quittent le choix.
   $effect(() => {
@@ -658,6 +661,7 @@
           </div>
         {/if}
         {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}
+        {#if ralenti !== null}<p class="note" role="status">{t("salon.room.ralenti", { duree: formatDuration(ralenti, lang, { precise: true }) })}</p>{/if}
         {#if tropLong}<Button variant="secondary" dense onpress={() => {
             if (tropLong) enFichier(tropLong);
           }}>{t("salon.room.toolong.txt")}</Button>{/if}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Lots, causeLecture, envoyerPiece, lirePiece } from "./pieces";
+import { Lots, causeLecture, envoyerPiece, lectureDefinitive, lirePiece } from "./pieces";
 import { SalonError, type Net } from "./api";
 
 /** Faux serveur des pièces : segments gardés tels quels, tailles exactes vérifiées. */
@@ -102,11 +102,14 @@ describe("pièces du salon", () => {
     expect(causeLecture(e)).toBe("sortie");
     expect(refus).toBe(1); // aucun nouvel essai
   });
-  it("causeLecture : 404 indisponible, 403 egress_limit sortie, le reste lecture (réessayable)", () => {
+  it("causeLecture : 404 indisponible, 403 egress_limit sortie, 429 budget relu, le reste lecture (réessayable)", () => {
     expect(causeLecture(new SalonError(404, "not_found"))).toBe("indisponible");
     expect(causeLecture(new SalonError(403, "egress_limit"))).toBe("sortie");
     expect(causeLecture(new SalonError(403, "excluded"))).toBe("lecture");
-    expect(causeLecture(new SalonError(429, "budget"))).toBe("lecture");
+    expect(causeLecture(new SalonError(429, "budget"))).toBe("relu");
+    expect(causeLecture(new SalonError(429, "limit"))).toBe("lecture");
+    expect(lectureDefinitive("relu") && lectureDefinitive("sortie")).toBe(true);
+    expect(lectureDefinitive("lecture") || lectureDefinitive("indisponible") || lectureDefinitive(undefined)).toBe(false);
     expect(causeLecture(new Error("reseau"))).toBe("lecture");
   });
 });

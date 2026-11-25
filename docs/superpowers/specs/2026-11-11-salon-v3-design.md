@@ -265,7 +265,7 @@ Choisi sur la page d'explication avant d'entrer (§39.4, règles de forme et d'u
 
 ## 8. Appels audio et vidéo : plus tard, payants, mais préparés
 
-> **20 novembre** : appels conçus, codés et testés ; conception dans `2026-11-20-appels-design.md`. Écart à valider par le propriétaire : pas de SFrame tant que les appels sont en maillage (son §2.1). Désactivés en production tant que le relais n'est pas installé.
+> **20 novembre** : appels conçus, codés et testés ; conception dans `2026-11-20-appels-design.md`, qui fait foi (la suite de cette section est l'intention du 11 novembre). Écart à valider par le propriétaire : pas de SFrame tant que les appels sont en maillage (son §2.1). **24 novembre** : réservés aux offres Plus et Pro ; offerts seulement si le relais TURN est configuré **et** `SHH_PAIEMENT=1` (son §5.1).
 
 **Fonctions payantes** (décision du propriétaire, 11 novembre). Rien n'est codé maintenant. Contraintes posées dès aujourd'hui pour ne rien bloquer :
 
@@ -356,7 +356,7 @@ Le propriétaire veut une conversation aussi proche que possible d'une messageri
 
 - **Envoi** : choisir plusieurs photos, vidéos ou documents d'un coup (galerie, fichiers, glisser-déposer). Chaque fichier devient une pièce et un message ; les photos et vidéos envoyées ensemble s'affichent groupées en **album** (grille de 2 à 4 vignettes, « +N »). La limite de 120 pièces par heure et par personne (C-2 Task 13) s'applique ; au-delà, l'écran dit combien attendre.
 - **Réception** : mode sélection (appui long sur un message, ou case à cocher au survol) ; barre d'actions « Télécharger (N) », « Tout sélectionner ». Plusieurs fichiers partent en une seule archive `.zip` faite dans l'appareil (module `zip` existant, sans compression ni métadonnée), ou un par un si l'appareil le permet mieux (application native). Chaque fichier téléchargé envoie son accusé « Téléchargé ».
-- Le budget de lecture par pièce (C-2 Task 13) s'applique : télécharger dix fois la même archive finit par être refusé, avec un message clair. **24 novembre** : plus le plafond de sortie par pièce (§3.4, 403 `egress_limit`, message « limite de téléchargement », sans nouvel essai). Le refus du budget par jeton (429 `budget`) affiche encore le message générique « Le fichier n'a pas pu être ouvert. Réessayez. » (signalé, voir le rapport du 24 novembre).
+- Le budget de lecture par pièce (C-2 Task 13) s'applique : télécharger dix fois la même archive finit par être refusé, avec un message clair. **24 novembre** : plus le plafond de sortie par pièce (§3.4, 403 `egress_limit`, message « limite de téléchargement », sans nouvel essai). Le refus du budget par jeton (429 `budget`, définitif pour ce jeton : le budget ne se recharge pas) affiche, depuis le 25 novembre, « Vous avez atteint votre limite de lecture pour ce fichier : le serveur ne vous l'envoie plus. Demandez à l'expéditeur de l'envoyer à nouveau. » et la pièce n'est plus redemandée (`pieces.ts`, `causeLecture` « relu »). Pour ne pas l'atteindre sans raison, une pièce déjà affichée (image, vocal, vidéo) est enregistrée ou mise dans le `.zip` depuis la mémoire de la page, sans nouvelle lecture du serveur.
 
 ### 14.4 Son de nouveau message et mode silencieux
 

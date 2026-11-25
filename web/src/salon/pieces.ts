@@ -20,14 +20,20 @@ export type RefPiece = { r: Uint8Array; piece: Uint8Array; palier: number };
 
 /**
  * Cause d'une lecture de pièce ratée, pour le message : « indisponible » (404 : retirée ou
- * effacée), « sortie » (403 egress_limit : plafond de sortie de la pièce atteint sur le serveur,
- * définitif, jamais réessayé), sinon « lecture » (réessayable).
+ * effacée), « sortie » (403 egress_limit : plafond de sortie de la pièce atteint sur le serveur),
+ * « relu » (429 budget : budget de lecture de ce membre pour cette pièce épuisé, 2 lectures
+ * complètes ; il ne se recharge jamais pour ce jeton), sinon « lecture » (réessayable).
+ * « sortie » et « relu » sont définitifs : jamais réessayés (`lectureDefinitive`).
  */
-export function causeLecture(e: unknown): "indisponible" | "sortie" | "lecture" {
+export function causeLecture(e: unknown): "indisponible" | "sortie" | "relu" | "lecture" {
   if (e instanceof api.SalonError && e.status === 404) return "indisponible";
   if (e instanceof api.SalonError && e.status === 403 && e.code === "egress_limit") return "sortie";
+  if (e instanceof api.SalonError && e.status === 429 && e.code === "budget") return "relu";
   return "lecture";
 }
+
+/** Refus du serveur qu'aucun nouvel essai ne lèverait (plafond de sortie, budget de lecture). */
+export const lectureDefinitive = (c: string | undefined): boolean => c === "sortie" || c === "relu";
 
 const segments = (bucket: number) => Math.ceil(bucket / SEG_CHUNKS);
 const chunksDuSegment = (bucket: number, n: number) => Math.min(SEG_CHUNKS, bucket - n * SEG_CHUNKS);
