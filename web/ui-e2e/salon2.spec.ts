@@ -139,6 +139,19 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
     await bulle(page, t2b).screenshot({ path: `${CAPTURES}/salon2-ephemere-accuses-pc.png` });
     expect(await axe(page)).toEqual([]);
 
+    // Message retiré : « Message retiré » tient sur une ligne (la bulle ne se resserre plus).
+    const t5 = `Je retire ceci ${r}`;
+    await envoyer(page, t5);
+    await expect(bulle(pageB, t5)).toBeVisible({ timeout: 30_000 });
+    await bulle(page, t5).getByRole("button", { name: "Actions du message" }).click();
+    await bulle(page, t5).getByRole("button", { name: "Retirer pour tous" }).click();
+    await page.getByRole("button", { name: "Retirer pour tous" }).last().click();
+    for (const p of [page, pageB]) {
+      const retire = fil(p).locator("p.retire").last();
+      await expect(retire).toHaveText("Message retiré", { timeout: 30_000 });
+      expect((await retire.boundingBox())!.height).toBeLessThan(30);
+    }
+
     // Paramètres : panneau latéral (ordinateur), feuille du bas (téléphone) ; Échap le ferme.
     const params = bouton(page, "Paramètres du salon");
     await expect(params).toHaveAttribute("aria-expanded", "false");

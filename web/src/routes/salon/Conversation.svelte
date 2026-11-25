@@ -604,6 +604,8 @@
             {@const al = albums.get(e.cle)}
             {@const dc = decompte(e)}
             <li class={["msg", { moi: e.moi, album: al !== undefined, choisi: selection && choix.has(e.cle) }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e} use:appuiLong={e} out:dissoudre>
+              <!-- Rangée : case de sélection, bulle, bouton « ⋯ » (toujours à côté de la bulle). -->
+              <div class="rang">
               {#if selection && selectionnable(e)}
                 <input type="checkbox" class="sel" id="sel-{e.cle}" checked={choix.has(e.cle)} aria-label={t("salon.files.choisir", { nom: nomPiece(e) })} onchange={() => basculer(e.cle)} />
               {/if}
@@ -659,6 +661,9 @@
               </div>
               {#if !e.retire && e.id}
                 <button type="button" class="plus" aria-label={t("salon.room.actions")} aria-expanded={menu === e.cle} onclick={() => (menu = menu === e.cle ? null : e.cle)}><Ellipsis size={20} aria-hidden="true" /></button>
+              {/if}
+              </div>
+              {#if !e.retire && e.id}
                 {#if menu === e.cle}
                   <div class="actions-msg" role="group" aria-label={t("salon.room.actions")}>
                     <div class="rapides">
@@ -1062,9 +1067,15 @@
     grid-column: auto;
   }
   /* Album : la photo prend toute la case, le bouton « ⋯ » passe dessous. */
+  .album,
+  .album .rang {
+    align-items: stretch;
+  }
+  .album .rang {
+    flex-wrap: wrap;
+  }
   .album .bulle {
     flex: 1 1 100%;
-    max-width: none;
   }
   .album :global(.img) {
     width: 100%;
@@ -1096,24 +1107,31 @@
     font-size: 0.8125rem;
     text-align: center;
   }
+  /* Mes messages à droite, ceux des autres à gauche (chez chacun). */
   .msg {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     align-items: flex-start;
     gap: var(--sp-1);
     max-width: min(92%, 600px);
   }
   .msg.moi {
     justify-self: end;
+    align-items: flex-end;
+  }
+  .rang {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-1);
+    max-width: 100%;
+  }
+  .moi .rang {
     flex-direction: row-reverse;
   }
   /* Bulle : surface et filet, sans barre de couleur sur le côté (la couleur de la personne reste
      sur son nom) ; le coin du bas, du côté de l'auteur, est resserré. */
   .bulle {
     min-width: 0;
-    /* Le bouton « ⋯ » reste à côté de la bulle (il passait dessous sur téléphone). */
-    flex: 0 1 auto;
-    max-width: calc(100% - 48px);
     padding: var(--sp-2) var(--sp-3);
     border-radius: 16px 16px 16px 6px;
     background: var(--surface-1);
@@ -1305,7 +1323,7 @@
     outline-offset: 2px;
   }
   .actions-msg {
-    flex-basis: 100%;
+    align-self: stretch;
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-1);
