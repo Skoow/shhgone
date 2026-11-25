@@ -3,9 +3,9 @@
   // prix sur le côté, en haut ») : à gauche, le rythme (mensuel ou annuel), les trois offres (Plus
   // mis en avant ; toute la carte choisit l'offre) et le comparatif aligné sur leurs colonnes (les
   // cartes ne disent que le prix et une ligne-clé, le tableau seul porte le détail) ; à droite, le
-  // panneau de paiement collant (récapitulatif, moyen, pays, renonciation, bouton) ; questions en
-  // deux colonnes dessous. Téléphone : carrousel des offres, panneau de paiement dessous, tableau
-  // qui défile en largeur (première colonne fixe). Chiffres lus dans PAID et limits.ts.
+  // panneau de paiement collant (récapitulatif, moyen, pays, renonciation, bouton). Téléphone :
+  // carrousel des offres, panneau de paiement dessous, tableau qui défile en largeur (première
+  // colonne fixe). Plus de questions fréquentes (retirées le 25 novembre). Chiffres lus dans PAID et limits.ts.
   //
   // Paiement (conception du paiement) : le bouton n'est actif que si CE serveur
   // propose le moyen choisi (GET /api/paiement ; démo, serveur sans paiement : inactif, la raison
@@ -25,7 +25,7 @@
   import { paysProbable } from "../paiement/pays";
   import { href } from "../app/router.svelte";
   import { LimiteDefi, obtenirPreuve, preparerPreuve } from "../paiement/preuve";
-  import { Check, ChevronDown, Lock, Timer } from "./Icon";
+  import { Check, Lock, Timer } from "./Icon";
   import Banner from "./Banner.svelte";
 
   type Billing = "month" | "year";
@@ -66,7 +66,6 @@
     { g: t("offers.cmp.g.onsite"), rows: [{ k: t("offers.calls.label"), v: (x: Tier) => (x === "free" ? t("offers.calls.no") : t("offers.calls.yes")), calls: true }] },
     { g: t("offers.cmp.g.security"), rows: [{ k: t("offers.cmp.e2e"), v: () => t("offers.cmp.same"), same: true }] },
   ]);
-  const FAQ = ["safer", "card", "account", "unused", "country", "stop"] as const;
   const price = (x: PaidTier) => (billing === "month" ? PAID[x].month : PAID[x].year);
   const per = $derived(billing === "month" ? t("offers.per.month") : t("offers.per.year"));
   // Moyen de paiement : carte bancaire (Stripe), PayPal, crypto
@@ -371,21 +370,6 @@
     </table>
   </div>
 
-  <section class="ofaq" aria-labelledby="{uid}-faq">
-    <h2 id="{uid}-faq">{t("offers.faq.title")}</h2>
-    <div class="qa">
-      {#each [FAQ.slice(0, 3), FAQ.slice(3)] as col, c (c)}
-        <div>
-          {#each col as k (k)}
-            <details name="{uid}-faq">
-              <summary><span>{t(`offers.faq.${k}.q`)}</span><ChevronDown size={20} strokeWidth={1.75} aria-hidden="true" /></summary>
-              <p>{t(`offers.faq.${k}.a`)}</p>
-            </details>
-          {/each}
-        </div>
-      {/each}
-    </div>
-  </section>
 </div>
 
 <style>
@@ -401,9 +385,8 @@
       grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
       grid-template-areas:
         "top side"
-        "cmp side"
-        "faq faq";
-      grid-template-rows: auto 1fr auto;
+        "cmp side";
+      grid-template-rows: auto 1fr;
       column-gap: clamp(32px, 3.5vw, 56px);
       row-gap: 0;
     }
@@ -417,9 +400,6 @@
     }
     .cmpw {
       grid-area: cmp;
-    }
-    .ofaq {
-      grid-area: faq;
     }
   }
   .top {
@@ -975,66 +955,6 @@
     font-size: var(--fs-small);
   }
 
-  /* ---------- Questions, deux colonnes sur ordinateur ---------- */
-  .ofaq {
-    display: grid;
-    gap: var(--sp-5);
-    padding-block-start: var(--sp-8);
-  }
-  .ofaq h2 {
-    font-size: clamp(1.5rem, 1.2rem + 1vw, 1.75rem);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .qa {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-  }
-  @media (min-width: 900px) {
-    .qa {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: var(--sp-7);
-    }
-  }
-  details {
-    border-block-start: 1px solid var(--hair);
-  }
-  summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-4);
-    min-height: 56px;
-    padding-block: var(--sp-3);
-    font-weight: 600;
-    list-style: none;
-    cursor: pointer;
-  }
-  summary::-webkit-details-marker {
-    display: none;
-  }
-  summary:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: 6px;
-  }
-  summary :global(svg) {
-    flex: none;
-    color: var(--text-3);
-    transition: transform var(--dur-fast) var(--ease-out);
-  }
-  details[open] summary :global(svg) {
-    transform: rotate(180deg);
-    color: var(--accent);
-  }
-  details p {
-    margin: 0 0 var(--sp-4);
-    max-width: 62ch;
-    color: var(--text-2);
-    line-height: 1.55;
-  }
-
   /* ---------- Téléphone et tablette ---------- */
   @media (max-width: 1023px) {
     .side {
@@ -1113,8 +1033,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .card,
-    .billing label,
-    summary :global(svg) {
+    .billing label {
       transition: none;
     }
   }

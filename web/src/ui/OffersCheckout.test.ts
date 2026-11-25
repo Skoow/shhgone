@@ -54,7 +54,7 @@ describe("Offres : cartes, comparatif, panneau de paiement, questions", () => {
     expect(document.querySelector(".cmp")!.textContent).not.toMatch(/vidéo filmée/iu);
   });
 
-  it("panneau : récapitulatif après le choix seulement, bouton inactif ; questions en deux colonnes", () => {
+  it("panneau : récapitulatif après le choix seulement, bouton inactif ; sans questions fréquentes", () => {
     app = mount(OffersCheckout as never, { target: document.body }) as Record<string, unknown>;
     flushSync();
     expect(document.querySelector("[data-summary]")).toBeNull();
@@ -68,7 +68,7 @@ describe("Offres : cartes, comparatif, panneau de paiement, questions", () => {
     expect(sum.querySelectorAll(".adds li")).toHaveLength(4);
     expect(pay.disabled).toBe(true);
     expect(document.querySelector("[data-waiver]")!.closest("[data-summary]")).toBe(sum);
-    const cols = [...document.querySelectorAll(".ofaq .qa > div")];
-    expect(cols.map((c) => c.querySelectorAll("details").length)).toEqual([3, 3]);
+    // Plus de questions fréquentes sur la page Offres (retirées le 25 novembre).
+    expect(document.querySelector(".ofaq, details")).toBeNull();
   });
 });
