@@ -395,12 +395,12 @@ describe("polices hébergées (UI §4.1)", () => {
     expect(faces[1]).toMatch(/size-adjust:\s*101\.35%/);
     expect(T.get("--font-sans")).toBe('"Mona Sans", "Mona Sans repli", system-ui, sans-serif');
   });
-  it("index.html : préchargement de Mona Sans seulement", () => {
-    const html = readFileSync(join(webDir, "index.html"), "utf8");
-    const pre = [...html.matchAll(/<link[^>]*rel="preload"[^>]*>/g)].map((m) => m[0]);
-    expect(pre.length).toBe(1);
-    expect(pre[0]).toContain("/src/assets/fonts/mona-sans-latin-standard-normal.woff2");
-    expect(pre[0]).toContain("crossorigin");
+  // Mesuré : le préchargement de la police retardait le premier affichage (index.html).
+  it("index.html, page.html, s.html : aucun préchargement (la police vient par sa feuille de style)", () => {
+    for (const f of ["index.html", "page.html", "s.html"]) {
+      const html = readFileSync(join(webDir, f), "utf8");
+      expect([...html.matchAll(/<link[^>]*rel="preload"[^>]*>/g)], f).toEqual([]);
+    }
   });
 });
 
