@@ -2,6 +2,9 @@
   // Options de l'envoi (UI §9.3, benchmark M4) : durée et ouvertures (phrase « S'efface dans
   // 12 h ou après 1 ouverture… » sur ordinateur), destinataire (interrupteur
   // « Autoriser le téléchargement » ; plus de sous-option du coffre), estimation du temps d'envoi.
+  // Mot de passe (D42-27) : interrupteur « Protéger par un mot de passe », désactivé par défaut ;
+  // activé, le mot de passe généré, « Générer un autre », « Copier » et le rappel de l'envoyer
+  // par un autre moyen.
 // `compact` : feuille du téléphone, une ligne d'aide au plus par réglage.
   // Choix payants : plus aucun ici ; une
   // seule ligne discrète dans l'en-tête du composeur ouvre la feuille d'information.
@@ -9,7 +12,9 @@
   import type { Options } from "../flows/options.svelte";
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
-  import { ShieldAlert, TriangleAlert } from "../ui/Icon";
+  import Button from "../ui/Button.svelte";
+  import CopyField from "../ui/CopyField.svelte";
+  import { RefreshCw, ShieldAlert, TriangleAlert } from "../ui/Icon";
   import Segmented from "../ui/Segmented.svelte";
   import Stepper from "../ui/Stepper.svelte";
   import Switch from "../ui/Switch.svelte";
@@ -58,8 +63,28 @@
   </p>
 {/snippet}
 {#snippet trust()}
-  <p class="line"><ShieldAlert size={16} strokeWidth={1.9} aria-hidden="true" /><span>{t("options.pw.lead")}</span></p>
-  <p class="line"><ShieldAlert size={16} strokeWidth={1.9} aria-hidden="true" /><span>{t("options.tries", { n: PW_TRIES })}</span></p>
+  {#if options.protect}
+    <p class="line"><ShieldAlert size={16} strokeWidth={1.9} aria-hidden="true" /><span>{t("options.pw.lead")}</span></p>
+    <p class="line"><ShieldAlert size={16} strokeWidth={1.9} aria-hidden="true" /><span>{t("options.tries", { n: PW_TRIES })}</span></p>
+  {:else}
+    <p class="line" data-pw-off><ShieldAlert size={16} strokeWidth={1.9} aria-hidden="true" /><span>{t("options.pw.off")}</span></p>
+  {/if}
+{/snippet}
+<!-- Mot de passe facultatif (D42-27) : désactivé par défaut ; activé, toujours généré (D41-15). -->
+{#snippet protection()}
+  <div class="block" data-protect>
+    <Switch label={t("options.pw.switch")} hint={options.protect ? undefined : t("options.pw.off")} checked={options.protect} onchange={(v) => (options.protect = v)} />
+    {#if options.protect}
+      <div class="pw" data-pw>
+        <CopyField label={t("options.pw.label")} value={options.generated} />
+        <Button variant="ghost" dense onpress={() => options.regenerate()}>
+          {#snippet icon()}<RefreshCw size={18} strokeWidth={1.9} />{/snippet}
+          {t("options.pw.regenerate")}
+        </Button>
+        <p class="hint">{t("options.pw.elsewhere")}</p>
+      </div>
+    {/if}
+  </div>
 {/snippet}
 
 {#if part === "summary"}
@@ -114,9 +139,10 @@
     </div>
   </div>
 
-  <!-- Plus de mot de passe dans les options : il est
-       généré sur l'appareil et montré une fois le lien créé, sous le lien (« Lien prêt »). -->
-  {#if part === "all"}<div class="block">{@render trust()}</div>{/if}
+  <!-- Mot de passe (D42-27) : choisi ici, généré sur l'appareil, montré de nouveau sous le lien
+       (« Lien prêt ») s'il est activé. -->
+  {@render protection()}
+  {#if part === "all" && options.protect}<div class="block">{@render trust()}</div>{/if}
 
   <div class="block" role="group" aria-labelledby="rights-title">
     <h3 class="h3" id="rights-title">{t("options.rights.label")}</h3>
@@ -223,6 +249,23 @@
   .rights {
     display: grid;
     border-radius: 14px;
+  }
+  .pw {
+    display: grid;
+    gap: var(--sp-2);
+    justify-items: start;
+    min-width: 0;
+  }
+  .pw > :global(*) {
+    max-width: 100%;
+  }
+  .pw > :global(:first-child) {
+    justify-self: stretch;
+  }
+  /* Valeur à gauche, « Copier » à sa taille (la feuille du téléphone élargit ses boutons). */
+  .pw :global(.cf .row > button) {
+    flex: none;
+    width: auto;
   }
   .warn {
     display: grid;

@@ -425,10 +425,10 @@ describe("page Contact et adresses e-mail", () => {
 
   test("contenu : pour quoi écrire, ce qu'il ne faut jamais envoyer, langues ; ni adresse postale ni délai promis", () => {
     const f = pageTexte(infoPage("contact", "fr", false));
-    for (const re of [/En français ou en anglais/u, /Signaler un abus/u, /autorités[^.]*demandes de retrait/u, /RGPD/u, /CNIL/u, /faille/u, /Le lien complet d'un partage avec son mot de passe/u, /Seule exception, un signalement d'abus par écrit/u, /hébergée par OVH/u])
+    for (const re of [/En français ou en anglais/u, /Signaler un abus/u, /autorités[^.]*demandes de retrait/u, /RGPD/u, /CNIL/u, /faille/u, /Le lien complet d'un partage, avec son mot de passe s'il en a un/u, /Seule exception, un signalement d'abus par écrit/u, /hébergée par OVH/u])
       expect(f).toMatch(re);
     const e = pageTexte(infoPage("contact", "en", false));
-    for (const re of [/In French or English/u, /Report abuse/u, /removal requests/u, /GDPR/u, /flaw/u, /The full link of a share together with its password/u, /The only exception is a written abuse report/u]) expect(e).toMatch(re);
+    for (const re of [/In French or English/u, /Report abuse/u, /removal requests/u, /GDPR/u, /flaw/u, /The full link of a share, with its password if it has one/u, /The only exception is a written abuse report/u]) expect(e).toMatch(re);
     for (const lang of ["fr", "en"] as const)
       for (const comptes of [false, true]) {
         const t = pageTexte(infoPage("contact", lang, comptes));

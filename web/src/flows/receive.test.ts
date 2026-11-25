@@ -261,6 +261,37 @@ describe("createReceiver (UI §9.7)", () => {
     expect([r.state, r.error, r.attemptsLeft]).toEqual(["locked", "password_required", 4]);
   });
 
+  it("partage sans mot de passe (lien « #l », D42-27) : jamais ouvert au chargement ; « Ouvrir » sans mot de passe consomme une ouverture", async () => {
+    const NOPW = "https://x.test/s#l" + "A".repeat(43);
+    const { r, openShare, store } = setup({}, NOPW);
+    await flush();
+    // Chargement : meta seulement (compte à rebours, ouvertures), aucune ouverture.
+    expect([r.state, r.noPassword]).toEqual(["locked", true]);
+    expect(openShare).not.toHaveBeenCalled();
+    await r.unlock("");
+    expect(openShare).toHaveBeenCalledTimes(1);
+    expect((openShare as ReturnType<typeof vi.fn>).mock.calls[0]!.slice(0, 2)).toEqual([NOPW, ""]);
+    expect(r.state).toBe("open");
+    // Entrée de l'onglet : la marque « l » est gardée avec la clé (rechargement sans mot de passe).
+    expect(store.value?.link).toBe("l" + "A".repeat(43));
+    // Ancien lien : toujours avec mot de passe.
+    const old = setup();
+    await flush();
+    expect(old.r.noPassword).toBe(false);
+    await old.r.unlock("");
+    expect([old.r.error, (old.openShare as ReturnType<typeof vi.fn>).mock.calls.length]).toEqual(["password_required", 0]);
+  });
+
+  it("rechargement d'un partage sans mot de passe : « reopen » avec la marque reprise de l'onglet, rouvert sans mot de passe", async () => {
+    const store = memStore({ v: 1, link: "l" + "A".repeat(43), grant: GRANT, last: 1_000_000 });
+    const { r, openShare } = setup({ grants: store, navType: () => "reload" }, null);
+    await flush();
+    expect([r.state, r.noPassword, r.reopening]).toEqual(["reopen", true, true]);
+    await r.unlock("");
+    expect((openShare as ReturnType<typeof vi.fn>).mock.calls[0]!.slice(0, 2)).toEqual(["https://x.test/s#l" + "A".repeat(43), ""]);
+    expect(r.state).toBe("open");
+  });
+
   it("réseau à l'ouverture → locked/network (rien n'est affirmé sur l'ouverture consommée)", async () => {
     const { r } = setup({ openShare: vi.fn(async () => Promise.reject(new Error("reseau"))) });
     await flush();

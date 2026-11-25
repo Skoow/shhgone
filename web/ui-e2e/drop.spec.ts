@@ -10,7 +10,7 @@ import type { Page } from "@playwright/test";
 import { openShare } from "../src/index";
 import { captureOf, expect, test } from "./fixtures";
 import { file, freshPage, unlock } from "./open-helpers";
-import { addText, closeAddSheet, noViewTransition, openFilePicker, readyHeading, sendButton } from "./send-helpers";
+import { addText, closeAddSheet, noViewTransition, openFilePicker, readyHeading, sendButton, protectOn } from "./send-helpers";
 
 const SHOTS = fileURLToPath(new URL("../test-results/captures/DROP/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
@@ -50,6 +50,7 @@ test("note : cadenas vert avant le clic ; modifiée → renvoyée, nouvelle vers
   await expect.poll(() => puts.length, { timeout: 30_000 }).toBe(2);
   await expect(row.locator("[data-up]")).toHaveAttribute("data-up", "pret", { timeout: 30_000 });
 
+  await protectOn(page); // D42-27 : mot de passe désactivé par défaut
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   expect(puts.length).toBe(2); // rien de plus au clic : la note était déjà partie
@@ -100,6 +101,7 @@ test("ordinateur : filigrane de dépôt dans la liste (texte entier, clic → ch
   await captureOf(noteRow(page), { path: SHOTS + "ligne-note-1440.png" });
 
   // Destinataire : même règle, le contenu se lit avec « Voir ».
+  await protectOn(page); // D42-27 : mot de passe désactivé par défaut
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const read = async (name: string) => {

@@ -84,7 +84,9 @@ const longParagraphs = (scope: Locator) =>
   scope.locator("p, .h, .line").evaluateAll((els) =>
     els
 
-      .filter((e) => (e as HTMLElement).offsetParent !== null && !e.closest(".sr-only, .cnote") && e.textContent!.trim() !== "")
+      // [data-protect] : avertissement exigé à la création (D42-27, « Sans mot de passe, quiconque a
+      // le lien peut ouvrir… »), une phrase de sécurité, pas une aide : trois lignes permises au téléphone.
+      .filter((e) => (e as HTMLElement).offsetParent !== null && !e.closest(".sr-only, .cnote, [data-protect]") && e.textContent!.trim() !== "")
       .filter((e) => {
         const lh = parseFloat(getComputedStyle(e).lineHeight) || 20;
         return e.getBoundingClientRect().height > lh * 2 + 4;

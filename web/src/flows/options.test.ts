@@ -10,12 +10,28 @@ function make(over: Partial<OptionsDeps> = {}) {
 }
 
 describe("createOptions (UI §9.3)", () => {
-  it("défauts : 12 h, 1 ouverture, mot de passe généré, voir et enregistrer", () => {
+  it("défauts : 12 h, 1 ouverture, SANS mot de passe (D42-27 : désactivé par défaut, mot de passe déjà généré), voir et enregistrer", () => {
     const o = make();
     expect(o.ttlHours).toBe(12);
     expect(o.maxOpens).toBe(1);
-    expect(o.password).toBe("Gen1abcd");
+    expect(o.protect).toBe(false);
+    expect(o.password).toBeNull();
+    expect(o.generated).toBe("Gen1abcd");
     expect(o.rights).toBe("enregistrer");
+  });
+
+  it("« Protéger par un mot de passe » (D42-27) : activé, le mot de passe généré est utilisé ; désactivé, null", () => {
+    const o = make();
+    o.protect = true;
+    expect(o.password).toBe("Gen1abcd");
+    o.regenerate();
+    expect(o.password).toBe("Gen2abcd");
+    o.protect = false;
+    expect(o.password).toBeNull();
+    expect(o.generated).toBe("Gen2abcd");
+    // Seul un vrai booléen active la protection.
+    o.protect = "oui" as unknown as boolean;
+    expect(o.protect).toBe(false);
   });
 
   it("mot de passe toujours généré (D41-15) : aucune saisie possible", () => {
@@ -26,6 +42,7 @@ describe("createOptions (UI §9.3)", () => {
 
   it("regenerate : un nouveau à chaque appel, sans limite", () => {
     const o = make();
+    o.protect = true;
     for (let i = 2; i < 30; i++) {
       o.regenerate();
       expect(o.password).toBe(`Gen${i}abcd`.slice(0, 8));

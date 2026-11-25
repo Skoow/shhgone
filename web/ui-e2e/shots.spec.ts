@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { file, settle, unlock } from "./open-helpers";
-import { addText, openFilePicker, readyHeading, sendButton, enterComposer } from "./send-helpers";
+import { addText, openFilePicker, readyHeading, sendButton, protectOn, enterComposer } from "./send-helpers";
 
 const DIR = process.env.SHOTS_DIR ?? "";
 const [W, H] = (process.env.SHOTS_VP ?? "390x844").split("x").map(Number) as [number, number];
@@ -103,6 +103,7 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
     await new Promise((res) => setTimeout(res, 2500));
     await r.continue();
   });
+  await protectOn(page); // D42-27 : mot de passe désactivé par défaut
   await sendButton(page).click();
   await page.waitForTimeout(1500);
   await shot(page, "06-envoi");

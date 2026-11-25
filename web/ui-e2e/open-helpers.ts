@@ -36,8 +36,23 @@ export type Sent = { link: string; password: string; manage: string };
 export async function sendShare(
   page: Page,
   url: string,
-  o: { text?: string; files?: (string | { name: string; mimeType: string; buffer: Buffer })[]; opens?: number; download?: boolean; isMobile?: boolean; clean?: boolean; title?: string } = {},
+  o: {
+    text?: string;
+    files?: (string | { name: string; mimeType: string; buffer: Buffer })[];
+    opens?: number;
+    download?: boolean;
+    isMobile?: boolean;
+    clean?: boolean;
+    title?: string;
+    /**
+     * « Protéger par un mot de passe » (D42-28, désactivé par défaut dans l'interface) : activé
+     * ici par défaut, pour les tests écrits avec un mot de passe ; `false` : partage sans mot de
+     * passe (lien « #l », `password` vide).
+     */
+    protect?: boolean;
+  } = {},
 ): Promise<Sent> {
+  const protect = o.protect !== false;
   await page.goto(url);
   if (o.text !== undefined) await addText(page, o.text);
   if (o.files?.length) {
@@ -47,9 +62,11 @@ export async function sendShare(
     // Rien n'est nettoyé sans le balai : « Tout nettoyer » pour l'éprouver.
     if (o.clean) await cleanAll(page);
   }
-  if (o.opens !== undefined || o.download === false || o.title !== undefined) {
+  if (o.opens !== undefined || o.download === false || o.title !== undefined || protect) {
     let opts = page.locator(".side");
-    if (o.isMobile) {
+    // Téléphone : feuille « Options » (aussi quand l'appelant ne le dit pas : la colonne est cachée).
+    const mobile = o.isMobile ?? !(await opts.isVisible().catch(() => false));
+    if (mobile) {
       await page.getByRole("button", { name: /^Options · / }).click();
       opts = page.getByRole("dialog", { name: "Options" });
     }
@@ -68,21 +85,40 @@ export async function sendShare(
       await sw.click();
       await expect(sw).toHaveAttribute("aria-checked", "false");
     }
-    if (o.isMobile) await page.keyboard.press("Escape");
+    if (protect) {
+      const sw = opts.getByRole("switch", { name: "Protéger par un mot de passe" });
+      await expect(sw).toHaveAttribute("aria-checked", "false"); // désactivé par défaut (D42-27)
+      await sw.click();
+      await expect(sw).toHaveAttribute("aria-checked", "true");
+    }
+    if (mobile) await page.keyboard.press("Escape");
   }
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const read = async (l: ReturnType<Page["locator"]>) => (await l.locator(".sr-only").first().textContent()) ?? "";
   const link = await read(page.getByRole("group", { name: "Lien", exact: true }));
-  // Mot de passe masqué à l'arrivée : l'œil l'affiche, puis le remasque.
+  // Mot de passe masqué à l'arrivée : l'œil l'affiche, puis le remasque. Sans mot de passe : aucun.
   const pw = page.getByRole("group", { name: "Mot de passe", exact: true });
-  await pw.locator("[data-reveal]").click();
-  const password = await read(pw);
-  await pw.locator("[data-reveal]").click();
+  let password = "";
+  if (protect) {
+    await pw.locator("[data-reveal]").click();
+    password = await read(pw);
+    await pw.locator("[data-reveal]").click();
+  } else await expect(pw).toHaveCount(0);
   // Lien de gestion : toujours montré (historique des liens retiré, spec §33).
   const manage = await read(page.locator("[data-manage]"));
-  expect(link).toMatch(/#[A-Za-z0-9_-]{43}$/);
+  expect(link).toMatch(protect ? /#[A-Za-z0-9_-]{43}$/ : /#l[A-Za-z0-9_-]{43}$/);
   return { link, password, manage };
+}
+
+/** Bouton « Ouvrir » d'un partage sans mot de passe (D42-27). */
+export const openButton = (page: Page) => page.getByRole("button", { name: /^(Ouvrir|Ouverture…)$/ });
+
+/** Ouvre un partage sans mot de passe (geste « Ouvrir ») ; attend l'écran de contenu. */
+export async function openNoPassword(page: Page): Promise<void> {
+  await expect(pwField(page)).toHaveCount(0);
+  await openButton(page).click();
+  await expect(page.getByRole("heading", { name: /^Contenu(, .+)?$/ })).toBeVisible({ timeout: 30_000 });
 }
 
 /** Contexte neuf (aucun état partagé avec l'expéditeur), même locale. */

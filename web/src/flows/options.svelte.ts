@@ -1,7 +1,8 @@
 // Options de l'envoi (UI §9.3, spec §31, §34) : nom du partage, durée,
 // ouvertures, mot de passe, droits du destinataire. En mémoire seulement : le mot de passe
 // n'est jamais rangé ni journalisé.
-// Le mot de passe est toujours généré (D41-15) : aucune saisie, donc aucun contrôle ici.
+// Le mot de passe est facultatif, désactivé par défaut (D42-27) ; activé, il est toujours généré
+// (D41-15) : aucune saisie, donc aucun contrôle ici.
 import { OPENS_DEFAULT, TITLE_MAX, TTL_DEFAULT, previewKindOf, type TtlHours } from "../index";
 import { limitesDe, type Formule } from "../limits";
 
@@ -23,6 +24,9 @@ export function createOptions(deps: OptionsDeps) {
   let formules = $state<readonly Formule[]>([]);
   const lim = $derived(limitesDe(formule));
   let generated = $state(deps.generate());
+  // « Protéger par un mot de passe » (D42-27) : désactivé par défaut ; activé, le mot de passe
+  // généré (toujours généré, D41-15) est demandé à l'ouverture. Désactivé : le lien seul ouvre.
+  let protect = $state(false);
   // Nom du partage : texte libre, nettoyé par le moteur au scellement (cleanTitle).
   let title = $state("");
   // Droits (spec §34, simplifiés) : un interrupteur
@@ -69,9 +73,23 @@ export function createOptions(deps: OptionsDeps) {
     get limites() {
       return lim;
     },
-    /** Mot de passe qui sera utilisé : toujours le dernier généré. */
-    get password() {
+    /** « Protéger par un mot de passe » (D42-27), désactivé par défaut. */
+    get protect(): boolean {
+      return protect;
+    },
+    set protect(v: boolean) {
+      protect = v === true;
+    },
+    /** Dernier mot de passe généré, affiché quand la protection est activée. */
+    get generated(): string {
       return generated;
+    },
+    /**
+     * Mot de passe qui sera utilisé : le dernier généré si la protection est activée ; null sinon
+     * (partage sans mot de passe, lien « #l », D42-27).
+     */
+    get password(): string | null {
+      return protect ? generated : null;
     },
     /** Droit écrit dans le manifeste : voir, enregistrer ou coffre. */
     get rights(): Rights {

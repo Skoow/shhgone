@@ -5,6 +5,8 @@
 // `password`, spec §29.4.4) et fait l'enveloppe, chiffre le manifeste des seuls éléments gardés (dans l'ordre affiché) et finalise. Le lien n'existe qu'après.
 // Le serveur ne reçoit que K_accès et S_gestion (création), des segments chiffrés, des numéros
 // de segments, et à la fin le sel, Argon2id, V_preuve, E, l'en-tête et le manifeste chiffré.
+// Partage sans mot de passe (D42-27, `password: null`) : mêmes champs, K_sans à la place de K_mdp,
+// lien « #l » ; rien ne dit au serveur lequel des deux il reçoit.
 import {
   CHUNK_CT,
   HEADER,
@@ -29,6 +31,7 @@ import {
   newKLien,
   newSGestion,
   newSeed,
+  noPasswordKey,
   passwordKeyForCreate,
   randomBytes,
   reservationFor,
@@ -37,6 +40,7 @@ import {
   segmentsNeeded,
   shareId,
   shareLink,
+  shareLinkNoPassword,
   type ElementSealer,
   type FinalEntry,
   type Item,
@@ -667,11 +671,12 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     warm,
     /**
      * Mot de passe généré affiché (A5) : K_mdp calculé d'avance, recalculé à chaque changement.
-     * Un mot de passe d'une autre forme n'est pas calculé (finalize le refusera).
+     * Un mot de passe d'une autre forme n'est pas calculé (finalize le refusera). null : partage
+     * sans mot de passe (D42-27), rien à calculer (un K_mdp d'avance est effacé).
      */
-    password(pw: string) {
+    password(pw: string | null) {
       if (closed) return;
-      wantPw = isGeneratedPassword(pw) ? pw : undefined;
+      wantPw = pw !== null && isGeneratedPassword(pw) ? pw : undefined;
       if (kMdpReady && kMdpReady.pw !== wantPw) dropKMdp();
       precompute();
     },
@@ -723,8 +728,10 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     if (!lim.ttlHours.includes(f.ttlHours)) throw new Error("duree_invalide");
     if (!Number.isInteger(f.maxOpens) || f.maxOpens < 1 || f.maxOpens > lim.maxOpens) throw new Error("ouvertures_invalides");
     f.prepared?.proof.catch(() => undefined);
-    // Mot de passe de la forme générée (D41-15) : refusé avant toute requête.
-    if (!isGeneratedPassword(f.password)) throw new Error("mot_de_passe_non_genere");
+    // Mot de passe de la forme générée (D41-15) : refusé avant toute requête. Sans mot de passe
+    // (D42-27) : null explicite seulement (un oubli, undefined, reste refusé).
+    const noPassword = f.password === null;
+    if (!noPassword && (typeof f.password !== "string" || !isGeneratedPassword(f.password))) throw new Error("mot_de_passe_non_genere");
     throwIfAborted(f.signal);
     if (closed) throw new NotFoundError();
     if (finalizing) throw new Error("finalisation_en_cours");
@@ -847,6 +854,8 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   }
 
   async function finish(cr: Created, list: { id: string; item: Item }[], f: CreateOpts) {
+    // Forme déjà vérifiée par finalize (null : sans mot de passe, D42-27).
+    const noPassword = f.password === null;
     // R neuve à chaque finalisation (une ContentKeys par R, jamais recréée : moteur), opaque.
     const r = await newSeed();
     const wipe: Uint8Array[] = [];
@@ -883,7 +892,11 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
         );
       });
       throwIfAborted(f.signal);
-      const kMdp = await kMdpFor(f.password);
+      // Sans mot de passe (D42-27) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp ») à la place de
+      // K_mdp ; tout le reste (sel tiré, paramètres, V_preuve, E) part à l'identique : le serveur
+      // ne distingue pas les deux sortes de partage.
+      if (noPassword) dropKMdp();
+      const kMdp = noPassword ? await noPasswordKey(cr.kLien) : await kMdpFor(f.password as string);
       wipe.push(kMdp);
       const ak = await accessKeys(cr.kLien, kMdp);
       engine.push(ak.kEnv);
@@ -923,7 +936,9 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       closed = true;
       clearInterval(keepTimer);
       const base = f.base ?? "/";
-      const out = { link: await shareLink(origin, cr.kLien, base), manage: await manageLink(origin, cr.sGestion, base), expiresInS, ...(title === undefined ? {} : { title }) };
+      // Lien « #l » (sans mot de passe, la marque reste dans le fragment) ou « #<K_lien> ».
+      const link = noPassword ? await shareLinkNoPassword(origin, cr.kLien, base) : await shareLink(origin, cr.kLien, base);
+      const out = { link, manage: await manageLink(origin, cr.sGestion, base), expiresInS, ...(title === undefined ? {} : { title }) };
       for (const e of els.values()) e.sealer?.forget();
       cr.kLien.fill(0);
       cr.sGestion.fill(0);

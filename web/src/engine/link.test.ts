@@ -16,7 +16,7 @@ describe("liens (spec §32, sous /s : secret après #)", () => {
     expect(await shareLink("https://shhdrop.app", k)).toHaveLength(65); // 65 caractères en tout
     const p = await parseLink(link);
     if (p.kind !== "s") throw new Error("type");
-    expect(p).toEqual({ kind: "s", origin: "https://shhdrop.example", kLien: k });
+    expect(p).toEqual({ kind: "s", origin: "https://shhdrop.example", kLien: k, noPassword: false });
     expect(Object.keys(p)).not.toContain("id"); // l'id se calcule par shareId, jamais lu dans le lien
   });
 
@@ -80,7 +80,7 @@ describe("liens (spec §32, sous /s : secret après #)", () => {
     const k = newKLien();
     const link = await shareLink("https://skoow.github.io", k, "/shhdrop/");
     expect(link).toBe(`https://skoow.github.io/shhdrop/s#${b64u(k)}`);
-    expect(await parseLink(link, "/shhdrop/")).toEqual({ kind: "s", origin: "https://skoow.github.io", kLien: k });
+    expect(await parseLink(link, "/shhdrop/")).toEqual({ kind: "s", origin: "https://skoow.github.io", kLien: k, noPassword: false });
     const s = newSGestion();
     expect(await parseLink(await manageLink("https://skoow.github.io", s, "/shhdrop/"), "/shhdrop/")).toEqual({
       kind: "m",

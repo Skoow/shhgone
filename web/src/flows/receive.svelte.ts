@@ -6,6 +6,9 @@
 // d'application (S4), où le « # » reste jusqu'à « Continuer ici quand même ». Le mot de passe
 // n'est jamais gardé : il ne vit que le temps de l'appel à unlock().
 //
+// Partage sans mot de passe (lien « #l », D42-27) : `noPassword`, aucun champ ; « Ouvrir » est
+// le geste qui appelle unlock (jamais au chargement : aperçus de liens, robots).
+//
 // Rechargement et autres onglets (spec §41.4, UI §9.7.1) : après un déverrouillage, K_lien et
 // l'octroi d'ouverture sont gardés dans l'onglet (session/open-grant.ts, jamais le mot de
 // passe) ; un rechargement (adresse sans « # ») passe à l'état « reopen » et rouvre la même
@@ -18,6 +21,7 @@
 // fermé l'onglet, passe à l'état « reopen » (mot de passe ressaisi, aucune ouverture de plus).
 // Octroi gardé mais partage introuvable : « return_lost » (retour impossible, dit clairement).
 import type { LinkState } from "../app/link";
+import { isNoPasswordLink } from "../engine/pure";
 import { pageReturns, type Returns } from "../storage/returns";
 import {
   BadPasswordError,
@@ -127,6 +131,8 @@ export type Receiver = {
   readonly otherTab: boolean;
   /** Rechargement : l'écran dit « Rouvrir » (états reopen et unlocking qui en vient). */
   readonly reopening: boolean;
+  /** Partage sans mot de passe (lien « #l », D42-28) : « Ouvrir » sans champ ; le geste reste demandé. */
+  readonly noPassword: boolean;
   /** Activité (clic, touche, défilement, visibilité) : repousse l'effacement après 30 min. */
   touch(): void;
   continueHere(): void;
@@ -157,7 +163,7 @@ export type Receiver = {
 
 const isCode = (e: unknown, code: string) => e instanceof Error && e.message === code;
 
-/** K_lien (43 caractères) d'un lien de partage `${origin}/s#<clé>`. */
+/** Fragment d'un lien de partage `${origin}/s#<clé>` : K_lien (43 caractères), précédé de « l » sans mot de passe (D42-27). */
 const keyOf = (l: string) => l.slice(l.lastIndexOf("#") + 1);
 
 export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}): Receiver {
@@ -215,6 +221,9 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     grant = stored.grant;
     reloaded = true;
   }
+  // Partage sans mot de passe (D42-27) : lu sur la forme du lien (marque « l » du fragment, aussi
+  // gardée dans l'entrée de l'onglet), jamais demandé au serveur.
+  const noPassword = secret !== null && isNoPasswordLink(secret);
   // Heure de sortie de page notée dans l'entrée (RESTORE_MS). Jamais retirée : sans entrée,
   // elle ne fait rien, et une ouverture suivante dans la page en a besoin.
   d.onHide(() => {
@@ -411,6 +420,9 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     get otherTab() {
       return s.otherTab;
     },
+    get noPassword() {
+      return noPassword;
+    },
     get reopening() {
       return s.reopening;
     },
@@ -458,7 +470,7 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
       const back = s.state;
       if (expired()) return end("invalid");
       if (d.now() < limitedUntil) return;
-      if (password === "") {
+      if (password === "" && !noPassword) {
         s.error = "password_required";
         return;
       }

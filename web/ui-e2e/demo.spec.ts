@@ -4,7 +4,7 @@
 // Les tâches suivantes ajoutent leur parcours à ce fichier.
 import type { Page } from "@playwright/test";
 import { axe, capture, expect, test } from "./fixtures";
-import { addFile, addText, readyHeading, sendButton } from "./send-helpers";
+import { addFile, addText, readyHeading, sendButton, protectOn } from "./send-helpers";
 
 // La démo garde ses données chiffrées dans ce navigateur, sur une
 // origine partagée par tous les sites GitHub Pages du compte : « ne mettez rien de réel ».
@@ -306,6 +306,7 @@ test.describe("fr-FR : envoi (–18)", () => {
     await page.goto(demo.url);
     await addText(page, "Le code de la porte est 4471.");
     await addFile(page, "releve.bin", 2 * 1048576);
+    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
     await sendButton(page).click();
     // Les étapes peuvent défiler très vite (démo locale) : n'importe quel écran du parcours d'envoi.
     await expect(page.getByRole("heading", { name: /^(Préparation des clés|Vérification anti-robot|Chiffrement et envoi|Finalisation|Lien prêt)$/ }).first()).toBeVisible();
@@ -365,6 +366,7 @@ test.describe("fr-FR : envoi (–18)", () => {
     test.setTimeout(90_000);
     await page.goto(demo.url);
     await addText(page, "À supprimer.");
+    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     const link = (await page.getByRole("group", { name: "Lien", exact: true }).locator(".sr-only").first().textContent()) ?? "";
@@ -382,6 +384,7 @@ test.describe("fr-FR : envoi (–18)", () => {
     test.setTimeout(120_000);
     await page.goto(demo.url + "?coupure");
     await addFile(page, "releve.bin", 3 * 1048576);
+    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(page.getByRole("status").filter({ hasText: /Connexion perdue|Hors ligne/ })).toBeVisible({ timeout: 30_000 });
     await capture(page, "demo-seal-offline");

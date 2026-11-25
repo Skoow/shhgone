@@ -63,12 +63,16 @@ export { fileSha256 } from "./engine";
 export { cleanTitle } from "./engine";
 export {
   MANAGE_FRAGMENT,
+  NO_PASSWORD_FRAGMENT,
+  NO_PASSWORD_LINK_SHAPE,
   SHARE_FRAGMENT,
   SHARE_LINK_SHAPE,
   SHARE_PW_FRAGMENT,
+  isNoPasswordLink,
   manageLink,
   parseLink,
   shareLink,
+  shareLinkNoPassword,
   shareLinkWithPassword,
   splitPassword,
   type ParsedLink,

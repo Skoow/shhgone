@@ -259,7 +259,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         h: "Fermé à clé sur votre appareil",
         p: [
           "Vos fichiers et vos textes sont chiffrés dans votre navigateur, avant de partir. Ce qui arrive sur notre serveur est illisible sans la clé, pour nous comme pour n'importe qui d'autre.",
-          "Le mot de passe est volontairement lent à vérifier : essayer des mots de passe au hasard coûte très cher à qui voudrait le deviner.",
+          "Le mot de passe, facultatif et désactivé par défaut, est volontairement lent à vérifier quand vous l'activez : essayer des mots de passe au hasard coûte très cher à qui voudrait le deviner.",
           "Les noms de fichiers, leurs types et vos textes sont chiffrés aussi : nous ne pouvons pas les lire.",
         ],
       },
@@ -267,8 +267,9 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         id: "lien",
         h: "Le lien et le mot de passe",
         p: [
-          "La clé est cachée dans la fin du lien, après le signe #. Les navigateurs n'envoient jamais cette partie à un serveur. Il faut le lien et le mot de passe pour ouvrir un partage : notre serveur n'a ni l'un ni l'autre.",
-          `Après ${v.tries} mots de passe faux, le partage est détruit. Il s'efface aussi à la fin de sa durée (${v.h} h au plus en gratuit) ou après le nombre d'ouvertures choisi (${v.opens} au plus).`,
+          "La clé est cachée dans la fin du lien, après le signe #. Les navigateurs n'envoient jamais cette partie à un serveur. Il faut le lien pour ouvrir un partage, et aussi le mot de passe si vous en avez mis un : notre serveur n'a ni l'un ni l'autre.",
+          "Sans mot de passe (le réglage par défaut), quiconque a le lien peut ouvrir le partage : une sauvegarde de messagerie ou un historique de navigateur qui garde le lien suffit, tant que le partage existe et qu'il reste une ouverture. Activez le mot de passe et envoyez-le par un autre moyen pour plus de sûreté.",
+          `Avec un mot de passe, après ${v.tries} mots de passe faux, le partage est détruit. Il s'efface aussi à la fin de sa durée (${v.h} h au plus en gratuit) ou après le nombre d'ouvertures choisi (${v.opens} au plus).`,
         ],
       },
       {
@@ -286,7 +287,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         h: "Après la dernière ouverture",
         p: [
           "Quand toutes les ouvertures sont prises, personne d'autre ne peut entrer. Chaque personne qui a ouvert le partage peut y revenir depuis le même navigateur jusqu'à la fin de sa durée, sans compter d'ouverture : le contenu chiffré reste donc sur le serveur jusque-là. La dernière personne peut le détruire tout de suite ; sinon, il est effacé à la fin de la durée choisie à l'envoi.",
-          "Pour revenir, ce navigateur garde l'autorisation d'ouverture, chiffrée, jamais la clé ni le mot de passe ; il faut rouvrir le lien et retaper le mot de passe. Depuis un autre appareil, en navigation privée ou après un redémarrage de notre serveur, le retour n'est plus possible si toutes les ouvertures sont prises.",
+          "Pour revenir, ce navigateur garde l'autorisation d'ouverture, chiffrée, jamais la clé ni le mot de passe ; il faut rouvrir le lien (et retaper le mot de passe s'il y en a un). Depuis un autre appareil, en navigation privée ou après un redémarrage de notre serveur, le retour n'est plus possible si toutes les ouvertures sont prises.",
         ],
       },
       {
@@ -295,7 +296,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         list: [
           "Empêcher une capture d'écran, une photo de l'écran ou une copie : ce que le destinataire voit ou télécharge lui appartient.",
           "Effacer l'historique de votre navigateur. Nous retirons la clé de la barre d'adresse, mais le navigateur a déjà noté l'adresse complète dans son historique (parfois synchronisé). Ouvrez le lien en navigation privée pour laisser moins de traces.",
-          "Garantir que la mémoire de l'appareil est vidée : nous l'effaçons du mieux possible. Pour qu'un rechargement ne coûte pas une ouverture, le lien et un code d'ouverture restent dans le stockage de cet onglet le temps de l'ouverture (jamais le mot de passe ni le contenu).",
+          "Garantir que la mémoire de l'appareil est vidée : nous l'effaçons du mieux possible. Pour qu'un rechargement ne coûte pas une ouverture, le lien et un code d'ouverture restent dans le stockage de cet onglet le temps de l'ouverture (jamais le mot de passe ni le contenu ; sans mot de passe, ce lien suffit à rouvrir le partage).",
           "Tout effacer dans les fichiers. Photos, PDF et documents bureautiques perdent leurs informations cachées (lieu, appareil, auteur, dates), comme les vidéos et les sons, si vous les nettoyez avant l'envoi (un geste, sur votre appareil ; sans lui, le fichier part tel quel). Les archives et les formats non pris en charge partent tels quels : leur ligne le dit. Ce qui se voit dans l'image ou se lit dans le document reste : la vignette d'aperçu d'une photo est gardée (elle peut montrer la photo d'avant un recadrage ou une retouche), un PDF ne perd que ses propriétés de document (ses pages, leurs miniatures et ses images restent telles quelles), les commentaires d'un document gardent leurs auteurs, et un PDF modifié plusieurs fois peut garder d'anciens passages.",
           "Vérifier l'expéditeur : un lien peut venir de n'importe qui.",
           "Vous protéger d'un site piégé : si notre serveur ou notre code était compromis, le site servi pourrait voler les clés. C'est pour cela que le code est public et que le site se reconstruit à l'identique depuis ce code.",
@@ -307,7 +308,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         id: "qr",
         h: "QR code et partage en un geste",
         p: [
-          "« Partager » peut envoyer le lien et le mot de passe ensemble, et le QR code les contient tous les deux. Avec une seule ouverture (le réglage par défaut), personne d'autre ne pourra voir le contenu ensuite, et le destinataire verrait qu'il a déjà été ouvert.",
+          "« Partager » peut envoyer le lien et le mot de passe ensemble, et le QR code les contient tous les deux (sans mot de passe, le lien seul). Avec une seule ouverture (le réglage par défaut), personne d'autre ne pourra voir le contenu ensuite, et le destinataire verrait qu'il a déjà été ouvert.",
           "Mais quelqu'un qui lit le message avant le destinataire peut l'ouvrir à sa place, et l'adresse du QR (lien et mot de passe) reste dans l'historique du navigateur qui l'ouvre. Pour plus de sûreté, envoyez le lien et le mot de passe par deux moyens différents.",
         ],
       },
@@ -324,8 +325,8 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       h: "Détails techniques (pour les experts)",
       list: [
         "Contenu, noms, types et textes : AES-256-GCM (WebCrypto), clés dérivées par HKDF-SHA-256 ; aucune cryptographie maison.",
-        "Mot de passe : Argon2id (RustCrypto, dans le moteur WebAssembly du site), 64 Mio de mémoire, 3 passes, combiné à la clé du fragment du lien (après #), jamais transmise au serveur.",
-        `Ouverture : le serveur vérifie une preuve dérivée de la clé et du mot de passe, sans recevoir ni l'une ni l'autre ; ${v.tries} preuves fausses détruisent le partage.`,
+        "Mot de passe (facultatif) : Argon2id (RustCrypto, dans le moteur WebAssembly du site), 64 Mio de mémoire, 3 passes, combiné à la clé du fragment du lien (après #), jamais transmise au serveur. Sans mot de passe, une clé tirée du fragment par HKDF-SHA-256 prend sa place ; le serveur reçoit les mêmes données et ne sait pas quels partages ont un mot de passe.",
+        `Ouverture : le serveur vérifie une preuve dérivée de la clé et du mot de passe (ou de la clé seule), sans recevoir ni l'une ni l'autre ; ${v.tries} preuves fausses détruisent le partage.`,
         "Taille : l'envoi chiffré commence dès qu'un fichier est ajouté, avant « Chiffrer et envoyer ». Pendant l'envoi, le serveur voit la taille à 4 Mio près, car le contenu part en morceaux chiffrés de 4 Mio. Une fois l'envoi fini, le contenu chiffré occupe un palier de taille fixe : le serveur ne connaît plus que ce palier.",
         "Navigateur : en-têtes stricts (Content-Security-Policy, Permissions-Policy) ; aucun script, police ni traceur d'un autre site.",
         ...VERIFIER_FR.tech,
@@ -451,7 +452,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Objet",
         p: [
-          "Shhgone permet d'envoyer des fichiers, des photos, des vidéos, des messages vocaux et des notes, chiffrés sur votre appareil, par un lien et un mot de passe, sans compte. Ces conditions s'appliquent à toute utilisation du site. En utilisant Shhgone, vous les acceptez.",
+          "Shhgone permet d'envoyer des fichiers, des photos, des vidéos, des messages vocaux et des notes, chiffrés sur votre appareil, par un lien (et un mot de passe si vous le voulez), sans compte. Ces conditions s'appliquent à toute utilisation du site. En utilisant Shhgone, vous les acceptez.",
         ],
       },
       {
@@ -495,7 +496,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Vos responsabilités",
         p: [
-          "Vous êtes responsable de ce que vous envoyez et de la personne à qui vous l'envoyez. Transmettez le lien et le mot de passe par deux moyens différents, et seulement à qui doit les recevoir.",
+          "Vous êtes responsable de ce que vous envoyez et de la personne à qui vous l'envoyez. Transmettez le lien (et le mot de passe, s'il y en a un, par un autre moyen) seulement à qui doit les recevoir.",
         ],
       },
       {
@@ -587,7 +588,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Depuis le partage",
         list: [
-          "Ouvrez le partage avec son lien et son mot de passe.",
+          "Ouvrez le partage avec son lien (et son mot de passe s'il en a un).",
           "En bas du contenu, choisissez « Signaler ce partage », dites ce qui se passe, puis « Signaler ».",
           "Chaque ouverture compte pour une voix. Le partage est supprimé pour tout le monde quand la moitié de ses ouvertures permises l'ont signalé (deux voix au moins dès deux ouvertures : 1 sur 1, 2 sur 2, 2 sur 3, 3 sur 5) : les téléchargements en cours sont coupés, plus aucune ouverture n'est possible. Sinon, votre signalement est compté et le partage reste ouvert aux autres.",
         ],
@@ -596,13 +597,13 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         h: "Ce que nous recevons",
         p: [
           "Le signalement ne contient que la catégorie choisie (par exemple « Arnaque ») et la preuve que vous avez ouvert le partage : ni le contenu, ni qui vous êtes. Nous ne pouvons pas lire le partage. Nous comptons, en mémoire seulement, les signalements par catégorie depuis le dernier démarrage du serveur et leur nombre dans l'heure, pour repérer un abus massif ; rien n'est écrit sur disque.",
-          `Sans le lien et le mot de passe, rien ne peut être fait sur le partage : il s'effacera seul à son échéance (${v.h} h au plus en gratuit). Pour un contenu illégal, vous pouvez aussi écrire à l'adresse de la page Contact en joignant le lien.`,
+          `Sans le lien (et le mot de passe, s'il y en a un), rien ne peut être fait sur le partage : il s'effacera seul à son échéance (${v.h} h au plus en gratuit). Pour un contenu illégal, vous pouvez aussi écrire à l'adresse de la page Contact en joignant le lien.`,
         ],
       },
       {
         h: "Par écrit",
         list: [
-          "Écrivez à l'adresse de la page Contact en joignant : le lien complet du partage (avec ce qui suit le « # ») et son mot de passe si vous l'avez, sans lequel personne ne peut voir le contenu ; ce qui vous paraît illégal, et pourquoi ; votre nom et votre adresse e-mail (facultatifs pour un contenu d'abus sexuel sur mineur) ; une phrase qui confirme que vous signalez de bonne foi et que ces informations sont exactes.",
+          "Écrivez à l'adresse de la page Contact en joignant : le lien complet du partage (avec ce qui suit le « # ») et son mot de passe s'il en a un et si vous l'avez, sans lequel personne ne peut voir le contenu d'un partage protégé ; ce qui vous paraît illégal, et pourquoi ; votre nom et votre adresse e-mail (facultatifs pour un contenu d'abus sexuel sur mineur) ; une phrase qui confirme que vous signalez de bonne foi et que ces informations sont exactes.",
           "Nous accusons réception, une personne examine le partage (jamais un robot seul), puis nous vous répondons avec notre décision et les recours possibles.",
           "Un contenu manifestement illégal est détruit tout de suite : plus aucune ouverture, téléchargements en cours coupés. Si la vie ou la sécurité de quelqu'un est menacée, nous prévenons les autorités.",
         ],
@@ -636,7 +637,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         id: "jamais",
         h: "Ce qu'il ne faut jamais nous envoyer",
         p: [
-          "Le lien complet d'un partage avec son mot de passe\u202f: qui a les deux peut ouvrir le partage. Seule exception, un signalement d'abus par écrit, où ils nous sont nécessaires pour voir le contenu, comme le dit la page «\u00a0Signaler un abus\u00a0».",
+          "Le lien complet d'un partage, avec son mot de passe s'il en a un\u202f: qui les a peut ouvrir le partage. Seule exception, un signalement d'abus par écrit, où ils nous sont nécessaires pour voir le contenu, comme le dit la page «\u00a0Signaler un abus\u00a0».",
           "Nous ne vous demanderons jamais un mot de passe.",
         ],
       },
@@ -662,7 +663,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "Locked on your device",
         p: [
           "Your files and texts are encrypted in your browser before they leave. What reaches our server is unreadable without the key, for us as for anyone else.",
-          "The password is deliberately slow to check: trying passwords at random is very expensive for anyone who wants to guess it.",
+          "The password, optional and off by default, is deliberately slow to check when you turn it on: trying passwords at random is very expensive for anyone who wants to guess it.",
           "File names, their types and your texts are encrypted too: we can't read them.",
         ],
       },
@@ -670,8 +671,9 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         id: "lien",
         h: "The link and the password",
         p: [
-          "The key is hidden at the end of the link, after the # sign. Browsers never send that part to a server. Opening a share takes the link and the password: our server has neither.",
-          `After ${v.tries} wrong passwords, the share is destroyed. It is also erased when its time runs out (${v.h} h at most on the free plan) or after the chosen number of opens (${v.opens} at most).`,
+          "The key is hidden at the end of the link, after the # sign. Browsers never send that part to a server. Opening a share takes the link, and also the password if you set one: our server has neither.",
+          "Without a password (the default), anyone who has the link can open the share: a messaging backup or a browser history that keeps the link is enough, as long as the share exists and an open is left. Turn on the password and send it another way to be safer.",
+          `With a password, after ${v.tries} wrong passwords, the share is destroyed. It is also erased when its time runs out (${v.h} h at most on the free plan) or after the chosen number of opens (${v.opens} at most).`,
         ],
       },
       {
@@ -689,7 +691,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "After the last open",
         p: [
           "Once all opens are used, nobody else can get in. Each person who opened the share can come back to it from the same browser until its time runs out, without using an open: the encrypted content therefore stays on the server until then. The last person can destroy it right away; otherwise it is erased at the end of the duration chosen when sending.",
-          "To come back, this browser keeps the open permission, encrypted, never the key or the password; you reopen the link and type the password again. From another device, in a private window or after our server restarts, coming back is no longer possible once all opens are used.",
+          "To come back, this browser keeps the open permission, encrypted, never the key or the password; you reopen the link (and type the password again if there is one). From another device, in a private window or after our server restarts, coming back is no longer possible once all opens are used.",
         ],
       },
       {
@@ -698,7 +700,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         list: [
           "Prevent a screenshot, a photo of the screen or a copy: what the recipient sees or downloads is theirs.",
           "Erase your browser history. We remove the key from the address bar, but the browser has already recorded the full address in its history (sometimes synced). Open the link in a private window to leave fewer traces.",
-          "Guarantee the device's memory is wiped: we clear it as best we can. So that a reload doesn't cost an open, the link and an open code stay in this tab's storage while the share is open (never the password or the content).",
+          "Guarantee the device's memory is wiped: we clear it as best we can. So that a reload doesn't cost an open, the link and an open code stay in this tab's storage while the share is open (never the password or the content; without a password, that link is enough to reopen the share).",
           "Remove everything from files. Photos, PDFs and office documents lose their hidden information (location, device, author, dates), as do videos and audio, if you clean them before sending (one tap, on your device; without it, the file is sent as is). Archives and unsupported formats are sent as they are: their row says so. What is visible in the picture or readable in the document stays: a photo keeps its preview thumbnail (it may show the photo as it was before cropping or editing), a PDF only loses its document properties (its pages, their thumbnails and its images stay as they are), comments in a document keep their authors, and a PDF edited several times may keep older passages.",
           "Verify the sender: a link can come from anyone.",
           "Protect you from a tampered site: if our server or code were compromised, the site could steal keys. That is why the code is public and the site can be rebuilt identically from it.",
@@ -710,7 +712,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         id: "qr",
         h: "QR code and one-tap sharing",
         p: [
-          "“Share” can send the link and the password together, and the QR code holds both. With a single open (the default), nobody else can see the content afterwards, and the recipient would see it had already been opened.",
+          "“Share” can send the link and the password together, and the QR code holds both (without a password, the link alone). With a single open (the default), nobody else can see the content afterwards, and the recipient would see it had already been opened.",
           "But someone who reads the message before the recipient can open it in their place, and the QR address (link and password) stays in the history of the browser that opens it. To be safer, send the link and the password through two different channels.",
         ],
       },
@@ -727,8 +729,8 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       h: "Technical details (for experts)",
       list: [
         "Content, names, types and texts: AES-256-GCM (WebCrypto), keys derived with HKDF-SHA-256; no home-made cryptography.",
-        "Password: Argon2id (RustCrypto, in the site's WebAssembly engine), 64 MiB of memory, 3 passes, combined with the key in the link fragment (after #), which is never sent to the server.",
-        `Opening: the server checks a proof derived from the key and the password, without receiving either; ${v.tries} wrong proofs destroy the share.`,
+        "Password (optional): Argon2id (RustCrypto, in the site's WebAssembly engine), 64 MiB of memory, 3 passes, combined with the key in the link fragment (after #), which is never sent to the server. Without a password, a key derived from the fragment by HKDF-SHA-256 takes its place; the server receives the same data and does not know which shares have a password.",
+        `Opening: the server checks a proof derived from the key and the password (or the key alone), without receiving either; ${v.tries} wrong proofs destroy the share.`,
         "Size: the encrypted upload starts as soon as a file is added, before “Encrypt and send”. During the upload, the server sees the size to within 4 MiB, because the content goes up in encrypted 4 MiB pieces. Once the upload is done, the encrypted content fills a fixed size tier: the server then knows only that tier.",
         "Browser: strict headers (Content-Security-Policy, Permissions-Policy); no script, font or tracker from another site.",
         ...VERIFIER_EN.tech,
@@ -849,7 +851,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Purpose",
         p: [
-          "Shhgone lets you send files, photos, videos, voice messages and notes, encrypted on your device, with a link and a password, without an account. These terms apply to any use of the site. By using Shhgone, you accept them.",
+          "Shhgone lets you send files, photos, videos, voice messages and notes, encrypted on your device, with a link (and a password if you wish), without an account. These terms apply to any use of the site. By using Shhgone, you accept them.",
         ],
       },
       {
@@ -891,7 +893,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Your responsibilities",
         p: [
-          "You are responsible for what you send and for who you send it to. Pass on the link and the password through two different channels, and only to the person who should receive them.",
+          "You are responsible for what you send and for who you send it to. Pass on the link (and the password, if there is one, another way) only to the person who should receive them.",
         ],
       },
       {
@@ -975,7 +977,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "From the share",
         list: [
-          "Open the share with its link and password.",
+          "Open the share with its link (and its password if it has one).",
           "Below the content, choose “Report this share”, say what is going on, then “Report”.",
           "Each open counts as one vote. The share is deleted for everyone once half of its allowed opens have reported it (at least two votes from two opens: 1 of 1, 2 of 2, 2 of 3, 3 of 5): downloads in progress are cut, no open remains possible. Otherwise your report is counted and the share stays open to the others.",
         ],
@@ -984,13 +986,13 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "What we receive",
         p: [
           "A report holds only the category you chose (for example “Scam”) and the proof that you opened the share: neither the content nor who you are. We cannot read the share. We count, in memory only, reports per category since the server last started and their number per hour, to spot mass abuse; nothing is written to disk.",
-          `Without the link and the password, nothing can be done to the share: it erases itself when it expires (${v.h} h at most on the free plan). For illegal content, you can also write to the address on the Contact page with the link.`,
+          `Without the link (and the password, if there is one), nothing can be done to the share: it erases itself when it expires (${v.h} h at most on the free plan). For illegal content, you can also write to the address on the Contact page with the link.`,
         ],
       },
       {
         h: "In writing",
         list: [
-          "Write to the address on the Contact page with: the full link of the share (including what follows the “#”) and its password if you have it, without which no one can see the content; what seems illegal to you, and why; your name and email address (optional for child sexual abuse material); a sentence confirming that you report in good faith and that this information is accurate.",
+          "Write to the address on the Contact page with: the full link of the share (including what follows the “#”) and its password if it has one and you have it, without which no one can see the content of a protected share; what seems illegal to you, and why; your name and email address (optional for child sexual abuse material); a sentence confirming that you report in good faith and that this information is accurate.",
           "We acknowledge receipt, a person reviews the share (never a bot alone), then we reply with our decision and the possible remedies.",
           "Manifestly illegal content is destroyed at once: no open remains possible, downloads in progress are cut. If someone's life or safety is threatened, we alert the authorities.",
         ],
@@ -1024,7 +1026,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         id: "jamais",
         h: "What you should never send us",
         p: [
-          "The full link of a share together with its password: whoever has both can open the share. The only exception is a written abuse report, where we need them to see the content, as the “Report abuse” page says.",
+          "The full link of a share, with its password if it has one: whoever has them can open the share. The only exception is a written abuse report, where we need them to see the content, as the “Report abuse” page says.",
           "We will never ask you for a password.",
         ],
       },

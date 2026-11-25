@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { openShare } from "../src/index";
 import { expect, test } from "./fixtures";
-import { capturePutBodies, openFilePicker, readyHeading, sendButton, sleep } from "./send-helpers";
+import { capturePutBodies, openFilePicker, readyHeading, sendButton, protectOn, sleep } from "./send-helpers";
 
 const MIB = 1048576;
 const SEG = 48 + 64 * 65552; // segment 0 (avec l'en-tête) ; les suivants : 64 × 65 552 octets
@@ -84,6 +84,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator(".cap")).toContainText("3");
     await expect(page.locator(".cap")).not.toContainText("12");
 
+    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     const read = async (name: string) => {
@@ -127,6 +128,7 @@ test.describe("fr-FR", () => {
     expect(putBytes).toBeLessThan(sum * 1.06); // morceaux de 64 Kio ; avant : 20 × 4 Mio = 80 Mio
     await removeItem(page, "photo-01.bin");
     await expect(page.locator("[data-row]")).toHaveCount(19);
+    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     expect(erases).toEqual([]);

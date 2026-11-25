@@ -7,7 +7,7 @@
 import { shareId, type KLien } from "../src/engine";
 import { findIn, needle, scanDir, type Needle } from "../e2e/scan";
 import { expect, gotoRetrying, test } from "./fixtures";
-import { addText, capturePutBodies, openFilePicker, readyHeading, sendButton } from "./send-helpers";
+import { addText, capturePutBodies, openFilePicker, readyHeading, sendButton, protectOn } from "./send-helpers";
 
 const TEXT = "MOT-REPERE-NAVIGATEUR-5d1e : le code de la porte est 4471";
 // Aucune fenêtre de 8 caractères du nom ne doit exister dans un en-tête ordinaire : « navigate »
@@ -49,6 +49,7 @@ test.describe("fr-FR", () => {
     if ((await nameField().count()) === 0) await page.getByRole("button", { name: /^Options · / }).click();
     await nameField().fill(TITLE);
     if (await page.getByRole("dialog", { name: "Options" }).isVisible()) await page.keyboard.press("Escape");
+    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
 

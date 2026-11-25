@@ -55,7 +55,8 @@ export type SendOpts = {
   base: string;
   ttlHours: TtlHours;
   maxOpens: number;
-  password: string;
+  /** null : partage sans mot de passe (D42-27). */
+  password: string | null;
   rights?: Rights;
   keepTtlH?: KeepTtl;
   /** Nom du partage, facultatif. */
@@ -106,7 +107,7 @@ export function createSender(deps: SendDeps) {
   let pausing = $state(false);
   let resumeAt = $state<number | undefined>();
   let steps = $state<Step[]>([]);
-  let result = $state.raw<(Created & { password: string }) | undefined>();
+  let result = $state.raw<(Created & { password: string | null }) | undefined>();
   let restoredAt = $state<number | undefined>();
   /** Horloge relue par les getters (comptes à rebours). */
   let clock = $state(now());

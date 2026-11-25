@@ -17,6 +17,7 @@ import {
   open,
   openStream,
   parseLink,
+  noPasswordKey,
   passwordKey,
   readHeader,
   SEG_PLAIN,
@@ -278,8 +279,12 @@ export type CreateOpts = api.Net & {
   /** Heures : 1, 6, 12, 24 (gratuit) ; aussi 48, 72 (Plus) et 168 (Pro), vérifiées par le brouillon (limitesDe). */
   ttlHours: number;
   maxOpens: number;
-  /** Mot de passe généré (generatePassword, 11 caractères) ou saisi (checkPassword : 10 au moins). */
-  password: GeneratedPassword | string;
+  /**
+   * Mot de passe généré (generatePassword, 11 caractères, seule forme acceptée : D41-15), ou null
+   * pour un partage SANS mot de passe (D42-27, désactivé par défaut) : lien « #l », K_sans à la
+   * place de K_mdp ; le serveur reçoit les mêmes champs (sel, paramètres, V_preuve, E).
+   */
+  password: GeneratedPassword | string | null;
   /** Droits du destinataire (spec §34), dans le manifeste chiffré. Par défaut « enregistrer ». */
   rights?: Rights;
   /** Durée de garde dans le coffre, obligatoire avec rights « coffre » et seulement avec lui. */
@@ -503,10 +508,12 @@ export async function grantTag(link: string, expectedOrigin: string): Promise<st
  * K_env, K_preuve et V_preuve à partir de meta, en refusant tout paramètre douteux du
  * serveur (palier, nombre de segments, sel, Argon2id). K_mdp est mise à zéro ici.
  */
-async function keysFromMeta(kLien: KLien, m: api.Meta, password: string) {
+async function keysFromMeta(kLien: KLien, m: api.Meta, password: string | null) {
   if (!(BUCKETS as readonly number[]).includes(m.bucket) || m.segments !== segmentCount(m.bucket)) {
     throw new api.BadResponse();
   }
+  // Sel et paramètres Argon2id vérifiés même sans mot de passe : le serveur les rend pour tout
+  // partage (il ne sait pas lequel n'en a pas, D42-27) ; une réponse mal formée reste refusée.
   checkKdfParams(m.kdf); // le minimum est imposé par le navigateur, pas par le serveur
   let salt: Uint8Array<ArrayBuffer>;
   try {
@@ -515,7 +522,9 @@ async function keysFromMeta(kLien: KLien, m: api.Meta, password: string) {
     throw new api.BadResponse();
   }
   if (salt.length !== 16) throw new api.BadResponse();
-  const kMdp = await passwordKey(password, salt, m.kdf);
+  // Partage sans mot de passe (lien « #l », D42-27) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp »)
+  // à la place de K_mdp, sans Argon2id ; le sel lu n'y entre pas.
+  const kMdp = password === null ? await noPasswordKey(kLien) : await passwordKey(password, salt, m.kdf);
   try {
     return await accessKeys(kLien, kMdp);
   } finally {
@@ -626,10 +635,11 @@ export async function openShare(
   let idBytes: Uint8Array<ArrayBuffer> | undefined;
   try {
     // Avant toute requête et toute dérivation (coûteuse) : un champ vide, ou fait seulement des
-    // blancs que le moteur retire en bord (D42-21), n'est pas un mot de passe.
-    if (/^[ \t\r\n]*$/.test(password)) throw new Error("mot_de_passe_requis");
+    // blancs que le moteur retire en bord (D42-21), n'est pas un mot de passe. Lien d'un partage
+    // sans mot de passe (« #l », D42-27) : `password` est ignoré, le lien seul ouvre.
+    if (!p.noPassword && /^[ \t\r\n]*$/.test(password)) throw new Error("mot_de_passe_requis");
     idBytes = await shareId(p.kLien); // données authentifiées seulement, jamais envoyé
-    return await openWith(p, idBytes, password, onProgress, grant, net);
+    return await openWith(p, idBytes, p.noPassword ? null : password, onProgress, grant, net);
   } finally {
     p.kLien.fill(0);
     idBytes?.fill(0);
@@ -639,7 +649,7 @@ export async function openShare(
 async function openWith(
   p: ShareLink,
   idBytes: Uint8Array<ArrayBuffer>,
-  password: string,
+  password: string | null,
   onProgress: ((d: number, t: number) => void) | undefined,
   grant: string | undefined,
   net: api.Net | undefined,
@@ -863,7 +873,8 @@ export async function collectToBlob(open: Opened, i: number, foldBytes = FOLD_BY
  */
 export async function destroyShare(link: string, expectedOrigin: string, opts: { password?: string } & api.Net = {}): Promise<void> {
   const p = await parseFor(link, expectedOrigin);
-  if (p.kind === "s" && (opts.password === undefined || opts.password === "")) throw new Error("mot_de_passe_requis");
+  // Lien d'un partage sans mot de passe (« #l », D42-27) : le lien seul suffit.
+  if (p.kind === "s" && !p.noPassword && (opts.password === undefined || opts.password === "")) throw new Error("mot_de_passe_requis");
   const c = api.ctx(p.origin, opts);
   await guarded(async () => {
     if (p.kind === "m") return api.destroy(c, { sGestion: p.sGestion });
@@ -871,7 +882,7 @@ export async function destroyShare(link: string, expectedOrigin: string, opts: {
     let keys: Awaited<ReturnType<typeof keysFromMeta>> | undefined;
     try {
       const m = await api.meta(c, kAcces);
-      keys = await keysFromMeta(p.kLien, m, opts.password!);
+      keys = await keysFromMeta(p.kLien, m, p.noPassword ? null : opts.password!);
       // Sans ouverture, pas d'octroi : refusé (409), seul le dernier destinataire détruit.
       await api.destroy(c, { kAcces, kPreuve: keys.kPreuve, grant: "" });
     } finally {

@@ -145,8 +145,9 @@
   });
   // Mot de passe affiché par le composeur : K_mdp calculé pendant la composition (A5). Le
   // brouillon le reçoit de nouveau quand il est remplacé (liste vidée, envoi fini).
-  let shownPassword: string | undefined;
-  function onpassword(pw: string) {
+  // null : partage sans mot de passe (D42-27), rien à calculer.
+  let shownPassword: string | null | undefined;
+  function onpassword(pw: string | null) {
     shownPassword = pw;
     draft.password(pw);
   }
@@ -186,7 +187,7 @@
     disarm?.();
     readySecured = false;
     disarm = leaveGuard?.arm({
-      confirm: () => (view === "ready" ? readySecured || window.confirm(t("leave.ready")) : window.confirm(t("leave.sending"))),
+      confirm: () => (view === "ready" ? readySecured || window.confirm(t(sender?.result?.password === null ? "leave.ready.link" : "leave.ready")) : window.confirm(t("leave.sending"))),
       onleave: () => {
         disarm = undefined;
         unloadArmed = false;

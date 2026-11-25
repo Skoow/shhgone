@@ -32,18 +32,39 @@ describe("options : mot de passe généré seulement, aucun choix payant", () =>
     show(Options, { options, unviewable: [] });
     return { options };
   }
-  it("aucune saisie de mot de passe ; plus de mot de passe dans les options (montré sous le lien, sur « Lien prêt »)", () => {
+  it("aucune saisie de mot de passe ; « Protéger par un mot de passe » désactivé par défaut (D42-27), activé : mot de passe généré, Générer un autre, Copier, rappel", () => {
     const { options } = opts();
-    // Seul champ de texte : le nom du partage, jamais un mot de passe.
-    const fields = [...document.querySelectorAll("input[type=text], input:not([type]), input[type=password]")];
-    expect(fields.filter((f) => !f.closest("[data-share-name]"))).toHaveLength(0);
-    expect(fields.map((f) => f.getAttribute("type"))).not.toContain("password");
-    expect(text()).not.toContain("Écrire mon propre");
-    expect(text()).not.toContain(options.password);
-    const labels = [...document.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? b.textContent);
-    expect(labels).not.toContain("Générer un autre");
-    // Toujours généré, 11 caractères, prêt pour l'envoi.
+    const fieldsOk = () => {
+      // Seul champ de texte : le nom du partage, jamais un mot de passe.
+      const fields = [...document.querySelectorAll("input[type=text], input:not([type]), input[type=password]")];
+      expect(fields.filter((f) => !f.closest("[data-share-name]"))).toHaveLength(0);
+      expect(fields.map((f) => f.getAttribute("type"))).not.toContain("password");
+      expect(text()).not.toContain("Écrire mon propre");
+    };
+    const labels = () => [...document.querySelectorAll("button")].map((b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").trim());
+    fieldsOk();
+    // Désactivé : aucun mot de passe montré, la phrase d'avertissement est là.
+    expect(options.password).toBeNull();
+    expect(text()).not.toContain(options.generated);
+    expect(labels()).not.toContain("Générer un autre");
+    expect(text()).toContain("Sans mot de passe, quiconque a le lien peut ouvrir ; activez le mot de passe pour plus de sûreté.");
+    const sw = document.querySelector<HTMLElement>("[data-protect] [role=switch]")!;
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+    expect(sw.textContent).toContain("Protéger par un mot de passe");
+    // Activé : le mot de passe généré (11 caractères), « Générer un autre », « Copier », le rappel.
+    sw.click();
+    flushSync();
+    fieldsOk();
     expect(options.password).toHaveLength(11);
+    expect(text()).toContain(options.password!);
+    expect(labels()).toContain("Générer un autre");
+    expect(document.querySelector("[data-pw] button[aria-label*='Copier'], [data-pw] button")).not.toBeNull();
+    expect(text()).toContain("Envoyez-le par un autre moyen que le lien.");
+    const before = options.password;
+    [...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("Générer un autre"))!.click();
+    flushSync();
+    expect(options.password).not.toBe(before);
+    expect(text()).toContain(options.password!);
   });
   it("Aucun choix payant verrouillé dans les options, ni coffre", () => {
     opts();

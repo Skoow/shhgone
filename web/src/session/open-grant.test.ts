@@ -46,6 +46,16 @@ describe("open-grant (spec §41.4)", () => {
     expect(loadOpenGrant()).toBeNull();
   });
 
+  it("partage sans mot de passe (D42-27) : la marque « l » est gardée devant la clé ; toute autre lettre refusée", () => {
+    saveOpenGrant({ v: 1, link: "l" + LINK, grant: GRANT, last: 5 });
+    expect(loadOpenGrant()).toEqual({ v: 1, link: "l" + LINK, grant: GRANT, last: 5 });
+    clearOpenGrant();
+    for (const bad of ["m" + LINK, "L" + LINK, "ll" + LINK, "l" + LINK + "A"]) {
+      saveOpenGrant({ v: 1, link: bad, grant: GRANT, last: 5 });
+      expect(ss.length, bad).toBe(0);
+    }
+  });
+
   it("forme inattendue : rien d'écrit, ou entrée effacée à la lecture", () => {
     saveOpenGrant({ v: 1, link: LINK + "A", grant: GRANT, last: 5 });
     saveOpenGrant({ v: 1, link: LINK, grant: "x", last: 5 });

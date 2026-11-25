@@ -186,6 +186,14 @@ export function passwordKey(password: string, salt: Uint8Array<ArrayBuffer>, par
   return run(async (e) => (await kdfOpen(e, password, salt, params)) as KMdp);
 }
 
+/**
+ * Partage sans mot de passe (D42-27) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp »), à la place
+ * de K_mdp (même chaîne ensuite : accessKeys). Aucun Argon2id ; l'appelant l'efface.
+ */
+export function noPasswordKey(kLien: KLien): Promise<KMdp> {
+  return run((e) => e.wasm.noPasswordKey(kLien) as KMdp);
+}
+
 /** K_mdp pour CRÉER : mot de passe de la forme générée (sinon mot_de_passe_non_genere), KDF_CREATE. */
 export function passwordKeyForCreate(password: string, salt: Uint8Array<ArrayBuffer>): Promise<KMdp> {
   return run(async (e) => (await kdfCreate(e, password, salt)) as KMdp);
@@ -518,7 +526,7 @@ export function sealFinal(
 // --- Liens (spec §32) : clé lue et écrite par le moteur ------------------------------------------
 
 /** Lien analysé : K_lien pour un lien de partage, S_gestion pour un lien de gestion. */
-export type ParsedLink = { kind: "s"; origin: string; kLien: KLien } | { kind: "m"; origin: string; sGestion: SGestion };
+export type ParsedLink = { kind: "s"; origin: string; kLien: KLien; noPassword: boolean } | { kind: "m"; origin: string; sGestion: SGestion };
 
 /** Analyse un lien (forme de linkForm), clé décodée par le moteur ; sinon lien_invalide. */
 export function parseLink(url: string, base = "/"): Promise<ParsedLink> {
@@ -526,7 +534,9 @@ export function parseLink(url: string, base = "/"): Promise<ParsedLink> {
     const bytes = utf8(url);
     try {
       const p = e.wasm.parseLink(bytes, base);
-      return p.kind === "s" ? { kind: "s", origin: p.origin, kLien: p.kLien as KLien } : { kind: "m", origin: p.origin, sGestion: p.sGestion as SGestion };
+      return p.kind === "s"
+        ? { kind: "s", origin: p.origin, kLien: p.kLien as KLien, noPassword: p.noPassword === true }
+        : { kind: "m", origin: p.origin, sGestion: p.sGestion as SGestion };
     } finally {
       bytes.fill(0);
     }
@@ -536,6 +546,11 @@ export function parseLink(url: string, base = "/"): Promise<ParsedLink> {
 /** `${origin}${base}#<K_lien>`. */
 export function shareLink(origin: string, kLien: KLien, base = "/"): Promise<string> {
   return run((e) => String(e.wasm.shareLink(origin, kLien, base)));
+}
+
+/** `${origin}${base}s#l<K_lien>` : partage sans mot de passe (D42-27), marque dans le fragment. */
+export function shareLinkNoPassword(origin: string, kLien: KLien, base = "/"): Promise<string> {
+  return run((e) => String(e.wasm.shareLinkNoPassword(origin, kLien, base)));
 }
 
 /** `${origin}${base}#m<S_gestion>`. */

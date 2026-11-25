@@ -94,6 +94,22 @@ export async function addRealFile(page: Page, name: string) {
 }
 
 export const sendButton = (page: Page) => page.getByRole("button", { name: "Chiffrer et envoyer" });
+
+/**
+ * Active « Protéger par un mot de passe » (D42-27 : désactivé par défaut) dans les options du
+ * composeur : colonne sur ordinateur, feuille « Options » sur téléphone (refermée ensuite). Pour
+ * les tests écrits avec un mot de passe (lecture sur « Lien prêt », champ à l'ouverture).
+ */
+export async function protectOn(page: Page): Promise<void> {
+  const side = page.locator(".side");
+  const sheet = !(await side.isVisible().catch(() => false));
+  if (sheet) await page.getByRole("button", { name: /^Options · / }).click();
+  const opts = sheet ? page.getByRole("dialog", { name: "Options" }) : side;
+  const sw = opts.getByRole("switch", { name: /^(Protéger par un mot de passe|Protect with a password)$/ });
+  if ((await sw.getAttribute("aria-checked")) !== "true") await sw.click();
+  await expect(sw).toHaveAttribute("aria-checked", "true");
+  if (sheet) await page.keyboard.press("Escape");
+}
 export const readyHeading = (page: Page) => page.getByRole("heading", { name: "Lien prêt" });
 export const noHScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
 /** Un `beforeunload` synthétique est-il annulé par la page ? */

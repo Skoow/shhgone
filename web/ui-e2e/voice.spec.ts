@@ -7,7 +7,7 @@ import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
 import { captureOf, expect, test } from "./fixtures";
-import { openFilePicker, enterComposer } from "./send-helpers";
+import { openFilePicker, enterComposer, protectOn } from "./send-helpers";
 
 const local = process.env.PW_LOCAL_CHROMIUM === "1" ? { executablePath: "/opt/pw-browsers/chromium" } : {};
 test.use({
@@ -350,6 +350,7 @@ test("destinataire : un vocal s'écoute, jamais téléchargé ; la note se lit e
   await rec.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
   await rec.getByRole("button", { name: "Valider" }).click();
   await expect(page.locator("[data-row]").filter({ hasText: "Mémo vocal 1" })).toBeVisible();
+  await protectOn(page); // D42-27 : mot de passe désactivé par défaut
   await page.getByRole("button", { name: "Chiffrer et envoyer" }).click();
   await expect(page.getByRole("heading", { name: "Lien prêt" })).toBeVisible({ timeout: 60_000 });
   const read = async (name: string) => {

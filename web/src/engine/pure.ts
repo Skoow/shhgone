@@ -389,6 +389,13 @@ export const KEY_CHARS = 43;
  */
 export const SHARE_FRAGMENT = /^#[A-Za-z0-9_-]{43}$/;
 export const MANAGE_FRAGMENT = /^#m[A-Za-z0-9_-]{43}$/;
+/**
+ * Partage sans mot de passe (D42-27) : « #l » + 43. Même longueur que la gestion (45), autre
+ * lettre ; la marque ne quitte jamais l'appareil (fragment), le serveur ne la voit pas.
+ */
+export const NO_PASSWORD_FRAGMENT = /^#l[A-Za-z0-9_-]{43}$/;
+/** Marque du partage sans mot de passe, juste après le « # » (moteur : NO_PASSWORD_MARK). */
+export const NO_PASSWORD_MARK = "l";
 
 /**
  * Forme d'un lien de partage de production (benchmark M13, réutilisée par les tests de
@@ -396,6 +403,8 @@ export const MANAGE_FRAGMENT = /^#m[A-Za-z0-9_-]{43}$/;
  * requête, ni mot de passe).
  */
 export const SHARE_LINK_SHAPE = /^https:\/\/[a-z0-9.-]+(?::\d+)?\/s#[A-Za-z0-9_-]{43}$/;
+/** Même forme, partage sans mot de passe (D42-27) : `https://hôte/s#l` + 43 caractères. */
+export const NO_PASSWORD_LINK_SHAPE = /^https:\/\/[a-z0-9.-]+(?::\d+)?\/s#l[A-Za-z0-9_-]{43}$/;
 
 const LOCAL = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -431,7 +440,7 @@ function invalid(): Error {
 }
 
 /** Forme d'un lien, sans décoder sa clé : la chaîne de 43 caractères telle quelle. */
-export type LinkForm = { kind: "s" | "m"; origin: string; key: string };
+export type LinkForm = { kind: "s" | "m"; origin: string; key: string; /** Partage sans mot de passe (« #l », D42-27). */ noPassword: boolean };
 
 // Encodage canonique de 32 octets en 43 caractères : les 2 bits de bourrage du dernier caractère
 // sont nuls (unb64u refuse sinon), soit un dernier caractère d'indice multiple de 4.
@@ -462,10 +471,21 @@ export function linkForm(url: string, base = "/"): LinkForm {
   if (u.pathname !== base + LINK_PATH) throw invalid();
   // Le genre vient de la forme entière (longueur), jamais du seul « m » de tête : une clé de
   // partage commence par « m » une fois sur 64 (« #m » + 42 caractères = partage).
-  const kind = SHARE_FRAGMENT.test(u.hash) ? "s" : MANAGE_FRAGMENT.test(u.hash) ? "m" : null;
-  const key = kind === "s" ? u.hash.slice(1) : kind === "m" ? u.hash.slice(2) : null;
+  // « #l » + 43 (45 caractères) : partage sans mot de passe (D42-27) ; « #m » + 43 : gestion.
+  const noPassword = NO_PASSWORD_FRAGMENT.test(u.hash);
+  const kind = SHARE_FRAGMENT.test(u.hash) || noPassword ? "s" : MANAGE_FRAGMENT.test(u.hash) ? "m" : null;
+  const key = kind === "s" ? u.hash.slice(noPassword ? 2 : 1) : kind === "m" ? u.hash.slice(2) : null;
   if (kind === null || key === null || key.length !== KEY_CHARS || !canonical(key)) throw invalid();
-  return { kind, origin: u.origin, key };
+  return { kind, origin: u.origin, key, noPassword };
+}
+
+/**
+ * Le lien de partage (déjà de la forme de linkForm, ou fragment seul « #… ») est-il celui d'un
+ * partage sans mot de passe (D42-27) ? Seule la forme du fragment compte ; faux pour tout le reste.
+ */
+export function isNoPasswordLink(link: string): boolean {
+  const i = link.lastIndexOf("#");
+  return i >= 0 && NO_PASSWORD_FRAGMENT.test(link.slice(i));
 }
 
 /**

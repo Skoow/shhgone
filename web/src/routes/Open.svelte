@@ -106,6 +106,12 @@
   });
 
   async function unlock() {
+    // Sans mot de passe (D42-27) : « Ouvrir » seul, jamais au chargement (aperçus de liens des
+    // messageries, robots) ; il consomme une ouverture comme un déverrouillage.
+    if (r.noPassword) {
+      if (!busy && !limited) await r.unlock("");
+      return;
+    }
     if (pw === "" || busy || limited) {
       if (pw === "") await r.unlock(""); // message « Entrez le mot de passe. », aucun essai
       return;
@@ -280,6 +286,14 @@
     {:else if r.state === "locked" || r.state === "reopen" || r.state === "unlocking"}
       <p class="intro">{t("open.intro")}</p>
       <div class="unlock">
+        {#if r.noPassword}
+          <p class="nopw" data-open-nopw>{t("open.noPw")}</p>
+          {#if errorText}
+            <div id="open-err" class="err" role="alert">
+              <p>{errorText}</p>
+            </div>
+          {/if}
+        {:else}
         <label class="fl" for="shh-unlock">{t("open.password")}</label>
         <div class={["box", r.error === "bad_password" && "bad"]}>
           <input
@@ -310,16 +324,17 @@
           </div>
         {/if}
         <p id="open-tries" class="small">{t("open.tries", { n: PW_TRIES })}</p>
+        {/if}
         <!-- Audit du 25 novembre : le mot de passe puis le bouton d'abord ; le coût d'ouverture est
              une information neutre sous le bouton (plus d'encadré jaune) ; les options, repliées. -->
         <div class="cta dock">
-          <Button variant="primary" busy={busy} disabled={pw === "" || limited} onpress={unlock} aria-describedby={r.reopening || r.otherTab || r.opensLeft > 0 ? "open-cost" : undefined}>
+          <Button variant="primary" busy={busy} disabled={(!r.noPassword && pw === "") || limited} onpress={unlock} aria-describedby={r.reopening || r.otherTab || r.opensLeft > 0 ? "open-cost" : undefined}>
             {#snippet icon()}<LockOpen size={18} />{/snippet}
-            {busy ? t("open.unlocking") : r.reopening ? t("open.reopen") : t("open.unlock")}
+            {busy ? t(r.noPassword ? "open.opening" : "open.unlocking") : r.reopening ? t("open.reopen") : t(r.noPassword ? "open.open" : "open.unlock")}
           </Button>
         </div>
         {#if r.reopening}
-          <p id="open-cost" class="cost">{@render costIcon()}<span>{t("open.reopen.body")}</span></p>
+          <p id="open-cost" class="cost">{@render costIcon()}<span>{t(r.noPassword ? "open.reopen.body.noPw" : "open.reopen.body")}</span></p>
         {:else if r.otherTab}
           <p id="open-cost" class="cost">{@render costIcon()}<span>{t("open.otherTab")}</span></p>
         {:else if r.opensLeft > 0}
@@ -579,6 +594,12 @@
     from {
       opacity: 0;
     }
+  }
+  /* Sans mot de passe (D42-27) : une phrase à la place du champ. */
+  .nopw {
+    margin: 0;
+    color: var(--text-2);
+    line-height: 1.45;
   }
   .small {
     margin: 0;

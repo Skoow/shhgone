@@ -75,6 +75,31 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     expect(fake.inspect()[0]).toMatchObject({ bucket: 160 });
   });
 
+  it("sans mot de passe (D42-27, password: null) : lien « #l », ouvert par le lien seul ; finalize porte les mêmes champs, de mêmes tailles, qu'avec un mot de passe", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const links: string[] = [];
+    for (const password of [PW, null]) {
+      const { seen, net } = setup();
+      const d = createDraft(ORIGIN, { ...net, solveCaptcha, auto: true });
+      const f = file(100_000, 11);
+      d.sync([{ id: "a", data: f }]);
+      const r = await d.finalize([{ id: "a", item: fileItem("a.bin", f) }], { ttlHours: 1, maxOpens: 1, password, solveCaptcha });
+      links.push(r.link);
+      const body = JSON.parse(seen.find((x) => x.path === "/api/shares/finalize")!.body.toString()) as Record<string, unknown>;
+      bodies.push(Object.fromEntries(Object.entries(body).map(([k, v]) => [k, typeof v === "string" ? v.length : v])));
+      // Le lien entier (et donc la marque « l ») n'est dans aucune requête.
+      const frag = r.link.slice(r.link.indexOf("#"));
+      for (const x of seen) expect(findIn(Buffer.concat([Buffer.from(x.path), x.body, Buffer.from(x.headers)]), [needle("fragment", frag.slice(1))]), x.path).toEqual([]);
+      const o = await openShare(r.link, password === null ? "" : PW, ORIGIN, undefined, net);
+      expect(Buffer.from(await o.item(0)).equals(Buffer.from(await f.arrayBuffer()))).toBe(true);
+      await o.done();
+    }
+    expect(links[0]).toMatch(/\/s#[A-Za-z0-9_-]{43}$/);
+    expect(links[1]).toMatch(/\/s#l[A-Za-z0-9_-]{43}$/);
+    expect(bodies[1]).toEqual(bodies[0]);
+    expect(bodies[1]).toMatchObject({ salt: 22, kdf_ops: 3, kdf_mem: 67_108_864, proof_v: 43, envelope: 80 });
+  });
+
   it("formule payante (conception du paiement §11) : jeton pris une fois, à la création, en PrivateToken ; jamais ailleurs", async () => {
     expect(() => createDraft(ORIGIN, { palier: 1 })).toThrow("jeton_absent");
     const { seen, net } = setup();

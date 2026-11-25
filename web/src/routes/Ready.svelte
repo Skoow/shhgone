@@ -7,8 +7,10 @@
   // passe » ; lien de gestion replié ; Supprimer ce partage ; « Nouveau partage », discret (rien
   // à valider : le lien marche déjà ; confirmation seulement tant que le lien et le mot de passe
   // n'ont pas été copiés, ready-copies.ts). Les valeurs ne viennent que des props (Copier lit l'état, jamais le
-  // DOM) ; rien n'est écrit dans la console, le titre, l'URL ou un stockage.
-  import { tick } from "svelte";
+  // DOM) ; rien n'est écrit dans la console, le titre, l'URL ou un stockage. Sans mot de passe
+  // (D42-27, `password: null`) : le lien seul (ticket sans perforation, « Copier le lien »,
+  // Partager et QR du lien seul), et la phrase « quiconque a ce lien peut ouvrir ».
+  import { tick, untrack } from "svelte";
   import { getDemo } from "../app/demo-hooks";
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
@@ -30,7 +32,8 @@
   import { NOTHING_COPIED, confirmLeave, noteCopy, secured, warnOnUnload, type Copied } from "./ready-copies";
 
   /** `title` : nom du partage tel que le moteur l'a écrit (nettoyé) ; absent sans nom. */
-  export type ReadyResult = { link: string; manage: string; expiresInS: number; password: string; title?: string };
+  /** `password` : null pour un partage sans mot de passe (D42-27) : seul le lien est montré. */
+  export type ReadyResult = { link: string; manage: string; expiresInS: number; password: string | null; title?: string };
   type Props = {
     /** null après Nouveau partage ou Supprimer : plus aucune référence aux secrets. */
     result: ReadyResult | null;
@@ -56,7 +59,9 @@
 
   // ---------- Garde de sortie : jusqu'à la copie des deux, Nouveau partage ou Supprimer (UI §9.5, A12) ----------
   // État en mémoire seulement : quelles valeurs ont été copiées (ou partagées), jamais les valeurs.
-  let copies = $state(NOTHING_COPIED);
+  // Sans mot de passe (D42-27) : seul le lien est à mettre de côté.
+  const noPw = untrack(() => result?.password === null);
+  let copies = $state(noPw ? { ...NOTHING_COPIED, password: true } : NOTHING_COPIED);
   let finished = $state(false);
   function copied(what: Copied) {
     const was = secured(copies);
@@ -97,7 +102,8 @@
   // Une seule ouverture par défaut : même envoyés au même endroit, personne d'autre ne pourra
   // voir le contenu ensuite, et le destinataire verrait qu'il a déjà été ouvert (spec D41-29).
   const canShare = canShareLink();
-  const both = (r: ReadyResult) => t("ready.share.text", { link: r.link, password: r.password });
+  // Sans mot de passe : le lien seul (D42-27).
+  const both = (r: ReadyResult) => (r.password === null ? r.link : t("ready.share.text", { link: r.link, password: r.password }));
   let sheet = $state(false);
   let qrShown = $state(false);
   let copyNote = $state("");
@@ -108,7 +114,7 @@
     if (!result) return;
     const r = await copyText(both(result));
     if (r === "copied") copied("both");
-    copyNote = r === "copied" ? t("ready.share.copied") : t("ready.share.manual");
+    copyNote = r === "copied" ? t(noPw ? "ready.share.copied.link" : "ready.share.copied") : t(noPw ? "ready.share.manual.link" : "ready.share.manual");
     announce(copyNote);
   }
   function openSheet() {
@@ -191,19 +197,21 @@
           <!-- Le ticket : lien, perforation, mot de passe (masqué à l'arrivée, œil pour l'afficher,
                copiable masqué). Rien entre les deux : la paire reste ensemble. -->
           <!-- Apparition propre au ticket (CSS, coupée en mouvement réduit), pas l'éventail data-fan. -->
-          <div class="ticket" data-ticket>
+          <div class={["ticket", noPw && "seul"]} data-ticket>
             <!-- Coche menthe discrète, à hauteur du libellé : cette valeur a été copiée (ou partagée). -->
             <div class="cell lien" role="group" aria-label={t("ready.link.title")}>
               <CopyField label={t("ready.link.label")} value={result.link} oncopied={() => copied("link")} />
               {#if copies.link}<span class="kept" data-ready-copied><Check size={16} strokeWidth={2.25} aria-hidden="true" /><span class="sr-only">{t("ready.copied")}</span></span>{/if}
             </div>
-            <div class="perfo" aria-hidden="true"></div>
-            <div class="cell mdp" role="group" aria-label={t("ready.pw.title")}>
-              <CopyField label={t("ready.pw.title")} value={result.password} whole secret oncopied={() => copied("password")} />
-              {#if copies.password}<span class="kept" data-ready-copied><Check size={16} strokeWidth={2.25} aria-hidden="true" /><span class="sr-only">{t("ready.copied")}</span></span>{/if}
-            </div>
+            {#if result.password !== null}
+              <div class="perfo" aria-hidden="true"></div>
+              <div class="cell mdp" role="group" aria-label={t("ready.pw.title")}>
+                <CopyField label={t("ready.pw.title")} value={result.password} whole secret oncopied={() => copied("password")} />
+                {#if copies.password}<span class="kept" data-ready-copied><Check size={16} strokeWidth={2.25} aria-hidden="true" /><span class="sr-only">{t("ready.copied")}</span></span>{/if}
+              </div>
+            {/if}
           </div>
-          <p class="works" data-ready-works>{t("ready.works")}</p>
+          <p class="works" data-ready-works>{t(noPw ? "ready.works.link" : "ready.works")}</p>
 
           <div class="send" data-fan>
             <Button variant="primary" onpress={openSheet} aria-haspopup="dialog">
@@ -212,7 +220,7 @@
             </Button>
             <Button variant="secondary" onpress={copyBoth}>
               {#snippet icon()}<Copy size={20} strokeWidth={1.75} />{/snippet}
-              {t("ready.share.both")}
+              {t(noPw ? "ready.share.link" : "ready.share.both")}
             </Button>
             {#if copyNote && !sheet}<p class="note" role="status">{copyNote}</p>{/if}
           </div>
@@ -267,7 +275,7 @@
             {#if confirmLeave(copies)}
               <InlineConfirm
                 label={t("ready.done")}
-                message={t("ready.done.confirm")}
+                message={t(noPw ? "ready.done.confirm.link" : "ready.done.confirm")}
                 confirmLabel={t("ready.done.yes")}
                 kind="warn"
                 triggerVariant="ghost"
@@ -287,7 +295,7 @@
     </div>
   </section>
 
-  <Sheet bind:open={sheet} title={t("ready.share.title")}>
+  <Sheet bind:open={sheet} title={t(noPw ? "ready.share.title.link" : "ready.share.title")}>
     <div class="choices">
       {#if canShare}
         <Button variant="secondary" onpress={shareApp}>
@@ -297,7 +305,7 @@
       {/if}
       <Button variant="secondary" onpress={copyBoth}>
         {#snippet icon()}<Copy size={20} strokeWidth={1.75} />{/snippet}
-        {t("ready.share.both")}
+        {t(noPw ? "ready.share.link" : "ready.share.both")}
       </Button>
       <Button variant="secondary" aria-expanded={qrShown} onpress={() => void (qrShown = !qrShown)}>
         {#snippet icon()}<QrIcon size={20} strokeWidth={1.75} />{/snippet}
@@ -307,7 +315,8 @@
     </div>
     {#if qrShown}
       <figure class="qr">
-        <QrCode text={shareLinkWithPassword(result.link, result.password)} label={t("ready.qr.alt")} />
+        <!-- Sans mot de passe (D42-27) : le QR code ne porte que le lien. -->
+        <QrCode text={result.password === null ? result.link : shareLinkWithPassword(result.link, result.password)} label={t(noPw ? "ready.qr.alt.link" : "ready.qr.alt")} />
         <figcaption>{t("ready.qr.caption")}</figcaption>
       </figure>
     {/if}
@@ -456,6 +465,19 @@
     mask:
       radial-gradient(circle var(--encoche) at 0 0, #0000 98%, #000) left / 51% 100% no-repeat,
       radial-gradient(circle var(--encoche) at 100% 0, #0000 98%, #000) right / 51% 100% no-repeat;
+  }
+  /* Sans mot de passe (D42-27) : le lien seul, sans perforation ni encoches. */
+  .ticket.seul .lien {
+    padding-bottom: var(--sp-5);
+    border-radius: var(--r-xl);
+    box-shadow:
+      inset 0 1px 0 var(--bord),
+      inset 0 2px 0 rgb(255 255 255 / 0.06),
+      inset 1px 0 0 var(--bord),
+      inset -1px 0 0 var(--bord),
+      inset 0 -1px 0 var(--bord);
+    -webkit-mask: none;
+    mask: none;
   }
   /* Reflet qui traverse le haut du ticket une fois, à l'arrivée. */
   .ticket .lien::after {
@@ -759,6 +781,9 @@
     .ticket .mdp {
       padding: var(--sp-4);
       border-radius: 0 0 var(--r-lg) var(--r-lg);
+    }
+    .ticket.seul .lien {
+      border-radius: var(--r-lg);
     }
     .ticket .kept,
     .ticket .mdp .kept {

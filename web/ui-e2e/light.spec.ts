@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { file, freshPage, settle, unlock } from "./open-helpers";
-import { noViewTransition, openFilePicker, readyHeading, sendButton } from "./send-helpers";
+import { noViewTransition, openFilePicker, readyHeading, sendButton, protectOn } from "./send-helpers";
 
 const SHOTS = fileURLToPath(new URL("../test-results/captures/LIGHT/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
@@ -59,6 +59,7 @@ test("composeur et destinataire allégés ; captures", async ({ page, shh, brows
   await expect(page.locator("main")).not.toContainText(/Ctrl|Cmd|collez/i);
   await light(page.locator("section.group").first(), ".li");
   await shot(page, "composeur", isMobile);
+  await protectOn(page); // D42-27 : mot de passe désactivé par défaut
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const read = async (name: string) => {

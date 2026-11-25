@@ -1,6 +1,6 @@
 // Hygiène du lien (UI §12.1, spec §5.3) : le secret du « # » est lu une fois au démarrage de
 // la route, puis retiré de la barre d'adresse et de l'entrée d'historique.
-import { linkForm, splitPassword } from "../engine/pure";
+import { NO_PASSWORD_MARK, linkForm, splitPassword } from "../engine/pure";
 
 /**
  * Résultat de la lecture. `link` contient le secret : il est passé par valeur au flux
@@ -14,7 +14,7 @@ export type ShareTake = { state: LinkState; password: string | null };
 const INCOMPLETE: LinkState = Object.freeze({ kind: "incomplete" });
 
 /**
- * Lit le lien de l'adresse courante (spec §32 : `${base}s#<clé>` ou `${base}s#m<clé>` ; l'ancienne
+ * Lit le lien de l'adresse courante (spec §32 : `${base}s#<clé>`, `${base}s#l<clé>` (sans mot de passe) ou `${base}s#m<clé>` ; l'ancienne
  * forme à la racine est refusée).
  * Seule la forme est vérifiée (linkForm, mêmes refus que parseLink du moteur) : la clé n'est pas
  * décodée ici, mais par le moteur au moment de l'utiliser (transfer/client.ts). Le chemin
@@ -29,7 +29,8 @@ export function readLink(href: string, expected: "s" | "m", base: string = impor
   try {
     const p = linkForm(href, base);
     if (p.kind !== expected) return INCOMPLETE;
-    return { kind: p.kind, link: `${p.origin}/s#${p.kind === "m" ? "m" : ""}${p.key}` };
+    // Marque du fragment gardée : « m » (gestion), « l » (partage sans mot de passe, D42-27).
+    return { kind: p.kind, link: `${p.origin}/s#${p.kind === "m" ? "m" : p.noPassword ? NO_PASSWORD_MARK : ""}${p.key}` };
   } catch {
     return INCOMPLETE;
   }

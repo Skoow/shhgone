@@ -4,8 +4,10 @@
 // fermeture : Chromium l'écrit sur le disque du profil (« Session Storage ») et la rend à
 // l'onglet restauré (constaté par persist.spec.ts) ; d'où RESTORE_MS. Elle contient
 // que K_lien (43 caractères, déjà dans le « # » du lien) et l'octroi : JAMAIS le mot de passe,
-// R, une clé de contenu ni le clair. Sans mot de passe, elle n'ouvre rien ; elle évite
-// seulement qu'un rechargement compte une ouverture de plus.
+// R, une clé de contenu ni le clair. Partage protégé : sans le mot de passe, elle n'ouvre rien ;
+// elle évite seulement qu'un rechargement compte une ouverture de plus. Partage SANS mot de passe
+// (marque « l », D42-27) : elle rouvre le contenu, comme le lien lui-même (déjà dans l'historique
+// du navigateur, spec §5.3) ; elle reste bornée à l'onglet, 30 min d'inactivité et RESTORE_MS.
 
 export const OPEN_GRANT_KEY = "shh.og";
 /** 30 min sans activité (clic, touche, défilement, visibilité) : l'entrée est effacée. */
@@ -17,9 +19,11 @@ export const INACTIVITY_MS = 30 * 60_000;
  */
 export const RESTORE_MS = 2 * 60_000;
 
-export type OpenGrantEntry = { v: 1; link: string /* K_lien, 43 car. */; grant: string /* 54 car. */; last: number };
+export type OpenGrantEntry = { v: 1; link: string /* K_lien, 43 car. (précédé de « l » sans mot de passe, D42-27) */; grant: string /* 54 car. */; last: number };
 
-const LINK = /^[A-Za-z0-9_-]{43}$/;
+// Fragment du lien sans le « # » : K_lien (43), précédé de la marque « l » pour un partage sans mot
+// de passe (D42-27) : 44 caractères, jamais confondus (longueurs différentes).
+const LINK = /^l?[A-Za-z0-9_-]{43}$/;
 const GRANT = /^[A-Za-z0-9_-]{54}$/;
 
 function store(): Storage | null {

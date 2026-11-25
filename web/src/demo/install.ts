@@ -6,7 +6,7 @@
 import { setDemo } from "../app/demo-hooks";
 import { leaveGuard } from "../app/router.svelte";
 import { getLang } from "../i18n/i18n.svelte";
-import { SHARE_FRAGMENT, type CaptchaProof } from "../index";
+import { NO_PASSWORD_FRAGMENT, SHARE_FRAGMENT, type CaptchaProof } from "../index";
 import DemoBanner from "./DemoBanner.svelte";
 import { createFauxCompte } from "./fake-compte";
 import { passkeysSimulees } from "./passkeys";
@@ -123,7 +123,7 @@ export async function installDemo(w: Window): Promise<void> {
       // se charge dans le même onglet ; le faux serveur y retrouve les partages de l'onglet
       // (demo/persist.ts) et l'écran d'ouverture lit puis retire le « # » comme pour tout lien.
       const u = new URL(link);
-      const ok = u.origin === w.location.origin && u.pathname === base + "/s" && u.search === "" && SHARE_FRAGMENT.test(u.hash);
+      const ok = u.origin === w.location.origin && u.pathname === base + "/s" && u.search === "" && (SHARE_FRAGMENT.test(u.hash) || NO_PASSWORD_FRAGMENT.test(u.hash)); // « #l » : sans mot de passe (D42-27)
       if (!ok) throw new Error("lien_invalide");
       // Navigation voulue : la garde du bouton Retour (« Lien prêt ») ne la retient pas.
       leaveGuard?.release();
