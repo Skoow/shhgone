@@ -151,7 +151,7 @@
         message={t("hist.destroy.confirm")}
         confirmLabel={t("hist.destroy.yes")}
         kind="danger"
-        triggerVariant="danger"
+        triggerVariant="danger-line"
         dense
         onconfirm={destroy}
       >

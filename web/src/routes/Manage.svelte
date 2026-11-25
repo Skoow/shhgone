@@ -18,6 +18,7 @@
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import DestroyedArt from "../ui/DestroyedArt.svelte";
   import Logo from "../ui/Logo.svelte";
+  import PageHeader from "../ui/PageHeader.svelte";
   import StateChip from "../ui/StateChip.svelte";
   import TimeRim from "../ui/TimeRim.svelte";
   import Invalid from "./Invalid.svelte";
@@ -155,15 +156,15 @@
     <p><a class="send" href={href("/")} onclick={(e) => followLink(e, "/")}>{t("invalid.send")}</a></p>
   </section>
 {:else}
-  <section class="manage" aria-labelledby="m-title" aria-busy={phase === "loading" ? "true" : undefined}>
-    <div class="head titre-bandeau">
-      <h1 id="m-title" class="title" tabindex="-1" data-large-title bind:this={title}>{t("manage.title")}</h1>
+  <section class="manage live" aria-labelledby="m-title" aria-busy={phase === "loading" ? "true" : undefined}>
+    <PageHeader id="m-title" title={t("manage.title")} bind:titleEl={title}>
       {#if summary}
         <p class="ctx num" data-manage-context>
           {#if summary.label}<bdi class="nm" translate="no">{summary.label}</bdi><span aria-hidden="true">{" · "}</span>{/if}{t("hist.items", { n: summary.itemsCount })}<span aria-hidden="true">{" · "}</span>{formatBytes(summary.sizeBytes, lang)}
         </p>
       {/if}
-    </div>
+    </PageHeader>
+    <div class="grid">
     <div class="card" bind:this={card} data-capsule data-state="open">
       {#if status}
         {#key reads}
@@ -188,18 +189,21 @@
         <p class="sub">{t("manage.loading")}</p>
       {/if}
     </div>
-    {#if error}<p class="err" role="alert">{error}</p>{/if}
-    <div class="actions">
-      <Button variant="ghost" onpress={refresh}>
-        {#snippet icon()}<RefreshCw size={18} />{/snippet}
-        {t("manage.refresh")}
-      </Button>
+    <div class="side">
+      {#if error}<p class="err" role="alert">{error}</p>{/if}
+      <div class="actions">
+        <Button variant="secondary" onpress={refresh}>
+          {#snippet icon()}<RefreshCw size={18} />{/snippet}
+          {t("manage.refresh")}
+        </Button>
+      </div>
+      <div class="danger-zone">
+        <InlineConfirm label={t("manage.delete")} message={t("manage.delete.confirm")} confirmLabel={t("manage.delete.yes")} kind="danger" triggerVariant="danger-line" onconfirm={remove}>
+          {#snippet icon()}<Trash2 size={18} />{/snippet}
+        </InlineConfirm>
+        {#if deleteError}<p class="err" role="alert">{deleteError}</p>{/if}
+      </div>
     </div>
-    <div class="danger-zone">
-      <InlineConfirm label={t("manage.delete")} message={t("manage.delete.confirm")} confirmLabel={t("manage.delete.yes")} kind="danger" triggerVariant="danger-line" onconfirm={remove}>
-        {#snippet icon()}<Trash2 size={18} />{/snippet}
-      </InlineConfirm>
-      {#if deleteError}<p class="err" role="alert">{deleteError}</p>{/if}
     </div>
   </section>
 {/if}
@@ -218,21 +222,46 @@
     justify-items: start;
     gap: var(--sp-5);
   }
+  /* « Supprimé » : même échelle que les pages d'état (ui/StatusPage.svelte). */
   .title {
     margin: 0;
-    font-size: var(--fs-screen);
-    font-stretch: var(--wd-screen);
-    line-height: 1.1;
+    font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
+    font-weight: 700;
+    font-stretch: var(--wd-display, 112%);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
   }
   .title:focus {
     outline: none;
   }
-  .head {
+  /* Écran du suivi : en-tête commun sur toute la largeur ; dessous, l'état à gauche et les actions
+     à droite sur ordinateur (une colonne sur téléphone). */
+  .manage.live {
+    width: min(100%, 1120px);
+    padding-block-start: 0;
+    justify-items: stretch;
+  }
+  .grid {
     display: grid;
-    gap: var(--sp-1);
+    gap: var(--sp-5);
+    align-items: start;
+  }
+  .side {
+    display: grid;
+    gap: var(--sp-4);
+  }
+  @media (min-width: 900px) {
+    .grid {
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+      column-gap: var(--sp-6);
+    }
+    .side {
+      padding: var(--sp-5);
+      border-radius: var(--r-xl);
+      box-shadow: inset 0 0 0 1px var(--hair);
+    }
   }
   .ctx {
-    margin: 0;
     color: var(--text-2);
     min-width: 0;
     overflow-wrap: anywhere;
@@ -292,12 +321,25 @@
   .gone-logo {
     height: 34px;
   }
+  /* Lien d'action dessiné en bouton secondaire, comme les pages d'état (ui/StatusPage.svelte). */
   .send {
     display: inline-flex;
     align-items: center;
-    min-height: 44px;
-    color: var(--accent);
-    text-underline-offset: 0.2em;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.045);
+    box-shadow: inset 0 0 0 1px var(--hair-2), var(--edge-hi);
+    color: var(--text);
+    font-size: 0.9375rem;
+    font-weight: 560;
+    text-decoration: none;
+  }
+  @media (hover: hover) {
+    .send:hover {
+      background: rgb(255 255 255 / 0.08);
+    }
   }
   /* Téléphone : actions pleine largeur et alignées ; grand titre natif (réduit dans la barre). */
   @media (max-width: 899px) {
@@ -321,14 +363,8 @@
       justify-content: center;
     }
     .send {
-      justify-content: center;
       width: 100%;
       min-height: 52px;
-      border-radius: 14px;
-      background: var(--surface-3);
-      color: var(--text);
-      font-weight: 600;
-      text-decoration: none;
     }
   }
 </style>

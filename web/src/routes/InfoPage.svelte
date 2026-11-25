@@ -9,6 +9,7 @@
   // téléphone, il devient une rangée de pastilles. Sections espacées, texte plus grand.
   import { followLink, href } from "../app/router.svelte";
   import { getLang, t } from "../i18n/i18n.svelte";
+  import PageHeader from "../ui/PageHeader.svelte";
   import { infoPage, type InfoName } from "./pages/content";
 
   let { name }: { name: InfoName } = $props();
@@ -42,11 +43,9 @@
 </script>
 
 <article class="info" data-info={name} aria-labelledby="info-title">
-  <header class="hd page-card titre-bandeau">
-    <h1 id="info-title" class="title" tabindex="-1" data-large-title>{page.title}</h1>
-    <p class="lede">{page.lede}</p>
+  <PageHeader id="info-title" size="display" title={page.title} lede={page.lede}>
     {#if page.draft}<p class="draft" role="note" data-draft>{t("info.draft")}</p>{/if}
-  </header>
+  </PageHeader>
 
   <div class={["body", { solo: page.blocks.length <= 2 }]}>
     {#if page.blocks.length > 2}
@@ -106,10 +105,7 @@
     margin-inline: auto;
     padding-block: 0 var(--sp-7);
   }
-  /* En-tête : carte de titre commune (.page-card, ui/base.css). */
-  .hd {
-    margin-block-start: clamp(16px, 3vw, 32px);
-  }
+  /* En-tête : ui/PageHeader.svelte. */
   .draft {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
@@ -221,7 +217,6 @@
       width: 2px;
       border-radius: 2px;
       background: var(--accent);
-      box-shadow: 0 0 10px rgb(95 227 181 / 0.6);
     }
   }
 
@@ -232,15 +227,16 @@
     max-width: 68ch;
   }
   /* Grand écran (1100 px et plus) : la page prend toute la largeur du contenu (en-tête pleine
-     largeur, ui/base.css). La largeur gagnée va au sommaire et aux marges, pas aux lignes : le
-     texte garde 70 à 80 signes par ligne. Le sommaire reste aligné sur le bord gauche du titre. */
+     largeur, ui/base.css). La largeur gagnée va aux marges, pas aux lignes : le texte garde 70 à
+     80 signes par ligne, le sommaire reste proche du texte (plus de grand vide entre eux) et aligné
+     sur le bord gauche du titre. */
   @media (min-width: 1100px) {
     .info {
       max-width: none;
     }
     .body {
-      grid-template-columns: minmax(260px, 320px) minmax(0, 37rem);
-      column-gap: clamp(72px, 9vw, 176px);
+      grid-template-columns: minmax(240px, 280px) minmax(0, 40rem);
+      column-gap: clamp(56px, 5vw, 96px);
       padding-block-start: 88px;
     }
     .text {
@@ -297,7 +293,6 @@
     height: 6px;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 8px rgb(95 227 181 / 0.5);
   }
   /* Commandes à recopier : défilent seules en largeur, la page ne défile jamais de côté. */
   .cmd {

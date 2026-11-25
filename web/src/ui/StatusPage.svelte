@@ -55,7 +55,7 @@
 
 <style>
   .status {
-    width: min(100%, 640px);
+    width: min(100%, 720px);
     margin-inline: auto;
     padding: var(--sp-8) var(--sp-4);
     display: grid;
@@ -73,8 +73,8 @@
     width: 88px;
     height: 88px;
     border-radius: 50%;
-    background: radial-gradient(circle at 50% 40%, rgb(95 227 181 / 0.16), rgb(95 227 181 / 0.03) 62%, transparent 70%);
-    box-shadow: inset 0 0 0 1px var(--hair);
+    background: var(--surface-1);
+    box-shadow: inset 0 0 0 1px var(--hair-2), var(--edge-hi);
   }
   .mark {
     display: block;
@@ -98,21 +98,25 @@
     box-shadow: inset 0 0 0 1px var(--line-strong);
     color: var(--accent);
   }
+  /* Titre à l'échelle des en-têtes de page (ui/PageHeader.svelte, taille « screen »). */
   .title {
     margin: 0;
-    font-size: var(--fs-screen);
-    font-stretch: var(--wd-screen);
-    line-height: 1.1;
-    letter-spacing: -0.02em;
+    font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
+    font-weight: 700;
+    font-stretch: var(--wd-display, 112%);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
     text-wrap: balance;
-    max-width: 22ch;
+    max-width: 20ch;
   }
   .title:focus {
     outline: none;
   }
   .lede {
     margin: 0;
-    color: var(--text-2);
+    color: #b5c0da;
+    font-size: 1.0625rem;
+    line-height: 1.55;
     max-width: 60ch;
     text-wrap: pretty;
   }
@@ -122,16 +126,41 @@
     gap: var(--sp-3);
     align-items: center;
   }
+  .act {
+    padding-top: var(--sp-2);
+  }
+  /* Lien d'action dessiné en bouton secondaire (même relief que Button « secondary »). */
   .act :global(a) {
     display: inline-flex;
     align-items: center;
-    min-height: 44px;
-    color: var(--accent);
-    text-underline-offset: 0.2em;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.045);
+    box-shadow: inset 0 0 0 1px var(--hair-2), var(--edge-hi);
+    color: var(--text);
+    font-size: 0.9375rem;
+    font-weight: 560;
+    text-decoration: none;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+  .act :global(a:active) {
+    transform: scale(0.98);
   }
   @media (hover: hover) {
     .act :global(a:hover) {
-      color: var(--accent-hover);
+      background: rgb(255 255 255 / 0.08);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .act :global(a) {
+      transition: background-color var(--dur-fast) var(--ease-out);
+    }
+    .act :global(a:active) {
+      transform: none;
     }
   }
   @media (forced-colors: active) {
@@ -159,20 +188,8 @@
     }
     .act :global(a),
     .act :global(button) {
-      display: flex;
-      align-items: center;
-      justify-content: center;
       width: 100%;
       min-height: 52px;
-      border-radius: 14px;
-      background: var(--surface-3);
-      box-shadow: inset 0 0 0 1px var(--hair-2);
-      color: var(--text);
-      font-weight: 600;
-      text-decoration: none;
-    }
-    .act :global(a:active) {
-      transform: scale(0.98);
     }
   }
 </style>

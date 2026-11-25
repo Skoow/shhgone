@@ -11,11 +11,13 @@
   import { getLang, t } from "../i18n/i18n.svelte";
   import { announce } from "../ui/announce";
   import Button from "../ui/Button.svelte";
+  import EmptyState from "../ui/EmptyState.svelte";
   import FormatIcon from "../ui/FormatIcon.svelte";
   import { Trash2, X } from "../ui/Icon";
   import IconButton from "../ui/IconButton.svelte";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import { midSplitName } from "../ui/midname";
+  import PageHeader from "../ui/PageHeader.svelte";
   import Switch from "../ui/Switch.svelte";
 
   const lang = $derived(getLang());
@@ -50,11 +52,15 @@
   }
 </script>
 
+{#snippet tray()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3v12m-5-5 5 5 5-5" />
+    <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+  </svg>
+{/snippet}
+
 <section class="dls" aria-labelledby="d-title" aria-busy={downloads.status === "loading" || downloads.status === "idle" ? "true" : undefined}>
-  <div class="top titre-bandeau">
-    <h1 id="d-title" class="title" tabindex="-1" data-large-title bind:this={title}>{t("downloads.title")}</h1>
-    <p class="sub">{t("downloads.sub")}</p>
-  </div>
+  <PageHeader id="d-title" title={t("downloads.title")} lede={t("downloads.sub")} bind:titleEl={title} />
 
   {#if downloads.status === "unavailable"}
     <p class="sub" data-downloads-unavailable>{t("downloads.unavailable")}</p>
@@ -69,18 +75,14 @@
     </div>
 
     {#if !downloads.enabled}
-      <div class="empty" data-downloads-off>
-        <h2 class="et">{t("downloads.off.title")}</h2>
+      <EmptyState title={t("downloads.off.title")} data-downloads-off>
+        {#snippet art()}{@render tray()}{/snippet}
         <Button variant="secondary" onpress={() => toggle(true)}>{t("downloads.off.cta")}</Button>
-      </div>
+      </EmptyState>
     {:else if downloads.entries.length === 0}
-      <div class="empty" data-downloads-empty>
-        <svg class="art" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
-          <path d="M32 8v32m-12-12 12 12 12-12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M10 42v8a6 6 0 0 0 6 6h32a6 6 0 0 0 6-6v-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg>
-        <p class="et">{t("downloads.empty")}</p>
-      </div>
+      <EmptyState title={t("downloads.empty")} level="p" data-downloads-empty>
+        {#snippet art()}{@render tray()}{/snippet}
+      </EmptyState>
     {:else}
       {#each groups as g (g.day)}
         <section class="day" aria-labelledby="day-{g.day}" data-day>
@@ -111,25 +113,16 @@
 
 <style>
   .dls {
-    width: min(100%, 760px);
+    width: min(100%, 1120px);
     margin-inline: auto;
-    padding: var(--sp-6) var(--sp-4) var(--sp-8);
+    padding: 0 var(--sp-4) var(--sp-8);
     display: grid;
     gap: var(--sp-5);
     min-width: 0;
   }
-  .top {
-    display: grid;
-    gap: var(--sp-2);
-  }
-  .title {
-    margin: 0;
-    font-size: var(--fs-screen);
-    font-stretch: var(--wd-screen);
-    line-height: 1.1;
-  }
-  .title:focus {
-    outline: none;
+  /* En-tête sur toute la largeur, comme les autres écrans ; la liste garde une mesure de lecture. */
+  .dls > :global(:not(.ph)) {
+    max-width: 52rem;
   }
   .sub,
   .foot {
@@ -152,20 +145,6 @@
   }
   .sw {
     min-width: min(100%, 280px);
-  }
-  .empty {
-    display: grid;
-    justify-items: start;
-    gap: var(--sp-3);
-    padding: var(--sp-5) 0;
-  }
-  .art {
-    color: var(--text-2);
-  }
-  .et {
-    margin: 0;
-    font-size: var(--fs-h3, 1.25rem);
-    font-weight: 600;
   }
   .day {
     display: grid;
@@ -236,7 +215,7 @@
   }
   @media (max-width: 899px) {
     .dls {
-      padding: var(--sp-2) 0 var(--sp-6);
+      padding: 0 0 var(--sp-6);
       gap: var(--sp-4);
     }
   }

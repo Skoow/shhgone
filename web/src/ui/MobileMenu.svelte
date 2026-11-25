@@ -393,7 +393,8 @@
     padding: 0;
     list-style: none;
   }
-  /* « Nouveau partage » : le geste principal, en pastille menthe. */
+  /* « Nouveau partage » : le geste principal, avec le relief du bouton principal du site
+     (ui/Button.svelte) : coins de 12 px, reflets intérieurs, ombre neutre (plus de halo menthe). */
   .mm-cta {
     display: flex;
     align-items: center;
@@ -401,12 +402,24 @@
     gap: var(--sp-2);
     min-height: 52px;
     margin-block-end: var(--sp-3);
-    border-radius: var(--r-pill);
+    border-radius: 12px;
     background: var(--accent);
-    color: var(--bg);
-    font-weight: 650;
+    color: var(--on-accent);
+    font-weight: 600;
     text-decoration: none;
-    box-shadow: 0 10px 28px -10px rgb(95 227 181 / 0.65);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.4),
+      inset 0 -1px 0 rgb(0 0 0 / 0.14),
+      0 10px 24px -14px rgb(0 0 0 / 0.9);
+    transition: transform var(--dur-press) var(--ease-out);
+  }
+  .mm-cta:active {
+    transform: scale(0.98);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mm-cta:active {
+      transform: none;
+    }
   }
   .mm-ci {
     display: grid;

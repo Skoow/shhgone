@@ -25,9 +25,11 @@
   import { isActive, type HistoryEntry } from "../history/store";
   import { announce } from "../ui/announce";
   import Button from "../ui/Button.svelte";
+  import EmptyState from "../ui/EmptyState.svelte";
   import { Plus, Trash2 } from "../ui/Icon";
   import InboxDetail from "../ui/InboxDetail.svelte";
   import InboxRow from "../ui/InboxRow.svelte";
+  import PageHeader from "../ui/PageHeader.svelte";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import Segmented from "../ui/Segmented.svelte";
   import ShareCard from "../ui/ShareCard.svelte";
@@ -87,45 +89,43 @@
 </script>
 
 <section class="hist" aria-labelledby="h-title" aria-busy={shares.status === "loading" || shares.status === "idle" ? "true" : undefined}>
-  <div class="top titre-bandeau">
-    <div class="tt">
-      <h1 id="h-title" class="title" tabindex="-1" data-large-title bind:this={title}>{t("hist.title")}</h1>
-      {#if shares.status === "ready" && shares.entries.length > 0}
-        <p class="counts num" data-counts>{t("hist.count.active", { n: activeCount })} · {t("hist.count.ended", { n: endedCount })}</p>
-      {/if}
-    </div>
-    <Button variant="primary" onpress={() => navigate("/envoyer")}>
-      {#snippet icon()}<Plus size={20} strokeWidth={2} />{/snippet}
-      {t("hist.new")}
-    </Button>
-  </div>
+  <PageHeader id="h-title" title={t("hist.title")} bind:titleEl={title}>
+    {#if shares.status === "ready" && shares.entries.length > 0}
+      <p class="counts num" data-counts>{t("hist.count.active", { n: activeCount })} · {t("hist.count.ended", { n: endedCount })}</p>
+    {/if}
+    {#snippet actions()}
+      <Button variant="primary" onpress={() => navigate("/envoyer")}>
+        {#snippet icon()}<Plus size={20} strokeWidth={2} />{/snippet}
+        {t("hist.new")}
+      </Button>
+    {/snippet}
+  </PageHeader>
 
   {#if shares.status === "unavailable"}
-    <div class="empty" data-history-unavailable>
-      <h2 class="et">{t("hist.unavailable.title")}</h2>
-      <p class="sub">{t("hist.unavailable.body")}</p>
-    </div>
+    <EmptyState title={t("hist.unavailable.title")} data-history-unavailable>
+      <p>{t("hist.unavailable.body")}</p>
+    </EmptyState>
   {:else if shares.status !== "ready"}
     <ul class="list" role="list" aria-label={t("hist.loading")}>
       {#each [0, 1] as k (k)}<li class="skel" aria-hidden="true"></li>{/each}
     </ul>
   {:else if shares.all.length === 0}
-    <div class="empty" data-history-empty>
-      <svg class="art" viewBox="0 0 64 80" width="64" height="80" aria-hidden="true">
-        <path d="M8 4h32l16 16v52a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="2" />
-        <path d="M40 4v16h16" fill="none" stroke="currentColor" stroke-width="2" />
-      </svg>
+    <EmptyState title={keepSentDefault() ? t("hist.empty.title") : t("hist.off.title")} data-history-empty>
+      {#snippet art()}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5M9 13h6M9 17h4" />
+        </svg>
+      {/snippet}
       {#if keepSentDefault()}
-        <h2 class="et">{t("hist.empty.title")}</h2>
-        <p class="sub">{t("hist.empty.body")}</p>
-        <p class="sub">{t("hist.honest")}</p>
+        <p>{t("hist.empty.body")}</p>
+        <p>{t("hist.honest")}</p>
         <a class="cta" href={href("/envoyer")} onclick={(e) => followLink(e, "/envoyer")}>{t("hist.empty.cta")}</a>
       {:else}
-        <h2 class="et">{t("hist.off.title")}</h2>
-        <p class="sub">{t("hist.off.body")}</p>
+        <p>{t("hist.off.body")}</p>
         <Button variant="secondary" onpress={enable}>{t("hist.off.cta")}</Button>
       {/if}
-    </div>
+    </EmptyState>
   {:else}
     <div class="filters"><Segmented label={t("hist.filter")} options={filters} bind:value={filter} /></div>
     {#if filter === "received"}
@@ -185,32 +185,11 @@
   .hist {
     width: min(100%, 1120px);
     margin-inline: auto;
-    padding: var(--sp-6) var(--sp-4) var(--sp-8);
+    padding: 0 var(--sp-4) var(--sp-8);
     display: grid;
     gap: var(--sp-5);
   }
-  .top {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--sp-4);
-  }
-  .tt {
-    display: grid;
-    gap: var(--sp-1);
-  }
-  .title {
-    margin: 0;
-    font-size: var(--fs-screen);
-    font-stretch: var(--wd-screen);
-    line-height: 1.1;
-  }
-  .title:focus {
-    outline: none;
-  }
   .counts {
-    margin: 0;
     color: var(--text-2);
     font-variant-numeric: tabular-nums;
   }
@@ -243,20 +222,6 @@
     border-radius: var(--r-xl);
     background: var(--surface-1);
   }
-  .empty {
-    display: grid;
-    justify-items: start;
-    gap: var(--sp-3);
-    padding: var(--sp-6) 0;
-    max-width: 62ch;
-  }
-  .art {
-    color: var(--text-2);
-  }
-  .et {
-    margin: 0;
-    font-size: var(--fs-h2, 1.5rem);
-  }
   .sub {
     margin: 0;
     color: var(--text-2);
@@ -285,12 +250,8 @@
   }
   @media (max-width: 899px) {
     .hist {
-      padding: var(--sp-2) 0 var(--sp-6);
+      padding: 0 0 var(--sp-6);
       gap: var(--sp-4);
-    }
-    .top :global(.btn) {
-      width: 100%;
-      justify-content: center;
     }
   }
 </style>
