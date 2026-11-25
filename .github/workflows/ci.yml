@@ -148,7 +148,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: captures-ui
-          path: web/ui-e2e/__captures__/
+          path: |
+            web/ui-e2e/__captures__/
+            web/test-results/captures/
           if-no-files-found: ignore
       # Traces (trace.zip) et error-context.md des tests échoués, pour diagnostiquer WebKit (absent
       # en local). Aucun secret réel : ce job n'a aucun secret GitHub (persist-credentials: false),
