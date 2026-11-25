@@ -204,7 +204,7 @@
     color: var(--text-2);
     text-wrap: pretty;
   }
-  /* Avantages : pastille ronde (icône menthe), titre, une phrase (points forts du compte). */
+  /* Avantages : icône au trait (couleur du texte secondaire, sans pastille), titre, une phrase. */
   .points {
     display: grid;
     gap: var(--sp-4);
@@ -221,17 +221,13 @@
   .pic {
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgb(95 227 181 / 0.1);
-    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.3);
-    color: var(--accent);
+    width: 20px;
+    height: 24px;
+    color: var(--text-2);
   }
   .ptx {
     display: grid;
     gap: 2px;
-    padding-top: 2px;
   }
   .ptx strong {
     color: var(--text);
@@ -266,9 +262,9 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
+  /* Rejoindre : à part, par l'espace seulement. */
   .rejoindre {
-    padding-top: var(--sp-4);
-    border-top: 1px solid var(--hair);
+    padding-top: var(--sp-3);
   }
   /* Tablette et téléphone : la vitrine passe au-dessus, le bloc d'action dessous. */
   @media (max-width: 899px) {

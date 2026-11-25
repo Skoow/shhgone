@@ -7,7 +7,7 @@
   // Animation en CSS seulement (arrivée des messages, saisie, onde), arrêtée sous mouvement réduit.
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatBytes, formatClock, formatDuration } from "../../i18n/format";
-  import { FileArchive, FileText, Folder, Mic, Paperclip, Phone, Play, Video } from "../../ui/Icon";
+  import { FileArchive, FileText, Folder, Mic, Paperclip, Pause, Phone, Video } from "../../ui/Icon";
 
   const lang = $derived(getLang());
   // Heures d'exemple : un soir, à la minute ; seules les heures sont montrées.
@@ -23,7 +23,7 @@
 
 <section class="vitrine" aria-label={t("salon.vitrine.label")} data-vitrine>
   <p class="sr-only">{t("salon.vitrine.resume")}</p>
-  <div class="ecran" aria-hidden="true" inert>
+  <div class="ecran" aria-hidden="true" inert data-ui>
     <span class="apercu" data-apercu>{t("salon.vitrine.apercu")}</span>
     <div class="tete">
       <div class="titre">
@@ -80,8 +80,8 @@
             <div class="bulle">
               <span class="auteur">{NOE.nom}</span>
               <div class="vocal">
-                <span class="lire"><Play size={18} /></span>
-                <span class="onde">{#each ONDE as v, i (i)}<i class="b{v}"></i>{/each}</span>
+                <span class="lire"><Pause size={18} /></span>
+                <span class="onde">{#each ONDE as v}<i class="b{v}"></i>{/each}</span>
                 <span class="duree">{formatDuration(12, lang, { precise: true })}</span>
               </div>
               <p class="meta"><time>{h(3)}</time></p>
@@ -270,8 +270,8 @@
     gap: var(--sp-2);
   }
   .reserve {
-    color: var(--text-3);
-    font-size: 0.6875rem;
+    color: var(--text-2);
+    font-size: 0.75rem;
     line-height: 1.2;
     white-space: nowrap;
   }
@@ -547,8 +547,10 @@
     transform-origin: center;
     animation: onde 1.1s ease-in-out infinite alternate;
   }
+  /* Lecture en cours : la partie déjà lue bouge, le reste attend, plus pâle. */
   .onde i:nth-child(n + 11) {
     opacity: 0.4;
+    animation: none;
   }
   .onde i:nth-child(3n) {
     animation-delay: -0.35s;
@@ -687,31 +689,30 @@
     font-weight: 560;
   }
 
-  /* ---------- Arrivée des messages, un par un (une fois) ---------- */
-  .fil > li,
+  /* ---------- Arrivée des derniers messages, un par un (une fois) ---------- */
+  /* Le début de la conversation est là d'emblée (jamais d'écran vide) ; seuls les deux derniers
+     messages puis « … écrit » arrivent : une montée courte, sans rebond. */
+  .fil > li:nth-last-child(-n + 2),
   .ecrit {
-    animation: arrive 0.45s var(--ease-out, ease-out) both;
+    animation: arrive 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  .fil > li:nth-child(1) { animation-delay: 0.2s; }
-  .fil > li:nth-child(2) { animation-delay: 0.9s; }
-  .fil > li:nth-child(3) { animation-delay: 1.6s; }
-  .fil > li:nth-child(4) { animation-delay: 2.5s; }
-  .fil > li:nth-child(5) { animation-delay: 3.4s; }
-  .fil > li:nth-child(6) { animation-delay: 4.1s; }
-  .fil > li:nth-child(7) { animation-delay: 5s; }
-  .ecrit { animation-delay: 5.8s; }
+  .fil > li:nth-last-child(2) { animation-delay: 0.5s; }
+  .fil > li:nth-last-child(1) { animation-delay: 1.5s; }
+  .ecrit { animation-delay: 2.4s; }
   @keyframes arrive {
     from {
       opacity: 0;
       transform: translateY(8px);
+      filter: blur(2px);
     }
     to {
       opacity: 1;
       transform: none;
+      filter: none;
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .fil > li,
+    .fil > li:nth-last-child(-n + 2),
     .ecrit,
     .onde i,
     .points i {
