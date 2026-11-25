@@ -42,6 +42,6 @@ describe("MobileMenu", () => {
     flushSync();
     document.querySelector<HTMLButtonElement>('[data-mm-sec="server"]')!.click();
     flushSync();
-    expect(S.allerSection).toHaveBeenLastCalledWith("faq-server", true);
+    expect(S.allerSection).toHaveBeenLastCalledWith("serveur", undefined);
   });
 });

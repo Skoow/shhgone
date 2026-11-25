@@ -28,14 +28,14 @@ test("captures : accueil", async ({ page, shh, isMobile }) => {
   const ROOT = fileURLToPath(new URL("../test-results/captures/", import.meta.url));
   await page.screenshot({ path: `${ROOT}lot2-accueil-${w(isMobile)}-complet.png`, fullPage: true });
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  for (const s of ["facts", "how", "demo-sec", "priv", "life", "trust", "offers", "faq"]) {
+  for (const s of ["how", "life", "priv", "trust", "offers", "faq"]) {
     const sec = page.locator(`section.${s}`).first();
     await sec.scrollIntoViewIfNeeded();
     await page.waitForTimeout(700);
     await sec.screenshot({ path: `${ROOT}lot2-accueil-${w(isMobile)}-${s}.png` });
   }
   // Jonctions : la ligne de partage entre deux sections, au milieu d'une fenêtre de 500 px.
-  for (const [i, s] of (["how", "priv", "life", "trust"] as const).entries()) {
+  for (const [i, s] of (["how", "life", "priv", "trust", "offers", "faq"] as const).entries()) {
     const y = await page.locator(`section.${s}`).first().evaluate((e) => e.getBoundingClientRect().top + scrollY);
     await page.evaluate((y) => scrollTo(0, y - 250), y);
     await page.waitForTimeout(500);

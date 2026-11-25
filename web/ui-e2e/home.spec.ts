@@ -160,7 +160,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator("#faq-title")).toBeInViewport();
   });
 
-  test("lot 2 : les mini-schémas (frise, vie d'un lien) ne tournent que près de l'écran", async ({ page, shh }) => {
+  test("lot 2 : le schéma de la vie d'un lien ne tourne que près de l'écran", async ({ page, shh }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(shh.origin + "/");
     const etat = (sel: string) =>
@@ -169,11 +169,10 @@ test.describe("fr-FR", () => {
     await expect.poll(() => etat("section.life")).toBe("running");
     await page.locator("footer[data-foot]").evaluate((e) => e.scrollIntoView({ block: "end" }));
     await expect.poll(() => etat("section.life")).toBe("paused");
-    await expect.poll(() => etat("section.how")).toBe("paused");
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(shh.origin + "/");
-    await page.locator("section.how").evaluate((e) => e.scrollIntoView({ block: "center" }));
-    await expect.poll(() => etat("section.how")).toBe("");
+    await page.locator("section.life").evaluate((e) => e.scrollIntoView({ block: "center" }));
+    await expect.poll(() => etat("section.life")).toBe("");
   });
 
   test("K8 : le titre a pour nom la phrase entière ; la copie animée est cachée", async ({ page, shh }) => {
@@ -320,14 +319,14 @@ test.describe("fr-FR", () => {
 
   test("questions : accordéon natif, une seule réponse ouverte à la fois", async ({ page, shh }) => {
     await page.goto(shh.origin + "/");
-    const q1 = page.getByText("Que voit le serveur ?");
-    const q2 = page.getByText("Puis-je récupérer un partage détruit ?");
+    const q1 = page.getByText("Que se passe-t-il si je perds le lien ?");
+    const q2 = page.getByText("Le destinataire peut-il garder une copie ?");
     await q1.scrollIntoViewIfNeeded();
     await q1.click();
-    await expect(page.getByText(/^Il voit et garde jusqu'à l'échéance des données chiffrées/)).toBeVisible();
+    await expect(page.getByText(/^Personne ne peut le retrouver, pas même nous/)).toBeVisible();
     await q2.click();
-    await expect(page.getByText(/^Non\. Un partage détruit ou expiré/)).toBeVisible();
-    await expect(page.getByText(/^Il voit et garde jusqu'à l'échéance des données chiffrées/)).toBeHidden();
+    await expect(page.getByText(/^Oui, s.il enregistre un élément/)).toBeVisible();
+    await expect(page.getByText(/^Personne ne peut le retrouver, pas même nous/)).toBeHidden();
     expect(await page.locator("details[open]").count()).toBe(1);
   });
 

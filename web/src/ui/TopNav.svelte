@@ -202,7 +202,7 @@
   ]);
   const secItems = $derived<Item[]>([
     { id: "how", icon: Compass, tint: "mint", title: t("nav.sec.how.t"), desc: t("nav.sec.how.d"), run: () => void section("comment") },
-    { id: "server", icon: Server, tint: "blue", title: t("nav.sec.server.t"), desc: t("nav.sec.server.d"), run: () => void section("faq-server", true) },
+    { id: "server", icon: Server, tint: "blue", title: t("nav.sec.server.t"), desc: t("nav.sec.server.d"), run: () => void section("serveur") },
     { id: "page", icon: ShieldCheck, tint: "cyan", title: t("nav.sec.page.t"), desc: t("nav.sec.page.d"), path: "/securite" },
     { id: "privacy", icon: EyeOff, tint: "blue", title: t("nav.sec.privacy.t"), desc: t("nav.sec.privacy.d"), path: "/confidentialite" },
     { id: "report", icon: Flag, tint: "amber", title: t("nav.sec.report.t"), desc: t("nav.sec.report.d"), path: "/signaler" },

@@ -42,7 +42,7 @@
       icon: ShieldCheck,
       subs: [
         { id: "how", label: t("nav.sec.how.t"), icon: Compass, section: "comment" },
-        { id: "server", label: t("nav.sec.server.t"), icon: Server, section: "faq-server", faq: true },
+        { id: "server", label: t("nav.sec.server.t"), icon: Server, section: "serveur" },
       ],
     },
     { label: t("nav.offers"), path: "/offres", icon: Tag },

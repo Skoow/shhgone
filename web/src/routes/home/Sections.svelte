@@ -1,34 +1,15 @@
-<script module lang="ts">
-  // Trame de points du logo, en petit : grille 6 × 6 d'une page (schémas « Chiffrez » et
-  // « Ça s'efface »). Chaque point de « Ça s'efface » part à droite d'une distance qui dépend de sa
-  // place (graine fixe : même dessin au build et dans la page).
-  const GRID = (() => {
-    const out: { x: number; y: number; dx: number; dy: number; d: number }[] = [];
-    let s = 0x5eed;
-    const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-    for (let r = 0; r < 8; r++)
-      for (let c = 0; c < 5; c++) {
-        const x = 37 + c * 7;
-        out.push({ x, y: 30 + r * 7, dx: Math.round(18 + rnd() * 30), dy: Math.round(-14 + rnd() * 28), d: Math.round((4 - c) * 120 + rnd() * 260) });
-      }
-    return out;
-  })();
-</script>
-
 <script lang="ts">
-  // Accueil, sous le héros (lot 2 de l'audit de design) : sections qui alternent leur mise en page
-  // (titre à gauche et frise ; texte et schéma ; schéma et texte ; grande typographie), fonds
-  // raccordés au fond de la page (.fondu, ui/base.css) avec quelques coupures en biais, filet
-  // lumineux aux jonctions. Chaque section montre quelque chose de concret : chiffres clés (lus
-  // dans limits.ts), étapes animées, lien en deux et ce que voit le serveur, vie d'un lien
-  // (durées, ouvertures, fin), vérification du site, offres. Animations en CSS seulement, lentes,
-  // arrêtées hors écran et coupées en mouvement réduit.
+  // Accueil, sous le héros : un parcours où chaque idée n'est dite qu'une fois (audit des
+  // répétitions du 25 novembre). Comment ça marche (infographie animée) → la vie d'un lien
+  // (durées, ouvertures, fin ; chiffres lus dans limits.ts) → ce qui reste hors de notre portée
+  // (sans compte, nettoyage, salon ; lien en deux et ce que voit le serveur) → vérification du
+  // site → offres ; les questions suivent (Faq.svelte). Fonds raccordés au fond de la page
+  // (.fondu, ui/base.css), biais et sections droites en alternance, filet lumineux aux jonctions.
+  // Animations en CSS seulement, lentes, arrêtées hors écran et coupées en mouvement réduit.
   import { followLink, href } from "../../app/router.svelte";
-  import { formatBytes, formatDuration } from "../../i18n/format";
+  import { formatDuration } from "../../i18n/format";
   import { getLang, t, type Key } from "../../i18n/i18n.svelte";
-  import { limitParams } from "../../i18n/limit-params";
-  import { CONTENT_MAX, MAX_OPENS, PW_TRIES, TTL_HOURS, TTL_MAX_HOURS } from "../../limits";
-  import { PASSWORD_LEN } from "../../engine/pure";
+  import { MAX_OPENS, PW_TRIES, TTL_HOURS, TTL_MAX_HOURS } from "../../limits";
   import { SOURCE_URL } from "../pages/content";
   import { reveal } from "../../ui/attach";
   import { reducedMotion } from "../../ui/motion";
@@ -37,22 +18,8 @@
   import SecureDemo from "../../ui/SecureDemo.svelte";
   import TabIcon from "../../ui/TabIcon.svelte";
 
-  const how = ["add", "seal", "go", "gone"] as const;
-  const priv = ["account", "server", "clean", "room"] as const;
-  const uid = $props.id();
+  const priv = ["account", "clean", "room"] as const;
   const lang = $derived(getLang());
-  // Page : coin replié en haut à droite (schémas de « Comment ça marche »).
-  const PAGE = "M26 14H58L70 26V82H26Z";
-
-  // Chiffres clés, tous lus dans limits.ts et le moteur (PASSWORD_LEN : mot de passe toujours tiré,
-  // spec §4). Pas de nom d'algorithme (AES-256-GCM) : UI §20.8, vérifié par i18n.test.ts.
-  const stats = $derived([
-    { v: formatBytes(CONTENT_MAX, lang), l: t("home.stat.size") },
-    { v: formatDuration(TTL_MAX_HOURS * 3600, lang), l: t("home.stat.ttl") },
-    { v: String(MAX_OPENS), l: t("home.stat.opens") },
-    { v: "0", l: t("home.stat.account") },
-    { v: String(PASSWORD_LEN), l: t("home.stat.pw") },
-  ]);
   const hours = $derived(new Intl.ListFormat(lang, { type: "disjunction" }).format(TTL_HOURS.map((h) => formatDuration(h * 3600, lang))));
   const life = $derived([
     { k: "ttl", p: t("home.life.ttl.p", { hours }) },
@@ -81,123 +48,14 @@
   }
 </script>
 
-<!-- Chiffres clés, juste sous le premier écran. -->
-<section class="facts" aria-label={t("home.stats.label")}>
-  <ul class="stats">
-    {#each stats as s, i (i)}
-      <li class="rv" style:--i="{i * 60}ms" {@attach reveal}><b class="sv num">{s.v}</b><span class="sl">{s.l}</span></li>
-    {/each}
-  </ul>
-</section>
-
-<section class="sec how fondu fondu-biais filet" id="comment" aria-labelledby="how-title" data-boucle {@attach joue}>
+<!-- Comment ça marche : l'infographie animée (sept étapes, de votre appareil à celui du
+     destinataire), seule explication du parcours sur l'accueil. -->
+<section class="sec how fondu fondu-biais filet" id="comment" aria-labelledby="how-title">
   <div class="head split rv" {@attach reveal}>
     <h2 id="how-title" tabindex="-1">{t("home.how.title")}</h2>
     <p>{t("home.how.lede")}</p>
   </div>
-  <ol class="steps3">
-    {#each how as k, i (k)}
-      <li class="st rv" data-how-card style:--i="{i * 90}ms" {@attach reveal}>
-        <span class="tile">
-          <svg class="ill {k}" viewBox="0 0 96 96" aria-hidden="true" focusable="false">
-            {#if k === "add"}
-              <path d={PAGE} fill="#ebe6dc" />
-              <path d="M58 14V26H70Z" fill="#bdb6a8" />
-              {#each [36, 46, 56, 66] as y, j (y)}<rect class="ln" x="34" {y} width={[26, 30, 20, 24][j]} height="3.5" rx="1.75" fill="#0b0d10" style:--d="{j * 0.35}s" />{/each}
-              <g class="plus"><circle cx="70" cy="76" r="11" fill="#5fe3b5" /><path d="M70 70.5v11M64.5 76h11" stroke="#0b0d10" stroke-width="2.6" stroke-linecap="round" /></g>
-            {:else if k === "seal"}
-              <defs><clipPath id="{uid}-scan"><rect class="scanclip" x="20" y="14" width="56" height="68" /></clipPath></defs>
-              <path d={PAGE} fill="#ebe6dc" />
-              {#each [30, 40, 50, 60, 70] as y, j (y)}<rect x="34" {y} width={[26, 30, 20, 28, 22][j]} height="3.5" rx="1.75" fill="#0b0d10" />{/each}
-              <g clip-path="url(#{uid}-scan)">
-                <path d={PAGE} fill="#0b0d10" stroke="#5fe3b5" stroke-width="1.5" />
-                {#each GRID as g, j (j)}<circle cx={g.x} cy={g.y} r="1.7" fill={j % 3 === 0 ? "#5fe3b5" : "#ebe6dc"} />{/each}
-              </g>
-              <rect class="scan" x="22" y="13" width="52" height="2.5" rx="1.25" fill="#5fe3b5" />
-            {:else if k === "go"}
-              <!-- Deux chemins : le lien (maillons) et le mot de passe (points), chacun par son moyen. -->
-              <rect x="8" y="18" width="50" height="24" rx="12" fill="#ebe6dc" />
-              <rect x="17" y="25" width="17" height="10" rx="5" fill="none" stroke="#0b0d10" stroke-width="3" />
-              <rect x="31" y="25" width="17" height="10" rx="5" fill="none" stroke="#0b0d10" stroke-width="3" />
-              <rect x="8.75" y="54.75" width="48.5" height="22.5" rx="11.25" fill="#0b0d10" stroke="#5fe3b5" stroke-width="1.5" />
-              {#each [19, 27, 35, 43] as x (x)}<circle cx={x} cy="66" r="2.6" fill="#5fe3b5" />{/each}
-              <path class="road" d="M62 30H88" stroke="#ebe6dc" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 5" />
-              <path class="road" d="M62 66H88" stroke="#5fe3b5" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 5" />
-            {:else}
-              {#each GRID as g, j (j)}<circle class="dot" cx={g.x} cy={g.y} r="1.9" fill={j % 4 === 0 ? "#5fe3b5" : "#ebe6dc"} style:--dx="{g.dx}px" style:--dy="{g.dy}px" style:--d="{g.d}ms" />{/each}
-            {/if}
-          </svg>
-        </span>
-        <div class="tx">
-          <span class="n num" aria-hidden="true">{i + 1}</span>
-          <h3><span class="sr-only">{i + 1}. </span>{t(`home.how.${k}.t` as Key)}</h3>
-          <p>{t(`home.how.${k}.p` as Key, limitParams(lang))}</p>
-        </div>
-      </li>
-    {/each}
-  </ol>
-</section>
-
-<!-- L'animation en grand : la scène et le journal à gauche, les étapes à droite. -->
-<section class="sec demo-sec fondu filet" aria-labelledby="demo-title">
-  <div class="head split rv" {@attach reveal}>
-    <h2 id="demo-title">{t("demo.title")}</h2>
-    <p>{t("home.demo.lede")}</p>
-  </div>
-  <SecureDemo labelledby="demo-title" />
-</section>
-
-<section class="sec priv fondu fondu-biais fondu-biais-inv filet" aria-labelledby="priv-title">
-  <div class="pcol">
-    <div class="head rv" {@attach reveal}>
-      <h2 id="priv-title" tabindex="-1">{t("home.priv.title")}</h2>
-      <p>{t("home.priv.lede")}</p>
-      <a class="more" href={href("/securite")} onclick={(e) => followLink(e, "/securite")}>{t("home.why.more")}<ArrowRight size={18} strokeWidth={1.9} aria-hidden="true" /></a>
-    </div>
-    <ul class="plist">
-      {#each priv as k, i (k)}
-        <li class={["prow", "rv", { soon: k === "room" && !__SALONS__ }]} data-priv-card style:--i="{i * 70}ms" {@attach reveal}>
-          <span class="tile-ic" aria-hidden="true">
-            {#if k === "account"}<UserX size={22} strokeWidth={1.8} />{:else if k === "server"}<EyeOff size={22} strokeWidth={1.8} />{:else if k === "clean"}<Broom size={22} strokeWidth={1.8} />{:else}<TabIcon id="chat" size={22} />{/if}
-          </span>
-          <div>
-            <h3>{t(`home.priv.${k}.t` as Key)}{#if k === "room" && !__SALONS__}{" "}<span class="pill">{t("foot.soon")}</span>{/if}</h3>
-            <!-- Avec le compte (__COMPTES__) seulement, la ligne dit ce que garde le compte (conception compte §16). -->
-            <p>{t((__COMPTES__ && k === "account" ? "home.priv.account.p.comptes" : `home.priv.${k}.p`) as Key)}</p>
-          </div>
-        </li>
-      {/each}
-    </ul>
-  </div>
-  <!-- Le lien en deux, agrandi : l'adresse va au serveur ; tout ce qui suit le « # » reste dans le
-       navigateur. Exemple de la longueur réelle (43 caractères : la clé de 32 octets en base64url),
-       jamais une vraie clé. Dessous, comme la réponse « Que voit le serveur ? » (spécification §36) :
-       ce qu'il voit et garde jusqu'à l'échéance (données chiffrées, taille arrondie, échéance au
-       quart d'heure, ouvertures et essais restants), ce qu'il voit sans l'enregistrer (adresse IP,
-       jamais sur disque ; heures des envois et des ouvertures, en mémoire seulement) et ce qu'il ne
-       voit jamais. -->
-  <figure class="link card-relief rv" data-key-note {@attach reveal} {@attach lueur}>
-    <div class="lk-bar" aria-hidden="true"><i></i><i></i><i></i></div>
-    <div class="lk" aria-hidden="true">
-      <span class="lk-a"><span class="lk-l">{t("home.key.server")}</span><span class="lk-v num">https://shhgone.com/s</span></span>
-      <span class="lk-b"><span class="lk-l"><KeyRound size={13} strokeWidth={2} />{t("home.key.browser")}</span><span class="lk-v num">#Kq7mXw2Rt9pLz4VbN8cYe1HsJ6uFa3DgQo5WtM0rEiA</span></span>
-    </div>
-    <div class="sees">
-      <div class="sv-col">
-        <p class="sv-t"><Server size={15} strokeWidth={2} aria-hidden="true" />{t("home.sees.keep.t")}</p>
-        <ul>{#each [1, 2, 3, 4] as n (n)}<li>{t(`home.sees.keep.${n}` as Key)}</li>{/each}</ul>
-      </div>
-      <div class="sv-col live">
-        <p class="sv-t"><Eye size={15} strokeWidth={2} aria-hidden="true" />{t("home.sees.live.t")}</p>
-        <ul>{#each [1, 2] as n (n)}<li>{t(`home.sees.live.${n}` as Key)}</li>{/each}</ul>
-      </div>
-      <div class="sv-col never">
-        <p class="sv-t"><EyeOff size={15} strokeWidth={2} aria-hidden="true" />{t("home.never.t")}</p>
-        <ul>{#each [1, 2, 3, 4] as n (n)}<li>{t(`home.never.${n}` as Key)}</li>{/each}</ul>
-      </div>
-    </div>
-    <figcaption>{t("home.key.note")}</figcaption>
-  </figure>
+  <SecureDemo labelledby="how-title" />
 </section>
 
 <!-- La vie d'un lien : schéma à gauche, règles à droite (chiffres lus dans limits.ts). -->
@@ -241,8 +99,61 @@
   </div>
 </section>
 
+<section class="sec priv fondu fondu-biais fondu-biais-inv filet" id="serveur" aria-labelledby="priv-title">
+  <div class="pcol">
+    <div class="head rv" {@attach reveal}>
+      <h2 id="priv-title" tabindex="-1">{t("home.priv.title")}</h2>
+      <p>{t("home.priv.lede")}</p>
+      <a class="more" href={href("/securite")} onclick={(e) => followLink(e, "/securite")}>{t("home.why.more")}<ArrowRight size={18} strokeWidth={1.9} aria-hidden="true" /></a>
+    </div>
+    <ul class="plist">
+      {#each priv as k, i (k)}
+        <li class={["prow", "rv", { soon: k === "room" && !__SALONS__ }]} data-priv-card style:--i="{i * 70}ms" {@attach reveal}>
+          <span class="tile-ic" aria-hidden="true">
+            {#if k === "account"}<UserX size={22} strokeWidth={1.8} />{:else if k === "clean"}<Broom size={22} strokeWidth={1.8} />{:else}<TabIcon id="chat" size={22} />{/if}
+          </span>
+          <div>
+            <h3>{t(`home.priv.${k}.t` as Key)}{#if k === "room" && !__SALONS__}{" "}<span class="pill">{t("foot.soon")}</span>{/if}</h3>
+            <!-- Avec le compte (__COMPTES__) seulement, la ligne dit ce que garde le compte (conception compte §16). -->
+            <p>{t((__COMPTES__ && k === "account" ? "home.priv.account.p.comptes" : `home.priv.${k}.p`) as Key)}</p>
+          </div>
+        </li>
+      {/each}
+    </ul>
+  </div>
+  <!-- Le lien en deux, agrandi : l'adresse va au serveur ; tout ce qui suit le « # » reste dans le
+       navigateur. Exemple de la longueur réelle (43 caractères : la clé de 32 octets en base64url),
+       jamais une vraie clé. Dessous, comme la réponse « Que voit le serveur ? » (spécification §36) :
+       ce qu'il voit et garde jusqu'à l'échéance (données chiffrées, taille arrondie, échéance au
+       quart d'heure, ouvertures et essais restants), ce qu'il voit sans l'enregistrer (adresse IP,
+       jamais sur disque ; heures des envois et des ouvertures, en mémoire seulement) et ce qu'il ne
+       voit jamais. -->
+  <figure class="link card-relief rv" data-key-note {@attach reveal} {@attach lueur}>
+    <div class="lk-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="lk" aria-hidden="true">
+      <span class="lk-a"><span class="lk-l">{t("home.key.server")}</span><span class="lk-v num">https://shhgone.com/s</span></span>
+      <span class="lk-b"><span class="lk-l"><KeyRound size={13} strokeWidth={2} />{t("home.key.browser")}</span><span class="lk-v num">#Kq7mXw2Rt9pLz4VbN8cYe1HsJ6uFa3DgQo5WtM0rEiA</span></span>
+    </div>
+    <div class="sees">
+      <div class="sv-col">
+        <p class="sv-t"><Server size={15} strokeWidth={2} aria-hidden="true" />{t("home.sees.keep.t")}</p>
+        <ul>{#each [1, 2, 3, 4] as n (n)}<li>{t(`home.sees.keep.${n}` as Key)}</li>{/each}</ul>
+      </div>
+      <div class="sv-col live">
+        <p class="sv-t"><Eye size={15} strokeWidth={2} aria-hidden="true" />{t("home.sees.live.t")}</p>
+        <ul>{#each [1, 2] as n (n)}<li>{t(`home.sees.live.${n}` as Key)}</li>{/each}</ul>
+      </div>
+      <div class="sv-col never">
+        <p class="sv-t"><EyeOff size={15} strokeWidth={2} aria-hidden="true" />{t("home.never.t")}</p>
+        <ul>{#each [1, 2, 3, 4] as n (n)}<li>{t(`home.never.${n}` as Key)}</li>{/each}</ul>
+      </div>
+    </div>
+    <figcaption>{t("home.key.note")}</figcaption>
+  </figure>
+</section>
+
 <!-- Grande typographie : on n'a pas à nous croire sur parole. -->
-<section class="sec trust fondu fondu-biais filet" aria-labelledby="trust-title">
+<section class="sec trust fondu filet" aria-labelledby="trust-title">
   <div class="big rv" {@attach reveal}>
     <h2 id="trust-title">{t("home.trust.title")}</h2>
     <p>{t("home.trust.lede")}</p>
@@ -273,7 +184,7 @@
   </ul>
 </section>
 
-<section class="sec offers fondu filet" aria-labelledby="offers-title">
+<section class="sec offers fondu fondu-biais filet" aria-labelledby="offers-title">
   <!-- Titre centré, le texte d'introduction dessous, centré lui aussi. -->
   <div class="head centre rv" {@attach reveal}>
     <h2 id="offers-title">{t("home.offers.title")}</h2>
@@ -307,10 +218,6 @@
   .how {
     --lueur: rgb(95 227 181 / 0.07);
     --lueur-x: 18%;
-  }
-  .demo-sec {
-    --lueur: rgb(141 178 255 / 0.06);
-    --lueur-x: 80%;
   }
   .priv {
     --lueur: rgb(141 178 255 / 0.07);
@@ -389,283 +296,6 @@
     letter-spacing: -0.01em;
   }
 
-  /* ---------- Chiffres clés ---------- */
-  .facts {
-    position: relative;
-    padding-block: var(--sp-5) var(--sp-6);
-  }
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border-block: 1px solid rgb(233 236 242 / 0.08);
-  }
-  .stats li {
-    display: grid;
-    align-content: start;
-    gap: 4px;
-    min-width: 0;
-    padding: var(--sp-4) var(--sp-4) var(--sp-4) 0;
-  }
-  .stats li:last-child {
-    grid-column: 1 / -1;
-    border-block-start: 1px solid rgb(233 236 242 / 0.08);
-  }
-  @media (min-width: 760px) {
-    .stats {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-    .stats li {
-      padding: var(--sp-5) var(--sp-4);
-    }
-    .stats li + li {
-      border-inline-start: 1px solid rgb(233 236 242 / 0.08);
-    }
-    .stats li:last-child {
-      grid-column: auto;
-      border-block-start: 0;
-    }
-  }
-  .sv {
-    font-size: clamp(1.75rem, 1.3rem + 1.2vw, 2.5rem);
-    font-weight: 700;
-    font-stretch: 110%;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.03em;
-    line-height: 1.05;
-    overflow-wrap: anywhere;
-  }
-  .sl {
-    color: #9aa7c6;
-    font-size: var(--fs-small);
-    line-height: 1.4;
-  }
-
-  /* ---------- Comment ça marche : frise ---------- */
-  .steps3 {
-    position: relative;
-    display: grid;
-    gap: var(--sp-6);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  /* Téléphone : frise verticale, la ligne à gauche à travers les pastilles. */
-  .steps3::before {
-    content: "";
-    position: absolute;
-    inset-block: 36px;
-    inset-inline-start: 35px;
-    width: 1px;
-    background: linear-gradient(180deg, rgb(95 227 181 / 0.05), rgb(95 227 181 / 0.4), rgb(95 227 181 / 0.05));
-  }
-  .st {
-    position: relative;
-    display: grid;
-    grid-template-columns: 72px minmax(0, 1fr);
-    gap: var(--sp-4);
-    align-items: start;
-    min-width: 0;
-  }
-  .tile {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 72px;
-    aspect-ratio: 1;
-    border-radius: 20px;
-    background: linear-gradient(180deg, #181d27, #10141b);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.08),
-      inset 0 0 0 1px rgb(233 236 242 / 0.08),
-      0 18px 40px -24px rgb(0 0 0 / 0.9);
-  }
-  .ill {
-    display: block;
-    width: 82%;
-    height: auto;
-    overflow: visible;
-  }
-  .tx {
-    display: grid;
-    justify-items: start;
-    gap: var(--sp-1);
-    min-width: 0;
-  }
-  .n {
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-weight: 650;
-    letter-spacing: 0.08em;
-  }
-  .n::before {
-    content: "0";
-  }
-  .st p {
-    margin: 0;
-    color: #aab6d3;
-    font-size: 0.9375rem;
-    line-height: 1.55;
-    overflow-wrap: break-word;
-    text-wrap: pretty;
-  }
-  @media (min-width: 900px) {
-    .steps3 {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: var(--sp-5);
-    }
-    .steps3::before {
-      inset-block: 72px auto;
-      inset-inline: 12.5%;
-      width: auto;
-      height: 1px;
-      background: linear-gradient(90deg, rgb(95 227 181 / 0.05), rgb(95 227 181 / 0.45) 50%, rgb(95 227 181 / 0.05));
-    }
-    .st {
-      grid-template-columns: minmax(0, 1fr);
-      justify-items: center;
-      text-align: center;
-    }
-    .tile {
-      width: 144px;
-      border-radius: 32px;
-    }
-    .tx {
-      justify-items: center;
-      max-width: 17rem;
-    }
-  }
-  /* Mini-schémas : lents (5 à 7 s), seulement près de l'écran (.joue), jamais en mouvement réduit. */
-  .ill * {
-    transform-box: fill-box;
-  }
-  .add .ln {
-    transform-origin: left center;
-  }
-  .add .plus {
-    transform-origin: center;
-  }
-  .seal .scanclip {
-    transform: translateY(-34px);
-  }
-  .seal .scan {
-    transform: translateY(34px);
-  }
-  .seal .scan {
-    filter: drop-shadow(0 0 3px rgb(95 227 181 / 0.9));
-  }
-  .gone .dot {
-    transform-origin: center;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .how .ill .ln {
-      animation: ecrit 6s var(--ease-out) var(--d) infinite;
-    }
-    .how .ill .plus {
-      animation: depose 6s var(--ease-settle) infinite;
-    }
-    .how .seal .scanclip {
-      animation: trame 5s var(--ease-in-out) infinite;
-    }
-    .how .seal .scan {
-      animation: balaye 5s var(--ease-in-out) infinite;
-    }
-    .how .go .road {
-      animation: route 2.4s linear infinite;
-    }
-    .how .gone .dot {
-      animation: envol 7s var(--ease-in-out) var(--d) infinite;
-    }
-    .how:not(:global(.joue)) .ill * {
-      animation-play-state: paused;
-    }
-  }
-  @keyframes ecrit {
-    0%,
-    8% {
-      transform: scaleX(0);
-    }
-    30%,
-    88% {
-      transform: scaleX(1);
-    }
-    100% {
-      transform: scaleX(0);
-    }
-  }
-  @keyframes depose {
-    0%,
-    50% {
-      transform: translateY(-6px) scale(0.6);
-      opacity: 0;
-    }
-    62%,
-    90% {
-      transform: none;
-      opacity: 1;
-    }
-    100% {
-      transform: scale(0.6);
-      opacity: 0;
-    }
-  }
-  @keyframes trame {
-    0%,
-    10% {
-      transform: translateY(-70px);
-    }
-    60%,
-    85% {
-      transform: translateY(0);
-    }
-    100% {
-      transform: translateY(-70px);
-    }
-  }
-  @keyframes balaye {
-    0%,
-    10% {
-      transform: translateY(0);
-      opacity: 0;
-    }
-    14% {
-      opacity: 1;
-    }
-    60% {
-      transform: translateY(68px);
-      opacity: 1;
-    }
-    66%,
-    100% {
-      transform: translateY(68px);
-      opacity: 0;
-    }
-  }
-  @keyframes route {
-    to {
-      stroke-dashoffset: -14;
-    }
-  }
-  @keyframes envol {
-    0%,
-    30% {
-      transform: none;
-      opacity: 1;
-    }
-    60%,
-    85% {
-      transform: translate(var(--dx), var(--dy)) scale(0.4);
-      opacity: 0;
-    }
-    100% {
-      transform: none;
-      opacity: 1;
-    }
-  }
-
   /* ---------- Hors de notre portée : texte à gauche, lien agrandi à droite ---------- */
   .priv {
     align-items: center;
@@ -683,7 +313,7 @@
   }
   .plist {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-5) var(--sp-5);
     margin: 0;
     padding: 0;
@@ -1249,7 +879,7 @@
     font-weight: 600;
   }
 
-  .demo-sec :global(.fig) {
+  .how :global(.fig) {
     min-width: 0;
   }
   .offers :global([data-offer-cards]) {
@@ -1271,8 +901,7 @@
     .more {
       color: LinkText;
     }
-    .card-relief,
-    .tile {
+    .card-relief {
       border: 1px solid CanvasText;
     }
   }

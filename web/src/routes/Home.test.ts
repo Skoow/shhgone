@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
-import { CONTENT_MAX, MAX_OPENS, PAID, PW_TRIES, TTL_HOURS, TTL_MAX_HOURS } from "../limits";
-import { PASSWORD_LEN } from "../engine/pure";
-import { formatBytes, formatDuration } from "../i18n/format";
+import { MAX_OPENS, PAID, PW_TRIES, TTL_HOURS } from "../limits";
+import { formatDuration } from "../i18n/format";
 import { createRawSnippet, flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../i18n/i18n.svelte";
@@ -30,9 +29,8 @@ describe("Home (UI §9.1)", () => {
   it("lot 2 : chiffres clés et vie d'un lien lus dans limits.ts, aucun nom d'algorithme ; lien en deux, ce que voit le serveur ; vérification", () => {
     show();
     const n = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
-    const stats = [...document.querySelectorAll(".stats li")].map((l) => n(l.querySelector(".sv")!.textContent));
-    expect(stats).toEqual([formatBytes(CONTENT_MAX, "fr"), formatDuration(TTL_MAX_HOURS * 3600, "fr"), String(MAX_OPENS), "0", String(PASSWORD_LEN)].map(n));
-    expect(document.querySelector(".stats")!.closest("section")!.getAttribute("aria-label")).toBe("En chiffres");
+    // Plus de bande de chiffres clés : chaque chiffre n'est dit qu'une fois (offres, vie d'un lien).
+    expect(document.querySelector(".stats")).toBeNull();
     expect(document.body.textContent).not.toMatch(/AES|GCM|ne voit rien/u);
     const rules = n(document.querySelector(".life .rules")!.textContent);
     for (const h of TTL_HOURS) expect(rules).toContain(n(formatDuration(h * 3600, "fr")));
@@ -88,25 +86,23 @@ describe("Home (UI §9.1)", () => {
     const h2 = [...document.querySelectorAll("h2")].map((h) => h.textContent!.trim());
     expect(h2).toEqual([
       "Comment ça marche",
-      "Ce qui se passe quand vous partagez", // section de l'infographie
-      "Ce qui reste hors de notre portée",
       "La vie d'un lien",
+      "Ce qui reste hors de notre portée",
       "Vous n'avez pas à nous croire sur parole.",
       "Offres",
       "Vos questions",
     ]);
-    expect(document.querySelectorAll("[data-how-card]")).toHaveLength(4); // ajouter, chiffrer, partager, effacé
-    // « Comment ça marche » (maquette « La trame ») : trois illustrations fixes,
-    // cachées aux lecteurs d'écran, et trois étapes numérotées ; l'infographie a sa section, titrée
-    // par son h2 visible, avec ses sept étapes à droite.
+    // « Comment ça marche » : l'infographie seule (sept étapes), titrée par le h2 de la section ;
+    // plus de frise en quatre étapes qui disait la même chose.
+    expect(document.querySelector("[data-how-card]")).toBeNull();
     expect(document.querySelector(".hero [data-demo]")).toBeNull();
-    expect(document.querySelector("#comment [data-demo]")).toBeNull();
-    expect(document.querySelector(".demo-sec [data-demo]")!.getAttribute("aria-labelledby")).toBe("demo-title");
-    expect([...document.querySelectorAll("#comment svg.ill")].map((s) => s.getAttribute("aria-hidden"))).toEqual(["true", "true", "true", "true"]);
-    expect([...document.querySelectorAll("ol.steps3 > li[data-how-card] .n")].map((e) => e.textContent)).toEqual(["1", "2", "3", "4"]);
+    expect(document.querySelector("#comment [data-demo]")!.getAttribute("aria-labelledby")).toBe("how-title");
     const priv = [...document.querySelectorAll("[data-priv-card]")];
-    expect(priv).toHaveLength(4);
-    expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);
+    expect(priv).toHaveLength(3);
+    expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Aucune identité demandée", "Fichiers nettoyés", "Salon éphémère bientôt"]);
+    // Questions : seulement ce qui n'est dit nulle part ailleurs sur la page.
+    expect([...document.querySelectorAll("#faq details")].map((d) => d.id)).toEqual(["faq-lost", "faq-copy"]);
+    expect(document.getElementById("serveur")!.querySelector("h2")!.id).toBe("priv-title");
     for (const c of [...document.querySelectorAll("[data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
 
     // Le lien en deux : l'adresse au serveur,
@@ -124,7 +120,7 @@ describe("Home (UI §9.1)", () => {
     // offres : plus de « bientôt »).
     expect(norm(card("free").querySelector("[data-calls] .dv")!.textContent)).toBe("Non inclus");
     for (const x of ["plus", "pro"]) expect(norm(card(x).querySelector("[data-calls] .dv")!.textContent)).toBe("Inclus");
-    expect(document.querySelectorAll("details[name=faq]")).toHaveLength(5);
+    expect(document.querySelectorAll("details[name=faq]")).toHaveLength(2);
     expect(document.querySelector('[data-slot="compose"]')).toBeNull(); // composeur : page d'envoi seulement
   });
 

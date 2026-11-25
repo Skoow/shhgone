@@ -163,7 +163,7 @@ describe("textes publics et compte par passkey", () => {
     expect(JSON.stringify(infoPage("securite", "en"))).not.toMatch(/only knows the tier/u);
   });
 
-  test("accueil : la carte « Partage sans compte » ne parle du compte qu'avec __COMPTES__", () => {
+  test("accueil : la carte « Aucune identité demandée » ne parle du compte qu'avec __COMPTES__", () => {
     expect(fr["home.priv.account.p"]).not.toMatch(/salon|empreinte|en clair/u);
     expect(fr["home.priv.account.p.comptes"]).toMatch(/Pour créer un salon, un compte sans e-mail ni mot de passe, par passkey\./u);
     expect(en["home.priv.account.p.comptes"]).toMatch(/To create a room, an account with neither email nor password, using a passkey\./u);

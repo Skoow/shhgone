@@ -6,7 +6,7 @@
   import { reveal } from "../../ui/attach";
   import { ChevronDown } from "../../ui/Icon";
 
-  const qs = ["server", "lost", "back", "scan", "copy"] as const;
+  const qs = ["lost", "copy"] as const;
 </script>
 
 <!-- Fond raccordé (.fondu, ui/base.css) ; titre centré, questions centrées dessous. -->
@@ -16,7 +16,6 @@
   </div>
   <div class="qa">
     {#each qs as k (k)}
-      <!-- « Ce que voit le serveur » (menu Sécurité de la barre du haut) ouvre la première question. -->
       <details name="faq" id="faq-{k}" class="rv" {@attach reveal}>
         <summary><span>{t(`home.faq.${k}.q` as Key)}</span><ChevronDown size={22} strokeWidth={1.75} aria-hidden="true" /></summary>
         <div class="a"><p>{t(`home.faq.${k}.a` as Key)}</p></div>

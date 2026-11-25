@@ -70,7 +70,7 @@ test.describe("barre du haut (ordinateur)", () => {
     await expect(sec).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("Envoyer › Note ouvre l'éditeur ; Sécurité › Ce que voit le serveur ouvre la question ; Offres", async ({ page, shh }) => {
+  test("Envoyer › Note ouvre l'éditeur ; Sécurité › Ce que voit le serveur descend à la carte du serveur ; Offres", async ({ page, shh }) => {
     await page.goto(shh.origin + "/");
     await page.getByRole("navigation", { name: "Menu principal" }).getByRole("button", { name: "Envoyer", exact: true }).click();
     await page.getByRole("button", { name: /^Note / }).click();
@@ -78,8 +78,8 @@ test.describe("barre du haut (ordinateur)", () => {
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Sécurité" }).click();
     await page.locator("[data-nav-item]").filter({ hasText: "Ce que voit le serveur" }).click();
-    await expect(page.locator("#faq-server")).toHaveAttribute("open", "");
-    await expect(page.locator("#faq-server summary")).toBeFocused();
+    await expect(page.locator("#priv-title")).toBeFocused();
+    await expect(page.locator("#serveur [data-key-note]")).toBeAttached();
     await page.getByRole("link", { name: "Offres", exact: true }).click();
     await expect(page).toHaveURL(shh.origin + "/offres");
     // Ailleurs que sur l'accueil : « Envoyer › Note » mène à la page d'envoi.
