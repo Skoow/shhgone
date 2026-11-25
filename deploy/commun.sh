@@ -94,7 +94,7 @@ comptes=$(sed -nE 's/^ +SHH_COMPTES: "([01])"$/\1/p' compose.yaml)
 # un secret qui traîne ou une installation ancienne ; elle fait refuser, jamais ignorer.
 for v in $(compgen -v); do
 	case $v in
-	SHH_SMTP_* | SHH_MAIL_FROM) die "deploy/.env : $v ne sert plus (compte par e-mail retiré le 22 novembre, compte par passkey) : l'ôter (README §12)" ;;
+	SHH_SMTP_* | SHH_MAIL_FROM) die "deploy/.env : $v ne sert plus (le compte se crée par passkey) : l'ôter (README §12)" ;;
 	esac
 done
 # rp.id des passkeys = hôte de SHH_ORIGIN (https://SHH_DOMAIN) : définitif, le changer rend
@@ -273,7 +273,7 @@ preflight() {
 	fi
 	# Ancien mot de passe SMTP (compte par e-mail, retiré) : un secret qui ne sert plus ne reste pas.
 	if [ -e "$secrets/shh_smtp_mdp" ] || [ -L "$secrets/shh_smtp_mdp" ]; then
-		die "$secrets/shh_smtp_mdp ne sert plus (compte par e-mail retiré le 22 novembre) : l'effacer (shred -u), puis révoquer ce mot de passe chez le fournisseur (README §12)"
+		die "$secrets/shh_smtp_mdp ne sert plus (le compte se crée par passkey) : l'effacer (shred -u), puis révoquer ce mot de passe chez le fournisseur (README §12)"
 	fi
 	if [ "$paiement" = 1 ]; then
 		[ -n "${SHH_TVA:-}" ] || die "paiement activé : SHH_TVA manque dans deploy/.env (franchise, france ou oss, README §13)"
