@@ -42,12 +42,16 @@ type Detail struct {
 }
 
 // details : par offre (tableau indexé, pas de table : rien qui ressemble à un compteur).
+// Droits : seulement ceux qui marchent aujourd'hui (rendus par POST /api/paiement/etat, lus
+// par le site et plus tard par les apps). `premiere_ouverture`, `salon_plus` et `salon_pro`
+// (conception §11) ne sont pas encore codés : ils seront ajoutés ici le jour où ils le seront,
+// jamais annoncés avant (revue du 25 novembre ; avant, l'état les rendait déjà).
 var details = [3]Detail{
 	{},
 	{Nom: "plus", Libelle: "Shhgone Plus", Mois: 700, An: 7000, JetonsPeriod: 30,
-		Droits: []string{"partage_plus", "premiere_ouverture", "salon_plus", "appel_audio", "appel_video"}},
+		Droits: []string{"partage_plus", "appel_audio", "appel_video"}},
 	{Nom: "pro", Libelle: "Shhgone Pro", Mois: 2000, An: 20000, JetonsPeriod: 100,
-		Droits: []string{"partage_pro", "premiere_ouverture", "salon_pro", "appel_audio", "appel_video"}},
+		Droits: []string{"partage_pro", "appel_audio", "appel_video"}},
 }
 
 // Bientot : droits prévus dans le format mais pas encore disponibles (conception §11) : jamais

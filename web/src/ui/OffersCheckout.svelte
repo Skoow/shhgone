@@ -18,7 +18,7 @@
   import { getLang, t } from "../i18n/i18n.svelte";
   import { CONTENT_MAX, MAX_OPENS, PAID, TTL_MAX_HOURS, type PaidTier } from "../limits";
   import { commander, lireOffre, type ErreurCommande, type Moyen, type OffreServeur, type Preuve } from "../paiement/api";
-  import { garder, idbDuNavigateur, nouvelId, oublier, tirerPass } from "../paiement/pass";
+  import { garder, idbDuNavigateur, lirePasses, nouvelId, oublier, tirerPass } from "../paiement/pass";
   import { paysProbable } from "../paiement/pays";
   import { href } from "../app/router.svelte";
   import { LimiteDefi, obtenirPreuve, preparerPreuve } from "../paiement/preuve";
@@ -49,7 +49,7 @@
   // (NOWPayments). Noms de l'écran (clés de texte) → noms de l'API.
   type Means = "card" | "paypal" | "crypto";
   let means = $state<Means>("card");
-  const MEANS: readonly Means[] = ["card", "paypal", "crypto"];
+  const TOUS: readonly Means[] = ["card", "paypal", "crypto"];
   const API: Readonly<Record<Means, Moyen>> = { card: "carte", paypal: "paypal", crypto: "crypto" };
   // Appels des salons (19 novembre) : prévus, jamais vendus ni promis comme disponibles.
   // Ce que l'offre choisie ajoute au gratuit (lu dans PAID et limits.ts). Le départ du compte à
@@ -72,6 +72,17 @@
   let serveur = $state<OffreServeur | null>(null);
   let lue = $state(false);
   const ferme = $derived(lue && serveur === null);
+  // Moyens montrés : ceux que CE serveur propose (conception §9.1 : sous SHH_TVA=oss, la crypto
+  // n'est pas montrée ; un prestataire non configuré non plus) ; paiement fermé ou pas encore lu :
+  // les trois, pour information (le bouton reste inactif).
+  const MEANS = $derived(serveur === null ? TOUS : TOUS.filter((m) => serveur!.moyens.includes(API[m])));
+  $effect(() => {
+    if (MEANS.length > 0 && !MEANS.includes(means)) means = MEANS[0]!;
+  });
+  // Une offre déjà gardée sur cet appareil (lecture locale seulement, aucune requête) : lien vers
+  // sa page (état, arrêt du renouvellement à tout moment, note de vente ; revue du 25 novembre :
+  // la résiliation n'était joignable qu'au retour du paiement).
+  let mien = $state(false);
   $effect(() => {
     let vivant = true;
     void lireOffre().then((o) => {
@@ -79,6 +90,11 @@
       serveur = o;
       lue = true;
     });
+    const idb = idbDuNavigateur();
+    if (idb !== null)
+      void lirePasses(idb).then((l) => {
+        if (vivant) mien = l.length > 0;
+      });
     return () => {
       vivant = false;
     };
@@ -171,6 +187,9 @@
 <div class="co" data-checkout>
   {#if ferme}
     <div class="ferme" data-pay-closed><Banner kind="info">{t("offers.continue.wait")}</Banner></div>
+  {/if}
+  {#if mien}
+    <p class="ferme mine" data-mine>{t("offers.mine")} <a href={href("/offres/retour")}>{t("offers.mine.link")}</a></p>
   {/if}
   <!-- Mise en page « La trame », version 2 (propriétaire, 19 novembre) : étapes numérotées à
        gauche (offre et rythme, moyen de paiement, compte), récapitulatif à droite. -->
@@ -278,6 +297,9 @@
           <div><dt>{t("offers.means.title")}</dt><dd>{t(`offers.means.${means}`)}</dd></div>
           <div><dt>{t("offers.summary.total")}</dt><dd class="tot num">{eur(price(chosen))} <span>{per}</span></dd></div>
         </dl>
+        <!-- Réserve de partages payants (information obligatoire avant paiement, 25 novembre ;
+             mêmes chiffres que les Conditions de vente : PAID.shares = JetonsPeriod d'offres.go). -->
+        <p class="sn" data-reserve>{t("offers.summary.reserve", { n: PAID[chosen].shares })}</p>
         <p class="sn">{means === "crypto" ? t("offers.summary.crypto") : billing === "month" ? t("offers.summary.month") : t("offers.summary.year")}</p>
         <label class="waiver">
           <input type="checkbox" bind:checked={waiver} data-waiver />
@@ -319,6 +341,9 @@
   }
   .ferme {
     grid-column: 1 / -1;
+  }
+  .mine {
+    margin: 0;
   }
   .main {
     display: grid;

@@ -20,8 +20,10 @@ export async function offresAppel(idb: IDBFactory | null = idbDuNavigateur(), ma
   const auj = maintenant.toISOString().slice(0, 10);
   const out = new Set<OffrePayante>();
   for (const g of await lirePasses(idb)) {
-    if (g.enAttente) continue;
     const e = await lireEtatGarde(idb, g.id).catch(() => null);
+    // Commande en attente : ne compte que si le serveur l'a déjà dite payée (page de retour
+    // fermée avant la confirmation ; formulesDisponibles la range alors comme payée).
+    if (g.enAttente && e?.etat !== "payee") continue;
     // État gardé (au plus d'un jour) : il fait foi ; sans état, le serveur tranchera.
     if (e !== null && (e.etat !== "payee" || e.fin === null || e.fin <= auj || !e.droits.includes("appel_audio"))) continue;
     out.add(g.offre);

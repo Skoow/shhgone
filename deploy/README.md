@@ -745,6 +745,62 @@ chown 65532:65532 /srv/shhdrop/secrets/shh_stripe_cle && chmod 0400 /srv/shhdrop
 
 `paiements.db` (empreintes des pass, commandes en attente, références des prestataires ; aucune identité, aucun montant, aucun pays ; jamais les clés privées des jetons) est sauvegardée **avec `comptes.db`**, chaque jour, dans son propre fichier chiffré (§12.4), et se restaure de la même façon (§12.5 : clés de jetons effacées ; un pass payé depuis la sauvegarde est à rembourser depuis le tableau de bord du prestataire). La sauvegarde doit être en place **le jour de l'activation** : perdre `paiements.db` rendrait inutilisables tous les pass payés.
 
+### 13.4 Essai en préproduction (bacs à sable des prestataires)
+
+But : payer « pour de faux » sur `https://shhgone.com` (barrière d'accès de la préproduction en place) avec les clés de **test** des trois prestataires, et voir le pass s'activer. Aucune adresse n'est à écrire nulle part : le serveur construit lui-même, depuis `SHH_ORIGIN` (`https://${SHH_DOMAIN}`, `compose.yaml`), l'adresse de retour `https://shhgone.com/offres/retour` (réussite et abandon, sans paramètre) et l'adresse IPN de NOWPayments ; les API (production ou bac à sable) sont fixées dans le code d'après `SHH_PAIEMENT_ESSAI`.
+
+**Les secrets ne passent jamais par le chat, le dépôt ni `deploy/.env`** : le propriétaire les tape lui-même sur le serveur, dans un fichier par secret (commande du §13.2 : `umask 077`, coller, Ctrl-D, puis `chown 65532:65532` et `chmod 0400` ; compte 65532 parce que c'est lui qui fait tourner le serveur et doit les lire). `deploy/.env` ne reçoit que des réglages publics (identifiants PayPal, régime de TVA).
+
+**1. Interrupteurs** (dans `deploy/compose.yaml`, commité, jamais dans `deploy/.env`) : le jour où les secrets d'au moins un prestataire sont en place, et seulement alors (sans secret, `deploy.sh` refuse d'installer) :
+
+```yaml
+      SHH_PAIEMENT: "1"
+      SHH_PAIEMENT_ESSAI: "1"
+```
+
+**2. `deploy/.env`** :
+
+| Variable | Valeur en essai |
+| --- | --- |
+| `SHH_TVA` | `franchise` ou `france` pour essayer aussi la crypto (en `oss`, la crypto n'est ni montrée ni acceptée) ; le régime réel est choisi plus tard avec le comptable |
+| `SHH_STRIPE_TAXE` | vide (ou `1` pour essayer Stripe Tax, à activer d'abord dans le tableau de bord de test) |
+| `SHH_PAYPAL_CLIENT_ID` | « Client ID » de l'application PayPal **Sandbox** |
+| `SHH_PAYPAL_WEBHOOK_ID` | « Webhook ID » du webhook Sandbox |
+| `SHH_PAYPAL_PLANS` | `plus-mois=P-…,plus-an=P-…,pro-mois=P-…,pro-an=P-…` (plans Sandbox) |
+
+**3. Chez chaque prestataire (comptes de test)** — les noms de menus changent souvent : chercher le libellé le plus proche.
+
+- **Stripe** (dashboard.stripe.com, **mode test** ou « bac à sable » activé en haut de l'écran) :
+  - *Développeurs → Clés API* : créer une **clé restreinte** `rk_test_…` (droits : *Checkout Sessions* en écriture, *Subscriptions* en écriture, rien d'autre) ou, à défaut, la clé secrète `sk_test_…` → fichier `shh_stripe_cle`.
+  - *Développeurs → Webhooks* (« Destinations d'événements ») → ajouter un point de terminaison : URL **`https://shhgone.com/api/paiement/webhook/stripe`**, **version d'API `2026-02-25.clover`**, événements `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `invoice.paid`, `invoice_payment.paid`, `customer.subscription.deleted`, `charge.refunded`, `charge.dispute.created` (cocher **ceux-là seulement**) → révéler le **secret de signature** `whsec_…` → fichier `shh_stripe_webhook`.
+  - Payer avec la carte de test `4242 4242 4242 4242` (date future, CVC quelconque) ; refus : `4000 0000 0000 0002` ; authentification 3-D Secure : `4000 0027 6000 3184`. Remboursement et litige d'essai : depuis la page du paiement dans le tableau de bord (le pass doit passer « Offre arrêtée »).
+  - `stripe trigger …` (CLI) envoie des événements **sans nos métadonnées** : ils reçoivent 200 et ne changent rien ; essayer avec de vrais paiements de test depuis la page Offres.
+- **PayPal** (developer.paypal.com, interrupteur **Sandbox**) :
+  - *Apps & Credentials → Create App* (type marchand) → **Client ID** (`SHH_PAYPAL_CLIENT_ID`) et **Secret** → fichier `shh_paypal_secret`.
+  - Dans l'application, *Add Webhook* : URL **`https://shhgone.com/api/paiement/webhook/paypal`**, événements `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`, `BILLING.SUBSCRIPTION.ACTIVATED`, `BILLING.SUBSCRIPTION.CANCELLED`, `BILLING.SUBSCRIPTION.EXPIRED`, `BILLING.SUBSCRIPTION.SUSPENDED`, `PAYMENT.SALE.COMPLETED`, `PAYMENT.SALE.REFUNDED`, `PAYMENT.SALE.REVERSED`, `CUSTOMER.DISPUTE.CREATED` → **Webhook ID** (`SHH_PAYPAL_WEBHOOK_ID`).
+  - *Testing Tools → Sandbox Accounts* : un compte « Business » (le vendeur, celui de l'application) et un compte « Personal » (l'acheteur, pour payer). Connecté à www.sandbox.paypal.com avec le compte Business : un **produit** (service numérique) et **quatre plans** d'abonnement en EUR, prix **TTC sans taxe ajoutée par PayPal**, sans essai gratuit ni frais d'installation, un seul échec de paiement toléré : Plus mensuel 7,00 €, Plus annuel 70,00 €, Pro mensuel 20,00 €, Pro annuel 200,00 € → leurs identifiants `P-…` dans `SHH_PAYPAL_PLANS`. Un montant différent du nôtre met la commande en « anomalie » (aucun crédit).
+  - Le **simulateur de webhooks** de PayPal envoie des événements que l'API de vérification refuse : 400 attendu, sans effet. Essayer avec de vrais paiements Sandbox.
+- **NOWPayments** (compte du **bac à sable**, distinct du compte réel : account-sandbox.nowpayments.io) :
+  - *Settings → Payments → API keys* : clé d'API → fichier `shh_nowpayments_cle` ; *Instant payment notifications* : générer le **secret IPN** → fichier `shh_nowpayments_ipn` ; une adresse de versement (payout) par monnaie activée.
+  - Adresse IPN : rien à déclarer, le serveur la donne à chaque facture (`https://shhgone.com/api/paiement/webhook/nowpayments`) ; si le tableau de bord en demande une par défaut, mettre la même.
+  - Le bac à sable ne transfère aucune monnaie : suivre sa documentation pour simuler un paiement « finished » (ou partiel, ou expiré). Un paiement partiel reste « en attente » (jamais crédité, §8 de la conception).
+
+**4. Webhooks et barrière de la préproduction** : les trois adresses `https://shhgone.com/api/paiement/webhook/{stripe,paypal,nowpayments}` doivent **passer la barrière d'accès** (les prestataires n'ont pas le mot de passe) ; tout le reste, `/offres/retour` compris, reste derrière (le navigateur de l'essayeur l'a déjà ouverte). Sans cette exception, les webhooks reçoivent 401 et aucun paiement ne s'active (la page reste « Paiement en attente »).
+
+**5. Contrôles** après `deploy.sh` : `curl -s https://shhgone.com/api/paiement` (avec l'identifiant de la barrière) rend `"moyens":["carte",…]` ; un webhook mal signé est refusé (`curl -s -o /dev/null -w '%{http_code}' -X POST https://shhgone.com/api/paiement/webhook/stripe -d '{}'` : **400**, pas 401 ni 404) ; puis, sur la page Offres : payer, revenir sur « Paiement reçu », faire un envoi Plus ou Pro (Options), arrêter le renouvellement (lien « Une offre est gardée sur cet appareil » de la page Offres), rembourser depuis le tableau de bord → « Offre arrêtée ». Le tableau de bord de chaque prestataire montre l'état de livraison de chaque webhook (code de réponse de notre serveur).
+
+**Attention, essai ouvert au public** : en essai, n'importe quelle carte de test « paie ». Ne jamais retirer la barrière d'accès tant que `SHH_PAIEMENT_ESSAI: "1"`.
+
+### 13.5 Passer du test au réel
+
+1. Avoir fait la liste « Avant la première vente réelle » de la conception (§13 : statut, régime de TVA, CGV, mentions légales, médiateur, mentions de la note de vente, `cargo audit`, `govulncheck`).
+2. Chez chaque prestataire, en mode **réel** (Stripe : mode test désactivé ; PayPal : interrupteur *Live*, application *Live* ; NOWPayments : compte réel account.nowpayments.io) : **nouvelles** clés (`sk_live_…`/`rk_live_…`, secret *Live*, clé d'API réelle), **nouveaux** webhooks aux mêmes adresses (nouveau `whsec_…`, nouveau *Webhook ID*, nouveau secret IPN), **nouveaux** plans PayPal (nouveaux `P-…`). Rien des comptes de test ne sert en réel.
+3. Sur le serveur : `docker compose down` ; remplacer chaque fichier de `secrets/` par sa valeur réelle (même commande, le propriétaire tape) ; mettre à jour `SHH_PAYPAL_CLIENT_ID`, `SHH_PAYPAL_WEBHOOK_ID`, `SHH_PAYPAL_PLANS` et le vrai `SHH_TVA` dans `deploy/.env`.
+4. **Écarter la base d'essai** : `mv <SHH_DATA_ROOT>/data/paiements.db* <dossier hors du volume>/` (puis l'effacer une fois le réel vérifié). Le serveur **refuse de démarrer en réel sur une base créée en essai** (marquée à sa création) : sans cela, les pass « payés » avec des cartes de test resteraient valables. L'inverse (base réelle ouverte en essai) est refusé aussi. La sauvegarde (§12.4) ne doit pas garder d'ancienne copie d'essai comme référence.
+5. `SHH_PAIEMENT_ESSAI: "0"` dans `compose.yaml` (commité), puis `deploy.sh` (le serveur refuse une clé Stripe de test en réel, et l'inverse ; les relais passent aux hôtes de production).
+6. Sur les appareils d'essai : « Oublier cette commande » (ou effacer les données du site) : leurs pass d'essai sont inconnus du nouveau serveur, et les clés de jetons vues pendant l'essai feraient croire à une clé changée (avertissement « clé de jetons différente », jusqu'à 8 jours).
+7. Premier achat réel de faible montant (Plus mensuel), puis remboursement depuis le tableau de bord : le pass doit passer « Offre arrêtée ».
+
 ## 14. Appels audio et vidéo du salon : relais TURN intégré
 
 Conception : `docs/superpowers/specs/2026-11-20-appels-design.md`. Les appels sont **activés par défaut** et **rien n'est à installer**, ni sur la machine ni chez les utilisateurs : le relais fait partie de notre image (`/shhcheck turn`, `deploy/shhcheck/turn.go`, bibliothèque pion/turn épinglée), lancé par `compose.yaml` (service `relais-turn`, profil « appels »). **Depuis le 24 novembre, les appels sont réservés aux offres Plus et Pro** (conception des appels §5.1) : le serveur ne les propose (route `/api/salons/appel`, `calls: true`, boutons) que si le paiement est aussi ouvert (`SHH_PAIEMENT=1`). Paiement fermé, le relais tourne sans servir : `SHH_APPELS=0` l'arrête d'ici là.

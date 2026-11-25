@@ -21,10 +21,15 @@
     let vivant = true;
     let minuterie: ReturnType<typeof setTimeout> | undefined;
     const idb = idbDuNavigateur();
+    // Rien dans l'adresse (conception §2 point 5) : PayPal y ajoute son jeton de paiement
+    // (?token=…&PayerID=…) ; retiré de l'historique, jamais lu.
+    if (location.search !== "" || location.hash !== "") history.replaceState(history.state, "", location.pathname);
     void (async () => {
       const tous = idb === null ? [] : await lirePasses(idb);
       if (!vivant) return;
-      const cible = tous.find((x) => x.enAttente) ?? tous[0] ?? null;
+      // Commande en attente (retour de paiement), sinon l'abonnement le plus récent (arrêt du
+      // renouvellement à tout moment, lien de la page Offres), sinon le pass le plus récent.
+      const cible = tous.find((x) => x.enAttente) ?? tous.find((x) => x.renouvelle) ?? tous[0] ?? null;
       g = cible;
       if (cible === null || idb === null) return;
       let essais = 0;
@@ -97,7 +102,7 @@
   {:else if vue === "payee" && e}
     <h2>{t("offers.ret.paid")}</h2>
     <p class="body">{t("offers.ret.paid.body", { tier: t(`paid.badge.${e.offre ?? "plus"}`), date: e.fin ? jusqua(e.fin) : "" })}</p>
-    <p class="body">{t("offers.ret.notyet")}</p>
+    <p class="body">{t("offers.ret.use", { tier: t(`paid.badge.${e.offre ?? "plus"}`) })}</p>
     {#if e.renouvelle}
       <p class="body">{t("offers.ret.renew")}</p>
       <button type="button" class="act" onclick={arreter} data-stop>{t("offers.ret.stop")}</button>

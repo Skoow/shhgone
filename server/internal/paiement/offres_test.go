@@ -17,13 +17,16 @@ func TestOffresCommeLeSite(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, o := range []Offre{Plus, Pro} {
-		re := regexp.MustCompile(`(?m)^\s*` + o.String() + `: \{[^}]*month: (\d+), year: (\d+) \}`)
+		re := regexp.MustCompile(`(?m)^\s*` + o.String() + `: \{[^}]*shares: (\d+), month: (\d+), year: (\d+) \}`)
 		m := re.FindSubmatch(src)
 		if m == nil {
 			t.Fatalf("%s introuvable dans PAID (limits.ts)", o)
 		}
-		mois, _ := strconv.ParseInt(string(m[1]), 10, 64)
-		an, _ := strconv.ParseInt(string(m[2]), 10, 64)
+		if n, _ := strconv.Atoi(string(m[1])); n != o.Detail().JetonsPeriod {
+			t.Errorf("%s : %d jetons par période au serveur, %d partages sur le site", o, o.Detail().JetonsPeriod, n)
+		}
+		mois, _ := strconv.ParseInt(string(m[2]), 10, 64)
+		an, _ := strconv.ParseInt(string(m[3]), 10, 64)
 		if Prix(o, JoursMois) != mois*100 || Prix(o, JoursAn) != an*100 {
 			t.Errorf("%s : serveur %d/%d centimes, site %d/%d €", o, Prix(o, JoursMois), Prix(o, JoursAn), mois, an)
 		}
