@@ -409,6 +409,8 @@ export const en = {
   "content.undecodable.fmt.viewOnly": "This browser can't play the {fmt} format. Open the link in {browser} to view it.",
   "content.browser.safari": "Safari",
   "content.browser.chrome": "Chrome or Firefox",
+  "content.noPreview":
+    "This image can't be shown here: its dimensions are too large or unreadable. Save it to open it with another app.",
   "content.undecodable":
     "This file can't be played on this device. Save it to open it with another app.",
   "content.risky":
@@ -529,7 +531,7 @@ export const en = {
     "This share has been destroyed. It has been erased from the server. Anything you already saved on this device is not affected.",
 
   "err.limit": "Upload limit reached. Try again in {duration}.",
-  "err.limit.day": "Daily limit reached: {n}\u00a0free shares per day from your connection. Try again in {duration}.",
+  "err.limit.day": "Daily limit reached: {n}\u00a0free shares per day per connection, {m}\u00a0for a whole network. Devices on the same router or network (home, office, public Wi-Fi) count together: another device may have used them. Try again in {duration}.",
   "err.limit.pending": "Another upload is already being prepared from your connection, in another tab for example ({n}\u00a0at most at a time). Finish or close it, then try again in {duration}.",
   "err.full": "The service is full right now. Try again later.",
   "err.interrupted": "The transfer was interrupted (the server may have restarted). Try again.",
@@ -1551,6 +1553,7 @@ export const en = {
   "salon.piece.annuler": "Don't send",
   "salon.piece.err.indisponible": "File unavailable: it was removed or erased.",
   "salon.piece.err.lecture": "The file could not be opened. Try again.",
+  "salon.piece.err.apercu": "This image can't be shown here: its dimensions are too large or unreadable. Save it to open it with another app.",
   "salon.piece.err.relu": "You have already downloaded this file: each participant can download it only once. Ask the sender to send it again.",
   "salon.piece.err.sortie": "This file has reached its download limit: the server no longer sends it. Ask the sender to send it again.",
   "salon.piece.err.trop_gros": "File too large: 500 MB at most per file.",

@@ -411,6 +411,8 @@ export const fr = {
   "content.undecodable.fmt.viewOnly": "Ce navigateur ne sait pas lire le format {fmt}. Ouvrez le lien dans {browser} pour le voir.",
   "content.browser.safari": "Safari",
   "content.browser.chrome": "Chrome ou Firefox",
+  "content.noPreview":
+    "Cette image ne peut pas être affichée ici\u202f: ses dimensions sont trop grandes ou illisibles. Enregistrez-la pour l'ouvrir avec une autre application.",
   "content.undecodable":
     "Ce fichier ne peut pas être lu sur cet appareil. Enregistrez-le pour l'ouvrir avec une autre application.",
   "content.risky":
@@ -531,7 +533,7 @@ export const fr = {
     "Ce partage a été détruit. Il a été effacé du serveur. Ce que vous avez déjà enregistré sur cet appareil n'est pas concerné.",
 
   "err.limit": "Limite d'envois atteinte. Réessayez dans {duration}.",
-  "err.limit.day": "Limite du jour atteinte\u202f: {n}\u202fpartages gratuits par jour depuis votre connexion. Réessayez dans {duration}.",
+  "err.limit.day": "Limite du jour atteinte\u202f: {n}\u202fpartages gratuits par jour et par connexion, {m}\u202fpour tout un réseau. Les appareils d'une même box ou d'un même réseau (famille, bureau, wifi public) comptent ensemble\u202f: la limite a pu être atteinte par un autre appareil que le vôtre. Réessayez dans {duration}.",
   "err.limit.pending": "Un autre envoi est déjà en préparation depuis votre connexion, dans un autre onglet par exemple ({n}\u202fau plus à la fois). Terminez-le ou fermez-le, puis réessayez dans {duration}.",
   "err.full": "Le service est plein pour le moment. Réessayez plus tard.",
   "err.interrupted": "Le transfert a été interrompu (le serveur a peut-être redémarré). Réessayez.",
@@ -1555,6 +1557,7 @@ export const fr = {
   "salon.piece.annuler": "Ne pas envoyer",
   "salon.piece.err.indisponible": "Fichier indisponible\u202f: il a été retiré ou effacé.",
   "salon.piece.err.lecture": "Le fichier n'a pas pu être ouvert. Réessayez.",
+  "salon.piece.err.apercu": "Cette image ne peut pas être affichée ici\u202f: ses dimensions sont trop grandes ou illisibles. Enregistrez-la pour l'ouvrir avec une autre application.",
   "salon.piece.err.sortie": "Ce fichier a atteint sa limite de téléchargement\u202f: le serveur n'en envoie plus rien. Demandez à l'expéditeur de l'envoyer à nouveau.",
   "salon.piece.err.relu": "Vous avez déjà téléchargé ce fichier\u202f: chaque participant ne peut le télécharger qu'une fois. Demandez à l'expéditeur de l'envoyer à nouveau.",
   "salon.piece.err.trop_gros": "Fichier trop lourd : 500 Mo au plus par fichier.",

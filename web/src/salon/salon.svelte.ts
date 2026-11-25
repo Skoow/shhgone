@@ -1062,13 +1062,15 @@ export async function afficherPiece(b: Bulle): Promise<void> {
   if (!x?.client || !p?.ref || pieces.urls[b.cle]) return;
   const mime = typeAffichage(p.sorte, p.mime);
   if (!mime || p.taille > (p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX)) return;
-  if (lectureDefinitive(pieces.erreurs[b.cle])) return; // plafond de sortie ou budget de lecture : aucun nouvel essai
+  // Plafond de sortie, budget de lecture ou image déjà refusée à l'affichage : aucun nouvel essai.
+  if (lectureDefinitive(pieces.erreurs[b.cle]) || pieces.erreurs[b.cle] === "apercu") return;
   try {
     const blob = await lire(x, b, p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX);
     if (s !== x) return;
-    // Image aux dimensions démesurées (bombe de décompression) : jamais décodée d'office.
+    // Image aux dimensions démesurées ou illisibles (bombe de décompression) : jamais décodée
+    // d'office ; elle reste en mémoire pour « Enregistrer » (aucune seconde lecture du serveur).
     if (p.sorte === "image" && !(await previewable(blob))) {
-      pieces.erreurs[b.cle] = "lecture";
+      pieces.erreurs[b.cle] = "apercu";
       return;
     }
     // Deux appels pour la même lecture : une seule adresse blob:.

@@ -27,9 +27,11 @@ export const NAME_MAX = 120;
 /** Nom du partage : longueur maximale en points de code après nettoyage, celle du
  *  moteur (manifest::TITLE_MAX, prouvée par engine/vectors/v2-titre.json). */
 export const TITLE_MAX = 80;
-/** Partages gratuits créés par jour et par connexion (spec §24 ; limits.CreatesPer64 du serveur,
- *  qui borne aussi le réseau entier : limits.CreatesPer48). */
+/** Partages gratuits créés par jour et par connexion (spec §24 ; limits.CreatesPer64 du serveur). */
 export const CREATES_PER_DAY = 3;
+/** Même plafond pour tout un réseau (limits.CreatesPer48 du serveur : bloc IPv6 /48). Le serveur
+ *  ne dit pas lequel des deux a refusé : le message cite les deux. */
+export const CREATES_PER_DAY_NETWORK = 10;
 /** Envois en préparation (non finalisés) à la fois par connexion (spec §29.5 ; limits.PendingPer64). */
 export const PENDING_MAX = 2;
 

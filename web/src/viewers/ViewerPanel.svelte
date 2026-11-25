@@ -184,7 +184,7 @@
       {:else if phase === "egress"}
         <p class="msg" role="alert" data-egress>{t("dl.fail.egress")}</p>
       {:else if phase === "noPreview"}
-        <p class="msg" role="alert">{viewOnly ? t("content.notViewable") : t("content.undecodable")}</p>
+        <p class="msg" role="alert">{viewOnly ? t("content.notViewable") : t("content.noPreview")}</p>
       {:else if phase === "undecodable"}
         <!-- Format que ce navigateur ne décode pas (retours CLEAN4) : le format, et quel navigateur essayer. -->
         {@const other = otherBrowser(cur.name)}

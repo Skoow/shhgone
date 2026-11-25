@@ -6,7 +6,7 @@
   import { tick } from "svelte";
   import { setProgressTitle, setScreenTitle } from "../app/title";
   import { UPLOAD_WINDOW_MS, type Sender, type Step } from "../flows/send.svelte";
-  import { CREATES_PER_DAY, PENDING_MAX } from "../limits";
+  import { CREATES_PER_DAY, CREATES_PER_DAY_NETWORK, PENDING_MAX } from "../limits";
   import type { Category } from "../flows/kinds";
   import { formatBytes, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
@@ -167,7 +167,7 @@
       case "limite": {
         // La règle d'abord, puis l'attente.
         const duration = formatDuration(s.retryAfterS ?? 60, lang, { coarse: true });
-        if (s.limitKind === "jour") return t("err.limit.day", { duration, n: CREATES_PER_DAY });
+        if (s.limitKind === "jour") return t("err.limit.day", { duration, n: CREATES_PER_DAY, m: CREATES_PER_DAY_NETWORK });
         if (s.limitKind === "en_cours") return t("err.limit.pending", { duration, n: PENDING_MAX });
         return t("err.limit", { duration });
       }

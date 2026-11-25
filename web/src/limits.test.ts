@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BUCKETS, CHUNK, MANIFEST_MAX } from "./engine/pure";
 import { UPLOAD_WINDOW_MS } from "./flows/send.svelte";
-import { CONTENT_MAX, CREATES_PER_DAY, MAX_ITEMS, MAX_OPENS, PENDING_MAX, PW_TRIES, TTL_HOURS, TTL_MAX_HOURS } from "./limits";
+import { CONTENT_MAX, CREATES_PER_DAY, CREATES_PER_DAY_NETWORK, MAX_ITEMS, MAX_OPENS, PENDING_MAX, PW_TRIES, TTL_HOURS, TTL_MAX_HOURS } from "./limits";
 
 const go = (f: string) => readFileSync(new URL(`../../server/internal/${f}`, import.meta.url), "utf8");
 
@@ -13,6 +13,7 @@ describe("limites : mêmes valeurs côté serveur (Go)", () => {
   it("partages par jour et envois en préparation à la fois, par connexion", () => {
     const lim = go("limits/limits.go");
     expect(/CreatesPer64\s*=\s*(\d+)/.exec(lim)?.[1]).toBe(String(CREATES_PER_DAY));
+    expect(/CreatesPer48\s*=\s*(\d+)/.exec(lim)?.[1]).toBe(String(CREATES_PER_DAY_NETWORK));
     expect(/PendingPer64\s*=\s*(\d+)/.exec(lim)?.[1]).toBe(String(PENDING_MAX));
     expect(/pendingRetry\s*=\s*60 \* time\.Second/.test(lim)).toBe(true); // seuil « en cours » de send.svelte.ts
   });
