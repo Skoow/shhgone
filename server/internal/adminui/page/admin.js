@@ -8,6 +8,8 @@ let echecs = 0; // lectures d'état sans réponse, de suite
 let gele = false;
 let armeGel = 0;
 let armeDetruire = 0;
+let suspendues = false; // ventes des offres suspendues (lu dans /api/paiement)
+let armeVentes = 0;
 
 const $ = (id) => document.getElementById(id);
 
@@ -130,6 +132,10 @@ function afficher(e) {
   chiffre(us, 'Destructions demandées', u.destructions_demandees);
   chiffre(us, 'Effacés par l’entretien', u.effaces_par_entretien);
   chiffre(us, 'Expéditeurs distincts aujourd’hui', u.expediteurs_du_jour);
+  if (s.paiement_actif) {
+    chiffre(us, 'Partages payants Plus', u.partages_payants[0]);
+    chiffre(us, 'Partages payants Pro', u.partages_payants[1]);
+  }
   if (e.salon) {
     chiffre(us, 'Salons créés', u.salons_crees);
     chiffre(us, 'Entrées dans un salon', u.entrees_salon);
@@ -139,6 +145,8 @@ function afficher(e) {
   fait(ud, 'Volume chiffré reçu', octets(u.octets_recus));
   fait(ud, 'Volume chiffré servi', octets(u.octets_servis));
   fait(ud, 'Requêtes refusées par la limite de débit', nombre.format(u.refus_debit));
+  fait(ud, 'Plafond de sortie, par partage', octets(e.capacite.plafond_sortie_partage));
+  fait(ud, 'Refus au plafond de sortie', nombre.format(u.refus_plafond_sortie));
 
   const c = e.capacite, ch = $('charge');
   vider(ch);
@@ -170,9 +178,86 @@ function afficher(e) {
   if (e.salon) fait(md, 'Paniques récupérées (entretien du salon)', nombre.format(e.salon.paniques_entretien));
   me.append(md);
 
+  appels(e);
   categories(u);
   sections(s);
   if (!armeGel) boutonGel();
+}
+
+// appels : relais et jetons (configuration), salons aux appels ouverts, compteurs depuis le
+// démarrage. Le serveur ne voit pas les appels eux-mêmes.
+function appels(e) {
+  const s = e.sante, u = e.usage;
+  $('carte-appels').hidden = !s.salon_actif;
+  const p = $('appels-pastilles');
+  vider(p);
+  p.append(s.relais_turn ? el('li', 'Relais configuré', 'ok') : el('li', 'Relais non configuré'));
+  p.append(s.appels_offerts ? el('li', 'Appels proposés (offres payantes)', 'ok')
+    : el('li', s.relais_turn ? 'Appels non proposés : paiement fermé' : 'Appels non proposés'));
+  const d = $('appels');
+  vider(d);
+  if (e.salon) fait(d, 'Salons aux appels ouverts', nombre.format(e.salon.salons_appels_ouverts));
+  fait(d, 'Appels ouverts par un jeton, depuis le démarrage', nombre.format(u.appels_ouverts));
+  fait(d, 'Identifiants du relais donnés, depuis le démarrage', nombre.format(u.identifiants_turn));
+}
+
+// ----- Paiement (SHH_PAIEMENT=1) -----
+
+const PRESTATAIRES = [['stripe', 'Stripe (carte)'], ['paypal', 'PayPal'], ['nowpayments', 'NOWPayments (crypto)']];
+
+function afficherPaiement(a) {
+  suspendues = a.ventes_suspendues;
+  const p = $('pass');
+  vider(p);
+  chiffre(p, 'Pass Plus valables', a.pass_plus);
+  chiffre(p, 'Pass Pro valables', a.pass_pro);
+  chiffre(p, 'Pass révoqués gardés', a.pass_revoques);
+  chiffre(p, 'Abonnements qui se renouvellent', a.abonnements_renouveles);
+  const c = $('commandes');
+  vider(c);
+  compte(c, 'Commandes récentes en attente (4 h)', a.commandes_recentes, a.commandes_recentes_max);
+  const cd = el('dl', undefined, 'faits');
+  fait(cd, 'Commandes en attente de paiement (7 j)', nombre.format(a.commandes_en_attente));
+  fait(cd, 'Anomalies gardées (montant inattendu)', nombre.format(a.anomalies_gardees));
+  c.append(cd);
+  if (a.anomalies_gardees > 0) {
+    c.append(el('p', 'Anomalie : un paiement confirmé n’avait pas le montant ou la devise attendus ; rien n’a été crédité. Vérifier chez le prestataire.', 'note'));
+  }
+
+  const j = $('jetons');
+  vider(j);
+  chiffre(j, 'Émis Plus', a.jetons_emis[0]);
+  chiffre(j, 'Émis Pro', a.jetons_emis[1]);
+  chiffre(j, 'Dépensés Plus', a.jetons_depenses[0]);
+  chiffre(j, 'Dépensés Pro', a.jetons_depenses[1]);
+  const jd = $('jetons-details');
+  vider(jd);
+  fait(jd, 'Rendus (création refusée après la dépense)', nombre.format(a.jetons_rendus));
+  if (!a.jetons_actif) fait(jd, 'Émission', 'non configurée');
+
+  const tb = $('prestataires');
+  vider(tb);
+  for (const [cle, nom] of PRESTATAIRES) {
+    const x = a[cle];
+    const tr = el('tr', undefined, x.webhooks_refuses > 0 || x.anomalies > 0 ? 'grave' : undefined);
+    const th = el('th', nom);
+    th.scope = 'row';
+    const etat = !x.configure ? 'non configuré' : (x.vendable ? 'vend' : 'webhooks seulement');
+    tr.append(th, el('td', etat), el('td', nombre.format(x.commandes), 'n'), el('td', nombre.format(x.paiements_credites), 'n'),
+      el('td', nombre.format(x.anomalies), 'n'), el('td', nombre.format(x.revocations), 'n'),
+      el('td', nombre.format(x.webhooks_refuses), 'n'));
+    tb.append(tr);
+  }
+  $('revocations-main').textContent = 'Révocations à la main (shhdrop admin paiement revoquer) depuis le démarrage : ' +
+    nombre.format(a.revocations_a_la_main) + '.';
+  if (!armeVentes) boutonVentes();
+}
+
+function boutonVentes() {
+  $('ventes').textContent = suspendues ? 'Rétablir les ventes' : 'Suspendre les ventes';
+  $('ventes-etat').textContent = suspendues
+    ? 'Suspendues jusqu’au prochain redémarrage : aucune nouvelle commande. Les paiements en cours sont crédités, les pass payés gardent leurs droits.'
+    : 'Ouvertes. Suspendre refuse les nouvelles commandes jusqu’au redémarrage ; les paiements en cours et les pass payés ne sont pas touchés.';
 }
 
 function boutonGel() {
@@ -233,6 +318,12 @@ async function rafraichir() {
     if (c.statut === 404) return 'refus';
     if (c.ok && c.json) afficherComptes(c.json);
   }
+  if (paiementActif) {
+    let c;
+    try { c = await appel('GET', '/api/paiement'); } catch { return 'injoignable'; }
+    if (c.statut === 404) return 'refus';
+    if (c.ok && c.json) afficherPaiement(c.json);
+  }
   $('perdu').hidden = true;
   $('fraicheur').textContent = 'Lu à ' + new Date().toLocaleTimeString('fr-FR') + ', relu toutes les 5 secondes. Rien n’est enregistré.';
   return 'ok';
@@ -289,6 +380,23 @@ $('gel').addEventListener('click', async () => {
   boutonGel();
 });
 
+// Suspendre ou rétablir les ventes : second appui dans les 5 secondes, comme le gel.
+$('ventes').addEventListener('click', async () => {
+  const b = $('ventes');
+  if (!armeVentes) {
+    b.textContent = suspendues ? 'Confirmer : rétablir' : 'Confirmer : suspendre';
+    armeVentes = setTimeout(() => { armeVentes = 0; boutonVentes(); }, 5000);
+    return;
+  }
+  clearTimeout(armeVentes); armeVentes = 0;
+  b.disabled = true;
+  const r = await appel('POST', suspendues ? '/api/paiement/retablir' : '/api/paiement/suspendre').catch(() => ({ ok: false }));
+  b.disabled = false;
+  $('resultat').textContent = r.ok ? (suspendues ? 'Ventes rétablies.' : 'Ventes suspendues jusqu’au prochain redémarrage.') : 'Échec : rien n’a changé.';
+  await relire();
+  boutonVentes();
+});
+
 $('detruire').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const b = $('detruire-bouton');
@@ -328,6 +436,7 @@ const FILTRES = [['', 'Tous'], ['actifs', 'Actifs'], ['suspendus', 'Suspendus'],
 
 let comptesActifs = false;
 let salonsActifs = false;
+let paiementActif = false;
 let filtre = '';
 let page = 0;
 let totalBannis = 0;
@@ -366,6 +475,10 @@ function sections(s) {
     $(id).hidden = !comptesActifs;
   }
   $('carte-signales').hidden = !salonsActifs;
+  paiementActif = !!s.paiement_actif;
+  for (const id of ['onglet-paiement', 'paiement', 'carte-pass', 'carte-jetons', 'carte-prestataires', 'action-ventes']) {
+    $(id).hidden = !paiementActif;
+  }
 }
 
 // categories : tableau 10 lignes × partage / salon (compteurs en mémoire, depuis le démarrage).
@@ -634,7 +747,9 @@ function afficherComptes(a) {
   const c = $('comptes-chiffres');
   vider(c);
   chiffre(c, 'Comptes (plafond ' + nombre.format(a.comptes_max) + ')', a.comptes);
-  chiffre(c, 'Récents (< 7 j)', a.neufs);
+  chiffre(c, 'Inscrits aujourd’hui (UTC)', a.inscrits_aujourdhui);
+  chiffre(c, 'Inscrits ces 7 jours', a.inscrits_7_jours);
+  chiffre(c, 'Récents (< 7 j d’ancienneté)', a.neufs);
   chiffre(c, 'Confirmés', a.confirmes);
   chiffre(c, 'Passkeys', a.passkeys);
   chiffre(c, 'Dont ouvrant les données (PRF)', a.passkeys_prf);

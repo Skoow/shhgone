@@ -20,6 +20,11 @@ type Counters struct {
 	partagesCrees, envoisTermines, deverrouillages, destructions atomic.Int64
 	refusDebit, octetsRecus, octetsServis                        atomic.Int64
 	salonsCrees, entreesSalon                                    atomic.Int64
+	// partagesPayants : partages créés avec un jeton anonyme, indice 0 = Plus, 1 = Pro.
+	partagesPayants [2]atomic.Int64
+	// appelsOuverts : salons dont les appels ont été ouverts par un jeton ; identifiantsTurn :
+	// identifiants temporaires du relais délivrés.
+	appelsOuverts, identifiantsTurn atomic.Int64
 	// signalementsPartage, signalementsSalon : indice = code de la catégorie − 1.
 	signalementsPartage, signalementsSalon [NbCategories]atomic.Int64
 }
@@ -51,6 +56,13 @@ type Snapshot struct {
 	// indice 9 = code 10 « Autre »), partages ouverts et salons.
 	SignalementsPartage [NbCategories]int64 `json:"signalements_partage"`
 	SignalementsSalon   [NbCategories]int64 `json:"signalements_salon"`
+	// PartagesPayants : partages créés avec un jeton anonyme d'une offre payante (indice 0 =
+	// Plus, 1 = Pro) ; comptés aussi dans PartagesCrees. Jamais lequel ni par qui.
+	PartagesPayants [2]int64 `json:"partages_payants"`
+	// AppelsOuverts : salons dont les appels ont été ouverts (un jeton payant dépensé) ;
+	// IdentifiantsTurn : identifiants temporaires du relais délivrés à un membre.
+	AppelsOuverts    int64 `json:"appels_ouverts"`
+	IdentifiantsTurn int64 `json:"identifiants_turn"`
 }
 
 func (c *Counters) PartageCree()       { c.partagesCrees.Add(1) }
@@ -62,6 +74,16 @@ func (c *Counters) Recu(octets int64)  { c.octetsRecus.Add(octets) }
 func (c *Counters) Servi(octets int64) { c.octetsServis.Add(octets) }
 func (c *Counters) SalonCree()         { c.salonsCrees.Add(1) }
 func (c *Counters) EntreeSalon()       { c.entreesSalon.Add(1) }
+func (c *Counters) AppelsOuverts()     { c.appelsOuverts.Add(1) }
+func (c *Counters) IdentifiantsTurn()  { c.identifiantsTurn.Add(1) }
+
+// PartagePayant : un partage créé avec un jeton de l'offre o (1 = Plus, 2 = Pro, comme
+// paiement.Offre) ; toute autre valeur n'est pas comptée.
+func (c *Counters) PartagePayant(o uint8) {
+	if o == 1 || o == 2 {
+		c.partagesPayants[o-1].Add(1)
+	}
+}
 
 // SignalementPartage, SignalementSalon : un signalement de la catégorie code (1 à 10) ; un code
 // hors de ces bornes n'est pas compté (l'API le refuse avant).
@@ -89,5 +111,7 @@ func (c *Counters) Snapshot() Snapshot {
 		RefusDebit: c.refusDebit.Load(), OctetsRecus: c.octetsRecus.Load(), OctetsServis: c.octetsServis.Load(),
 		SalonsCrees: c.salonsCrees.Load(), EntreesSalon: c.entreesSalon.Load(),
 		SignalementsPartage: lire(&c.signalementsPartage), SignalementsSalon: lire(&c.signalementsSalon),
+		PartagesPayants: [2]int64{c.partagesPayants[0].Load(), c.partagesPayants[1].Load()},
+		AppelsOuverts:   c.appelsOuverts.Load(), IdentifiantsTurn: c.identifiantsTurn.Load(),
 	}
 }

@@ -1,6 +1,10 @@
 package main
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/skoow/shhdrop/server/internal/adminui"
 	"github.com/skoow/shhdrop/server/internal/config"
 	"github.com/skoow/shhdrop/server/internal/paiement"
 )
@@ -178,5 +183,58 @@ func TestAdminPaiementRevoquer(t *testing.T) {
 		if code, _, _ := run(cfg, a...); code != 2 {
 			t.Errorf("%v : %d", a, code)
 		}
+	}
+}
+
+// Tableau de bord, paiement activé : agrégats (nombres et booléens, ni pass, ni commande, ni
+// montant, ni pays) et suspension des ventes, réversible, sans redémarrage.
+func TestAdminPaiementAgregats(t *testing.T) {
+	cfg := cfgPaiement(t)
+	p, err := setupPaiement(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.db.Close()
+	cfg.AdminTokenHash = sha256.Sum256([]byte(jetonAdmin))
+	h := adminui.New(adminConfig(cfg, adminDeps{pai: p.svc}))
+	appel := func(method, path string) (int, string) {
+		r := httptest.NewRequest(method, path, nil)
+		r.RemoteAddr, r.Host = "127.0.0.1:4000", "localhost:9191"
+		r.Header.Set("Authorization", "Bearer "+jetonAdmin)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code, w.Body.String()
+	}
+	code, body := appel("GET", "/api/paiement")
+	var v any
+	if code != 200 || json.Unmarshal([]byte(body), &v) != nil {
+		t.Fatal(code, body)
+	}
+	var chaines []string
+	chainesDe(v, &chaines)
+	if len(chaines) != 0 {
+		t.Fatalf("chaînes dans les agrégats du paiement : %q", chaines)
+	}
+	var a paiement.Agregats
+	json.Unmarshal([]byte(body), &a)
+	if !a.Stripe.Configure || !a.Stripe.Vendable || a.PayPal.Configure || !a.NOWPayments.Configure || a.NOWPayments.Vendable ||
+		!a.JetonsActif || a.Suspendu {
+		t.Fatalf("%+v", a)
+	}
+	if c, _ := appel("POST", "/api/paiement/suspendre"); c != 200 {
+		t.Fatal("suspendre", c)
+	}
+	if _, err := p.svc.Commander(context.Background(), paiement.Pass{1}, paiement.Formule{Offre: paiement.Plus,
+		Jours: 30, Renouvelle: true, Moyen: paiement.Carte}, "FR", true); !errors.Is(err, paiement.ErrSuspendu) {
+		t.Fatal("commande pendant la suspension :", err)
+	}
+	if _, body := appel("GET", "/api/paiement"); !strings.Contains(body, `"ventes_suspendues":true`) {
+		t.Fatal(body)
+	}
+	if c, _ := appel("POST", "/api/paiement/retablir"); c != 200 {
+		t.Fatal("rétablir", c)
+	}
+	if _, body := appel("GET", "/api/paiement"); !strings.Contains(body, `"ventes_suspendues":false`) {
+		t.Fatal(body)
 	}
 }

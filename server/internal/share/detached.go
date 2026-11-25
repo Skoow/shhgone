@@ -223,6 +223,7 @@ func (s *Service) openOnce(parent context.Context, id string, n, openN int) (seg
 	// Compté après l'ouverture réussie : une erreur du serveur ne consomme pas le budget.
 	if err := s.budget.chargeAll(k, size, s.budgetLocked(k, bucket), s.egressMax, now); err != nil {
 		sec.Close()
+		s.compterSortie(err)
 		return nil, false, 0, err
 	}
 	return s.startLocked(parent, k, sec, size, func() { sec.Close() }, nil), false, 0, nil
@@ -276,6 +277,7 @@ func (s *Service) serveDetachedLocked(parent context.Context, id string, d *deta
 	}
 	size := int64(SegmentSize(d.bucket, n))
 	if err := s.budget.chargeAll(k, size, s.budgetLocked(k, d.bucket), s.egressMax, now); err != nil {
+		s.compterSortie(err)
 		return nil, err
 	}
 	d.refs++

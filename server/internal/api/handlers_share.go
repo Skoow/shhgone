@@ -170,6 +170,9 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	ok = true
 	s.cap.RecordCreate(ip)
 	s.usage.PartageCree()
+	if tier != share.Gratuit {
+		s.usage.PartagePayant(uint8(tier)) // 1 Plus, 2 Pro : jamais lequel ni par qui
+	}
 	// Jeton d'envoi : 6 h, 24 h pour un partage payant (fenêtre d'envoi de la formule).
 	ttl := time.Duration(tier.UploadWindow()) * time.Second
 	writeJSON(w, http.StatusCreated, struct {

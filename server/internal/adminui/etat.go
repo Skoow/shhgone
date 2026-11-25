@@ -38,10 +38,13 @@ type Usage struct {
 	// minuit UTC, lu dans les compteurs de quotas (limits.DistinctCreators).
 	ExpediteursDuJour int `json:"expediteurs_du_jour"`
 	// Envois et lectures de segments en cours, et le plus haut atteint depuis le démarrage.
-	EnvoisEnCours   int `json:"envois_en_cours"`
-	EnvoisPic       int `json:"envois_pic"`
-	LecturesEnCours int `json:"lectures_en_cours"`
-	LecturesPic     int `json:"lectures_pic"`
+	// RefusSortie : demandes refusées par le plafond de sortie d'un partage
+	// (SHH_SHARE_EGRESS_MAX), sans dire lequel.
+	RefusSortie     int64 `json:"refus_plafond_sortie"`
+	EnvoisEnCours   int   `json:"envois_en_cours"`
+	EnvoisPic       int   `json:"envois_pic"`
+	LecturesEnCours int   `json:"lectures_en_cours"`
+	LecturesPic     int   `json:"lectures_pic"`
 }
 
 // Sante : état général (A, G).
@@ -53,8 +56,15 @@ type Sante struct {
 	Gele       bool   `json:"creations_gelees"`
 	SalonActif bool   `json:"salon_actif"`
 	// ComptesActif : SHH_COMPTES=1 (la page montre alors bannissements et comptes).
-	ComptesActif bool   `json:"comptes_actif"`
-	Origine      string `json:"origine"`
+	ComptesActif bool `json:"comptes_actif"`
+	// PaiementActif : SHH_PAIEMENT=1 (la page montre alors l'onglet Paiement).
+	PaiementActif bool `json:"paiement_actif"`
+	// RelaisTurn : relais des appels configuré (SHH_TURN_URLS) ; AppelsOfferts : relais ET jetons
+	// anonymes (les appels sont réservés aux offres payantes). Le serveur ne parle jamais au
+	// relais : son état réel se lit sur la machine (deploy/deploy.sh status).
+	RelaisTurn    bool   `json:"relais_turn"`
+	AppelsOfferts bool   `json:"appels_offerts"`
+	Origine       string `json:"origine"`
 	// AlerteSignalements : au moins 5 signalements dans l'heure (le booléen de /healthz) ;
 	// jamais le nombre (spec §15.2, §36 S21).
 	AlerteSignalements bool `json:"alerte_signalements"`
@@ -101,6 +111,9 @@ type Capacite struct {
 	Octrois          int   `json:"octrois_lecture"`
 	Budgets          int   `json:"budgets_lecture"`
 	AppelsDisque     int64 `json:"appels_disque"`
+	// PlafondSortie : octets servis au plus PAR PARTAGE, toutes ouvertures confondues
+	// (SHH_SHARE_EGRESS_MAX) ; il n'y a pas de plafond global de trafic sortant.
+	PlafondSortie int64 `json:"plafond_sortie_partage"`
 }
 
 // Runtime lit la mémoire et le moteur d'exécution à l'instant.

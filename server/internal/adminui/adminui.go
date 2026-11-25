@@ -60,6 +60,9 @@ type Config struct {
 	Signales    func() ([]Signale, error)
 	ActionSalon func(cle, action string, dureeJours int, motif uint8) (Resultat, error)
 	Comptes     *Comptes
+	// Paiement : agrégats et suspension des ventes (SHH_PAIEMENT=1 ; nil sinon : routes refusées
+	// comme inconnues).
+	Paiement *Paiement
 }
 
 // maxLink : longueur maximale du lien signalé (comme maxStdinLink de la ligne de commande).
@@ -168,6 +171,9 @@ type file struct {
 //	POST /api/bannis/action         { id, action, jusqu? }
 //	POST /api/bannir                { lien, duree_jours, motif }
 //	GET  /api/comptes               agrégats des comptes
+//	GET  /api/paiement              agrégats du paiement (SHH_PAIEMENT=1)
+//	POST /api/paiement/suspendre    ventes suspendues jusqu'au redémarrage (réversible)
+//	POST /api/paiement/retablir     ventes rétablies
 //
 // Tout /api/* exige « Authorization: Bearer <jeton> ». Jeton absent, faux, de mauvaise
 // longueur, route inconnue, mauvaise méthode, pair hors boucle locale, requête relayée, hôte
@@ -312,6 +318,12 @@ func (a *admin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			a.comptes(w)
 		}
+	case "GET /api/paiement", "POST /api/paiement/suspendre", "POST /api/paiement/retablir":
+		if a.c.Paiement == nil {
+			refuse(w)
+			return
+		}
+		a.paiement(w, r)
 	default:
 		refuse(w)
 	}

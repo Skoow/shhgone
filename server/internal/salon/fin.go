@@ -229,6 +229,7 @@ func (m *Manager) oublier(s *salon, raison uint8, signaler bool) (fait, premier 
 	clear(s.revoques)
 	s.sieges = [nbSieges]*siege{}
 	s.occ.Store(0)
+	s.appelsFin.Store(0)
 	s.journal = nil
 	s.aEcraser = nil        // la conversation entière est détruite par achever
 	s.globDec(len(s.index)) // trames en mémoire rendues au compte global avant de vider l'index

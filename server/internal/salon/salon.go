@@ -150,6 +150,9 @@ type salon struct {
 	// dépensé un jeton d'offre payante) ; zéro : fermés. En mémoire seulement, sans identifiant
 	// ni siège : rien ne dit qui l'a ouvert ; perdu avec l'état du salon (fin, redémarrage).
 	appelsJusqua time.Time
+	// appelsFin : appelsJusqua en secondes Unix, lu sans verrou par Stats (tableau de bord :
+	// nombre de salons aux appels ouverts) ; remis à 0 à la fin du salon.
+	appelsFin atomic.Int64
 }
 
 // globAtteint : ce salon ne peut plus ranger de trame en mémoire (pot nil : sans plafond

@@ -523,6 +523,9 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if cpt != nil {
 		ad.cpt = cpt.svc
 	}
+	if pai != nil {
+		ad.pai = pai.svc
+	}
 	defer startAdmin(cfg, out, ad)()
 	jctx, jcancel := context.WithCancel(ctx)
 	jdone := make(chan struct{})

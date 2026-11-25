@@ -195,6 +195,9 @@ type Service struct {
 	// Effaces : partages effacés par Sweep depuis le démarrage (échéance, envoi abandonné,
 	// essais épuisés), confondus : un entier pour le tableau de bord d'administration.
 	Effaces atomic.Int64
+	// RefusSortie : demandes refusées par le plafond de sortie d'un partage (ErrEgressLimit :
+	// ouverture ou segment) depuis le démarrage ; un entier, sans dire quel partage.
+	RefusSortie atomic.Int64
 
 	DB         *sql.DB
 	Blobs      *blob.Store
@@ -924,6 +927,7 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 		// que si un téléchargement complet tient encore sous le plafond du partage ; sinon
 		// ErrEgressLimit, sans ouverture ni essai consommé. Dit seulement à qui a le mot de passe.
 		if s.budget.shareUsed(id, now) > s.egressMax-totalSize(bucket) {
+			s.RefusSortie.Add(1)
 			return Opened{}, ErrEgressLimit
 		}
 		var openN, left int

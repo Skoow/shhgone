@@ -26,6 +26,9 @@ func TestAppelsOuverture(t *testing.T) {
 	if _, ok, err := b.m.AppelsOuverts(ma); ok || err != nil {
 		t.Fatalf("fermés à la création : %v %v", ok, err)
 	}
+	if n := b.m.Stats().AppelsOuverts; n != 0 {
+		t.Fatal("tableau de bord, avant l'ouverture :", n)
+	}
 	s := b.etat(t, c)
 	var fin time.Time
 	sous(s, func() { fin = s.expires })
@@ -37,6 +40,9 @@ func TestAppelsOuverture(t *testing.T) {
 	// Ouverts pour tous les membres, jusqu'à la fin du salon.
 	if r, ok, err := b.m.AppelsOuverts(mbb); !ok || err != nil || r != fin.Sub(b.h.Now()) {
 		t.Fatalf("autre membre : %v %v %v", r, ok, err)
+	}
+	if n := b.m.Stats().AppelsOuverts; n != 1 {
+		t.Fatal("tableau de bord, salons aux appels ouverts :", n)
 	}
 	// Second ouvreur : déjà ouverts (son jeton est à rendre).
 	if _, deja, err := b.m.OuvrirAppels(mbb); err != nil || !deja {
@@ -79,6 +85,9 @@ func TestAppelsOuverture(t *testing.T) {
 	b.h.avancer(fin.Sub(b.h.Now()))
 	if _, _, err := b.m.AppelsOuverts(mc); !errors.Is(err, ErrNotFound) {
 		t.Fatal("échu :", err)
+	}
+	if n := b.m.Stats().AppelsOuverts; n != 0 {
+		t.Fatal("tableau de bord, salon échu :", n)
 	}
 }
 

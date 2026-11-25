@@ -1,6 +1,9 @@
 package share
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
 // DefaultEgressMax : octets servis au plus par un partage, toutes ouvertures confondues
 // (SHH_SHARE_EGRESS_MAX ; décision du propriétaire du 24 novembre, décision 12). 250 Gio : le
@@ -146,3 +149,13 @@ func (b *readBudget) count() int {
 	defer b.mu.Unlock()
 	return len(b.m)
 }
+
+// compterSortie : un refus du plafond de sortie de plus (tableau de bord : Service.RefusSortie).
+func (s *Service) compterSortie(err error) {
+	if errors.Is(err, ErrEgressLimit) {
+		s.RefusSortie.Add(1)
+	}
+}
+
+// EgressMax : plafond de sortie par partage en vigueur (Config.EgressMax, ou DefaultEgressMax).
+func (s *Service) EgressMax() int64 { return s.egressMax }

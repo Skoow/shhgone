@@ -203,3 +203,16 @@ Renvoi : la page finalisée (onglets État, Signalements, Bannissements, Comptes
 3. **« Introuvable » répond 200 `{"introuvable":true}`**, pas 404 : un 404 est le refus uniforme, qui fait oublier le jeton à la page.
 4. **Sans `SHH_COMPTES=1`**, les routes du compte répondent comme une route inconnue ; la liste des salons signalés reste (destruction), sans créateur.
 5. `GET /api/etat` gagne le booléen `sante.comptes_actif` (la page montre ou cache les onglets du compte).
+
+## Version finale (25 novembre)
+
+Demande du propriétaire : « tout ce qui est possible de gérer pour un administrateur ». Ajouté, sous les mêmes règles (agrégats seulement, compteurs en mémoire depuis le démarrage ou `COUNT` sur les bases existantes, rien de nouveau sur disque) :
+
+- **Comptes** : inscrits aujourd'hui et ces 7 jours (`cree_jour`, déjà gardé au jour).
+- **Paiement** (onglet, `SHH_PAIEMENT=1`, `GET /api/paiement`) : pass Plus et Pro valables, pass révoqués gardés, commandes en attente, abonnements qui se renouvellent, anomalies (lus dans `paiements.db`) ; plafond des commandes récentes ; par prestataire depuis le démarrage : pages créées, paiements crédités, anomalies, remboursements et litiges, webhooks refusés ; révocations à la main ; jetons émis et dépensés par offre, rendus. **Aucun montant**, même agrégé (le serveur ne garde aucun montant ; le chiffre d'affaires se lit chez le prestataire).
+- **Appels** : relais configuré, appels proposés, salons aux appels ouverts, appels ouverts par un jeton et identifiants du relais donnés depuis le démarrage. Le serveur ne voit pas les appels eux-mêmes : « appels en cours » n'est pas mesurable sans toucher à la signalisation ; l'état réel du relais se lit sur la machine (il ne parle jamais au serveur).
+- **Trafic sortant** : plafond par partage (`SHH_SHARE_EGRESS_MAX`) et refus à ce plafond ; ce plafond est par partage, il n'existe pas de plafond global à comparer aux octets servis.
+- **Usage** : partages payants par offre.
+- **Action** : suspendre et rétablir les ventes (`POST /api/paiement/suspendre|retablir`), en mémoire jusqu'au redémarrage ; nouvelles commandes refusées (503 `busy`), webhooks toujours traités, pass payés intacts. Réversible et sans perte, comme le gel.
+
+Écarté : couper les appels depuis la page (les identifiants déjà donnés valent 6 h : seul l'arrêt du relais coupe, par SSH) ; montant ou chiffre d'affaires ; total cumulé de partages sur disque (§9.5, §35.1) ; sonde du relais TURN depuis le serveur (aucune route vers lui).

@@ -112,6 +112,8 @@ type Jetons struct {
 	emetteur string
 	mu       sync.Mutex
 	cache    []cleJour // de la veille à J+JoursAvance (au plus 2 × (JoursAvance + 2) entrées)
+	// cpt : jetons émis, dépensés et rendus depuis le démarrage (tableau de bord, agregats.go).
+	cpt compteursJetons
 }
 
 // NouveauxJetons : emetteur = nom public du service (hôte de SHH_ORIGIN).
@@ -238,6 +240,7 @@ func (j *Jetons) Emettre(s *Service, p Pass, requetes [][]byte) ([][]byte, Offre
 			return nil, 0, errJeton
 		}
 	}
+	j.cpt.emis[offre].Add(int64(len(out)))
 	return out, offre, nil
 }
 
@@ -283,6 +286,7 @@ func (j *Jetons) Depenser(jeton []byte) (Offre, error) {
 	if n, _ := res.RowsAffected(); n != 1 {
 		return 0, errJeton // déjà dépensé
 	}
+	j.cpt.depenses[trouvee.offre].Add(1)
 	return trouvee.offre, nil
 }
 
@@ -290,7 +294,11 @@ func (j *Jetons) Depenser(jeton []byte) (Offre, error) {
 // utilisable (son empreinte est retirée) ; sans effet sinon.
 func (j *Jetons) Rendre(jeton []byte) {
 	h := sha256.Sum256(jeton)
-	j.db.Exec(`DELETE FROM depenses WHERE h=?`, h[:])
+	if res, err := j.db.Exec(`DELETE FROM depenses WHERE h=?`, h[:]); err == nil {
+		if n, _ := res.RowsAffected(); n == 1 {
+			j.cpt.rendus.Add(1)
+		}
+	}
 }
 
 // Purger : clés d'avant la veille, dépenses d'avant-hier (un jeton de ces clés n'est plus accepté).

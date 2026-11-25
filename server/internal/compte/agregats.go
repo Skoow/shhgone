@@ -25,6 +25,11 @@ type AgregatsComptes struct {
 	// Anciennete : depuis compte_des, < 7 j, 7 à 29 j, 30 à 182 j (« 1 à 6 mois »), 183 à 364 j
 	// (« 6 à 12 mois »), 365 j et plus.
 	Anciennete [5]int `json:"anciennete"`
+	// InscritsJour, Inscrits7Jours : comptes encore présents créés aujourd'hui (jour UTC) et ces
+	// 7 derniers jours (aujourd'hui compris), lus dans cree_jour (au jour, déjà gardé) ; Neufs
+	// compte l'ancienneté (compte_des, remise à zéro par un bannissement), pas la création.
+	InscritsJour   int `json:"inscrits_aujourdhui"`
+	Inscrits7Jours int `json:"inscrits_7_jours"`
 	// Passkeys enregistrées, dont avec enveloppe PRF ; comptes sans aucune passkey
 	// synchronisable (be = 0 partout : R3, perte plus probable).
 	Passkeys           int `json:"passkeys"`
@@ -61,9 +66,10 @@ func (s *Service) Agregats() (AgregatsComptes, error) {
 		coalesce(sum((?1-compte_des)/86400 BETWEEN 30 AND 182), 0),
 		coalesce(sum((?1-compte_des)/86400 BETWEEN 183 AND 364), 0),
 		coalesce(sum((?1-compte_des)/86400 >= 365), 0),
-		coalesce(sum(NOT EXISTS (SELECT 1 FROM passkeys p WHERE p.h = comptes.h AND p.be = 1)), 0) FROM comptes`, auj)
+		coalesce(sum(NOT EXISTS (SELECT 1 FROM passkeys p WHERE p.h = comptes.h AND p.be = 1)), 0),
+		coalesce(sum(cree_jour = ?1), 0), coalesce(sum(cree_jour > ?1 - 7*86400), 0) FROM comptes`, auj)
 	if err := q.Scan(&a.Comptes, &a.Anciennete[0], &a.Anciennete[1], &a.Anciennete[2], &a.Anciennete[3], &a.Anciennete[4],
-		&a.ComptesSansSynchro); err != nil {
+		&a.ComptesSansSynchro, &a.InscritsJour, &a.Inscrits7Jours); err != nil {
 		return AgregatsComptes{}, err
 	}
 	a.Neufs = a.Anciennete[0]
