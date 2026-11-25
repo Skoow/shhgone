@@ -41,7 +41,8 @@ func lignes(t *testing.T, db *sql.DB, q string, args ...any) []string {
 
 // Conception du compte par passkey §6.3 : schéma 3 exact de comptes.db (tables, colonnes,
 // index), rien d'autre ; aucune colonne texte ; aucune colonne d'adresse, de mot de passe, de
-// TOTP, de séquestre, d'AAGUID, de compteur, de BS ni de date d'usage (TestSchemaComptes v3).
+// TOTP, de séquestre, d'AAGUID, de BS ni de date d'usage. Schéma 4 : sign_count, compteur de
+// signatures WebAuthn (refus d'un compteur qui recule, demande de l'audit du 25 novembre).
 func TestSchemaComptes(t *testing.T) {
 	db, _ := ouvrir(t)
 	const wantMaster = "index:bannis_h,index:comptes_p_empreinte,index:comptes_v_r,index:passkeys_h," +
@@ -52,14 +53,14 @@ func TestSchemaComptes(t *testing.T) {
 	want := map[string]string{
 		"comptes": "h:BLOB,p_empreinte:BLOB,pseudo_jour:INTEGER,v_r:BLOB,env_r:BLOB,blob_profil:BLOB,gen_profil:INTEGER," +
 			"blob_prive:BLOB,gen_prive:INTEGER,cree_jour:INTEGER,compte_des:INTEGER,vu_mois:INTEGER",
-		"passkeys":   "cred_id:BLOB,h:BLOB,cle_pub:BLOB,alg:INTEGER,be:INTEGER,etiquette:BLOB,ajoutee_mois:INTEGER",
+		"passkeys":   "cred_id:BLOB,h:BLOB,cle_pub:BLOB,alg:INTEGER,be:INTEGER,etiquette:BLOB,ajoutee_mois:INTEGER,sign_count:INTEGER",
 		"enveloppes": "cred_id:BLOB,n:INTEGER,env:BLOB",
 		"sessions": "t_v:BLOB,sid:BLOB,h:BLOB,etiquette:BLOB,cree_mois:INTEGER,expire_jour:INTEGER,persistante:INTEGER," +
 			"par_recup:INTEGER",
 		"bannis": "id:BLOB,h:BLOB,debut_jour:INTEGER,jusqu_jour:INTEGER,actif:INTEGER,motif:INTEGER,salons_fermes:INTEGER",
 	}
 	interdits := []string{"e_", "email", "adresse", "mdp", "cle_profil", "totp", "recup_jour", "aaguid", "compteur",
-		"sign_count", "bs", "vu_jour", "transport", "attestation", "ip", "heure", "pseudo_canon", "p_canon"}
+		"bs", "vu_jour", "transport", "attestation", "ip", "heure", "pseudo_canon", "p_canon"}
 	for table, w := range want {
 		got := strings.Join(lignes(t, db, `SELECT name || ':' || type FROM pragma_table_info(?) ORDER BY cid`, table), ",")
 		if got != w {
@@ -77,7 +78,7 @@ func TestSchemaComptes(t *testing.T) {
 			}
 		}
 	}
-	if v := lignes(t, db, `PRAGMA user_version`); len(v) != 1 || v[0] != "3" {
+	if v := lignes(t, db, `PRAGMA user_version`); len(v) != 1 || v[0] != "4" {
 		t.Fatalf("user_version = %v", v)
 	}
 	for p, w := range map[string]string{"secure_delete": "1", "journal_mode": "wal", "foreign_keys": "1", "temp_store": "2",
@@ -342,7 +343,7 @@ func TestBaseVersionEtDroits(t *testing.T) {
 			t.Errorf("%s : droits %o", filepath.Base(f), st.Mode().Perm())
 		}
 	}
-	if _, err := db.Exec(`PRAGMA user_version=4`); err != nil {
+	if _, err := db.Exec(`PRAGMA user_version=5`); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -415,7 +416,7 @@ func TestSchema2VideRecree(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "3" {
+	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "4" {
 		t.Fatal(v)
 	}
 	if c := lignes(t, db, `SELECT name FROM pragma_table_info('comptes') WHERE name='e_canon'`); len(c) != 0 {
@@ -448,5 +449,34 @@ func TestSchema2NonVideRefuse(t *testing.T) {
 	}
 	if strings.Contains(ErrBaseEmail.Error(), p) {
 		t.Fatal("chemin dans le message")
+	}
+}
+
+// Migration 3 → 4 : colonne sign_count ajoutée en place, 0 pour les passkeys déjà
+// enregistrées (gardées, comme leurs comptes) ; rejouée sans erreur.
+func TestMigrationCompteur(t *testing.T) {
+	b := nouveauBanc(t)
+	h, _, _ := b.inscrire(t, "lea")
+	if _, err := b.db.Exec(`ALTER TABLE passkeys DROP COLUMN sign_count`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.db.Exec(`PRAGMA user_version=3`); err != nil {
+		t.Fatal(err)
+	}
+	b.db.Close()
+	db, err := OuvrirBase(b.chemin)
+	if err != nil {
+		t.Fatal("migration 3 → 4 :", err)
+	}
+	defer db.Close()
+	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "4" {
+		t.Fatal(v)
+	}
+	var n int64
+	if err := db.QueryRow(`SELECT sign_count FROM passkeys WHERE h=?`, h[:]).Scan(&n); err != nil || n != 0 {
+		t.Fatal("passkey après migration :", n, err)
+	}
+	if _, err := db.Exec(`UPDATE passkeys SET sign_count=-1`); err == nil {
+		t.Fatal("compteur négatif accepté")
 	}
 }

@@ -185,6 +185,9 @@ type Passkey struct {
 	BE        bool
 	Env       []byte
 	Etiquette []byte
+	// SignCount : dernier compteur de signatures reçu (0 : passkey synchronisée, qui n'en tient
+	// pas, ou aucun encore).
+	SignCount uint32
 }
 
 // Limites des passkeys (conception §6.3).
@@ -278,8 +281,9 @@ func (s *Service) creerCompteTx(tx *sql.Tx, h [16]byte, nc NouveauCompte, pk Pas
 
 // insererPasskeyTx : une ligne passkeys pour h (mois d'ajout seulement).
 func insererPasskeyTx(tx *sql.Tx, h [16]byte, pk Passkey, now time.Time) error {
-	if _, err := tx.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, etiquette, ajoutee_mois)
-		VALUES(?,?,?,?,?,?,?)`, pk.CredID, h[:], pk.ClePub, pk.Alg, boolInt(pk.BE), nulle(pk.Etiquette), moisDe(now)); err != nil {
+	if _, err := tx.Exec(`INSERT INTO passkeys(cred_id, h, cle_pub, alg, be, etiquette, ajoutee_mois, sign_count)
+		VALUES(?,?,?,?,?,?,?,?)`, pk.CredID, h[:], pk.ClePub, pk.Alg, boolInt(pk.BE), nulle(pk.Etiquette), moisDe(now),
+		int64(pk.SignCount)); err != nil {
 		return err
 	}
 	if pk.Env == nil {

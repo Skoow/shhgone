@@ -174,8 +174,8 @@ func (s *Service) passkeyDe(credID []byte) ([16]byte, Passkey, error) {
 	var h [16]byte
 	var p Passkey
 	var be int
-	err := s.db.QueryRow(`SELECT h, cred_id, cle_pub, alg, be, etiquette FROM passkeys WHERE cred_id=?`, credID).Scan(
-		(*octets16)(&h), &p.CredID, &p.ClePub, &p.Alg, &be, &p.Etiquette)
+	err := s.db.QueryRow(`SELECT h, cred_id, cle_pub, alg, be, etiquette, sign_count FROM passkeys WHERE cred_id=?`, credID).Scan(
+		(*octets16)(&h), &p.CredID, &p.ClePub, &p.Alg, &be, &p.Etiquette, &p.SignCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return h, p, ErrIdentifiants
 	}
@@ -206,12 +206,15 @@ func (s *Service) ConnexionFin(ip netip.Addr, jeton [32]byte, credential []byte,
 	if e == nil {
 		return Ouverture{}, ErrEtape
 	}
-	h, credID, err := s.wa.finAssertion(e.defi, credential, s.passkeyDe, nil, nil)
+	h, credID, n, err := s.wa.verifierAssertion(e.defi, credential, s.passkeyDe, nil, nil)
 	if errors.Is(err, ErrIdentifiants) {
 		s.lim.NoterEchecConnexion(ip)
 		s.cpt.echecs.Add(1)
 	}
 	if err != nil {
+		return Ouverture{}, err
+	}
+	if err := s.noterCompteur(credID, n); err != nil {
 		return Ouverture{}, err
 	}
 	ov := Ouverture{H: h, CredID: credID}

@@ -27,7 +27,7 @@ type PasskeyVue struct {
 
 // passkeysDe : les passkeys du compte h (ordre d'ajout).
 func (s *Service) passkeysDe(h [16]byte) ([]Passkey, []PasskeyVue, error) {
-	rows, err := s.db.Query(`SELECT cred_id, cle_pub, alg, be, etiquette, ajoutee_mois,
+	rows, err := s.db.Query(`SELECT cred_id, cle_pub, alg, be, etiquette, ajoutee_mois, sign_count,
 		EXISTS (SELECT 1 FROM enveloppes e WHERE e.cred_id = passkeys.cred_id) FROM passkeys WHERE h=?
 		ORDER BY ajoutee_mois, cred_id`, h[:])
 	if err != nil {
@@ -41,7 +41,7 @@ func (s *Service) passkeysDe(h [16]byte) ([]Passkey, []PasskeyVue, error) {
 		var be int
 		var m int64
 		var prf bool
-		if err := rows.Scan(&p.CredID, &p.ClePub, &p.Alg, &be, &p.Etiquette, &m, &prf); err != nil {
+		if err := rows.Scan(&p.CredID, &p.ClePub, &p.Alg, &be, &p.Etiquette, &m, &p.SignCount, &prf); err != nil {
 			return nil, nil, err
 		}
 		p.BE = be == 1
@@ -114,12 +114,15 @@ func (s *Service) ReauthFin(ip netip.Addr, c Courante, jeton [32]byte, credentia
 	if err != nil {
 		return nil, err
 	}
-	_, cred, err := s.wa.finAssertion(e.defi, credential, nil, &c.H, ps)
+	_, cred, n, err := s.wa.verifierAssertion(e.defi, credential, nil, &c.H, ps)
 	if err != nil {
 		if errors.Is(err, ErrIdentifiants) {
 			s.lim.NoterEchecConnexion(ip)
 			s.cpt.echecs.Add(1)
 		}
+		return nil, err
+	}
+	if err := s.noterCompteur(cred, n); err != nil {
 		return nil, err
 	}
 	s.rendreRecente(c, cred)
@@ -357,4 +360,14 @@ func (s *Service) RecupRenouveler(c Courante, vr [32]byte, envR [60]byte) error 
 	}
 	s.vider()
 	return nil
+}
+
+// noterCompteur : dernier compteur de signatures de la passkey cred_id, gardé s'il progresse (deux
+// connexions simultanées ne le font jamais reculer).
+func (s *Service) noterCompteur(credID []byte, n uint32) error {
+	if n == 0 {
+		return nil
+	}
+	_, err := s.db.Exec(`UPDATE passkeys SET sign_count=? WHERE cred_id=? AND sign_count<?`, int64(n), credID, int64(n))
+	return err
 }

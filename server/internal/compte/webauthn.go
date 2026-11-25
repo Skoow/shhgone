@@ -147,7 +147,8 @@ func (u utilisateur) WebAuthnCredentials() []webauthn.Credential { return u.pk }
 // gardé ; attestation « none »).
 func credentialDe(p Passkey) webauthn.Credential {
 	return webauthn.Credential{ID: p.CredID, PublicKey: p.ClePub, AttestationType: "none", AttestationFormat: "none",
-		Flags: webauthn.CredentialFlags{UserPresent: true, UserVerified: true, BackupEligible: p.BE}}
+		Flags:         webauthn.CredentialFlags{UserPresent: true, UserVerified: true, BackupEligible: p.BE},
+		Authenticator: webauthn.Authenticator{SignCount: p.SignCount}}
 }
 
 func descripteurs(ps []Passkey) []protocol.CredentialDescriptor {
@@ -243,7 +244,8 @@ func (c *Ceremonies) finCreation(h [16]byte, sd *defi, reponse []byte) (Passkey,
 	if err := webauthncbor.Unmarshal(cr.PublicKey, &pk); err != nil || !algOK(pk.Algorithm) {
 		return Passkey{}, ErrRequete
 	}
-	out := Passkey{CredID: bytes.Clone(cr.ID), ClePub: bytes.Clone(cr.PublicKey), Alg: pk.Algorithm, BE: cr.Flags.BackupEligible}
+	out := Passkey{CredID: bytes.Clone(cr.ID), ClePub: bytes.Clone(cr.PublicKey), Alg: pk.Algorithm, BE: cr.Flags.BackupEligible,
+		SignCount: cr.Authenticator.SignCount}
 	if len(out.CredID) < 1 || len(out.CredID) > CredIDMax || len(out.ClePub) > ClePubMax {
 		return Passkey{}, ErrRequete
 	}
@@ -253,20 +255,25 @@ func (c *Ceremonies) finCreation(h [16]byte, sd *defi, reponse []byte) (Passkey,
 // chercheur : la passkey cred_id et son compte, ou ErrIdentifiants.
 type chercheur func(credID []byte) ([16]byte, Passkey, error)
 
-// finAssertion : réponse de navigator.credentials.get vérifiée. h nul : connexion découvrable (le
-// userHandle doit être le h de la passkey) ; sinon le compte h (reauth : passkey de ce compte).
-// Toute erreur de vérification : ErrIdentifiants (même réponse, conception §6.4).
-func (c *Ceremonies) finAssertion(sd *defi, reponse []byte, cherche chercheur, h *[16]byte, permises []Passkey) ([16]byte, []byte, error) {
+// verifierAssertion : réponse de navigator.credentials.get vérifiée. h nul : connexion découvrable
+// (le userHandle doit être le h de la passkey) ; sinon le compte h (reauth : passkey de ce
+// compte). Rend le compte, le cred_id et le compteur de signatures reçu, à garder
+// (Service.noterCompteur). Compteur qui ne progresse pas alors que la passkey en tient un (gardé
+// ou reçu non nul : clone possible, WebAuthn §6.1.1) : refus. Passkey synchronisée (compteur
+// toujours 0) : jamais refusée pour cela. Toute erreur de vérification : ErrIdentifiants (même
+// réponse, conception §6.4).
+func (c *Ceremonies) verifierAssertion(sd *defi, reponse []byte, cherche chercheur, h *[16]byte, permises []Passkey) ([16]byte, []byte, uint32, error) {
 	p, err := protocol.ParseCredentialRequestResponseBytes(reponse)
 	if err != nil {
-		return [16]byte{}, nil, ErrRequete
+		return [16]byte{}, nil, 0, ErrRequete
 	}
 	if err := sansSecret(p.ClientExtensionResults); err != nil {
-		return [16]byte{}, nil, err
+		return [16]byte{}, nil, 0, err
 	}
 	var trouve [16]byte
+	var cr *webauthn.Credential
 	if h == nil {
-		_, err = c.w.ValidateDiscoverableLogin(func(rawID, userHandle []byte) (webauthn.User, error) {
+		cr, err = c.w.ValidateDiscoverableLogin(func(rawID, userHandle []byte) (webauthn.User, error) {
 			hh, pk, err := cherche(rawID)
 			if err != nil || !bytes.Equal(userHandle, hh[:]) {
 				return nil, ErrIdentifiants
@@ -280,10 +287,12 @@ func (c *Ceremonies) finAssertion(sd *defi, reponse []byte, cherche chercheur, h
 			u.pk = append(u.pk, credentialDe(pk))
 		}
 		trouve = *h
-		_, err = c.w.ValidateLogin(u, *sd, p)
+		cr, err = c.w.ValidateLogin(u, *sd, p)
 	}
-	if err != nil {
-		return [16]byte{}, nil, ErrIdentifiants
+	// UpdateCounter (go-webauthn) : CloneWarning si le compteur reçu n'est pas supérieur au
+	// compteur gardé, sauf s'ils valent 0 tous les deux.
+	if err != nil || cr == nil || cr.Authenticator.CloneWarning {
+		return [16]byte{}, nil, 0, ErrIdentifiants
 	}
-	return trouve, bytes.Clone(p.RawID), nil
+	return trouve, bytes.Clone(p.RawID), cr.Authenticator.SignCount, nil
 }

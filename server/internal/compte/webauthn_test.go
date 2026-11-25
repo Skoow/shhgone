@@ -10,6 +10,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -48,6 +49,12 @@ func creerPasskey(t *testing.T, c *Ceremonies, a *webauthntest.Authentificateur,
 		t.Fatal(err)
 	}
 	return pk, p
+}
+
+// finAssertion : verifierAssertion sans le compteur rendu (tests des cérémonies).
+func (c *Ceremonies) finAssertion(sd *defi, reponse []byte, cherche chercheur, h *[16]byte, permises []Passkey) ([16]byte, []byte, error) {
+	hh, id, _, err := c.verifierAssertion(sd, reponse, cherche, h, permises)
+	return hh, id, err
 }
 
 // connexion : une connexion découvrable avec p ; cherche trouve pk (compte h).
@@ -89,15 +96,30 @@ func TestCeremoniesParAlgorithme(t *testing.T) {
 		if err != nil || hh != h || !bytes.Equal(id, p.ID) {
 			t.Fatalf("%d : connexion %v", alg, err)
 		}
-		// Compteur de signatures : jamais lu ; une deuxième connexion (compteur plus grand chez
-		// l'authentificateur, 0 côté serveur) passe, une passkey synchronisée qui rend 0 aussi.
+		// Compteur de signatures : gardé 0 côté serveur, une deuxième connexion (compteur plus grand
+		// chez l'authentificateur) passe, une passkey synchronisée qui rend 0 aussi.
 		if _, _, err := connexion(c, a, p, h, pk, nil); err != nil {
 			t.Fatal(err)
 		}
-		p.Compteur = 0
+		p.Compteur = math.MaxUint32 // signature suivante : compteur 0
 		if _, _, err := connexion(c, a, p, h, pk, nil); err != nil {
 			t.Fatal("compteur à 0 refusé :", err)
 		}
+		// Compteur gardé non nul : reçu plus grand, accepté et rendu ; égal ou plus petit (clone
+		// possible), ou 0 après un compteur non nul : refusé.
+		pk.SignCount, p.Compteur = 5, 5
+		opts, sd, _ := c.debutAssertion(nil, nil)
+		rep, _ := a.Obtenir(opts, origineTest, p)
+		if _, _, n, err := c.verifierAssertion(sd, rep, func([]byte) ([16]byte, Passkey, error) { return h, pk, nil }, nil, nil); err != nil || n != 6 {
+			t.Fatal("compteur qui progresse :", n, err)
+		}
+		for _, recu := range []uint32{4, 3, math.MaxUint32} { // signatures 5, 4 et 0
+			p.Compteur = recu
+			if _, _, err := connexion(c, a, p, h, pk, nil); !errors.Is(err, ErrIdentifiants) {
+				t.Fatalf("compteur %d après 5 accepté : %v", recu+1, err)
+			}
+		}
+		pk.SignCount = 0
 	}
 }
 

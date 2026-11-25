@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS passkeys(
   alg INTEGER NOT NULL CHECK(alg IN (-7,-8,-257)),
   be INTEGER NOT NULL CHECK(be IN (0,1)),
   etiquette BLOB CHECK(etiquette IS NULL OR (` + blobN("etiquette", 64) + `)),
-  ajoutee_mois INTEGER NOT NULL CHECK(` + moisCheck("ajoutee_mois") + `)) WITHOUT ROWID;
+  ajoutee_mois INTEGER NOT NULL CHECK(` + moisCheck("ajoutee_mois") + `),
+  sign_count INTEGER NOT NULL DEFAULT 0 CHECK(` + signCountCheck + `)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS passkeys_h ON passkeys(h);
 CREATE TABLE IF NOT EXISTS enveloppes(
   cred_id BLOB NOT NULL REFERENCES passkeys(cred_id) ON DELETE CASCADE,
@@ -109,9 +110,13 @@ func coffreCheck(col string) string {
 }
 
 // VersionBase : version du schéma de comptes.db (PRAGMA user_version). 3 : compte par
-// passkey. Les versions 1 et 2 (compte par e-mail) ne sont jamais migrées : le service
+// passkey ; 4 : colonne passkeys.sign_count (ajout en place, 0 pour les passkeys déjà
+// enregistrées). Les versions 1 et 2 (compte par e-mail) ne sont jamais migrées : le service
 // n'a jamais été ouvert (conception du compte par passkey §15).
-const VersionBase = 3
+const VersionBase = 4
+
+// signCountCheck : compteur de signatures WebAuthn (entier de 32 bits non signé).
+const signCountCheck = `typeof(sign_count)='integer' AND sign_count BETWEEN 0 AND 4294967295`
 
 // ErrBasePlusRecente : comptes.db écrite par une version plus récente ; message fixe, sans chemin.
 var ErrBasePlusRecente = errors.New("comptes.db créée par une version plus récente de Shhgone : refus d'ouvrir " +
@@ -157,6 +162,15 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 				return nil, err
 			}
 			return nil, fmt.Errorf("retrait du schéma 2 de comptes.db : %w", err)
+		}
+	}
+	if v == 3 && !colonne(db, "passkeys", "sign_count") {
+		// Version 3 → 4 : compteur de signatures, 0 pour les passkeys existantes (rien n'était
+		// gardé : le premier compteur reçu le pose, sans refus).
+		if _, err := db.Exec(`ALTER TABLE passkeys ADD COLUMN sign_count INTEGER NOT NULL DEFAULT 0 CHECK(` +
+			signCountCheck + `)`); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("migration 3 → 4 de comptes.db : %w", err)
 		}
 	}
 	if _, err := db.Exec(schemaComptes); err != nil {
@@ -212,4 +226,10 @@ func serrer(chemin string) error {
 		}
 	}
 	return nil
+}
+
+// colonne : la table a cette colonne (migration rejouée sans erreur).
+func colonne(db *sql.DB, table, nom string) bool {
+	var n int
+	return db.QueryRow(`SELECT count(*) FROM pragma_table_info(?) WHERE name=?`, table, nom).Scan(&n) == nil && n == 1
 }
