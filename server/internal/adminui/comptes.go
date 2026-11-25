@@ -367,5 +367,5 @@ func (a *admin) comptes(w http.ResponseWriter) {
 		write(w, http.StatusInternalServerError, []byte(`{"error":"internal"}`))
 		return
 	}
-	writeJSON(w, ag)
+	writeJSON(w, a.ralentirComptes(ag))
 }

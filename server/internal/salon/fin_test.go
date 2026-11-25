@@ -734,3 +734,39 @@ func TestPaniquesTickComptees(t *testing.T) {
 		t.Fatal("paniques comptées :", n)
 	}
 }
+
+// Suppression ratée d'une ligne par l'entretien (lignes) : l'erreur n'est plus jetée, elle est
+// comptée (Stats.NettoyagesRates, sans identifiant) ; la ligne reste et la passe suivante,
+// la base revenue, l'efface.
+func TestNettoyageRateCompte(t *testing.T) {
+	b := nouveauBanc(t, 200)
+	a, e := b.creer(t, 4), b.creer(t, 4)
+	ida, ide := b.idDe(t, a), b.idDe(t, e)
+	if _, err := b.db.Exec(`UPDATE salons SET failed_attempts=? WHERE id=?`, maxEssais, ida); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.db.Exec(`UPDATE salons SET expires_at=? WHERE id=?`, b.h.Now().Unix()-1, ide); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.db.Exec(`CREATE TRIGGER panne BEFORE DELETE ON salons BEGIN SELECT RAISE(FAIL, 'panne injectée'); END`); err != nil {
+		t.Fatal(err)
+	}
+	b.m.lignes(b.h.Now())
+	if n := b.m.Stats().NettoyagesRates; n != 2 {
+		t.Fatal("suppressions ratées comptées :", n)
+	}
+	var n int
+	if b.db.QueryRow(`SELECT count(*) FROM salons WHERE id IN (?,?)`, ida, ide).Scan(&n); n != 2 {
+		t.Fatal("témoin : les deux lignes devaient rester", n)
+	}
+	if _, err := b.db.Exec(`DROP TRIGGER panne`); err != nil {
+		t.Fatal(err)
+	}
+	b.m.lignes(b.h.Now())
+	if b.db.QueryRow(`SELECT count(*) FROM salons WHERE id IN (?,?)`, ida, ide).Scan(&n); n != 0 {
+		t.Fatal("lignes non reprises :", n)
+	}
+	if n := b.m.Stats().NettoyagesRates; n != 2 {
+		t.Fatal("compteur après reprise :", n)
+	}
+}

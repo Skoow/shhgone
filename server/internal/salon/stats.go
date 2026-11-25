@@ -21,6 +21,9 @@ type Stats struct {
 	OctetsConversations int64 `json:"octets_conversations"`
 	// Paniques : paniques récupérées dans l'entretien (Tick) depuis le démarrage.
 	Paniques int64 `json:"paniques_entretien"`
+	// NettoyagesRates : suppressions de lignes échues ou à 10 essais ratées par l'entretien
+	// depuis le démarrage (base occupée, disque plein) ; chaque ligne est reprise ensuite.
+	NettoyagesRates int64 `json:"nettoyages_rates"`
 	// AppelsOuverts : salons vivants dont les appels sont ouverts en ce moment (un jeton payant
 	// dépensé). Ce n'est pas le nombre d'appels en cours : le serveur ne voit pas les appels
 	// (signalisation chiffrée, média par le relais).
@@ -46,6 +49,7 @@ func (m *Manager) Stats() Stats {
 	return Stats{
 		Vivants: vivants, Max: m.cfg.Max, Sieges: sieges, Connexions: m.servis.Load(),
 		Trames: m.tramesGlob.Load(), TramesMax: m.tramesTotalMax(),
-		OctetsConversations: m.octetsConv.Load(), Paniques: m.paniquesTick.Load(), AppelsOuverts: appels,
+		OctetsConversations: m.octetsConv.Load(), Paniques: m.paniquesTick.Load(),
+		NettoyagesRates: m.nettoyagesRates.Load(), AppelsOuverts: appels,
 	}
 }

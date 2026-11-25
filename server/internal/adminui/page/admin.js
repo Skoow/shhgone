@@ -124,7 +124,8 @@ function afficher(e) {
 
   const u = e.usage, us = $('usage-chiffres');
   $('usage-note').textContent = 'Compté depuis ' + duree(s.en_marche_depuis_s)
-    + ', en mémoire seulement : rien par personne ni par partage, rien sur disque, et tout repart de zéro au redémarrage.';
+    + ', en mémoire seulement : rien par personne ni par partage, rien sur disque, et tout repart de zéro au redémarrage.'
+    + (s.paiement_actif ? ' Les partages payants ne changent qu’une fois par minute au plus.' : '');
   vider(us);
   chiffre(us, 'Partages créés', u.partages_crees);
   chiffre(us, 'Envois terminés', u.envois_termines);
@@ -176,6 +177,7 @@ function afficher(e) {
   fait(md, 'Passes du ramasse-miettes', nombre.format(m.passes_gc));
   fait(md, 'Dernière pause', (m.derniere_pause_gc_ns / 1e6).toFixed(2).replace('.', ',') + '\u00a0ms');
   if (e.salon) fait(md, 'Paniques récupérées (entretien du salon)', nombre.format(e.salon.paniques_entretien));
+  if (e.salon) fait(md, 'Nettoyages de la base ratés (entretien du salon)', nombre.format(e.salon.nettoyages_rates));
   me.append(md);
 
   appels(e);

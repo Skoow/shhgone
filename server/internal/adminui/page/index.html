@@ -57,7 +57,7 @@
 
   <section class="carte" aria-labelledby="t-appels" id="carte-appels" hidden>
     <h3 class="titre" id="t-appels">Appels audio et vidéo</h3>
-    <p class="note">Le serveur ne voit aucun appel (signalisation chiffrée, son et image par le relais) : seulement les salons où un jeton payant a ouvert les appels, et les identifiants du relais qu'il a donnés.</p>
+    <p class="note">Le serveur ne voit aucun appel (signalisation chiffrée, son et image par le relais) : seulement les salons où un jeton payant a ouvert les appels, et les identifiants du relais qu'il a donnés. Ces nombres ne changent qu'une fois par minute au plus.</p>
     <ul class="pastilles apres" id="appels-pastilles"></ul>
     <dl class="faits" id="appels"></dl>
   </section>
@@ -134,7 +134,7 @@
   <h2 class="groupe" id="comptes" hidden>Comptes</h2>
   <section class="carte large" aria-labelledby="t-comptes" id="carte-comptes" hidden>
     <h3 class="titre" id="t-comptes">Comptes et ancienneté</h3>
-    <p class="note">Lus à l'instant : des nombres, jamais une adresse, un pseudo ni un compte. Avec très peu de comptes, un nombre peut désigner une personne : rien n'est enregistré.</p>
+    <p class="note">Des nombres, jamais une adresse, un pseudo ni un compte. Avec très peu de comptes, un nombre peut désigner une personne : rien n'est enregistré, et ces nombres ne changent qu'une fois par minute au plus, pour ne pas dater une inscription. Plafond, bannissements et salons sont lus à l'instant.</p>
     <dl class="chiffres" id="comptes-chiffres"></dl>
     <h4 class="sous-titre">Ancienneté</h4>
     <dl class="chiffres" id="comptes-anciennete"></dl>
@@ -145,7 +145,7 @@
   <h2 class="groupe" id="paiement" hidden>Paiement</h2>
   <section class="carte" aria-labelledby="t-pass" id="carte-pass" hidden>
     <h3 class="titre" id="t-pass">Pass et commandes</h3>
-    <p class="note">Lus à l'instant dans paiements.db : des nombres, jamais un pass, une commande, un montant ni un pays. Le chiffre d'affaires se lit chez le prestataire.</p>
+    <p class="note">Lus dans paiements.db : des nombres, jamais un pass, une commande, un montant ni un pays. Pour ne pas dater un achat, tous les nombres du paiement ne changent qu'une fois par minute au plus ; la suspension des ventes est lue à l'instant. Le chiffre d'affaires se lit chez le prestataire.</p>
     <dl class="chiffres" id="pass"></dl>
     <div class="apres" id="commandes"></div>
   </section>

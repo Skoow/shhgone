@@ -3,7 +3,7 @@
 // distinct du site public (SHH_ADMIN_LISTEN), jamais par Caddy. Il ne montre que des
 // agrégats : aucun identifiant, aucune adresse, aucun contenu, aucune date de partage ; il
 // n'écrit rien sur disque hors du fichier de gel, et ne garde rien (ni journal ni dernier
-// accès). Pas d'effacement d'urgence ici : « wipe » reste en ligne de commande.
+// accès), sauf, en mémoire et une minute au plus, les compteurs lents (lent.go). Pas d'effacement d'urgence ici : « wipe » reste en ligne de commande.
 package adminui
 
 import (
@@ -41,7 +41,7 @@ type Config struct {
 	// Peers : pairs servis en plus de la boucle locale (SHH_TRUSTED_PROXY : dans le conteneur
 	// de production, la machine elle-même, par où arrive le tunnel SSH).
 	Peers []netip.Prefix
-	// State : état agrégé, lu à chaque demande, jamais gardé.
+	// State : état agrégé, lu à chaque demande ; seuls ses compteurs lents sont gardés (lent.go).
 	State func() (State, error)
 	// Freeze, Unfreeze : gel et dégel des créations (fichier « frozen »).
 	Freeze, Unfreeze func() error
@@ -93,6 +93,7 @@ type admin struct {
 	files [3]file
 	frein frein
 	refs  refs
+	lents lents
 }
 
 // Délai global après un jeton faux (variables : écourtées par les tests).
@@ -284,7 +285,7 @@ func (a *admin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			write(w, http.StatusInternalServerError, []byte(`{"error":"internal"}`))
 			return
 		}
-		writeJSON(w, st)
+		writeJSON(w, a.ralentirEtat(st))
 	case "POST /api/geler":
 		a.act(w, r, a.c.Freeze)
 	case "POST /api/degeler":

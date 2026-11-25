@@ -150,6 +150,9 @@ type Manager struct {
 	servis atomic.Int64
 	// paniquesTick : paniques récupérées dans Tick (Run, PaniquesTick), sans identifiant.
 	paniquesTick atomic.Int64
+	// nettoyagesRates : suppressions de lignes ratées par l'entretien (lignes), sans
+	// identifiant ; la ligne reste et la passe suivante la reprend.
+	nettoyagesRates atomic.Int64
 	// octetsConv : somme des tailles des conversations ouvertes (Conversation.compterDans) :
 	// usage lu sans verrou ni parcours des salons (UsedBytes, plein).
 	octetsConv atomic.Int64

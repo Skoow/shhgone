@@ -32,6 +32,6 @@ func (a *admin) paiement(w http.ResponseWriter, r *http.Request) {
 			write(w, http.StatusInternalServerError, []byte(`{"error":"internal"}`))
 			return
 		}
-		writeJSON(w, ag)
+		writeJSON(w, a.ralentirPaiement(ag))
 	}
 }

@@ -369,9 +369,12 @@ func (m *Manager) lignes(now time.Time) {
 	// Lecture d'abord (cas rare) : aucune écriture en base à chaque seconde.
 	var un int
 	if m.cfg.DB.QueryRow(`SELECT 1 FROM salons WHERE failed_attempts>=? LIMIT 1`, maxEssais).Scan(&un) == nil {
-		_, _ = m.cfg.DB.Exec(`DELETE FROM salons WHERE failed_attempts>=? AND NOT EXISTS
-			(SELECT 1 FROM salon_pieces WHERE salon_pieces.salon_id=salons.id)`, maxEssais)
-		m.vidage.Demander()
+		if _, err := m.cfg.DB.Exec(`DELETE FROM salons WHERE failed_attempts>=? AND NOT EXISTS
+			(SELECT 1 FROM salon_pieces WHERE salon_pieces.salon_id=salons.id)`, maxEssais); err != nil {
+			m.nettoyagesRates.Add(1) // lignes restées (« détruit » partout), reprises au tick suivant
+		} else {
+			m.vidage.Demander()
+		}
 	}
 	m.echuesSansEtat(now.Unix())
 }
@@ -462,8 +465,8 @@ func (m *Manager) disparus() []*salon {
 // base effacées (fichier puis ligne), puis ligne du salon, comme par achever. Un salon qui a un
 // état (vivant ou tombe) n'y est pas : Tick le finit (entretenir) et achever efface sa ligne.
 // Lecture d'abord, lotLignes au plus par passe : aucune écriture en base sans ligne échue. Sans
-// état, aucun Rejoindre ne peut en recréer un (la ligne est échue). Erreurs ignorées : la
-// ligne reste, reprise à un tick suivant.
+// état, aucun Rejoindre ne peut en recréer un (la ligne est échue). Sur une erreur, la ligne
+// reste, reprise à un tick suivant ; un échec de la suppression est compté (nettoyagesRates).
 func (m *Manager) echuesSansEtat(now int64) {
 	// Curseur d'un tick à l'autre : lotLignes lignes échues par passe,
 	// après la dernière vue, dans l'ordre des id ; des tombes en mémoire en tête n'affament
@@ -500,8 +503,11 @@ func (m *Manager) echuesSansEtat(now int64) {
 		if enMemoire || m.effacerPiecesEnBase(id) != nil {
 			continue
 		}
-		_, _ = m.cfg.DB.Exec(`DELETE FROM salons WHERE id=? AND expires_at<=? AND NOT EXISTS
-			(SELECT 1 FROM salon_pieces WHERE salon_id=?)`, id, now, id)
+		if _, err := m.cfg.DB.Exec(`DELETE FROM salons WHERE id=? AND expires_at<=? AND NOT EXISTS
+			(SELECT 1 FROM salon_pieces WHERE salon_id=?)`, id, now, id); err != nil {
+			m.nettoyagesRates.Add(1) // ligne échue restée (plus servie), reprise au tick suivant
+			continue
+		}
 		m.vidage.Demander()
 	}
 }
