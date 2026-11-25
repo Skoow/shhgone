@@ -51,8 +51,8 @@
 </script>
 
 <section class="dls" aria-labelledby="d-title" aria-busy={downloads.status === "loading" || downloads.status === "idle" ? "true" : undefined}>
-  <div class="top">
-    <h1 id="d-title" class="title bandeau" tabindex="-1" data-large-title bind:this={title}>{t("downloads.title")}</h1>
+  <div class="top titre-bandeau">
+    <h1 id="d-title" class="title" tabindex="-1" data-large-title bind:this={title}>{t("downloads.title")}</h1>
     <p class="sub">{t("downloads.sub")}</p>
   </div>
 

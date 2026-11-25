@@ -368,15 +368,15 @@ html.kbd-open .dock {
   }
 }
 
-/* En-tête des pages d'information et des offres (InfoPage, Offres) : titre et sous-titre sur le
-   fond du site, sans carte ni trame (« plus léger ») ; le titre porte le bandeau ci-dessous.
-   Téléphone et tablette : centrés. Grand écran (1100 px et plus) : pleine largeur du contenu,
-   alignés à gauche sur le bord du logo, une couture fine en bas. Rien ne bouge. */
+/* En-tête des pages d'information et des offres (InfoPage, Offres) : titre et sous-titre dans
+   le bandeau (.titre-bandeau, ci-dessous), à la largeur de ce bloc. Téléphone et tablette :
+   centrés. Grand écran (1100 px et plus) : alignés à gauche, sur le bord du contenu. */
 .page-card {
   display: grid;
   justify-items: center;
   gap: var(--sp-4);
-  padding: clamp(24px, 5vw, 56px) 0 clamp(20px, 4vw, 40px);
+  margin-inline: auto;
+  margin-block: var(--sp-3) var(--sp-2);
   text-align: center;
 }
 .page-card > h1 {
@@ -406,8 +406,8 @@ html.kbd-open .dock {
   .page-card {
     justify-items: start;
     gap: var(--sp-5);
-    padding: clamp(56px, 6vw, 88px) 0 clamp(40px, 4vw, 56px);
-    box-shadow: inset 0 -1px 0 var(--hair);
+    margin-inline: 0;
+    margin-block: var(--sp-6) var(--sp-3);
     text-align: start;
   }
   .page-card > h1 {
@@ -419,32 +419,29 @@ html.kbd-open .dock {
   }
 }
 
-/* Bandeau des titres principaux (h1 de chaque page) : une bande fine derrière le bas du titre, à sa
-   largeur (plus 0,4 em de chaque côté), menthe puis bleu nuit en demi-teinte, éteinte aux deux
-   bouts, et un filet menthe dessous. Fait ressortir le titre sans faire bloc ; CSS seul, aucune
-   image. Contraste : le titre (--text) reste au-dessus de 12:1 sur la bande la plus claire.
-   Sur l'élément h1 lui-même (classe .bandeau) : il prend la largeur de son texte ; un titre
-   centré le centre avec margin-inline: auto (ou justify-self: center dans une grille).
-   Contraste renforcé ou couleurs forcées : pas de bande. */
-.bandeau {
-  position: relative;
-  isolation: isolate;
+/* Bandeau des titres principaux : un voile léger derrière le bloc titre + sous-titre de chaque
+   page (classe unique, posée sur l'élément qui contient le h1 et son sous-titre). Il prend la
+   largeur du bloc (jamais toute la page), plus une marge de chaque côté et en haut et en bas.
+   Pas de fond sombre : menthe et bleu nuit transparents (8 à 14 %) qui s'estompent vers le
+   centre et les bords, un filet à peine visible, coins arrondis. Le centrage ou l'alignement
+   à gauche reste à l'écran (margin-inline: auto, justify-self...). Contraste : le titre et le
+   sous-titre restent au-dessus de AA (le voile éclaircit à peine le fond). Contraste renforcé
+   ou couleurs forcées : pas de voile. CSS seul. */
+.titre-bandeau {
   width: fit-content;
   max-width: 100%;
-}
-.bandeau::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset-block: 0.34em 0;
-  inset-inline: -0.4em;
-  pointer-events: none;
+  min-width: 0;
+  padding: clamp(18px, 3vw, 32px) clamp(20px, 3.5vw, 40px);
+  border-radius: clamp(16px, 2.5vw, 24px);
   background:
-    linear-gradient(90deg, transparent, rgb(95 227 181 / 0.7) 20%, rgb(85 150 248 / 0.45) 80%, transparent) bottom / 100% 1px no-repeat,
-    linear-gradient(90deg, transparent, rgb(95 227 181 / 0.17) 18%, rgb(85 150 248 / 0.13) 82%, transparent);
+    radial-gradient(90% 120% at 0% 0%, rgb(95 227 181 / 0.14), transparent 65%),
+    radial-gradient(90% 120% at 100% 100%, rgb(85 150 248 / 0.11), transparent 65%),
+    rgb(233 236 242 / 0.02);
+  box-shadow: inset 0 0 0 1px rgb(233 236 242 / 0.06);
 }
 @media (prefers-contrast: more), (forced-colors: active) {
-  .bandeau::before {
-    display: none;
+  .titre-bandeau {
+    background: none;
+    box-shadow: none;
   }
 }

@@ -12,8 +12,8 @@
 </script>
 
 <article class="offers" aria-labelledby="offers-title">
-  <header class="hd page-card">
-    <h1 id="offers-title" class="title bandeau" tabindex="-1" data-large-title>{retour ? t("offers.ret.title") : t("offers.title")}</h1>
+  <header class="hd page-card titre-bandeau">
+    <h1 id="offers-title" class="title" tabindex="-1" data-large-title>{retour ? t("offers.ret.title") : t("offers.title")}</h1>
     {#if !retour}<p class="lede">{t("offers.lede")}</p>{/if}
   </header>
   {#if retour}<OffersReturn />{:else}<OffersCheckout />{/if}

@@ -151,7 +151,7 @@
   </section>
 {:else}
   <section class="manage" aria-labelledby="m-title" aria-busy={phase === "loading" ? "true" : undefined}>
-    <h1 id="m-title" class="title bandeau" tabindex="-1" data-large-title bind:this={title}>{t("manage.title")}</h1>
+    <h1 id="m-title" class="title titre-bandeau" tabindex="-1" data-large-title bind:this={title}>{t("manage.title")}</h1>
     <div class="card" bind:this={card} data-capsule data-state="open">
       {#if status}
         {#key reads}

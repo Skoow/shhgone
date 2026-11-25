@@ -15,8 +15,10 @@
 </script>
 
 <section class="cadre" aria-labelledby="compte-titre">
-  <h1 id="compte-titre" class="titre bandeau" tabindex="-1" data-large-title bind:this={h1}>{titre}</h1>
-  {#if sous}<p class="sous">{sous}</p>{/if}
+  <div class="tete titre-bandeau">
+    <h1 id="compte-titre" class="titre" tabindex="-1" data-large-title bind:this={h1}>{titre}</h1>
+    {#if sous}<p class="sous">{sous}</p>{/if}
+  </div>
   {#if getDemo()}<p class="note" data-demo-note>{getDemo()!.compteNote}</p>{/if}
   {@render children()}
 </section>
@@ -48,15 +50,20 @@
     font-stretch: var(--wd-display, 112%);
     letter-spacing: -0.03em;
     line-height: 1.08;
-    justify-self: center;
     text-align: center;
     text-wrap: balance;
   }
   .titre:focus {
     outline: none;
   }
+  /* Titre et sous-titre : dans le bandeau des titres (ui/base.css), centré dans le cadre. */
+  .tete {
+    display: grid;
+    gap: var(--sp-2);
+    justify-self: center;
+  }
   .sous {
-    margin: calc(-1 * var(--sp-3)) 0 0;
+    margin: 0;
     color: var(--text-2);
     text-align: center;
     text-wrap: pretty;
