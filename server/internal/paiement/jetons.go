@@ -225,20 +225,21 @@ func (j *Jetons) Emettre(s *Service, p Pass, requetes [][]byte) ([][]byte, Offre
 			return nil, 0, errJeton
 		}
 	}
-	n, err := s.prendreDuJour(p, len(requetes), EmisParJour(offre))
-	if err != nil {
-		return nil, 0, err
-	}
-	if n < len(requetes) {
-		// Prendre est tout ou rien ici : rien n'a été décompté.
-		return nil, 0, ErrPasDeJetons
-	}
+	// Signé avant de décompter : une erreur de signature ne coûte rien à la réserve du pass.
 	signer := blindrsa.NewSigner(c.sk)
 	out := make([][]byte, len(requetes))
 	for i, r := range requetes {
 		if out[i], err = signer.BlindSign(r[3:]); err != nil {
 			return nil, 0, errJeton
 		}
+	}
+	n, err := s.prendreDuJour(p, len(requetes), EmisParJour(offre))
+	if err != nil {
+		return nil, 0, err
+	}
+	if n < len(requetes) {
+		// Prendre est tout ou rien ici : rien n'a été décompté, et rien n'est rendu.
+		return nil, 0, ErrPasDeJetons
 	}
 	j.cpt.emis[offre].Add(int64(len(out)))
 	return out, offre, nil
