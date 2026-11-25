@@ -18,8 +18,8 @@ test("démo : envoi → « Vos envois » (en mémoire), aucune base IndexedDB d'
   await keep.click();
   await expect(keep).toHaveAttribute("aria-checked", "true");
   await expect(page.locator("[data-keep][data-kept]")).toHaveCount(1);
-  await page.getByRole("button", { name: "Terminé" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Terminer" }).or(page.locator(".ready").getByRole("button", { name: "Terminer" })).filter({ visible: true }).first().click();
+  await page.locator(".ready .done").getByRole("button", { name: "Nouveau partage", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Continuer" }).or(page.locator(".ready").getByRole("button", { name: "Continuer" })).filter({ visible: true }).first().click();
   await expect(readyHeading(page)).toBeHidden();
   // Navigation dans l'application (aucun rechargement : la démo garde l'historique en mémoire) ;
   // « Mes partages » est dans l'en-tête, ou dans le menu ☰ sur téléphone.

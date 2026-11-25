@@ -182,8 +182,9 @@ test.describe("téléphone façon app", () => {
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     await expect(tabbar(page)).toHaveCount(0);
     expect(await noHScroll(page)).toBe(true);
-    const done = page.getByRole("button", { name: "Terminé" });
-    expect(await inViewport(page, done)).toBe(true);
+    const done = page.locator(".ready .done").getByRole("button", { name: "Nouveau partage", exact: true });
+    // Plus de barre collée en bas : « Nouveau partage » est dans le fil, discret.
+    expect(await done.evaluate((e) => getComputedStyle(e.closest(".done")!).position)).toBe("static");
     await shot(page, "lien-pret");
     // Grand titre natif : une fois défilé, il se réduit dans la barre du haut.
     await expect(page.locator("header.top .small.on")).toHaveCount(0);
@@ -192,8 +193,9 @@ test.describe("téléphone façon app", () => {
     await page.evaluate(() => scrollTo(0, 0));
 
     // Confirmation : feuille qui monte du bas, gros boutons, focus sur Annuler.
+    await done.scrollIntoViewIfNeeded();
     await done.click();
-    const conf = page.getByRole("dialog", { name: "Terminé" });
+    const conf = page.getByRole("dialog", { name: "Nouveau partage" });
     await expect(conf).toBeVisible();
     const box = (await conf.boundingBox())!;
     expect(box.y + box.height).toBeGreaterThan(844 - 2); // ancrée en bas

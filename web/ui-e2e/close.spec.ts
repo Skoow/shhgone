@@ -115,8 +115,8 @@ test("expéditeur : chaque fenêtre a « Fermer » en haut à droite", async ({ 
   await checkAndClose(page, share);
 
   // Confirmation (feuille du bas).
-  await page.getByRole("button", { name: "Terminé" }).click();
-  await checkAndClose(page, page.getByRole("dialog", { name: "Terminé" }));
+  await page.locator(".ready .done").getByRole("button", { name: "Nouveau partage", exact: true }).click();
+  await checkAndClose(page, page.getByRole("dialog", { name: "Nouveau partage" }));
   await expect(readyHeading(page)).toBeVisible();
 });
 

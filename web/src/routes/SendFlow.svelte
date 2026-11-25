@@ -1,9 +1,9 @@
 <script lang="ts">
   // Parcours d'envoi (UI §9.2 à §9.5) : composeur → scellement → « Lien prêt ». Le composeur
   // n'est jamais détruit pendant l'envoi : il est masqué (`hidden`, `inert`) et revient intact
-  // après une annulation ou une erreur ; « Terminé » et « Nouvel envoi » le remontent vide.
+  // après une annulation ou une erreur ; « Nouveau partage » le remonte vide.
   // Les secrets (lien, lien de gestion, mot de passe) ne vivent que dans le sender et les props
-  // de Ready, oubliés à Terminé ou Supprimer.
+  // de Ready, oubliés à Nouveau partage ou Supprimer.
   import { flushSync, tick } from "svelte";
   import { getDemo } from "../app/demo-hooks";
   import { gate } from "../flows/clean-gate";
@@ -30,10 +30,13 @@
   type Props = {
     /** Vrai de l'appui sur « Chiffrer et envoyer » jusqu'à « Lien prêt » (langue figée, dépôt ignoré). */
     onbusy?: (busy: boolean) => void;
+    /** Vrai pendant le scellement seulement : menus et pied désactivés. Sur « Lien prêt », ils
+     *  restent actifs et passent par la garde de sortie (confirmation si rien n'est copié). */
+    onlock?: (locked: boolean) => void;
     /** Page d'envoi « /envoyer » : composeur affiché même vide (retours DROP). */
     sendPage?: boolean;
   };
-  let { onbusy, sendPage = false }: Props = $props();
+  let { onbusy, onlock, sendPage = false }: Props = $props();
 
   type View = "compose" | "sealing" | "ready";
   let view = $state<View>("compose");
@@ -168,6 +171,7 @@
   // (une finalisation qui attend échoue aussitôt) et les secrets oubliés.
   $effect(() => () => {
     onbusy?.(false);
+    onlock?.(false);
     stop();
     powAbort?.abort();
     disarm?.();
@@ -176,10 +180,13 @@
 
   // Bouton Retour pendant l'envoi et sur « Lien prêt » : confirmation, sinon on reste.
   let disarm: (() => void) | undefined;
+  /** « Lien prêt » : lien et mot de passe déjà copiés ou partagés, le Retour ne demande plus rien. */
+  let readySecured = false;
   function guard() {
     disarm?.();
+    readySecured = false;
     disarm = leaveGuard?.arm({
-      confirm: () => window.confirm(view === "ready" ? t("leave.ready") : t("leave.sending")),
+      confirm: () => (view === "ready" ? readySecured || window.confirm(t("leave.ready")) : window.confirm(t("leave.sending"))),
       onleave: () => {
         disarm = undefined;
         unloadArmed = false;
@@ -194,7 +201,7 @@
     });
   }
   /**
-   * Sortie sans « Terminé » : l'envoi est annulé ; pendant la finalisation (plus annulable,
+   * Sortie sans « Nouveau partage » : l'envoi est annulé ; pendant la finalisation (plus annulable,
    * UI §9.4.5), le partage qui en sortira, dont personne n'aura vu le lien, est supprimé dès
    * qu'il existe. Après « Lien prêt », le partage reste (le lien a pu être copié).
    */
@@ -235,6 +242,7 @@
     // Retour au composeur (annuler, modifier, nouvel envoi) : glissement inverse sur téléphone.
     void runTransition(() => flushSync(() => (view = v)), { back: v === "compose" });
     onbusy?.(v !== "compose");
+    onlock?.(v === "sealing");
   }
 
   function start(state: SendState) {
@@ -304,7 +312,7 @@
     setView("ready");
   }
 
-  /** Terminé, Nouvel envoi : composeur vide, plus aucune référence aux secrets. */
+  /** Nouveau partage (Lien prêt ou après Supprimer) : composeur vide, plus aucune référence aux secrets. */
   function reset() {
     unguard();
     sender?.forget();
@@ -386,6 +394,7 @@
     itemsCount={sent.names.length}
     sizeBytes={sent.bytes}
     ondone={reset}
+    onsecured={() => (readySecured = true)}
     onforget={forget}
     onnew={reset}
   />

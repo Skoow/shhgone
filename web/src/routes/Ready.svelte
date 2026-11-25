@@ -4,8 +4,9 @@
   // (masqué à l'arrivée), chacun avec sa copie ; ordinateur : l'échéance et la gestion dans une
   // colonne à droite (audit design, lot 2) ; puis « Partager » (feuille : envoyer vers une app, copier le lien et le mot
   // de passe, QR code du lien et du mot de passe, D41-29) et « Copier le lien et le mot de
-  // passe » ; lien de gestion replié ; Supprimer ce partage (secondaire) ; Terminé (principal,
-  // collé en bas sur téléphone). Les valeurs ne viennent que des props (Copier lit l'état, jamais le
+  // passe » ; lien de gestion replié ; Supprimer ce partage ; « Nouveau partage », discret (rien
+  // à valider : le lien marche déjà ; confirmation seulement tant que le lien et le mot de passe
+  // n'ont pas été copiés, ready-copies.ts). Les valeurs ne viennent que des props (Copier lit l'état, jamais le
   // DOM) ; rien n'est écrit dans la console, le titre, l'URL ou un stockage.
   import { tick, untrack } from "svelte";
   import { getDemo } from "../app/demo-hooks";
@@ -18,7 +19,7 @@
   import { copyText } from "../ui/clipboard";
   import CopyField from "../ui/CopyField.svelte";
   import Deadline from "../ui/Deadline.svelte";
-  import { ClipboardX, Copy, Eye, Lock, QrCode as QrIcon, Send, Share2, Trash2 } from "../ui/Icon";
+  import { Check, ClipboardX, Copy, Eye, Lock, Plus, QrCode as QrIcon, Send, Share2, Trash2 } from "../ui/Icon";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import Logo from "../ui/Logo.svelte";
   import QrCode from "../ui/QrCode.svelte";
@@ -28,11 +29,12 @@
   import Switch from "../ui/Switch.svelte";
   import { forgetShare, keepSentDefault, loadHistory, markDestroyed, recordShare, setHistoryEnabled, shares } from "../history/live.svelte";
   import "../ui/seal.css";
+  import { NOTHING_COPIED, confirmLeave, noteCopy, secured, warnOnUnload, type Copied } from "./ready-copies";
 
   /** `title` : nom du partage tel que le moteur l'a écrit (nettoyé) ; absent sans nom. */
   export type ReadyResult = { link: string; manage: string; expiresInS: number; password: string; title?: string };
   type Props = {
-    /** null après Terminé ou Supprimer : plus aucune référence aux secrets. */
+    /** null après Nouveau partage ou Supprimer : plus aucune référence aux secrets. */
     result: ReadyResult | null;
     summary: string;
     ttlHours: number;
@@ -40,14 +42,16 @@
     /** Pour l'historique local (spec §33.1) : nombre d'éléments et taille, jamais leurs noms. */
     itemsCount: number;
     sizeBytes: number;
-    /** Terminé : retour au composeur vide. */
+    /** Nouveau partage : retour au composeur vide. */
     ondone: () => void;
+    /** Le lien et le mot de passe ont été copiés ou partagés : le Retour ne demande plus rien. */
+    onsecured?: () => void;
     /** Le partage est supprimé : oublier les secrets. */
     onforget: () => void;
     /** « Nouvel envoi » après la suppression. */
     onnew: () => void;
   };
-  let { result, summary, ttlHours, maxOpens, itemsCount, sizeBytes, ondone, onforget, onnew }: Props = $props();
+  let { result, summary, ttlHours, maxOpens, itemsCount, sizeBytes, ondone, onsecured, onforget, onnew }: Props = $props();
   const lang = $derived(getLang());
   const demo = getDemo();
 
@@ -59,7 +63,7 @@
   // Désactivé par défaut, avec ou sans compte (keepSentDefault), le
   // lien de gestion est alors montré ici ; activé par la personne, le réglage vaut pour les envois
   // suivants. Une fois activé, gardé dès l'affichage (fermer l'onglet
-  // sans « Terminé » ne le perd pas) : le lien de gestion,
+  // sans « Nouveau partage » ne le perd pas) : le lien de gestion,
   // l'heure locale, la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures et le
   // nom du partage ; jamais le lien de partage, le mot de passe ni les noms des
   // éléments. Désactiver retire l'entrée et vaut pour les prochains envois. Opérations à la file : une bascule rapide garde l'ordre.
@@ -98,11 +102,20 @@
     });
   }
 
-  // ---------- Garde de sortie : jusqu'à Terminé ou Supprimer (UI §9.5, A12) ----------
-  let guarded = $state(true);
+  // ---------- Garde de sortie : jusqu'à la copie des deux, Nouveau partage ou Supprimer (UI §9.5, A12) ----------
+  // État en mémoire seulement : quelles valeurs ont été copiées (ou partagées), jamais les valeurs.
+  let copies = $state(NOTHING_COPIED);
+  let finished = $state(false);
+  function copied(what: Copied) {
+    const was = secured(copies);
+    copies = noteCopy(copies, what);
+    if (!was && secured(copies)) onsecured?.();
+  }
+  // L'état est lu au moment de l'événement (pas d'ajout ni de retrait différé par un effet) : une
+  // sortie déjà confirmée par la garde du routeur (secrets oubliés, `result` à null) ne redemande rien.
   $effect(() => {
-    if (!guarded) return;
     const warn = (e: BeforeUnloadEvent) => {
+      if (!result || !warnOnUnload(copies, finished)) return;
       e.preventDefault();
       e.returnValue = "";
     };
@@ -141,11 +154,12 @@
   let qrShown = $state(false);
   let copyNote = $state("");
   async function shareApp() {
-    if (result) await shareText(both(result));
+    if (result && (await shareText(both(result))) === "shared") copied("both");
   }
   async function copyBoth() {
     if (!result) return;
     const r = await copyText(both(result));
+    if (r === "copied") copied("both");
     copyNote = r === "copied" ? t("ready.share.copied") : t("ready.share.manual");
     announce(copyNote);
   }
@@ -155,9 +169,9 @@
     sheet = true;
   }
 
-  // ---------- Terminé, Supprimer ----------
+  // ---------- Nouveau partage, Supprimer ----------
   function done() {
-    guarded = false;
+    finished = true;
     ondone();
   }
   let deleteError = $state("");
@@ -176,7 +190,7 @@
       }
     }
     // Après la réponse du serveur seulement : dissolution, puis message (UI §7.4).
-    guarded = false;
+    finished = true;
     void queue(async () => {
       if (keepId) await markDestroyed(keepId);
     });
@@ -224,7 +238,7 @@
 
       <!-- Ordinateur : deux colonnes. À gauche le « ticket » (le lien, une perforation, le mot de
            passe) et l'envoi ; à droite l'échéance et la gestion. Téléphone : une colonne, même
-           ordre (celui du DOM : avertissement, lien, mot de passe, informations, Supprimer, Terminé). -->
+           ordre (celui du DOM : avertissement, lien, mot de passe, informations, Supprimer, Nouveau partage). -->
       <div class="corps" data-ready-card>
         <div class="gauche">
           <p class="never" data-fan><ClipboardX size={18} strokeWidth={1.75} aria-hidden="true" />{t("ready.never")}</p>
@@ -233,10 +247,18 @@
                copiable masqué). Rien entre les deux : la paire reste ensemble. -->
           <!-- Apparition propre au ticket (CSS, coupée en mouvement réduit), pas l'éventail data-fan. -->
           <div class="ticket" data-ticket>
-            <div class="cell lien" role="group" aria-label={t("ready.link.title")}><CopyField label={t("ready.link.label")} value={result.link} /></div>
+            <!-- Coche menthe discrète, à hauteur du libellé : cette valeur a été copiée (ou partagée). -->
+            <div class="cell lien" role="group" aria-label={t("ready.link.title")}>
+              <CopyField label={t("ready.link.label")} value={result.link} oncopied={() => copied("link")} />
+              {#if copies.link}<span class="kept" data-ready-copied><Check size={16} strokeWidth={2.25} aria-hidden="true" /><span class="sr-only">{t("ready.copied")}</span></span>{/if}
+            </div>
             <div class="perfo" aria-hidden="true"></div>
-            <div class="cell mdp" role="group" aria-label={t("ready.pw.title")}><CopyField label={t("ready.pw.title")} value={result.password} whole secret /></div>
+            <div class="cell mdp" role="group" aria-label={t("ready.pw.title")}>
+              <CopyField label={t("ready.pw.title")} value={result.password} whole secret oncopied={() => copied("password")} />
+              {#if copies.password}<span class="kept" data-ready-copied><Check size={16} strokeWidth={2.25} aria-hidden="true" /><span class="sr-only">{t("ready.copied")}</span></span>{/if}
+            </div>
           </div>
+          <p class="works" data-ready-works>{t("ready.works")}</p>
 
           <div class="send" data-fan>
             <Button variant="primary" onpress={openSheet} aria-haspopup="dialog">
@@ -305,14 +327,25 @@
             {#if deleteError}<p class="del-err" role="alert">{deleteError}</p>{/if}
           </div>
 
+          <!-- Pas d'action principale : rien à « terminer », le partage marche déjà. Lien discret. -->
           <div class="done">
-            <InlineConfirm
-              label={t("ready.done")}
-              message={t("ready.done.confirm")}
-              confirmLabel={t("ready.done.yes")}
-              triggerVariant="primary"
-              onconfirm={done}
-            />
+            {#if confirmLeave(copies)}
+              <InlineConfirm
+                label={t("ready.done")}
+                message={t("ready.done.confirm")}
+                confirmLabel={t("ready.done.yes")}
+                kind="warn"
+                triggerVariant="ghost"
+                onconfirm={done}
+              >
+                {#snippet icon()}<Plus size={20} strokeWidth={1.75} />{/snippet}
+              </InlineConfirm>
+            {:else}
+              <Button variant="ghost" onpress={done}>
+                {#snippet icon()}<Plus size={20} strokeWidth={1.75} />{/snippet}
+                {t("ready.done")}
+              </Button>
+            {/if}
           </div>
         </div>
       </div>
@@ -408,7 +441,7 @@
   }
 
   /* Colonne de droite : deux groupes titrés (l'échéance, puis le suivi et la suppression),
-     l'heure de fin en grand, la phrase en petit ; Terminé en bas, pleine largeur. */
+     l'heure de fin en grand, la phrase en petit ; « Nouveau partage » en bas, discret. */
   .col-t {
     margin: 0;
     color: var(--text-3);
@@ -434,10 +467,6 @@
   .droite .self {
     font-size: var(--fs-small);
     line-height: var(--lh-small, 1.45);
-  }
-  .droite .done :global(.btn) {
-    width: 100%;
-    justify-content: center;
   }
 
   /* ---------- Le ticket ----------
@@ -536,6 +565,29 @@
     .ticket .lien::after {
       animation: none;
     }
+  }
+
+  /* Copiée : petite coche menthe en haut à droite de la case, à hauteur du libellé. */
+  .kept {
+    position: absolute;
+    top: var(--sp-5);
+    inset-inline-end: var(--sp-5);
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin-top: -3px;
+    border-radius: 50%;
+    background: var(--accent-tint);
+    color: var(--accent);
+  }
+  .ticket .mdp .kept {
+    top: calc(var(--sp-5) + 2px);
+  }
+  .works {
+    margin: 0;
+    font-size: var(--fs-small);
+    color: var(--text-2);
   }
 
   /* Valeurs dans le ticket : une seule boîte par valeur, « Copier » intégré à droite ; police
@@ -739,8 +791,8 @@
   .done {
     display: grid;
     justify-items: start;
-    padding-top: var(--sp-4);
-    border-top: 1px solid var(--line);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--hair-2);
   }
   .danger-zone {
     display: grid;
@@ -780,6 +832,11 @@
       padding: var(--sp-4);
       border-radius: 0 0 var(--r-lg) var(--r-lg);
     }
+    .ticket .kept,
+    .ticket .mdp .kept {
+      top: var(--sp-4);
+      inset-inline-end: var(--sp-4);
+    }
     .send {
       display: grid;
     }
@@ -787,20 +844,13 @@
       width: 100%;
       justify-content: center;
     }
-    /* Supprimer reste loin de la barre collée de Terminé (pas de geste raté). */
     .danger-zone {
       justify-items: stretch;
-      margin-block-end: var(--sp-6);
     }
-    /* Terminé, l'action principale, sous le pouce ; la suppression reste dans le fil. */
+    /* « Nouveau partage » dans le fil, jamais collé en bas (rien à valider). */
     .done {
-      position: sticky;
-      bottom: 0;
-      z-index: 2;
       justify-items: stretch;
-      margin-inline: calc(-1 * var(--sp-4));
-      padding: var(--sp-2) var(--sp-4) calc(var(--sp-2) + env(safe-area-inset-bottom));
-      background: var(--bg);
+      margin-block-end: var(--sp-4);
     }
   }
   .gone {

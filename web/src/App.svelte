@@ -41,6 +41,9 @@
 
   // Vrai pendant un envoi et sur « Lien prêt » (langue figée, dépôt de fichier ignoré).
   let sending = $state(false);
+  // Vrai pendant le scellement seulement : menus et pied désactivés (sur « Lien prêt », ils
+  // passent par la garde de sortie du routeur).
+  let locked = $state(false);
 
   // Téléphone : barre d'onglets sur les écrans racine de l'expéditeur seulement (app/tabbar.ts).
   // Accueil connecté : seulement avec __COMPTES__ et une session ouverte ;
@@ -139,9 +142,9 @@
   {#if demo}<demo.Banner />{/if}
 {/snippet}
 
-<!-- Pied de page sur toutes les pages ; pendant un envoi, ses liens et
+<!-- Pied de page sur toutes les pages ; pendant le scellement, ses liens et
      réglages sont désactivés (busy). Ordinateur : le composeur tient dans l'écran, le pied dessous. -->
-<AppShell banner={demo ? demoBanner : undefined} busy={sending} {tabs}>
+<AppShell banner={demo ? demoBanner : undefined} busy={locked} {tabs}>
   {#if !supported}
     <Unsupported />
   {:else if router.current.name === "notfound"}
@@ -152,7 +155,7 @@
     <!-- Accueil, puis composeur dès le premier élément (UI §9.1, §9.2) ; « /envoyer » : composeur
          même vide (retours DROP). Un seul SendFlow pour les deux : passer de l'un à l'autre garde
          la liste. -->
-    <SendFlow sendPage={router.current.name === "envoyer"} onbusy={(b) => (sending = b)} />
+    <SendFlow sendPage={router.current.name === "envoyer"} onbusy={(b) => (sending = b)} onlock={(l) => (locked = l)} />
   {:else if LINK_ROUTES.has(router.current.name)}
     <!-- Ouverture rechargée sous « / » : la page part vers « /s » (onRoute), rien n'est affiché ici. -->
   {:else if router.current.name === "envois"}

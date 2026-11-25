@@ -3,8 +3,9 @@
 // entrée d'historique de garde (même adresse, état marqué, aucun secret) est ajoutée au début
 // de l'envoi (clic : activation de l'utilisateur, sans quoi Chrome peut sauter l'entrée) ; un
 // Retour qui la quitte demande confirmation : refus → l'entrée est remise et on reste ; accord →
-// `onleave` (annulation, oubli des secrets), puis le vrai retour. Fermer l'onglet ou quitter le
-// site reste couvert par `beforeunload`.
+// `onleave` (annulation, oubli des secrets), puis le vrai retour. Les menus et liens internes
+// (router.navigate) passent par la même confirmation (leave). Fermer l'onglet ou quitter le site
+// reste couvert par `beforeunload`.
 
 export const STAY_MARK = "shhStay";
 
@@ -42,6 +43,20 @@ export function createLeaveGuard(w: HistoryWindow) {
           w.history.back();
         }
       };
+    },
+    /**
+     * Navigation dans l'application (menus, liens, navigate()) : même confirmation que le Retour.
+     * Refus → `go` faux, on reste. Accord (ou rien à garder) → `onleave`, plus de garde ; `replace` :
+     * l'entrée de garde est au sommet, la nouvelle adresse doit la remplacer (sinon un Retour
+     * ultérieur retomberait sur elle).
+     */
+    leave(): { go: boolean; replace: boolean } {
+      if (!active) return { go: true, replace: false };
+      const { g } = active;
+      if (!g.confirm()) return { go: false, replace: false };
+      active = null;
+      g.onleave();
+      return { go: true, replace: marked() };
     },
     /** Navigation voulue par le code (démo « Ouvrir comme destinataire ») : plus de garde, rien n'est retiré. */
     release(): void {

@@ -81,7 +81,7 @@ describe("garde de sortie", () => {
     expect(f2.pops).toEqual([]);
   });
 
-  it("désarmée (Terminé, annulation) : l'entrée de garde est retirée par un back() absorbé ; plus aucune confirmation", () => {
+  it("désarmée (Nouveau partage, annulation) : l'entrée de garde est retirée par un back() absorbé ; plus aucune confirmation", () => {
     const f = fakeWindow();
     const g = createLeaveGuard(f.w);
     const confirm = vi.fn(() => false);
@@ -110,6 +110,28 @@ describe("garde de sortie", () => {
     g.arm({ confirm: () => false, onleave: vi.fn() });
     g.arm({ confirm: () => false, onleave: vi.fn() });
     expect(f.stack).toHaveLength(3);
+  });
+
+  it("leave (menus, liens internes) : sans garde → on part ; refus → on reste, garde intacte ; accord → onleave, remplacer l'entrée de garde", () => {
+    const f = fakeWindow();
+    const g = createLeaveGuard(f.w);
+    expect(g.leave()).toEqual({ go: true, replace: false });
+    let ok = false;
+    const confirm = vi.fn(() => ok);
+    const onleave = vi.fn();
+    g.arm({ confirm, onleave });
+    expect(g.leave()).toEqual({ go: false, replace: false });
+    expect(onleave).not.toHaveBeenCalled();
+    ok = true;
+    expect(g.leave()).toEqual({ go: true, replace: true });
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(onleave).toHaveBeenCalledTimes(1);
+    // Plus de garde : ni nouvelle confirmation, ni Retour absorbé, aucun back() lancé.
+    expect(g.leave()).toEqual({ go: true, replace: false });
+    f.w.history.pushState(null, "", "/");
+    expect(g.onPop()).toBe(false);
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(f.pops).toEqual([]);
   });
 
   it("release (navigation voulue) : plus de confirmation, aucun retour lancé", () => {

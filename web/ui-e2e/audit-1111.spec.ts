@@ -25,8 +25,8 @@ test("I2 : Retour sur « Lien prêt » : confirmation ; refus → on reste, lien
   test.setTimeout(120_000);
   await toReady(page, shh.origin);
   const url = page.url();
-  // Logo de l'en-tête désactivé comme le pied (rien ne doit quitter la page par mégarde).
-  await expect(page.locator("header.top a.logo")).toHaveAttribute("aria-disabled", "true");
+  // Logo de l'en-tête actif : il passe par la même garde (confirmation tant que rien n'est copié).
+  await expect(page.locator("header.top a.logo")).not.toHaveAttribute("aria-disabled", "true");
   let msg = "";
   page.once("dialog", (d) => {
     msg = d.message();
@@ -48,7 +48,7 @@ test("I2 : Retour sur « Lien prêt » : confirmation ; refus → on reste, lien
   await expect(page.locator("header.top a.logo")).not.toHaveAttribute("aria-disabled", "true");
 });
 
-test("I2 : Terminé retire l'entrée de garde : Retour ne demande plus rien", async ({ page, shh }) => {
+test("I2 : Nouveau partage retire l'entrée de garde : Retour ne demande plus rien", async ({ page, shh }) => {
   test.setTimeout(120_000);
   await toReady(page, shh.origin);
   const dialogs: string[] = [];
@@ -56,8 +56,8 @@ test("I2 : Terminé retire l'entrée de garde : Retour ne demande plus rien", as
     dialogs.push(d.message());
     void d.dismiss();
   });
-  await page.getByRole("button", { name: "Terminé" }).click();
-  await page.getByRole("button", { name: "Terminer", exact: true }).click();
+  await page.locator(".ready .done").getByRole("button", { name: "Nouveau partage", exact: true }).click();
+  await page.getByRole("button", { name: "Continuer", exact: true }).filter({ visible: true }).click();
   await expect(readyHeading(page)).toHaveCount(0);
   await page.goBack();
   await page.waitForTimeout(300);
@@ -146,23 +146,29 @@ test("M17, M18, coffre : bloc des offres (remplace la ligne Plus et Pro), aucune
   }
 });
 
-test("M16, M22, I2 : « Lien prêt » : heure de fin seule et arrondi dit ; h1 ; Tab atteint le pied désactivé (et rien ne part)", async ({ page, shh, isMobile }) => {
+test("M16, M22, I2 : « Lien prêt » : heure de fin seule et arrondi dit ; h1 ; Tab atteint le pied, actif, qui demande confirmation (refus : rien ne part)", async ({ page, shh, isMobile }) => {
   test.setTimeout(120_000);
   await toReady(page, shh.origin);
   await expect(page.locator("h1", { hasText: "Lien prêt" })).toBeVisible();
   await expect(page.locator("[data-deadline] .left")).toHaveCount(0);
   await expect(page.getByText(/arrondie au quart d'heure supérieur/)).toBeVisible();
   await shot(page, "m16-lien-pret", isMobile);
-  // Du bouton Terminé, Tab mène au pied : liens désactivés mais atteignables, avec leur raison.
-  await page.getByRole("button", { name: "Terminé" }).focus();
+  // De « Nouveau partage », Tab mène au pied : liens actifs, par la garde de sortie (rien de copié : confirmation).
+  await page.locator(".ready .done").getByRole("button", { name: "Nouveau partage", exact: true }).focus();
   let inFoot = false;
   for (let k = 0; k < 8 && !inFoot; k++) {
     await page.keyboard.press("Tab");
     inFoot = await page.evaluate(() => !!document.activeElement?.closest("footer.foot"));
   }
   expect(inFoot).toBe(true);
-  expect(await page.evaluate(() => document.activeElement?.getAttribute("aria-disabled"))).toBe("true");
+  expect(await page.evaluate(() => document.activeElement?.getAttribute("aria-disabled"))).toBeNull();
+  let msg = "";
+  page.once("dialog", (d) => {
+    msg = d.message();
+    void d.dismiss();
+  });
   await page.keyboard.press("Enter");
+  await expect.poll(() => msg).toContain("Quitter cette page");
   await expect(readyHeading(page)).toBeVisible();
   await page.locator("footer.foot").scrollIntoViewIfNeeded();
   await shot(page, "m22-pied-lien-pret", isMobile, true);

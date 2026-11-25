@@ -13,9 +13,10 @@
    * `secret` : masquée à l'arrivée, bouton œil pour l'afficher ou la
    * masquer ; « Copier » copie toujours la vraie valeur, même masquée. Masquée, elle n'est pas
    * lue par les lecteurs d'écran non plus (le bouton dit qu'elle est masquée).
+   * `oncopied` : appelé après une copie réussie seulement (pas après le repli de copie à la main).
    */
-  type Props = { label: string; value: string; whole?: boolean; secret?: boolean };
-  let { label, value, whole = false, secret = false }: Props = $props();
+  type Props = { label: string; value: string; whole?: boolean; secret?: boolean; oncopied?: () => void };
+  let { label, value, whole = false, secret = false, oncopied }: Props = $props();
   let shown = $state(false);
   const hidden = $derived(secret && !shown);
   // Autant de points que de caractères : la longueur n'est pas un secret (elle est fixe).
@@ -46,6 +47,7 @@
       haptic();
       announce(t("copy.done", { label }));
       timer = setTimeout(() => (copied = false), 2000);
+      oncopied?.();
     } else {
       // Pas d'API ou refus : la valeur entière est montrée, sélectionnée, pour une copie à la main.
       copied = false;

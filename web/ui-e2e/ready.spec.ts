@@ -1,6 +1,7 @@
 // « Lien prêt » (UI §9.5) sur le vrai serveur : deux cartes pour deux secrets (M18), copie qui
-// lit l'état, partage natif sans mot de passe, QR du lien seul, dictée locale, garde de sortie,
-// Terminé, Supprimer. Captures fr-FR à 1440 × 900 et 390 × 844.
+// lit l'état, partage natif sans mot de passe, QR du lien seul, dictée locale, garde de sortie
+// tant que le lien et le mot de passe ne sont pas copiés (coches), « Nouveau partage » discret,
+// menus du site par la même garde, Supprimer. Captures fr-FR à 1440 × 900 et 390 × 844.
 import type { BrowserContext, Page } from "@playwright/test";
 import { NotFoundError, fetchMeta } from "../src/index";
 import { qrPath } from "../src/qr/qr";
@@ -17,6 +18,9 @@ async function toReady(page: Page, context: BrowserContext, origin: string, text
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
 }
 const clip = (page: Page) => readClipboard(page);
+const newShare = (page: Page) => page.locator(".ready .done").getByRole("button", { name: "Nouveau partage", exact: true });
+/** Captures demandées (PC, téléphone) : test-results/captures/<nom>-{d1440,m}.png. */
+const shot = (page: Page, name: string, isMobile: boolean) => page.screenshot({ path: `test-results/captures/${name}-${isMobile ? "m" : "d1440"}.png`, fullPage: isMobile });
 const linkCard = (page: Page) => page.getByRole("group", { name: "Lien", exact: true });
 const pwCard = (page: Page) => page.getByRole("group", { name: "Mot de passe", exact: true });
 /** Valeur complète d'un CopyField (texte pour lecteur d'écran). */
@@ -30,7 +34,7 @@ const valueOf = async (page: Page, card: ReturnType<typeof linkCard>) => {
 test.describe("fr-FR", () => {
   test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
 
-  test("deux cartes, copie depuis l'état, Partager (app, copie, QR du lien et du mot de passe, D41-29), Terminé", async ({ page, shh, context, isMobile }) => {
+  test("deux cartes, copie depuis l'état, coches, Partager (app, copie, QR du lien et du mot de passe, D41-29), Nouveau partage", async ({ page, shh, context, isMobile }) => {
     test.setTimeout(120_000);
     await page.addInitScript(() => {
       const shared: unknown[] = [];
@@ -41,7 +45,7 @@ test.describe("fr-FR", () => {
     await expect(readyHeading(page)).toBeFocused();
 
     // Ordre du DOM : avertissement → un seul cadre (lien, mot de passe, infos) →
-    // Supprimer → Terminé ; plus de « Gérer ce partage ».
+    // Supprimer → Nouveau partage ; plus de « Gérer ce partage ».
     const order = await page.evaluate(() => {
       const els = [...document.querySelectorAll(".ready p.never, .ready [data-ready-card] [role=group][aria-label], .ready [data-ready-facts], .ready .danger-zone, .ready .done")];
       return els.map((e) => e.getAttribute("aria-label") ?? e.className.split(" ").find((c) => c && !c.startsWith("svelte-")));
@@ -49,9 +53,14 @@ test.describe("fr-FR", () => {
     expect(order).toEqual(["never", "Lien", "Mot de passe", "facts", "danger-zone", "done"]);
     await expect(page.getByText("Gérer ce partage")).toHaveCount(0);
     await expect(page.locator(".ready p.never")).toHaveText("Ce lien et ce mot de passe ne seront plus jamais affichés.");
-    // Terminé : action principale ; Supprimer : secondaire.
-    await expect(page.getByRole("button", { name: "Terminé" })).toHaveClass(/\bprimary\b/);
+    // Aucune action principale en bas : « Nouveau partage » discret (fantôme), Supprimer aussi.
+    await expect(newShare(page)).toHaveClass(/\bghost\b/);
+    await expect(page.locator(".ready .done .btn.primary")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Supprimer ce partage" })).not.toHaveClass(/\bprimary\b/);
+    await expect(page.locator("[data-ready-works]")).toHaveText("Le lien marche déjà. Gardez le lien et le mot de passe\u202f: ils ne seront plus affichés après.");
+    // Rien de copié : aucune coche, avertissement à la fermeture armé.
+    await expect(page.locator("[data-ready-copied]")).toHaveCount(0);
+    expect(await armed(page)).toBe(true);
     // Mot de passe masqué à l'arrivée ; « Copier » donne la vraie valeur, même masquée.
     await expect(pwCard(page).locator("[data-masked]")).toBeVisible();
     await expect(pwCard(page).locator("[data-reveal]")).toHaveAttribute("aria-pressed", "false");
@@ -81,8 +90,15 @@ test.describe("fr-FR", () => {
     await page.evaluate(() => document.querySelectorAll(".cf .val").forEach((e) => (e.textContent = "x")));
     await linkCard(page).getByRole("button", { name: /^Copier/ }).click();
     expect(await clip(page)).toBe(link);
+    // Le lien seul : sa coche ; toujours l'avertissement (le mot de passe manque).
+    await expect(linkCard(page).locator("[data-ready-copied]")).toBeVisible();
+    await expect(pwCard(page).locator("[data-ready-copied]")).toHaveCount(0);
+    expect(await armed(page)).toBe(true);
     await pwCard(page).getByRole("button", { name: /^Copier/ }).click();
     expect(await clip(page)).toBe(password);
+    // Les deux : deux coches, plus d'avertissement.
+    await expect(pwCard(page).locator("[data-ready-copied]")).toBeVisible();
+    expect(await armed(page)).toBe(false);
 
     // Copier le lien et le mot de passe (D41-29) : une seule copie, deux lignes.
     await page.getByRole("button", { name: "Copier le lien et le mot de passe" }).first().click();
@@ -111,11 +127,9 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("button", { name: "Vider le presse-papier" })).toHaveCount(0);
     expect(await clip(page)).toBe(`Lien\u202f: ${link}\nMot de passe\u202f: ${password}`);
 
-    // Garde de sortie jusqu'à Terminé ; puis composeur vide, plus aucun secret à l'écran.
-    expect(await armed(page)).toBe(true);
-    await page.getByRole("button", { name: "Terminé" }).click();
-    await expect(page.getByText("Vous ne pourrez plus les afficher. Terminer ?")).toBeVisible();
-    await page.getByRole("button", { name: "Terminer" }).click();
+    // Tout est copié : « Nouveau partage » part sans confirmation ; composeur vide, plus aucun secret à l'écran.
+    expect(await armed(page)).toBe(false);
+    await newShare(page).click();
     // Composeur vide (page /envoyer, D41-37) : « Ajouter » sur téléphone, zone de dépôt sur ordinateur.
     await expect(page.getByRole("button", { name: /^(Commencer|Ou créer sur place|Ajouter)/ }).or(page.locator(".dropzone")).filter({ visible: true }).first()).toBeVisible();
     await expect(page.locator("[data-row]")).toHaveCount(0);
@@ -124,6 +138,69 @@ test.describe("fr-FR", () => {
     expect(body).not.toContain(password);
     expect(await armed(page)).toBe(false);
     expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
+  });
+
+  test("rien de copié : « Nouveau partage » demande confirmation (texte clair) ; Continuer → composeur vide", async ({ page, shh, context }) => {
+    test.setTimeout(120_000);
+    await toReady(page, context, shh.origin);
+    expect(await armed(page)).toBe(true);
+    await newShare(page).click();
+    await expect(page.getByText("Vous n'avez pas encore copié le lien et le mot de passe. Ils ne pourront plus être affichés. Continuer\u202f?")).toBeVisible();
+    await page.getByRole("button", { name: "Annuler" }).filter({ visible: true }).click();
+    await expect(readyHeading(page)).toBeVisible();
+    await newShare(page).click();
+    await page.getByRole("group").getByRole("button", { name: "Continuer", exact: true }).filter({ visible: true }).click();
+    await expect(readyHeading(page)).toHaveCount(0);
+    expect(await armed(page)).toBe(false);
+  });
+
+  test("menus du site (routeur) : rien de copié → une confirmation, refus → on reste, accord → on part ; tout copié → rien demandé, Retour non plus", async ({ page, shh, context, isMobile }) => {
+    test.setTimeout(150_000);
+    const dialogs: string[] = [];
+    let answer = false;
+    page.on("dialog", (d) => {
+      dialogs.push(`${d.type()}:${d.message()}`);
+      void (answer ? d.accept() : d.dismiss());
+    });
+    /** Logo de l'en-tête (« Shhgone, accueil ») : un lien du site, par le routeur. */
+    const home = () => page.locator("header.top a.logo").click();
+
+    await toReady(page, context, shh.origin);
+    await expect(page.locator("header.top a.logo")).not.toHaveAttribute("aria-disabled", "true");
+    await shot(page, "ready2-arrivee", isMobile);
+    await home();
+    await expect.poll(() => dialogs.length).toBe(1);
+    expect(dialogs[0]).toMatch(/^confirm:Quitter cette page/);
+    await expect(readyHeading(page)).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/envoyer");
+    // Accord : on part (une seule question, pas de seconde alerte « beforeunload »).
+    answer = true;
+    await home();
+    await expect(readyHeading(page)).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe("/");
+    expect(dialogs).toHaveLength(2);
+
+    // Page d'information (autre fichier HTML, chargement complet) : une seule question aussi.
+    await toReady(page, context, shh.origin);
+    await page.locator("footer.foot").getByRole("link", { name: "Sécurité", exact: true }).click();
+    await expect(page).toHaveURL(/\/securite$/);
+    expect(dialogs).toHaveLength(3);
+    expect(dialogs[2]).toMatch(/^confirm:/);
+
+    // Tout copié : coches, aucune question par les menus ni par le Retour ensuite.
+    answer = false;
+    await toReady(page, context, shh.origin);
+    await page.locator("main").getByRole("button", { name: "Copier le lien et le mot de passe" }).click();
+    await expect(page.locator("[data-ready-copied]")).toHaveCount(2);
+    expect(await armed(page)).toBe(false);
+    await page.waitForTimeout(400);
+    await shot(page, "ready2-copie", isMobile);
+    await home();
+    await expect(readyHeading(page)).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe("/");
+    await page.goBack();
+    await page.waitForTimeout(300);
+    expect(dialogs).toHaveLength(3);
   });
 
   test("Supprimer ce partage : confirmation, « Partage supprimé », plus rien sur le serveur", async ({ page, shh, context }) => {
@@ -247,22 +324,18 @@ test.describe("fr-FR", () => {
 test.describe("390 × 844", () => {
   test.use({ locale: "fr-FR", viewport: { width: 390, height: 844 }, isMobile: false });
 
-  test("Terminé collé en bas, sous le pouce ; Supprimer dans le fil, jamais collé ; QR en feuille ; capture", async ({ page, shh, context }) => {
+  test("« Nouveau partage » dans le fil, jamais collé en bas ; sous Supprimer ; QR en feuille ; capture", async ({ page, shh, context }) => {
     test.setTimeout(120_000);
     await toReady(page, context, shh.origin);
     await page.waitForTimeout(700);
     await capture(page, "ready-390");
-    const done = page.getByRole("button", { name: "Terminé" });
+    const done = newShare(page);
     const del = page.getByRole("button", { name: "Supprimer ce partage" });
-    await expect(done).toBeInViewport();
-    // (Plus court : Supprimer peut être visible d'emblée ; il reste dans le fil.)
-    await page.evaluate(() => window.scrollTo(0, 300));
-    await expect(done).toBeInViewport();
     expect(await del.evaluate((e) => getComputedStyle(e.closest(".danger-zone")!).position)).toBe("static");
-    // Tout en bas : Supprimer n'est pas sous la barre de Terminé (ni recouvert, ni collé à elle).
+    expect(await done.evaluate((e) => getComputedStyle(e.closest(".done")!).position)).toBe("static");
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    const [d, b] = [await del.boundingBox(), await page.locator(".done").boundingBox()];
-    expect(d!.y + d!.height).toBeLessThan(b!.y - 40);
+    const [d, b] = [await del.boundingBox(), await done.boundingBox()];
+    expect(d!.y + d!.height).toBeLessThanOrEqual(b!.y);
     await capture(page, "ready-390-bottom");
     await page.locator("main").getByRole("button", { name: "Partager", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "Partager le lien et le mot de passe" });

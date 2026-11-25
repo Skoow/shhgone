@@ -147,7 +147,7 @@ function sync(): void {
   if (next.name !== router.current.name) router.current = next;
 }
 
-/** Garde du bouton Retour pendant un envoi et sur « Lien prêt » (app/leave-guard.ts). */
+/** Garde du bouton Retour et des liens internes pendant un envoi et sur « Lien prêt » (app/leave-guard.ts). */
 export const leaveGuard = typeof window === "undefined" ? null : createLeaveGuard(window);
 
 // Retour du système (geste, bouton) : même glissement, vers la droite, sur téléphone.
@@ -226,13 +226,18 @@ export function href(path: string, lang: Lang = getLang(), bilingue: boolean = B
 export function navigate(path: string, opts: { back?: boolean } = {}): void {
   const nu = path.replace(/^(\/compte\/(?:connexion|inscription))\?suite=salon$/, "$1");
   if (!/^\/(?!\/)[^\\#?]*$/.test(nu)) throw new Error("chemin interne attendu");
+  // Envoi en cours ou « Lien prêt » pas encore copié : la même confirmation que le Retour.
+  const leave = leaveGuard?.leave() ?? { go: true, replace: false };
+  if (!leave.go) return;
   // L'autre fichier HTML (application ↔ page d'information) : chargement complet.
   if (otherEntry(nu)) {
-    location.assign(href(path));
+    if (leave.replace) location.replace(href(path));
+    else location.assign(href(path));
     return;
   }
   const go = () => {
-    history.pushState(null, "", href(path));
+    if (leave.replace) history.replaceState(null, "", href(path));
+    else history.pushState(null, "", href(path));
     sync();
     if (typeof window.scrollTo === "function") window.scrollTo(0, 0);
   };

@@ -42,7 +42,7 @@ async function confirm(page: Page, scope: Locator, trigger: string, yes: string)
 }
 
 async function finish(page: Page) {
-  await confirm(page, page.locator(".ready"), "Terminé", "Terminer");
+  await confirm(page, page.locator(".ready .done"), "Nouveau partage", "Continuer");
   await expect(page.getByRole("heading", { name: "Lien prêt" })).toBeHidden();
 }
 

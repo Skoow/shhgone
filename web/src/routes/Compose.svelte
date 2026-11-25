@@ -621,9 +621,10 @@
     else say(t("compose.send.soon"));
   }
 
-  // Quitter la page avec une liste non vide : la liste serait perdue (UI §9.2.9).
+  // Quitter la page avec une liste non vide : la liste serait perdue (UI §9.2.9). Composeur masqué
+  // (envoi, « Lien prêt ») : c'est l'écran affiché qui décide (scellement, Ready), pas la liste envoyée.
   $effect(() => {
-    if (!filled) return;
+    if (!filled || !active) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
