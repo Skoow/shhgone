@@ -2,7 +2,7 @@ package compte
 
 import "sync/atomic"
 
-// Agrégats des comptes pour le tableau de bord (conception §21.14.2 ; plan lot 7). Que des
+// Agrégats des comptes pour le tableau de bord (conception §21.14.2). Que des
 // entiers : lus en direct dans comptes.db (aucune ligne n'en sort), ou comptés depuis le
 // démarrage en mémoire (un entier chacun, sans clé, perdus au redémarrage, comme
 // internal/usage). Avec peu de comptes, un agrégat peut désigner une personne (§21.14.2) :
@@ -31,7 +31,7 @@ type AgregatsComptes struct {
 	InscritsJour   int `json:"inscrits_aujourdhui"`
 	Inscrits7Jours int `json:"inscrits_7_jours"`
 	// Passkeys enregistrées, dont avec enveloppe PRF ; comptes sans aucune passkey
-	// synchronisable (be = 0 partout : R3, perte plus probable).
+	// synchronisable (be = 0 partout, perte plus probable).
 	Passkeys           int `json:"passkeys"`
 	PasskeysPRF        int `json:"passkeys_prf"`
 	ComptesSansSynchro int `json:"comptes_sans_passkey_synchronisable"`

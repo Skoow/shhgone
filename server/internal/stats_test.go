@@ -1,8 +1,8 @@
-// Test « aucune statistique » côté serveur (spec §35.1, §9.5 ; Task M2), bloquant.
-// Amendé le 13 novembre (décision du propriétaire) : des compteurs d'usage globaux, un entier
-// chacun, en mémoire, existent pour le tableau de bord d'administration (internal/usage) ;
-// ce test garde le reste : aucune télémétrie, aucune table (map) non justifiée, donc rien
-// par personne, par adresse ni par partage.
+// Test « aucune statistique » côté serveur (spec §35.1, §9.5), bloquant. Exception : des
+// compteurs d'usage globaux, un entier chacun, en mémoire, existent pour le
+// tableau de bord d'administration (internal/usage) ; ce test garde le reste : aucune
+// télémétrie, aucune table (map) non justifiée, donc rien par personne, par adresse ni par
+// partage.
 package internal_test
 
 import (
@@ -79,7 +79,7 @@ var allowedMaps = map[string]string{
 	"salon/salon.go:jetons":             "§39.3.6 empreintes des jetons de membre → siège, effacées avec le salon",
 	"salon/salon.go:revoques":           "§39.3.6 empreintes des jetons révoqués (exclusion, §39.13), effacées avec le salon",
 	"salon/salon.go:pieces":             "§39.3.4 auteur d'une pièce en mémoire : rang de la trame → pièce liée (plan, point 2), effacé avec le salon",
-	"salon/salon.go:lesPieces":          "§9.5 état d'un salon vivant : pièces vivantes par id (plan C-2 Task 13), effacées avec elles ou le salon",
+	"salon/salon.go:lesPieces":          "§9.5 état d'un salon vivant : pièces vivantes par id, effacées avec elles ou le salon",
 	"salon/salon.go:libres":             "§9.5 état d'un salon vivant : pièces pas encore liées (échéances de 15 min), effacées avec elles ou le salon",
 	"salon/manager.go:pieceIdx":         "§9.5 état d'un salon vivant : id de pièce → salon (routes à jeton d'envoi), effacé avec la pièce",
 	"salon/pieces.go:lus":               "§9.5 budget de lecture par (jeton de membre, pièce) (§24, M1), effacé avec la pièce",
@@ -101,7 +101,7 @@ var allowedMaps = map[string]string{
 	"compte/defis.go:m":      "conception du compte par passkey §6.2 cérémonies WebAuthn en cours (défi, rp.id, passkeys permises, h tiré, empreinte du pseudo réservé), clé SHA-256 du jeton d'étape, usage unique, 5 min, 20 000 au plus ; aucune sortie PRF ni clé",
 	"compte/sessions.go:m":   "conception du compte §8.3 dernier usage et « session récente » d'une session, clé t_v (SHA-256 du jeton), oublié 2 h sans usage",
 	"compte/service.go:refs": "conception du compte §21.6.2 salons du compte (GET salons) : ref aléatoire de 16 octets → h et identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants (et finis depuis moins de 10 min) de chaque compte ; perdue au redémarrage",
-	// Lot 7 : tableau de bord finalisé.
+	// Tableau de bord des comptes.
 	"adminui/comptes.go:m": "conception du compte §21.14.3 salons signalés en cours (tableau de bord) : ref aléatoire de 16 octets → identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants signalés ; perdue au redémarrage",
 }
 
@@ -214,8 +214,8 @@ func TestNoUnlistedCounter(t *testing.T) {
 
 // sortants : appels qui ouvrent une connexion sortante (spec §35.1) ; interdits partout, sauf
 // internal/paiement/http.go (prestataires de paiement). Le repli reCAPTCHA (spec §26) est retiré
-// le 24 novembre et n'a jamais été codé : aucune exception pour lui.
-// Plus aucune sortie SMTP depuis le 22 novembre (compte par passkey) : net/smtp est interdit
+// et n'a jamais été codé : aucune exception pour lui.
+// Plus aucune sortie SMTP (compte par passkey) : net/smtp est interdit
 // partout.
 var sortants = map[string]bool{
 	"http.Client": true, "http.Get": true, "http.Post": true, "http.PostForm": true, "http.Head": true,
@@ -239,7 +239,7 @@ var paiementPermis = map[string]bool{"http.Client": true, "http.Transport": true
 
 // TestNoOutgoingHTTP : aucun client sortant hors de internal/paiement/http.go (prestataires de
 // paiement seulement) ; aucun client SMTP nulle part (plus d'exception SMTP, conception du compte
-// par passkey §8). Aucun saut : le repli reCAPTCHA (spec §26) a été retiré le 24 novembre.
+// par passkey §8). Aucun saut : le repli reCAPTCHA (spec §26) a été retiré.
 func TestNoOutgoingHTTP(t *testing.T) {
 	paiementVu := false
 	for _, g := range sources(t, "..") {

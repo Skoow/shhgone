@@ -8,20 +8,20 @@ import (
 	"time"
 )
 
-// Relais et stockage des trames (plan C-2 Task 8, « Protocole ») : chaque trame reçue prend
+// Relais et stockage des trames (protocole du salon) : chaque trame reçue prend
 // le rang suivant du salon, sous son verrou. Une trame non volatile est écrite dans la
 // conversation (chiffrée, sans rang, siège, heure ni drapeau en clair), hors du verrou du
 // salon, puis indexée en mémoire sous ce verrou (Recevoir) ; une volatile n'est ni écrite ni
 // indexée (son rang est consommé : trou normal). La diffusion aux connexions en direct, rangée
 // ou non, se fait sous le verrou du salon (connexion.go).
 
-// entree : trame non volatile rangée, 24 octets (plan, point 10 ; TestTailleEntree).
+// entree : trame non volatile rangée, 24 octets (TestTailleEntree).
 // recuMs : heure de réception du serveur (ms Unix), jamais lue dans la trame ni écrite sur
 // disque. emplacement : numéro dans la conversation, ou effaceMarque une fois l'emplacement
 // écrasé (retrait, règle). attendus : lecteurs attendus d'une trame des règles 1 à 3, un bit
-// par siège (bitSiege ; sièges occupés à la réception, moins l'expéditeur ; plan, point 8),
+// par siège (bitSiege ; sièges occupés à la réception, moins l'expéditeur),
 // retirés à chaque lecture, départ ou reprise (effacement.go) ; 0 pour les autres règles. La
-// pièce liée d'une trame est rangée à part (salon.pieces, Task 13).
+// pièce liée d'une trame est rangée à part (salon.pieces).
 type entree struct {
 	seq         uint64
 	recuMs      int64
@@ -49,9 +49,8 @@ func (s *salon) membreLocked(mb Membre, now time.Time) bool {
 }
 
 // perimeLocked : erreur d'un membre qui ne l'est plus (membreLocked faux) : ErrExcluded pour
-// un jeton révoqué par une exclusion (son siège est pourtant libéré ; relecture de l'audit du
-// 12 novembre), ErrNotFound sinon (salon fini ou échu, jeton remplacé ou oublié). Appelé sous
-// s.mu.
+// un jeton révoqué par une exclusion (son siège est pourtant libéré), ErrNotFound sinon
+// (salon fini ou échu, jeton remplacé ou oublié). Appelé sous s.mu.
 func (s *salon) perimeLocked(mb Membre, now time.Time) error {
 	if !s.fini && now.Before(s.expires) {
 		if _, ok := s.revoques[mb.jetonV]; ok {
@@ -62,19 +61,19 @@ func (s *salon) perimeLocked(mb Membre, now time.Time) error {
 }
 
 // Recevoir range la trame de mb et rend son rang. En-tête invalide (taille, marque, bit
-// réservé) : ErrBadRequest, aucun rang consommé. lien (facultatif, Task 13) : pièce
+// réservé) : ErrBadRequest, aucun rang consommé. lien (facultatif) : pièce
 // « ready » de ce salon et de cet auteur, pas encore liée, pour une trame non volatile
 // (pieceLiableLocked) ; elle suit ensuite la vie de la trame (retrait, règle, lectures, fin du
 // salon). Trame volatile ou pièce d'un autre auteur : ErrBadRequest sans rang consommé ;
-// pièce disparue, pas prête ou déjà liée : trame rangée sans lien (audit D6). Membre
+// pièce disparue, pas prête ou déjà liée : trame rangée sans lien. Membre
 // périmé : ErrNotFound ; exclu : ErrExcluded (perimeLocked, de même pour Retirer, Quitter et
 // Lu). Erreur d'écriture de la conversation (ErrES, fixe) : trame non rangée,
 // aucun rang consommé. Règles 1 à 3 (« vu par tous + délai », effacement.go) : lecteurs
 // attendus rangés ; expéditeur seul : échéance rangée tout de suite (maintenant + délai).
 //
-// Trois temps pour une trame non volatile (audit adverse du 13 novembre, front serveur, F1 :
-// l'écriture se faisait sous le verrou du salon, où elle attendait la borne des appels disque ;
-// une borne saturée figeait l'entretien de tous les salons et le tableau de bord) :
+// Trois temps pour une trame non volatile (l'écriture se faisait sous le verrou du salon, où
+// elle attendait la borne des appels disque ; une borne saturée figeait l'entretien de tous les
+// salons et le tableau de bord) :
 //  1. admettre, sous le verrou du salon : membre, pièce, plafonds, seaux ;
 //  2. écriture dans la conversation, HORS du verrou du salon, sous la borne des écritures
 //     (Manager.ecr) : seule l'expéditrice attend le disque ;
@@ -88,7 +87,7 @@ func (s *salon) perimeLocked(mb Membre, now time.Time) error {
 // (par salon, global) dépassés d'au plus une trame par siège qui écrit en même temps
 // (accepté, comme pour le disque ci-dessous).
 //
-// Garde-fous (Task 12), sans rang consommé ni jeton pris : trame non volatile alors que
+// Garde-fous, sans rang consommé ni jeton pris : trame non volatile alors que
 // l'usage (partages, pièces, conversations) plus un palier de conversation dépasse StorageMax,
 // ou usage illisible, ou salon qui a déjà TramesMax trames rangées (index, effacées comprises :
 // leurs emplacements restent sur le disque), ou plafond global atteint (globAtteint) → ErrPlein
@@ -109,7 +108,7 @@ func (m *Manager) Recevoir(mb Membre, trame []byte, lien *[16]byte) (uint64, err
 	}
 	// Usage lu avant s.mu (Manager.plein) : des trames rangées en même temps dans d'autres
 	// salons, ou des partages créés en même temps, peuvent dépasser StorageMax d'autant : au
-	// plus un palier (TaillePalier) par Recevoir simultané. Accepté (décision du 12 novembre) :
+	// plus un palier (TaillePalier) par Recevoir simultané. Accepté :
 	// la création d'un salon garde 2 Gio de marge.
 	plein := !h.Volatile && m.plein(TaillePalier)
 	conv, seq, err := m.admettre(s, mb, h, trame, lien, plein)
@@ -137,7 +136,7 @@ func (m *Manager) admettre(s *salon, mb Membre, h EnTete, trame []byte, lien *[1
 			return nil, 0, err
 		}
 	}
-	// Plafond de trames rangées : par salon (audit D3) ET global, tous salons confondus, avec
+	// Plafond de trames rangées : par salon ET global, tous salons confondus, avec
 	// une part réservée à chaque salon (globAtteint). 0x0C dans les deux cas ; les volatiles
 	// passent encore. Seul un renouvellement (index vidé) rouvre l'écriture.
 	if plein || !h.Volatile && (len(s.index) >= m.tramesMax() || s.globAtteint()) {
@@ -209,10 +208,10 @@ func (m *Manager) ranger(s *salon, mb Membre, h EnTete, trame []byte, lien *[16]
 	return s.seq, nil, nil
 }
 
-// Retirer écrase la trame non volatile de rang seq si mb en est l'auteur (décision du
-// propriétaire, 12 novembre) : même siège et rang postérieur à l'arrivée (0x02) de
-// l'occupant actuel, qu'une reprise (0x0A) ne change pas ; au siège 0, toujours le créateur,
-// tout depuis la création. Une trame d'un ancien titulaire d'un siège invité n'est pas à lui.
+// Retirer écrase la trame non volatile de rang seq si mb en est l'auteur : même siège et rang
+// postérieur à l'arrivée (0x02) de l'occupant actuel, qu'une reprise (0x0A) ne change pas ; au
+// siège 0, toujours le créateur, tout depuis la création. Une trame d'un ancien titulaire d'un
+// siège invité n'est pas à lui.
 // Toute autre trame (autre auteur, volatile, rang inconnu, déjà effacée) : ignorée sans
 // erreur. Membre périmé : ErrNotFound. Effacement commun (effacerLocked), sans 0x0E : la
 // trame est marquée effacée sous le verrou du salon, puis son emplacement écrasé hors du
@@ -280,7 +279,7 @@ func (s *salon) prendreAEcraser() (*Conversation, []uint32) {
 	return s.conv, l
 }
 
-// Quitter : départ de mb (0x03 au journal, diffusé à la Task 9), jeton oublié, siège libéré,
+// Quitter : départ de mb (0x03 au journal, diffusé aux connexions), jeton oublié, siège libéré,
 // plus attendu par aucune trame des règles 1 à 3 (departLocked), puis son WebSocket, s'il en a
 // un, fermé en 1000 (demande 0x03, ou POST /api/salons/signaler hors du WebSocket). Membre
 // périmé : ErrNotFound ; exclu : ErrExcluded.
@@ -354,7 +353,7 @@ func (m *Manager) quitter(mb Membre, signaler bool, categorie uint8) (premier bo
 }
 
 // SalonSignale : un salon vivant signalé au moins une fois : identifiant interne (jamais
-// montré : le tableau de bord n'en montre qu'une ref éphémère, lot 7), signalements par
+// montré : le tableau de bord n'en montre qu'une ref éphémère), signalements par
 // catégorie (indice = code − 1), échéance (au quart d'heure ; la page n'en dit que « moins de
 // 6 h » ou « 6 à 24 h »), places (max_members) et sièges occupés.
 type SalonSignale struct {
@@ -456,7 +455,7 @@ type lotRefs struct {
 // qu'elle a été effacée entre-temps (efface(seq)), ou parce que sa conversation a été
 // détruite par un renouvellement ou une fin (ErrDetruite), est sautée. Toute autre trame illisible
 // (emplacement qui ne s'authentifie plus, erreur d'entrée-sortie) arrête la lecture : les
-// enregistrements d'avant sont rendus avec l'erreur (relecture Task 8 : une trame, peut-être
+// enregistrements d'avant sont rendus avec l'erreur (une trame, peut-être
 // un Commit MLS, n'est jamais sautée sans rien dire). Les enregistrements rendus ne doivent
 // pas être modifiés.
 func (s *salon) lireRefs(conv *Conversation, refs []ref, efface func(seq uint64) bool) ([][]byte, error) {

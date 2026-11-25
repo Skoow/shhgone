@@ -12,8 +12,8 @@ import (
 // retire à un autre processus le droit de lire /proc/<pid>/mem, /proc/<pid>/maps, etc. (ils
 // passent à root:root, non lisibles par le service non privilégié). Les clés de conversation du
 // salon vivent en mémoire : c'est une ceinture, en plus de ulimits.core=0 et memswap=mem du
-// conteneur (audit adverse du 13 novembre, Z2). Sans effet sur le fonctionnement. Une erreur
-// (noyau sans prctl) n'empêche pas de démarrer : le durcissement du conteneur reste.
+// conteneur. Sans effet sur le fonctionnement. Une erreur (noyau sans prctl) n'empêche pas de
+// démarrer : le durcissement du conteneur reste.
 //
 // SHH_DISABLE_DUMPABLE_HARDENING=1 l'éteint : réservé au test « le serveur ne voit rien », qui
 // DOIT lire /proc/<pid>/mem du serveur pour prouver l'absence de secrets (web/e2e/server.ts).

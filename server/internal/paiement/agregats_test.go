@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Agrégats du tableau de bord (25 novembre) : compteurs depuis le démarrage, par prestataire,
+// Agrégats du tableau de bord : compteurs depuis le démarrage, par prestataire,
 // comptés seulement quand l'écriture est faite ; pass valables par offre lus dans la base ;
 // jetons émis, dépensés, rendus ; aucun montant, aucun pass ni commande dans la réponse.
 func TestAgregats(t *testing.T) {

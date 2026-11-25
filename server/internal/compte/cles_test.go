@@ -21,8 +21,8 @@ func ecrireCle(t *testing.T, contenu []byte, mode os.FileMode) string {
 	return p
 }
 
-// Conception §5.2, §21.2.2 : une seule sous-clé HKDF-SHA-256 (sel vide) de K_serveur depuis le
-// 22 novembre (K_pseudo), égale à hkdf.Key calculé ici avec l'étiquette du plan.
+// Conception §5.2, §21.2.2 : une seule sous-clé HKDF-SHA-256 (sel vide) de K_serveur
+// (K_pseudo), égale à hkdf.Key calculé ici avec l'étiquette de la conception.
 func TestLireClesDerivations(t *testing.T) {
 	k := bytes.Repeat([]byte{0x42}, 32)
 	for _, mode := range []os.FileMode{0o600, 0o400} {

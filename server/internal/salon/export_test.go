@@ -2,8 +2,7 @@ package salon
 
 import "github.com/skoow/shhdrop/server/internal/share"
 
-// Aides des tests seulement (revue finale C-2, mineur g) : retirées du code de production, où
-// rien ne les appelait.
+// Aides des tests seulement : retirées du code de production, où rien ne les appelait.
 
 // suite : au plus max enregistrements de rang > apres (refsLocked), lus sous le verrou du
 // salon, comme le dernier lot du rattrapage (connexion.prochainLot), trames échues effacées
@@ -31,3 +30,6 @@ func (m *Manager) CreerPiece(mb Membre, bucket int, vocal bool) (string, error) 
 // Taille : octets du fichier (emplacements effacés compris) ; 0 après Detruire. Une
 // conversation inutilisable compte la borne haute de son fichier. Sans verrou (atomique).
 func (c *Conversation) Taille() int64 { return c.taille.Load() }
+
+// tickSur : Tick, panique récupérée et comptée (paniquesTick), sans rien écrire.
+func (m *Manager) tickSur() { m.passeSure(m.Tick) }

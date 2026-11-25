@@ -10,7 +10,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/compte/webauthntest"
 )
 
-// Lot S5 : passkeys du compte, réauthentification, nouvelle clé de récupération (conception du
+// Passkeys du compte, réauthentification, nouvelle clé de récupération (conception du
 // compte par passkey §3.5, §6.4).
 
 // etapeOptions : { etape, options } d'une réponse.

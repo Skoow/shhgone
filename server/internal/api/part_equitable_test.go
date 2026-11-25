@@ -1,6 +1,6 @@
 package api
 
-// Audit de sécurité du 13 novembre, D2 : les plafonds globaux étaient communs à tous ; 8
+// Les plafonds globaux étaient communs à tous ; 8
 // adresses IPv4, avec 2 envois vivants chacune et 4 PUT lents par envoi, prenaient les 64
 // places d'envoi du serveur. Part équitable (limits.NewFairSlots) : une adresse ou un /48 prend
 // au plus 1/8 des places, et le dernier quart va aux nouveaux venus.

@@ -13,7 +13,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/token"
 )
 
-// Routes JSON du salon (plan C-2 Task 7, spec §39.3.3, §39.3.9) : création, meta, entrée,
+// Routes JSON du salon (spec §39.3.3, §39.3.9) : création, meta, entrée,
 // gestion. Enregistrées seulement si le gestionnaire est donné (SHH_SALONS=1) : sinon la 404
 // uniforme des routes inconnues. Secrets en en-tête ou dans le corps (base64url sans
 // bourrage, longueur exacte), jamais dans l'URL ; aucun identifiant de salon dans le chemin.
@@ -297,9 +297,9 @@ var errQuotaSalon = errors.New("quota de création de salons")
 
 // reglages : POST /api/salons/reglages (X-Shh-Manage ; corps {max_members?, renouveler_h?,
 // altcha?, hp?, shown_at?}, au moins un réglage) → {max_members, expires_in_s, depuis} (spec
-// 2026-11-13, révision du 13 novembre). Corps invalide, champs de la preuve sans
-// renouveler_h : 400. X-Shh-Manage : mêmes réponses fixes que gestion (absent ou mal formé
-// 400, inconnu ou salon plus vivant 404). Places sous les sièges occupés : 409 occupied.
+// 2026-11-13). Corps invalide, champs de la preuve sans renouveler_h : 400. X-Shh-Manage :
+// mêmes réponses fixes que gestion (absent ou mal formé 400, inconnu ou salon plus vivant
+// 404). Places sous les sièges occupés : 409 occupied.
 // renouveler_h (renouvellement : conversation effacée, membres gardés) compte comme une
 // création de salon : gel (503 frozen), preuve anti-robot (400) et quota de AllowSalonCreate
 // (429 limit jusqu'à minuit UTC), dans cet ordre, seulement une fois S_gestion et les places
@@ -383,8 +383,8 @@ func (a salonAPI) reglages(w http.ResponseWriter, r *http.Request) {
 }
 
 // exclure : POST /api/salons/exclure (X-Shh-Manage, X-Shh-Access-New = K_accès_s' ; corps
-// {seat?, nonce_arrivee?, r, proof_v, salt, kdf_ops, kdf_mem}) → {} (spec §39.13.2, plan C-2
-// Task 14). X-Shh-Manage absent, mal formé ou d'aucun salon vivant (jeton de membre à sa
+// {seat?, nonce_arrivee?, r, proof_v, salt, kdf_ops, kdf_mem}) → {} (spec §39.13.2).
+// X-Shh-Manage absent, mal formé ou d'aucun salon vivant (jeton de membre à sa
 // place) : 403 forbidden, avant même la lecture du corps. seat et nonce_arrivee tous deux
 // présents (exclusion) ou tous deux absents (rotation seule) ; siège 0 : 400 ; siège
 // réattribué ou r déjà vu : 409 stale ; nouvelle K_accès_s' déjà prise : 400 (comme une
@@ -440,11 +440,11 @@ func (a salonAPI) exclure(w http.ResponseWriter, r *http.Request) {
 
 // detruire : POST /api/salons/detruire (X-Shh-Manage du créateur, ou X-Shh-Membre si
 // members_can_destroy ; exactement l'un des deux ; corps {reason?: "report"}) → {} (spec
-// §39.3.9, plan C-2 Task 15). Ni l'un ni l'autre, ou membre sans la permission : 403
-// forbidden ; les deux, en-tête mal formé, raison autre que "report" : 400 ; salon inconnu,
-// échu ou détruit, jeton inconnu : 404 ; jeton révoqué : 403 excluded. Un signalement réussi
-// compte dans l'entier horaire des signalements (§9.5, sans identifiant), comme les partages,
-// une fois par salon avec « Quitter et signaler » (salon.signale ; revue finale C-2, mineur d).
+// §39.3.9). Ni l'un ni l'autre, ou membre sans la permission : 403 forbidden ; les deux,
+// en-tête mal formé, raison autre que "report" : 400 ; salon inconnu, échu ou détruit, jeton
+// inconnu : 404 ; jeton révoqué : 403 excluded. Un signalement réussi compte dans l'entier
+// horaire des signalements (§9.5, sans identifiant), comme les partages,
+// une fois par salon avec « Quitter et signaler » (salon.signale).
 func (a salonAPI) detruire(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		Reason json.RawMessage `json:"reason"` // valeur brute : null, "" ou "REPORT" refusés
@@ -494,7 +494,7 @@ func (a salonAPI) detruire(w http.ResponseWriter, r *http.Request) {
 }
 
 // signale : premier signalement d'un salon : compté dans l'entier horaire (/healthz) et, salon
-// créé par un compte, ancienneté du créateur remise à zéro (conception du compte §11, D4 ; au
+// créé par un compte, ancienneté du créateur remise à zéro (conception du compte §11 ; au
 // mieux : le signalement est déjà fait, une erreur de comptes.db n'y change rien).
 func (a salonAPI) signale(sig salon.Signalement) {
 	if !sig.Premier {

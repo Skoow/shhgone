@@ -28,9 +28,9 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Lot 7 du plan du compte : tableau de bord finalisé et ligne de commande du bannissement,
-// branchés sur les vrais services (compte, salon). Bannissement par compte seulement depuis le
-// 22 novembre (conception du compte par passkey §7.4).
+// Comptes : tableau de bord et ligne de commande du bannissement,
+// branchés sur les vrais services (compte, salon). Bannissement par compte seulement
+// (conception du compte par passkey §7.4).
 
 func coffreTest(magic string) []byte {
 	b := make([]byte, 4096+45)

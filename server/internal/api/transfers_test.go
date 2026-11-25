@@ -78,7 +78,7 @@ func (e *env) tokens(t *testing.T, bucket, count int) (ids, toks []string) {
 	t.Helper()
 	for len(toks) < count {
 		k := newKeys()
-		c := e.create(t, "", k, bucket, share.MaxOpens)
+		c := e.create(t, remoteN(len(toks)), k, bucket, share.MaxOpens)
 		e.upload(t, c, bucket)
 		for i := 0; i < share.MaxOpens && len(toks) < count; i++ {
 			dl, _ := e.unlock(t, c.ID, k)
@@ -100,8 +100,8 @@ func waitFor(t *testing.T, what string, f func() bool) {
 	t.Fatal("délai dépassé :", what)
 }
 
-// Audit E1 (reproduction devenue test) : 200 GET de segments de 4 Mio que le client ne lit
-// pas. Avant : chaque requête gardait le segment entier en mémoire (+805 Mio mesurés).
+// 200 GET de segments de 4 Mio que le client ne lit pas. Avant : chaque requête
+// gardait le segment entier en mémoire (+805 Mio mesurés).
 // Servis en flux, ils ne tiennent que leurs tampons de copie.
 func TestSlowReadersHeapBounded(t *testing.T) {
 	if testing.Short() {
@@ -135,7 +135,7 @@ func TestSlowReadersHeapBounded(t *testing.T) {
 	}
 }
 
-// Audit E1 : transferts simultanés bornés par connexion (/64), par /48 et au total, avec
+// Transferts simultanés bornés par connexion (/64), par /48 et au total, avec
 // 429 ou 503 et Retry-After ; les places reviennent quand les clients partent.
 func TestSegmentConcurrencyCap(t *testing.T) {
 	x := defaultTransfers()
@@ -187,7 +187,7 @@ func TestSegmentConcurrencyCap(t *testing.T) {
 	})
 }
 
-// Audit E1 : un client plus lent que le débit minimal est coupé à la fin de la première
+// Un client plus lent que le débit minimal est coupé à la fin de la première
 // tranche (1 s ici, débit exigé inatteignable) et rend sa place, sans attendre le
 // WriteTimeout de 300 s ; il ne reçoit jamais un segment complet.
 //
@@ -251,7 +251,7 @@ func TestSlowReaderCutOff(t *testing.T) {
 	}
 }
 
-// Audit M1 : un jeton lit au plus share.ReadBudget octets. Une lecture complète et un
+// Un jeton lit au plus share.ReadBudget octets. Une lecture complète et un
 // nouvel essai de chaque segment passent ; relire au-delà donne 429 « budget ».
 func TestDownloadBudget(t *testing.T) {
 	e := newEnv(t, false, nil)
@@ -266,7 +266,7 @@ func TestDownloadBudget(t *testing.T) {
 		for i := 0; i < n; i++ {
 			w := e.do(req{method: "GET", path: seg(i), hdr: auth(dl)})
 			expect(t, w, 200, "")
-			if string(w.Body.Bytes()) != string(segs[i]) {
+			if w.Body.String() != string(segs[i]) {
 				t.Fatalf("segment %d altéré", i)
 			}
 			served += int64(w.Body.Len())
@@ -319,9 +319,9 @@ func putSeg(t *testing.T, srv *httptest.Server, tok string, n int, body []byte, 
 	return resp.StatusCode
 }
 
-// Audit I3 (reproduction devenue test) : 64 PUT lents (1 octet sur 4 Mio annoncés) depuis 8
-// adresses IPv4, 2 envois chacune, prenaient toutes les places d'envoi pendant 138 s (échéance
-// absolue) ; un envoi honnête recevait 503. Avec le débit minimal mesuré par tranche, ils sont
+// 64 PUT lents (1 octet sur 4 Mio annoncés) depuis 8 adresses IPv4, 2 envois
+// chacune, prenaient toutes les places d'envoi pendant 138 s (échéance absolue) ; un envoi
+// honnête recevait 503. Avec le débit minimal mesuré par tranche, ils sont
 // coupés dès la première tranche trop lente et rendent leur place.
 func TestSlowPUTsCutByMinRate(t *testing.T) {
 	x := defaultTransfers()
@@ -346,7 +346,7 @@ func TestSlowPUTsCutByMinRate(t *testing.T) {
 	}
 }
 
-// Audit I3 : un PUT qui envoie sans cesse, mais moins que le débit minimal sur chaque tranche,
+// Un PUT qui envoie sans cesse, mais moins que le débit minimal sur chaque tranche,
 // est coupé (l'ancienne échéance absolue le laissait tenir 138 s).
 func TestTricklePUTCut(t *testing.T) {
 	x := defaultTransfers()
@@ -373,7 +373,7 @@ func TestTricklePUTCut(t *testing.T) {
 	waitFor(t, "PUT au compte-gouttes coupé", func() bool { return e.srv.xfer.ul.Len() == 0 })
 }
 
-// Audit I3 : 4 PUT simultanés au plus par envoi (jeton), quelle que soit l'adresse ; le
+// 4 PUT simultanés au plus par envoi (jeton), quelle que soit l'adresse ; le
 // suivant reçoit 429 sans prendre de place du serveur.
 func TestPUTsPerUpload(t *testing.T) {
 	e := newEnv(t, false, nil)
@@ -395,7 +395,7 @@ func TestPUTsPerUpload(t *testing.T) {
 	}
 }
 
-// Audit M4 : 4 GET simultanés au plus par ouverture (partage, n° d'ouverture) ; le client du
+// 4 GET simultanés au plus par ouverture (partage, n° d'ouverture) ; le client du
 // site n'en fait qu'un à la fois (web/src/transfer/client.ts, lecture en flux du moteur).
 func TestGETsPerOpen(t *testing.T) {
 	e := newEnv(t, false, nil)
@@ -413,7 +413,7 @@ func TestGETsPerOpen(t *testing.T) {
 	}
 }
 
-// Audit M4 : un lecteur qui lit sans cesse, mais moins que le débit minimal sur chaque
+// Un lecteur qui lit sans cesse, mais moins que le débit minimal sur chaque
 // tranche, est coupé (l'ancienne échéance absolue le laissait tenir 138 s par segment).
 func TestTrickleGETCut(t *testing.T) {
 	x := defaultTransfers()

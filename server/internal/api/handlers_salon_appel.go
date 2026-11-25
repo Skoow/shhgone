@@ -16,7 +16,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Appels audio et vidéo du salon (conception des appels, 20 novembre). Le serveur ne voit ni
+// Appels audio et vidéo du salon (conception des appels). Le serveur ne voit ni
 // le son, ni l'image, ni la signalisation (messages du salon, chiffrés par MLS) : il donne
 // seulement à un membre des identifiants temporaires du relais TURN, par où passe tout le
 // média (jamais en direct entre participants : l'adresse IP de chacun resterait visible des
@@ -57,10 +57,9 @@ func identifiantsTurn(secret []byte, exp time.Time, alea []byte) (nom, mdp strin
 }
 
 // appels : les appels sont offerts par ce serveur : relais configuré ET jetons anonymes
-// disponibles (SHH_PAIEMENT=1). Les appels sont réservés aux offres Plus et Pro (décision du
-// propriétaire, 24 novembre ; conception des appels §5.1) : paiement fermé, personne ne
-// pourrait en ouvrir, donc ni route ni boutons (`calls: false`), plutôt qu'une fonction
-// montrée et impossible à obtenir.
+// disponibles (SHH_PAIEMENT=1). Les appels sont réservés aux offres Plus et Pro (conception
+// des appels §5.1) : paiement fermé, personne ne pourrait en ouvrir, donc ni route ni
+// boutons (`calls: false`), plutôt qu'une fonction montrée et impossible à obtenir.
 func (a salonAPI) appels() bool { return a.turn.actif() && a.jetons != nil }
 
 // errOffreRequise : appels fermés dans ce salon et aucun jeton présenté (402 offre_requise).

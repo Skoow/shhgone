@@ -220,7 +220,7 @@ func masterNames(t *testing.T, db *sql.DB) []string {
 const wantMaster = "index:salon_pieces_salon,index:salons_access_v,index:salons_compte,index:salons_manage_v," +
 	"index:shares_access_v,index:shares_manage_v,table:salon_pieces,table:salons,table:shares"
 
-// Spec §36 S5, S11, S12 (Task M2) : progress_at, upload_deadline et purge_at vivent en
+// Spec §36 S5, S12 : progress_at, upload_deadline et purge_at vivent en
 // mémoire ; la base ne garde qu'une date (expires_at). sqlite_master : shares et ses index.
 func TestSchemaMinimal(t *testing.T) {
 	db, err := Open(filepath.Join(t.TempDir(), "s.db"))
@@ -240,7 +240,7 @@ func TestSchemaMinimal(t *testing.T) {
 	if got := strings.Join(masterNames(t, db), ","); got != wantMaster {
 		t.Fatalf("sqlite_master = %s, attendu %s", got, wantMaster)
 	}
-	// Un partage prêt sans ttl_hours est accepté (ttl_hours à NULL après finalize, S11).
+	// Un partage prêt sans ttl_hours est accepté (ttl_hours à NULL après finalize).
 	if _, err := db.Exec(`INSERT INTO shares(id,state,bucket,max_opens,opens_left,segments_mask,salt,kdf_ops,kdf_mem,access_v,proof_v,manage_v,envelope,expires_at)
 		VALUES('r','ready',16,1,1,x'00',x'00',3,3,x'01',x'01',x'02',zeroblob(60),900)`); err != nil {
 		t.Fatal("ready sans ttl_hours refusé :", err)
@@ -321,7 +321,7 @@ CREATE UNIQUE INDEX shares_manage_v ON shares(manage_v)`
 }
 
 // synchronous reste FULL (2) : un partage « ready » ne doit pas disparaître à une coupure de
-// courant (optimisation NORMAL écartée, décision du 11 novembre).
+// courant (optimisation NORMAL écartée).
 func TestSynchronousFull(t *testing.T) {
 	db, err := Open(filepath.Join(t.TempDir(), "shares.db"))
 	if err != nil {
@@ -333,7 +333,7 @@ func TestSynchronousFull(t *testing.T) {
 	}
 }
 
-// Audit F8 : un vidage du WAL bloqué par un lecteur (busy = 1) est une erreur : le WAL garde
+// Un vidage du WAL bloqué par un lecteur (busy = 1) est une erreur : le WAL garde
 // alors des pages de partages effacés (spec §9.1), il ne doit pas passer pour vidé.
 func TestCheckpointBusy(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")
@@ -650,7 +650,7 @@ func TestRefuseV4(t *testing.T) {
 	}
 }
 
-// Plan C-2 Task 15 : les commandes d'administration du salon exigent le schéma courant
+// Les commandes d'administration du salon exigent le schéma courant
 // (tables du salon) ; une base d'une version antérieure donne ErrOldSchema (message fixe).
 func TestRequireCurrent(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "s.db")
@@ -670,7 +670,7 @@ func TestRequireCurrent(t *testing.T) {
 	}
 }
 
-// Relecture Task 15 : une table salons du schéma 2 d'avant rotation_r (bases de développement,
+// Une table salons du schéma 2 d'avant rotation_r (bases de développement,
 // jamais publié) est refusée à l'ouverture, avec un message fixe, au lieu d'échouer plus tard
 // en 500 sur exclure.
 func TestOpenRefuseSalonsSansRotation(t *testing.T) {
@@ -731,7 +731,7 @@ CREATE INDEX IF NOT EXISTS salon_pieces_salon ON salon_pieces(salon_id)`
 	}
 }
 
-// Plan du compte, lot 2 : une base du schéma 2 passe au schéma 3 en place (salon et pièce
+// Une base du schéma 2 passe au schéma 3 en place (salon et pièce
 // gardés, compte NULL), avec le même sqlite_master et les mêmes colonnes qu'une base neuve.
 func TestMigreV2VersV3(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")

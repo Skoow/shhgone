@@ -1,6 +1,6 @@
 package share
 
-// Formules payantes (spec §38.8.1, décisions du 16 et 17 novembre ; conception du paiement §11) :
+// Formules payantes (spec §38.8.1 ; conception du paiement §11) :
 // le niveau (`tier`) d'un partage est fixé à sa création par un jeton anonyme dépensé (couche
 // HTTP) et gardé EN MÉMOIRE avec l'envoi, jusqu'à la finalisation : il ne change que le plus
 // grand palier, les durées et les ouvertures permises, et la fenêtre d'envoi. Aucune colonne ne
@@ -35,8 +35,7 @@ func (t Tier) MaxBucket() int {
 	return Buckets[len(Buckets)-1]
 }
 
-// MaxOpensOf : ouvertures au plus (gratuit 5, Plus 10, Pro 20 : décision du 17 novembre ; PAID
-// de web/src/limits.ts).
+// MaxOpensOf : ouvertures au plus (gratuit 5, Plus 10, Pro 20 ; PAID de web/src/limits.ts).
 func (t Tier) MaxOpensOf() int {
 	switch t {
 	case Plus:
@@ -48,7 +47,7 @@ func (t Tier) MaxOpensOf() int {
 }
 
 // TTLAllowed : durées permises en heures (gratuit 1, 6, 12, 24 ; Plus aussi 2 et 3 jours ; Pro
-// aussi 7 jours : décision du 16 novembre, PAID.ttlDays).
+// aussi 7 jours, PAID.ttlDays).
 func (t Tier) TTLAllowed(h int) bool {
 	switch {
 	case validTTL(h):
@@ -89,6 +88,3 @@ func bucketAllowed(b int, t Tier) bool {
 
 // allBuckets : paliers gratuits puis payants, croissants.
 func allBuckets() []int { return append(append([]int(nil), Buckets...), PaidBuckets...) }
-
-// ContentBytesOf : ContentBytes, pour tout palier (quotas des partages payants).
-func ContentBytesOf(b int) int64 { return ContentBytes(b) }

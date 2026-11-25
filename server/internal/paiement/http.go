@@ -48,9 +48,6 @@ func NouveauClient() *Client {
 	}}
 }
 
-// clientTest : client des tests (faux serveur httptest, son propre transport).
-func clientTest(c *http.Client) *Client { return &Client{c: c} }
-
 // requete : un appel ; corps déjà encodé.
 type requete struct {
 	methode string

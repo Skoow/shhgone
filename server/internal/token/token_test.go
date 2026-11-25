@@ -126,7 +126,7 @@ func TestCheckExp(t *testing.T) {
 	}
 }
 
-// Audit F8 : la comparaison à math.MaxUint32 ne compilait pas en 32 bits ; le jeton
+// La comparaison à math.MaxUint32 ne compilait pas en 32 bits ; le jeton
 // contenant \n (ignoré par le base64 de Go) est refusé.
 func TestTokenRejectsNewline(t *testing.T) {
 	now := t0

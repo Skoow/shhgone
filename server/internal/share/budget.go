@@ -6,11 +6,10 @@ import (
 )
 
 // DefaultEgressMax : octets servis au plus par un partage, toutes ouvertures confondues
-// (SHH_SHARE_EGRESS_MAX ; décision du propriétaire du 24 novembre, décision 12). 250 Gio : le
-// plafond « taille × ouvertures ≤ 250 Go » du Pro retenu par l'analyse de la spec (§38.6,
-// §38.8.1, Q-P11). Un partage gratuit (2 Gio, 5 ouvertures) ne l'atteint jamais ; un Plus
-// (10 Gio, 10 ouvertures) seulement en relisant plus de deux fois et demie ; un Pro de 30 Gio
-// sert environ 8 téléchargements complets.
+// (SHH_SHARE_EGRESS_MAX). 250 Gio : le plafond « taille × ouvertures ≤ 250 Go » du Pro retenu
+// par l'analyse de la spec (§38.6, §38.8.1, Q-P11). Un partage gratuit (2 Gio, 5 ouvertures)
+// ne l'atteint jamais ; un Plus (10 Gio, 10 ouvertures) seulement en relisant plus de deux
+// fois et demie ; un Pro de 30 Gio sert environ 8 téléchargements complets.
 const DefaultEgressMax int64 = 250 << 30
 
 // MinEgressMax : plus petit plafond accepté : un téléchargement complet du plus grand palier
@@ -23,7 +22,7 @@ const MinEgressMax int64 = 32 << 30
 // nouveau le segment 0 ; le bourrage n'est jamais lu. Budget = une ouverture complète
 // (fichier + segment 0 + dernier segment) plus un nouvel essai de chaque segment
 // (fichier), soit 2 × fichier chiffré + segment 0 + dernier segment.
-// Audit de sécurité M1 : sans borne, un jeton relit le partage pendant 6 h.
+// Sans borne, un jeton relirait le partage pendant 6 h.
 func ReadBudget(bucket int) int64 {
 	return 2*totalSize(bucket) + int64(SegmentSize(bucket, 0)) + int64(SegmentSize(bucket, SegmentCount(bucket)-1))
 }
@@ -69,11 +68,6 @@ func (b *readBudget) initLocked(now int64) {
 			}
 		}
 	}
-}
-
-// charge : chargeAll sans plafond de partage (tests).
-func (b *readBudget) charge(k openKey, n, limit, now int64) bool {
-	return b.chargeAll(k, n, limit, 0, now) == nil
 }
 
 // chargeAll ajoute n octets au compteur de l'ouverture k et à celui de son partage si les

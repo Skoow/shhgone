@@ -12,7 +12,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// upMem : échéances en mémoire d'un envoi (spec §36 S5, S12).
+// upMem : échéances en mémoire d'un envoi (spec §36 S5).
 func upMem(s *Service, id string) (upload, bool) {
 	s.mem.mu.Lock()
 	defer s.mem.mu.Unlock()
@@ -36,7 +36,7 @@ func dbRow(t *testing.T, s *Service, id string) (ttl sql.NullInt64, exp sql.Null
 	return
 }
 
-// S5, S11, S12 : après finalize, la base ne garde qu'une date (expires_at, multiple de
+// S5, S12 : après finalize, la base ne garde qu'une date (expires_at, multiple de
 // 900) et ttl_hours est NULL ; les échéances d'envoi, de blocage et de purge vivent en mémoire.
 func TestOnlyExpiresAtInDB(t *testing.T) {
 	s, c := newSvc(t)

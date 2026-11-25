@@ -45,7 +45,7 @@ const (
 	maxSegmentLen = share.Header + share.SegChunks*share.ChunkCT
 )
 
-// Transferts de segments simultanés (audit E1) : un GET se sert en flux (quelques dizaines
+// Transferts de segments simultanés : un GET se sert en flux (quelques dizaines
 // de Kio de mémoire), un PUT garde son corps entier (≤ 4 Mio) jusqu'à l'écriture, d'où
 // une borne plus basse. Au-delà : 429 (connexion ou /48) ou 503 (serveur), avec Retry-After.
 // Totaux (dlTotal, ulTotal) : valeurs par défaut des tests et sans configuration ; en
@@ -54,13 +54,13 @@ const (
 const (
 	dlTotal, dlPer64, dlPer48 = 256, 16, 64
 	ulTotal, ulPer64, ulPer48 = 64, 8, 32
-	// Par envoi (jeton d'envoi) et par ouverture (partage, n° d'ouverture) : audit I3, M4.
+	// Par envoi (jeton d'envoi) et par ouverture (partage, n° d'ouverture).
 	// Le site envoie un segment à la fois par brouillon (web/src/transfer/draft.ts, pump) et
 	// lit un segment à la fois par ouverture (client.ts, lecture en flux du moteur) : 4 laissent
 	// la place d'un nouvel essai pendant qu'une requête coupée finit côté serveur. Une même
 	// ouverture ou un même envoi ne prend donc jamais toutes les places d'une connexion.
 	ulPerUpload, dlPerOpen = 4, 4
-	// Débit minimal d'un transfert (audit I3, M4), mesuré en continu : au moins xferMinRate ×
+	// Débit minimal d'un transfert, mesuré en continu : au moins xferMinRate ×
 	// xferWindow octets (160 Kio) par tranche de xferWindow, sinon la connexion est coupée et
 	// rend sa place. L'ancienne échéance absolue (138 s par segment de 4 Mio) laissait un client
 	// qui envoie 1 octet tenir sa place jusqu'au bout. Un segment de 4 Mio prend au plus
@@ -98,8 +98,6 @@ func (t transfers) start() time.Time {
 	}
 	return time.Now()
 }
-
-func defaultTransfers() transfers { return transfersFor(Capacity{}) }
 
 // transfersFor : places de transfert d'après c (valeur nulle : dlTotal, ulTotal).
 func transfersFor(c Capacity) transfers {
@@ -283,11 +281,6 @@ func timerWait(d time.Duration) (<-chan time.Time, func() bool) {
 	return t.C, t.Stop
 }
 
-func newServer(svc *share.Service, sig *token.Signer, lim *limits.Limiter, capt *captcha.Captcha,
-	behindProxy bool, proxies []netip.Prefix) *server {
-	return newServerCap(svc, sig, lim, capt, behindProxy, proxies, Capacity{})
-}
-
 func newServerCap(svc *share.Service, sig *token.Signer, lim *limits.Limiter, capt *captcha.Captcha,
 	behindProxy bool, proxies []netip.Prefix, c Capacity) *server {
 	c = c.withDefaults()
@@ -298,17 +291,6 @@ func newServerCap(svc *share.Service, sig *token.Signer, lim *limits.Limiter, ca
 }
 
 type ctxIP struct{}
-
-// New construit le gestionnaire HTTP complet : /api/* puis le site statique.
-// behindProxy (SHH_BEHIND_PROXY) : une requête d'un pair qui n'est pas un proxy de
-// confiance (boucle locale ou proxies, SHH_TRUSTED_PROXY), ou sans X-Shh-Client-IP
-// valide, reçoit 500 au lieu de partager les limites du proxy (échec fermé).
-// sal : réglages du salon ; valeur zéro = salon désactivé. capa : places du serveur.
-func New(svc *share.Service, sig *token.Signer, lim *limits.Limiter, capt *captcha.Captcha,
-	static http.Handler, behindProxy bool, proxies []netip.Prefix, sal Salons, capa Capacity) http.Handler {
-	h, _ := NewWithProbes(svc, sig, lim, capt, static, behindProxy, proxies, sal, capa)
-	return h
-}
 
 // Probes : lectures agrégées pour le tableau de bord d'administration ; jamais servies par
 // une route publique.
@@ -322,7 +304,12 @@ type Probes struct {
 	Uploads, Downloads func() (enCours, pic int)
 }
 
-// NewWithProbes : New, plus les lectures du tableau de bord d'administration.
+// NewWithProbes construit le gestionnaire HTTP complet (/api/* puis le site statique) et
+// les lectures du tableau de bord d'administration.
+// behindProxy (SHH_BEHIND_PROXY) : une requête d'un pair qui n'est pas un proxy de
+// confiance (boucle locale ou proxies, SHH_TRUSTED_PROXY), ou sans X-Shh-Client-IP
+// valide, reçoit 500 au lieu de partager les limites du proxy (échec fermé).
+// sal : réglages du salon ; valeur zéro = salon désactivé. capa : places du serveur.
 func NewWithProbes(svc *share.Service, sig *token.Signer, lim *limits.Limiter, capt *captcha.Captcha,
 	static http.Handler, behindProxy bool, proxies []netip.Prefix, sal Salons, capa Capacity) (http.Handler, Probes) {
 	s := newServerCap(svc, sig, lim, capt, behindProxy, proxies, capa)
@@ -349,7 +336,7 @@ func NewWithProbes(svc *share.Service, sig *token.Signer, lim *limits.Limiter, c
 type Salons struct {
 	Origin string
 	// Turn : relais des appels (SHH_TURN_URLS, SHH_TURN_SECRET_FILE) ; URLs vide, ou paiement
-	// fermé (appels réservés aux offres payantes, 24 novembre) : pas d'appels (aucune route
+	// fermé (appels réservés aux offres payantes) : pas d'appels (aucune route
 	// /api/salons/appel, `calls: false`).
 	Turn     Turn
 	M        *salon.Manager
@@ -395,8 +382,8 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 	if sal.Paiement != nil {
 		paiementAPI{server: s, p: sal.Paiement}.routes(api)
 	} else {
-		// Paiement fermé (audit du 20 novembre, P6) : l'offre répond 200 « aucun moyen » plutôt
-		// qu'une 404 que le navigateur affichait en erreur dans la console. Rien d'autre.
+		// Paiement fermé : l'offre répond 200 « aucun moyen » plutôt qu'une 404 que le
+		// navigateur affichait en erreur dans la console. Rien d'autre.
 		api.HandleFunc("GET /api/paiement", paiementFerme)
 	}
 	api.HandleFunc("/api/", notFoundAPI)
@@ -423,8 +410,7 @@ func notFoundAPI(w http.ResponseWriter, _ *http.Request) {
 
 // methodNotAllowed : routes des segments (partages, pièces du salon) appelées par une autre
 // méthode que GET ou PUT, HEAD compris (le motif « GET » de ServeMux l'accepte aussi) : 405,
-// avant tout jeton ni budget de lecture (audit du 12 novembre, D4 : un HEAD consommait le
-// budget sans rien servir).
+// avant tout jeton ni budget de lecture (un HEAD consommait le budget sans rien servir).
 func methodNotAllowed(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Allow", "GET, PUT")
 	writeErr(w, http.StatusMethodNotAllowed, "method_not_allowed")
@@ -684,7 +670,7 @@ func bearer(r *http.Request) (string, error) {
 }
 
 // readJSON : corps ≤ 4 Kio, un seul objet, aucun champ inconnu. encoding/json ignore la
-// casse des clés et garde le dernier doublon (audit F2) : les clés sont d'abord vérifiées
+// casse des clés et garde le dernier doublon : les clés sont d'abord vérifiées
 // une à une (exactes, sensibles à la casse, sans doublon) par strictKeys.
 func readJSON(w http.ResponseWriter, r *http.Request, v any) error {
 	return readJSONMax(w, r, v, maxJSON)
@@ -694,14 +680,14 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) error {
 // morceau chiffré du manifeste, spec §41.14).
 func readJSONMax(w http.ResponseWriter, r *http.Request, v any, max int64) error {
 	// v : pointeur non nul exigé par Decode ; autre chose est une erreur de programmation :
-	// erreur interne (500 sans détail), jamais une panique (revue finale C-2, mineur h).
+	// erreur interne (500 sans détail), jamais une panique.
 	if t := reflect.TypeOf(v); t == nil || t.Kind() != reflect.Pointer || reflect.ValueOf(v).IsNil() {
 		return errInterne
 	}
-	// Échéance de lecture du corps (audit du 13 novembre, D5) : un corps de quelques Kio
-	// envoyé au goutte-à-goutte tenait sinon sa connexion jusqu'à ReadTimeout (300 s). Sans
-	// connexion réelle (tests en mémoire) : sans effet. net/http repose ses délais à la
-	// requête suivante de la même connexion.
+	// Échéance de lecture du corps : un corps de quelques Kio envoyé au goutte-à-goutte
+	// tenait sinon sa connexion jusqu'à ReadTimeout (300 s). Sans connexion réelle (tests
+	// en mémoire) : sans effet. net/http repose ses délais à la requête suivante de la même
+	// connexion.
 	rc := http.NewResponseController(w)
 	if err := rc.SetReadDeadline(time.Now().Add(jsonReadTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		return errBadRequest
@@ -735,8 +721,8 @@ var errKeys = errors.New("clés JSON invalides")
 // JSON (balise `json`) d'un champ du type attendu, et n'apparaît qu'une fois, et qu'un tableau
 // de taille fixe a exactement ce nombre d'éléments. Les types des valeurs sont vérifiés
 // ensuite par Decode. `null` à la place d'un objet (structure qui n'est pas derrière un
-// pointeur : le corps entier, ou un champ objet obligatoire) → errKeys (relecture C-2 Task 17 :
-// sinon un corps `null` passait pour `{}`) ; un champ pointeur facultatif peut valoir `null`.
+// pointeur : le corps entier, ou un champ objet obligatoire) → errKeys (sinon un corps `null`
+// passait pour `{}`) ; un champ pointeur facultatif peut valoir `null`.
 //
 // json.RawMessage (objet WebAuthn du compte par passkey, lu ensuite par sa bibliothèque) : une
 // valeur JSON quelconque, lue sans contrôle des clés (sansNull refuse déjà tout null du corps).
@@ -783,7 +769,7 @@ func strictKeys(dec *json.Decoder, t reflect.Type) error {
 		n := 0
 		for dec.More() {
 			// Tableau de taille fixe ([2]int) : encoding/json ignore les éléments en trop et
-			// complète par des zéros (audit F7) ; exactement t.Len() éléments ici.
+			// complète par des zéros ; exactement t.Len() éléments ici.
 			if n++; t.Kind() == reflect.Array && n > t.Len() {
 				return errKeys
 			}
@@ -869,7 +855,7 @@ func ipOf(r *http.Request) netip.Addr {
 	return ip
 }
 
-// paiementFerme : GET /api/paiement quand le paiement n'est pas ouvert (P6) : même forme que
+// paiementFerme : GET /api/paiement quand le paiement n'est pas ouvert : même forme que
 // l'offre, sans moyen ni pays ; le site la lit comme « paiement fermé ».
 func paiementFerme(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, struct {

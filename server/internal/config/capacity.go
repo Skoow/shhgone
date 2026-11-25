@@ -9,11 +9,11 @@ import (
 	"strings"
 )
 
-// Capacité du serveur (demande du propriétaire du 13 novembre : aucune limite de capacité
-// fixée en dur). Chaque valeur est réglable par une variable SHH_* ; sans elle, elle est
-// calculée au démarrage d'après la machine : GOMEMLIMIT pour la mémoire, la limite de
-// descripteurs de fichiers (RLIMIT_NOFILE, que Go relève à son plafond au démarrage) pour les
-// connexions. Les limites anti-abus PAR PERSONNE (limits.go) ne sont pas ici.
+// Capacité du serveur (aucune limite de capacité fixée en dur). Chaque valeur est réglable
+// par une variable SHH_* ; sans elle, elle est calculée au démarrage d'après la machine :
+// GOMEMLIMIT pour la mémoire, la limite de descripteurs de fichiers (RLIMIT_NOFILE, que Go
+// relève à son plafond au démarrage) pour les connexions. Les limites anti-abus PAR PERSONNE
+// (limits.go) ne sont pas ici.
 type Capacity struct {
 	// Uploads (SHH_UPLOADS_MAX) : PUT de segments simultanés (partages et pièces du salon).
 	// Chacun garde son corps entier en mémoire (4 Mio) jusqu'à l'écriture.
@@ -27,23 +27,23 @@ type Capacity struct {
 	// rattrapage en mémoire tant que son client ne lit pas (wsCost).
 	WebSockets int
 	// DiskOps (SHH_DISK_OPS_MAX) : appels système de fichiers simultanés dans les dossiers des
-	// partages et des pièces (blob.Gate) : chacun tient un fil du système (audit D4).
+	// partages et des pièces (blob.Gate) : chacun tient un fil du système.
 	DiskOps int
 	// SegmentsPerMin (SHH_SEGMENTS_PER_MIN) : requêtes de segments par minute et par connexion
 	// (limite anti-abus par personne, réglable : 1 500 par défaut, limits.SegmentsPerMin).
 	SegmentsPerMin int
 	// SalonFrames (SHH_SALON_FRAMES_MAX) : trames non volatiles rangées au plus par salon
-	// (audit D3 ; salon.TramesMaxDefaut).
+	// (salon.TramesMaxDefaut).
 	SalonFrames int
 	// SalonFramesTotal (SHH_SALON_FRAMES_TOTAL) : trames non volatiles rangées au plus EN
-	// MÉMOIRE, tous salons confondus (audit adverse du 13 novembre, front serveur). C'est le
-	// vrai garde-fou de la mémoire : le plafond par salon (SalonFrames) × SHH_SALONS_MAX
-	// dépasserait sinon GOMEMLIMIT (200 salons pleins ≈ 840 Mio d'index) et ferait tuer le
-	// processus. Partagé par tous les salons (Manager.tramesGlob) ; au-delà, 0x0C.
+	// MÉMOIRE, tous salons confondus. C'est le vrai garde-fou de la mémoire : le plafond par
+	// salon (SalonFrames) × SHH_SALONS_MAX dépasserait sinon GOMEMLIMIT (200 salons pleins ≈
+	// 840 Mio d'index) et ferait tuer le processus. Partagé par tous les salons
+	// (Manager.tramesGlob) ; au-delà, 0x0C.
 	SalonFramesTotal int
 	// ConvDiskOps : appels système simultanés au plus sur les fichiers de conversation du
 	// salon, pour les écritures d'une part et les lectures de l'autre (deux bornes de cette
-	// taille, séparées de DiskOps : audit adverse du 13 novembre, front serveur, F1 et F2).
+	// taille, séparées de DiskOps).
 	// Jamais réglé à part : le quart de DiskOps (au moins 1). Fils du système au pire, tous
 	// appels de fichiers confondus : DiskThreads.
 	ConvDiskOps int
@@ -57,10 +57,10 @@ const (
 	downloadCost = 256 << 10
 	// wsCost : mémoire budgétée par WebSocket du salon (salon.MemoireParConnexion, un test les
 	// compare) : un lot de rattrapage tenu par un client qui ne lit plus, et la marge de la
-	// connexion (audit adverse du 13 novembre, 3e campagne, front serveur, D : aucun budget ne
-	// comptait les WebSocket ; 2 000 connexions tenaient ≈ 600 Mio pour GOMEMLIMIT = 900 Mio).
+	// connexion (sans lui, aucun budget ne comptait les WebSocket ; 2 000 connexions tenaient ≈
+	// 600 Mio pour GOMEMLIMIT = 900 Mio).
 	wsCost = WebSocketMem
-	// Valeurs sans GOMEMLIMIT (aucune base de calcul : celles d'avant le 13 novembre).
+	// Valeurs sans GOMEMLIMIT (aucune base de calcul : valeurs fixes).
 	defaultUploads, defaultDownloads = 64, 256
 	defaultWebSockets                = 2000
 	// defaultDiskOps : 64 fils au plus bloqués dans des appels de fichiers, quel que soit le
@@ -89,7 +89,7 @@ func memLimit() int64 { return debug.SetMemoryLimit(-1) }
 // DiskThreads : fils du système que les appels de fichiers peuvent tenir en même temps, au
 // pire (disque qui ne répond plus) : partages et pièces (DiskOps), écritures et lectures des
 // conversations (2 × ConvDiskOps). Plus aucun appel de fichier ne dépend du nombre de
-// connexions (SHH_WS_MAX) : les lectures du rattrapage passent par leur borne (F2).
+// connexions (SHH_WS_MAX) : les lectures du rattrapage passent par leur borne.
 func (c Capacity) DiskThreads() int { return c.DiskOps + 2*c.ConvDiskOps }
 
 // pidsFile : limite de processus et de fils du conteneur (cgroup v2 ; pids_limit de
@@ -114,8 +114,7 @@ func pidsMax(f string) int {
 // checkThreads refuse une configuration où les appels de fichiers pourraient, à eux seuls,
 // tenir plus de la moitié des fils permis au conteneur (pids, 0 : inconnu) : sous un disque
 // lent, le runtime Go s'arrêterait net (« failed to create new OS thread »), partages et
-// salons avec lui (audit du 13 novembre, D4 ; audit adverse, F2). L'autre moitié reste au
-// runtime Go, au réseau et à SQLite.
+// salons avec lui. L'autre moitié reste au runtime Go, au réseau et à SQLite.
 func checkThreads(c Capacity, pids int) error {
 	if n := c.DiskThreads(); pids > 0 && n > pids/2 {
 		return fmt.Errorf("SHH_DISK_OPS_MAX=%d : jusqu'à %d fils du système bloqués sur le disque (partages et pièces %d, "+
@@ -134,7 +133,7 @@ const (
 	// enregistrement de 26 o au plus). Un test compare avec salon.MemoireJournalMax.
 	SalonJournalMem = 4096 * 64
 	// salonPartMin : trames en mémoire garanties au moins à chaque salon (SalonFramesShare) ;
-	// en dessous, le plafond global ne protège plus un salon de ses voisins (F3).
+	// en dessous, le plafond global ne protège plus un salon de ses voisins.
 	salonPartMin = 1000
 )
 
@@ -148,9 +147,8 @@ func SalonFramesShare(total, max, perSalon int) int {
 	return min(total/2/max, perSalon)
 }
 
-// checkSalons refuse un SHH_SALONS_MAX que la mémoire ne porte pas (audit adverse du
-// 13 novembre, front serveur : aucun garde-fou de démarrage ne croisait SHH_SALONS_MAX et la
-// mémoire) :
+// checkSalons refuse un SHH_SALONS_MAX que la mémoire ne porte pas (aucun garde-fou de
+// démarrage ne croisait SHH_SALONS_MAX et la mémoire) :
 //   - journaux des annonces (hors du plafond global des trames) : SHH_SALONS_MAX ×
 //     SalonJournalMem tient dans 10 % de GOMEMLIMIT (mem ; sans limite connue : pas de
 //     contrôle) ;
@@ -172,9 +170,9 @@ func checkSalons(salonsMax int, c Capacity, mem int64) error {
 // computeCapacity : valeurs par défaut pour une limite de mémoire mem (math.MaxInt64 : aucune)
 // et nofile descripteurs (0 : inconnu).
 //
-// Budgets mémoire, tirés d'un seul GOMEMLIMIT et pensés pour ne pas se recouvrir (audit
-// adverse du 13 novembre : avant, l'index des salons n'était soustrait d'aucun budget et 200
-// salons pleins faisaient tuer le processus) :
+// Budgets mémoire, tirés d'un seul GOMEMLIMIT et pensés pour ne pas se recouvrir (avant,
+// l'index des salons n'était soustrait d'aucun budget et 200 salons pleins faisaient tuer le
+// processus) :
 //
 //   - Envois : 30 % de GOMEMLIMIT, à 4 Mio par envoi. Le ramasse-miettes peut doubler le tas
 //     vivant (GOGC=100) : 60 % au pire. 900 Mio → 67 places (64 avant).
@@ -270,9 +268,9 @@ func capacityFromEnv(mem int64, nofile uint64) (Capacity, error) {
 
 // checkWebSockets refuse un SHH_WS_MAX que la mémoire ne porte pas : SHH_WS_MAX × wsCost doit
 // tenir dans 10 % de GOMEMLIMIT (mem ; sans limite connue : pas de contrôle), comme la valeur
-// calculée (audit adverse du 13 novembre, 3e campagne, front serveur, D). Sinon des connexions
-// en rattrapage qui ne lisent plus, ou une reconnexion de tous les membres après une coupure,
-// feraient tuer le processus faute de mémoire, et tous les salons avec lui.
+// calculée. Sinon des connexions en rattrapage qui ne lisent
+// plus, ou une reconnexion de tous les membres après une coupure, feraient tuer le processus
+// faute de mémoire, et tous les salons avec lui.
 func checkWebSockets(c Capacity, mem int64) error {
 	if mem > 0 && mem < math.MaxInt64 && int64(c.WebSockets)*wsCost > max(mem/10, 16*wsCost) {
 		return fmt.Errorf("SHH_WS_MAX=%d : les WebSocket du salon pourraient tenir %d Mio (%d Kio chacun), plus de 10 %% de "+

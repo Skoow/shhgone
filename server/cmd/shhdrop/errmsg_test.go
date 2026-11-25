@@ -14,7 +14,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Audit F3 : une erreur système (chemin d'un fichier de partage, donc son identifiant
+// Une erreur système (chemin d'un fichier de partage, donc son identifiant
 // interne) n'est jamais recopiée sur la sortie d'erreur ; seuls les messages écrits pour
 // l'exploitant le sont.
 func TestPublicMessage(t *testing.T) {
@@ -44,7 +44,7 @@ func TestPublicMessage(t *testing.T) {
 	}
 }
 
-// Audit F4 : une commande inconnue n'est jamais recopiée (elle peut contenir un secret
+// Une commande inconnue n'est jamais recopiée (elle peut contenir un secret
 // collé par erreur, comme un lien).
 func TestUnknownCommandNotEchoed(t *testing.T) {
 	var out, errOut bytes.Buffer
@@ -57,7 +57,7 @@ func TestUnknownCommandNotEchoed(t *testing.T) {
 	}
 }
 
-// Audit F3 : une erreur de démarrage système n'est pas recopiée par run.
+// Une erreur de démarrage système n'est pas recopiée par run.
 func TestServeErrorNotEchoed(t *testing.T) {
 	var out, errOut bytes.Buffer
 	t.Setenv("SHH_DATA_DIR", t.TempDir())

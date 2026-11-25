@@ -14,8 +14,8 @@ var ErrRevoked = errors.New("flux révoqué")
 
 // Streams : flux de segments en cours, par clé de révocation (spec §41.8, §9.5) : (id
 // interne, n° d'ouverture) pour un partage (ShareKey) ; empreinte du jeton de membre pour un
-// salon (Task C-6) ; (id, étiquette du lien) pour un lien révoqué (Task F5). Mémoire
-// seulement ; une entrée vit le temps du flux. Valeur zéro prête à l'emploi.
+// salon ; (id, étiquette du lien) pour un lien révoqué. Mémoire seulement ; une entrée vit
+// le temps du flux. Valeur zéro prête à l'emploi.
 type Streams struct {
 	mu   sync.Mutex
 	seq  uint64
@@ -70,7 +70,7 @@ func (r *Streams) Revoke(key string) int {
 	return len(m)
 }
 
-// Len : nombre de flux inscrits (tests).
+// Len : nombre de flux inscrits.
 func (r *Streams) Len() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()

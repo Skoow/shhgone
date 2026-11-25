@@ -17,7 +17,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/token"
 )
 
-// Pièces jointes et vocaux du salon (plan C-2 Task 13, spec §39.3.9). Aucun identifiant ni
+// Pièces jointes et vocaux du salon (spec §39.3.9). Aucun identifiant ni
 // secret dans le chemin : le membre par X-Shh-Membre (jeton de membre), la pièce par
 // X-Shh-Piece (22 caractères) ou par le jeton d'envoi signé (token.SalonPiece). Segments
 // envoyés et servis comme ceux des partages : places de transfert, débit minimal (pacer),
@@ -158,8 +158,7 @@ func (a salonAPI) envoyerSegmentPiece(w http.ResponseWriter, r *http.Request) {
 		failSalon(w, errBadRequest)
 		return
 	}
-	// Pièce finie, effacée ou inconnue : refusée avant toute place et toute lecture (audit du
-	// 13 novembre, D1).
+	// Pièce finie, effacée ou inconnue : refusée avant toute place et toute lecture.
 	vocal, open := a.m.PieceEnvoi(id)
 	if !open {
 		refuseUnread(w)

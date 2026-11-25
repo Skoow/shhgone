@@ -230,10 +230,10 @@ var ErrEnveloppesMax = errors.New("enveloppes_max")
 
 // PasskeysEnveloppe : passkeys/enveloppe (session) : une enveloppe PRF de plus pour la passkey
 // qui a signé la dernière assertion de CETTE session (jamais un cred_id venu du corps), après
-// une ouverture réussie par un autre moyen (sortie PRF différente : R6, R10 ; correction du
-// 22 novembre, « enveloppes multiples »). La même enveloppe déjà là : rien à faire ; une
-// cinquième : ErrEnveloppesMax. Aucune route n'en retire : elles partent avec la passkey (une
-// session volée ne peut pas effacer le bon chemin d'ouverture).
+// une ouverture réussie par un autre moyen (sortie PRF différente, « enveloppes multiples »).
+// La même enveloppe déjà là : rien à faire ; une cinquième : ErrEnveloppesMax. Aucune route
+// n'en retire : elles partent avec la passkey (une session volée ne peut pas effacer le bon
+// chemin d'ouverture).
 func (s *Service) PasskeysEnveloppe(c Courante, env []byte) error {
 	// Session récente exigée : sinon une session volée remplirait les 4 places d'enveloppes
 	// inutiles, et aucune route ne les retire (connexion/fin et reauth/fin en donnent une).

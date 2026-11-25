@@ -15,9 +15,9 @@ type fauxNomme struct {
 
 func (f fauxNomme) Nom() string { return f.nom }
 
-// TestCryptoRefuseEnOSS : sous le régime OSS, la crypto n'est ni proposée ni acceptée (décision
-// du propriétaire, 24 novembre ; conception §9.1, S3 : une seule preuve de localisation), mais
-// ses webhooks restent lus (paiement tardif ou remboursement d'une commande d'avant le changement).
+// TestCryptoRefuseEnOSS : sous le régime OSS, la crypto n'est ni proposée ni acceptée (conception
+// §9.1, S3 : une seule preuve de localisation), mais ses webhooks restent lus (paiement tardif ou
+// remboursement d'une commande d'avant le changement).
 func TestCryptoRefuseEnOSS(t *testing.T) {
 	db, err := OuvrirBase(filepath.Join(t.TempDir(), "paiements.db"))
 	if err != nil {

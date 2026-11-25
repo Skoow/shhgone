@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Accusé d'acceptation 0x0F (revue finale C-2, I1) : l'expéditeur d'une trame 0x01 acceptée
+// Accusé d'acceptation 0x0F : l'expéditeur d'une trame 0x01 acceptée
 // reçoit 0x0F (seq de la trame), même en rattrapage, quand il ne verra jamais l'écho de sa
 // trame (volatile, « instantané » effacée avant que son rattrapage l'atteigne). Personne
 // d'autre ne le reçoit. 0x0B et 0x0C atteignent aussi l'expéditeur en rattrapage.

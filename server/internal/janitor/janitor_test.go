@@ -184,7 +184,7 @@ func TestRun(t *testing.T) {
 	}
 }
 
-// Revue du 10 novembre : la place utilisée est comptée en mémoire (blob.Store.UsedBytes) ; le
+// La place utilisée est comptée en mémoire (blob.Store.UsedBytes) ; le
 // balayage la recale sur le disque, pour voir la place rendue par la commande
 // d'administration, qui supprime les fichiers depuis un autre processus.
 func TestRunResyncsUsedBytes(t *testing.T) {
@@ -217,7 +217,7 @@ func TestRunResyncsUsedBytes(t *testing.T) {
 	<-done
 }
 
-// Audit du 13 novembre, D6 : une panique dans un tour (ici, un service nil) ne fait plus
+// Une panique dans un tour (ici, un service nil) ne fait plus
 // tomber le processus ; la boucle continue et s'arrête avec son contexte.
 func TestRunWatchRecuperentLesPaniques(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -238,7 +238,7 @@ func TestRunWatchRecuperentLesPaniques(t *testing.T) {
 	}
 }
 
-// Passe quotidienne du compte (plan du compte, lot 5) : au démarrage, puis une fois par jour
+// Passe quotidienne du compte : au démarrage, puis une fois par jour
 // UTC (vérifié à chaque période) ; une erreur ou une panique n'arrête pas la boucle.
 type effaceur struct {
 	mu    sync.Mutex

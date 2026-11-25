@@ -99,7 +99,7 @@ type SessionVue struct {
 	Etiquette   []byte // 64 octets chiffrés par le client, ou nil
 	Courante    bool
 	Persistante bool
-	ParRecup    bool // ouverte par la clé de récupération (R4)
+	ParRecup    bool // ouverte par la clé de récupération
 }
 
 func plafond(creeMois int64) int64 { return creeMois + joursPlafond*jourS }
@@ -113,7 +113,7 @@ func echeance(persistante bool, creeMois int64, now time.Time) int64 {
 
 // creerSessionTx : nouvelle session de h (récente) ; au-delà de 20, les plus anciennes sont
 // fermées.
-// parRecup : session ouverte par la clé de récupération (montrée aux autres appareils, R4).
+// parRecup : session ouverte par la clé de récupération (montrée aux autres appareils).
 func (s *Service) creerSessionTx(tx *sql.Tx, h [16]byte, o OptionsSession, parRecup bool, now time.Time) ([32]byte, error) {
 	var jeton [32]byte
 	var sid [16]byte
@@ -296,7 +296,7 @@ func (s *Service) FermerAutres(c Courante) error {
 }
 
 // EtiquetterSession : nom d'appareil de la session courante (64 octets chiffrés par le client
-// avec K_etiquette, §8.5). Lot 10 : à la connexion, l'appareil n'a pas encore K_compte (il
+// avec K_etiquette, §8.5). À la connexion, l'appareil n'a pas encore K_compte (il
 // l'ouvre avec l'enveloppe rendue par la réponse) ; il pose donc le nom juste après. Seule la
 // session de la requête change ; le serveur ne voit que des octets chiffrés.
 func (s *Service) EtiquetterSession(c Courante, etiquette []byte) error {

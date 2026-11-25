@@ -7,9 +7,9 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Exclusion d'un participant et rotation de l'invitation (plan C-2 Task 14, spec §39.13.1,
+// Exclusion d'un participant et rotation de l'invitation (spec §39.13.1,
 // §39.13.1b, §39.13.2). Partie serveur seulement : la distribution de K_maître_s' aux membres
-// restants est l'affaire des clients (plan, point 16).
+// restants est l'affaire des clients.
 
 // ExclureReq : POST /api/salons/exclure. ManageV, AccessNewV, ProofV : SHA-256 de S_gestion,
 // de la nouvelle K_accès_s' (calculés par la couche HTTP depuis les secrets reçus) et de la
@@ -110,7 +110,7 @@ func (m *Manager) Exclure(r ExclureReq) error {
 		return err
 	}
 	// Anciens V_accès, V_preuve et sel récrits : vidage du WAL demandé (regroupé, hors de cette
-	// requête ; audit adverse du 13 novembre, 3e campagne, stockage, F6).
+	// requête).
 	m.vidage.Demander()
 	defer m.purger(s) // pièces des trames effacées par le départ : fichier et ligne hors du verrou
 	return m.appliquerExclusion(s, r, cible)

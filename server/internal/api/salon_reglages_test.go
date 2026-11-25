@@ -10,8 +10,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// POST /api/salons/reglages (spec 2026-11-13, révision du 13 novembre) : places et
-// renouvellement par le créateur.
+// POST /api/salons/reglages (spec 2026-11-13) : places et renouvellement par le créateur.
 
 func (e *env) reglages(hdr map[string]string, body map[string]any, remote string) *httptest.ResponseRecorder {
 	return e.do(req{method: "POST", path: "/api/salons/reglages", hdr: hdr, body: mustJSON(body), remote: remote})

@@ -20,7 +20,7 @@ func decodeBody(body string) (voidBody, error) {
 	return v, err
 }
 
-// Audit F7 : un tableau de taille fixe ([2]int) n'accepte que ce nombre d'éléments ;
+// Un tableau de taille fixe ([2]int) n'accepte que ce nombre d'éléments ;
 // encoding/json ignorait le 3ᵉ (« [[0,5,999]] » accepté comme [0,5]) et complétait un tableau
 // trop court par des zéros.
 func TestReadJSONFixedArrays(t *testing.T) {
@@ -69,7 +69,7 @@ func FuzzReadJSON(f *testing.F) {
 	})
 }
 
-// Relecture C-2 Task 17 : un corps `null` là où un objet est attendu est refusé (errKeys), pour
+// Un corps `null` là où un objet est attendu est refusé (errKeys), pour
 // toutes les routes ; un champ pointeur facultatif peut rester `null`.
 func TestReadJSONNull(t *testing.T) {
 	type vide struct{}
@@ -113,7 +113,7 @@ func TestStrictKeysNull(t *testing.T) {
 	}
 }
 
-// Revue finale C-2, mineur (h) : v qui n'est pas un pointeur non nul (erreur de programmation)
+// V qui n'est pas un pointeur non nul (erreur de programmation)
 // → erreur interne (500), jamais une panique ni un 400.
 func TestReadJSONSansPointeur(t *testing.T) {
 	var nul *voidBody

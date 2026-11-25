@@ -16,7 +16,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Fin de vie d'un salon (plan C-2 Task 15) : échéance, destruction (créateur, membre si
+// Fin de vie d'un salon : échéance, destruction (créateur, membre si
 // permis, 10 mots de passe faux, administrateur), purge au démarrage.
 //
 // Une fin se fait en deux temps :
@@ -60,8 +60,8 @@ func (m *Manager) Detruire(sGestion, jeton []byte) error {
 // Detruire ; Premier vaut vrai seulement si cet appel a détruit le salon et que c'est le
 // premier signalement du salon (salon.signale, partagé avec QuitterSignaler, posé sous le
 // verrou du salon) : un salon ne compte qu'un signalement, et un second « détruire »
-// simultané, qui trouve une tombe, ne compte pas (revue finale C-2, mineur d). Compte : compte
-// créateur, lu avec la ligne avant la destruction, rendu avec Premier seulement.
+// simultané, qui trouve une tombe, ne compte pas. Compte : compte créateur, lu avec la ligne
+// avant la destruction, rendu avec Premier seulement.
 func (m *Manager) DetruireSignaler(sGestion, jeton []byte) (Signalement, error) {
 	premier, compte, err := m.detruireDemande(sGestion, jeton, true)
 	if !premier {
@@ -118,7 +118,7 @@ func (m *Manager) DetruireDuCompte(h [16]byte, id string) error {
 	return nil
 }
 
-// FermerDuCompte : suppression (et, au lot 7, bannissement) du compte h : chaque salon vivant
+// FermerDuCompte : suppression ou bannissement du compte h : chaque salon vivant
 // qu'il a créé est fini comme par « Détruire » de son créateur (raison 2, WebSocket coupés,
 // conversation, pièces et ligne effacées ; partie disque ratée : reprise par Tick). Rend le
 // nombre de salons fermés. La liste est lue sous createMu (comme le palier et l'insertion
@@ -192,7 +192,7 @@ func (m *Manager) oublier(s *salon, raison uint8, signaler bool) (fait, premier 
 	}
 	// « fini » et fin « à faire » posés avant toute étape qui pourrait paniquer : une panique
 	// (récupérée par Run) laisse une tombe dont Tick reprend la partie disque (reprendreFin) ;
-	// finirAvec prend la fin (finEnCours) par le même test (relecture C-2, N2).
+	// finirAvec prend la fin (finEnCours) par le même test.
 	s.fini = true
 	s.finiA.Store(true)
 	s.etatFin = finAFaire
@@ -282,9 +282,8 @@ func (m *Manager) achever(s *salon) (err error) {
 	err = errors.Join(errs...)
 	complete = err == nil
 	// Lignes du salon et de ses pièces effacées (ou rendues mortes) : vidage du WAL demandé,
-	// regroupé et hors de cet appel (audit adverse du 13 novembre, stockage, F1 : aucune fin de
-	// salon ne vidait le WAL ; identifiant, vérificateurs, sel et échéance y restaient jusqu'au
-	// passage du janitor).
+	// regroupé et hors de cet appel (aucune fin de salon ne vidait le WAL ; identifiant,
+	// vérificateurs, sel et échéance y restaient jusqu'au passage du janitor).
 	m.vidage.Demander()
 	return err
 }
@@ -458,15 +457,15 @@ func (m *Manager) disparus() []*salon {
 	return partis
 }
 
-// echuesSansEtat (revue finale C-2, I2) : lignes échues à now (expires_at<=now) d'un salon
-// sans état en mémoire (personne n'y est entré, ou personne depuis un redémarrage) : pièces en
+// echuesSansEtat : lignes échues à now (expires_at<=now) d'un salon sans état en mémoire
+// (personne n'y est entré, ou personne depuis un redémarrage) : pièces en
 // base effacées (fichier puis ligne), puis ligne du salon, comme par achever. Un salon qui a un
 // état (vivant ou tombe) n'y est pas : Tick le finit (entretenir) et achever efface sa ligne.
 // Lecture d'abord, lotLignes au plus par passe : aucune écriture en base sans ligne échue. Sans
 // état, aucun Rejoindre ne peut en recréer un (la ligne est échue). Erreurs ignorées : la
 // ligne reste, reprise à un tick suivant.
 func (m *Manager) echuesSansEtat(now int64) {
-	// Curseur d'un tick à l'autre (relecture C-2, N6) : lotLignes lignes échues par passe,
+	// Curseur d'un tick à l'autre : lotLignes lignes échues par passe,
 	// après la dernière vue, dans l'ordre des id ; des tombes en mémoire en tête n'affament
 	// jamais les lignes qui suivent. Revenu au début quand un lot n'est pas plein.
 	m.mu.Lock()
@@ -509,13 +508,12 @@ func (m *Manager) echuesSansEtat(now int64) {
 
 // Run : entretien chaque seconde jusqu'à l'annulation de ctx, en trois boucles indépendantes :
 // la passe mémoire (entretienMemoire), la passe disque (entretienDisque) et la passe des
-// pièces (entretienPieces), pour que la première n'attende jamais le disque (audit adverse du
-// 13 novembre, front serveur, F1) ni la deuxième la borne des partages (3e campagne, H). Rend
-// la main quand les trois sont finies. Une panique dans une passe est récupérée sans aucune
-// sortie (ni journal ni stderr : le message pourrait citer un identifiant) et la passe suivante
-// repart (revue finale C-2, mineur f) : une panique de l'entretien n'arrête pas tout le
-// serveur, partages compris. Tous les verrous pris par l'entretien sont rendus par defer ; une
-// fin interrompue reste « à faire » (achever) et est reprise.
+// pièces (entretienPieces), pour que la première n'attende jamais le disque ni la deuxième la
+// borne des partages. Rend la main quand les trois sont finies. Une panique
+// dans une passe est récupérée sans aucune sortie (ni journal ni stderr : le message pourrait
+// citer un identifiant) et la passe suivante repart : une panique de l'entretien n'arrête pas
+// tout le serveur, partages compris. Tous les verrous pris par l'entretien sont rendus par
+// defer ; une fin interrompue reste « à faire » (achever) et est reprise.
 func (m *Manager) Run(ctx context.Context) {
 	var fini sync.WaitGroup
 	for _, passe := range []func(){m.entretienDisque, m.entretienPieces} {
@@ -538,9 +536,6 @@ func chaqueSeconde(ctx context.Context, f func()) {
 	}
 }
 
-// tickSur : Tick, panique récupérée et comptée (paniquesTick), sans rien écrire.
-func (m *Manager) tickSur() { m.passeSure(m.Tick) }
-
 // passeSure : une passe de l'entretien, panique récupérée et comptée (paniquesTick), sans rien
 // écrire.
 func (m *Manager) passeSure(passe func()) {
@@ -552,12 +547,12 @@ func (m *Manager) passeSure(passe func()) {
 	passe()
 }
 
-// PaniquesTick : paniques récupérées dans Tick depuis le démarrage (relecture C-2, N7) : un
+// PaniquesTick : paniques récupérées dans Tick depuis le démarrage : un
 // entier, sans identifiant ni message, en mémoire seulement. Lu par les tests ; shhdrop admin
 // tourne hors du serveur et ne le voit pas (deploy/README.md §10).
 func (m *Manager) PaniquesTick() int64 { return m.paniquesTick.Load() }
 
-// PurgerAuDemarrage (plan, point 11) : à appeler une fois, avant toute autre méthode et avant
+// PurgerAuDemarrage : à appeler une fois, avant toute autre méthode et avant
 // l'écoute. Les clés des conversations, les jetons et les planchers des pièces étaient en
 // mémoire : tout fichier de conversation et toute pièce sont effacés (fichiers d'abord, puis
 // toutes les lignes salon_pieces, pieces_bytes = 0) ; les lignes des salons vivants restent
@@ -629,10 +624,9 @@ const passesHorsLigne = 3
 // plus aucune requête ne voit le salon, et un serveur en marche le finit à sa passe suivante
 // (lignes disparues : connexions fermées en raison 2, état oublié, place du bloc rendue,
 // pièces et ligne effacées). Ensuite seulement : pièces (fichier puis ligne), fichier de
-// conversation, ligne du salon, vérifiée partie (audit adverse du 13 novembre, 3e campagne,
-// tableau de bord, F2 : la ligne était supprimée en dernier, sans regarder si elle l'avait
-// été ; une pièce déposée pendant la destruction la gardait vivante, et la commande répondait
-// quand même « détruit »).
+// conversation, ligne du salon, vérifiée partie (la ligne était supprimée en dernier, sans
+// regarder si elle l'avait été ; une pièce déposée pendant la destruction la gardait vivante,
+// et la commande répondait quand même « détruit »).
 //
 // complet : la ligne et ses pièces sont parties. Faux sans erreur : la ligne, morte, reste
 // avec une pièce déposée pendant les passes ; le serveur en marche finit l'effacement.
@@ -650,8 +644,8 @@ func DetruireHorsLigne(db *sql.DB, pieces *blob.Store, dossierConv string, kAcce
 	return detruireHorsLigneID(db, pieces, dossierConv, id)
 }
 
-// FermerDuCompteHorsLigne : bannissement en ligne de commande (shhdrop admin bannir -,
-// lot 7) : chaque salon vivant créé par le compte h est détruit comme par DetruireHorsLigne ;
+// FermerDuCompteHorsLigne : bannissement en ligne de commande (shhdrop admin bannir -) :
+// chaque salon vivant créé par le compte h est détruit comme par DetruireHorsLigne ;
 // le serveur en marche ferme leurs connexions à sa passe suivante. Rend le nombre de salons
 // rendus inaccessibles (une pièce déposée pendant la commande peut rester à effacer : le
 // serveur en marche le fait).
@@ -739,7 +733,7 @@ func (m *Manager) DetruireAdmin(kAcces []byte) (complet bool, err error) {
 }
 
 // DetruireAdminID : DetruireAdmin d'un salon désigné par son identifiant interne (salon
-// signalé choisi dans le tableau de bord par sa ref éphémère, lot 7) ; mêmes réponses.
+// signalé choisi dans le tableau de bord par sa ref éphémère) ; mêmes réponses.
 func (m *Manager) DetruireAdminID(id string) (complet bool, err error) {
 	var un int
 	if err := m.cfg.DB.QueryRow(`SELECT 1 FROM salons WHERE id=?`, id).Scan(&un); err != nil {

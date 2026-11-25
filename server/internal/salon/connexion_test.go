@@ -22,7 +22,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/limits"
 )
 
-// Connexions du salon (plan C-2 Task 9) : faux Lien en mémoire, délais sous testing/synctest.
+// Connexions du salon : faux Lien en mémoire, délais sous testing/synctest.
 // Chaque test ferme toutes ses connexions : synctest.Test échoue si une goroutine reste.
 
 var errCoupe = errors.New("faux lien : fermé")
@@ -426,7 +426,7 @@ func TestDepuisBorne(t *testing.T) {
 	})
 }
 
-// Relecture Task 8 : arrivé au rang N, depuis = 0 ne donne aucune trame de rang < N ; un
+// Arrivé au rang N, depuis = 0 ne donne aucune trame de rang < N ; un
 // depuis au-delà du dernier rang est plafonné.
 func TestNouveauVenuDepuisZero(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -940,7 +940,7 @@ func TestMessageTexte(t *testing.T) {
 	})
 }
 
-// Relecture Task 3 : ErrEnTete et ErrProtocole donnent toutes deux 4003.
+// ErrEnTete et ErrProtocole donnent toutes deux 4003.
 func TestDemandeInvalide(t *testing.T) {
 	marqueFausse := trameD(0, 1)
 	marqueFausse[0] = 'X'
@@ -975,8 +975,8 @@ func TestDemandeInvalide(t *testing.T) {
 	}
 }
 
-// 481ᵉ trame de la minute depuis la même adresse (revue finale C-2, I4) : 0x0B (secondes
-// jusqu'à la minute suivante), trame non rangée.
+// 481ᵉ trame de la minute depuis la même adresse : 0x0B (secondes jusqu'à la minute
+// suivante), trame non rangée.
 func TestTrameFrequenceIP(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := nouveauBanc(t, 200)
@@ -1045,8 +1045,8 @@ func TestPresence(t *testing.T) {
 	})
 }
 
-// Relecture Task 6, bloquant : un membre en ligne ne perd jamais son siège ; hors ligne non
-// plus (revue finale C-2, I3 : siège réservé pour la vie du salon), jusqu'à l'échéance.
+// Un membre en ligne ne perd jamais son siège ; hors ligne non
+// plus (siège réservé pour la vie du salon), jusqu'à l'échéance.
 func TestEnLigneGardeSonSiege(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := nouveauBanc(t, 200)
@@ -1082,7 +1082,7 @@ func TestEnLigneGardeSonSiege(t *testing.T) {
 	})
 }
 
-// Relecture Task 6 : 20 reprises par heure et par siège, la 21ᵉ ferme en 4003 sans rien
+// 20 reprises par heure et par siège, la 21ᵉ ferme en 4003 sans rien
 // annoncer ; l'heure suivante repart.
 func TestReprisesPlafonnees(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -1117,7 +1117,7 @@ func TestReprisesPlafonnees(t *testing.T) {
 	})
 }
 
-// Relecture Task 8 : erreur d'entrée-sortie de la conversation → 1011, jamais 4003.
+// Erreur d'entrée-sortie de la conversation → 1011, jamais 4003.
 func TestErreurESFerme1011(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := nouveauBanc(t, 200)
@@ -1134,7 +1134,7 @@ func TestErreurESFerme1011(t *testing.T) {
 	})
 }
 
-// Relecture Task 8 : une trame illisible au rattrapage ferme en 1011 (jamais sautée) ; une
+// Une trame illisible au rattrapage ferme en 1011 (jamais sautée) ; une
 // trame retirée est sautée sans erreur.
 func TestTrameIllisibleFerme1011(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -1426,7 +1426,7 @@ func TestBasculeSousEnvoiContinu(t *testing.T) {
 			cc := s.conns[ec.Siege]
 			return cc != nil && cc.direct
 		})
-		// Au moins une trame reçue avant de partir (audit D4 : 2 ms d'attente ne suffisaient
+		// Au moins une trame reçue avant de partir (2 ms d'attente ne suffisaient
 		// pas sous -race avec tous les paquets en parallèle).
 		attendre(t, func() bool { return len(rangs(l.enrs())) > 0 })
 		finir(t, l)
@@ -1454,7 +1454,7 @@ func TestBasculeSousEnvoiContinu(t *testing.T) {
 	}
 }
 
-// Relecture Task 9, point 1 : une panique sous le verrou du salon (dernier lot du
+// Une panique sous le verrou du salon (dernier lot du
 // rattrapage) est récupérée sans garder le verrou : la connexion ferme en 1011, puis
 // Recevoir d'un autre membre et Tick rendent la main. Temps réel (un verrou gardé ne
 // bloque pas durablement sous synctest).
@@ -1559,7 +1559,7 @@ func TestFermerTout(t *testing.T) {
 	})
 }
 
-// Dernière connexion (Task 9b, spec v3 §14.1) : heure de la dernière déconnexion de chaque
+// Dernière connexion (spec v3 §14.1) : heure de la dernière déconnexion de chaque
 // siège, en mémoire seulement, arrondie à la minute inférieure.
 
 // poser : l'horloge du banc à t.
@@ -1710,7 +1710,7 @@ func TestDerniereConnexionAccueil(t *testing.T) {
 	})
 }
 
-// Revue finale C-2, I3 : la dernière connexion d'un absent reste annoncée (0x0D et 0x07) tant
+// La dernière connexion d'un absent reste annoncée (0x0D et 0x07) tant
 // que son siège existe, même après des heures d'absence.
 func TestDerniereConnexionGardeeLongtemps(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -1719,7 +1719,7 @@ func TestDerniereConnexionGardeeLongtemps(t *testing.T) {
 		ea := b.entrer(t, c, false)
 		eb := b.entrer(t, c, false)
 		s := b.etat(t, c)
-		l0 := b.connecter(ea.Jeton, ea.Seq) // A connecté une fois : réservé à vie (N1)
+		l0 := b.connecter(ea.Jeton, ea.Seq) // A connecté une fois : réservé à vie
 		synctest.Wait()
 		finir(t, l0)
 		lb := b.connecter(eb.Jeton, eb.Seq)

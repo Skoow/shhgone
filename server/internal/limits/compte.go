@@ -10,7 +10,7 @@ import (
 // secret du jour (une adresse IP ou un h n'y est jamais en clair, et la même valeur change de clé
 // chaque jour), compteurs du jour vidés à minuit UTC, de l'heure à l'heure UTC, de la minute à la
 // minute (fenêtres fixes). Un refus n'est compté nulle part. Plus aucune limite d'e-mail ni de
-// TOTP (retirés le 22 novembre).
+// TOTP.
 const (
 	// Comptes créés (inscription/fin) par jour.
 	InscriptionsPer64 = 3

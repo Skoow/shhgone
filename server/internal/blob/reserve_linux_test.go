@@ -68,7 +68,7 @@ func TestReserveFallback(t *testing.T) {
 	}
 }
 
-// Audit F6 : en production (NoSparse), le repli « fichier creux » est refusé : le disque
+// En production (NoSparse), le repli « fichier creux » est refusé : le disque
 // pourrait se remplir en plein envoi.
 func TestReserveNoSparse(t *testing.T) {
 	orig := fallocate

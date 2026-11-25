@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Appels réservés aux offres payantes (24 novembre) : fermés à la création ; ouverts par un
+// Appels réservés aux offres payantes : fermés à la création ; ouverts par un
 // membre jusqu'à la fin du salon, pour tous ; un second ouvreur l'apprend (deja) pour rendre son
 // jeton ; un membre parti, exclu ou un salon échu n'ouvre ni ne lit rien.
 func TestAppelsOuverture(t *testing.T) {
@@ -111,9 +111,9 @@ func TestAppelsDerniereSeconde(t *testing.T) {
 	}
 }
 
-// Renouvellement qui raccourcit le salon (places-durée, révision du 13 novembre) : les appels
-// ouverts avant ne donnent jamais d'identifiants au-delà de la nouvelle fin du salon
-// (conception des appels §5 : « jamais au-delà de la fermeture des appels du salon, donc de sa fin »).
+// Renouvellement qui raccourcit le salon (places-durée) : les appels ouverts avant ne donnent
+// jamais d'identifiants au-delà de la nouvelle fin du salon (conception des appels §5 : « jamais
+// au-delà de la fermeture des appels du salon, donc de sa fin »).
 func TestAppelsBornesParLaFinDuSalon(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	c := b.creer(t, 4)

@@ -119,7 +119,7 @@ ALTER TABLE passes ADD COLUMN emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emi
 // Mode de paiements.db (PRAGMA application_id, en-tête du fichier, gardé par VACUUM et donc par
 // la sauvegarde) : une base n'est ouverte que dans le mode où elle a été créée. Sans cela, les
 // pass « payés » en bac à sable avec des cartes de test (SHH_PAIEMENT_ESSAI=1, préproduction)
-// resteraient valables une fois les clés de production posées (revue du 25 novembre).
+// resteraient valables une fois les clés de production posées.
 const (
 	idReel  = 0x53485031 // « SHP1 »
 	idEssai = 0x53485445 // « SHTE »

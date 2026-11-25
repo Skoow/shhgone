@@ -12,7 +12,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Exclusion et rotation de l'invitation (plan C-2 Task 14, spec §39.13).
+// Exclusion et rotation de l'invitation (spec §39.13).
 
 // invitation : nouvelle invitation (K_accès_s', K_preuve_s') d'une rotation ; même S_gestion.
 func invitation(c cles) cles {
@@ -76,7 +76,7 @@ func de(l *fauxLien, ty byte) []enrC {
 
 // L'exclu est refusé partout : WebSocket fermé (0x05 raison 5 puis 4002, sans le 0x09),
 // reconnexion 4002, Membre ErrExcluded, et toute action d'un Membre obtenu avant l'exclusion
-// rend ErrExcluded, siège pourtant libéré (hypothèse de l'audit).
+// rend ErrExcluded, siège pourtant libéré (cas limite).
 func TestExcluRefusePartout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := nouveauBanc(t, 200)
@@ -423,8 +423,8 @@ func TestRotationAtomique(t *testing.T) {
 }
 
 // Une ligne arrivée à 10 essais entre la lecture et la transaction ne revit jamais : l'UPDATE
-// filtré par failed_attempts<10 ne touche aucune ligne → ErrForbidden (relecture Task 14,
-// comme les autres cas « introuvable » d'Exclure), rien de changé.
+// filtré par failed_attempts<10 ne touche aucune ligne → ErrForbidden (comme les autres cas
+// « introuvable » d'Exclure), rien de changé.
 func TestRotationLigneBloquee(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	c := b.creer(t, 4)
@@ -618,7 +618,7 @@ func TestRevoquesJusquaLaFin(t *testing.T) {
 	})
 }
 
-// Relecture Task 14 : l'exclu reprend son siège par WebSocket (0x0A, nonce neuf) entre la
+// L'exclu reprend son siège par WebSocket (0x0A, nonce neuf) entre la
 // vérification et la transaction ; le 0x09 porte alors le nonce COURANT du siège (celui du
 // 0x0A), pas celui de la requête : les membres retrouvent la feuille à retirer.
 func TestExclusionApresRepriseWS(t *testing.T) {
@@ -665,7 +665,7 @@ func TestExclusionApresRepriseWS(t *testing.T) {
 	})
 }
 
-// Relecture Task 14 (spec §39.13.1b) : le numéro de rotation vit en base (rotation_r). Après
+// Le numéro de rotation vit en base (rotation_r). Après
 // un redémarrage (nouveau Manager sur la même base, mémoire vide), un ancien exclure rejoué
 // ne fait pas revivre l'invitation morte : ErrStale, ligne inchangée.
 func TestRotationRejoueeApresRedemarrage(t *testing.T) {
@@ -714,7 +714,7 @@ func TestRotationRejoueeApresRedemarrage(t *testing.T) {
 	}
 }
 
-// Relecture Task 14 : une ligne passée à 10 essais, ou échue, pendant la transaction rend
+// Une ligne passée à 10 essais, ou échue, pendant la transaction rend
 // ErrForbidden, comme les autres cas « introuvable » d'Exclure ; rien n'est changé.
 func TestRotationLigneMorteForbidden(t *testing.T) {
 	for nom, q := range map[string]string{

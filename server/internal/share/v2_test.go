@@ -118,7 +118,7 @@ func TestUnlockEnvelopeOnlyWhenReady(t *testing.T) {
 	}
 }
 
-// Revue K1, I2 (oracle d'existence fermé) : une création ne heurte un partage existant que
+// Une création ne heurte un partage existant que
 // par V_accès ou V_gestion, c'est-à-dire si son auteur connaît K_accès ou S_gestion. L'id
 // interne vient du serveur ; un id déjà pris (impossible en pratique) est refusé aussi.
 func TestCreateConflict(t *testing.T) {
@@ -193,7 +193,7 @@ func TestOnAbandon(t *testing.T) {
 	}
 }
 
-// Revue K1, I1 : N finalize simultanés sur le même envoi → un seul écrit le bourrage ;
+// N finalize simultanés sur le même envoi → un seul écrit le bourrage ;
 // les autres repartent aussitôt (ErrBusy) ou trouvent l'envoi déjà finalisé (404).
 func TestFinalizeConcurrentFillsOnce(t *testing.T) {
 	s, _ := newSvc(t)
@@ -246,7 +246,7 @@ func TestFinalizeConcurrentFillsOnce(t *testing.T) {
 	}
 }
 
-// Revue K1, I3 : après finalize, le masque des segments ne garde plus la frontière du bourrage.
+// Après finalize, le masque des segments ne garde plus la frontière du bourrage.
 func TestFinalizeResetsSegmentsMask(t *testing.T) {
 	s, _ := newSvc(t)
 	k := newKeys()

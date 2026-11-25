@@ -14,8 +14,8 @@ import (
 )
 
 // vecteursV3 : engine/vectors/compte-v3.json (compte par passkey, conception
-// 2026-11-22-compte-passkey-design.md §5, §14), produit par le moteur Rust (lot P1 du plan
-// 2026-11-22-compte-passkey.md), rejoué ici pour ce qui concerne le serveur : v_r = SHA-256(A_r)
+// 2026-11-22-compte-passkey-design.md §5, §14), produit par le moteur Rust, rejoué
+// ici pour ce qui concerne le serveur : v_r = SHA-256(A_r)
 // (la route recup cherche le compte par cette empreinte), longueurs exactes des champs reçus
 // (h, A_r, v_r, enveloppes de 60 octets, identifiant de passkey de 1 à 1 023 octets, coffres de
 // palier + 45 octets), p_canon des pseudos et pseudos réservés. Le serveur ne déchiffre jamais

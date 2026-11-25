@@ -77,7 +77,7 @@ type FinInscription struct {
 // Pseudo pris, réservé par une autre inscription ou interdit : ErrPseudoPris ; plafonds :
 // ErrBusy (SHH_COMPTES_MAX, SHH_COMPTES_JOUR) ou ErrLimit (3 par jour par connexion, 10 par
 // /48) ; corps faux : ErrRequete. Dans ces cas l'étape reste valable 5 min (même passkey : la
-// personne n'a pas à en recréer une, R11). Une passkey refusée par la vérification consomme
+// personne n'a pas à en recréer une). Une passkey refusée par la vérification consomme
 // l'étape ; le succès aussi.
 func (s *Service) InscriptionFin(ip netip.Addr, jeton [32]byte, nc NouveauCompte, f FinInscription, o OptionsSession) ([32]byte, [16]byte, error) {
 	if s.wa == nil {

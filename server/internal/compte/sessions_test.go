@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Nom d'appareil posé après la connexion (lot 10) : il est chiffré par une clé tirée de
+// Nom d'appareil posé après la connexion : il est chiffré par une clé tirée de
 // K_compte, que l'appareil n'a qu'après la réponse de connexion. Seule la session courante
 // change ; 64 octets exactement ; jamais en clair (le serveur garde les octets reçus).
 func TestEtiquetteApresConnexion(t *testing.T) {

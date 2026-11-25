@@ -16,7 +16,7 @@ func TestReadBudgetValues(t *testing.T) {
 	}
 }
 
-// Audit M1 : une lecture complète plus un nouvel essai de chaque segment passent ; au-delà
+// Une lecture complète plus un nouvel essai de chaque segment passent ; au-delà
 // du budget, ErrBudget. Le budget est propre à chaque ouverture.
 func TestOpenSegmentBudget(t *testing.T) {
 	s, c := newSvc(t)

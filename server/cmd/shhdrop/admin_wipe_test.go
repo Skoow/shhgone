@@ -11,7 +11,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Revue B5 : « wipe --yes » annonçait tout effacé alors qu'un téléchargement commencé sur un
+// « wipe --yes » annonçait tout effacé alors qu'un téléchargement commencé sur un
 // partage déjà retiré (descripteur détaché, jusqu'à 2 h de grâce) continuait d'être servi par
 // le serveur en marche. La commande demande au serveur de tout couper et dit ce qu'il en est.
 func TestAdminWipeCutsDetachedReads(t *testing.T) {

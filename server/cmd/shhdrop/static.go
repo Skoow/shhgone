@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// staticHandler sert le site (web/dist) depuis dir (audit F7) :
+// staticHandler sert le site (web/dist) depuis dir :
 //   - dir et dir/index.html doivent exister au démarrage ;
 //   - os.Root : aucun lien symbolique ne sort du dossier ;
 //   - tout nom qui commence par « . » (.env, .git/…) → 404 ;
@@ -23,15 +23,15 @@ import (
 //   - un fichier n'est servi qu'à son chemin exact (exactPath) : « /x.html/ », « /x.html//… »
 //     → 404. Les en-têtes de sécurité propres à un fichier (CSP sandbox du cadre PDF,
 //     api.pathHeaders) suivent le chemin de la requête : aucun autre chemin ne doit donc
-//     rendre les mêmes octets (audit adverse du 13 novembre, site, N1) ;
+//     rendre les mêmes octets ;
 //   - repli de l'application monopage : un chemin inconnu dont le dernier segment n'a pas
 //     d'extension sert index.html ; un fichier absent (x.js) → 404. Les liens sont à la
 //     racine (« /#clé », spec §32) : plus de repli particulier sous /s/ ni /m/ ; un chemin
 //     abîmé sans extension charge l'application, qui retire le « # » (UI §12.1) ;
-//   - statut réel (audit de performance, point 5) : seules les routes de l'application
-//     (appRoutes, mêmes que web/src/app/router.svelte.ts) répondent 200 ; tout autre chemin
-//     sans extension reçoit index.html avec le statut 404 (l'application y affiche « Cette
-//     page n'existe pas. »), jamais un « soft 404 » en 200.
+//   - statut réel : seules les routes de l'application (appRoutes, mêmes que
+//     web/src/app/router.svelte.ts) répondent 200 ; tout autre chemin sans extension reçoit
+//     index.html avec le statut 404 (l'application y affiche « Cette page n'existe pas. »),
+//     jamais un « soft 404 » en 200.
 //
 // Les en-têtes de sécurité sont posés par api.New autour de ce gestionnaire.
 //
@@ -65,9 +65,9 @@ func staticHandler(dir string, comptes, salons bool) (http.Handler, error) {
 			return
 		}
 		status := http.StatusOK
-		// Pages séparées (conception du 16 novembre) : une page d'information a son propre fichier
-		// (« /securite » → securite.html). Liste fermée : aucun autre fichier .html n'est servi
-		// sans son extension (le cadre PDF garde ses en-têtes propres à son seul chemin, N1).
+		// Pages séparées : une page d'information a son propre fichier (« /securite » →
+		// securite.html). Liste fermée : aucun autre fichier .html n'est servi
+		// sans son extension (le cadre PDF garde ses en-têtes propres à son seul chemin).
 		if file, ok := pageFiles[r.URL.Path]; ok && errors.Is(err, fs.ErrNotExist) {
 			if f2, fi2, err2 := openRegular(fsys, file); err2 == nil {
 				name, f, fi, err = file, f2, fi2, nil
@@ -77,7 +77,7 @@ func staticHandler(dir string, comptes, salons bool) (http.Handler, error) {
 			if !appRoutes[r.URL.Path] && !(comptes && compteRoutes[r.URL.Path]) && !(salons && salonRoutes[r.URL.Path]) {
 				status = http.StatusNotFound
 			}
-			// app.html (18 novembre) : la page de l'application sans l'accueil écrit au build
+			// app.html : la page de l'application sans l'accueil écrit au build
 			// (référencement), pour que « /envoyer », « /envois » ou un 404 ne l'affichent pas
 			// avant le script ; index.html si le build n'en a pas (anciens dossiers, tests).
 			name = "app.html"
@@ -110,7 +110,7 @@ func staticHandler(dir string, comptes, salons bool) (http.Handler, error) {
 		h := w.Header()
 		// Cache : no-store partout, posé par api.New, sauf pour un fichier à empreinte de
 		// /assets/ qui existe (jamais pour un 404 ni pour le repli vers index.html) : un an,
-		// immuable (revue du 10 novembre ; remplace « aucun cache », retours CLEAN4).
+		// immuable.
 		if immutableAsset.MatchString("/"+name) && path.Base(name) == fi.Name() {
 			h.Set("Cache-Control", immutableCache)
 		} else if dayAsset.MatchString("/"+name) && path.Base(name) == fi.Name() {
@@ -143,10 +143,10 @@ var immutableAsset = regexp.MustCompile(`^/assets/.+-[A-Za-z0-9_-]{8,}\.(js|css|
 
 const immutableCache = "public, max-age=31536000, immutable"
 
-// dayAsset : icônes, manifeste, polices et images fixes sans empreinte (audit de vitesse du
-// 20 novembre) : un jour de cache au lieu de no-store. Rien de secret ni de propre à quelqu'un ;
-// un changement met au plus un jour à être vu. HTML, cadre PDF (intégrité vérifiée), robots.txt
-// et sitemap.xml restent en no-store.
+// dayAsset : icônes, manifeste, polices et images fixes sans empreinte : un jour de cache au
+// lieu de no-store. Rien de secret ni de propre à quelqu'un ; un changement met au plus un jour
+// à être vu. HTML, cadre PDF (intégrité vérifiée), robots.txt et sitemap.xml restent en
+// no-store.
 var dayAsset = regexp.MustCompile(`^/(?:fonts/[a-z0-9-]+\.woff2|assets/[a-z0-9-]+\.(?:png|svg|webp)|favicon\.(?:svg|ico)|favicon-32\.png|apple-touch-icon\.png|icon-(?:192|512)\.png|logo\.svg|manifest\.webmanifest)$`)
 
 const dayCache = "public, max-age=86400"
@@ -221,7 +221,7 @@ var appRoutes = map[string]bool{
 	"/telechargements":  true,
 }
 
-// compteRoutes : pages du compte (table COMPTE_PATHS de web/src/app/router.svelte.ts, lot 10),
+// compteRoutes : pages du compte (table COMPTE_PATHS de web/src/app/router.svelte.ts),
 // servies en 200 seulement avec SHH_COMPTES=1.
 // pageFiles : pages servies par leur propre fichier HTML : pages d'information (web/vite.config.ts,
 // PAGE_PATHS ; web/scripts/check-dist.mjs, INFO_PAGES) et page d'ouverture « /s » (s.html).
@@ -236,9 +236,9 @@ var pageFiles = map[string]string{
 	"/mentions-legales": "mentions-legales.html",
 	"/signaler":         "signaler.html",
 	"/verifier":         "verifier.html",
-	// Liens de partage et de gestion sous « /s » (16 novembre) : page d'ouverture seule.
+	// Liens de partage et de gestion sous « /s » : page d'ouverture seule.
 	"/s": "s.html",
-	// Versions anglaises des pages bilingues (20 novembre, web/vite.config.ts, infoPages).
+	// Versions anglaises des pages bilingues (web/vite.config.ts, infoPages).
 	"/en":                  "en.html",
 	"/en/securite":         "en-securite.html",
 	"/en/confidentialite":  "en-confidentialite.html",
@@ -263,7 +263,7 @@ var enVersion = map[string]string{
 	"/verifier":         "/en/verifier",
 }
 
-// salonRoutes : pages du salon (table SALON_PATHS de web/src/app/router.svelte.ts, plan C-3),
+// salonRoutes : pages du salon (table SALON_PATHS de web/src/app/router.svelte.ts),
 // servies en 200 seulement avec SHH_SALONS=1 et SHH_COMPTES=1 (le site n'a les écrans du salon
 // qu'avec le compte : créer un salon l'exige). Aucun secret dans le chemin (lien « #c… »).
 var salonRoutes = map[string]bool{

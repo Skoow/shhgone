@@ -2,10 +2,10 @@ package salon
 
 import "time"
 
-// Appels réservés aux offres payantes (décision du propriétaire, 24 novembre ; conception des
-// appels §5.1) : un membre qui a Plus ou Pro dépense un jeton anonyme pour ouvrir les appels du
-// salon, puis tous ses membres peuvent appeler jusqu'à la fin du salon. Le gestionnaire ne garde
-// que l'heure de fin (en mémoire) : ni le jeton, ni l'offre, ni le siège qui l'a ouvert.
+// Appels réservés aux offres payantes (conception des appels §5.1) : un membre qui a Plus ou Pro
+// dépense un jeton anonyme pour ouvrir les appels du salon, puis tous ses membres peuvent
+// appeler jusqu'à la fin du salon. Le gestionnaire ne garde que l'heure de fin (en mémoire) : ni
+// le jeton, ni l'offre, ni le siège qui l'a ouvert.
 
 // membreActuelLocked : mb occupe encore son siège (ni parti, ni exclu, ni remplacé) dans un
 // salon vivant à now. Appelé sous s.mu.

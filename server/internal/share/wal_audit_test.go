@@ -14,7 +14,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Audit adverse du 13 novembre, St1 : une destruction EXPLICITE (créateur, S_gestion) vide
+// Une destruction EXPLICITE (créateur, S_gestion) vide
 // tout de suite shares.db-wal. Avant, les métadonnées du partage supprimé (V_accès, V_gestion,
 // sel) y restaient jusqu'au prochain passage du janitor (≤ 60 s), lisibles à une saisie ou à
 // un instantané du serveur EN MARCHE. Les destructions chaudes (fin de téléchargement, 5 essais)
@@ -116,7 +116,7 @@ func plusRien(t *testing.T, quoi, dir string, r map[string][]byte) {
 	t.Errorf("%s : encore lisible 5 s après l'effacement : %v", quoi, l)
 }
 
-// Audit adverse du 13 novembre, 2e passage, stockage, F1 : TOUT effacement d'un partage vide
+// TOUT effacement d'un partage vide
 // le WAL dans un délai borné, pas seulement la destruction explicite. Pour chaque chemin, le
 // partage est d'abord replié dans shares.db (plus vieux qu'un passage du janitor : le cas
 // courant), puis effacé ; ni shares.db ni shares.db-wal ne gardent son identifiant, ses
@@ -223,7 +223,7 @@ func TestDestructionBaseOccupeeSansAttendre(t *testing.T) {
 	plusRien(t, "après le départ du lecteur", dir, r)
 }
 
-// Audit adverse du 13 novembre, 3e campagne, stockage, Z3 : chaque réécriture de la ligne d'un
+// Chaque réécriture de la ligne d'un
 // partage vivant (ouverture, essai faux, fin d'une ouverture, agrandissement, effacement de
 // segments) laissait une version de la ligne dans shares.db-wal jusqu'au janitor (60 s) : un
 // lecteur du disque savait quels partages avaient été ouverts ou essayés dans la dernière

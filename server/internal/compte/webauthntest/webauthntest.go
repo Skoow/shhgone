@@ -1,8 +1,8 @@
-// Package webauthntest : authentificateur logiciel pour les tests du compte par passkey (lot S3
-// du plan 2026-11-22-compte-passkey.md). Il joue le navigateur et l'authentificateur : il lit les
-// options JSON de WebAuthn niveau 3 que rend le serveur, et rend les réponses JSON
-// (RegistrationResponseJSON, AuthenticationResponseJSON) que le site enverrait. ES256, EdDSA et
-// RS256 ; drapeaux UV, BE, BS réglables ; attestation « none » (ou une autre, pour la refuser).
+// Package webauthntest : authentificateur logiciel pour les tests du compte par passkey. Il joue
+// le navigateur et l'authentificateur : il lit les options JSON de WebAuthn niveau 3 que rend le
+// serveur, et rend les réponses JSON (RegistrationResponseJSON, AuthenticationResponseJSON) que
+// le site enverrait. ES256, EdDSA et RS256 ; drapeaux UV, BE, BS réglables ; attestation « none »
+// (ou une autre, pour la refuser).
 //
 // Seulement pour les tests : aucune source du serveur ne l'importe hors des fichiers _test.go
 // (TestWebAuthnTestSeulementDansLesTests). Le secret PRF n'est pas simulé côté serveur : le
@@ -101,7 +101,11 @@ func nouvelleCle(alg int) (crypto.Signer, []byte, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		x, y := k.PublicKey.X.FillBytes(make([]byte, 32)), k.PublicKey.Y.FillBytes(make([]byte, 32))
+		pub, err := k.PublicKey.Bytes() // 0x04 ‖ X (32) ‖ Y (32)
+		if err != nil {
+			return nil, nil, err
+		}
+		x, y := pub[1:33], pub[33:]
 		c, err := webauthncbor.Marshal(map[int]any{1: 2, 3: ES256, -1: 1, -2: x, -3: y})
 		return k, c, err
 	case EdDSA:

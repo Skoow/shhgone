@@ -6,19 +6,18 @@ import (
 	"sort"
 )
 
-// Effacement des trames par lectures puis délai (plan C-2 Task 11, v3 §5 ; règle « vu par tous
-// + délai », décision du propriétaire du 13 novembre) :
+// Effacement des trames par lectures puis délai (v3 §5 ; règle « vu par tous + délai ») :
 //   - règle 0 « désactivé » : rien avant la fin ou le renouvellement du salon (sauf retrait) ;
 //     trames de protocole (Commit, Welcome, KeyPackage, profil) et messages de fichier ;
 //   - règles 1, 2, 3 (1 min, 5 min, 1 h) : lecteurs attendus = sièges occupés à la réception,
 //     moins l'expéditeur (bits de entree.attendus) ; chacun envoie 0x05 lu ; un siège qui part
-//     (Quitter, exclusion ; jamais pour une absence, revue finale C-2, I3 : un absent la lit à
-//     son retour) ou reprend (0x0A, plan point 8) n'est plus attendu nulle part. Quand plus
-//     personne n'est attendu (dernière lecture, dernier départ, ou expéditeur seul à la
-//     réception), la trame entre dans le tas d'échéances à maintenant + son délai ; à
-//     l'échéance (Tick, ou avant tout rattrapage), elle est effacée et 0x0E est diffusé à tous
-//     (renvoyé à la reconnexion : drapeauLu). Le délai est compté depuis l'heure du serveur à
-//     la dernière lecture, jamais depuis heure_ms (chiffrée, illisible).
+//     (Quitter, exclusion ; jamais pour une absence : un absent la lit à son retour) ou
+//     reprend (0x0A) n'est plus attendu nulle part. Quand plus personne n'est attendu
+//     (dernière lecture, dernier départ, ou expéditeur seul à la réception), la trame entre
+//     dans le tas d'échéances à maintenant + son délai ; à l'échéance (Tick, ou avant tout
+//     rattrapage), elle est effacée et 0x0E est diffusé à tous (renvoyé à la reconnexion :
+//     drapeauLu). Le délai est compté depuis l'heure du serveur à la dernière lecture, jamais
+//     depuis heure_ms (chiffrée, illisible).
 // Le tas a au plus une échéance par entrée de l'index (posée une fois, au passage à zéro des
 // attendus) ; la fin et le renouvellement du salon le vident.
 

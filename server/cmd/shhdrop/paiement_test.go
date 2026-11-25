@@ -58,7 +58,7 @@ func TestSetupPaiement(t *testing.T) {
 	if err != nil || fi.Mode().Perm() != 0o600 {
 		t.Fatal(fi, err)
 	}
-	// Régime OSS : la crypto n'est pas proposée (décision du 24 novembre), ses webhooks restent lus.
+	// Régime OSS : la crypto n'est pas proposée, ses webhooks restent lus.
 	if m := p.svc.Moyens(); len(m) != 1 || m[0] != paiement.Carte || p.svc.PrestataireDe("nowpayments") == nil {
 		t.Fatal("moyens", m)
 	}
@@ -94,7 +94,7 @@ func TestSetupPaiementRefus(t *testing.T) {
 }
 
 // TestSetupPaiementModeBase : une paiements.db créée en essai (préproduction) fait refuser le
-// démarrage en production, message dit à l'exploitant (revue du 25 novembre).
+// démarrage en production, message dit à l'exploitant.
 func TestSetupPaiementModeBase(t *testing.T) {
 	cfg := cfgPaiement(t)
 	p, err := setupPaiement(cfg)

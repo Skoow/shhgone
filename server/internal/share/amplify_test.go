@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// D42-6 (revue complète du 10 novembre) : un brouillon ne fait jamais écrire au serveur
+// D42-6 : un brouillon ne fait jamais écrire au serveur
 // beaucoup plus d'aléa qu'il n'a reçu d'octets. Avant : un morceau par palier, envoyé au
 // dernier segment plein de la réservation, suffisait à faire grandir le brouillon jusqu'à
 // 2 Gio (Grow), puis finalize écrivait tout le palier en aléa pour quelques morceaux reçus.

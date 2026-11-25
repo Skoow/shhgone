@@ -37,7 +37,7 @@ var (
 	// ErrConflict : V_accès ou V_gestion déjà pris (seul qui connaît K_accès ou S_gestion
 	// peut le provoquer, spec §29.8), ou id tiré par le serveur déjà pris (128 bits : jamais).
 	ErrConflict = errors.New("partage déjà présent")
-	// ErrBusy : un autre Finalize du même envoi est en cours (revue K1, I1).
+	// ErrBusy : un autre Finalize du même envoi est en cours.
 	ErrBusy = errors.New("finalisation déjà en cours")
 	// ErrBudget : l'ouverture a déjà lu son budget d'octets (ReadBudget).
 	ErrBudget = errors.New("budget de lecture épuisé")
@@ -78,8 +78,8 @@ type CreateReq struct {
 	Tier Tier
 }
 
-// StorageReserve : 1/StorageReserve de StorageMax n'est ouvert qu'aux nouveaux venus (audit
-// du 13 novembre, D2 : environ 34 adresses IPv4 remplissaient les 200 Gio et fermaient le
+// StorageReserve : 1/StorageReserve de StorageMax n'est ouvert qu'aux nouveaux venus
+// (environ 34 adresses IPv4 remplissaient les 200 Gio et fermaient le
 // service à tous). Avec 200 Gio : 25 Gio, au moins 12 nouvelles adresses pour les prendre.
 const StorageReserve = 8
 
@@ -95,7 +95,7 @@ func StorageLimit(storageMax int64, newcomer bool) int64 {
 // FinalizeReq : tout ce qui dépend du mot de passe, la durée, les ouvertures, et le palier
 // final d'un brouillon (spec §29.8, §41.14) : Bucket (≤ la réservation) ; Header (48 octets)
 // et Tail (morceau chiffré du manifeste) sont écrits par le serveur, et tous les morceaux
-// manquants du palier final sont remplis d'aléa. Seule finalisation depuis le 24 novembre
+// manquants du palier final sont remplis d'aléa. Seule finalisation
 // (spec H-5 : l'ancienne, sans brouillon, avec bourrage [fill_from, fill_to), est retirée).
 type FinalizeReq struct {
 	TTLHours, MaxOpens, KdfOps, KdfMem int
@@ -103,7 +103,7 @@ type FinalizeReq struct {
 	Bucket                             int
 	Header, Tail                       []byte
 	// Void : plages [début, fin) de morceaux (numéros dans le paquet) de petits éléments
-	// retirés, remplies d'aléa comme les morceaux jamais reçus (audit H-2, brouillon seulement).
+	// retirés, remplies d'aléa comme les morceaux jamais reçus (brouillon seulement).
 	Void [][2]int
 }
 
@@ -147,7 +147,7 @@ type Config struct {
 	KillWait time.Duration
 	// ExtraUsed (facultatif, nil : 0) : octets pris hors des partages sous le même
 	// StorageMax (salons : pièces et conversations, salon.Manager.UsedBytes), ajoutés à
-	// l'usage à la création et à l'agrandissement (plan C-2, point 10). Ne doit pas bloquer ni
+	// l'usage à la création et à l'agrandissement. Ne doit pas bloquer ni
 	// prendre de verrou du Service ; une erreur de lecture doit rendre une valeur haute (échec
 	// fermé).
 	ExtraUsed func() int64
@@ -162,7 +162,7 @@ type Config struct {
 }
 
 // NewService valide la configuration : une valeur zéro ne doit jamais désactiver le gel
-// en silence ni refuser toutes les créations (audit F10).
+// en silence ni refuser toutes les créations.
 func NewService(c Config) (*Service, error) {
 	switch {
 	case c.DB == nil:
@@ -211,25 +211,25 @@ type Service struct {
 
 	createMu sync.Mutex // rend atomiques « place libre ? » et la réservation
 	// attemptMu : rend atomiques, par partage, la lecture du compteur, la vérification de
-	// K_preuve et son décompte (audit F1) : jamais plus de 5 essais évalués, même en parallèle.
+	// K_preuve et son décompte : jamais plus de 5 essais évalués, même en parallèle.
 	// Verrous rayés (id haché) : mémoire bornée, aucune donnée retenue.
 	attemptMu [64]sync.Mutex
-	// uploadMus : verrous des envois, rayés par id comme attemptMu (revue du 10 novembre :
-	// un seul verrou pour tous retenait les segments de chacun pendant l'effacement ou
-	// l'agrandissement d'un seul). Par envoi : les écritures de segments le prennent en
-	// lecture ; Erase, Grow, la fin de Finalize et sweepOne en écriture, pour attendre la
-	// fin des écritures en vol de cet envoi. Jamais deux à la fois : aucun ordre à tenir.
+	// uploadMus : verrous des envois, rayés par id comme attemptMu (un seul verrou pour
+	// tous retenait les segments de chacun pendant l'effacement ou l'agrandissement d'un
+	// seul). Par envoi : les écritures de segments le prennent en lecture ; Erase, Grow,
+	// la fin de Finalize et sweepOne en écriture, pour attendre la fin des écritures en
+	// vol de cet envoi. Jamais deux à la fois : aucun ordre à tenir.
 	uploadMus [256]sync.RWMutex
 	budget    readBudget // octets lus par ouverture et par partage, en mémoire seulement
 	egressMax int64      // plafond de sortie par partage (Config.EgressMax)
 	// mem : échéances d'envoi, minute du dernier segment reçu et purge des « draining », en
-	// mémoire seulement (spec §36 S5, S12) : un redémarrage efface de toute façon ces partages
+	// mémoire seulement (spec §36 S5) : un redémarrage efface de toute façon ces partages
 	// (PurgeAtStart), aucun jeton n'y survivant.
 	mem struct {
 		mu    sync.Mutex
 		up    map[string]upload
 		purge map[string]int64
-		// part : segments d'un brouillon reçus en partie (audit H-2), un bit par morceau.
+		// part : segments d'un brouillon reçus en partie, un bit par morceau.
 		part map[string]map[int]uint64
 	}
 	streams Streams        // flux de segments annulables (spec §41.8)
@@ -241,19 +241,19 @@ type Service struct {
 	// reports : voix de signalement par partage, en mémoire seulement (report.go).
 	reports reportBox
 	// finalizing : envois dont un Finalize est en cours ; un seul à la fois par id, pour
-	// qu'aucun appel concurrent ne réécrive le bourrage (revue K1, I1).
+	// qu'aucun appel concurrent ne réécrive le bourrage.
 	finalizing struct {
 		mu  sync.Mutex
 		ids map[string]struct{}
 		// sealing : envois dont un Finalize écrit le bourrage (hors du verrou de l'envoi) ;
-		// leurs segments sont refusés (ErrBusy) jusqu'à la fin du Finalize (audit F6).
+		// leurs segments sont refusés (ErrBusy) jusqu'à la fin du Finalize.
 		sealing map[string]struct{}
 	}
 }
 
 func (s *Service) now() int64 { return s.Now().Unix() }
 
-// attemptLock : verrou des essais de mot de passe du partage id (audit F1).
+// attemptLock : verrou des essais de mot de passe du partage id.
 func (s *Service) attemptLock(id string) *sync.Mutex {
 	h := fnv.New32a()
 	h.Write([]byte(id))
@@ -279,16 +279,16 @@ type upload struct {
 	tier   Tier
 	window int64
 	// dirty : octets écrits depuis la dernière synchronisation de fond ; syncing : une
-	// synchronisation de fond est en cours (rapport de performance A12).
+	// synchronisation de fond est en cours.
 	dirty   int64
 	syncing bool
 }
 
 // syncEvery : octets écrits dans un envoi après lesquels son fichier est synchronisé en
 // arrière-plan (fdatasync), pour qu'à Finalize il ne reste que la fin et le bourrage à écrire
-// sur le disque (rapport de performance A12 : 702 ms au clic pour 200 Mo). 32 Mio : 8
-// segments. La durabilité reste celle de Finalize, qui synchronise tout le fichier avant
-// « ready » : ces synchronisations ne font qu'avancer le travail.
+// sur le disque (702 ms au clic pour 200 Mo). 32 Mio : 8 segments. La durabilité reste celle
+// de Finalize, qui synchronise tout le fichier avant « ready » : ces synchronisations ne font
+// qu'avancer le travail.
 const syncEvery = 32 << 20
 
 // bgSyncBlob : synchronisation de fond (variable pour les tests).
@@ -296,8 +296,7 @@ var bgSyncBlob = func(b *blob.Store, id string) error { return b.Sync(id) }
 
 // UploadOpen : l'envoi id est encore ouvert (connu de ce processus, non finalisé, échéance
 // non passée), en mémoire seulement, sans SQL. Vérifié avant de prendre une place de transfert
-// et de lire le corps d'un segment (audit du 13 novembre, D1 : un jeton d'envoi reste signé
-// 6 h après finalize).
+// et de lire le corps d'un segment (un jeton d'envoi reste signé 6 h après finalize).
 func (s *Service) UploadOpen(id string) bool { return s.uploadOpen(id, s.now()) }
 
 // uploadOpen : l'envoi id est connu de ce processus et son échéance n'est pas passée.
@@ -336,9 +335,6 @@ func (s *Service) tierOf(id string) Tier {
 	defer s.mem.mu.Unlock()
 	return s.mem.up[id].tier
 }
-
-// TierOf : formule d'un envoi en cours (couche HTTP : durée du jeton d'envoi).
-func (s *Service) TierOf(id string) Tier { return s.tierOf(id) }
 
 func (s *Service) touchUpload(id string, now int64) {
 	s.mem.mu.Lock()
@@ -440,7 +436,7 @@ func (s *Service) dueAt(id, state string, exp sql.NullInt64, failed int, now int
 }
 
 // match compare sha256(x) au vérificateur stocké, en temps constant. Un secret fait
-// toujours 32 octets : toute autre longueur (nil compris) est refusée (audit F4).
+// toujours 32 octets : toute autre longueur (nil compris) est refusée.
 func match(x, stored []byte) bool {
 	if len(x) != 32 {
 		return false
@@ -452,14 +448,14 @@ func match(x, stored []byte) bool {
 // Match : match pour les autres paquets (vérification de K_preuve_s et S_gestion du salon).
 func Match(x, stored []byte) bool { return match(x, stored) }
 
-// emptyHash : SHA-256 de la chaîne vide, refusé comme vérificateur (audit F4).
+// emptyHash : SHA-256 de la chaîne vide, refusé comme vérificateur.
 var emptyHash = sha256.Sum256(nil)
 
 var b64 = base64.RawURLEncoding.Strict()
 
 // DecodeB64 décode une valeur base64url sans bourrage de n octets, sous forme canonique :
 // longueur exacte en caractères et alphabet base64url seulement. Le décodeur de Go
-// ignore \r et \n même en mode Strict (audit F3) : ils sont refusés ici avant décodage.
+// ignore \r et \n même en mode Strict : ils sont refusés ici avant décodage.
 func DecodeB64(s string, n int) ([]byte, error) {
 	if len(s) != b64.EncodedLen(n) {
 		return nil, ErrBadRequest
@@ -505,7 +501,7 @@ func validID(id string) bool {
 // pour ne pas révéler la minute de création ou d'ouverture (spec §9.2).
 func ceil15(t int64) int64 { return (t + 899) / 900 * 900 }
 
-// Ceil15 : ceil15 pour les autres paquets (échéance des salons, plan C-2 Task 6).
+// Ceil15 : ceil15 pour les autres paquets (échéance des salons).
 func Ceil15(t int64) int64 { return ceil15(t) }
 
 // minute : précision de progress_at, qui n'existe que pendant l'envoi (spec §9.1).
@@ -528,7 +524,7 @@ func (s *Service) Frozen() bool {
 // NotEmptyHash : notEmptyHash pour les autres paquets (création d'un salon).
 func NotEmptyHash(vs ...[]byte) bool { return notEmptyHash(vs...) }
 
-// notEmptyHash : un vérificateur égal à SHA-256("") serait satisfait par un secret vide (audit F4).
+// notEmptyHash : un vérificateur égal à SHA-256("") serait satisfait par un secret vide.
 func notEmptyHash(vs ...[]byte) bool {
 	for _, v := range vs {
 		if subtle.ConstantTimeCompare(v, emptyHash[:]) == 1 {
@@ -565,12 +561,12 @@ func validCreate(r CreateReq) error {
 	return nil
 }
 
-// kdfOps, kdfMem : seuls paramètres Argon2id acceptés (spec §29.2, audit F4) ; le navigateur
+// kdfOps, kdfMem : seuls paramètres Argon2id acceptés (spec §29.2) ; le navigateur
 // refuse d'ouvrir tout autre réglage, l'accepter ici créerait un partage que personne n'ouvre.
 const kdfOps, kdfMem = 3, 64 << 20
 
-// MaxOpens : ouvertures au plus d'un partage gratuit (spec §4) ; 5 depuis le 17 novembre
-// (décision du propriétaire, 10 avant ; web/src/limits.ts, MAX_OPENS, même valeur).
+// MaxOpens : ouvertures au plus d'un partage gratuit (spec §4 ; web/src/limits.ts, MAX_OPENS,
+// même valeur).
 const MaxOpens = 5
 
 // ValidateFinalize vérifie les champs d'une finalisation qui ne dépendent pas du palier
@@ -593,7 +589,7 @@ func ValidateFinalizeTier(r FinalizeReq, t Tier) error {
 
 // UsedShares : octets des partages seuls (fichiers et descripteurs détachés), jamais
 // ExtraUsed : c'est la valeur que le salon ajoute à son propre usage (salon.Config.UsedPartages),
-// sans double compte (plan C-2 Task 15).
+// sans double compte.
 func (s *Service) UsedShares() (int64, error) {
 	used, err := s.Blobs.UsedBytes()
 	if err != nil {
@@ -613,7 +609,7 @@ func (s *Service) extraUsed() int64 {
 // Create réserve la place du palier et enregistre l'envoi sous r.ID (tiré par NewID, rendu
 // tel quel). Un V_accès ou un V_gestion déjà présent (ou un id déjà pris, en base ou sur
 // disque) donne ErrConflict, sans toucher au partage existant : sans K_accès ni S_gestion,
-// personne ne peut provoquer ce refus (aucun oracle d'existence, revue K1, I2).
+// personne ne peut provoquer ce refus (aucun oracle d'existence).
 func (s *Service) Create(r CreateReq) (string, int, error) { return s.create(r, Validate) }
 
 // create : Create avec la validation valid (validCreate dans les tests de grands paliers).
@@ -679,7 +675,7 @@ func (s *Service) PutSegment(id string, n int, body []byte) error {
 	mu.RLock()
 	defer mu.RUnlock()
 	if s.sealed(id) {
-		return ErrBusy // finalisation en cours (audit F6)
+		return ErrBusy // finalisation en cours
 	}
 	if !s.uploadOpen(id, s.now()) {
 		return ErrNotFound
@@ -731,7 +727,7 @@ func (s *Service) markReceived(id string, n int) error {
 	}
 }
 
-// Finalize termine un brouillon (spec §29.4, point 4, §41.14) : palier final, morceaux
+// Finalize termine un brouillon (spec §29.4, §41.14) : palier final, morceaux
 // manquants remplis d'octets aléatoires (crypto/rand, indiscernables d'un chiffré pour qui lit
 // le disque), en-tête et manifeste écrits, puis passage en « ready » avec le sel, Argon2id,
 // V_preuve, E, la durée et les ouvertures (finalizeDraft). Rejoué après succès : 404.
@@ -780,7 +776,7 @@ func (s *Service) releaseFinalize(id string) {
 }
 
 // seal (Finalize, claimFinalize déjà pris) : plus aucun segment de l'envoi id n'est accepté
-// jusqu'à releaseFinalize (audit F6), puis attente des écritures déjà en vol (verrou exclusif
+// jusqu'à releaseFinalize, puis attente des écritures déjà en vol (verrou exclusif
 // de l'envoi pris et rendu) : le bourrage, écrit ensuite hors de ce verrou, ne croise plus
 // aucune écriture de segment.
 func (s *Service) seal(id string) {
@@ -825,7 +821,7 @@ var (
 // syncBlob : contenu du fichier forcé sur le disque (variable pour tester l'ordre et l'échec).
 var syncBlob = func(b *blob.Store, id string) error { return b.Sync(id) }
 
-// syncFile force le fichier de l'envoi id sur le disque avant « ready » (revue B4) : après une
+// syncFile force le fichier de l'envoi id sur le disque avant « ready » : après une
 // panne de courant, un partage « ready » dont le contenu n'aurait pas atteint le disque
 // serait servi vide ou tronqué. Fichier effacé entre-temps : ErrNotFound.
 func (s *Service) syncFile(id string) error {
@@ -839,7 +835,7 @@ func (s *Service) syncFile(id string) error {
 }
 
 // fillWrite : écriture d'une tranche du bourrage dans le fichier ouvert une seule fois
-// (rapport de performance A12 ; variable pour compter les écritures en test).
+// (variable pour compter les écritures en test).
 var fillWrite = func(w io.WriterAt, off int64, b []byte) error { _, err := w.WriteAt(b, off); return err }
 
 // fillChunk : taille maximale des écritures du bourrage (un seul tampon par plage, réutilisé).
@@ -854,7 +850,7 @@ func (s *Service) fillRange(id string, start, end int64) error {
 	if err != nil {
 		return err
 	}
-	buf := make([]byte, min(fillChunk, end-start)) // jamais 4 Mio pour un seul morceau (revue B8)
+	buf := make([]byte, min(fillChunk, end-start)) // jamais 4 Mio pour un seul morceau
 	for off := start; off < end; {
 		n := min(int64(len(buf)), end-off)
 		b := buf[:n]
@@ -923,9 +919,9 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 		return Opened{}, ErrNotFound // ne compte pas comme essai
 	}
 	if match(kPreuve, proofV) {
-		// Plafond de sortie (décision du 24 novembre) : une nouvelle ouverture n'est consommée
-		// que si un téléchargement complet tient encore sous le plafond du partage ; sinon
-		// ErrEgressLimit, sans ouverture ni essai consommé. Dit seulement à qui a le mot de passe.
+		// Plafond de sortie : une nouvelle ouverture n'est consommée que si un téléchargement
+		// complet tient encore sous le plafond du partage ; sinon ErrEgressLimit, sans ouverture
+		// ni essai consommé. Dit seulement à qui a le mot de passe.
 		if s.budget.shareUsed(id, now) > s.egressMax-totalSize(bucket) {
 			s.RefusSortie.Add(1)
 			return Opened{}, ErrEgressLimit
@@ -940,7 +936,7 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 		if err != nil {
 			return Opened{}, notFound(err)
 		}
-		s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé (audit adverse 3, stockage, Z3)
+		s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé
 		if state == "draining" {
 			// D42-22 : toutes les ouvertures sont prises ; le partage reste jusqu'à son échéance
 			// pour que leurs détentrices y reviennent (purge en mémoire : un redémarrage, qui
@@ -960,14 +956,13 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 	return Opened{}, &BadPassword{AttemptsLeft: left}
 }
 
-// grantIfLive inscrit l'octroi de l'ouverture openN (grantLocked) si le partage existe encore
-// (audit des partages du 12 novembre, D1) : une destruction passée entre l'UPDATE qui consomme
-// l'ouverture et ce point a déjà oublié octrois et budgets (retire), qui ne doivent pas être
-// recréés pour un partage effacé. Sous gone.mu : partage mort ou en retrait → ErrNotFound ;
-// sinon la ligne est relue (retire prend gone.mu pour son oubli final : une ligne encore là
-// sera oubliée après nous) ; absente → ErrNotFound.
-// La ligne est relue hors de gone.mu, époque revérifiée sous le verrou (liveRead, audit du
-// 13 novembre, D7).
+// grantIfLive inscrit l'octroi de l'ouverture openN (grantLocked) si le partage existe
+// encore : une destruction passée entre l'UPDATE qui consomme l'ouverture et ce point a déjà
+// oublié octrois et budgets (retire), qui ne doivent pas être recréés pour un partage effacé.
+// Sous gone.mu : partage mort ou en retrait → ErrNotFound ; sinon la ligne est relue (retire
+// prend gone.mu pour son oubli final : une ligne encore là sera oubliée après nous) ; absente
+// → ErrNotFound.
+// La ligne est relue hors de gone.mu, époque revérifiée sous le verrou (liveRead).
 func (s *Service) grantIfLive(id string, openN int, exp int64) (string, error) {
 	var one int
 	gone, err := s.liveRead(id, func() error { return s.DB.QueryRow(`SELECT 1 FROM shares WHERE id=?`, id).Scan(&one) })
@@ -990,7 +985,7 @@ func (s *Service) countFailure(id string) (int, error) {
 	if err != nil {
 		return 0, notFound(err)
 	}
-	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé (audit adverse 3, stockage, Z3)
+	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé
 	if failed >= maxAttempts {
 		// En cas d'échec, Sweep réessaie (failed_attempts>=5) ; le partage est déjà inaccessible.
 		// 5 mots de passe faux : comme une suppression (spec §41.8 cas 2), les ouvertures
@@ -1048,7 +1043,7 @@ func (s *Service) Done(id string, openN int) error {
 	if err != nil {
 		return err
 	}
-	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé (audit adverse 3, stockage, Z3)
+	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé
 	// En « draining », opens_issued est figé et done_mask ne fait que croître : sûr. Toutes
 	// les ouvertures sont terminées : aucune n'a besoin de grâce.
 	if state == "draining" && bits.OnesCount64(uint64(mask)) == issued {
@@ -1088,11 +1083,11 @@ func (s *Service) aliveUpload(id, state string, now int64) bool {
 
 // DestroyWithProof : destruction par le destinataire (K_accès, K_preuve et l'octroi de son
 // ouverture). Partage trouvé par V_accès ; K_preuve faux = un essai de mot de passe (compteur
-// commun avec Unlock). Seulement par le DERNIER destinataire (audit du 20 novembre, M1) : plus
-// aucune ouverture possible (« draining ») et l'octroi est celui de la dernière ouverture
-// (n = opens_issued) ; sinon ErrStillOpen. Octroi faux : ErrGrantInvalid. Un destinataire ne
-// peut donc pas effacer un partage que d'autres doivent encore ouvrir ou rouvrir (D42-22). Les
-// ouvertures actives finissent (cas 2).
+// commun avec Unlock). Seulement par le DERNIER destinataire : plus aucune ouverture possible
+// (« draining ») et l'octroi est celui de la dernière ouverture (n = opens_issued) ; sinon
+// ErrStillOpen. Octroi faux : ErrGrantInvalid. Un destinataire ne peut donc pas effacer un
+// partage que d'autres doivent encore ouvrir ou rouvrir (D42-22). Les ouvertures actives
+// finissent (cas 2).
 func (s *Service) DestroyWithProof(kAcces, kPreuve []byte, grant string) error {
 	v := Verifier(kAcces)
 	if v == nil {
@@ -1111,7 +1106,7 @@ func (s *Service) DestroyWithProof(kAcces, kPreuve []byte, grant string) error {
 	mu := s.attemptLock(id)
 	mu.Lock()
 	defer mu.Unlock()
-	// Relu sous le verrou : un essai concurrent a pu épuiser le compteur (audit F1).
+	// Relu sous le verrou : un essai concurrent a pu épuiser le compteur.
 	var failed, issued int
 	if err := s.DB.QueryRow(`SELECT failed_attempts, state, opens_issued FROM shares WHERE id=?`, id).Scan(&failed, &state, &issued); err != nil {
 		return notFound(err)
@@ -1261,7 +1256,7 @@ func (s *Service) Sweep() (int, error) {
 }
 
 // sweepOrphanUploads oublie les envois en cours connus de la mémoire dont la ligne a disparu
-// hors de ce processus (« shhdrop admin destroy » ou « wipe », audit F9) et les signale à
+// hors de ce processus (« shhdrop admin destroy » ou « wipe ») et les signale à
 // OnAbandon : sans cela, leur échéance restait en mémoire et leur place d'envoi en cours
 // restait prise dans les quotas jusqu'à minuit. Sous createMu : Create pose l'échéance et
 // écrit la ligne sous ce verrou, un envoi en cours de création n'est donc jamais pris pour
@@ -1389,9 +1384,9 @@ func (s *Service) destroy(id string) (bool, error) {
 		return false, err
 	}
 	// Ligne effacée : vidage du WAL demandé (regroupé, hors de cette requête), pour TOUT
-	// effacement (fin de téléchargement, essais, échéance, destruction : audit adverse du
-	// 13 novembre, stockage, F1). En WAL, la ligne supprimée reste lisible dans shares.db-wal
-	// et dans shares.db tant que le WAL n'est pas replié.
+	// effacement (fin de téléchargement, essais, échéance, destruction). En WAL, la ligne
+	// supprimée reste lisible dans shares.db-wal et dans shares.db tant que le WAL n'est pas
+	// replié.
 	s.Vidage.Demander()
 	s.forget(id)
 	s.reports.forget(id)
@@ -1405,11 +1400,10 @@ func (s *Service) destroy(id string) (bool, error) {
 // administrateur). Au succès, le WAL est vidé tout de suite, dans cette requête (Vidage.
 // Maintenant) : les métadonnées du partage supprimé (V_accès, V_gestion, sel, palier, échéance)
 // ne restent ni dans shares.db-wal ni dans shares.db, lisibles à une saisie du serveur en
-// marche (audit adverse du 13 novembre, St1). Tous les autres effacements (fin de
-// téléchargement, 5 essais, échéance : destroy) demandent un vidage regroupé, fait dans la
-// seconde hors de la requête (2e passage, stockage, F1). Un vidage incomplet (base occupée par
-// un autre processus : attente courte, F3) n'est pas une erreur : il est compté et refait par
-// la boucle des vidages (le partage est de toute façon déjà supprimé).
+// marche. Tous les autres effacements (fin de téléchargement, 5 essais, échéance : destroy)
+// demandent un vidage regroupé, fait dans la seconde hors de la requête. Un vidage incomplet
+// (base occupée par un autre processus : attente courte) n'est pas une erreur : il est compté
+// et refait par la boucle des vidages (le partage est de toute façon déjà supprimé).
 func (s *Service) retireOrNotFound(id string, grace bool) error {
 	ok, err := s.retire(id, grace, s.now())
 	if err != nil {

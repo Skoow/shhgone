@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Disparition pendant un téléchargement (spec §41.8, D41-10 ; Task M2 étapes 3c et 7b).
+// Disparition pendant un téléchargement (spec §41.8, D41-10).
 // Palier 400 : 7 segments (un fichier de 40 segments ne correspond à aucun palier ; la
 // règle est la même à chaque segment).
 const gb = 400
@@ -383,7 +383,7 @@ func TestWatch(t *testing.T) {
 	}
 }
 
-// Audit F2, revu le 20 novembre : un signalement ne vise plus qu'un partage encore ouvert aux
+// Un signalement ne vise plus qu'un partage encore ouvert aux
 // ouvertures. Après l'échéance ou une destruction, il est refusé (introuvable) et ne coupe
 // rien : sinon une seule personne pourrait couper la lecture des autres (règle des voix,
 // report.go). Les lectures en grâce finissent normalement.

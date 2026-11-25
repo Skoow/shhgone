@@ -802,9 +802,9 @@ func TestFinalizeValidation(t *testing.T) {
 		func(r *FinalizeReq) { r.TTLHours = 48 },
 		func(r *FinalizeReq) { r.MaxOpens = 0 },
 		func(r *FinalizeReq) { r.MaxOpens = 11 },
-		func(r *FinalizeReq) { r.MaxOpens = MaxOpens + 1 }, // 6 : refusé depuis le 17 novembre
+		func(r *FinalizeReq) { r.MaxOpens = MaxOpens + 1 }, // 6 : refusé
 		func(r *FinalizeReq) { r.KdfOps = 2 },
-		func(r *FinalizeReq) { r.KdfOps = 4 }, // audit F4 : plafond = paramètres de création (3 passes, 64 Mio)
+		func(r *FinalizeReq) { r.KdfOps = 4 }, // plafond = paramètres de création (3 passes, 64 Mio)
 		func(r *FinalizeReq) { r.KdfMem = 67108863 },
 		func(r *FinalizeReq) { r.KdfMem = 67108865 },
 		func(r *FinalizeReq) { r.Salt = rnd(15) },
@@ -1188,9 +1188,9 @@ func readSegment(s *Service, id string, n, openN int) ([]byte, error) {
 	return io.ReadAll(sec)
 }
 
-// F1 (audit du 8 novembre) : vérification et décompte atomiques. 19 faux et 1 juste en
-// parallèle : au plus 5 essais évalués en tout (faux comptés + juste accepté), jamais un
-// 6ᵉ, et 5 faux comptés ⇒ partage détruit sans ouverture.
+// F1 : vérification et décompte atomiques. 19 faux et 1 juste en parallèle : au plus 5
+// essais évalués en tout (faux comptés + juste accepté), jamais un 6ᵉ, et 5 faux comptés
+// ⇒ partage détruit sans ouverture.
 func TestParallelUnlockAtomicAttempts(t *testing.T) {
 	for round := 0; round < 40; round++ {
 		s, _ := newSvc(t)
@@ -1232,7 +1232,7 @@ func TestParallelUnlockAtomicAttempts(t *testing.T) {
 	}
 }
 
-// Plan C-2 Task 12, point 10 : les partages comptent l'usage du salon (Config.ExtraUsed) à la
+// Les partages comptent l'usage du salon (Config.ExtraUsed) à la
 // création et à l'agrandissement.
 func TestPartagesVoientLeSalon(t *testing.T) {
 	s, _ := newSvc(t)
@@ -1256,7 +1256,7 @@ func TestPartagesVoientLeSalon(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Sans l'usage du salon, l'agrandissement tiendrait largement. Un agrandissement n'entre
-	// pas dans la réserve des nouveaux venus (StorageLimit, audit D2) : plus petit StorageMax
+	// pas dans la réserve des nouveaux venus (StorageLimit) : plus petit StorageMax
 	// dont la part hors réserve suffit.
 	need := 3<<30 + used + totalSize(160) - totalSize(80)
 	s.StorageMax = need * StorageReserve / (StorageReserve - 1)
@@ -1276,7 +1276,7 @@ func TestPartagesVoientLeSalon(t *testing.T) {
 	}
 }
 
-// Plan C-2 Task 15 (relecture Task 12) : UsedShares n'inclut jamais ExtraUsed (le salon compte
+// UsedShares n'inclut jamais ExtraUsed (le salon compte
 // les partages par elle : aucun double compte) ; un téléchargement de partage reste servi
 // pendant que le salon remplit le disque (seules les créations sont refusées).
 func TestUsedSharesSansSalon(t *testing.T) {
@@ -1305,7 +1305,7 @@ func TestUsedSharesSansSalon(t *testing.T) {
 	seg.Close()
 }
 
-// Audit du 13 novembre, D2 : réserve de stockage des nouveaux venus. Une création d'un auteur
+// Réserve de stockage des nouveaux venus. Une création d'un auteur
 // qui a déjà créé aujourd'hui (Returning) s'arrête à 7/8 de StorageMax ; un nouveau venu peut
 // encore créer dans le dernier huitième.
 func TestReserveStockageNouveauxVenus(t *testing.T) {

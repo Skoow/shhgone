@@ -20,7 +20,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/salon"
 )
 
-// ---- WebSocket du salon (plan C-2 Task 10) ----
+// ---- WebSocket du salon ----
 
 const origineSalon = "https://shhdrop.app" // Origin de salonEnv
 
@@ -442,7 +442,7 @@ func TestWSPlaces(t *testing.T) {
 		t.Fatalf("sans Upgrade : %d places prises", n)
 	}
 	var cs []*websocket.Conn
-	// 8 par adresse (revue finale C-2, I4 : une famille derrière un même NAT).
+	// 8 par adresse (une famille derrière un même NAT).
 	for range 8 {
 		cs = append(cs, b.ouvrir(t)) // sans accueil : tenus jusqu'à 5 s
 	}

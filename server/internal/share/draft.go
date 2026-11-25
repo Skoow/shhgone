@@ -33,7 +33,7 @@ func chunkOffset(bucket, n, c int) int64 {
 	return off
 }
 
-// PutChunks écrit les morceaux [from, from+k) du segment n d'un brouillon (audit H-2) :
+// PutChunks écrit les morceaux [from, from+k) du segment n d'un brouillon :
 // petits éléments empaquetés dans un segment partagé, et fin d'un grand élément, envoyés sans
 // bourrage. Au segment 0, une plage qui part du morceau 0 commence par les 48 octets de
 // l'en-tête (zéros, réécrits à finalize). Les morceaux reçus sont notés en mémoire ; un
@@ -46,7 +46,7 @@ func (s *Service) PutChunks(id string, n, from int, body []byte) error {
 	mu.RLock()
 	defer mu.RUnlock()
 	if s.sealed(id) {
-		return ErrBusy // finalisation en cours (audit F6)
+		return ErrBusy // finalisation en cours
 	}
 	bucket, _, err := s.draftRow(id)
 	if err != nil {
@@ -132,7 +132,7 @@ func validVoid(v [][2]int, bucket int) bool {
 	return true
 }
 
-// growMargin : segments réservables au-delà du dernier segment reçu (audit H1) : le client
+// growMargin : segments réservables au-delà du dernier segment reçu : le client
 // agrandit au fil de l'envoi, jamais d'avance pour tout un fichier.
 const growMargin = 2
 
@@ -161,7 +161,7 @@ func (s *Service) Grow(id string, bucket int) error { return s.GrowCharged(id, b
 // place vérifiée contre StorageMax comme à la création, fichier agrandi, masque prolongé
 // (segments reçus gardés). Refusé pendant un Finalize ou un autre Grow (ErrBusy).
 //
-// charge (facultatif) débite le quota du nouveau palier (revue B3a). Il est appelé ici, sous
+// charge (facultatif) débite le quota du nouveau palier. Il est appelé ici, sous
 // la réservation de l'envoi (claimFinalize : un seul Grow à la fois par id), une fois la
 // demande reconnue valable et avant de toucher au fichier ; son erreur refuse
 // l'agrandissement. Si la suite échoue, il est rappelé avec l'ancien palier, lu sous la même
@@ -228,7 +228,7 @@ func (s *Service) GrowCharged(id string, bucket int, charge func(bucket int) err
 	if k, _ := res.RowsAffected(); k != 1 {
 		return ErrNotFound
 	}
-	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé (audit adverse 3, stockage, Z3)
+	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé
 	s.touchUpload(id, s.now())
 	return nil
 }
@@ -272,7 +272,7 @@ func (s *Service) Erase(id string, from, to int) error {
 	if _, err := s.DB.Exec(`UPDATE shares SET segments_mask=? WHERE id=? AND state='uploading'`, next, id); err != nil {
 		return err
 	}
-	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé (audit adverse 3, stockage, Z3)
+	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé
 	s.touchUpload(id, s.now())
 	return nil
 }
@@ -302,7 +302,7 @@ func (s *Service) finalizeDraft(id string, reserved int, r FinalizeReq) (time.Du
 	}
 	part := s.partOf(id)
 	recv, top := s.received(id)
-	// Palier final borné par les segments reçus, avec la marge de Grow (revue M1) : sans
+	// Palier final borné par les segments reçus, avec la marge de Grow : sans
 	// cela, un brouillon réservé à 2 Gio et finalisé vide ferait écrire 2 Gio d'aléa.
 	// Le client finalise au plus petit palier qui contient son dernier morceau envoyé
 	// (bucketFor), toujours sous cette borne.
@@ -312,7 +312,7 @@ func (s *Service) finalizeDraft(id string, reserved int, r FinalizeReq) (time.Du
 	segs := SegmentCount(b)
 	// Morceaux présents par segment : segment reçu en entier (masque ; reçu au palier de
 	// réservation ≥ b, il couvre ses morceaux au palier b), ou en partie (part) ; moins les
-	// morceaux des petits éléments retirés (Void, audit H-2).
+	// morceaux des petits éléments retirés (Void).
 	have := make([]uint64, segs)
 	for n := range have {
 		if mask[n/8]&(1<<(n%8)) != 0 {
@@ -362,7 +362,7 @@ func (s *Service) finalizeDraft(id string, reserved int, r FinalizeReq) (time.Du
 			return 0, err
 		}
 	}
-	// Le gros du fichier atteint le disque hors du verrou de l'envoi (revue B4, comme Finalize).
+	// Le gros du fichier atteint le disque hors du verrou de l'envoi (comme Finalize).
 	if err := s.syncFile(id); err != nil {
 		return 0, err
 	}

@@ -5,10 +5,10 @@ import (
 	"sync/atomic"
 )
 
-// Agrégats du paiement pour le tableau de bord d'administration (25 novembre, tableau de bord
-// finalisé). Que des entiers et des booléens : comptés depuis le démarrage, en mémoire (un entier
-// chacun, sans clé : ni pass, ni commande, ni montant, ni pays ; perdus au redémarrage, comme
-// internal/usage), ou lus à l'instant par COUNT dans paiements.db (aucune ligne n'en sort).
+// Agrégats du paiement pour le tableau de bord d'administration. Que des entiers et des
+// booléens : comptés depuis le démarrage, en mémoire (un entier chacun, sans clé : ni pass, ni
+// commande, ni montant, ni pays ; perdus au redémarrage, comme internal/usage), ou lus à
+// l'instant par COUNT dans paiements.db (aucune ligne n'en sort).
 // Aucun montant, même agrégé : le chiffre d'affaires se lit chez le prestataire, jamais ici (le
 // serveur ne garde aucun montant, conception du paiement §5.1).
 

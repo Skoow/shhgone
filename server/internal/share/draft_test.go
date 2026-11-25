@@ -263,7 +263,7 @@ func TestFinalizeDraftFillsHolesWithRandom(t *testing.T) {
 	}
 }
 
-// Audit H1 : la réservation ne dépasse jamais les segments reçus de plus de growMargin.
+// La réservation ne dépasse jamais les segments reçus de plus de growMargin.
 func TestGrowBoundedByReceivedSegments(t *testing.T) {
 	s, _ := newSvc(t)
 	id, _, err := s.createAny(newKeys().req(80, 1, 1))
@@ -289,7 +289,7 @@ func TestGrowBoundedByReceivedSegments(t *testing.T) {
 	}
 }
 
-// Audit H-2 (§41.14) : petits éléments empaquetés dans des segments partagés, envoyés par
+// Petits éléments empaquetés dans des segments partagés, envoyés par
 // plages de morceaux (sans bourrage) ; le serveur remplit d'aléa, à finalize, les morceaux
 // jamais reçus et ceux des petits éléments retirés (void).
 func chunkBody(n, from, k int, fill byte) []byte {
@@ -460,7 +460,7 @@ func TestFinalizeDraftVoidValidation(t *testing.T) {
 	}
 }
 
-// Audit F6 : pendant une finalisation (bourrage écrit hors du verrou de l'envoi), un segment ou
+// Pendant une finalisation (bourrage écrit hors du verrou de l'envoi), un segment ou
 // une plage de morceaux du même envoi est refusé (ErrBusy) : sinon l'aléa du bourrage pouvait
 // écraser des données reçues au même moment, ou l'inverse.
 func TestPutRefusedDuringFinalize(t *testing.T) {
@@ -502,7 +502,7 @@ func TestPutRefusedDuringFinalize(t *testing.T) {
 	}
 }
 
-// Audit F6 : une finalisation refusée après la fermeture de l'envoi (ici, palier final plus
+// Une finalisation refusée après la fermeture de l'envoi (ici, palier final plus
 // grand que la réservation) rend la main : les segments manquants sont de nouveau acceptés.
 func TestPutAcceptedAfterFailedFinalize(t *testing.T) {
 	s, _ := newSvc(t)

@@ -13,7 +13,7 @@ func TestReportsNeeded(t *testing.T) {
 	}
 }
 
-// Règle des voix (20 novembre) : 5 ouvertures permises, il faut 3 voix d'ouvertures
+// Règle des voix : 5 ouvertures permises, il faut 3 voix d'ouvertures
 // différentes ; la même ouverture qui signale deux fois ne compte qu'une fois ; une mauvaise
 // preuve compte un essai et ne vote pas ; un octroi faux est refusé sans essai.
 func TestReportVotesPerOpening(t *testing.T) {
@@ -81,7 +81,7 @@ func TestReportGrantOfOtherShare(t *testing.T) {
 	}
 }
 
-// Destruction par un destinataire : seulement par le DERNIER (audit du 20 novembre, M1) :
+// Destruction par un destinataire : seulement par le DERNIER :
 // refusée tant que d'autres ouvertures restent possibles, et refusée au premier destinataire
 // une fois toutes prises ; octroi absent ou faux refusé.
 func TestDestroyWithProofStillOpen(t *testing.T) {
@@ -113,7 +113,7 @@ func TestDestroyWithProofStillOpen(t *testing.T) {
 	}
 }
 
-// Voix oubliées quand le partage est effacé par n'importe quel chemin (audit du 20 novembre, B1).
+// Voix oubliées quand le partage est effacé par n'importe quel chemin.
 func TestReportVotesForgottenOnDestroy(t *testing.T) {
 	s, _ := newSvc(t)
 	k := newKeys()
@@ -136,7 +136,7 @@ func TestReportVotesForgottenOnDestroy(t *testing.T) {
 	}
 }
 
-// Signalement d'un partage encore en envoi : introuvable, pas une erreur interne (audit, B2).
+// Signalement d'un partage encore en envoi : introuvable, pas une erreur interne.
 func TestReportDuringUpload(t *testing.T) {
 	s, _ := newSvc(t)
 	k := newKeys()

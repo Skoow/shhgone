@@ -294,8 +294,8 @@ func TestEtatQueDesAgregats(t *testing.T) {
 		case reflect.Pointer:
 			voir(chemin, ty.Elem())
 		case reflect.Array:
-			// Tableau de taille fixe d'entiers seulement (signalements par catégorie, lot 6 du
-			// plan du compte) : jamais une liste qui grandit.
+			// Tableau de taille fixe d'entiers seulement (signalements par catégorie) :
+			// jamais une liste qui grandit.
 			if k := ty.Elem().Kind(); k != reflect.Int64 && k != reflect.Int {
 				t.Errorf("tableau non agrégé dans l'état : %s (%s)", chemin, ty.Elem().Kind())
 			}
@@ -311,11 +311,11 @@ func TestEtatQueDesAgregats(t *testing.T) {
 	voir("", reflect.TypeOf(State{}))
 }
 
-// Audit adverse du 13 novembre, 3e campagne (tableau de bord H1, site F3) : l'en-tête Host est
-// contrôlé. Seuls localhost, 127.0.0.1 et l'adresse d'écoute sont servis, sur n'importe quel
-// port (le tunnel SSH choisit le port local) ; tout autre nom (un site qui fait pointer son nom
-// vers la boucle locale, ou Caddy qui relaierait le nom public) reçoit le refus uniforme, page
-// comprise, même avec le bon jeton.
+// L'en-tête Host est contrôlé. Seuls localhost,
+// 127.0.0.1 et l'adresse d'écoute sont servis, sur n'importe quel port (le tunnel SSH choisit
+// le port local) ; tout autre nom (un site qui fait pointer son nom vers la boucle locale, ou
+// Caddy qui relaierait le nom public) reçoit le refus uniforme, page comprise, même avec le bon
+// jeton.
 func TestHoteControle(t *testing.T) {
 	b := nouveauBanc()
 	ref := b.faire(req{method: "GET", path: "/api/nimporte"})
@@ -357,10 +357,10 @@ func TestHoteControle(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 3e campagne, tableau de bord, F4 : aucun frein aux essais de
-// jeton (26 900 par seconde mesurés). Un jeton faux pose maintenant un délai global (rien par
-// adresse) : sa réponse, et celle de toute vérification arrivée entretemps, bonne ou fausse,
-// n'est rendue qu'à la fin du délai ; chaque jeton faux le prolonge, jusqu'à un plafond.
+// Aucun frein aux essais de jeton (26 900 par seconde
+// mesurés). Un jeton faux pose maintenant un délai global (rien par adresse) : sa réponse, et
+// celle de toute vérification arrivée entretemps, bonne ou fausse, n'est rendue qu'à la fin
+// du délai ; chaque jeton faux le prolonge, jusqu'à un plafond.
 // L'exploitant n'est jamais refusé : au pire il attend le plafond.
 func TestFreinApresJetonFaux(t *testing.T) {
 	const pas, plafond = 40 * time.Millisecond, 160 * time.Millisecond
@@ -431,7 +431,7 @@ func TestFreinApresJetonFaux(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 3e campagne, site F3 : après une coupure du tunnel, l'onglet
+// Après une coupure du tunnel, l'onglet
 // renvoyait le jeton toutes les 5 s à quiconque répondait sur ce port. Le script oublie
 // maintenant le jeton, arrête sa minuterie et revient à la saisie dès un refus (404) ou après
 // trois lectures sans réponse de suite. Le comportement est prouvé hors de ce dépôt de tests Go
@@ -465,9 +465,9 @@ func TestPageOublieLeJeton(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 3e campagne, tableau de bord, F6 : l'empreinte posée à la
-// compilation (-ldflags -X main.buildID, deploy/Dockerfile) est celle affichée ; vide, repli
-// sur l'empreinte vcs du binaire. Abrégée à 12 caractères, et rien d'autre que les caractères
+// L'empreinte posée à la compilation (-ldflags -X
+// main.buildID, deploy/Dockerfile) est celle affichée ; vide, repli sur l'empreinte vcs du
+// binaire. Abrégée à 12 caractères, et rien d'autre que les caractères
 // d'une empreinte ou d'une étiquette n'arrive dans l'état.
 func TestEmpreinteDeCompilation(t *testing.T) {
 	for id, want := range map[string]string{

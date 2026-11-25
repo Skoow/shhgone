@@ -24,8 +24,8 @@ import (
 // la demande ; la commande attend cet effacement (KillWait), sinon retire sa demande et
 // répond « introuvable ». La demande est vide et ne vit que quelques secondes.
 //
-// Nom à clé (audit du 13 novembre, D8) : un nom peut rester dans les blocs du dossier après
-// sa suppression ; hex(V_accès) y aurait confirmé, à qui détient le lien, qu'un partage a été
+// Nom à clé : un nom peut rester dans les blocs du dossier après sa suppression ;
+// hex(V_accès) y aurait confirmé, à qui détient le lien, qu'un partage a été
 // détruit par l'administrateur. La clé est tirée par le serveur à son premier passage
 // (PollRemoved) et réécrite en place dans <dossier des données>/kill.key à chaque démarrage :
 // un nom resté sur le disque ne se relie plus à un lien dès que la clé a changé. Dates du
@@ -66,8 +66,7 @@ func (s *Service) ensureKillKey() ([]byte, error) {
 	}
 	// Dossier des demandes créé ici, au premier passage du serveur, et non à la première
 	// destruction par l'administrateur : sa date de création (btime, que rien ne remet) ne dit
-	// plus l'heure de la première destruction (audit adverse du 13 novembre, 3e campagne,
-	// stockage, F5).
+	// plus l'heure de la première destruction.
 	if err := os.MkdirAll(s.killDir(), 0o700); err != nil {
 		return nil, err
 	}
@@ -123,7 +122,7 @@ func (s *Service) killLocked(id string, d *detached) {
 	s.notifyLocked(id)
 }
 
-// killAll : demande de « shhdrop admin wipe » : couper tous les partages détachés (revue B5).
+// killAll : demande de « shhdrop admin wipe » : couper tous les partages détachés.
 // Ce n'est pas un V_accès en hexadécimal : un serveur plus ancien l'ignore.
 const killAll = "all"
 
@@ -250,12 +249,12 @@ var fichiersDeDonnees = []string{"frozen", "kill", "kill.key", "shares.db", "sha
 // l'heure de ce passage, comme pour les autres fichiers (blob.Store.ScrubTimes). Sans cela,
 // ils donnaient à qui lit le disque l'heure du dernier gel ou dégel (frozen, dossier), de la
 // dernière destruction par l'administrateur (kill/) et de la dernière écriture en base
-// (shares.db, shares.db-wal), à la milliseconde (audit adverse du 13 novembre, 3e campagne,
-// stockage, F5). Après un passage, ces heures ne sont plus lisibles qu'à la période du janitor
-// près. Sans effet sur SQLite, qui ne lit jamais les dates de ses fichiers (son compteur de
-// changements est dans l'en-tête). La date de création (btime) reste : celle de frozen dit
-// l'heure du gel en cours (README §9). Fichier absent : ignoré ; la première autre erreur est
-// rendue, sans arrêter le passage. Sous la borne des appels disque des partages.
+// (shares.db, shares.db-wal), à la milliseconde. Après un passage, ces heures ne sont plus
+// lisibles qu'à la période du janitor près. Sans effet sur SQLite, qui ne lit jamais les dates
+// de ses fichiers (son compteur de changements est dans l'en-tête). La date de création (btime)
+// reste : celle de frozen dit l'heure du gel en cours (README §9). Fichier absent : ignoré ; la
+// première autre erreur est rendue, sans arrêter le passage. Sous la borne des appels disque
+// des partages.
 func (s *Service) ScrubDataTimes() error {
 	dir := filepath.Dir(s.FrozenFile)
 	var first error

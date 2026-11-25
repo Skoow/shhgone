@@ -66,7 +66,7 @@ func lecteurExterne(t *testing.T, dir string) (partir func()) {
 	return partir
 }
 
-// Audit adverse du 13 novembre, stockage, F1 : un vidage demandé est fait par Run sans que
+// Un vidage demandé est fait par Run sans que
 // l'appelant attende ; plusieurs demandes rapprochées ne font qu'un vidage par intervalle ;
 // une valeur nil ne fait rien.
 func TestVidageRegroupe(t *testing.T) {

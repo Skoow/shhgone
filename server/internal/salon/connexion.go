@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Connexions WebSocket du salon (plan C-2 Task 9, « Protocole », Review Focus 1 et 2) :
+// Connexions WebSocket du salon :
 // accueil, séquence d'accueil, rattrapage puis direct, contre-pression, ping.
 //
 // Écrivain à deux modes, une goroutine par connexion :
@@ -38,9 +38,9 @@ const (
 	// fileMax : enregistrements en attente au plus dans la file du direct.
 	fileMax = 256
 	// lotRattrapage : enregistrements lus au plus par lot de rattrapage. Le lot entier est en
-	// mémoire tant que le client ne l'a pas lu (jusqu'à ecritureMax) : 8 et non 64 (audit adverse
-	// du 13 novembre, 3e campagne, front serveur, D : 310 Kio par connexion, hors de tout budget ;
-	// le débit du rattrapage ne dépend pas de la taille du lot).
+	// mémoire tant que le client ne l'a pas lu (jusqu'à ecritureMax) : 8 et non 64 (64 tenaient
+	// 310 Kio par connexion, hors de tout budget ; le débit du rattrapage ne
+	// dépend pas de la taille du lot).
 	lotRattrapage = 8
 	// MemoireParConnexion : mémoire budgétée par WebSocket (config.computeCapacity, un test
 	// compare) : un lot de rattrapage tenu par un client qui ne lit plus (≈ 5 Kio par trame,
@@ -55,7 +55,7 @@ const (
 	controlesParMinute = 600
 	// repriseMax : reprises (0x0A) par heure et par siège, par WebSocket (au-delà, 4003) ou
 	// par rejoindre du créateur (au-delà, *Attente : 429 limit) : un membre qui recharge en
-	// boucle ne remplit pas le journal des annonces (relecture Task 6).
+	// boucle ne remplit pas le journal des annonces.
 	repriseMax = 20
 	// priveMax : réponses propres à la connexion (pong, limite, plein) en attente au plus ;
 	// au-delà, le client ne lit plus : 4006.
@@ -80,7 +80,7 @@ var errPanique = errors.New("salon: panique récupérée dans une connexion")
 // production. Ne pas paralléliser les tests qui le modifient (t.Parallel interdit).
 var crochetAccueil func()
 
-// Lien : WebSocket d'un membre, vu du salon (adaptateur coder/websocket à la Task 10).
+// Lien : WebSocket d'un membre, vu du salon (adaptateur coder/websocket dans le paquet api).
 //   - Lire rend le message binaire suivant ; un message texte rend ErrProtocole.
 //   - Ecrire envoie b en un message binaire ; b ne doit pas être modifié ni gardé.
 //   - Ping envoie un ping et attend le pong (ou l'échéance de ctx).
@@ -154,11 +154,12 @@ func (f *fermeur) fermer(code int) {
 
 // Servir sert le WebSocket l d'un membre jusqu'à sa fermeture : accueil dans les 5 s (sinon
 // 4001), jeton révoqué 4002, inconnu 4004 ; une seule connexion par siège (l'ancienne reçoit
-// 0x05 raison 4 et 4005) ; séquence d'accueil du « Protocole » ; reprise (DepuisReprise) :
-// nouveau nonce_arrivée annoncé par 0x0A, 20 par heure et par siège. autoriser() est
-// consultée avant chaque trame (limits.FrameGuard dans le serveur) : refus → 0x0B jusqu'à la
-// minute suivante, trame non rangée. ctx annulé : 1001. Rend nil, ou une erreur fixe si une
-// panique a été récupérée (rien n'est écrit dans un journal).
+// 0x05 raison 4 et 4005) ; séquence d'accueil
+// (docs/conception/specs/2026-11-11-salon-v3-design.md §17) ; reprise (DepuisReprise) : nouveau
+// nonce_arrivée annoncé par 0x0A, 20 par heure et par siège. autoriser() est consultée avant
+// chaque trame (limits.FrameGuard dans le serveur) : refus → 0x0B jusqu'à la minute suivante,
+// trame non rangée. ctx annulé : 1001. Rend nil, ou une erreur fixe si une panique a été
+// récupérée (rien n'est écrit dans un journal).
 func (m *Manager) Servir(ctx context.Context, l Lien, autoriser func() bool) (err error) {
 	m.servis.Add(1)
 	defer m.servis.Add(-1) // en dernier : après desinscrire (AttendreConnexions)
@@ -272,7 +273,7 @@ func accueillir(ctx context.Context, l Lien, f *fermeur) (Accueil, int) {
 }
 
 // inscrire : séquence d'accueil sous le verrou du salon. Reconnexion : 0x0D au rang
-// max(depuis, rang d'émission du jeton) plafonné au dernier rang (plan, point 7), puis un
+// max(depuis, rang d'émission du jeton) plafonné au dernier rang, puis un
 // 0x07 par siège occupé ; le rattrapage suit (écrivain). Reprise : 0x0A diffusé avec un
 // nonce neuf, 0x0D au rang de ce 0x0A, 0x07, direct. L'ancienne connexion du siège est
 // remplacée.
@@ -307,11 +308,11 @@ func (m *Manager) inscrire(ctx context.Context, mb Membre, a Accueil, l Lien) (*
 		x.nonce = nonce
 		x.repris = seq
 		x.reprises = append(x.reprises, now)
-		s.plusAttenduLocked(mb.siege) // nouvelle identité (plan, point 8)
+		s.plusAttenduLocked(mb.siege) // nouvelle identité
 		point = seq
 	} else {
 		// Borne dédiée (borneEffaces) : après une reprise par WebSocket, rien d'antérieur au
-		// 0x0A n'est servi, comme pour les 0x0E ci-dessous (décision du 12 novembre).
+		// 0x0A n'est servi, comme pour les 0x0E ci-dessous.
 		// Renouvellement (reglages.go) : rien de rang ≤ départ n'est plus servi ; le 0x0D au
 		// rang de départ donne les membres gardés.
 		point = min(max(a.Depuis, x.borneEffaces(), s.depart), s.seq)
@@ -341,7 +342,7 @@ func (m *Manager) inscrire(ctx context.Context, mb Membre, a Accueil, l Lien) (*
 		old.arreter(CodeRemplace, EnrFin(s.seq, RaisonRemplace))
 	}
 	s.conns[mb.siege] = c
-	x.jamaisConnecte = false              // connecté une fois : réservé pour la vie du salon (I3, N1)
+	x.jamaisConnecte = false              // connecté une fois : réservé pour la vie du salon
 	s.limites[mb.siege].vocal.ouvrir(now) // présence comptée pour la réserve vocale
 	s.diffuserLocked(EnrPresence(s.seq, mb.siege, true, 0), genrePresence, c)
 	return c, 0
@@ -349,7 +350,7 @@ func (m *Manager) inscrire(ctx context.Context, mb Membre, a Accueil, l Lien) (*
 
 // presencesLocked : un 0x07 par siège occupé (en ligne s'il a une connexion ; soi, le siège
 // de la connexion servie, toujours en ligne), hors ligne avec la minute de sa dernière
-// déconnexion (Task 9b).
+// déconnexion.
 func (s *salon) presencesLocked(soi uint8) [][]byte {
 	var out [][]byte
 	for n, x := range s.sieges {
@@ -361,7 +362,7 @@ func (s *salon) presencesLocked(soi uint8) [][]byte {
 }
 
 // listeLocked : annonces du 0x0D au rang point (etatAuLocked), chacune avec la dernière
-// connexion de son occupant (Task 9b) s'il occupe encore le siège (arrivée au plus tard à
+// connexion de son occupant s'il occupe encore le siège (arrivée au plus tard à
 // point) et s'il est hors ligne ; 0 sinon, et pour soi.
 func (s *salon) listeLocked(point uint64, soi uint8) []Annonce {
 	l := s.etatAuLocked(point)
@@ -374,8 +375,8 @@ func (s *salon) listeLocked(point uint64, soi uint8) []Annonce {
 }
 
 // desinscrire retire c de son siège s'il l'occupe encore (pas remplacé) : siège hors ligne,
-// toujours réservé (revue finale C-2, I3), minute de la déconnexion gardée en mémoire
-// (Task 9b) et 0x07 hors ligne diffusé avec elle.
+// toujours réservé, minute de la déconnexion gardée en mémoire et 0x07 hors ligne diffusé
+// avec elle.
 func (m *Manager) desinscrire(c *connexion) {
 	s := c.s
 	s.mu.Lock()
@@ -642,8 +643,7 @@ func (c *connexion) traiter(d Demande, autoriser func() bool) bool {
 
 // codeErreur : code de fermeture d'une erreur de Recevoir, Retirer, Lu ou Quitter. Requête
 // invalide : 4003 ; membre périmé (jeton remplacé, oublié, salon fini) : 4004 ; exclu : 4002 ;
-// toute autre erreur (ErrES, ErrInutilisable, ErrPleine…) : 1011, jamais 4003 (relecture
-// Task 8).
+// toute autre erreur (ErrES, ErrInutilisable, ErrPleine…) : 1011, jamais 4003.
 func codeErreur(err error) int {
 	switch {
 	case errors.Is(err, ErrBadRequest):
@@ -682,8 +682,8 @@ func (c *connexion) repondre(enr func(seq uint64) []byte) {
 	c.signaler()
 }
 
-// accepter : 0x0F de la trame de rang seq pour ce client seul (revue finale C-2, I1), en
-// direct comme en rattrapage, sans jamais fermer ni faire sortir du direct.
+// accepter : 0x0F de la trame de rang seq pour ce client seul, en direct comme en
+// rattrapage, sans jamais fermer ni faire sortir du direct.
 func (c *connexion) accepter(seq uint64) {
 	s := c.s
 	s.mu.Lock()
@@ -820,7 +820,7 @@ func (c *connexion) etapeLocked() (lot [][]byte, refs lotRefs, gen uint64, e eta
 	// Conversation prise avec les refs : un renouvellement la remplace, un lot lu hors du
 	// verrou lit toujours celle de ses emplacements (détruite : trames sautées, lireRefs).
 	refs = lotRefs{conv: s.conv, l: s.refsLocked(c.curseur, lotRattrapage)}
-	// Toute trame se lit hors du verrou (audit adverse du 13 novembre, F1 et F2 : aucune
+	// Toute trame se lit hors du verrou (aucune
 	// lecture du disque, ni attente de la borne des lectures, sous s.mu). Le passage au direct
 	// se fait donc au premier passage où il ne reste que des annonces (en mémoire) ou rien.
 	if len(refs.l) == lotRattrapage || aDesTrames(refs.l) {
@@ -883,7 +883,7 @@ func (c *connexion) avancer(seq uint64) {
 
 func (s *salon) estFini() bool { return s.finiA.Load() }
 
-// FermerTout (arrêt du serveur, srv.RegisterOnShutdown, Task 15) ferme toutes les connexions
+// FermerTout (arrêt du serveur, srv.RegisterOnShutdown) ferme toutes les connexions
 // en 1001 sans attendre leur fin ; une connexion dont l'accueil arrive ensuite est fermée en
 // 1001 sans être inscrite (net/http ne suit plus une connexion mise à niveau : Shutdown ne
 // l'attend pas). Définitif pour ce Manager.

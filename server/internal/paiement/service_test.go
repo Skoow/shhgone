@@ -163,8 +163,8 @@ func TestCommanderRefus(t *testing.T) {
 	}
 }
 
-// Plafond des commandes en attente (§8 ; audit du 20 novembre, S2) : seules les commandes
-// encore en attente ET créées dans les dernières heures bloquent les ventes.
+// Plafond des commandes en attente (§8) : seules les commandes encore en attente ET
+// créées dans les dernières heures bloquent les ventes.
 func TestCommanderPlafondEnAttente(t *testing.T) {
 	b := nouveauBanc(t)
 	passI := func(i int) Pass {

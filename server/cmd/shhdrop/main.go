@@ -37,7 +37,7 @@ func main() { os.Exit(runCmd(os.Args, os.Stdout, os.Stderr)) }
 var serveFn = serve
 
 // runCmd : commande args[1]. Rien de ce que le programme ne maîtrise pas n'est recopié sur
-// stderr (audit F3, F4) : ni l'argument reçu (il peut contenir un lien collé par erreur), ni
+// stderr : ni l'argument reçu (il peut contenir un lien collé par erreur), ni
 // une erreur système (son chemin peut contenir l'identifiant interne d'un partage), voir
 // publicMessage. Les erreurs de configuration (config.FromEnv) ne reprennent que les valeurs
 // données par l'exploitant.
@@ -68,7 +68,7 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		// Les commandes d'administration lisent le lien signalé (K_accès en mémoire) : même
-		// durcissement que le serveur (audit adverse du 13 novembre, stockage, H1).
+		// durcissement que le serveur.
 		if err := durcir(cfg); err != nil {
 			fmt.Fprintln(stderr, "erreur:", publicMessage(err))
 			return 1
@@ -81,10 +81,10 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 }
 
 // durcir : interdit core dump et lecture de /proc/<pid>/mem par un autre processus (clés en
-// mémoire, audit adverse du 13 novembre, Z2 ; durcirProcessus, sans effet hors Linux).
+// mémoire ; durcirProcessus, sans effet hors Linux).
 // SHH_DISABLE_DUMPABLE_HARDENING=1, qui l'éteint pour le test « le serveur ne voit rien », est
 // refusée en production (SHH_BEHIND_PROXY=1) : un fichier compose ajouté ne peut pas ouvrir
-// cette porte sans que le serveur le dise (2e passage, stockage, H1).
+// cette porte sans que le serveur le dise.
 func durcir(cfg config.Config) error {
 	if cfg.BehindProxy && os.Getenv("SHH_DISABLE_DUMPABLE_HARDENING") == "1" {
 		return shown("SHH_DISABLE_DUMPABLE_HARDENING=1 est réservée aux essais (elle rend la mémoire du serveur " +
@@ -153,7 +153,7 @@ func placeholder() http.Handler {
 // prepareDataDir : SHH_DATA_DIR (absolu, vérifié par config) est créé s'il n'existe pas.
 // Un dossier existant doit être vide (premier démarrage) ou contenir shares.db et blobs/ :
 // sinon c'est sans doute le dossier d'un autre programme (/var, $HOME…), dont tightenPerms
-// forcerait les droits et dont Reconcile effacerait des fichiers (audit F5).
+// forcerait les droits et dont Reconcile effacerait des fichiers.
 func prepareDataDir(dir string) error {
 	es, err := os.ReadDir(dir)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -184,7 +184,7 @@ var diskFree = statfsFree
 const storageMargin = 1 << 30
 
 // checkStorage : SHH_STORAGE_MAX doit tenir dans l'espace libre plus la place déjà
-// réservée par les fichiers, moins 1 Gio de marge (audit F6).
+// réservée par les fichiers, moins 1 Gio de marge.
 func checkStorage(dataDir string, max int64, used int64) error {
 	free, err := diskFree(dataDir)
 	if err != nil {
@@ -253,10 +253,10 @@ const salonWait = 5 * time.Second
 
 // setupSalons : sans SHH_SALONS=1, rien (nil : aucune route, ExtraUsed des partages non câblé,
 // aucun dossier créé). Sinon le gestionnaire du salon, dossiers en 0700, purge au démarrage
-// faite (plan C-2, point 11 : avant l'écoute), et l'usage du salon ajouté à celui des
-// partages (ExtraUsed). Le gestionnaire voit les partages par UsedShares, qui n'inclut
-// jamais ExtraUsed : aucun double compte. cpt (SHH_COMPTES=1, sinon nil) : le gestionnaire lit
-// le palier d'un compte dans cpt.svc, créé ensuite par brancherComptes (avant l'écoute).
+// faite (avant l'écoute), et l'usage du salon ajouté à celui des partages (ExtraUsed). Le
+// gestionnaire voit les partages par UsedShares, qui n'inclut jamais ExtraUsed : aucun double
+// compte. cpt (SHH_COMPTES=1, sinon nil) : le gestionnaire lit le palier d'un compte dans
+// cpt.svc, créé ensuite par brancherComptes (avant l'écoute).
 func setupSalons(cfg config.Config, db *sql.DB, svc *share.Service, lim *limits.Limiter, gate *blob.Gate,
 	vidage *store.Vidage, cpt *comptes) (*salon.Manager, error) {
 	if !cfg.Salons {
@@ -311,8 +311,8 @@ func setupComptes(cfg config.Config) (*comptes, error) {
 	return &comptes{db: db, cles: cles}, nil
 }
 
-// brancherComptes : service du compte (aucune connexion sortante : plus d'e-mail depuis le
-// 22 novembre), sur le limiteur de l'API. sm (SHH_SALONS=1, sinon nil) : crochets des salons du
+// brancherComptes : service du compte (aucune connexion sortante : plus d'e-mail), sur le
+// limiteur de l'API. sm (SHH_SALONS=1, sinon nil) : crochets des salons du
 // compte (fermeture, nombre, liste, destruction).
 func brancherComptes(cfg config.Config, cpt *comptes, lim *limits.Limiter, sm *salon.Manager) error {
 	if cfg.Comptes && cpt != nil {
@@ -401,13 +401,13 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	}
 	// En production (derrière le proxy), pas de fichier creux : la place doit être allouée.
 	// Limites en mémoire ; un envoi effacé sans finalize compte en octets abandonnés (§29.5).
-	// Une seule borne des appels de fichiers pour les partages et les pièces (audit D4).
+	// Une seule borne des appels de fichiers pour les partages et les pièces.
 	gate := blob.NewGate(max(1, cfg.Capacity.DiskOps))
-	// Vidages regroupés du WAL, communs aux partages et aux salons (stockage, F1) ; leur boucle
+	// Vidages regroupés du WAL, communs aux partages et aux salons ; leur boucle
 	// tourne plus bas, avec le janitor.
 	vidage := store.NewVidage(db)
 	lim := limits.New(cfg.Now)
-	lim.SetStorage(cfg.StorageMaxBytes) // part équitable du stockage (audit D2)
+	lim.SetStorage(cfg.StorageMaxBytes) // part équitable du stockage
 	lim.SetSegmentsPerMin(cfg.Capacity.SegmentsPerMin)
 	svc, err := share.NewService(share.Config{DB: db, OnAbandon: func(id string, _ int) { lim.AbandonUpload(id) },
 		Blobs: &blob.Store{Dir: filepath.Join(cfg.DataDir, "blobs"), NoSparse: cfg.BehindProxy, Gate: gate},
@@ -451,11 +451,10 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	// Vidage du WAL au démarrage, APRÈS les purges (partages : PurgeAtStart et Reconcile ;
 	// salons : PurgerAuDemarrage) et avant l'écoute : ni un -wal laissé par un arrêt brutal ni
 	// les lignes que les purges viennent d'effacer ne restent lisibles dans shares.db-wal ou
-	// dans shares.db (audit adverse du 13 novembre, St1 ; 2e passage, stockage, F2 : placé avant
-	// les purges, il laissait les partages purgés dans la base jusqu'au premier passage du
-	// janitor, ≈ 55 s). Base occupée : seul un autre processus peut la tenir ici (outil de
-	// sauvegarde, sqlite3) ; refus de démarrer, message fixe (store.ErrCheckpointBusy), comme
-	// le fait déjà la purge des salons.
+	// dans shares.db (placé avant les purges, il laissait les partages purgés dans la base
+	// jusqu'au premier passage du janitor, ≈ 55 s). Base occupée : seul un autre processus peut
+	// la tenir ici (outil de sauvegarde, sqlite3) ; refus de démarrer, message fixe
+	// (store.ErrCheckpointBusy), comme le fait déjà la purge des salons.
 	if err := store.Checkpoint(db); err != nil {
 		return err
 	}

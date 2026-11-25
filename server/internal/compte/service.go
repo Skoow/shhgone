@@ -36,7 +36,7 @@ type Service struct {
 	et  etapes
 	act activites
 
-	// Crochets du salon (lot 6) : fermer les salons créés par un compte, les compter, les
+	// Crochets du salon : fermer les salons créés par un compte, les compter, les
 	// lister, en détruire un. nil (salon désactivé, tests) : aucun salon relié.
 	fermerSalons, salonsActifs func(h [16]byte) (int, error)
 	salonsVivants              func(h [16]byte) ([]SalonVivant, error)
@@ -192,7 +192,7 @@ const (
 	ClePubMax     = 1024
 	PasskeysMax   = 10
 	EnveloppeLen  = 60
-	EnveloppesMax = 4 // par passkey (correction du 22 novembre, « enveloppes multiples »)
+	EnveloppesMax = 4 // par passkey (« enveloppes multiples »)
 )
 
 func algOK(a int64) bool { return a == -7 || a == -8 || a == -257 }
@@ -404,10 +404,10 @@ func (s *Service) PseudoVerifier(c Courante, pCanon []byte) (bool, error) {
 	return s.pseudoLibre(pCanon)
 }
 
-// PseudoVerifierInvite : pseudo d'un invité du salon (décision du propriétaire, 22 novembre :
-// unique dans sa conversation, et jamais le pseudo d'un compte, ni réservé, ni interdit). Sans
-// compte ni salon : la requête ne dit pas de quel salon il s'agit et rien n'est gardé ; bornée
-// par connexion (limits.AllowPseudoInvite) contre l'énumération des pseudos des comptes.
+// PseudoVerifierInvite : pseudo d'un invité du salon (unique dans sa conversation, et jamais
+// le pseudo d'un compte, ni réservé, ni interdit). Sans compte ni salon : la requête ne dit
+// pas de quel salon il s'agit et rien n'est gardé ; bornée par connexion
+// (limits.AllowPseudoInvite) contre l'énumération des pseudos des comptes.
 func (s *Service) PseudoVerifierInvite(ip netip.Addr, pCanon []byte) (bool, error) {
 	if len(pCanon) == 0 {
 		return false, ErrRequete
@@ -418,17 +418,16 @@ func (s *Service) PseudoVerifierInvite(ip netip.Addr, pCanon []byte) (bool, erro
 	return s.pseudoLibre(pCanon)
 }
 
-// PseudoEcart : temps minimal entre deux changements de pseudo (décision du propriétaire,
-// 20 novembre : « 3 fois par an au plus ») ; 123 jours : 3 × 123 = 369 > 366, jamais plus de
-// 3 changements sur 12 mois glissants, même une année bissextile (audit, B4), sans nouvelle
-// colonne (pseudo_jour suffit).
+// PseudoEcart : temps minimal entre deux changements de pseudo (« 3 fois par an au plus ») ;
+// 123 jours : 3 × 123 = 369 > 366, jamais plus de 3 changements sur 12 mois glissants, même
+// une année bissextile, sans nouvelle colonne (pseudo_jour suffit).
 const PseudoEcart = 123 * jourS
 
 // ChangerPseudo : au plus un changement par PseudoEcart, l'attente ne courant qu'à partir d'un
-// premier changement (décision du propriétaire, 14 novembre : pseudo_jour vaut 0 tant que le
-// pseudo n'a jamais changé ; le premier, depuis le pseudo de l'inscription, est donc libre) ;
-// l'ancien pseudo est libéré aussitôt (§21.5). Pris, réservé ou interdit : ErrPseudoPris (le
-// nouveau doit toujours être libre). Le même pseudo que le sien : rien à faire.
+// premier changement (pseudo_jour vaut 0 tant que le pseudo n'a jamais changé ; le premier,
+// depuis le pseudo de l'inscription, est donc libre) ; l'ancien pseudo est libéré aussitôt
+// (§21.5). Pris, réservé ou interdit : ErrPseudoPris (le nouveau doit toujours être libre). Le
+// même pseudo que le sien : rien à faire.
 func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
 	pe, err := s.empreintePseudo(pCanon)
 	if err != nil {
@@ -450,7 +449,7 @@ func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
 		if pe != [32]byte{} && subtle.ConstantTimeCompare(actuel, pe[:]) == 1 {
 			return nil
 		}
-		// « Pris » dit l'existence d'un compte : même limite que pseudo/verifier (audit, M3).
+		// « Pris » dit l'existence d'un compte : même limite que pseudo/verifier.
 		if !s.lim.AllowPseudoVerifier(c.H[:]) {
 			return ErrLimit{heureSuivante(now)}
 		}

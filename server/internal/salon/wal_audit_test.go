@@ -13,11 +13,11 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Audit adverse du 13 novembre, 2e passage, stockage, F1 : aucune fin de salon ne vidait le
-// WAL (seuls la purge au démarrage, la destruction par l'administrateur et le wipe le
-// faisaient) : identifiant, vérificateurs, sel et échéance restaient dans shares.db-wal et dans
-// shares.db jusqu'au passage du janitor (60 s au plus). Toute fin de salon et tout
-// renouvellement demandent maintenant un vidage regroupé (store.Vidage), fait dans la seconde.
+// Aucune fin de salon ne vidait le WAL (seuls la purge au
+// démarrage, la destruction par l'administrateur et le wipe le faisaient) : identifiant,
+// vérificateurs, sel et échéance restaient dans shares.db-wal et dans shares.db jusqu'au
+// passage du janitor (60 s au plus). Toute fin de salon et tout renouvellement demandent
+// maintenant un vidage regroupé (store.Vidage), fait dans la seconde.
 
 // bancVidage : banc dont la boucle des vidages regroupés tourne, comme dans le serveur.
 func bancVidage(t *testing.T) *banc {
@@ -135,9 +135,8 @@ func TestRenouvellementVideLeWAL(t *testing.T) {
 }
 
 // Rotation de l'invitation (exclusion) : l'ancien V_accès, l'ancien V_preuve et l'ancien sel ne
-// restent ni dans le -wal ni dans la base (audit adverse du 13 novembre, 3e campagne, stockage,
-// F6 : seule réécriture de vérificateurs qui ne demandait pas de vidage ; ils restaient
-// jusqu'au passage du janitor, 60 s au plus).
+// restent ni dans le -wal ni dans la base (seule réécriture de vérificateurs qui ne demandait
+// pas de vidage ; ils restaient jusqu'au passage du janitor, 60 s au plus).
 func TestRotationVideLeWAL(t *testing.T) {
 	b := bancVidage(t)
 	c, r := b.creerRepere(t)

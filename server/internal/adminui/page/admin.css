@@ -68,7 +68,7 @@ code { font: .875em ui-monospace, SFMono-Regular, Menlo, monospace; background: 
 .large { grid-column: 1 / -1; }
 .apres { margin-top: .875rem; max-width: 34rem; }
 
-/* Lot 7 : onglets (ancres), signalements, bannissements, comptes. */
+/* Onglets (ancres), signalements, bannissements, comptes. */
 .onglets {
   grid-column: 1 / -1; position: sticky; top: 0; z-index: 1; display: flex; gap: .25rem; overflow-x: auto;
   padding: .5rem 0; background: var(--bg); border-bottom: 1px solid var(--line); scrollbar-width: thin;

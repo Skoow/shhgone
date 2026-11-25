@@ -30,8 +30,8 @@ const (
 	gardePass    = 31 * jourS  // pass après sa fin : validité des jetons émis
 	maxEnAttente = 1000        // commandes en attente récentes au plus (§8)
 	// heuresRecentes : une commande est « récente » pendant l'heure UTC de sa création et les
-	// heuresRecentes-1 suivantes (3 à 4 h ; audit du 20 novembre, S2). Seules les récentes
-	// bloquent les ventes ; la ligne reste 7 jours (gardeAttente) pour un paiement tardif.
+	// heuresRecentes-1 suivantes (3 à 4 h). Seules les récentes bloquent les ventes ; la
+	// ligne reste 7 jours (gardeAttente) pour un paiement tardif.
 	heuresRecentes = 4
 	periodeJetons  = 30 * jourS
 )
@@ -218,10 +218,10 @@ func (s *Service) Moyens() []Moyen {
 }
 
 // vendable : le moyen m peut prendre une nouvelle commande. Sous le régime OSS, jamais la crypto
-// (décision du propriétaire, 24 novembre ; conception §9.1, S3) : au-delà du seuil, l'OSS exige
-// deux preuves de localisation non contradictoires, et un paiement crypto n'en donne qu'une (le
-// pays déclaré). Le prestataire reste inscrit pour ses webhooks (PrestataireDe) : un paiement
-// tardif ou un remboursement d'une commande passée avant le changement de régime est traité.
+// (conception §9.1) : au-delà du seuil, l'OSS exige deux preuves de localisation non
+// contradictoires, et un paiement crypto n'en donne qu'une (le pays déclaré). Le prestataire
+// reste inscrit pour ses webhooks (PrestataireDe) : un paiement tardif ou un remboursement d'une
+// commande passée avant le changement de régime est traité.
 func (s *Service) vendable(m Moyen) bool {
 	return m >= Carte && m <= Crypto && s.prest[m] != nil && !(m == Crypto && s.regime == OSS)
 }
@@ -263,9 +263,9 @@ func (s *Service) Commander(ctx context.Context, p Pass, f Formule, pays string,
 	q := p.Empreinte()
 	now := s.now()
 	auj := jourDe(now)
-	// Plafond (§8, audit du 20 novembre, S2) : 1 000 commandes à la fois encore en attente ET
-	// créées dans les dernières heures. Les commandes en attente plus anciennes (gardées 7 jours
-	// pour un paiement tardif) ne bloquent plus les ventes : il faut entretenir l'attaque.
+	// Plafond (§8) : 1 000 commandes à la fois encore en attente ET créées dans les dernières
+	// heures. Les commandes en attente plus anciennes (gardées 7 jours pour un paiement tardif)
+	// ne bloquent plus les ventes : il faut entretenir l'attaque.
 	if s.nRecentes(now) >= maxEnAttente {
 		var n int
 		if err := s.db.QueryRow(`SELECT count(*) FROM commandes WHERE etat=?`, etatAttente).Scan(&n); err != nil {
@@ -450,7 +450,7 @@ func (s *Service) Webhook(ctx context.Context, pr Prestataire, h http.Header, co
 }
 
 // cibleur : prestataire dont la vérification d'un webhook coûte un appel sortant authentifié
-// (PayPal). Audit du 20 novembre, S3 : avant de vérifier, Service.Webhook lit (Cibles, sans
+// (PayPal). Avant de vérifier, Service.Webhook lit (Cibles, sans
 // vérification) ce que vise le webhook ; s'il ne vise aucune commande connue chez nous, quel que
 // soit son état, il est refusé comme une signature fausse, sans appel sortant. Ces valeurs non
 // vérifiées ne servent qu'à cette recherche ; Lire relit le corps après vérification.
@@ -684,8 +684,8 @@ func crediter(tx *sql.Tx, l ligneCommande, auj int64) (int64, error) {
 	return fin, err
 }
 
-// Prendre : jusqu'à n jetons de la réserve du pass de p (émission des jetons anonymes, plan
-// tâche 7). La réserve est remise à sa valeur à chaque période de 30 jours commencée avant la
+// Prendre : jusqu'à n jetons de la réserve du pass de p (émission des jetons
+// anonymes). La réserve est remise à sa valeur à chaque période de 30 jours commencée avant la
 // fin (sans report). Rend le nombre pris (0 : pass inconnu, révoqué, échu ou réserve vide).
 func (s *Service) Prendre(p Pass, n int) (int, Offre, error) {
 	if n <= 0 {

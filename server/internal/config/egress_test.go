@@ -6,7 +6,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// SHH_SHARE_EGRESS_MAX : octets servis au plus par un partage (décision du 24 novembre). Absent :
+// SHH_SHARE_EGRESS_MAX : octets servis au plus par un partage. Absent :
 // 0 (le service prend share.DefaultEgressMax) ; au moins share.MinEgressMax, entier décimal.
 func TestFromEnvShareEgressMax(t *testing.T) {
 	t.Setenv("SHH_DATA_DIR", "/d")

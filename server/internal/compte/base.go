@@ -20,7 +20,7 @@ import (
 // v_r (SHA-256 de A_r, index unique : la clé de récupération seule retrouve le compte) ; env_r
 // (K_compte enveloppée par la clé de récupération, 60) ; coffres de profil et privé au palier
 // exact (4, 16, 64 ou 256 Kio + 45 octets) avec leur gen ; ancienneté. Aucune adresse, aucun
-// mot de passe, aucun TOTP, aucun séquestre (retirés le 22 novembre).
+// mot de passe, aucun TOTP, aucun séquestre.
 // passkeys : cred_id (1 à 1 023) ; h ; clé publique COSE (≤ 1 024) ; algorithme (−7, −8,
 // −257) ; be (passkey synchronisable) ; etiquette (libellé chiffré par l'appareil, 64, ou
 // rien) ; mois d'ajout. Jamais d'AAGUID, de transports, d'attestation, de compteur, de BS ni de
@@ -28,13 +28,13 @@ import (
 // enveloppes : K_compte enveloppée par une sortie PRF de la passkey cred_id (60), au plus 4 par
 // passkey (n de 0 à 3) : une même passkey peut rendre des sorties différentes selon le chemin
 // (local, QR) ou la version (iCloud, 1Password) ; chaque sortie observée a son enveloppe
-// (correction du 22 novembre, « enveloppes multiples »). Ni date, ni ordre d'usage ; effacées
+// (« enveloppes multiples »). Ni date, ni ordre d'usage ; effacées
 // avec la passkey, jamais une à une.
 // sessions : t_v (SHA-256 du jeton) ; sid (identifiant montré) ; h (effacées avec le compte) ;
 // etiquette (nom d'appareil chiffré par le client, 64) ; mois d'ajout ; jour d'échéance ;
-// par_recup (session ouverte par la clé de récupération, R4).
+// par_recup (session ouverte par la clé de récupération).
 // bannis : id (8, montré au fondateur) ; h (effacé avec le compte : un nouveau compte se crée
-// sans coût, R2) ; début et échéance ; actif ; motif (catégorie 1 à 10, §21.10.1) ; salons
+// sans coût) ; début et échéance ; actif ; motif (catégorie 1 à 10, §21.10.1) ; salons
 // fermés.
 var schemaComptes = `
 CREATE TABLE IF NOT EXISTS comptes(
@@ -108,8 +108,8 @@ func coffreCheck(col string) string {
 		4096+45, 16384+45, 65536+45, 262144+45)
 }
 
-// VersionBase : version du schéma de comptes.db (PRAGMA user_version). 3 : compte par passkey
-// (22 novembre). Les versions 1 et 2 (compte par e-mail) ne sont jamais migrées : le service
+// VersionBase : version du schéma de comptes.db (PRAGMA user_version). 3 : compte par
+// passkey. Les versions 1 et 2 (compte par e-mail) ne sont jamais migrées : le service
 // n'a jamais été ouvert (conception du compte par passkey §15).
 const VersionBase = 3
 

@@ -20,9 +20,9 @@ func salonAccessKeyOf(link string) ([]byte, bool) {
 	return k, err == nil && salon
 }
 
-// Audit adverse du 13 novembre, 3e campagne, stockage, F4 : le lien signalé est traité en
-// octets de bout en bout. cleAccesDuLien ne garde aucune copie du lien : il travaille dans la
-// tranche reçue (que l'appelant efface) et efface K_lien décodée. Vérifié ici sur ce qui est
+// Le lien signalé est traité en octets de bout en bout.
+// cleAccesDuLien ne garde aucune copie du lien : il travaille dans la tranche reçue (que
+// l'appelant efface) et efface K_lien décodée. Vérifié ici sur ce qui est
 // observable : la tranche n'est pas modifiée (l'appelant l'efface lui-même), les mêmes liens
 // qu'avant sont acceptés ou refusés, et lireLien rend un seul tampon, borné.
 func TestLienEnOctets(t *testing.T) {
@@ -66,9 +66,9 @@ func TestLienEnOctets(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 3e campagne, stockage, F5 : le gel et le dégel ne laissent
-// l'heure de l'action ni sur frozen ni sur le dossier de données (dates de contenu et d'accès à
-// l'epoch tout de suite ; le ctime est ramené par le janitor).
+// Le gel et le dégel ne laissent l'heure de l'action ni sur
+// frozen ni sur le dossier de données (dates de contenu et d'accès à l'epoch tout de suite ; le
+// ctime est ramené par le janitor).
 func TestGelSansDate(t *testing.T) {
 	dir := t.TempDir()
 	frozen := filepath.Join(dir, "frozen")

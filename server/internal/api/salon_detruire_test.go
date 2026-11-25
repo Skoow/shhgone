@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// ---- Destruction du salon (plan C-2 Task 15, spec §39.3.9) ----
+// ---- Destruction du salon (spec §39.3.9) ----
 
 func (e *env) detruireSalon(hdr map[string]string, body string) int {
 	return e.do(req{method: "POST", path: "/api/salons/detruire", hdr: hdr, body: []byte(body)}).Code
@@ -90,7 +90,7 @@ func TestDetruireSignalement(t *testing.T) {
 	}
 }
 
-// Revue finale C-2, mineur (d) : un seul signalement par salon, « Quitter et signaler » et
+// Un seul signalement par salon, « Quitter et signaler » et
 // « Détruire et signaler » confondus (même booléen signale) : le membre signale (+1), puis le
 // créateur détruit en signalant : 200, toujours 1.
 func TestDetruireSignalementUneFoisParSalon(t *testing.T) {

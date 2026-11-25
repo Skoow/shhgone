@@ -6,18 +6,6 @@ import (
 	"strings"
 )
 
-// ClientIP rend l'adresse du client (spec §8, « IP de confiance »).
-//
-// L'en-tête X-Shh-Client-IP n'est cru que si le pair TCP est un proxy de confiance : la
-// boucle locale (127.0.0.0/8 ou ::1), ou un réseau de proxies (SHH_TRUSTED_PROXY, par
-// exemple le réseau Docker de Caddy). X-Forwarded-For n'est jamais lu. Si l'en-tête manque
-// ou est invalide, on rend l'adresse du proxy : toutes ces requêtes partagent alors les
-// mêmes limites (échec du côté sûr). Rend une adresse invalide si RemoteAddr est illisible.
-func ClientIP(r *http.Request, proxies []netip.Prefix) netip.Addr {
-	a, _, _ := clientIP(r, proxies)
-	return a
-}
-
 // isProxy : pair dont X-Shh-Client-IP est cru.
 func isProxy(peer netip.Addr, proxies []netip.Prefix) bool {
 	if peer.IsLoopback() {
@@ -31,7 +19,15 @@ func isProxy(peer netip.Addr, proxies []netip.Prefix) bool {
 	return false
 }
 
-// clientIP rend aussi trusted = faux pour une requête d'un proxy sans X-Shh-Client-IP
+// clientIP rend l'adresse du client (spec §8, « IP de confiance »).
+//
+// L'en-tête X-Shh-Client-IP n'est cru que si le pair TCP est un proxy de confiance : la
+// boucle locale (127.0.0.0/8 ou ::1), ou un réseau de proxies (SHH_TRUSTED_PROXY, par
+// exemple le réseau Docker de Caddy). X-Forwarded-For n'est jamais lu. Si l'en-tête manque
+// ou est invalide, on rend l'adresse du proxy : toutes ces requêtes partagent alors les
+// mêmes limites (échec du côté sûr). Rend une adresse invalide si RemoteAddr est illisible.
+//
+// Rend aussi trusted = faux pour une requête d'un proxy sans X-Shh-Client-IP
 // valide, et proxied = le pair est un proxy de confiance (derrière le proxy,
 // SHH_BEHIND_PROXY=1, toute requête doit avoir trusted et proxied). Seul endroit, avec
 // /healthz, qui lit l'adresse du pair (spec §36 S2, minimize_test.go).

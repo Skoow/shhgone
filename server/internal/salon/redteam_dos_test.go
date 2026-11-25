@@ -13,8 +13,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 )
 
-// Non-régression de l'audit adverse du 13 novembre, 2e passage, front « serveur Go et déni de
-// service » (F1, F2, F3). Les démonstrations de l'audit (R1 à R5) sont reprises ici, retournées :
+// Non-régression : déni de service du serveur. Chaque test reprend une attaque, retournée :
 // ce qui prouvait la faiblesse doit maintenant échouer.
 
 // borneOccupee : toutes les places de g prises par des appels qui ne rendent qu'à l'appel de

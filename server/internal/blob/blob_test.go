@@ -183,7 +183,7 @@ func TestRemoveProbes(t *testing.T) {
 	}
 }
 
-// Revue B4 : Sync force le contenu du fichier sur le disque (avant « ready ») ; les dates
+// Sync force le contenu du fichier sur le disque (avant « ready ») ; les dates
 // restent à l'epoch ; fichier absent : fs.ErrNotExist ; identifiant invalide refusé.
 func TestSync(t *testing.T) {
 	s := &Store{Dir: t.TempDir()}
@@ -209,7 +209,7 @@ func TestSync(t *testing.T) {
 	}
 }
 
-// Audit du salon (12 novembre), D7 : le dossier gardait l'heure de la dernière création ou
+// Le dossier gardait l'heure de la dernière création ou
 // suppression de fichier. Ses dates de modification et d'accès sont remises à l'epoch après
 // chaque Reserve et chaque Delete, comme celles des fichiers (wipeTimes).
 func TestDossierSansDate(t *testing.T) {

@@ -119,7 +119,7 @@ func clePour(t *testing.T, j *Jetons, o Offre, decalage int64) []byte {
 	return nil
 }
 
-// TestJetonsClesAvance (S17) : clés d'aujourd'hui à J+JoursAvance, une par formule et par jour,
+// TestJetonsClesAvance : clés d'aujourd'hui à J+JoursAvance, une par formule et par jour,
 // toutes différentes, servies dans l'ordre (jour, Plus, Pro) ; la clé d'un jour ne change pas
 // d'un appel à l'autre, ni le lendemain (J+1 d'hier = J d'aujourd'hui), ni après redémarrage
 // (base, cache vide) ; l'acceptation reste le jour de la clé et le lendemain.

@@ -15,7 +15,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 )
 
-// Disparition pendant un téléchargement (spec §41.8, D41-10 ; §36 S60, S61).
+// Disparition pendant un téléchargement (spec §41.8, D41-10 ; §36 S60).
 //
 // Ouverture active : une ouverture qui a un segment en cours, ou en a fini un dans les
 // 120 s. Quand un partage disparaît (échéance, suppression par l'expéditeur ou le
@@ -50,7 +50,7 @@ func (a *activity) activeAt(now int64) bool {
 type detached struct {
 	f        *os.File
 	accessV  []byte // V_accès, pour qu'une destruction par l'administrateur le coupe (kill.go)
-	proofV   []byte // V_preuve, pour qu'un signalement le coupe (cutReported, audit F2)
+	proofV   []byte // V_preuve, pour qu'un signalement le coupe (cutReported)
 	bucket   int
 	graceEnd int64
 	opens    map[int]bool // ouvertures qui gardent le droit de finir
@@ -90,8 +90,8 @@ type goneState struct {
 func (g *goneState) retiringLocked(id string) bool { return slices.Contains(g.retiring, id) }
 
 // unlock rend mu, puis ferme les descripteurs détachés qui ne servent plus : la fermeture
-// rend jusqu'à 2 Gio au système de fichiers et ne doit pas retenir les lectures de segments
-// (revue du 10 novembre).
+// rend jusqu'à 2 Gio au système de fichiers et ne doit pas retenir les lectures de
+// segments.
 func (g *goneState) unlock() {
 	ds := g.closing
 	g.closing = nil
@@ -187,7 +187,7 @@ var errRetry = errors.New("share : ouverture à refaire")
 // d'abord être retiré, à l'heure event.
 //
 // La ligne est lue et le fichier ouvert hors de gone.mu, que prennent toutes les lectures et
-// les surveillances (optimisation du 11 novembre : une ouverture lente ne les retient plus).
+// les surveillances (une ouverture lente ne les retient plus).
 // gone.epoch, relu sous le verrou, dit si un retrait ou une coupure a eu lieu entre-temps :
 // alors tout est refait sous le verrou, comme avant (jamais un partage retiré servi depuis un
 // fichier ouvert juste avant son retrait).
@@ -216,7 +216,7 @@ func (s *Service) openOnce(parent context.Context, id string, n, openN int) (seg
 	defer s.gone.unlock()
 	if s.gone.epoch != ep {
 		// Retrait ou coupure pendant l'ouverture : on recommence (errRetry, OpenSegmentCtx),
-		// sans relire la base sous le verrou (audit du 13 novembre, D7).
+		// sans relire la base sous le verrou.
 		sec.Close()
 		return nil, false, 0, errRetry
 	}
@@ -286,7 +286,7 @@ func (s *Service) serveDetachedLocked(parent context.Context, id string, d *deta
 }
 
 // reopenExtraMin : relecture permise au-delà de trois fichiers complets, pour les petits
-// partages (revue D42-22, point 3).
+// partages (revue D42-22).
 const reopenExtraMin = 256 << 20
 
 // budgetLocked : budget de lecture de l'ouverture k : ReadBudget + min(r × F, max(3 × F,
@@ -370,19 +370,19 @@ func (s *Service) detachedBytes() int64 {
 // Renvoie si une ligne existait.
 //
 // Le fichier (jusqu'à 2 Gio) est supprimé du dossier hors de gone.mu, que prend chaque
-// lecture de segment (revue du 10 novembre). En trois temps : sous gone.mu, la décision
-// (descripteur détaché, flux coupés) et l'inscription du partage dans retiring, qui le fait
-// passer pour disparu aux lectures et aux surveillances ; hors verrou, la suppression du
-// fichier ; sous gone.mu de nouveau, la ligne. L'ordre « fichier puis ligne » est gardé : si
-// la suppression échoue, la ligne reste et Sweep réessaie. Un retrait déjà en cours du même
-// partage : (false, nil), comme une ligne déjà effacée.
+// lecture de segment. En trois temps : sous gone.mu, la décision (descripteur détaché, flux
+// coupés) et l'inscription du partage dans retiring, qui le fait passer pour disparu aux
+// lectures et aux surveillances ; hors verrou, la suppression du fichier ; sous gone.mu de
+// nouveau, la ligne. L'ordre « fichier puis ligne » est gardé : si la suppression échoue, la
+// ligne reste et Sweep réessaie. Un retrait déjà en cours du même partage : (false, nil),
+// comme une ligne déjà effacée.
 //
-// La ligne est lue avant gone.mu (audit du 13 novembre, D7 : aucune requête SQL sous ce
-// verrou). Rien n'exige qu'elle soit encore la même ensuite : bucket et vérificateurs ne
-// changent pas ; une ouverture émise entre-temps n'a pas de grâce (elle courait de toute
-// façon contre la destruction) ; une ouverture terminée entre-temps garde au pire un
-// descripteur détaché jusqu'à son done ou à la fin de grâce. Un retrait concurrent est vu sous
-// le verrou (retiring) ; un retrait déjà fini a supprimé le fichier, et destroy rend false.
+// La ligne est lue avant gone.mu (aucune requête SQL sous ce verrou). Rien n'exige qu'elle
+// soit encore la même ensuite : bucket et vérificateurs ne changent pas ; une ouverture émise
+// entre-temps n'a pas de grâce (elle courait de toute façon contre la destruction) ; une
+// ouverture terminée entre-temps garde au pire un descripteur détaché jusqu'à son done ou à la
+// fin de grâce. Un retrait concurrent est vu sous le verrou (retiring) ; un retrait déjà fini
+// a supprimé le fichier, et destroy rend false.
 func (s *Service) retire(id string, grace bool, event int64) (bool, error) {
 	now := s.now()
 	s.gone.mu.Lock()
@@ -474,7 +474,7 @@ const liveReads = 16
 // liveReads fois ; au-delà, la dernière est gardée. Ce dernier cas, rarissime, ne peut que
 // laisser une surveillance (prévenue par PollRemoved dans la seconde) ou un octroi (oublié par
 // sweepGrantsLocked) pour un partage effacé : jamais servir un fichier retiré (openOnce, qui
-// garde son propre contrôle). Aucune requête SQL sous gone.mu (audit du 13 novembre, D7).
+// garde son propre contrôle). Aucune requête SQL sous gone.mu.
 func (s *Service) liveRead(id string, read func() error) (gone bool, err error) {
 	for i := 0; ; i++ {
 		s.gone.mu.Lock()
@@ -526,8 +526,8 @@ func (s *Service) Watch(id string, openN int) (Watch, error) {
 		return Watch{}, ErrNotFound
 	}
 	now := s.now()
-	// Ligne lue hors de gone.mu (audit du 13 novembre, D7), puis époque revérifiée sous le
-	// verrou (s.liveRead) : un retrait passé entre-temps fait relire.
+	// Ligne lue hors de gone.mu, puis époque revérifiée sous le verrou (s.liveRead) : un
+	// retrait passé entre-temps fait relire.
 	var state string
 	var issued, failed int
 	var doneMask int64
@@ -588,7 +588,7 @@ func (s *Service) WatchCount() int {
 // demandé de couper (kill.go). À appeler chaque seconde (janitor.Watch).
 func (s *Service) PollRemoved() error {
 	// Toujours lu (un dossier, le plus souvent absent) : la demande « tout couper » de wipe
-	// est confirmée même sans descripteur détaché (revue B5). Lu hors de gone.mu.
+	// est confirmée même sans descripteur détaché. Lu hors de gone.mu.
 	key, err := s.ensureKillKey()
 	if err != nil {
 		return err

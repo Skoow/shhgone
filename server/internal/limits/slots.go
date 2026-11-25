@@ -38,11 +38,11 @@ func NewSlots(total, per64, per48 int) *Slots {
 	return &Slots{total: total, per64: per64, per48: per48, c64: map[string]int{}, c48: map[string]int{}}
 }
 
-// Part équitable des plafonds globaux (audit du 13 novembre, D2 : quelques adresses
-// prenaient toutes les places du serveur). FairShare : une connexion ou un bloc /48 prend au
-// plus 1/8 des places, en plus de ses propres plafonds ; FairReserve : le dernier quart des
-// places ne va qu'à un bloc qui n'en tient aucune (nouveau venu). Saturer le serveur exige
-// alors au moins 6 blocs pour les 3/4 partagés, puis un bloc de plus par place réservée.
+// Part équitable des plafonds globaux (quelques adresses prenaient toutes les places du
+// serveur). FairShare : une connexion ou un bloc /48 prend au plus 1/8 des places, en plus
+// de ses propres plafonds ; FairReserve : le dernier quart des places ne va qu'à un bloc qui
+// n'en tient aucune (nouveau venu). Saturer le serveur exige alors au moins 6 blocs pour les
+// 3/4 partagés, puis un bloc de plus par place réservée.
 const (
 	FairShare   = 8
 	FairReserve = 4
@@ -94,7 +94,7 @@ func (s *Slots) release(k64, k48 string) {
 // Total : places du serveur.
 func (s *Slots) Total() int { return s.total }
 
-// Len : transferts en cours au total (tests).
+// Len : transferts en cours au total.
 func (s *Slots) Len() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -109,7 +109,7 @@ func (s *Slots) InUse() (n, peak int) {
 	return s.n, s.peak
 }
 
-// Keyed borne les transferts simultanés d'une même clé (audit I3, M4) : un envoi (id interne)
+// Keyed borne les transferts simultanés d'une même clé : un envoi (id interne)
 // ou une ouverture (id interne et numéro). En mémoire seulement ; une clé sans transfert en
 // cours est oubliée aussitôt.
 type Keyed struct {
@@ -146,15 +146,4 @@ func (k *Keyed) Acquire(key string) (release func(), err error) {
 			}
 		})
 	}, nil
-}
-
-// Len : places prises au total (tests).
-func (k *Keyed) Len() int {
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	t := 0
-	for _, v := range k.n {
-		t += v
-	}
-	return t
 }

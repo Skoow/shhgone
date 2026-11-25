@@ -21,7 +21,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// ---- Pièces jointes et vocaux du salon (plan C-2 Task 13, spec §39.3.9) ----
+// ---- Pièces jointes et vocaux du salon (spec §39.3.9) ----
 
 // salonMembres : salon de n membres (le premier est le créateur) ; rend leurs jetons.
 func salonMembres(t *testing.T, e *env, n int) []string {
@@ -40,7 +40,7 @@ func salonMembres(t *testing.T, e *env, n int) []string {
 func membreHdr(jeton string) map[string]string { return map[string]string{"X-Shh-Membre": jeton} }
 
 // retirerPiece : effacement d'une pièce par son auteur, par le gestionnaire (la route HTTP
-// « retirer » est retirée le 22 novembre, audit P4 : aucun écran ne l'appelait).
+// « retirer » est retirée : aucun écran ne l'appelait).
 func retirerPiece(t *testing.T, m *salon.Manager, jeton, id string) {
 	t.Helper()
 	jet, err := base64.RawURLEncoding.DecodeString(jeton)
@@ -193,18 +193,17 @@ func TestLectureBudget(t *testing.T) {
 	expect(t, e.getPiece(j[0], id, 0), 200, "")
 }
 
-// Plafond de sortie par pièce (salon.SortieMax) : 403 egress_limit, sans Retry-After, même
-// pour un membre qui a encore son budget de lecture.
+// Plafond de sortie par pièce (salon.SortieMax : un budget de lecture par place) : 403
+// egress_limit, sans Retry-After, vérifié avant le budget du jeton.
 func TestLecturePlafondDeSortie(t *testing.T) {
-	avant := salon.SortieFacteur
-	salon.SortieFacteur = 1
-	t.Cleanup(func() { salon.SortieFacteur = avant })
 	e, _ := salonEnv(t)
-	j := salonMembres(t, e, 2)
+	j := salonMembres(t, e, 2) // salon de 2 places
 	id, _ := e.envoyerPiece(t, j[0], 1)
 	taille := int64(share.SegmentSize(1, 0))
-	for lus := taille; lus <= share.ReadBudget(1); lus += taille {
-		expect(t, e.getPiece(j[1], id, 0), 200, "")
+	for _, jeton := range j {
+		for lus := taille; lus <= share.ReadBudget(1); lus += taille {
+			expect(t, e.getPiece(jeton, id, 0), 200, "")
+		}
 	}
 	w := e.getPiece(j[0], id, 0)
 	expect(t, w, 403, `{"error":"egress_limit"}`)
@@ -273,7 +272,7 @@ func TestPieceSansDate(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(e.dir, "blobs", id)); !os.IsNotExist(err) {
 		t.Fatal("pièce dans blobs/ :", err)
 	}
-	// Dossiers sans date (audit D7) : ni la dernière création de pièce, de conversation ou de
+	// Dossiers sans date : ni la dernière création de pièce, de conversation ou de
 	// partage, ni la dernière suppression.
 	c := e.create(t, "203.0.113.7:1", newKeys(), 1, 1)
 	e.upload(t, c, 1)
@@ -289,7 +288,7 @@ func TestPieceSansDate(t *testing.T) {
 	}
 }
 
-// Quotas (plan, point 22) : un fichier passe par limits (2 envois non finalisés à la fois,
+// Quotas : un fichier passe par limits (2 envois non finalisés à la fois,
 // octets utiles réservés à la création et gardés à la finalisation) ; un vocal n'y passe pas
 // (seulement cadencé par la réserve du siège, qui se remplit WebSocket ouvert).
 func TestQuotasPieces(t *testing.T) {
@@ -320,7 +319,7 @@ func TestQuotasPieces(t *testing.T) {
 	e.srv.lim.CancelUpload(sonde)
 	e.pieceCreee(t, j[0], 1, false)
 	expect(t, e.creerPieceHTTP(j[0], 1, false), 429, "")
-	// Vocaux : la réserve de départ (19 novembre, un palier 16) fait passer un premier vocal
+	// Vocaux : la réserve de départ (un palier 16) fait passer un premier vocal
 	// sans présence ; ensuite, sans présence, refus (429 limit) ; WebSocket ouvert 40 s
 	// (160 000 o) : deux vocaux du palier 1 passent alors que les deux envois de fichiers sont pris.
 	expect(t, e.creerPieceHTTP(j[0], 16, true), 201, "")
@@ -332,7 +331,7 @@ func TestQuotasPieces(t *testing.T) {
 	expect(t, e.creerPieceHTTP(j[0], 1, true), 201, "")
 	_, vtok := e.pieceCreee(t, j[0], 1, true)
 	// Segment d'un vocal : hors des quotas des envois (limits.Receive ne le connaît pas, et
-	// refuse un envoi inconnu depuis l'audit du 13 novembre, D1) : accepté.
+	// refuse un envoi inconnu) : accepté.
 	expect(t, e.putPiece(vtok, 0, rnd(share.SegmentSize(1, 0))), 204, "")
 	w = e.creerPieceHTTP(j[0], 1, true)
 	expect(t, w, 429, "")
@@ -373,9 +372,9 @@ func TestSegmentsPiecesHorsLimite(t *testing.T) {
 	}
 }
 
-// Une pièce n'est pas une création de partage (décision du 12 novembre) : 11 photos de suite
-// passent, et les 10 créations de partage du jour restent entières ensuite ; au-delà de 120
-// pièces dans l'heure pour un siège : 429 limit avec retry_after_s.
+// Une pièce n'est pas une création de partage : 11 photos de suite passent, et les créations
+// de partage du jour restent entières ensuite ; au-delà de 120 pièces dans l'heure pour un
+// siège : 429 limit avec retry_after_s.
 func TestOnzePieces(t *testing.T) {
 	e, m := salonEnv(t)
 	j := salonMembres(t, e, 1)

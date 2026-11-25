@@ -2,7 +2,7 @@ package paiement
 
 import "errors"
 
-// Régime de TVA choisi par le propriétaire (SHH_TVA, conception §9.1) : aucune valeur par défaut.
+// Régime de TVA choisi par l'exploitant (SHH_TVA, conception §9.1) : aucune valeur par défaut.
 type Regime uint8
 
 const (
@@ -67,12 +67,6 @@ var tauxUE = [...]struct {
 
 // ErrPays : pays hors des 27 États membres (ventes limitées à l'UE, DP-9).
 var ErrPays = errors.New("pays non pris en charge")
-
-// PaysUE : code ISO à deux lettres majuscules d'un État membre.
-func PaysUE(p string) bool {
-	_, ok := tauxDe(p)
-	return ok
-}
 
 // Pays : codes des 27 États membres, triés (pour le site et les tests).
 func Pays() []string {

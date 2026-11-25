@@ -23,7 +23,7 @@ type State struct {
 	Partages share.ByState `json:"partages"`
 	// Salon : nil si le salon est désactivé (SHH_SALONS).
 	Salon *salon.Stats `json:"salon"`
-	// Usage : compteurs d'usage depuis le démarrage (décision du propriétaire du 13 novembre).
+	// Usage : compteurs d'usage depuis le démarrage.
 	Usage Usage `json:"usage"`
 }
 
@@ -70,7 +70,7 @@ type Sante struct {
 	AlerteSignalements bool `json:"alerte_signalements"`
 	// VidagesRates : vidages du WAL ratés depuis le démarrage (store.Vidage.Rates) : base tenue
 	// par un autre processus (outil de sauvegarde, sqlite3). Tant qu'il monte, le WAL garde les
-	// lignes effacées (audit adverse du 13 novembre, stockage, F3). Un entier, rien d'autre.
+	// lignes effacées. Un entier, rien d'autre.
 	VidagesRates int64 `json:"vidages_wal_rates"`
 }
 

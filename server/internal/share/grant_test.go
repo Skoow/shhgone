@@ -10,7 +10,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 )
 
-// Octroi d'ouverture (spec §41.4, plan amendement v2.9 ; D42-22 : valable jusqu'à l'échéance
+// Octroi d'ouverture (spec §41.4 ; D42-22 : valable jusqu'à l'échéance
 // du partage, retours bornés à MaxReopens par ouverture).
 
 func opensOf(t *testing.T, s *Service, id string) (left, issued, failed int) {
@@ -163,7 +163,7 @@ func TestReopenInvalidGrant(t *testing.T) {
 	check("ouverture terminée", o.Grant, k.preuve)
 }
 
-// Au plus MaxReopens (20) retours par ouverture ; budget de lecture borné (revue D42-22).
+// Au plus MaxReopens (20) retours par ouverture ; budget de lecture borné (D42-22).
 func TestReopenLimitAndBudget(t *testing.T) {
 	s, _ := newSvc(t)
 	k := newKeys()
@@ -384,7 +384,7 @@ func TestAdminDestroyCutsDetached(t *testing.T) {
 	}
 }
 
-// Revue de sécurité D42-22 (point 1) : aucun octroi ni compteur de budget ne reste en mémoire
+// Aucun octroi ni compteur de budget ne reste en mémoire
 // après l'échéance (balayage) ni après une destruction.
 func TestGrantsForgottenWhenShareGoes(t *testing.T) {
 	s, c := newSvc(t)
@@ -518,7 +518,7 @@ func TestLastOpen(t *testing.T) {
 	}
 }
 
-// Relecture du 12 novembre (B) : suppression du fichier en échec pendant qu'une lecture tient
+// Suppression du fichier en échec pendant qu'une lecture tient
 // le descripteur détaché (refs > 0) : la ligne reste, le partage vit ; ses octrois et budgets
 // ne doivent pas être oubliés quand ce descripteur est refermé, et un retrait suivant garde
 // les ouvertures qui finissent encore.
@@ -564,7 +564,7 @@ func TestFailedDestroyKeepsGrantsOfLiveShare(t *testing.T) {
 }
 
 // Le chiffre 20 est écrit dans les textes (lost.limit, content.return.limits, fr et en) : le
-// changer demande de changer les textes (relecture du 12 novembre).
+// changer demande de changer les textes.
 func TestMaxReopensMatchesTexts(t *testing.T) {
 	if MaxReopens != 20 {
 		t.Fatal("MaxReopens a changé : mettre à jour lost.limit et content.return.limits (fr, en)", MaxReopens)

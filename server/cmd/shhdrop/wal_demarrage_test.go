@@ -9,13 +9,12 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Audit adverse du 13 novembre, 2e passage, stockage, F2 : le vidage du WAL au démarrage
-// passait AVANT la purge de démarrage ; avec SHH_SALONS=0 (configuration livrée), les partages
-// purgés (envois en cours, « draining ») restaient lisibles dans shares.db jusqu'au premier
-// passage du janitor (≈ 55 s mesurées). Le vidage se fait maintenant après la purge des
-// partages, la réconciliation et la purge des salons, avant l'écoute : dès que le serveur
-// écoute, ni shares.db ni shares.db-wal ne gardent l'identifiant ou les vérificateurs d'un
-// partage purgé.
+// Le vidage du WAL au démarrage passait AVANT la purge de
+// démarrage ; avec SHH_SALONS=0 (configuration livrée), les partages purgés (envois en cours,
+// « draining ») restaient lisibles dans shares.db jusqu'au premier passage du janitor (≈ 55 s
+// mesurées). Le vidage se fait maintenant après la purge des partages, la réconciliation et la
+// purge des salons, avant l'écoute : dès que le serveur écoute, ni shares.db ni shares.db-wal
+// ne gardent l'identifiant ou les vérificateurs d'un partage purgé.
 func TestVidageApresLaPurgeDeDemarrage(t *testing.T) {
 	cfg, svc := adminSetup(t)
 	id := mk(t, svc) // envoi en cours : effacé au démarrage (PurgeAtStart)

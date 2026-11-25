@@ -287,7 +287,7 @@ func TestConcurrentSingleUse(t *testing.T) {
 	}
 }
 
-// Spec §36 S15 (Task M2) : les heures gardées pour la difficulté sont arrondies à la minute
+// Spec §36 S15 : les heures gardées pour la difficulté sont arrondies à la minute
 // (supérieure : une création compte au moins une heure) ; la difficulté double toujours à
 // chaque création de l'heure, même à quelques secondes d'écart.
 func TestCreateTimesRoundedToMinute(t *testing.T) {
@@ -320,7 +320,7 @@ func TestCreateTimesRoundedToMinute(t *testing.T) {
 	}
 }
 
-// Inventaire des adresses IP du 22 novembre : la clé de liaison à la connexion (HMAC tronqué
+// La clé de liaison à la connexion (HMAC tronqué
 // du /64) est tirée au hasard et remplacée à minuit UTC, comme les clés du limiteur ; celle de
 // la veille ne sert plus qu'une heure (défis en vol, difficulté de la dernière heure), puis elle
 // est effacée. Sans cela, une lecture de la mémoire reliait toute liaison à son adresse IPv4 en

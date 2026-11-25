@@ -15,18 +15,16 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Pièces jointes et vocaux (plan C-2 Task 13, v3 §5.1, spec §39.3.9). Une pièce est un
-// fichier chiffré de bout en bout, de la taille exacte d'un palier (share.TotalSize), dans
-// son propre blob.Store (jamais celui des partages, que janitor.Reconcile vide de ce qu'il n'y
+// Pièces jointes et vocaux (v3 §5.1, spec §39.3.9). Une pièce est un fichier chiffré de bout
+// en bout, de la taille exacte d'un palier (share.TotalSize), dans son propre blob.Store
+// (jamais celui des partages, que janitor.Reconcile vide de ce qu'il n'y
 // connaît pas). La base garde la ligne de §39.3.5 (salon, palier, état) ; l'auteur (siège,
 // SHA-256 du jeton), le rang de création, le lien avec sa trame, la sorte (vocal) et les
 // lectures restent en mémoire, sous le verrou du salon.
 //
-// Règles du propriétaire (v3 §5.1) : les fichiers consomment le budget de 2 Go du salon (13 novembre, décision du propriétaire ;
-// 1 Go avant)
-// (pieces_bytes) ; les vocaux n'y comptent pas et ne sont pas limités en nombre, seulement
-// cadencés au rythme d'une voix (réserve du siège, limites.go). Tous comptent dans
-// SHH_STORAGE_MAX.
+// Règles (v3 §5.1) : les fichiers consomment le budget de 2 Go du salon (pieces_bytes) ; les
+// vocaux n'y comptent pas et ne sont pas limités en nombre, seulement cadencés au rythme d'une
+// voix (réserve du siège, limites.go). Tous comptent dans SHH_STORAGE_MAX.
 //
 // Vie d'une pièce : créée (« uploading », fichier réservé), segments reçus, finalisée (bourrage
 // d'aléa, « ready »), liée à une trame non volatile (Recevoir), effacée avec cette trame
@@ -38,7 +36,7 @@ import (
 
 const (
 	// Budget : octets de pièces d'un salon (hors vocaux), 2 Gio comme un partage gratuit (§39.1,
-	// v3 §5.1 ; 13 novembre, décision du propriétaire ; 1 Gio avant).
+	// v3 §5.1 ; 1 Gio avant).
 	Budget int64 = 2147483648
 	// PalierMax : plus grand palier d'une pièce (8 000 morceaux, 524 416 048 octets).
 	PalierMax = 8000
@@ -47,48 +45,44 @@ const (
 	VocalOctetsParSeconde = 4000
 	// VocalReserveMax : réserve vocale d'un siège au plus (1 h de présence).
 	VocalReserveMax int64 = 14400000
-	// VocalReserveDepart : réserve vocale d'un nouvel occupant (décision du propriétaire du 19
-	// novembre) : un palier 16 (1 048 880 o), celui du plus petit vocal non vide (le palier 1 ne
-	// garde que le morceau du manifeste). Sans elle, le premier vocal attendait 4 min 22 s de
-	// présence. Borne anti-abus : les arrivées d'un salon sont plafonnées à 5 × max_members (au
-	// plus 50 × 1 Mo de vocaux d'avance par salon) ; une reprise garde la réserve du siège.
+	// VocalReserveDepart : réserve vocale d'un nouvel occupant : un palier 16 (1 048 880 o),
+	// celui du plus petit vocal non vide (le palier 1 ne garde que le morceau du manifeste).
+	// Sans elle, le premier vocal attendait 4 min 22 s de présence. Borne anti-abus : les
+	// arrivées d'un salon sont plafonnées à 5 × max_members (au plus 50 × 1 Mo de vocaux
+	// d'avance par salon) ; une reprise garde la réserve du siège.
 	VocalReserveDepart int64 = 1048880
 	// PieceSansLien : pièce finalisée jamais liée à une trame, effacée après ce délai.
 	PieceSansLien = 15 * time.Minute
 	// PieceSansSegment : pièce non finalisée sans segment reçu depuis ce délai, effacée.
 	PieceSansSegment = 15 * time.Minute
 	// PiecesParHeure : pièces non vocales créées au plus par heure et par siège (seau plein au
-	// départ, une de plus toutes les 30 s, neuf pour chaque nouvel occupant ; décision du
-	// 12 novembre). Une pièce n'est pas une création de partage (limits.BeginPiece) : ce
-	// plafond borne seul leur nombre ; les vocaux n'y comptent pas (réserve du siège).
+	// départ, une de plus toutes les 30 s, neuf pour chaque nouvel occupant). Une pièce n'est
+	// pas une création de partage (limits.BeginPiece) : ce plafond borne seul leur nombre ;
+	// les vocaux n'y comptent pas (réserve du siège).
 	PiecesParHeure = 120
 	// EcritureMax : octets de segments reçus au plus par pièce, réécritures comprises, en
-	// multiples de sa taille (audit du 12 novembre, D2) : une reprise complète après coupure
-	// passe, une réécriture sans fin (vocal hors de tout quota d'octets) non (ErrTropEcrit).
+	// multiples de sa taille : une reprise complète après coupure passe, une réécriture sans
+	// fin (vocal hors de tout quota d'octets) non (ErrTropEcrit).
 	EcritureMax = 2
 	// BourrageFacteur, BourrageMarge : aléa écrit à la finalisation, en morceaux, au plus
-	// BourrageFacteur × morceaux reçus + BourrageMarge (padAllowed des partages, D42-17 ;
-	// audit du 12 novembre, D1), sinon ErrBadRequest.
+	// BourrageFacteur × morceaux reçus + BourrageMarge (padAllowed des partages, D42-17),
+	// sinon ErrBadRequest.
 	BourrageFacteur = 4
 	BourrageMarge   = 8 * share.SegChunks
 )
 
-// SortieFacteur : octets servis au plus par pièce, tous jetons confondus, en multiples de son
-// budget de lecture par jeton (share.ReadBudget : 2 × le fichier chiffré, plus les segments 0
-// et dernier) : un téléchargement complet avec reprise pour chacun des nbSieges sièges. Le
-// budget par jeton se renouvelle avec chaque nouveau jeton (départ puis retour, reprise) ;
-// aujourd'hui, le plancher des pièces (lisibleLocked) empêche déjà un jeton neuf de lire une
-// pièce plus ancienne que lui, ce qui borne la sortie au même total : ce plafond la borne
-// sans dépendre de cette règle. Plus grande pièce (palier 8 000) : environ 10,6 Go, sous le
-// plus petit plafond de sortie d'un partage (share.MinEgressMax, 32 Gio ;
-// SHH_SHARE_EGRESS_MAX, 250 Gio par défaut). Variable pour les tests seulement.
-var SortieFacteur int64 = nbSieges
+// SortieMax : octets servis au plus par une pièce de palier bucket dans un salon de places
+// places, tous jetons confondus : un budget de lecture par place (share.ReadBudget : 2 × le
+// fichier chiffré, plus les segments 0 et dernier), soit un téléchargement complet avec
+// reprise pour chaque membre. Un jeton neuf (départ puis retour, reprise du créateur) aurait
+// un budget neuf, mais le plancher des pièces (lisibleLocked) l'empêche de lire une pièce plus
+// ancienne que son arrivée ; ce plafond borne la sortie sans dépendre de cette règle. places
+// ≤ nbSieges : plus grande pièce (palier 8 000), environ 10,6 Go au plus, sous le plus petit
+// plafond de sortie d'un partage (share.MinEgressMax, 32 Gio). Compteur en mémoire seulement,
+// oublié avec la pièce ; aucune adresse, aucune heure.
+func SortieMax(bucket, places int) int64 { return int64(places) * share.ReadBudget(bucket) }
 
-// SortieMax : octets servis au plus par une pièce de palier bucket, toutes lectures confondues
-// (compteur en mémoire seulement, oublié avec la pièce ; aucune adresse, aucune heure).
-func SortieMax(bucket int) int64 { return SortieFacteur * share.ReadBudget(bucket) }
-
-// VocalPaliers : paliers d'un vocal (plan, point 3 : 10 min tiennent dans 80).
+// VocalPaliers : paliers d'un vocal (10 min tiennent dans 80).
 var VocalPaliers = []int{1, 16, 80}
 
 // PalierValide : palier d'un vocal (VocalPaliers) ou d'un fichier (palier de share.Buckets
@@ -127,7 +121,11 @@ type piece struct {
 	activite  time.Time // création, dernier segment reçu, puis finalisation
 	lus       map[[32]byte]int64
 	servis    int64 // octets servis, tous jetons confondus (SortieMax)
-	efface    bool
+	// places : places du salon à la création de la pièce, relevées à sa liaison si elles ont
+	// augmenté entre-temps (lierLocked) ; une baisse ensuite ne retire rien aux membres déjà
+	// présents. Les lecteurs d'une pièce sont les membres présents à son rang de référence.
+	places int
+	efface bool
 }
 
 // purge : pièce à effacer hors du verrou du salon (fichier, puis ligne et budget).
@@ -147,7 +145,7 @@ func cleFluxPiece(id string) string        { return "p:" + id }
 // Flux : lectures de segments en cours, par clé de révocation ("m:" + hex(SHA-256(jeton)),
 // "p:" + id de pièce). Ne sert qu'aux tests du paquet api (coupure des lectures en cours à
 // une exclusion, désinscription des flux) : un fichier _test.go de salon ne leur serait pas
-// visible ; gardé, une ligne en lecture seule sans effet (revue finale C-2, mineur g).
+// visible ; gardé, une ligne en lecture seule sans effet.
 func (m *Manager) Flux() *share.Streams { return &m.flux }
 
 // Echeance : fin du salon de mb (jeton d'envoi d'une pièce valable au plus jusque-là).
@@ -257,8 +255,8 @@ func (m *Manager) CreerPieceID(mb Membre, id string, bucket int, vocal bool) (er
 	}
 	// Annulation : fichier d'abord, puis la ligne si elle a été insérée et seulement si le
 	// fichier est parti (même règle qu'effacerPiece) : jamais de fichier sans ligne, compté
-	// dans SHH_STORAGE_MAX jusqu'au redémarrage (revue finale C-2, mineur e). Une ligne
-	// gardée est reprise à la fin du salon (effacerPiecesEnBase) ou au démarrage.
+	// dans SHH_STORAGE_MAX jusqu'au redémarrage. Une ligne gardée est reprise à la fin du
+	// salon (effacerPiecesEnBase) ou au démarrage.
 	ligne := false
 	annuler = append(annuler, func() {
 		if m.cfg.Pieces.Delete(id) == nil && ligne {
@@ -284,6 +282,7 @@ func (m *Manager) debuterPiece(s *salon, mb Membre, p *piece, taille int64) (arr
 	}
 	x := s.sieges[mb.siege]
 	p.auteur, p.rang, p.activite, p.gen = x.jetonV, s.seq, now, s.gen.Load()
+	p.places = s.maxMembers
 	if p.vocal {
 		if d := s.limites[mb.siege].vocal.prendre(now, taille); d > 0 {
 			return 0, &Attente{Retry: d}
@@ -321,10 +320,10 @@ func (m *Manager) rendreBudget(id string, taille int64) error {
 
 // placer réserve n octets sous StorageMax (partages, pièces, conversations, réservations en
 // cours), vérification et réservation dans une même section (placeMu) : deux créations
-// simultanées ne dépassent jamais le plafond d'un palier (relecture Task 12). La réservation
+// simultanées ne dépassent jamais le plafond d'un palier. La réservation
 // (Manager.reserves) est comptée par usedBytes jusqu'à ce que le blob.Store compte le fichier.
 // Échec fermé : usage illisible → faux. Partages et trames créés en même temps peuvent encore
-// le dépasser de leur propre taille (comme Manager.plein, décision du 12 novembre).
+// le dépasser de leur propre taille (comme Manager.plein).
 func (m *Manager) placer(n int64) bool {
 	m.placeMu.Lock()
 	defer m.placeMu.Unlock()
@@ -333,7 +332,7 @@ func (m *Manager) placer(n int64) bool {
 		return false
 	}
 	u, err := m.usedBytes()
-	// Hors de la réserve des nouveaux venus (share.StorageLimit, audit D2).
+	// Hors de la réserve des nouveaux venus (share.StorageLimit).
 	if err != nil || partages+u+n > share.StorageLimit(m.cfg.StorageMax, false) {
 		return false
 	}
@@ -370,7 +369,7 @@ func (m *Manager) salonDePiece(id string) *salon {
 
 // PieceEnvoi : la pièce id attend encore des segments (connue, ni prête ni effacée, salon
 // vivant), en mémoire seulement ; vocal dit si c'est un vocal (hors quotas des envois). Vérifié
-// avant de prendre une place de transfert et de lire le corps (audit du 13 novembre, D1).
+// avant de prendre une place de transfert et de lire le corps.
 func (m *Manager) PieceEnvoi(id string) (vocal, ok bool) {
 	s := m.salonDePiece(id)
 	if s == nil {
@@ -612,10 +611,10 @@ func (s *salon) lisibleLocked(mb Membre, id string, n int, now time.Time) (*piec
 	if p == nil || p.etat != prete {
 		return nil, ErrNotFound
 	}
-	// Plancher (plan, point 11) : rang de la trame liée s'il y en a une, sinon rang de
-	// création (décision du 12 novembre). Une pièce envoyée avant l'arrivée du membre mais
-	// liée à une trame reçue après est lisible : il lit cette trame, donc la clé de la pièce ;
-	// rien d'antérieur à son arrivée ne l'est sans une trame qu'il a reçue.
+	// Plancher : rang de la trame liée s'il y en a une, sinon rang de création. Une pièce
+	// envoyée avant l'arrivée du membre mais liée à une trame reçue après est lisible : il lit
+	// cette trame, donc la clé de la pièce ; rien d'antérieur à son arrivée ne l'est sans une
+	// trame qu'il a reçue.
 	ref := p.rang
 	if p.lien != 0 {
 		ref = p.lien
@@ -651,7 +650,7 @@ func (m *Manager) commencerLecture(ctx context.Context, s *salon, mb Membre, id 
 	if err != nil {
 		return nil, err
 	}
-	if p.servis+taille > SortieMax(p.bucket) {
+	if p.servis+taille > SortieMax(p.bucket, p.places) {
 		return nil, ErrSortie
 	}
 	jv := s.sieges[mb.siege].jetonV
@@ -689,7 +688,7 @@ func (m *Manager) RetirerPiece(mb Membre, id string) error {
 	return nil
 }
 
-// pieceLiableLocked : pièce de la trame que mb envoie (audit D6, décision du 12 novembre).
+// pieceLiableLocked : pièce de la trame que mb envoie.
 // Pièce d'un autre auteur (autre siège, ou ancien occupant du siège) : ErrBadRequest (4003).
 // Pièce disparue (inconnue, effacée, d'un autre salon), pas encore « ready » ou déjà liée :
 // nil sans erreur, la trame est rangée sans lien (course honnête : PieceSansLien, retrait
@@ -711,6 +710,7 @@ func (s *salon) pieceLiableLocked(mb Membre, id [16]byte) (*piece, error) {
 // lierLocked : p suit désormais la trame de rang seq. Appelé sous s.mu.
 func (s *salon) lierLocked(p *piece, seq uint64) {
 	p.lien = seq
+	p.places = max(p.places, s.maxMembers)
 	if s.pieces == nil {
 		s.pieces = map[uint64]*piece{}
 	}
@@ -741,7 +741,7 @@ func (s *salon) supprimerPieceLocked(p *piece) {
 // lectures, départs : marquerLocked). Appelé sous s.mu.
 func (s *salon) pieceDeTrameLocked(seq uint64) {
 	if p := s.pieces[seq]; p != nil {
-		s.supprimerPieceLocked(p) // delete(s.pieces, seq) compris (relecture Task 8)
+		s.supprimerPieceLocked(p) // delete(s.pieces, seq) compris
 	}
 }
 
@@ -813,6 +813,6 @@ func (m *Manager) effacerPiece(salonID string, p purge) error {
 	if err := tx.Commit(); err != nil {
 		return base(err)
 	}
-	m.vidage.Demander() // ligne de pièce effacée : vidage du WAL regroupé (stockage, F1)
+	m.vidage.Demander() // ligne de pièce effacée : vidage du WAL regroupé
 	return nil
 }

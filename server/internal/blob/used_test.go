@@ -30,7 +30,7 @@ func used(t *testing.T, s *Store) int64 {
 	return n
 }
 
-// Revue du 10 novembre : UsedBytes ne relit plus le dossier à chaque appel. Un compteur en
+// UsedBytes ne relit plus le dossier à chaque appel. Un compteur en
 // mémoire, initialisé par une lecture du dossier, suit Reserve, Resize et Delete ; Resync le
 // recale sur le disque (fichiers supprimés par la commande d'administration, autre processus).
 func TestUsedBytesIsACounter(t *testing.T) {

@@ -9,10 +9,10 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Plafond de sortie par partage (décision du propriétaire du 24 novembre, décision 12 ; spec
-// §38.6, §38.8.1, Q-P11) : toutes ouvertures confondues, un partage ne sert pas plus que
-// EgressMax octets ; au-delà, ErrEgressLimit, et aucune nouvelle ouverture n'est consommée
-// tant qu'un téléchargement complet ne tient plus sous le plafond.
+// Plafond de sortie par partage (spec §38.6, §38.8.1, Q-P11) : toutes ouvertures confondues,
+// un partage ne sert pas plus que EgressMax octets ; au-delà, ErrEgressLimit, et aucune
+// nouvelle ouverture n'est consommée tant qu'un téléchargement complet ne tient plus sous le
+// plafond.
 func TestEgressLimitPerShare(t *testing.T) {
 	s, _ := newSvc(t)
 	k := newKeys()

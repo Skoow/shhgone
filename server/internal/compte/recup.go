@@ -30,7 +30,7 @@ type Ouverture struct {
 
 // Recup : POST recup (10 essais par heure par connexion, 30 par /48, justes ou faux). Clé
 // inconnue : ErrIdentifiants (même erreur qu'une passkey refusée). Juste : nouvelle session
-// récente, marquée « ouverte par la clé de récupération » (R4) ; un compte banni se connecte
+// récente, marquée « ouverte par la clé de récupération » ; un compte banni se connecte
 // (export et suppression, §13).
 func (s *Service) Recup(ip netip.Addr, aR [32]byte, o OptionsSession) (Ouverture, error) {
 	if !o.valide() {

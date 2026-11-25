@@ -268,7 +268,7 @@ func TestAdminDestroyDepuisLaPage(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 2e passage, stockage, F3 : le tableau de bord montre le nombre
+// Le tableau de bord montre le nombre
 // de vidages du WAL ratés (un entier en mémoire). Un autre processus qui lit la base fait
 // échouer le vidage : le compte monte ; il est nul sinon.
 func TestEtatVidagesRates(t *testing.T) {
@@ -327,10 +327,10 @@ func TestUsageCompteLesRefusDeDebit(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 3e campagne, tableau de bord, F2 : « détruire » ne répond
-// « salon » que si le salon est détruit. Un membre commence l'envoi d'une pièce pendant la
-// destruction (la borne des appels disque, occupée, tient la fenêtre ouverte) : avant, la ligne
-// du salon restait et la page répondait quand même « Salon détruit ».
+// « détruire » ne répond « salon » que si le salon est
+// détruit. Un membre commence l'envoi d'une pièce pendant la destruction (la borne des appels
+// disque, occupée, tient la fenêtre ouverte) : avant, la ligne du salon restait et la page
+// répondait quand même « Salon détruit ».
 func TestRT3SalonDetruitMalgreUnePieceDeposeePendant(t *testing.T) {
 	cfg, svc := adminSetup(t)
 	gate := blob.NewGate(1)
@@ -384,7 +384,7 @@ func TestRT3SalonDetruitMalgreUnePieceDeposeePendant(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 3e campagne, tableau de bord F3 et stockage F2 : la destruction
+// La destruction
 // d'un salon depuis la page passe par le vidage regroupé (store.Vidage, demande non bloquante).
 // Base lue par un autre programme : la destruction répond « salon » sans attendre, aucune autre
 // requête n'attend, et le vidage raté est compté puis redemandé.

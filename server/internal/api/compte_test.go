@@ -200,7 +200,7 @@ var routesCompte = [][2]string{
 	{"GET", "/api/compte/salons"}, {"POST", "/api/compte/salons/detruire"},
 }
 
-// routesRetirees : le compte par e-mail (22 novembre) : ces routes n'existent plus, même
+// routesRetirees : le compte par e-mail : ces routes n'existent plus, même
 // SHH_COMPTES=1 (404 uniforme, comme une route inconnue).
 var routesRetirees = [][2]string{
 	{"POST", "/api/compte/inscription/renvoyer"}, {"POST", "/api/compte/connexion"}, {"POST", "/api/compte/reauth"},
@@ -278,7 +278,7 @@ func TestParcoursCompteHTTP(t *testing.T) {
 		body: mustJSON(map[string]any{"if_gen": 1, "blob": coffreB64("SHH-ACCT1", 2)})})
 	expect(t, w, 409, `{"error":"conflict","gen":2}`)
 	s2 := e.recup(t, "203.0.113.30:1", a)
-	// Nom d'appareil posé après la connexion (lot 10) : 64 octets exactement, session exigée.
+	// Nom d'appareil posé après la connexion : 64 octets exactement, session exigée.
 	etiq := enc.EncodeToString(rnd(64))
 	for _, x := range []string{"", enc.EncodeToString(rnd(63)), etiq + "A"} {
 		expect(t, e.do(req{method: "POST", path: "/api/compte/sessions/etiquette", hdr: sess(s2),
@@ -303,7 +303,7 @@ func TestParcoursCompteHTTP(t *testing.T) {
 		body: []byte(`{"p_canon":"connard"}`)}), 200, `{"libre":false}`)
 	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/verifier", hdr: sess(s2),
 		body: []byte(`{"p_canon":"leo"}`)}), 200, `{"libre":true}`)
-	// Invité d'un salon (22 novembre) : sans session ; pseudo d'un compte, réservé ou interdit
+	// Invité d'un salon : sans session ; pseudo d'un compte, réservé ou interdit
 	// refusés de la même façon ; 30 par heure et par connexion.
 	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/libre", body: []byte(`{"p_canon":"lea"}`)}), 200, `{"libre":false}`)
 	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/libre", body: []byte(`{"p_canon":"adrnln"}`)}), 200, `{"libre":false}`)

@@ -47,7 +47,7 @@ func TestDraftRoutes(t *testing.T) {
 	}
 	put(1, 400, 2)
 	put(2, 400, 3)
-	// Plages de morceaux (audit H-2) : ?from=c, segment 3 partagé ; from invalide → 400.
+	// Plages de morceaux : ?from=c, segment 3 partagé ; from invalide → 400.
 	putFrom := func(n int, from string, k int, code int) {
 		w := e.do(req{method: "PUT", path: fmt.Sprintf("/api/shares/segments/%d?from=%s", n, from),
 			body: bytes.Repeat([]byte{4}, k*share.ChunkCT), hdr: auth(c.UploadToken)})
@@ -151,7 +151,7 @@ func TestDraftReceivedBytesQuota(t *testing.T) {
 		return e.do(req{method: "PUT", path: "/api/shares/segments/1", body: make([]byte, seg), hdr: auth(c.UploadToken)})
 	}
 	expect(t, putSeg(), 204, "")
-	// Octets comptés en données utiles (audit F1), morceau du manifeste non compté.
+	// Octets comptés en données utiles, morceau du manifeste non compté.
 	if _, err := e.srv.lim.Receive(c.ID, 6<<30-2*share.PayloadBytes(int64(seg))+limits.ManifestChunk+1); err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestDraftReceivedBytesQuota(t *testing.T) {
 	}
 }
 
-// Audit H1 : grow débite la place au quota du jour (429), et ne dépasse pas les segments
+// Grow débite la place au quota du jour (429), et ne dépasse pas les segments
 // reçus de plus de deux segments (400).
 func TestDraftGrowDebitsQuota(t *testing.T) {
 	e := newEnv(t, false, nil)
@@ -185,7 +185,7 @@ func TestDraftGrowDebitsQuota(t *testing.T) {
 	}
 }
 
-// Revue B3a : des grow refusés (palier non supérieur, ou « busy ») en parallèle d'un grow
+// Des grow refusés (palier non supérieur, ou « busy ») en parallèle d'un grow
 // accepté ne ramènent jamais la réservation du quota sous le palier réservé sur le disque.
 // Sonde : une création de (6 Gio − palier 160 + 1 octet) doit être refusée par le quota.
 func TestGrowQuotaNeverBelowDisk(t *testing.T) {

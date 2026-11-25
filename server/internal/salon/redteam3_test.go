@@ -12,9 +12,8 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 )
 
-// Non-régression de l'audit adverse du 13 novembre, 3e campagne, front « serveur Go,
-// concurrence et déni de service » (A, B, D, H). Les démonstrations de l'audit sont reprises
-// ici, retournées : ce qui prouvait la faiblesse doit maintenant échouer.
+// Non-régression : concurrence et déni de service du serveur. Chaque test reprend une
+// attaque, retournée : ce qui prouvait la faiblesse doit maintenant échouer.
 
 // A : le renouvellement ne fait plus aucun appel disque, et n'attend plus le verrou de la
 // conversation, sous le verrou du salon. Une écriture est bloquée dans son appel disque (verrou
@@ -320,10 +319,10 @@ func TestRT3_D_MemoireDesLotsDeRattrapage(t *testing.T) {
 // de 64 enregistrements).
 const memoireParConnexionTest = MemoireParConnexion
 
-// Audit adverse du 13 novembre, 3e campagne, tableau de bord, F2 : destruction par
-// l'administrateur dans le serveur en marche (DetruireAdmin). Le salon est fini par le
-// gestionnaire : jeton refusé tout de suite (sans attendre une passe d'entretien), conversation,
-// pièces et ligne effacées, et « complet » n'est rendu que si la ligne est partie.
+// Destruction par l'administrateur dans le serveur en marche
+// (DetruireAdmin). Le salon est fini par le gestionnaire : jeton refusé tout de suite (sans
+// attendre une passe d'entretien), conversation, pièces et ligne effacées, et « complet » n'est
+// rendu que si la ligne est partie.
 func TestRT3_DetruireAdmin(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	c, autre := b.creer(t, 4), b.creer(t, 4)

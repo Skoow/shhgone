@@ -17,25 +17,24 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Gestionnaire des salons (plan C-2 Task 6) : création, meta, entrée, sièges et jetons de
+// Gestionnaire des salons : création, meta, entrée, sièges et jetons de
 // membre. La base ne garde que les colonnes de §39.3.5 ; sièges, jetons (par SHA-256),
 // nonces et rangs vivent en mémoire.
 //
 // Ordre des verrous : createMu → Manager.mu → salon.mu (fin.go, lignes) ; essais (rayé par id) → Manager.mu → salon.mu →
 // Manager.idxMu ; Conversation a son propre verrou, pris en dernier. Bornes des appels disque
 // des conversations (ecr, lec) : une place ne s'attend JAMAIS sous Manager.mu, sous salon.mu
-// ni sous le verrou d'une conversation (audit adverse du 13 novembre, front serveur, F1) ;
-// elle se prend avant, et sous elle seul le verrou de la conversation est pris ; connexion.cmu
-// (connexion.go) est un verrou feuille, pris sous salon.mu (diffusion) ou seul, sous lequel
-// aucun autre verrou n'est pris ; le verrou de Manager.flux (share.Streams) aussi. placeMu
-// (pieces.go) n'est jamais pris sous salon.mu ; sous lui, seuls les verrous internes des
-// blob.Store (usage) sont pris. Aucune sortie (journal, stderr) : les erreurs remontent à
-// l'appelant, messages fixes.
+// ni sous le verrou d'une conversation ; elle se prend avant, et sous elle seul le verrou de la
+// conversation est pris ; connexion.cmu (connexion.go) est un verrou feuille, pris sous salon.mu
+// (diffusion) ou seul, sous lequel aucun autre verrou n'est pris ; le verrou de Manager.flux
+// (share.Streams) aussi. placeMu (pieces.go) n'est jamais pris sous salon.mu ; sous lui, seuls
+// les verrous internes des blob.Store (usage) sont pris. Aucune sortie (journal, stderr) : les
+// erreurs remontent à l'appelant, messages fixes.
 
 const (
 	// maxEssais : 10 K_preuve_s fausses détruisent le salon (§39.3.6).
 	maxEssais = 10
-	// reserveCreation : place disque libre exigée pour créer un salon (plan, point 10) : le budget
+	// reserveCreation : place disque libre exigée pour créer un salon : le budget
 	// de pièces d'un salon (Budget, 2 Gio). Ce n'est pas une réservation : chaque pièce et chaque
 	// trame revérifient SHH_STORAGE_MAX (placer, plein), qui reste le vrai garde-fou du disque.
 	reserveCreation int64 = Budget
@@ -43,18 +42,18 @@ const (
 	kdfMem                = 67108864
 	// VivantsParBloc : salons vivants au plus par bloc /48 (par adresse en IPv4), pour que
 	// 14 blocs à 15 créations par jour ne prennent pas les SHH_SALONS_MAX places (spec
-	// §39.3.6, décision de l'équipe du 12 novembre, réglable).
+	// §39.3.6, réglable).
 	VivantsParBloc = 5
-	// TramesMaxDefaut : trames non volatiles rangées au plus par salon (audit du 13 novembre,
-	// D3 : seul le plafond global du disque arrêtait une conversation, qui pouvait remplir le
-	// disque de tous, puis faire tuer le processus faute de mémoire, 24 o d'index par trame).
+	// TramesMaxDefaut : trames non volatiles rangées au plus par salon (seul le plafond global
+	// du disque arrêtait une conversation, qui pouvait remplir le disque de tous, puis faire
+	// tuer le processus faute de mémoire, 24 o d'index par trame).
 	// 100 000 × 4 168 o ≈ 417 Mo sur le disque et 2,4 Mio d'index par salon ; c'est plus que
 	// les 1 200 messages par heure d'un siège actif pendant 24 h (28 800), sans couvrir le pire
 	// cas de 10 sièges au plafond (288 000). Réglable (Config.TramesMax).
 	TramesMaxDefaut = 100000
-	// videMax : un salon où personne n'est entré est effacé ce délai après sa création (audit
-	// du 13 novembre, D2 : 40 adresses prenaient les SHH_SALONS_MAX places pour 24 h sans
-	// jamais y entrer). « Entré » : un Rejoindre réussi (créateur ou invité) ; le siège 0,
+	// videMax : un salon où personne n'est entré est effacé ce délai après sa création (40
+	// adresses prenaient les SHH_SALONS_MAX places pour 24 h sans jamais y entrer).
+	// « Entré » : un Rejoindre réussi (créateur ou invité) ; le siège 0,
 	// gardé au créateur, ne compte pas tant qu'il n'est pas entré.
 	videMax = 15 * time.Minute
 	// quart : arrondi des échéances (share.Ceil15) ; un salon ne peut pas échoir avant le
@@ -78,7 +77,7 @@ type Config struct {
 	// SalonFramesTotal (facultatif, SHH_SALON_FRAMES_TOTAL) : trames non volatiles rangées au
 	// plus EN MÉMOIRE, tous salons confondus (0 : sans plafond, tests seulement ; en production
 	// toujours posé, calé sur GOMEMLIMIT, config.Capacity). Au-delà : 0x0C, quel que soit le
-	// salon. Vrai garde-fou de la mémoire (audit adverse du 13 novembre, front serveur).
+	// salon. Vrai garde-fou de la mémoire.
 	SalonFramesTotal int
 	// OnAbandon (facultatif) : pièce effacée sans avoir été finalisée (limits.AbandonUpload :
 	// sa place d'envoi en cours est rendue, ses octets comptent comme abandonnés).
@@ -91,7 +90,7 @@ type Config struct {
 	// demandés après chaque effacement ou réécriture sensible d'une ligne de salon ou de
 	// pièce ; le serveur en fait tourner la boucle. Absent : un Vidage propre, sans boucle.
 	Vidage *store.Vidage
-	// Palier (facultatif, SHH_COMPTES=1 ; plan du compte, lot 6) : limites du compte h, lues à
+	// Palier (facultatif, SHH_COMPTES=1) : limites du compte h, lues à
 	// chaque création qui porte un compte et à chaque réglage d'un salon créé par un compte. Son
 	// erreur (compte banni, supprimé, base illisible) est rendue telle quelle. nil : une création
 	// avec compte est refusée (ErrBase) et les réglages d'un salon de compte ne sont pas bornés
@@ -119,10 +118,10 @@ type Manager struct {
 	createMu sync.Mutex // vérification du plafond et insertion d'une création, atomiques
 	// ecr, lec : bornes des appels disque des fichiers de conversation (chacun tient un fil du
 	// système tant que le disque ne répond pas), écritures et lectures. Séparées de la borne des
-	// partages et des pièces (blob.Store.Gate), et l'une de l'autre (audit adverse du
-	// 13 novembre, F1 et F2) : des transferts de partages sur un disque lent ne retardent ni
-	// les messages ni leurs effacements, et des lecteurs lents (rattrapage) n'affament pas les
-	// écritures. Prises hors de tout verrou (voir l'ordre des verrous).
+	// partages et des pièces (blob.Store.Gate), et l'une de l'autre : des transferts de partages
+	// sur un disque lent ne retardent ni les messages ni leurs effacements, et des lecteurs lents
+	// (rattrapage) n'affament pas les écritures. Prises hors de tout verrou (voir l'ordre des
+	// verrous).
 	ecr, lec *blob.Gate
 	// vidage : Config.Vidage, jamais nil après NewManager (nil pour un Manager bâti à la main,
 	// commandes hors du serveur : Demander ne fait alors rien).
@@ -137,7 +136,7 @@ type Manager struct {
 	vivants map[string]vivant
 	parBloc map[[32]byte]int
 	// curseurEchues : dernier id du dernier lot plein lu par echuesSansEtat (fin.go), "" pour
-	// repartir du début (relecture C-2, N6).
+	// repartir du début.
 	curseurEchues string
 
 	idxMu sync.Mutex
@@ -156,9 +155,9 @@ type Manager struct {
 	octetsConv atomic.Int64
 	// tramesGlob : trames non volatiles rangées en mémoire, tous salons confondus (somme des
 	// len(s.index) des salons vivants). Incrémenté à chaque trame rangée (relais.go), diminué
-	// quand un index est vidé (fin, renouvellement). Comparé à tramesTotalMax (plafond global,
-	// audit adverse du 13 novembre) sous le verrou du salon : un léger dépassement (une trame
-	// par Recevoir simultané, comme pour m.plein) est accepté.
+	// quand un index est vidé (fin, renouvellement). Comparé à tramesTotalMax (plafond global)
+	// sous le verrou du salon : un léger dépassement (une trame par Recevoir simultané, comme
+	// pour m.plein) est accepté.
 	tramesGlob atomic.Int64
 	// passesDisque, passesPieces : passes de entretienDisque et de entretienPieces (brouillage
 	// des dates une fois sur passesParBrouillage).
@@ -167,7 +166,7 @@ type Manager struct {
 	// disparues) : usage du blob.Store à relire par entretienPieces.
 	resyncPieces atomic.Bool
 	// tramesPot : trames rangées au-delà de la part réservée de leur salon, tous salons
-	// confondus (salon.globInc, globDec) : le pot commun, plafonné par potTramesMax (F3).
+	// confondus (salon.globInc, globDec) : le pot commun, plafonné par potTramesMax.
 	tramesPot atomic.Int64
 	// placeMu, reserves : place des pièces en cours de réservation (placer, pieces.go).
 	placeMu  sync.Mutex
@@ -198,7 +197,7 @@ func NewManager(c Config) (*Manager, error) {
 	if err := os.MkdirAll(c.Pieces.Dir, 0o700); err != nil {
 		return nil, es(err)
 	}
-	// Dates du dossier à l'epoch dès sa création (blob.Store les y remet ensuite, audit D7).
+	// Dates du dossier à l'epoch dès sa création (blob.Store les y remet ensuite).
 	if err := os.Chtimes(c.Pieces.Dir, time.Unix(0, 0), time.Unix(0, 0)); err != nil {
 		return nil, es(err)
 	}
@@ -242,12 +241,11 @@ func (m *Manager) tramesTotalMax() int {
 }
 
 // PartTrames : part de trames en mémoire réservée à chaque salon, pour un plafond global total
-// et max salons au plus (audit adverse du 13 novembre, front serveur, F3 : le plafond global
-// était un pot commun, qu'un groupe de salons pouvait vider pour tous les autres). La moitié
-// du plafond global est réservée, à parts égales entre les max salons possibles (jamais plus
-// que le plafond par salon) ; le reste (pot) est commun. max × part + pot = total : le
-// garde-fou de la mémoire ne bouge pas. Exportée pour le contrôle de démarrage
-// (config : une part trop petite refuse le démarrage).
+// et max salons au plus (le plafond global était un pot commun, qu'un groupe de salons pouvait
+// vider pour tous les autres). La moitié du plafond global est réservée, à parts égales entre
+// les max salons possibles (jamais plus que le plafond par salon) ; le reste (pot) est commun.
+// max × part + pot = total : le garde-fou de la mémoire ne bouge pas. Exportée pour le
+// contrôle de démarrage (config : une part trop petite refuse le démarrage).
 func PartTrames(total, max, parSalon int) (part, pot int) {
 	if total <= 0 || max <= 0 {
 		return 0, total
@@ -265,7 +263,7 @@ func (m *Manager) partTrames() (part, pot int) {
 }
 
 // parBlocMax : salons vivants au plus par bloc : VivantsParBloc, et au plus 1/8 de Max (part
-// équitable, audit du 13 novembre, D2 ; limits.FairShare).
+// équitable ; limits.FairShare).
 func (m *Manager) parBlocMax() int { return max(1, min(VivantsParBloc, m.cfg.Max/limits.FairShare)) }
 
 // reserveSalons : dernières places de Max, ouvertes seulement à un bloc sans salon vivant
@@ -296,8 +294,8 @@ func (m *Manager) effacerVides(now int64) {
 
 // effacerVide : le salon id, s'il est toujours vide, est détruit sous son verrou d'entrée,
 // rendu par defer : une panique dans la fin (récupérée par l'entretien, passeSure) ne garde pas
-// la raie (audit adverse du 13 novembre, 3e campagne, front serveur, B : le verrou restait pris
-// pour toujours, et avec lui toute entrée d'un salon sur 64, puis la passe disque).
+// la raie (sinon le verrou restait pris pour toujours, et avec lui
+// toute entrée d'un salon sur 64, puis la passe disque).
 func (m *Manager) effacerVide(id string) {
 	mu := m.essaiLock(id)
 	mu.Lock()
@@ -339,8 +337,7 @@ func (m *Manager) finirLocked(id string) {
 }
 
 // avecMu : f sous Manager.mu, rendu par defer : une panique de f, récupérée par l'entretien
-// (passeSure) ou par net/http, ne garde pas le verrou (audit adverse du 13 novembre, 3e
-// campagne, front serveur, B : même défaut cherché dans tout le paquet).
+// (passeSure) ou par net/http, ne garde pas le verrou.
 func (m *Manager) avecMu(f func()) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -447,7 +444,7 @@ func (m *Manager) Creer(r CreerReq) (time.Duration, error) {
 	}
 	var nouveau bool
 	m.avecMu(func() { m.echusLocked(now); nouveau = m.parBloc[r.Bloc] == 0 })
-	// Réserve des nouveaux venus (audit D2) : les dernières places de Max et le dernier
+	// Réserve des nouveaux venus : les dernières places de Max et le dernier
 	// huitième du stockage ne vont qu'à un bloc sans salon vivant.
 	if !nouveau && vivants >= m.cfg.Max-m.reserveSalons() {
 		return 0, ErrBusy
@@ -565,8 +562,8 @@ func (m *Manager) SalonsVivantsDuCompte(h [16]byte) ([]SalonVue, error) {
 	return out, nil
 }
 
-// CompteDuSalon : compte créateur du salon de K_accès_s, vivant ou non (bannissement par lien,
-// lot 7) ; nil pour un salon sans compte ; ErrNotFound si aucune ligne.
+// CompteDuSalon : compte créateur du salon de K_accès_s, vivant ou non (bannissement par
+// lien) ; nil pour un salon sans compte ; ErrNotFound si aucune ligne.
 func (m *Manager) CompteDuSalon(kAcces []byte) (*[16]byte, error) {
 	v := share.Verifier(kAcces)
 	if v == nil {
@@ -631,7 +628,7 @@ func (m *Manager) Meta(kAcces []byte) (Meta, error) {
 	return r, nil
 }
 
-// Entree : réponse de rejoindre (§39.3.3, plan point 21). Seq : rang de l'annonce (0x02, ou
+// Entree : réponse de rejoindre (§39.3.3). Seq : rang de l'annonce (0x02, ou
 // 0x0A quand le créateur reprend le siège 0) ; Nonce : nonce_arrivée de cette annonce.
 type Entree struct {
 	Jeton             [32]byte
@@ -729,7 +726,7 @@ func (m *Manager) Rejoindre(kAcces, kPreuve, sGestion []byte) (Entree, error) {
 	}, nil
 }
 
-// choisirLocked : siège donné à une entrée (plan, point 1). Le créateur n'est soumis ni au
+// choisirLocked : siège donné à une entrée. Le créateur n'est soumis ni au
 // plafond des sièges invités ni à celui des arrivées : sa place lui est gardée.
 func (s *salon) choisirLocked(createur bool) (uint8, error) {
 	if createur {
@@ -899,10 +896,10 @@ func (m *Manager) sortirLocked(s *salon, n uint8, enr func(seq uint64) []byte, r
 
 // Tick : une passe d'entretien complète, mémoire, disque puis pièces (tests, et tout appelant
 // qui veut l'entretien fait au retour). En marche (Run), les trois passes tournent chacune dans
-// sa goroutine : la passe mémoire n'attend jamais le disque (audit adverse du 13 novembre, front
-// serveur, F1 : une borne des appels disque saturée, ou un disque lent, figeait l'entretien de
-// tous les salons, donc les effacements à échéance et les fins de vie), et la passe disque
-// n'attend jamais la borne des partages et des pièces (3e campagne, H).
+// sa goroutine : la passe mémoire n'attend jamais le disque (une borne des appels disque
+// saturée, ou un disque lent, figeait l'entretien de tous les salons, donc les effacements à
+// échéance et les fins de vie), et la passe disque n'attend jamais la borne des partages et des
+// pièces.
 func (m *Manager) Tick() {
 	m.entretienMemoire()
 	m.entretienDisque()
@@ -926,8 +923,8 @@ func (m *Manager) copieSalons(avant func()) []*salon {
 
 // entretienMemoire : passe d'entretien sans aucun appel disque ni requête SQL, et sans
 // attendre aucune borne (chaque seconde, Run) : trames des règles 1 à 3 échues (délai après
-// lecture par tous) marquées effacées, donc plus jamais servies, et 0x0E diffusé (Task 11) ;
-// pièces échues marquées effacées, flux coupés (Task 13) ; sièges jamais connectés libérés ;
+// lecture par tous) marquées effacées, donc plus jamais servies, et 0x0E diffusé ; pièces
+// échues marquées effacées, flux coupés ; sièges jamais connectés libérés ;
 // salons arrivés à échéance finis en raison 1 pour tout ce qui est en mémoire (oublier : 0x05
 // aux connectés, jetons, journal et index oubliés) ; places de bloc des salons échus rendues.
 // Tout ce qui reste à faire sur le disque est laissé à entretienDisque.
@@ -945,14 +942,14 @@ func (m *Manager) entretienMemoire() {
 // seconde, Run, dans sa propre goroutine ; elle peut attendre un disque lent sans retarder
 // entretienMemoire). Elle ne prend JAMAIS la borne des partages et des pièces
 // (blob.Store.Gate, que des transferts de partages sur un disque lent saturent) : tout ce qui
-// la prend est dans entretienPieces (audit adverse du 13 novembre, 3e campagne, front serveur,
-// H : une pièce à purger faisait attendre, derrière cette borne, l'écrasement des trames
-// effacées et les fins de tous les salons). Dans l'ordre, chaque étape pour tous les salons
-// avant la suivante : salons où personne n'est entré effacés (jamais de pièce : personne n'y a
-// de jeton) ; emplacements des trames effacées écrasés (ecraser, borne des écritures de
-// conversation) ; fins restées à faire : conversation détruite, clé oubliée et ligne rendue
-// morte (finHorsPieces ; pièces et suppression de la ligne : entretienPieces) ; salons dont la
-// ligne vivante a disparu (admin destroy, wipe) finis de même.
+// la prend est dans entretienPieces (sinon une pièce à purger
+// faisait attendre, derrière cette borne, l'écrasement des trames effacées et les fins de tous
+// les salons). Dans l'ordre, chaque étape pour tous les salons avant la suivante : salons où
+// personne n'est entré effacés (jamais de pièce : personne n'y a de jeton) ; emplacements des
+// trames effacées écrasés (ecraser, borne des écritures de conversation) ; fins restées à
+// faire : conversation détruite, clé oubliée et ligne rendue morte (finHorsPieces ; pièces et
+// suppression de la ligne : entretienPieces) ; salons dont la ligne vivante a disparu (admin
+// destroy, wipe) finis de même.
 func (m *Manager) entretienDisque() {
 	now := m.cfg.Now()
 	m.effacerVides(now.Unix())
@@ -1014,10 +1011,10 @@ const passesParBrouillage = 60
 // BrouillerDates remet à l'epoch les dates de chaque fichier de conversation et de pièce, et
 // de leurs dossiers : leur date de changement d'inode (ctime) devient l'heure de ce passage, la
 // même pour tous, et non plus celle du dernier message, du dernier retrait ou de la dernière
-// suppression (audit adverse du 13 novembre, stockage, F4 ; blob.Store.ScrubTimes). Entre deux
-// passages (une minute), le ctime d'une conversation qui vient de recevoir un message donne
-// encore l'heure de ce message ; la date de création (btime) ne peut pas être changée. Hors
-// de tout verrou ; écritures sous la borne des écritures de conversation.
+// suppression (blob.Store.ScrubTimes). Entre deux passages (une minute), le ctime d'une
+// conversation qui vient de recevoir un message donne encore l'heure de ce message ; la date de
+// création (btime) ne peut pas être changée. Hors de tout verrou ; écritures sous la borne des
+// écritures de conversation.
 func (m *Manager) BrouillerDates() error {
 	return errors.Join(m.brouillerConversations(), es(m.cfg.Pieces.ScrubTimes()))
 }
@@ -1055,7 +1052,7 @@ func (m *Manager) oublierTombe(s *salon) {
 	}
 }
 
-// margeTombe : une tombe est gardée jusqu'à l'échéance plus cette marge (plan, Task 15) : un
+// margeTombe : une tombe est gardée jusqu'à l'échéance plus cette marge : un
 // Rejoindre qui a lu la ligne juste avant l'échéance ne recrée ni état ni fichier.
 const margeTombe = time.Minute
 
@@ -1073,9 +1070,9 @@ func (m *Manager) entretenir(s *salon, now time.Time) (echu bool) {
 	s.effacerEchuesLocked(now.UnixMilli())
 	// Un siège connecté au moins une fois n'est jamais libéré ici : un absent reste réservé et
 	// attendu par les trames des règles 1 à 3 jusqu'à son retour, son départ, son exclusion ou la
-	// fin du salon (revue finale C-2, I3). Seul un siège invité qui n'a jamais ouvert de
-	// WebSocket dans les jamaisConnecteMax après son entrée part (0x03 : réponse de rejoindre
-	// perdue, remplissage ; relecture C-2, N1) ; son arrivée reste comptée (s.arrivees).
+	// fin du salon. Seul un siège invité qui n'a jamais ouvert de WebSocket dans les
+	// jamaisConnecteMax après son entrée part (0x03 : réponse de rejoindre
+	// perdue, remplissage) ; son arrivée reste comptée (s.arrivees).
 	for n, x := range s.sieges {
 		if x != nil && x.jamaisConnecte && now.Sub(x.entre) >= jamaisConnecteMax {
 			m.departLocked(s, uint8(n))

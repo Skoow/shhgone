@@ -6,7 +6,7 @@ import (
 )
 
 // securityHeaders : en-têtes de la spec §10, posés sur toutes les réponses
-// Trusted Types (10 novembre) : toute chaîne brute donnée à un point d'injection de script
+// Trusted Types : toute chaîne brute donnée à un point d'injection de script
 // est refusée ; seules deux politiques existent, celle des gabarits de Svelte et « shhdrop »
 // (web/src/app/trusted.ts : nos fichiers de assets/ et les Blob de cette origine).
 // Cache-Control: no-store par défaut : exigé pour /api/* et le HTML (bfcache, spec §21), gardé
@@ -16,10 +16,10 @@ import (
 // worker-src blob: (seul) : les Workers d'Argon2id et de la preuve anti-robot sont lancés depuis
 // un Blob dont les octets viennent d'un fetch avec `integrity` (web/src/engine/source.verified.ts,
 // web/src/captcha/pow-source.verified.ts) ; new Worker(url) n'a pas de contrôle d'intégrité
-// (spec §28.3). Plus aucun Worker n'est lancé sur un fichier : 'self' retiré (revue du
-// 21 novembre), un script injecté ne peut plus lancer un fichier du site comme Worker.
+// (spec §28.3). Plus aucun Worker n'est lancé sur un fichier : 'self' retiré, un script injecté
+// ne peut plus lancer un fichier du site comme Worker.
 // connect-src … blob: : Chrome (156) relit lui-même une image blob: qu'il ne sait pas décoder
-// (HEIC) et la CSP bloquait cette relecture (CI du 10 novembre). Une adresse blob: ne désigne
+// (HEIC) et la CSP bloquait cette relecture. Une adresse blob: ne désigne
 // que des données déjà présentes dans la page : rien ne peut sortir par là.
 var securityHeaders = [][2]string{
 	{"Content-Security-Policy", "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; " +
@@ -27,14 +27,14 @@ var securityHeaders = [][2]string{
 		"object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types svelte-trusted-html shhdrop"},
 	{"Referrer-Policy", "no-referrer"},
 	{"X-Content-Type-Options", "nosniff"},
-	// X-Frame-Options: DENY double frame-ancestors 'none' (ceinture et bretelles, audit adverse
-	// du 13 novembre, Si2) : un très vieux navigateur sans CSP niveau 2 ne cadre pas non plus les
-	// pages qui détiennent des clés. Le cadre PDF (/pdf-frame.html), volontairement embarqué par
-	// l'application en même origine, repasse à SAMEORIGIN (pathHeaders).
+	// X-Frame-Options: DENY double frame-ancestors 'none' (ceinture et bretelles) : un très vieux
+	// navigateur sans CSP niveau 2 ne cadre pas non plus les pages qui détiennent des clés. Le
+	// cadre PDF (/pdf-frame.html), volontairement embarqué par l'application en même origine,
+	// repasse à SAMEORIGIN (pathHeaders).
 	{"X-Frame-Options", "DENY"},
 	// camera=(self) : photo et vidéo prises dans l'interface (Q-REC1 acceptée par le propriétaire,
 	// spec §35.3) ; /pdf-frame.html n'a besoin ni du micro ni de la caméra (pathHeaders).
-	// Le reste est refusé explicitement (audit F3) : fonctions puissantes inutilisées, qui
+	// Le reste est refusé explicitement : fonctions puissantes inutilisées, qui
 	// valent sinon « self » et serviraient à un script injecté (capture d'écran, lecture du
 	// presse-papiers, périphériques, capteurs). clipboard-write, web-share, screen-wake-lock,
 	// fullscreen restent à leur défaut (self) : utilisés ou prévus (§37.9). Passkeys du compte
@@ -48,7 +48,7 @@ var securityHeaders = [][2]string{
 	{"Cache-Control", "no-store"},
 }
 
-// deniedFeatures : fonctions refusées sur toutes les pages (spec §10, audit F3).
+// deniedFeatures : fonctions refusées sur toutes les pages (spec §10).
 const deniedFeatures = "geolocation=(), display-capture=(), clipboard-read=(), usb=(), serial=(), hid=(), " +
 	"payment=(), gyroscope=(), accelerometer=(), magnetometer=(), midi=(), " +
 	"xr-spatial-tracking=(), browsing-topics=(), interest-cohort=()"

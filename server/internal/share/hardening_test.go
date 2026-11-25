@@ -12,7 +12,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Audit F3 : le base64 de Go ignore \r et \n, même en mode Strict.
+// Le base64 de Go ignore \r et \n, même en mode Strict.
 func TestValidIDCanonical(t *testing.T) {
 	id := strings.Repeat("A", 22)
 	if !validID(id) {
@@ -47,7 +47,7 @@ func TestValidIDCanonical(t *testing.T) {
 	}
 }
 
-// Audit F4 : match(nil, SHA-256("")) valait vrai.
+// Match(nil, SHA-256("")) valait vrai.
 func TestMatchRequires32Bytes(t *testing.T) {
 	empty := sha256.Sum256(nil)
 	if match(nil, empty[:]) || match([]byte{}, empty[:]) {
@@ -84,7 +84,7 @@ func TestValidateRefusesEmptyHashVerifier(t *testing.T) {
 	if err := ValidateFinalize(f); !errors.Is(err, ErrBadRequest) {
 		t.Fatal("V_preuve = SHA-256(\"\") accepté")
 	}
-	// Scénario de l'audit : partage dont les vérificateurs valent SHA-256("") ; rien ne
+	// Scénario : partage dont les vérificateurs valent SHA-256("") ; rien ne
 	// le crée, et même inséré à la main, {"manage": n'importe quoi} ne le détruit pas.
 	s, _ := newSvc(t)
 	if _, _, err := s.createAny(k.req(1, 1, 1)); err != nil {
@@ -107,7 +107,7 @@ func TestValidateRefusesEmptyHashVerifier(t *testing.T) {
 	}
 }
 
-// Audit F10 : valeurs zéro dangereuses ; NewService valide la configuration.
+// Valeurs zéro dangereuses ; NewService valide la configuration.
 func TestNewService(t *testing.T) {
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "shares.db"))

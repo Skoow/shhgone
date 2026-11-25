@@ -5,30 +5,30 @@ import (
 	"time"
 )
 
-// Limites des trames montantes par siège (plan C-2 Task 12, Global Constraints) : seaux à
-// jetons, en mémoire seulement, sous s.mu. Les limites par connexion et par /48 (480 et 960
-// par minute) sont celles de limits.AllowFrame, consultées par Servir avant Recevoir.
+// Limites des trames montantes par siège : seaux à jetons, en mémoire seulement, sous s.mu.
+// Les limites par connexion et par /48 (480 et 960 par minute) sont celles de
+// limits.AllowFrame, consultées par Servir avant Recevoir.
 //   - cadence : trames non volatiles, rafale de 20 puis 1 par seconde (60 par minute) ;
 //   - horaire : trames non volatiles, 1 200 puis 1 200 par heure (1 par 3 s) ;
 //   - volatile : trames volatiles (« en train d'écrire », accusés), rafale de 30 puis 2 par
-//     seconde (120 par minute), seau à part (point D9 du rapport de performance, décision du
-//     13 novembre : elles consommaient le seau des messages, retenus 2 s après une rafale).
+//     seconde (120 par minute), seau à part (sinon elles consommaient le seau des messages,
+//     retenus 2 s après une rafale).
 //
 // Les seaux d'un siège invité sont remis à neuf à l'arrivée d'un nouvel occupant (0x02,
 // installerLocked) : il n'hérite pas du compte d'un autre (une arrivée coûte déjà une place
 // sur 5 × max_members et un rejoindre limité). Une reprise (0x0A, par WebSocket ou du
 // créateur par rejoindre) les garde : recharger la page ne remet rien à zéro. Le siège 0 garde
 // toujours les siens : le créateur, hors du plafond des arrivées, ne les recharge pas par
-// « Quitter » puis rejoindre (revue finale C-2, mineur c).
+// « Quitter » puis rejoindre.
 
 const (
 	rafaleSiege    = 20
 	cadenceSeconde = 1.0
-	// horaireMax, horaireParHeure : les messages sont illimités pour un usage normal (décision
-	// du propriétaire) ; ce seau n'arrête que les abus. Plein au départ, il laisse passer une
-	// rafale : sur une heure glissante, un siège peut ranger jusqu'à environ 2 400 trames non
-	// volatiles (1 200 d'un coup, plus la recharge), 1 200 par heure en régime établi. Accepté
-	// (décision du 12 novembre) : environ +4 % sur le dimensionnement du disque (plan, point 10).
+	// horaireMax, horaireParHeure : les messages sont illimités pour un usage normal ; ce seau
+	// n'arrête que les abus. Plein au départ, il laisse passer une rafale : sur une heure
+	// glissante, un siège peut ranger jusqu'à environ 2 400 trames non volatiles (1 200 d'un
+	// coup, plus la recharge), 1 200 par heure en régime établi. Accepté : environ +4 % sur le
+	// dimensionnement du disque.
 	horaireMax      = 1200
 	horaireParHeure = 1200.0
 	// rafaleVolatile, volatileSeconde : borne contre le flood des volatiles, qui ne sont ni
@@ -80,7 +80,7 @@ func (b *seau) rendre() { b.jetons = min(b.cap, b.jetons+1) }
 // limiteSiege : seaux (trames, pièces) et réserve vocale d'un numéro de siège.
 type limiteSiege struct {
 	cadence, horaire, volatile seau
-	// pieces : pièces non vocales créées (PiecesParHeure, pieces.go), décision du 12 novembre.
+	// pieces : pièces non vocales créées (PiecesParHeure, pieces.go).
 	pieces seau
 	vocal  reserveVocale
 }
@@ -88,7 +88,7 @@ type limiteSiege struct {
 // octetVocal : présence qui donne un octet de réserve vocale (250 µs à 4 000 o/s).
 const octetVocal = time.Second / VocalOctetsParSeconde
 
-// reserveVocale (v3 §5.1, plan point 3) : octets de vocaux que le siège peut encore créer.
+// reserveVocale (v3 §5.1) : octets de vocaux que le siège peut encore créer.
 // Elle gagne VocalOctetsParSeconde par seconde de WebSocket ouvert (ouvrir, fermer :
 // connexion.go), jusqu'à VocalReserveMax ; chaque vocal en prend la taille de son palier.
 // Neuve (vide) pour chaque nouvel occupant, gardée par une reprise, comme les seaux.

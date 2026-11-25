@@ -9,7 +9,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-// ---- Quitter et signaler (spec §39.5, §39.3.9 ; décision de l'équipe, plan C-2 Task 17) ----
+// ---- Quitter et signaler (spec §39.5, §39.3.9) ----
 
 func (e *env) signaler(hdr map[string]string, body string) *httpResp {
 	w := e.do(req{method: "POST", path: "/api/salons/signaler", hdr: hdr, body: []byte(body)})
@@ -146,8 +146,8 @@ func TestSignalerRefus(t *testing.T) {
 	}
 }
 
-// Un seul signalement compté par salon (relecture C-2 Task 17) : le second membre qui signale
-// part aussi, mais l'entier horaire ne bouge plus ; un autre salon compte de nouveau.
+// Un seul signalement compté par salon : le second membre qui signale part aussi, mais
+// l'entier horaire ne bouge plus ; un autre salon compte de nouveau.
 func TestSignalerUneFoisParSalon(t *testing.T) {
 	e, _ := salonEnv(t)
 	k := newKeys()

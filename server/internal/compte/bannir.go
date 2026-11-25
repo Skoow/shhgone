@@ -13,14 +13,14 @@ import (
 // §7.4). Une ligne bannis par compte (h), désignée devant le fondateur par un identifiant
 // aléatoire de 8 octets (« B-XXXX-XXXX-XXXXX ») : jamais un h, une empreinte ni un pseudo. Le
 // statut « banni » se lit seulement là (actif et non échu). Supprimer le compte efface la ligne
-// (cascade) : sans adresse, un nouveau compte se crée sans coût (R2), elle ne protégeait plus
+// (cascade) : sans adresse, un nouveau compte se crée sans coût, elle ne protégeait plus
 // rien.
 
 // Durées permises au moment de bannir (§21.11) : 30 jours, 1 an, 3 ans (défaut). Le
 // bannissement porte sur le compte, jamais sur une adresse IP.
 var dureesBan = [...]int{30, 365, 1095}
 
-// DureeBanDefaut : 3 ans (décision du propriétaire du 14 novembre, confirmée le 22 novembre).
+// DureeBanDefaut : 3 ans.
 const DureeBanDefaut = 1095
 
 // pageBans : lignes par page de la liste (§21.14.4) ; pagesMax borne le décalage demandé.
@@ -238,7 +238,7 @@ func (s *Service) ActionBan(id, action, jusqu string) (avant BanVue, apres *BanV
 	}
 	// Toute action sur un bannissement compte dans la même limite que bannir (20 par heure) :
 	// sans elle, un jeton d'administration volé levait ou suspendait tous les bannissements
-	// un par un (audit du lot 7).
+	// un par un.
 	if !s.lim.AllowBannir() {
 		return BanVue{}, nil, ErrLimit{heureSuivante(now)}
 	}

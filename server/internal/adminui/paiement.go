@@ -6,7 +6,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/paiement"
 )
 
-// Paiement (tableau de bord finalisé, 25 novembre) : agrégats du paiement et suspension des
+// Paiement (tableau de bord finalisé) : agrégats du paiement et suspension des
 // ventes. Que des nombres et des booléens : ni pass, ni commande, ni montant, ni pays.
 
 // Paiement : crochets du paiement (SHH_PAIEMENT=1 ; nil sinon : routes refusées comme inconnues).

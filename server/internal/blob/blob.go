@@ -14,7 +14,7 @@ import (
 )
 
 // Store range les fichiers dans Dir, un par identifiant. NoSparse (production) : la place
-// doit être réellement allouée sur le disque ; pas de repli « fichier creux » (audit F6).
+// doit être réellement allouée sur le disque ; pas de repli « fichier creux ».
 type Store struct {
 	Dir      string
 	NoSparse bool
@@ -143,9 +143,9 @@ func wipeTimes(p string) error {
 }
 
 // wipeDirTimes remet les dates du dossier à l'epoch après une création ou une suppression de
-// fichier, qui les met à l'heure (audit du 12 novembre, D7). Au mieux : un échec n'annule pas
-// l'opération faite (un fichier créé mais signalé en échec resterait orphelin) ; la date de
-// changement d'inode (ctime) ne peut pas être remise, aucun appel système ne le permet.
+// fichier, qui les met à l'heure. Au mieux : un échec n'annule pas l'opération faite (un
+// fichier créé mais signalé en échec resterait orphelin) ; la date de changement d'inode
+// (ctime) ne peut pas être remise, aucun appel système ne le permet.
 func (s *Store) wipeDirTimes() { _ = wipeTimes(s.Dir) }
 
 // Reserve crée le fichier de size octets, alloués sur le disque quand le système de
@@ -286,7 +286,7 @@ func (s *Section) Close() error { return s.f.Close() }
 
 // Open ouvre exactement n octets à partir de off, pour une lecture en flux. Le fichier est
 // ouvert sans mise à jour de la date d'accès quand le système le permet (OpenRead) :
-// l'atime trahirait l'heure de la première lecture (audit de confidentialité P5).
+// l'atime trahirait l'heure de la première lecture.
 // La taille est vérifiée sur le fichier ouvert : un fichier plus court que la zone
 // demandée est refusé avant d'envoyer quoi que ce soit.
 func (s *Store) Open(id string, off int64, n int64) (*Section, error) {
@@ -376,11 +376,10 @@ func (s *Store) List() ([]string, error) {
 // de contenu et d'accès y sont déjà (wipeTimes à chaque écriture) ; l'effet voulu est sur la
 // date de changement d'inode (ctime), qu'aucun appel ne permet de choisir mais que tout Chtimes
 // met à l'heure : après un passage, le ctime de tous les fichiers est l'heure de ce passage,
-// et non plus celle de la fin de l'envoi, du dernier message ou de la dernière suppression
-// (audit adverse du 13 novembre, stockage, F4). Appelée à chaque passage du janitor. La date
-// de création (btime) ne peut pas être changée : limite écrite dans deploy/README.md. Un
-// fichier supprimé entre-temps est ignoré ; la première autre erreur est rendue, sans arrêter
-// le passage.
+// et non plus celle de la fin de l'envoi, du dernier message ou de la dernière suppression.
+// Appelée à chaque passage du janitor. La date de création (btime) ne peut pas être changée :
+// limite écrite dans deploy/README.md. Un fichier supprimé entre-temps est ignoré ; la première
+// autre erreur est rendue, sans arrêter le passage.
 func (s *Store) ScrubTimes() error {
 	ids, err := s.List()
 	if err != nil {
@@ -524,7 +523,7 @@ func (s *Store) Erase(id string, off, n int64) error {
 }
 
 // Sync force le contenu du fichier sur le disque (fdatasync sous Linux : données et taille,
-// sans les dates), avant que le partage soit annoncé prêt (revue B4).
+// sans les dates), avant que le partage soit annoncé prêt.
 func (s *Store) Sync(id string) error {
 	return s.withFile(id, datasync)
 }

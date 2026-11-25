@@ -30,7 +30,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
-// Salon câblé dans le serveur et l'administration (plan C-2 Task 15).
+// Salon câblé dans le serveur et l'administration.
 
 const origineTest = "https://shhdrop.app"
 
@@ -500,7 +500,7 @@ func TestSetupSalons(t *testing.T) {
 	}
 }
 
-// Relecture Task 12 : aucun double compte. Le gestionnaire voit les partages par UsedShares
+// Aucun double compte. Le gestionnaire voit les partages par UsedShares
 // (sans ExtraUsed), les partages voient le salon par ExtraUsed : avec SHH_STORAGE_MAX juste
 // égal à partages + salon + 2 Gio, une création de salon passe ; un octet de moins, non. Le
 // partage voit, lui, exactement partages + salon.
@@ -588,7 +588,7 @@ func TestUsageAuDemarrage(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, front serveur : le contrôle de démarrage (config.checkSalons)
+// Le contrôle de démarrage (config.checkSalons)
 // et le gestionnaire du salon calculent la même part de trames par salon et le même budget de
 // journal (config ne dépend pas du paquet salon : deux écritures, tenues égales ici).
 func TestPartDesSalonsMemeCalcul(t *testing.T) {

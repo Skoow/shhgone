@@ -24,11 +24,11 @@ const pdfFramePermissions = "microphone=(), camera=(), publickey-credentials-cre
 // dessine des <canvas> (images blob: et data:) et ne se connecte à rien : pdf.js y tourne sur
 // le fil principal (aucun Worker), sans WebAssembly (useWasm: false) ni police téléchargée.
 // frame-ancestors 'self' : seule la page de l'application l'embarque (cadre sandbox).
-// sandbox allow-scripts (audit du 11 novembre) : les mêmes droits que l'attribut
-// sandbox="allow-scripts" de web/src/viewers/PdfViewer.svelte, posés par le serveur, donc
-// valables aussi si la page est ouverte directement (onglet, cadre sans attribut) : origine
-// opaque, ni formulaire, ni fenêtre, ni navigation du parent. postMessage marche toujours
-// (cible « * », source vérifiée des deux côtés). Rien ne change pour le cadre de l'application :
+// sandbox allow-scripts : les mêmes droits que l'attribut sandbox="allow-scripts" de
+// web/src/viewers/PdfViewer.svelte, posés par le serveur, donc valables aussi si la page est
+// ouverte directement (onglet, cadre sans attribut) : origine opaque, ni formulaire, ni fenêtre,
+// ni navigation du parent. postMessage marche toujours (cible « * », source vérifiée des deux
+// côtés). Rien ne change pour le cadre de l'application :
 // les deux listes de droits se combinent par intersection, et elles sont identiques.
 const pdfFrameCSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src blob: data:; " +
 	"connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'; sandbox allow-scripts"

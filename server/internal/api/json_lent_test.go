@@ -1,6 +1,6 @@
 package api
 
-// Audit de sécurité du 13 novembre, D5 (test offensif de l'audit, inversé) : un corps JSON
+// Un corps JSON
 // envoyé au goutte-à-goutte n'avait pas de débit minimal et tenait sa connexion 300 s
 // (ReadTimeout) : 50 POST /api/shares/unlock à 0,5 octet/s restaient ouverts après 20 s.
 

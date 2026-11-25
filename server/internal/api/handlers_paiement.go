@@ -38,7 +38,7 @@ func (a paiementAPI) routes(mux *http.ServeMux) {
 	}
 }
 
-// cles : clés publiques des jetons d'aujourd'hui à J+7 (conception du paiement §7, S17) ; les
+// cles : clés publiques des jetons d'aujourd'hui à J+7 (conception du paiement §7) ; les
 // mêmes pour tous, sans aucun en-tête lu.
 func (a paiementAPI) cles(w http.ResponseWriter, _ *http.Request) {
 	cl, err := a.p.Jetons().Cles()
@@ -231,8 +231,8 @@ func (a paiementAPI) commande(w http.ResponseWriter, r *http.Request) {
 		failPaiement(w, errBadRequest)
 		return
 	}
-	// Preuve anti-robot (audit du 20 novembre, S2 ; conception du paiement §8), comme une
-	// création de partage ou de salon : défi consommé, puis la limite par connexion et par /48.
+	// Preuve anti-robot (conception du paiement §8), comme une création de partage ou de
+	// salon : défi consommé, puis la limite par connexion et par /48.
 	ip := ipOf(r)
 	if err := a.antiRobot(b.Altcha, b.ShownAt, b.HP, ip); err != nil {
 		failPaiement(w, err)
@@ -325,7 +325,7 @@ func (a paiementAPI) webhook(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
-	// Place prise avant toute lecture (audit du 20 novembre, comme lire) : sans elle, des
+	// Place prise avant toute lecture (comme lire) : sans elle, des
 	// centaines de corps de 256 Kio envoyés au ralenti tenaient la mémoire. Occupé : 503, le
 	// prestataire réessaie.
 	if r.ContentLength > maxWebhook {
@@ -333,15 +333,15 @@ func (a paiementAPI) webhook(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request")
 		return
 	}
-	// Webhook PayPal (audit du 20 novembre, S3) : chacun peut coûter un appel sortant
-	// authentifié ; limite propre à la route, avant toute lecture (PayPal réessaie après 429).
+	// Webhook PayPal : chacun peut coûter un appel sortant authentifié ; limite propre à la
+	// route, avant toute lecture (PayPal réessaie après 429).
 	ip := ipOf(r)
 	if pr.Nom() == "paypal" && !a.lim.AllowWebhookPayPal(ip) {
 		w.Header().Set("Connection", "close")
 		writeLimit(w, a.lim.MinuteRetry())
 		return
 	}
-	k64, k48 := a.lim.Key(ip) // clé HMAC du jour, jamais le préfixe en clair (22 novembre)
+	k64, k48 := a.lim.Key(ip) // clé HMAC du jour, jamais le préfixe en clair
 	rendre, errPlace := corpsWebhook.Acquire(k64, k48)
 	if errPlace != nil {
 		w.Header().Set("Connection", "close")

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Lot 6 du plan du compte : signalements par catégorie (conception §21.10 ; codes 1 à 10, 10
+// Signalements par catégorie (conception §21.10 ; codes 1 à 10, 10
 // « Autre »), comptés en mémoire seulement (usage), jamais sur disque ; l'alerte de /healthz
 // reste un booléen.
 
@@ -67,7 +67,7 @@ func TestCategorieBornesPartage(t *testing.T) {
 		return k
 	}
 	detruire := func(k keys, corps map[string]any) (int, string) {
-		corps["grant"] = grants[string(k.preuve)] // toujours obligatoire (audit du 20 novembre)
+		corps["grant"] = grants[string(k.preuve)] // toujours obligatoire
 		corps["proof"] = enc.EncodeToString(k.preuve)
 		w := e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: mustJSON(corps)})
 		return w.Code, strings.TrimSpace(w.Body.String())

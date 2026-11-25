@@ -17,7 +17,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Lot 6 du plan du compte : création de salon réservée aux comptes (SHH_COMPTES=1), paliers,
+// Création de salon réservée aux comptes (SHH_COMPTES=1), paliers,
 // salons du compte, suppression qui ferme les salons ; le jeton de session ne sert qu'à la
 // création.
 

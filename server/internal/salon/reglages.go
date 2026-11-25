@@ -11,9 +11,9 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Réglages d'un salon ouvert (spec 2026-11-13-salon-places-duree-design.md, révision du
-// 13 novembre, qui fait foi) : nombre de places et renouvellement, par le créateur
-// (S_gestion), sans recréer de lien.
+// Réglages d'un salon ouvert (spec 2026-11-13-salon-places-duree-design.md, qui fait
+// foi) : nombre de places et renouvellement, par le créateur (S_gestion), sans recréer de
+// lien.
 //
 //   - Places : N entre le besoin minimal (sièges occupés, plus le siège 0 du créateur s'il
 //     est vide, puisqu'il lui est toujours rendu) et SalonPlacesMax (et au moins 2, comme à
@@ -40,9 +40,6 @@ const SalonPlacesMax = nbSieges
 
 // ErrOccupied : places demandées sous le nombre de sièges occupés (409 occupied).
 var ErrOccupied = errors.New("salon: places occupées")
-
-// errRenouvellement : la conversation n'a pas pu être recréée ; le salon est fini.
-var errRenouvellement = errors.New("salon: renouvellement impossible")
 
 // rouvrirConversation : conversation neuve d'un renouvellement, ouverte sous le nom provisoire
 // du salon (variable pour les tests : panne).
@@ -151,7 +148,7 @@ func (m *Manager) Regler(sGestion []byte, r ReglagesReq, avant func() error) (Re
 		return Reglages{}, ErrNotFound
 	}
 	// Ancienne échéance (l'heure de création à 15 min près) et anciennes places récrites :
-	// vidage du WAL demandé (regroupé, hors de cette requête ; stockage, F1).
+	// vidage du WAL demandé (regroupé, hors de cette requête).
 	m.vidage.Demander()
 	if r.Heures != 0 {
 		m.mu.Lock()
@@ -164,8 +161,8 @@ func (m *Manager) Regler(sGestion []byte, r ReglagesReq, avant func() error) (Re
 	defer m.purger(s) // pièces d'avant : fichier, puis ligne et budget, hors du verrou du salon
 	// Renouvellement : la nouvelle conversation est ouverte AVANT de prendre le verrou du salon
 	// (appel disque, sous un nom provisoire : l'ancienne tient encore le nom du salon), et
-	// l'ancienne est détruite APRÈS l'avoir rendu (audit adverse du 13 novembre, 3e campagne,
-	// front serveur, A : la destruction attendait le verrou de la conversation, donc le disque,
+	// l'ancienne est détruite APRÈS l'avoir rendu (sinon la
+	// destruction attendait le verrou de la conversation, donc le disque,
 	// sous le verrou du salon, et figeait l'entretien en mémoire de tous les salons).
 	var neuve *Conversation
 	if r.Heures != 0 {

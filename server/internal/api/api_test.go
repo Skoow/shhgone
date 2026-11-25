@@ -84,7 +84,7 @@ func newEnvFull(t *testing.T, behindProxy bool, proxies []netip.Prefix, static h
 	t.Helper()
 	// Pas t.TempDir() : sous un fuzz, son nom contient « seed#0 », et store.Open (DSN
 	// « file:… ») couperait le chemin au « # » : base partagée entre essais et gardée dans
-	// /tmp d'une exécution à l'autre (constaté en Task 15, schéma périmé).
+	// /tmp d'une exécution à l'autre (schéma périmé).
 	dir, err := os.MkdirTemp("", "shhdrop-api-")
 	if err != nil {
 		t.Fatal(err)
@@ -248,6 +248,9 @@ type created struct {
 	opens       int
 }
 
+// remoteN : adresse du client n, dans un /48 à elle (quotas de création distincts).
+func remoteN(n int) string { return fmt.Sprintf("[2001:db8:%x::1]:4444", 0x100+n) }
+
 func (e *env) create(t *testing.T, remote string, k keys, bucket, opens int) created {
 	t.Helper()
 	alt, shown := e.captchaFor(t, remote)
@@ -323,7 +326,7 @@ func (e *env) unlock(t *testing.T, id string, k keys) (string, int) {
 }
 
 // grant : ouvre le partage (une ouverture) et rend son octroi, qui porte la voix d'un
-// signalement (share.Report, 20 novembre).
+// signalement (share.Report).
 func (e *env) grant(t *testing.T, k keys) string {
 	t.Helper()
 	w := e.do(req{method: "POST", path: "/api/shares/unlock", hdr: access(k),
@@ -403,8 +406,8 @@ func TestFullFlow(t *testing.T) {
 	}
 
 	// Destruction par le destinataire (K_accès + K_preuve) : refusée tant qu'une ouverture
-	// reste possible (20 novembre), acceptée par la dernière.
-	// Destruction : seulement par la DERNIÈRE ouverture, avec son octroi (audit du 20 novembre).
+	// reste possible, acceptée par la dernière. Destruction : seulement par la DERNIÈRE
+	// ouverture, avec son octroi.
 	destroy := func(g string) req {
 		return req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
 			body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve), "grant": g})}
@@ -877,7 +880,7 @@ func TestCreateFrozenFull(t *testing.T) {
 }
 
 // Spec §29.5 : 2 envois non finalisés à la fois par connexion ; une fois finalisés,
-// les créations comptent dans le quota du jour (10), qui refuse ensuite toute création.
+// les créations comptent dans le quota du jour (CreatesPer64), qui refuse ensuite toute création.
 func TestCreateQuota(t *testing.T) {
 	e := newEnv(t, false, nil)
 	k, ka := newKeys(), newKeys()
@@ -892,7 +895,7 @@ func TestCreateQuota(t *testing.T) {
 	// Envoi détruit (abandon) : sa place est rendue et il ne compte pas comme création.
 	expect(t, e.do(req{method: "POST", path: "/api/manage/destroy", hdr: manage(ka)}), 204, "")
 	e.upload(t, b, 1)
-	for i := 0; i < 9; i++ {
+	for i := 0; i < limits.CreatesPer64-1; i++ {
 		e.upload(t, e.create(t, "", newKeys(), 1, 1), 1)
 	}
 	alt, shown = e.captchaFor(t, "")
@@ -1003,7 +1006,7 @@ func TestCreateConflictAndFinalizeV2(t *testing.T) {
 	}
 }
 
-// Revue K1, I2, option (a) : l'oracle d'existence est fermé. Qui ne connaît que l'id du
+// L'oracle d'existence est fermé. Qui ne connaît que l'id du
 // client (HKDF de K_lien) ou un vérificateur lu dans la base ne peut ni désigner un partage
 // ni provoquer un refus qui dépende de son existence : l'id et les vérificateurs ne sont plus
 // acceptés à la création, et une création avec d'autres secrets réussit pareil, partage
@@ -1076,9 +1079,9 @@ func TestCreateCannotProbeExistence(t *testing.T) {
 	live := e.create(t, "", k, 1, 1)
 	e.upload(t, live, 1)
 	pending := e.create(t, "", newKeys(), 1, 1)
-	dup := func(hdr map[string]string) *httptest.ResponseRecorder {
-		alt, shown := e.captchaFor(t, "")
-		return e.do(req{method: "POST", path: "/api/shares", hdr: hdr, body: mustJSON(k.createBody(1, 1, alt, shown))})
+	dup := func(hdr map[string]string, remote string) *httptest.ResponseRecorder {
+		alt, shown := e.captchaFor(t, remote)
+		return e.do(req{method: "POST", path: "/api/shares", hdr: hdr, body: mustJSON(k.createBody(1, 1, alt, shown)), remote: remote})
 	}
 	ref := func() *httptest.ResponseRecorder {
 		alt, shown := e.captchaFor(t, "")
@@ -1093,12 +1096,19 @@ func TestCreateCannotProbeExistence(t *testing.T) {
 		if i%2 == 1 {
 			h = sameManage.createHdr()
 		}
-		w := dup(h)
+		// Les premiers doublons épuisent le quota du jour de la connexion ; les suivants
+		// viennent d'autres connexions.
+		remote := ""
+		if i >= limits.CreatesPer64-2 {
+			remote = remoteN(i)
+		}
+		w := dup(h, remote)
 		if w.Code != ref.Code || w.Body.String() != ref.Body.String() || len(w.Header()) != len(ref.Header()) {
 			t.Fatalf("doublon %d : %d %q ; refus ordinaire : %d %q", i, w.Code, w.Body.String(), ref.Code, ref.Body.String())
 		}
 	}
-	// 2 créations + 8 doublons = 10 : le quota du jour est atteint (l'envoi en cours compte).
+	// 2 créations + 1 doublon = CreatesPer64 : le quota du jour est atteint (l'envoi en cours
+	// compte).
 	alt, shown := e.captchaFor(t, "")
 	k3 := newKeys()
 	w := e.do(req{method: "POST", path: "/api/shares", hdr: k3.createHdr(), body: mustJSON(k3.createBody(1, 1, alt, shown))})

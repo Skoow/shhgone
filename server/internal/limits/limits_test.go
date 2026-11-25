@@ -54,10 +54,13 @@ func TestKeyPseudonymous(t *testing.T) {
 	}
 }
 
-func TestTenPerDay(t *testing.T) {
+func TestCreatesPerDay(t *testing.T) {
+	if CreatesPer64 != 3 || CreatesPer48 != 10 {
+		t.Fatal(CreatesPer64, CreatesPer48)
+	}
 	now := t0
 	l := newLim(&now)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < CreatesPer64; i++ {
 		// Deux adresses du même /64 partagent le compteur.
 		addr := ip(fmt.Sprintf("2001:db8:0:1::%x", i+1))
 		if ok, _ := l.AllowCreate(addr, 1); !ok {
@@ -66,7 +69,7 @@ func TestTenPerDay(t *testing.T) {
 	}
 	ok, ra := l.AllowCreate(ip("2001:db8:0:1::abcd"), 1)
 	if ok || ra <= 0 {
-		t.Fatalf("11e création : ok=%v retryAfter=%v", ok, ra)
+		t.Fatalf("création %d : ok=%v retryAfter=%v", CreatesPer64+1, ok, ra)
 	}
 	want := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC).Sub(t0)
 	if ra != want {
@@ -81,7 +84,7 @@ func TestTenPerDay(t *testing.T) {
 func TestIPv4MappedSharesCounter(t *testing.T) {
 	now := t0
 	l := newLim(&now)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < CreatesPer64; i++ {
 		a := "1.2.3.4"
 		if i%2 == 1 {
 			a = "::ffff:1.2.3.4"
@@ -98,17 +101,17 @@ func TestIPv4MappedSharesCounter(t *testing.T) {
 	}
 }
 
-func TestThirtyPer48(t *testing.T) {
+func TestCreatesPer48(t *testing.T) {
 	now := t0
 	l := newLim(&now)
-	for i := 0; i < 30; i++ {
+	for i := 0; i < CreatesPer48; i++ {
 		if ok, _ := l.AllowCreate(ip(fmt.Sprintf("2001:db8:7:%x::1", i)), 1); !ok {
 			t.Fatalf("création %d refusée", i+1)
 		}
 	}
 	ok, ra := l.AllowCreate(ip("2001:db8:7:ff::1"), 1)
 	if ok || ra <= 0 {
-		t.Fatalf("31e création du /48 : ok=%v retryAfter=%v", ok, ra)
+		t.Fatalf("création %d du /48 : ok=%v retryAfter=%v", CreatesPer48+1, ok, ra)
 	}
 	if ok, _ := l.AllowCreate(ip("2001:db8:8::1"), 1); !ok {
 		t.Fatal("autre /48 refusé")
@@ -130,15 +133,15 @@ func TestBytesPerDay(t *testing.T) {
 	if ok, ra := l.AllowCreate(ip("1.2.3.4"), 32768*65536); ok || ra <= 0 {
 		t.Fatalf("4ᵉ partage de 2 Gio : ok=%v retryAfter=%v", ok, ra)
 	}
-	// Sept partages de 1 Gio : le 7ᵉ dépasse les 6 Gio.
+	// Deux partages de 3 Gio, puis 1 Gio : refusé par les octets, pas par le nombre.
 	l2 := newLim(&now)
-	for i := 0; i < 6; i++ {
-		if ok, _ := l2.AllowCreate(ip("5.6.7.8"), 1<<30); !ok {
-			t.Fatalf("partage de 1 Gio %d refusé", i+1)
+	for i := 0; i < 2; i++ {
+		if ok, _ := l2.AllowCreate(ip("5.6.7.8"), 3<<30); !ok {
+			t.Fatalf("partage de 3 Gio %d refusé", i+1)
 		}
 	}
 	if ok, _ := l2.AllowCreate(ip("5.6.7.8"), 1<<30); ok {
-		t.Fatal("7ᵉ partage de 1 Gio accepté")
+		t.Fatal("partage au-delà de 6 Gio accepté")
 	}
 }
 
@@ -154,9 +157,9 @@ func TestRefusalDoesNotCount(t *testing.T) {
 	if ok, _ := l.AllowCreate(ip("1.2.3.4"), 1<<62); ok {
 		t.Fatal("taille énorme acceptée")
 	}
-	// Les refus n'ont rien consommé : 10 créations et 6 Gio restent possibles.
-	for i := 0; i < 10; i++ {
-		if ok, _ := l.AllowCreate(ip("1.2.3.4"), BytesPer64/10); !ok {
+	// Les refus n'ont rien consommé : toutes les créations et 6 Gio restent possibles.
+	for i := 0; i < CreatesPer64; i++ {
+		if ok, _ := l.AllowCreate(ip("1.2.3.4"), BytesPer64/CreatesPer64); !ok {
 			t.Fatalf("création %d refusée", i+1)
 		}
 	}
@@ -285,8 +288,8 @@ func TestBytesPer48(t *testing.T) {
 	}
 }
 
-// Requêtes de segments à jeton valide : 1 500 par minute et par connexion (600 avant le
-// 13 novembre), compteur à part.
+// Requêtes de segments à jeton valide : 1 500 par minute et par connexion compteur à
+// part.
 func TestSegmentRate(t *testing.T) {
 	now := t0
 	l := newLim(&now)
@@ -310,7 +313,7 @@ func TestSegmentRate(t *testing.T) {
 	}
 }
 
-// Audit M1 : les /64 d'un même /48 partagent un compteur de 15 000 segments par minute.
+// Les /64 d'un même /48 partagent un compteur de 15 000 segments par minute.
 func TestSegmentRatePer48(t *testing.T) {
 	now := t0
 	l := newLim(&now)
@@ -355,7 +358,7 @@ func (l *Limiter) AllowCreate(ip netip.Addr, bytes int64) (bool, time.Duration) 
 // octets abandonnés débités à l'effacement (12 Gio par jour, puis 429).
 func TestUploadQuotas(t *testing.T) {
 	const gib = 1 << 30
-	t.Run("10 créations finalisées par jour, puis refus", func(t *testing.T) {
+	t.Run("CreatesPer64 créations finalisées par jour, puis refus", func(t *testing.T) {
 		l := New(fixed(time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)))
 		for i := 0; i < CreatesPer64; i++ {
 			if ok, _ := l.AllowCreate(ip("1.2.3.4"), 1); !ok {
@@ -423,7 +426,7 @@ func TestUploadQuotas(t *testing.T) {
 			t.Fatal("autre connexion touchée", err)
 		}
 	})
-	t.Run("trois partages de 2 Gio finalisés, le 4ᵉ refusé ; sept de 1 Gio, le 7ᵉ refusé (6 Gio par jour)", func(t *testing.T) {
+	t.Run("trois partages de 2 Gio finalisés, le 4ᵉ refusé ; deux de 3 Gio, puis 1 Gio refusé (6 Gio par jour)", func(t *testing.T) {
 		l := New(fixed(time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)))
 		for i := 0; i < 3; i++ {
 			id := fmt.Sprint("b", i)
@@ -435,15 +438,15 @@ func TestUploadQuotas(t *testing.T) {
 		if ra, err := l.BeginUpload(ip("1.2.3.4"), "b3", 2*gib); !errors.Is(err, ErrQuota) || ra <= 0 {
 			t.Fatal("4ᵉ partage de 2 Gio accepté", ra, err)
 		}
-		for i := 0; i < 6; i++ {
+		for i := 0; i < 2; i++ {
 			id := fmt.Sprint("c", i)
-			if _, err := l.BeginUpload(ip("5.6.7.8"), id, gib); err != nil {
+			if _, err := l.BeginUpload(ip("5.6.7.8"), id, 3*gib); err != nil {
 				t.Fatal(i, err)
 			}
-			l.FinishUpload(id, ip("1.2.3.4"))
+			l.FinishUpload(id, ip("5.6.7.8"))
 		}
-		if _, err := l.BeginUpload(ip("5.6.7.8"), "c6", gib); !errors.Is(err, ErrQuota) {
-			t.Fatal("7ᵉ partage de 1 Gio accepté", err)
+		if _, err := l.BeginUpload(ip("5.6.7.8"), "c2", gib); !errors.Is(err, ErrQuota) {
+			t.Fatal("partage au-delà de 6 Gio accepté", err)
 		}
 	})
 	t.Run("id déjà en cours : ErrDuplicate, compté comme une création (sonde), l'envoi existant intact", func(t *testing.T) {
@@ -457,7 +460,7 @@ func TestUploadQuotas(t *testing.T) {
 			}
 		}
 		if _, err := l.BeginUpload(ip("5.6.7.8"), "d", 1); !errors.Is(err, ErrQuota) {
-			t.Fatal("11ᵉ sonde : le quota devrait être épuisé", err)
+			t.Fatal("sonde de trop : le quota devrait être épuisé", err)
 		}
 		if ok, _ := l.AllowCreate(ip("5.6.7.8"), 1); ok {
 			t.Fatal("les sondes ne comptent pas dans le quota")
@@ -488,8 +491,8 @@ func TestUploadQuotas(t *testing.T) {
 	})
 }
 
-// Minuit UTC (revue du 10 novembre) : un envoi en cours à minuit reste compté le lendemain
-// (création, octets, place d'envoi en cours) sous sa clé de la veille, retrouvée par le
+// Minuit UTC : un envoi en cours à minuit reste compté le lendemain (création, octets,
+// place d'envoi en cours) sous sa clé de la veille, retrouvée par le
 // secret de la veille, gardé en mémoire tant qu'un tel envoi vit. Les envois terminés la
 // veille, eux, sont oubliés à minuit comme avant.
 func TestMidnightCarriesInFlightUploads(t *testing.T) {
@@ -526,7 +529,7 @@ func TestMidnightCarriesInFlightUploads(t *testing.T) {
 		if _, err := l.Receive("a", 6*gib); err != nil {
 			t.Fatal(err)
 		}
-		// Le morceau du manifeste (64 Kio) n'est pas compté (audit F1).
+		// Le morceau du manifeste (64 Kio) n'est pas compté.
 		if ra, err := l.Receive("a", ManifestChunk+1); !errors.Is(err, ErrQuota) || ra <= 0 {
 			t.Fatal("octets reçus par un envoi de la veille non comptés", ra, err)
 		}
@@ -553,9 +556,9 @@ func TestMidnightCarriesInFlightUploads(t *testing.T) {
 		if l.prev != nil {
 			t.Fatal("secret de la veille gardé sans envoi de la veille")
 		}
-		// Audit M5 (décision du propriétaire, 11 novembre ; attente changée) : b, fini
-		// aujourd'hui, compte dans les quotas du jour sous la clé du jour (création et octets,
-		// par connexion et par bloc : 4 entrées) ; plus rien sous la clé de la veille.
+		// B, fini aujourd'hui, compte dans les quotas du jour
+		// sous la clé du jour (création et octets, par connexion et par bloc : 4 entrées) ;
+		// plus rien sous la clé de la veille.
 		if n := len(l.count64) + len(l.count48) + len(l.bytes64) + len(l.bytes48) + len(l.uploads) +
 			len(l.pend64) + len(l.pend48) + len(l.aband64) + len(l.aband48); n != 4 {
 			t.Fatal("compteurs après le report", n)
@@ -625,9 +628,9 @@ type stepClock struct{ t time.Time }
 
 func (c *stepClock) Now() time.Time { return c.t }
 
-// Spec §9.5, §35.1 (Task M2) : chaque compteur est vide après sa durée de vie (horloge
+// Spec §9.5, §35.1 : chaque compteur est vide après sa durée de vie (horloge
 // injectée) : ceux de la minute à la minute suivante, ceux du jour à minuit UTC ; une place
-// de transfert est rendue à la fin du transfert. Revue du 10 novembre : un envoi encore en
+// de transfert est rendue à la fin du transfert. Un envoi encore en
 // cours à minuit reste compté jusqu'à sa fin (6 h 15 au plus), avec le secret de la veille.
 func TestCountersEmptyAfterRotation(t *testing.T) {
 	now := time.Date(2026, 11, 4, 23, 58, 10, 0, time.UTC)
@@ -664,7 +667,7 @@ func TestCountersEmptyAfterRotation(t *testing.T) {
 		t.Fatal("minuit UTC", m, d)
 	}
 	l.FinishUpload("id-2", ip("198.51.100.9"))
-	// Audit M5 : fini aujourd'hui, id-2 compte sous la clé du jour (création et octets, par
+	// Fini aujourd'hui, id-2 compte sous la clé du jour (création et octets, par
 	// connexion et par bloc : 4 entrées), jusqu'au prochain minuit ; le secret de la veille est jeté.
 	if m, d := lens(); m != 0 || d != 4 || l.prev != nil {
 		t.Fatal("après le dernier envoi de la veille", m, d)
@@ -709,7 +712,7 @@ func TestReceivedBytesCount(t *testing.T) {
 		t.Fatal("au-delà de 6 Gio reçus", ra, err)
 	}
 	// Envoi inconnu (fini, abandonné, plus vieux qu'UploadLife) : refusé, jamais gratuit
-	// (audit du 13 novembre, D1 : un jeton d'envoi finalisé lisait des Gio hors quota).
+	// (un jeton d'envoi finalisé lisait des Gio hors quota).
 	if _, err := l.Receive("inconnu", gib); !errors.Is(err, ErrQuota) {
 		t.Fatal("envoi inconnu : ErrQuota attendu", err)
 	}
@@ -737,7 +740,7 @@ func TestReserveDebitsQuota(t *testing.T) {
 	if _, err := l.Receive("a", 2*gib); err != nil { // 6 Gio reçus : +1 Gio
 		t.Fatal(err)
 	}
-	// Le morceau du manifeste n'est pas compté (audit F1) : 64 Kio de plus passent, pas au-delà.
+	// Le morceau du manifeste n'est pas compté : 64 Kio de plus passent, pas au-delà.
 	if _, err := l.Receive("a", ManifestChunk+1); !errors.Is(err, ErrQuota) {
 		t.Fatal(err)
 	}
@@ -761,9 +764,9 @@ func TestReserveDebitsQuota(t *testing.T) {
 	}
 }
 
-// Audit M5 (décision du propriétaire, 11 novembre) : un envoi commencé la veille et finalisé
-// après minuit compte dans les quotas du jour où il se termine (création et octets), sous la
-// clé du jour de l'adresse qui le finalise ; aucune adresse n'est gardée.
+// Un envoi commencé la veille et finalisé après minuit compte dans les quotas du
+// jour où il se termine (création et octets), sous la clé du jour de l'adresse qui le
+// finalise ; aucune adresse n'est gardée.
 func TestMidnightFinishedUploadCountsToday(t *testing.T) {
 	now := time.Date(2026, 11, 4, 23, 59, 0, 0, time.UTC)
 	l := newLim(&now)
@@ -828,7 +831,7 @@ func TestMidnightFinishNoDoubleCount(t *testing.T) {
 	}
 }
 
-// Audit F1 : un partage plein (palier de 32 769 morceaux) envoie le morceau du manifeste en
+// Un partage plein (palier de 32 769 morceaux) envoie le morceau du manifeste en
 // plus de ses 2 Gio de données : il n'est pas compté, et trois partages pleins tiennent dans
 // les 6 Gio du jour (spec §24, §41.2).
 func TestFullBucketThreePerDay(t *testing.T) {
@@ -853,7 +856,7 @@ func TestFullBucketThreePerDay(t *testing.T) {
 	}
 }
 
-// Salon (plan C-2 Task 7, spec §39.3.6) : créations de salons, 5 par jour par connexion et
+// Salon (spec §39.3.6) : créations de salons, 5 par jour par connexion et
 // 15 par /48 ; un refus n'est compté nulle part ; remise à zéro à minuit UTC.
 func TestAllowSalonCreateJour(t *testing.T) {
 	if SalonCreatesPer64 != 5 || SalonCreatesPer48 != 15 {
@@ -945,8 +948,8 @@ func TestAllowJoinHeure(t *testing.T) {
 	}
 }
 
-// Trames montantes : 480 par minute par connexion, 960 par /48 (revue finale C-2, I4 : une
-// famille ou un bureau derrière un même NAT, environ 48 trames par minute et par membre actif).
+// Trames montantes : 480 par minute par connexion, 960 par /48 (une famille ou un bureau
+// derrière un même NAT, environ 48 trames par minute et par membre actif).
 func TestAllowFrameMinute(t *testing.T) {
 	if FramesPer64 != 480 || FramesPer48 != 960 {
 		t.Fatal(FramesPer64, FramesPer48)
@@ -986,7 +989,7 @@ func TestAllowFrameMinute(t *testing.T) {
 	}
 }
 
-// FrameGuard (22 novembre) : une connexion de salon ne garde que des empreintes. Mêmes
+// FrameGuard : une connexion de salon ne garde que des empreintes. Mêmes
 // plafonds qu'AllowFrame et mêmes compteurs (deux connexions du même /64 se partagent la
 // minute) ; remise à zéro à la minute et au jour ; l'empreinte ne contient pas l'adresse.
 func TestFrameGuard(t *testing.T) {
@@ -1016,7 +1019,7 @@ func TestFrameGuard(t *testing.T) {
 	l.mu.Unlock()
 }
 
-// IPv4 (revue finale C-2, I4) : l'adresse est à la fois la connexion et le bloc ; 480 trames
+// IPv4 : l'adresse est à la fois la connexion et le bloc ; 480 trames
 // par minute pour tout un NAT, la 481ᵉ refusée.
 func TestAllowFrameIPv4(t *testing.T) {
 	now := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)
@@ -1103,7 +1106,7 @@ func TestRefundSalonCreate(t *testing.T) {
 }
 
 // CleBloc : HMAC-SHA-256 du /48 (de l'adresse en IPv4) : même bloc → même clé dans la journée ;
-// autre bloc, autre processus ou lendemain (clé remplacée à minuit, 22 novembre) → autre clé ;
+// autre bloc, autre processus ou lendemain (clé remplacée à minuit) → autre clé ;
 // jamais l'adresse en clair.
 func TestCleBloc(t *testing.T) {
 	now := time.Date(2026, 11, 12, 23, 59, 0, 0, time.UTC)
@@ -1134,7 +1137,7 @@ func TestCleBloc(t *testing.T) {
 	}
 }
 
-// Pièce jointe du salon (BeginPiece) : pas une création de partage (le quota de 10 n'est ni
+// Pièce jointe du salon (BeginPiece) : pas une création de partage (le quota des créations n'est ni
 // consulté ni débité, même à travers minuit) ; ses octets utiles et sa place d'envoi en cours
 // comptent comme ceux d'un partage.
 func TestBeginPieceSansCreation(t *testing.T) {
@@ -1149,7 +1152,7 @@ func TestBeginPieceSansCreation(t *testing.T) {
 		l.FinishUpload(id, a)
 	}
 	if _, err := l.BeginUpload(a, "trop", 1); !errors.Is(err, ErrQuota) {
-		t.Fatal("11e partage :", err)
+		t.Fatal("partage de trop :", err)
 	}
 	for i := range 3 * CreatesPer64 {
 		id := fmt.Sprintf("piece%d", i)
@@ -1166,7 +1169,7 @@ func TestBeginPieceSansCreation(t *testing.T) {
 	l.mu.Lock()
 	n, b := l.count64[k64], l.bytes64[k64]
 	l.mu.Unlock()
-	if n != CreatesPer64 || b != CreatesPer64+15<<20 {
+	if n != CreatesPer64 || b != CreatesPer64+(3*CreatesPer64+1)/2<<20 { // pièces paires finalisées
 		t.Fatal("créations, octets :", n, b)
 	}
 	// Envois en cours : 2 par connexion, pièces et partages confondus.
@@ -1196,7 +1199,7 @@ func TestBeginPieceSansCreation(t *testing.T) {
 	}
 }
 
-// Audit du 13 novembre, D2 : part équitable du stockage. Avec 20 Gio de stockage, une
+// Part équitable du stockage. Avec 20 Gio de stockage, une
 // adresse ne réserve plus 6 Gio par jour, mais 20/8 = 2,5 Gio.
 func TestPartEquitableStockage(t *testing.T) {
 	now := t0
@@ -1276,8 +1279,8 @@ func TestSegmentRateReglable(t *testing.T) {
 	}
 }
 
-// Requêtes par bloc /48 (audit du 20 novembre) : dix connexions d'un même /48 épuisent le
-// bloc ; une onzième est refusée, un autre bloc n'est pas touché.
+// Requêtes par bloc /48 : dix connexions d'un même /48 épuisent le bloc ; une onzième est
+// refusée, un autre bloc n'est pas touché.
 func TestAllowRequestPar48(t *testing.T) {
 	now := t0
 	l := newLim(&now)
@@ -1300,7 +1303,7 @@ func TestAllowRequestPar48(t *testing.T) {
 	}
 }
 
-// Pseudo d'un invité (22 novembre) : 30 par heure et par connexion, 90 par /48, remis à zéro
+// Pseudo d'un invité : 30 par heure et par connexion, 90 par /48, remis à zéro
 // à l'heure ; compteurs propres (les entrées de salon n'y comptent pas).
 func TestAllowPseudoInvite(t *testing.T) {
 	if PseudoInvitePer64 != 30 || PseudoInvitePer48 != 90 {

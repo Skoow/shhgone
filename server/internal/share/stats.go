@@ -1,7 +1,7 @@
 package share
 
-// Décomptes agrégés pour le tableau de bord d'administration (conception du 13 novembre,
-// docs/superpowers/specs/2026-11-13-tableau-de-bord-admin-design.md, catégorie E). Aucun
+// Décomptes agrégés pour le tableau de bord d'administration (conception
+// docs/conception/specs/2026-11-13-tableau-de-bord-admin-design.md, catégorie E). Aucun
 // identifiant, aucune date, aucune taille : seulement combien de partages dans chaque état.
 
 // ByState : nombre de partages par état (§29 : uploading, ready, draining).

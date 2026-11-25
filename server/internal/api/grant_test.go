@@ -66,7 +66,7 @@ func TestGrantHTTP(t *testing.T) {
 	e.upload(t, c2, 1)
 	k = k2
 	r2 := unlock("", k.preuve)
-	if r2["last_open"] != 0.0 { // revue D42-22 : seulement la dernière ouverture permise
+	if r2["last_open"] != 0.0 { // D42-22 : seulement la dernière ouverture permise
 		t.Fatal(r2)
 	}
 	bad := []byte(r2["grant"].(string))

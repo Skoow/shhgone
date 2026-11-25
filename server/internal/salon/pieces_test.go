@@ -16,7 +16,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Pièces jointes et vocaux (plan C-2 Task 13, v3 §5.1).
+// Pièces jointes et vocaux (v3 §5.1).
 
 // creux : les réservations deviennent des fichiers creux (aucun bloc alloué), recomptés par
 // Resync : un palier de 8 000 (524 Mo) ne prend rien sur le disque des tests.
@@ -130,9 +130,9 @@ func (b *banc) lire(t *testing.T, mb Membre, id string, n int) ([]byte, error) {
 	return io.ReadAll(l)
 }
 
-// Budget de 2 Go par salon (13 novembre, décision du propriétaire) : quatre paliers de 8 000
-// (4 × 524 416 048 = 2 097 664 192 o) passent, le cinquième est refusé ; le reste
-// (49 819 456 o) prend encore un palier 400 (26 220 848 o), pas un 800 (52 441 648 o).
+// Budget de 2 Go par salon : quatre paliers de 8 000 (4 × 524 416 048 = 2 097 664 192 o)
+// passent, le cinquième est refusé ; le reste (49 819 456 o) prend encore un palier 400
+// (26 220 848 o), pas un 800 (52 441 648 o).
 func TestBudgetDeuxGo(t *testing.T) {
 	creux(t)
 	b := nouveauBanc(t, 200)
@@ -171,7 +171,7 @@ func TestBudgetDeuxGo(t *testing.T) {
 	}
 }
 
-// Salon plein à 2 Go : les fichiers sont refusés, un vocal passe encore (v3 §5.1, décision 3).
+// Salon plein à 2 Go : les fichiers sont refusés, un vocal passe encore (v3 §5.1).
 func TestVocalHorsBudget(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	c := b.creer(t, 2)
@@ -212,7 +212,7 @@ func TestReserveVocale(t *testing.T) {
 	if VocalOctetsParSeconde != 4000 || VocalReserveMax != 14400000 {
 		t.Fatal("constantes")
 	}
-	// Réserve de départ (19 novembre) : un premier vocal de palier 16 passe tout de suite, sans
+	// Réserve de départ : un premier vocal de palier 16 passe tout de suite, sans
 	// présence ; ensuite, sans WebSocket ouvert, la réserve ne se remplit pas.
 	if got := b.reserveDe(mb); got != VocalReserveDepart || VocalReserveDepart != share.TotalSize(16) {
 		t.Fatal("réserve de départ :", got)
@@ -496,11 +496,11 @@ func TestPieceSansSegment(t *testing.T) {
 	}
 }
 
-// Lien d'une trame à une pièce (audit D6, décision du 12 novembre) : une pièce d'un autre
-// auteur (autre siège, ou ancien occupant du siège) ou une trame volatile → ErrBadRequest
-// (4003), sans rang consommé ; une pièce disparue (inconnue, effacée, d'un autre salon), pas
-// encore prête ou déjà liée (course honnête : PieceSansLien, retrait depuis un autre onglet,
-// message modifié) → trame rangée SANS lien (le client affichera « pièce indisponible »).
+// Lien d'une trame à une pièce : une pièce d'un autre auteur (autre siège, ou ancien
+// occupant du siège) ou une trame volatile → ErrBadRequest (4003), sans rang consommé ; une
+// pièce disparue (inconnue, effacée, d'un autre salon), pas encore prête ou déjà liée
+// (course honnête : PieceSansLien, retrait depuis un autre onglet, message modifié) → trame
+// rangée SANS lien (le client affichera « pièce indisponible »).
 func TestLienRefuse(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	c := b.creer(t, 3)
@@ -557,7 +557,7 @@ func TestLienRefuse(t *testing.T) {
 	b.lier(t, mb, 0, libre)
 }
 
-// Jeton révoqué (exclusion, Task 14) : envoi, finalisation, création et lecture refusés
+// Jeton révoqué (exclusion) : envoi, finalisation, création et lecture refusés
 // (ErrExcluded), même avec un jeton d'envoi encore valable.
 func TestPieceExclu(t *testing.T) {
 	b := nouveauBanc(t, 200)
@@ -590,7 +590,7 @@ func TestPieceExclu(t *testing.T) {
 	}
 }
 
-// Plancher (plan, point 11) : un arrivant ne lit pas une pièce d'avant son arrivée, sauf si
+// Plancher : un arrivant ne lit pas une pièce d'avant son arrivée, sauf si
 // elle est liée à une trame reçue après (qu'il peut lire).
 func TestPlancherPieces(t *testing.T) {
 	b := nouveauBanc(t, 200)
@@ -723,26 +723,24 @@ func TestLectureBudgetSalon(t *testing.T) {
 	}
 }
 
-// Plafond de sortie par pièce (SortieMax) : tous jetons confondus, en mémoire seulement ;
-// atteint, toute lecture de la pièce est refusée (ErrSortie, avant le budget du jeton), même
-// par un membre qui a encore du budget ; une autre pièce n'est pas touchée.
+// Plafond de sortie par pièce (SortieMax) : un salon de N places sert au plus N budgets de
+// lecture par pièce, tous jetons confondus, en mémoire seulement ; atteint, toute lecture de la
+// pièce est refusée (ErrSortie, avant le budget du jeton), même par un membre arrivé ensuite
+// qui a encore tout son budget ; une autre pièce n'est pas touchée.
 func TestSortieParPiece(t *testing.T) {
-	if SortieFacteur != nbSieges || SortieMax(PalierMax) > share.MinEgressMax || SortieMax(1) != nbSieges*share.ReadBudget(1) {
-		t.Fatal("plafond par défaut :", SortieFacteur, SortieMax(PalierMax))
+	if SortieMax(PalierMax, SalonPlacesMax) > share.MinEgressMax || SortieMax(1, 3) != 3*share.ReadBudget(1) {
+		t.Fatal("plafond :", SortieMax(PalierMax, SalonPlacesMax), SortieMax(1, 3))
 	}
-	avant := SortieFacteur
-	SortieFacteur = 2 // deux budgets de lecture, pour l'atteindre avec trois membres
-	t.Cleanup(func() { SortieFacteur = avant })
+	const places = 2
 	b := nouveauBanc(t, 200)
-	c := b.creer(t, 4)
+	c := b.creer(t, places)
 	_, mb := b.entrerMembre(t, c, true)
-	_, l1 := b.entrerMembre(t, c, false)
-	_, l2 := b.entrerMembre(t, c, false)
+	e1, l1 := b.entrerMembre(t, c, false)
 	id := b.pretePiece(t, mb, 1, false)
 	autre := b.pretePiece(t, mb, 1, false)
 	taille := int64(share.SegmentSize(1, 0))
 	servis := int64(0)
-	for _, l := range []Membre{l1, l2} {
+	for _, l := range []Membre{mb, l1} {
 		for lus := taille; lus <= share.ReadBudget(1); lus += taille {
 			if _, err := b.lire(t, l, id, 0); err != nil {
 				t.Fatal(err)
@@ -750,14 +748,18 @@ func TestSortieParPiece(t *testing.T) {
 			servis += taille
 		}
 	}
-	// Le créateur n'a rien lu : son budget est intact, mais la pièce a servi son plafond.
-	if servis+taille <= SortieMax(1) {
-		t.Fatal("banc : plafond non atteint", servis, SortieMax(1))
+	if servis+taille <= SortieMax(1, places) || servis > SortieMax(1, places) {
+		t.Fatal("banc : plafond non atteint", servis, SortieMax(1, places))
 	}
-	if _, err := b.lire(t, mb, id, 0); !errors.Is(err, ErrSortie) {
+	// l1 part, l2 prend sa place, puis la pièce est liée à une trame : l2 peut la lire
+	// (plancher) et a tout son budget, mais la pièce a servi ses N budgets.
+	b.depart(mb.salon, e1.Siege)
+	_, l2 := b.entrerMembre(t, c, false)
+	b.lier(t, mb, 0, id)
+	if _, err := b.lire(t, l2, id, 0); !errors.Is(err, ErrSortie) {
 		t.Fatal("au-delà du plafond de la pièce :", err)
 	}
-	if _, err := b.lire(t, l1, id, 0); !errors.Is(err, ErrSortie) {
+	if _, err := b.lire(t, mb, id, 0); !errors.Is(err, ErrSortie) {
 		t.Fatal("plafond avant le budget du jeton :", err)
 	}
 	if _, err := b.lire(t, mb, autre, 0); err != nil {
@@ -770,6 +772,33 @@ func TestSortieParPiece(t *testing.T) {
 	s.mu.Unlock()
 	if got != servis {
 		t.Fatal("octets servis :", got, servis)
+	}
+}
+
+// Places de la pièce : celles du salon à sa création, relevées si elles augmentent avant sa
+// liaison (les arrivants d'ici là la lisent), jamais baissées ensuite.
+func TestSortiePlacesALaLiaison(t *testing.T) {
+	b := nouveauBanc(t, 200)
+	c := b.creer(t, 2)
+	_, mb := b.entrerMembre(t, c, true)
+	id := b.pretePiece(t, mb, 1, false)
+	places := func() int {
+		s := mb.salon
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.lesPieces[id].places
+	}
+	if places() != 2 {
+		t.Fatal("à la création :", places())
+	}
+	b.regler(t, c, ReglagesReq{Places: 5})
+	b.lier(t, mb, 0, id)
+	if places() != 5 {
+		t.Fatal("relevées à la liaison :", places())
+	}
+	b.regler(t, c, ReglagesReq{Places: 2})
+	if places() != 5 {
+		t.Fatal("baissées après la liaison :", places())
 	}
 }
 
@@ -870,9 +899,9 @@ func TestFinSalonPieces(t *testing.T) {
 	}
 }
 
-// Plafond propre au salon (décision du 12 novembre) : 120 pièces non vocales par heure et par
-// siège (seau plein au départ, 1 toutes les 30 s), neuf pour chaque nouvel occupant ; les
-// vocaux n'y comptent pas ; un refus plus loin (budget) rend le jeton.
+// Plafond propre au salon : 120 pièces non vocales par heure et par siège (seau plein au
+// départ, 1 toutes les 30 s), neuf pour chaque nouvel occupant ; les vocaux n'y comptent
+// pas ; un refus plus loin (budget) rend le jeton.
 func TestPiecesParHeure(t *testing.T) {
 	b := bancLimite(t)
 	c := b.creer(t, 3)
@@ -925,7 +954,7 @@ func TestPiecesParHeure(t *testing.T) {
 	b.creerPiece(t, suivant, 1, false)
 }
 
-// Revue finale C-2, mineur (e) : l'annulation de CreerPieceID efface le fichier avant la ligne
+// L'annulation de CreerPieceID efface le fichier avant la ligne
 // (comme effacerPiece) ; un fichier qui ne s'efface pas garde sa ligne (reprise à la fin du
 // salon ou au démarrage), jamais un fichier sans ligne compté dans SHH_STORAGE_MAX.
 func TestCreerPieceAnnulationFichierAvantLigne(t *testing.T) {

@@ -29,7 +29,7 @@ const maxStdinLink = 4096
 // Codes de sortie : 0 ok, 1 opération échouée, 2 erreur d'usage.
 // La sortie ne reprend jamais l'argument reçu (il peut contenir un secret).
 // Les commandes ne créent jamais rien d'autre que le fichier de gel : le dossier de
-// données doit exister et contenir shares.db (audit M2). Chaque réussite affiche le
+// données doit exister et contenir shares.db. Chaque réussite affiche le
 // chemin absolu du dossier et le nombre de partages touchés.
 func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	usage := func(msg string) int {
@@ -41,7 +41,7 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 		return 2
 	}
 	fail := func(err error) int {
-		fmt.Fprintln(stderr, "erreur:", publicMessage(err)) // jamais une erreur système (audit F3)
+		fmt.Fprintln(stderr, "erreur:", publicMessage(err)) // jamais une erreur système
 		return 1
 	}
 	if len(args) == 0 {
@@ -61,7 +61,7 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 	case "destroy":
 		if len(args) != 2 || args[1] != "-" {
 			// Spec §32 : le lien ne contient plus que la clé (après #) ; en argument, elle irait
-			// dans l'historique du shell et dans /proc/<pid>/cmdline (audit F11).
+			// dans l'historique du shell et dans /proc/<pid>/cmdline.
 			return usage("destroy lit le lien signalé sur l'entrée standard : shhdrop admin destroy -")
 		}
 	case "wipe":
@@ -168,7 +168,7 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 			return fail(err)
 		}
 		// Un téléchargement commencé sur un partage déjà retiré finit sur un descripteur que
-		// seul le serveur en marche tient (grâce de 2 h, spec §41.8) : il doit le couper (revue B5).
+		// seul le serveur en marche tient (grâce de 2 h, spec §41.8) : il doit le couper.
 		cut, err := svc.CutAllDetached()
 		if err != nil {
 			return fail(err)
@@ -185,7 +185,7 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 }
 
 // runBannis : « bannir - » et « bannis … » (conception du compte §13, §21.11, §21.14.5 ;
-// plan lot 7 ; conception du compte par passkey §7.4 : par compte seulement, plus d'adresse).
+// conception du compte par passkey §7.4 : par compte seulement, plus d'adresse).
 // Exige SHH_COMPTES=1 (clé du serveur) et une comptes.db existante. Le lien se lit sur l'entrée
 // standard, jamais en argument (historique du shell, /proc/<pid>/cmdline) ; la sortie ne le
 // reprend jamais : seulement l'identifiant B-…. Le recours d'une personne bannie passe par cet
@@ -433,7 +433,7 @@ var (
 )
 
 // cleAccesDuLien tire K_accès du lien signalé, traité en OCTETS de bout en bout (jamais de
-// chaîne, qu'on ne peut pas effacer : audit adverse du 13 novembre, 3e campagne, stockage, F4 :
+// chaîne, qu'on ne peut pas effacer :
 // le lien, donc K_lien, restait en plusieurs exemplaires dans le tas). lien : une seule ligne
 // non vide (espaces et lignes vides autour ignorés). Partage : les 43 caractères base64url
 // après le dernier « # » (spec §32), ou la clé seule ; K_accès = HKDF-SHA-256(K_lien, sel
@@ -505,10 +505,10 @@ func decoderCle(dst *[32]byte, src []byte) bool {
 }
 
 // freeze crée le fichier de gel (0600) dans un dossier existant ; idempotent.
-// Dates de frozen et du dossier de données remises à l'epoch tout de suite (audit adverse du
-// 13 novembre, 3e campagne, stockage, F5 : elles donnaient l'heure du gel à la milliseconde) ;
-// leur ctime est ramené par le janitor (share.Service.ScrubDataTimes), à la minute près. Au
-// mieux : un échec de Chtimes ne change pas le gel.
+// Dates de frozen et du dossier de données remises à l'epoch tout de suite (elles donnaient
+// l'heure du gel à la milliseconde) ; leur ctime est ramené par le janitor
+// (share.Service.ScrubDataTimes), à la minute près. Au mieux : un échec de Chtimes ne change
+// pas le gel.
 func freeze(frozen string) error {
 	f, err := os.OpenFile(frozen, os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
@@ -565,7 +565,7 @@ func destroySalon(svc *share.Service, dir string, kAcces []byte, stdout, stderr 
 		return fail(err)
 	}
 	if !complet {
-		// Jamais « détruit » pour une ligne encore en base (audit adverse 3, F2).
+		// Jamais « détruit » pour une ligne encore en base.
 		fmt.Fprintf(stderr, "salon rendu inaccessible (plus aucune requête ne le voit), mais des pièces déposées pendant la "+
 			"commande restent à effacer (%s) : le serveur en marche le fait dans la seconde ; relancer la commande pour "+
 			"vérifier (réponse attendue : introuvable)\n", dir)

@@ -15,7 +15,7 @@ func TestCapaciteCalculee(t *testing.T) {
 		nofile uint64
 		want   Capacity
 	}{
-		// Sans GOMEMLIMIT ni limite connue : valeurs d'avant le 13 novembre (plafond global des
+		// Sans GOMEMLIMIT ni limite connue : valeurs fixes (plafond global des
 		// trames : defaultSalonFramesTotal).
 		{"sans limites", math.MaxInt64, 0, Capacity{64, 256, 256, 2000, 64, 1500, 100000, 1000000, 16}},
 		// compose.yaml : GOMEMLIMIT 900 Mio, nofile 65 536 (plafond global = 10 % / 48 o ;
@@ -70,7 +70,7 @@ func TestCapaciteReglee(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 3e campagne, front serveur (D) : les WebSocket du salon sont
+// Les WebSocket du salon sont
 // dans le budget mémoire (10 % de GOMEMLIMIT, au coût d'un lot de rattrapage par connexion), et
 // un SHH_WS_MAX réglé au-delà refuse le démarrage, avec un message qui dit quoi changer. Sans
 // limite de mémoire connue : pas de contrôle.
@@ -105,7 +105,7 @@ func TestWebSocketContreMemoire(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, front serveur (F2) : contrôle croisé au démarrage entre les
+// Contrôle croisé au démarrage entre les
 // fils du système que les appels de fichiers peuvent tenir (partages et pièces, écritures et
 // lectures des conversations) et pids_limit. Les valeurs par défaut tiennent sous le
 // pids_limit de compose.yaml (1 024) ; une valeur réglée trop haut refuse le démarrage, avec
@@ -159,7 +159,7 @@ func TestPidsMaxLu(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, front serveur (hypothèse H1 et garde-fou de démarrage) :
+// Garde-fou de démarrage :
 // SHH_SALONS_MAX croisé avec la mémoire. La configuration livrée (900 Mio, 200 salons) passe ;
 // 10 000 salons avec 900 Mio sont refusés (journaux : ≈ 2,4 Gio) ; un plafond global trop
 // petit pour garantir une part à chaque salon est refusé.

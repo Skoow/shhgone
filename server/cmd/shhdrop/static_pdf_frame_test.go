@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// Audit adverse du 13 novembre, 2e passage, front « site, navigateur » (N1) : /pdf-frame.html/
+// /pdf-frame.html/
 // (barre finale) servait les octets de pdf-frame.html SANS la directive sandbox ni les en-têtes
 // du cadre, parce que les en-têtes suivent le chemin exact alors que les fichiers étaient
 // servis aussi à des chemins voisins. À travers tout le serveur : un fichier du site n'est

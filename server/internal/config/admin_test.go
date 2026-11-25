@@ -75,9 +75,9 @@ func TestAdminAdresse(t *testing.T) {
 // empreinteTest : SHA-256 de jetonTest, en hexadécimal (printf %s "$JETON" | sha256sum).
 var empreinteTest = func() string { h := sha256.Sum256([]byte(jetonTest)); return hex.EncodeToString(h[:]) }()
 
-// Audit adverse du 13 novembre, 3e campagne (tableau de bord F5, stockage F3) : le serveur ne
-// reçoit plus le jeton, seulement son empreinte (SHH_ADMIN_TOKEN_SHA256). Avec elle seule, le
-// tableau de bord s'active et compare à cette empreinte.
+// Le serveur ne reçoit plus le jeton, seulement
+// son empreinte (SHH_ADMIN_TOKEN_SHA256). Avec elle seule, le tableau de bord s'active et
+// compare à cette empreinte.
 func TestAdminEmpreinte(t *testing.T) {
 	t.Setenv("SHH_DATA_DIR", "/d")
 	t.Setenv("SHH_ADMIN_LISTEN", "127.0.0.1:9191")
@@ -146,7 +146,7 @@ func TestAdminJetonEnClairRefuseEnProduction(t *testing.T) {
 	}
 }
 
-// Audit adverse 3, F1 : tout jeton tiré par la commande documentée (openssl rand -hex 32)
+// Tout jeton tiré par la commande documentée (openssl rand -hex 32)
 // doit être accepté. 2 000 tirages : aucun refus.
 func TestAdminJetonHexAleatoireAccepte(t *testing.T) {
 	b := make([]byte, 32)

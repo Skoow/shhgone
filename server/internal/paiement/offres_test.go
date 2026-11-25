@@ -62,9 +62,9 @@ func TestFormulesPermises(t *testing.T) {
 	}
 }
 
-// TestDroitsAppels : Plus et Pro comprennent l'audio et la vidéo (décision du propriétaire,
-// 24 novembre), devenus un vrai droit le même jour (conception des appels §5.1) : plus rien
-// n'est « bientôt » (liste vide, jamais nil, pour que l'API rende [] et non null).
+// TestDroitsAppels : Plus et Pro comprennent l'audio et la vidéo, devenus un vrai droit le
+// même jour (conception des appels §5.1) : plus rien n'est « bientôt » (liste vide, jamais
+// nil, pour que l'API rende [] et non null).
 func TestDroitsAppels(t *testing.T) {
 	for _, o := range []Offre{Plus, Pro} {
 		if !o.A("appel_video") || !o.A("appel_audio") {

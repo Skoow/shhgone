@@ -424,7 +424,7 @@ $('detruire').addEventListener('submit', async (ev) => {
 });
 
 // ---------------------------------------------------------------------------------------
-// Lot 7 : signalements, bannissements, comptes (conception du compte §21.14). La page ne
+// Signalements, bannissements, comptes (conception du compte §21.14). La page ne
 // reçoit jamais d'adresse, de pseudo, de lien ni d'identifiant de salon : seulement des
 // nombres, des références de 10 minutes et des identifiants de bannissement « B-… ».
 

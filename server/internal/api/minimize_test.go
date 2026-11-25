@@ -13,23 +13,22 @@ import (
 	"time"
 )
 
-// Spec §36 S2 (Task M2) : le serveur ne lit aucun en-tête hors de la liste blanche, jamais
+// Spec §36 S2 : le serveur ne lit aucun en-tête hors de la liste blanche, jamais
 // User-Agent ni Referer, et l'adresse du pair seulement dans clientip.go et /healthz.
-// Accept-Encoding (retours CLEAN2) : choix de la variante précompressée d'un fichier du site
+// Accept-Encoding : choix de la variante précompressée d'un fichier du site
 // (cmd/shhdrop/static.go) ; même valeur dans tous les navigateurs visés, jamais gardé ni journalisé.
 var readHeaders = []string{"Authorization", "X-Shh-Client-IP", "X-Shh-Access", "X-Shh-Manage", "X-Shh-Grant", "Accept-Encoding"}
 
-// salonHeaders : jeton de membre, identifiant de pièce (plan C-2 Task 13) et nouvelle
-// K_accès_s' d'une exclusion (Task 14), lus seulement dans les fichiers handlers_salon*.go
-// (audit des partages du 12 novembre, D3 : une liste globale laissait un gestionnaire de
-// partage les lire sans être vu).
+// salonHeaders : jeton de membre, identifiant de pièce et nouvelle K_accès_s' d'une
+// exclusion, lus seulement dans les fichiers handlers_salon*.go (une liste globale
+// laissait un gestionnaire de partage les lire sans être vu).
 var salonHeaders = []string{"X-Shh-Membre", "X-Shh-Piece", "X-Shh-Access-New"}
 
-// compteHeaders : jeton de session du compte (conception du compte §8.5, §15 ; plan lot 4),
+// compteHeaders : jeton de session du compte (conception du compte §8.5, §15),
 // lu seulement dans handlers_compte.go : il ne part que vers /api/compte/* et vers la création
-// de salon (lot 6), qui le lit par sessionCreation (définie dans handlers_compte.go, appelée
-// seulement par salonAPI.creer : TestSessionJamaisLueAilleurs). Écart au plan (lot 6, qui
-// prévoyait d'ajouter handlers_salon.go ici) : la règle de fichier reste plus étroite. Jamais
+// de salon, qui le lit par sessionCreation (définie dans handlers_compte.go, appelée
+// seulement par salonAPI.creer : TestSessionJamaisLueAilleurs). handlers_salon.go n'est
+// volontairement pas dans la liste : la règle de fichier reste plus étroite. Jamais
 // gardé ni recopié : le serveur n'en garde que SHA-256.
 var compteHeaders = []string{"X-Shh-Session"}
 
@@ -49,13 +48,12 @@ func headerAllowed(path, name string) bool {
 		slices.Contains(paiementHeaders, name) && filepath.Base(path) == "handlers_paiement.go"
 }
 
-// wsHeaders : poignée de main du WebSocket du salon (plan C-2 Task 10, spec §39.3.1
-// « Origine »), lus seulement dans handlers_salon_ws.go (salonWS, poigneeWS) : Origin comparé à
-// SHH_ORIGIN, les autres vérifiés (RFC 6455) avant toute place ; rien n'est gardé, journalisé
-// ni recopié dans une réponse. websocket.Accept (coder/websocket) relit ensuite Host,
-// Connection, Upgrade, Origin et Sec-WebSocket-* (Key, Version, Protocol, Extensions) pour la
-// mise à niveau, sans rien garder non plus. Caddy ne doit donc pas retirer Origin sur
-// /api/salons/ws (§36 S2 à amender).
+// wsHeaders : poignée de main du WebSocket du salon (spec §39.3.1 « Origine »), lus seulement
+// dans handlers_salon_ws.go (salonWS, poigneeWS) : Origin comparé à SHH_ORIGIN, les autres
+// vérifiés (RFC 6455) avant toute place ; rien n'est gardé, journalisé ni recopié dans une
+// réponse. websocket.Accept (coder/websocket) relit ensuite Host, Connection, Upgrade, Origin
+// et Sec-WebSocket-* (Key, Version, Protocol, Extensions) pour la mise à niveau, sans rien
+// garder non plus. Caddy ne doit donc pas retirer Origin sur /api/salons/ws (§36 S2 à amender).
 var wsHeaders = []string{"Origin", "Upgrade", "Connection", "Sec-WebSocket-Version", "Sec-WebSocket-Key"}
 
 type srcFile struct {
@@ -118,7 +116,7 @@ func TestNoHeaderReadOutsideAllowList(t *testing.T) {
 					t.Errorf("%s : %s() interdit (spec §36 S2)", where(x), x.Sel.Name)
 				case "RemoteAddr":
 					fn := enclosing(sf.f, x.Pos())
-					// adminui.peerOK (tableau de bord d'administration, 13 novembre) : la page ne
+					// adminui.peerOK (tableau de bord d'administration) : la page ne
 					// répond qu'à la boucle locale ou au pair de confiance ; l'adresse n'y est que
 					// comparée, comme dans /healthz.
 					adminPeer := strings.HasSuffix(filepath.ToSlash(sf.path), "internal/adminui/adminui.go") && fn == "peerOK"
@@ -130,7 +128,7 @@ func TestNoHeaderReadOutsideAllowList(t *testing.T) {
 				}
 			case *ast.CallExpr:
 				// headerSecret(r, nom) : vérifié avant le retour des appels qui ne sont pas des
-				// sélecteurs (audit D3 : cette vérification, placée après, ne s'exécutait jamais).
+				// sélecteurs (cette vérification, placée après, ne s'exécutait jamais).
 				if id, ok := x.Fun.(*ast.Ident); ok && id.Name == "headerSecret" {
 					if name, lit := strLit(x.Args[1]); !lit || !headerAllowed(sf.path, name) {
 						t.Errorf("%s : headerSecret(%s) hors liste blanche", where(x), name)
@@ -169,7 +167,7 @@ func TestNoHeaderReadOutsideAllowList(t *testing.T) {
 // recopiée dans une réponse.
 func TestDestroyReasonClosed(t *testing.T) {
 	e := newEnv(t, false, nil)
-	for _, tc := range []struct {
+	for i, tc := range []struct {
 		name string
 		body map[string]any
 		code int
@@ -187,11 +185,11 @@ func TestDestroyReasonClosed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e.clk.Add(time.Minute)
 			k := newKeys()
-			c := e.create(t, "", k, 1, 1)
+			c := e.create(t, remoteN(i), k, 1, 1)
 			e.upload(t, c, 1)
 			g := e.grant(t, k) // dernière ouverture : la destruction simple est permise
 			if v, ok := tc.body["grant"]; ok && v == nil {
-				delete(tc.body, "grant") // octroi absent : toujours obligatoire (audit du 20 novembre)
+				delete(tc.body, "grant") // octroi absent : toujours obligatoire
 			} else {
 				tc.body["grant"] = g
 			}
@@ -283,7 +281,7 @@ func TestHealthzReportsAlert(t *testing.T) {
 			t.Fatal(i, h)
 		}
 		k := newKeys()
-		c := e.create(t, "", k, 1, 1)
+		c := e.create(t, remoteN(i), k, 1, 1)
 		e.upload(t, c, 1)
 		expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, e.grant(t, k), nil)}), 200, `{"detruit":1}`)
 		e.clk.Add(time.Minute)

@@ -13,11 +13,11 @@ import (
 // dans un chemin. Les partages se trouvent par access_v (destinataire) ou manage_v
 // (expéditeur), index uniques (spec §29.8, §32) : sans K_accès ni S_gestion, aucune
 // requête ne désigne un partage, et une création ne peut heurter qu'un vérificateur dont
-// l'auteur connaît le secret (aucun oracle d'existence, revue K1, I2).
+// l'auteur connaît le secret (aucun oracle d'existence).
 // WITHOUT ROWID : pas de compteur d'insertion qui trahirait l'ordre de création (spec §9.1).
 // Schéma v2 (spec §29.8) : max_opens, salt, kdf_*, proof_v et envelope (E, 60 octets)
 // restent NULL jusqu'à finalize ; un partage « ready » les a tous (CHECK).
-// Minimisation (spec §36 S5, S11, S12, Task M2) : aucune échéance d'envoi, de blocage ni de
+// Minimisation (spec §36 S5) : aucune échéance d'envoi, de blocage ni de
 // purge en base (elles vivent en mémoire, share.Service) ; ttl_hours reste NULL après
 // finalize (il donnerait l'heure de création à 15 min près) ; seule date : expires_at.
 const tableDef = `(
@@ -41,18 +41,17 @@ const keptColumns = `id,state,bucket,ttl_hours,max_opens,opens_left,opens_issued
 const indexes = `CREATE UNIQUE INDEX IF NOT EXISTS shares_access_v ON shares(access_v);
 CREATE UNIQUE INDEX IF NOT EXISTS shares_manage_v ON shares(manage_v)`
 
-// salonsSchema (schéma 2, plan C-2 Task 4, spec §39.3.5) : seules colonnes du salon en base.
+// salonsSchema (schéma 2, spec §39.3.5) : seules colonnes du salon en base.
 // Ni durée, ni sièges, ni nombre de messages, ni pseudonyme : tout ce qui décrit les
 // personnes reste en mémoire. Comme shares : id interne jamais montré, salon trouvé par
 // access_v ou manage_v (index uniques), WITHOUT ROWID (aucun ordre de création), seule date
 // expires_at (arrondie au quart d'heure par l'appelant). salon_pieces : pièces jointes,
 // effacées avec leur salon (ON DELETE CASCADE, foreign_keys(ON) dans le DSN).
-// Bornes (plan C-2, Global Constraints) : pieces_bytes ≤ budget de 2 147 483 648 octets (hors
-// vocaux ; 13 novembre, décision du propriétaire, 1 Gio avant ; schéma 2 jamais publié : changé
-// sans migration), palier d'une pièce de 1 à 8 000. rotation_r : numéro de la dernière rotation de
-// l'invitation (exclure, spec §39.13.1b ; 0 : aucune), en base pour qu'un ancien exclure
-// rejoué après un redémarrage ne fasse pas revivre une invitation morte (relecture Task 14 ;
-// colonne ajoutée au schéma 2 sans migration : jamais publié en production).
+// Bornes : pieces_bytes ≤ budget de 2 147 483 648 octets (hors vocaux, 1 Gio avant ; schéma 2
+// jamais publié : changé sans migration), palier d'une pièce de 1 à 8 000. rotation_r : numéro de
+// la dernière rotation de l'invitation (exclure, spec §39.13.1b ; 0 : aucune), en base pour qu'un
+// ancien exclure rejoué après un redémarrage ne fasse pas revivre une invitation morte (colonne
+// ajoutée au schéma 2 sans migration : jamais publié en production).
 const salonsSchema = `CREATE TABLE IF NOT EXISTS salons(
   id TEXT PRIMARY KEY, access_v BLOB NOT NULL, manage_v BLOB NOT NULL, proof_v BLOB NOT NULL,
   salt BLOB NOT NULL, kdf_ops INTEGER NOT NULL, kdf_mem INTEGER NOT NULL, expires_at INTEGER NOT NULL,
@@ -85,7 +84,7 @@ const salonsIndexes = `CREATE INDEX IF NOT EXISTS salons_compte ON salons(compte
 // journal_size_limit(0) : le fichier -wal est ramené à zéro après CHAQUE point de contrôle, y
 // compris les points de contrôle automatiques PASSIVE (tous les 1 000 blocs) ; sinon les blocs
 // déjà repliés (dont les métadonnées d'un partage supprimé) restent écrits dans le fichier
-// entre deux TRUNCATE du janitor (audit adverse du 13 novembre, St1).
+// entre deux TRUNCATE du janitor.
 const pragmas = "_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=secure_delete(ON)" +
 	"&_pragma=busy_timeout(" + busyTimeoutMs + ")&_pragma=foreign_keys(ON)&_pragma=temp_store(MEMORY)" +
 	"&_pragma=journal_size_limit(0)"
@@ -144,7 +143,7 @@ func open(dsn string) (*sql.DB, error) {
 }
 
 // OpenExisting ouvre une base qui doit déjà exister et contenir la table shares, sans
-// jamais rien créer (mode=rw) : pour les commandes d'administration (audit M2).
+// jamais rien créer (mode=rw) : pour les commandes d'administration.
 // path : chemin absolu sans « ? », « # » ni « % » (vérifié par config).
 func OpenExisting(path string) (*sql.DB, error) {
 	db, err := open("file:" + path + "?mode=rw&" + pragmas)
@@ -165,7 +164,7 @@ func OpenExisting(path string) (*sql.DB, error) {
 
 // RequireCurrent : la base est au schéma courant (SchemaVersion), sinon ErrOldSchema. Pour les
 // commandes d'administration du salon : OpenExisting accepte une base plus ancienne, que
-// seul le serveur met à jour (plan C-2 Task 15).
+// seul le serveur met à jour.
 func RequireCurrent(db *sql.DB) error {
 	v, err := checkVersion(db)
 	if err != nil {
@@ -217,7 +216,7 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("création des tables du salon : %w", err)
 	}
 	// CREATE TABLE IF NOT EXISTS ne touche pas une table salons plus ancienne : sans
-	// rotation_r, exclure échouerait plus tard (relecture Task 15).
+	// rotation_r, exclure échouerait plus tard.
 	var rot int
 	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('salons') WHERE name='rotation_r'`).Scan(&rot); err != nil {
 		db.Close()
@@ -258,7 +257,7 @@ func migrateCompte(db *sql.DB) error {
 	return err
 }
 
-// migrate retire les colonnes de dates de l'ancien schéma v2 (Task M2) : copie dans une
+// migrate retire les colonnes de dates de l'ancien schéma v2 : copie dans une
 // nouvelle table WITHOUT ROWID sans elles (ttl_hours mis à NULL hors envoi), remplacement
 // de l'ancienne, puis VACUUM et vidage du WAL. secure_delete (DSN) efface les pages
 // libérées : aucun octet des colonnes retirées ne reste dans le fichier. Sans ces colonnes,
@@ -299,8 +298,8 @@ func migrate(db *sql.DB) error {
 }
 
 // Checkpoint replie le WAL dans la base et le tronque. Le PRAGMA ne rend pas d'erreur quand
-// un lecteur l'empêche de finir : il le dit dans sa première colonne (busy), lue ici (audit
-// F8) ; ErrCheckpointBusy alors.
+// un lecteur l'empêche de finir : il le dit dans sa première colonne (busy), lue ici ;
+// ErrCheckpointBusy alors.
 func Checkpoint(db *sql.DB) error {
 	var busy, logFrames, done int
 	if err := db.QueryRow("PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logFrames, &done); err != nil {

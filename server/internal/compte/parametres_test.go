@@ -48,7 +48,7 @@ func TestEtatCompte(t *testing.T) {
 	}
 }
 
-// L'état ne porte plus rien du compte par e-mail (22 novembre).
+// L'état ne porte plus rien du compte par e-mail.
 func TestEtatSansTOTPNiAttente(t *testing.T) {
 	for _, ty := range []reflect.Type{reflect.TypeFor[Etat](), reflect.TypeFor[Export]()} {
 		for i := range ty.NumField() {

@@ -8,7 +8,7 @@ import (
 )
 
 // Passkeys du compte, réauthentification, nouvelle clé de récupération (conception du compte par
-// passkey §6.4 ; lot S5). Toutes par une session (X-Shh-Session, lue par compteAPI.session).
+// passkey §6.4). Toutes par une session (X-Shh-Session, lue par compteAPI.session).
 
 func (a compteAPI) sessionEtCorps(w http.ResponseWriter, r *http.Request, v any) (compte.Courante, bool) {
 	c, err := a.session(r)

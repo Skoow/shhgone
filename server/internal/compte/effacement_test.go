@@ -20,7 +20,7 @@ func TestSuppressionEfface(t *testing.T) {
 	b.s.fermerSalons = func(h [16]byte) (int, error) {
 		fermes = append(fermes, h)
 		if len(fermes) > 1 {
-			return 0, nil // seconde passe (lot 6), après l'effacement : plus rien
+			return 0, nil // seconde passe, après l'effacement : plus rien
 		}
 		return 2, nil
 	}

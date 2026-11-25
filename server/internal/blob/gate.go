@@ -7,19 +7,18 @@ import (
 	"sync/atomic"
 )
 
-// Gate borne les appels système de fichiers simultanés (audit du 13 novembre, D4) : une
-// lecture ou une écriture de fichier en Go bloque un fil du système pendant l'appel, et le
-// noyau compte chaque fil dans pids_limit. Sous un disque lent, des centaines de transferts
-// créaient autant de fils, jusqu'à l'arrêt net du processus (« failed to create new OS
-// thread »). Au-delà de la borne, les appels attendent leur tour (goroutines, pas de fils).
+// Gate borne les appels système de fichiers simultanés : une lecture ou une écriture de
+// fichier en Go bloque un fil du système pendant l'appel, et le noyau compte chaque fil dans
+// pids_limit. Sous un disque lent, des centaines de transferts créaient autant de fils,
+// jusqu'à l'arrêt net du processus (« failed to create new OS thread »). Au-delà de la
+// borne, les appels attendent leur tour (goroutines, pas de fils).
 // Toujours pris en dernier, après les verrous du Store, et rendu sans rien prendre d'autre :
 // aucune attente croisée possible. Un Gate nil ne borne rien.
 //
-// Règle pour tout appelant hors de ce paquet (audit adverse du 13 novembre, front serveur,
-// F1) : ne jamais attendre une place en tenant un verrou qu'un entretien ou une lecture
-// d'état prend aussi (verrou d'un salon, du gestionnaire) : une borne saturée par un disque
-// lent figerait tout ce qui attend ce verrou. Le salon a ses propres bornes (Manager.ecr,
-// lec), prises avant ses verrous.
+// Règle pour tout appelant hors de ce paquet : ne jamais attendre une place en tenant un
+// verrou qu'un entretien ou une lecture d'état prend aussi (verrou d'un salon, du
+// gestionnaire) : une borne saturée par un disque lent figerait tout ce qui attend ce
+// verrou. Le salon a ses propres bornes (Manager.ecr, lec), prises avant ses verrous.
 type Gate struct {
 	c          chan struct{}
 	used, peak atomic.Int64 // tests : appels en cours, plus haut atteint
@@ -93,7 +92,7 @@ func (s *Store) ReaderAt(r io.ReaderAt) io.ReaderAt {
 }
 
 // Writer : fichier ouvert une fois pour une suite d'écritures dans sa réservation (bourrage
-// de Finalize : jusqu'à 2 Gio par tranches de 4 Mio, rapport de performance A12 : ouvrir,
+// de Finalize : jusqu'à 2 Gio par tranches de 4 Mio : ouvrir,
 // fermer et remettre les dates à zéro à chaque tranche coûtait autant d'appels). Chaque
 // écriture passe sous la borne (Gate). À fermer (Close remet les dates à l'epoch).
 type Writer struct {

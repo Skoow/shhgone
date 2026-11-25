@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Lot 6 du plan du compte : palier et bannissement à la création d'un salon, ancienneté remise
+// Palier et bannissement à la création d'un salon, ancienneté remise
 // à zéro par un signalement, salons du compte désignés par des ref éphémères.
 
 // Palier : neuf (1 salon, 4 places, 24 h) puis confirmé 7 jours pleins après compte_des ;

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// Vitesse (retours CLEAN2) : variantes précompressées servies selon Accept-Encoding, jamais
+// Vitesse : variantes précompressées servies selon Accept-Encoding, jamais
 // sans elles ; cache d'un an pour les seuls fichiers à empreinte de /assets/.
 func TestStaticPrecompressedAndImmutable(t *testing.T) {
 	dir := t.TempDir()
@@ -137,7 +137,7 @@ func TestStaticPrecompressedAndImmutable(t *testing.T) {
 	if r := get("/assets/aurora-ink.png", "br"); r.Header.Get("Vary") != "" {
 		t.Errorf("png : Vary %q", r.Header.Get("Vary"))
 	}
-	// Cache (revue du 10 novembre, remplace CLEAN4) : un an, immuable, pour les seuls fichiers
+	// Cache : un an, immuable, pour les seuls fichiers
 	// de /assets/ dont le nom porte une empreinte du contenu, sous toutes leurs variantes ;
 	// pour le reste, ce gestionnaire ne pose rien (le no-store vient de api.New, autour).
 	for _, p := range []string{"/assets/index-AbCd_123.js", "/assets/style-Zz9_Yy8x.css"} {
@@ -147,7 +147,7 @@ func TestStaticPrecompressedAndImmutable(t *testing.T) {
 			}
 		}
 	}
-	// Images fixes sans empreinte : un jour (audit de vitesse du 20 novembre).
+	// Images fixes sans empreinte : un jour.
 	if cc := get("/assets/aurora-ink.png", "br").Header.Values("Cache-Control"); len(cc) != 1 || cc[0] != "public, max-age=86400" {
 		t.Errorf("png : Cache-Control %q", cc)
 	}

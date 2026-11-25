@@ -1,6 +1,6 @@
 package salon
 
-// Audit de sécurité du 13 novembre, D2 : 40 adresses IPv4 prenaient les SHH_SALONS_MAX (200)
+// 40 adresses IPv4 prenaient les SHH_SALONS_MAX (200)
 // places pour 24 h, 5 salons chacune, sans jamais y entrer.
 
 import (

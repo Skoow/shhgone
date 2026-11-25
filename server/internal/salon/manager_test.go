@@ -638,7 +638,7 @@ func TestGestion(t *testing.T) {
 	}
 }
 
-// Jeton révoqué (exclusion, Task 14) : ErrExcluded ; jeton inconnu ou de mauvaise longueur :
+// Jeton révoqué (exclusion) : ErrExcluded ; jeton inconnu ou de mauvaise longueur :
 // ErrNotFound ; salon échu : ErrNotFound.
 func TestMembre(t *testing.T) {
 	b := nouveauBanc(t, 200)
@@ -665,7 +665,7 @@ func TestMembre(t *testing.T) {
 	}
 }
 
-// Revue finale C-2, I3 (règle « instantané » du propriétaire) : un siège hors ligne reste
+// Règle « instantané » : un siège hors ligne reste
 // réservé pendant toute la vie du salon, quel que soit le temps d'absence ; Tick ne le libère
 // jamais. Seuls un départ (0x03) ou une exclusion le libèrent : 0x03 au journal, jeton oublié,
 // place rendue.
@@ -677,7 +677,7 @@ func siegeReserveHorsLigne(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	c := b.creer(t, 2)
 	g := b.entrer(t, c, false)
-	lg := b.connecter(g.Jeton, g.Seq) // connecté une fois (N1), puis hors ligne
+	lg := b.connecter(g.Jeton, g.Seq) // connecté une fois, puis hors ligne
 	synctest.Wait()
 	finir(t, lg)
 	s := b.etat(t, c)
@@ -786,8 +786,8 @@ func (b *banc) idDe(t *testing.T, c cles) string {
 	return id
 }
 
-// invariantJournal : chaque siège occupé peut toujours être annoncé parti (plan Task 6, M3) ;
-// à réutiliser aux Tasks 9 et 14.
+// invariantJournal : chaque siège occupé peut toujours être annoncé parti ;
+// réutilisée par les tests de connexion et d'exclusion.
 func invariantJournal(t *testing.T, s *salon) {
 	t.Helper()
 	s.mu.Lock()
@@ -840,7 +840,7 @@ func TestDestructionSansDelete(t *testing.T) {
 	}
 }
 
-// M1 : une destruction appelée sans essaiLock (purge, Task 15) entre la lecture de la ligne et
+// M1 : une destruction appelée sans essaiLock (purge) entre la lecture de la ligne et
 // la création de l'état : aucun état ni fichier n'est recréé, Rejoindre et Membre refusent.
 func TestPasDeRecreationApresDestruction(t *testing.T) {
 	b := nouveauBanc(t, 200)
@@ -976,10 +976,10 @@ func TestErreursGestionnaireFixes(t *testing.T) {
 	}
 }
 
-// Plafond de salons vivants par bloc (/48, ou adresse IPv4 ; décision du 12 novembre) : la
-// 6ᵉ création d'un bloc est refusée (Attente jusqu'au quart d'heure suivant), sans ligne ;
-// la place revient quand un salon du bloc est détruit (10ᵉ essai) ou échu (Tick), et un
-// autre bloc n'est pas touché. Le compte vit en mémoire seulement.
+// Plafond de salons vivants par bloc (/48, ou adresse IPv4) : la 6ᵉ création d'un bloc est
+// refusée (Attente jusqu'au quart d'heure suivant), sans ligne ; la place revient quand un
+// salon du bloc est détruit (10ᵉ essai) ou échu (Tick), et un autre bloc n'est pas touché.
+// Le compte vit en mémoire seulement.
 func TestVivantsParBloc(t *testing.T) {
 	if VivantsParBloc != 5 {
 		t.Fatal("VivantsParBloc", VivantsParBloc)
@@ -992,7 +992,7 @@ func TestVivantsParBloc(t *testing.T) {
 		r.Bloc, r.TTLHours = bloc, ttl
 		_, err := b.m.Creer(r)
 		if err == nil {
-			b.entrer(t, c, true) // salon vide effacé après videMax (audit D2) : le créateur y entre
+			b.entrer(t, c, true) // salon vide effacé après videMax : le créateur y entre
 		}
 		return c, err
 	}

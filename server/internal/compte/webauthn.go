@@ -16,8 +16,8 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
-// Cérémonies WebAuthn (conception du compte par passkey §6.1, §6.2 ; revue de chaîne
-// d'approvisionnement docs/superpowers/plans/2026-11-22-revue-go-webauthn.md §5). Configuration
+// Cérémonies WebAuthn (conception du compte par passkey §6.1, §6.2 ; dépendances épinglées :
+// docs/conception/revues/2026-11-22-revue-go-webauthn.md §5). Configuration
 // figée, construite une fois depuis SHH_ORIGIN : rp.id = hôte de l'origine, origines acceptées =
 // SHH_ORIGIN et les origines Android exactes de SHH_WEBAUTHN_ORIGINES_APPS, rien d'autre ;
 // attestation « none » exigée (le code d'attestation de la bibliothèque ne voit jamais une donnée
@@ -132,7 +132,7 @@ func (c *Ceremonies) RPID() string { return c.rpID }
 type defi = webauthn.SessionData
 
 // utilisateur : le compte vu par la bibliothèque. Name et DisplayName vides : le site y met le
-// pseudo avant l'appel au navigateur (conception §6.2, Q6) ; le serveur ne le voit jamais.
+// pseudo avant l'appel au navigateur (conception §6.2) ; le serveur ne le voit jamais.
 type utilisateur struct {
 	h  []byte
 	pk []webauthn.Credential

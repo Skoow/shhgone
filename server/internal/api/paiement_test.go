@@ -88,14 +88,14 @@ func passB64(n byte) string { return base64.RawURLEncoding.EncodeToString(bytes.
 
 const corpsCommande = `{"offre":"plus","jours":30,"renouvelle":true,"moyen":"carte","pays":"FR","renonciation":true}`
 
-// preuve : corps de commande avec une preuve anti-robot fraîche (audit du 20 novembre, S2).
+// preuve : corps de commande avec une preuve anti-robot fraîche.
 func (e envPaiement) preuve(t *testing.T, corps, remote string) []byte {
 	t.Helper()
 	alt, shown := e.captchaFor(t, remote)
 	return []byte(strings.TrimSuffix(corps, "}") + `,"altcha":"` + alt + `","hp":"","shown_at":"` + shown + `"}`)
 }
 
-// Paiement fermé : l'offre répond 200 sans moyen (P6, 22 novembre : plus de 404 dans la console
+// Paiement fermé : l'offre répond 200 sans moyen (plus de 404 dans la console
 // du navigateur) ; toutes les autres routes restent la 404 uniforme.
 func TestPaiementDesactive(t *testing.T) {
 	e := newEnv(t, false, nil)
@@ -246,7 +246,7 @@ func TestPaiementWebhook(t *testing.T) {
 	}
 }
 
-// Audit du 20 novembre, S3 : webhooks PayPal limités par connexion et par /48, avant toute
+// Webhooks PayPal limités par connexion et par /48, avant toute
 // lecture : au-delà, 429 et rien n'atteint le prestataire (aucun appel sortant possible).
 func TestPaiementWebhookPayPalLimite(t *testing.T) {
 	pp := &prestTest{paypal: true, errL: paiement.ErrSignature}

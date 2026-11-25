@@ -21,7 +21,7 @@ func (e *env) putRaw(tok string, n int, body io.Reader, contentLength int64) *ht
 	return w
 }
 
-// Revue B8 : le corps d'un segment est lu dans un tampon de la taille annoncée
+// Le corps d'un segment est lu dans un tampon de la taille annoncée
 // (Content-Length), sans les copies de croissance d'io.ReadAll ; longueur inconnue : comme
 // avant. Un corps plus court que l'annonce reste refusé, et rien n'est écrit.
 func TestPutSegmentBodyRead(t *testing.T) {

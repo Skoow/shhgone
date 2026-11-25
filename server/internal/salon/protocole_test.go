@@ -184,7 +184,7 @@ func TestEnregistrements(t *testing.T) {
 		{"fin", EnrFin(seq, RaisonTropLent), 10, cat(tete(0x05), []byte{6})},
 		{"fin interrompue", EnrFin(seq, RaisonInterrompu), 10, cat(tete(0x05), []byte{7})},
 		{"présence en ligne", EnrPresence(seq, 2, true, 0), 19, cat(tete(0x07), []byte{2, 1}, u64(0))},
-		// En ligne : la minute donnée est ignorée (0 = inconnue ou en ligne, Task 9b).
+		// En ligne : la minute donnée est ignorée (0 = inconnue ou en ligne).
 		{"présence en ligne, minute ignorée", EnrPresence(seq, 2, true, 29_381_492), 19, cat(tete(0x07), []byte{2, 1}, u64(0))},
 		{"présence hors ligne", EnrPresence(seq, 2, false, 29_381_492), 19, cat(tete(0x07), []byte{2, 0}, u64(29_381_492))},
 		{"présence hors ligne, inconnue", EnrPresence(seq, 2, false, 0), 19, cat(tete(0x07), []byte{2, 0}, u64(0))},
@@ -401,7 +401,7 @@ func FuzzFlux(f *testing.F) {
 				t.Fatalf("enregistrement %#02x lu comme un accueil", e[0])
 			}
 		}
-		// Accusé d'acceptation (revue finale C-2, I1) : 0x0F ‖ seq, 9 octets.
+		// Accusé d'acceptation : 0x0F ‖ seq, 9 octets.
 		if a := EnrAcceptee(seq); len(a) != 9 || a[0] != 0x0F || binary.BigEndian.Uint64(a[1:]) != seq {
 			t.Fatalf("0x0F : %x", a)
 		}
@@ -411,7 +411,7 @@ func FuzzFlux(f *testing.F) {
 			binary.BigEndian.Uint32(g[17:]) != r || g[21] != siege {
 			t.Fatalf("0x10 : %x", g)
 		}
-		// Dernière connexion (Task 9b) : 0x07 de 19 octets, minute nulle en ligne ; 0x0D de
+		// Dernière connexion : 0x07 de 19 octets, minute nulle en ligne ; 0x0D de
 		// 11 + 25n octets, chaque annonce relue telle quelle.
 		enLigne := r&1 == 1
 		p := EnrPresence(seq, siege, enLigne, uint64(recu))

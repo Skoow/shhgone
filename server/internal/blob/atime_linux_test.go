@@ -21,7 +21,7 @@ func atime(t *testing.T, p string) time.Time {
 	return time.Unix(st.Atim.Unix())
 }
 
-// Audit de confidentialité P5 : une lecture ne change pas la date d'accès du fichier
+// Une lecture ne change pas la date d'accès du fichier
 // (O_NOATIME), même sur un volume en relatime où une lecture ordinaire la mettrait à jour.
 func TestOpenKeepsAtime(t *testing.T) {
 	s := newStore(t)
@@ -63,7 +63,7 @@ func ctime(t *testing.T, p string) time.Time {
 	return time.Unix(st.Ctim.Unix())
 }
 
-// Audit adverse du 13 novembre, stockage, F4 : la date de changement d'inode (ctime) d'un
+// La date de changement d'inode (ctime) d'un
 // fichier donnait l'heure de la fin de son envoi. Après ScrubTimes (passage du janitor), le
 // ctime de tous les fichiers et du dossier est l'heure du passage ; les dates de contenu et
 // d'accès restent à l'epoch.

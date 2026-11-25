@@ -1,19 +1,18 @@
 package share
 
-// Test offensif de l'audit des partages du 12 novembre (D1), repris du scratchpad et changé
-// en assertion : il échouait avant sa correction.
+// Test offensif des partages, écrit en assertion : il échouait avant la correction.
 
 import (
 	"sync"
 	"testing"
 )
 
-// D1 : un premier déverrouillage concurrent d'une destruction recréait, après le retrait,
+// Un premier déverrouillage concurrent d'une destruction recréait, après le retrait,
 // un octroi et un budget de lecture pour un partage effacé (et rendait 200 avec un jeton).
 // Sous gone.mu, UnlockGrant refuse un partage mort ou en retrait et relit la ligne avant
 // grantLocked : rien ne reste en mémoire. À lancer aussi en -count élevé.
 func TestAuditUnlockVsDestroyLeak(t *testing.T) {
-	for manche := 0; manche < 300; manche++ { // 600 dans l'audit : 0 à 4 manches touchées
+	for manche := 0; manche < 300; manche++ { // 600 manches : 0 à 4 touchées sans la correction
 		s, _ := newSvc(t)
 		k := newKeys()
 		id := ready(t, s, k, 1, 24, MaxOpens)

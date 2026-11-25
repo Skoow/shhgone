@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Revue du 10 novembre (remplace CLEAN4) : à travers tout le serveur (en-têtes de api.New
+// À travers tout le serveur (en-têtes de api.New
 // compris), une seule valeur de Cache-Control par réponse : un an et immuable pour les
 // fichiers à empreinte de /assets/ qui existent, no-store pour tout le reste (HTML, routes,
 // cadre PDF, /api/*, fichiers sans empreinte, 404).

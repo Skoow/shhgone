@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Revue B8 : remplir un seul morceau d'aléa (trou d'un petit élément retiré) n'alloue pas un
+// Remplir un seul morceau d'aléa (trou d'un petit élément retiré) n'alloue pas un
 // tampon de 4 Mio ; le tampon est à la taille de la plage, plafonné à fillChunk.
 func TestFillRangeAllocatesNoMoreThanRange(t *testing.T) {
 	s, _ := newSvc(t)

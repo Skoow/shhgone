@@ -32,7 +32,7 @@ func palier(compteDes int64, now time.Time) (string, Limites, string) {
 }
 
 // Etat : GET /api/compte. Une chaîne vide vaut « aucune » (null en JSON) ; BanniMotif 0 : aucun.
-// Plus de TOTP, d'attente de récupération ni de retrait de TOTP (22 novembre). BanniID :
+// Plus de TOTP, d'attente de récupération ni de retrait de TOTP. BanniID :
 // l'identifiant B-… du bannissement, montré à la personne pour son recours (elle le donne à
 // l'adresse de contact ; le fondateur agit par lui, conception du compte par passkey §7.4).
 type Etat struct {

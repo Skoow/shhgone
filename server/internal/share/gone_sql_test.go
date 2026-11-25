@@ -1,6 +1,6 @@
 package share
 
-// Audit de sécurité du 13 novembre, D7 : retire, Watch et grantIfLive lisaient la base en
+// Retire, Watch et grantIfLive lisaient la base en
 // tenant gone.mu, que prend chaque lecture de segment ; une base lente (verrouillée par
 // « shhdrop admin », busy_timeout de 5 s, vidage du WAL) suspendait alors tous les
 // téléchargements. La base n'a qu'une connexion (store.Open) : une transaction ouverte ici la

@@ -6,7 +6,7 @@
 // cours (rotateLocked) : ils restent comptés sous leur clé de la veille, et le secret de la
 // veille reste en mémoire tant qu'un de ces envois vit (UploadLife au plus). Un tel envoi
 // finalisé passe dans les quotas du jour, sous la clé du jour de l'adresse qui le finalise
-// (FinishUpload, audit M5).
+// (FinishUpload).
 package limits
 
 import (
@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	CreatesPer64 = 10
-	CreatesPer48 = 30
+	// Partages gratuits créés par jour, par connexion (IPv4 ou /64) et par /48.
+	CreatesPer64 = 3
+	CreatesPer48 = 10
 	BytesPer64   = 6 << 30  // 6 Gio utiles par jour : trois partages pleins (spec §24, §41.2)
 	BytesPer48   = 12 << 30 // 12 Gio utiles par jour et par /48 (anti-saturation du disque)
 	// Partages payants (spec §38.6, conception du paiement §11) : octets utiles par jour, à part
@@ -36,16 +37,16 @@ const (
 	// arrondie au quart d'heure comme UploadLife.
 	PaidUploadLife = 24*time.Hour + 15*time.Minute
 	RequestsPerMin = 60
-	// RequestsPer48Min : requêtes par minute et par bloc /48 (audit du 20 novembre : un /56
-	// résidentiel donne 256 /64 ; sans ce plafond la limite par connexion ne bornait rien).
+	// RequestsPer48Min : requêtes par minute et par bloc /48 (un /56 résidentiel donne 256
+	// /64 ; sans ce plafond la limite par connexion ne bornait rien).
 	RequestsPer48Min = 600
 	// SegmentsPerMin : requêtes de segments à jeton valide par minute et par connexion,
 	// compteur à part ; valeur par défaut, réglable (SetSegmentsPerMin, SHH_SEGMENTS_PER_MIN).
-	// 1 500 segments de 4 Mio par minute ≈ 840 Mbit/s par expéditeur (décision du propriétaire
-	// du 13 novembre ; 600 plafonnait un envoi sur la fibre à ≈ 335 Mbit/s).
+	// 1 500 segments de 4 Mio par minute ≈ 840 Mbit/s par expéditeur (600 plafonnait un envoi
+	// sur la fibre à ≈ 335 Mbit/s).
 	SegmentsPerMin = 1500
 	// SegmentsPer48Min : même compteur par bloc /48 (10 × la connexion), pour qu'un /48
-	// découpé en /64 ne multiplie pas le débit par 65 536 (audit M1).
+	// découpé en /64 ne multiplie pas le débit par 65 536.
 	SegmentsPer48Min = 10 * SegmentsPerMin
 	// Envois non finalisés à la fois (spec §29.5).
 	PendingPer64 = 2
@@ -59,7 +60,7 @@ const (
 	hour         = 3600
 )
 
-// Salon (spec §39.3.6, plan C-2 Task 7) : compteurs à part de ceux des partages, sous les
+// Salon (spec §39.3.6) : compteurs à part de ceux des partages, sous les
 // mêmes clés HMAC du jour.
 const (
 	// Créations de salons par jour (UTC).
@@ -69,24 +70,24 @@ const (
 	JoinsPer64 = 20
 	JoinsPer48 = 60
 	// Vérifications du pseudo d'un invité du salon (POST /api/compte/pseudo/libre, sans compte ni
-	// salon : décision du propriétaire, 22 novembre) par heure (fenêtre fixe UTC) : par
-	// connexion et par /48. Borne l'énumération des pseudos des comptes.
+	// salon) par heure (fenêtre fixe UTC) : par connexion et par /48. Borne l'énumération des
+	// pseudos des comptes.
 	PseudoInvitePer64 = 30
 	PseudoInvitePer48 = 90
 	// Commandes de paiement par heure (conception du paiement §8) : par connexion et par /48.
 	CommandesPer64 = 10
 	CommandesPer48 = 30
-	// Webhooks PayPal par minute (audit du 20 novembre, S3) : chacun peut coûter un appel
-	// sortant authentifié (verify-webhook-signature) ; par connexion et par /48, à part de la
+	// Webhooks PayPal par minute : chacun peut coûter un appel sortant authentifié
+	// (verify-webhook-signature) ; par connexion et par /48, à part de la
 	// limite générale. PayPal réessaie après un refus.
 	WebhooksPayPalPer64 = 30
 	WebhooksPayPalPer48 = 60
 	// Trames montantes par minute (fenêtre fixe), toutes connexions WebSocket confondues.
-	// 480 par connexion (IPv4 ou /64) et 960 par /48 (revue finale C-2, I4, 12 novembre) : une
-	// famille ou un bureau derrière un même NAT partage une adresse IPv4, et un membre actif
-	// envoie environ 48 trames par minute (accusés, « en train d'écrire », messages ; exigence
-	// C-3 17) ; 120 bloquait dès 3 membres actifs. Le plafond par siège (60 par minute, rafale
-	// 20, salon/limites.go) borne déjà chaque membre.
+	// 480 par connexion (IPv4 ou /64) et 960 par /48 : une famille ou un bureau derrière un
+	// même NAT partage une adresse IPv4, et un membre actif envoie environ 48 trames par
+	// minute (accusés, « en train d'écrire », messages ; exigence C-3 17) ; 120 bloquait dès 3
+	// membres actifs. Le plafond par siège (60 par minute, rafale 20, salon/limites.go) borne
+	// déjà chaque membre.
 	FramesPer64 = 480
 	FramesPer48 = 960
 )
@@ -142,7 +143,7 @@ type Limiter struct {
 	// Paiement (conception du paiement §8) : commandes de l'heure.
 	paie64 map[string]int
 	paie48 map[string]int
-	// Webhooks PayPal de la minute (audit du 20 novembre, S3).
+	// Webhooks PayPal de la minute.
 	ppw64   map[string]int
 	ppw48   map[string]int
 	frame64 map[string]int
@@ -159,7 +160,7 @@ type Limiter struct {
 	// oublié d'office.
 	prev      []byte
 	prevUntil int64
-	// bloc : clé de CleBloc (crypto/rand), jamais écrite, remplacée à minuit UTC (22 novembre).
+	// bloc : clé de CleBloc (crypto/rand), jamais écrite, remplacée à minuit UTC.
 	bloc []byte
 	// seg64Max, seg48Max : requêtes de segments par minute (SegmentsPerMin, SegmentsPer48Min,
 	// SetSegmentsPerMin).
@@ -175,7 +176,7 @@ type Limiter struct {
 	cnx64                                       map[string]int
 	bannirHeure                                 int // global, aucune clé
 	// bytes64Max, bytes48Max : octets utiles par jour (BytesPer64, BytesPer48), ramenés à
-	// StorageMax / FairShare par SetStorage (part équitable du stockage, audit D2).
+	// StorageMax / FairShare par SetStorage (part équitable du stockage).
 	bytes64Max, bytes48Max int64
 }
 
@@ -190,9 +191,9 @@ func (l *Limiter) SetSegmentsPerMin(n int) {
 	l.seg64Max, l.seg48Max = n, 10*n
 }
 
-// SetStorage : part équitable du stockage (audit du 13 novembre, D2) : une connexion ou un
-// bloc /48 ne réserve pas plus de storageMax / FairShare octets utiles par jour (les partages
-// vivent 24 h au plus : c'est aussi sa part du disque), en plus de BytesPer64 et BytesPer48.
+// SetStorage : part équitable du stockage : une connexion ou un bloc /48 ne réserve pas plus
+// de storageMax / FairShare octets utiles par jour (les partages vivent 24 h au plus : c'est
+// aussi sa part du disque), en plus de BytesPer64 et BytesPer48.
 // À appeler avant de servir.
 func (l *Limiter) SetStorage(storageMax int64) {
 	if storageMax <= 0 {
@@ -277,7 +278,7 @@ func (l *Limiter) DistinctCreators() int {
 func (l *Limiter) rotateLocked(now time.Time) {
 	t := now.Unix()
 	if d := floorDiv(t, day); d != l.day {
-		// Envois en cours créés depuis moins d'UploadLife : gardés (revue du 10 novembre).
+		// Envois en cours créés depuis moins d'UploadLife : gardés.
 		// Sans cela, un envoi à cheval sur minuit n'était plus compté (4 Gio par connexion
 		// et par jour hors quota) et les places d'envoi en cours repartaient de zéro. Un
 		// envoi déjà reporté une fois est plus vieux qu'UploadLife : jamais reporté deux fois.
@@ -296,7 +297,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		if _, err := rand.Read(l.secret); err != nil {
 			panic(err) // crypto/rand ne renvoie pas d'erreur sous Linux
 		}
-		// Clé du plafond des salons par bloc (CleBloc) : remplacée aussi (22 novembre).
+		// Clé du plafond des salons par bloc (CleBloc) : remplacée aussi.
 		clear(l.bloc)
 		if _, err := rand.Read(l.bloc); err != nil {
 			panic(err)
@@ -485,11 +486,10 @@ func (l *Limiter) BeginPaidUpload(ip netip.Addr, id string, bytes int64, tier in
 	return l.begin(ip, id, bytes, false, tier)
 }
 
-// BeginPiece : BeginUpload pour une pièce jointe du salon (plan C-2 Task 13, décision du
-// 12 novembre) : ce n'est pas une création de partage, le quota des créations n'est ni
-// consulté ni débité ; octets utiles du jour, envois en cours et octets abandonnés comptent
-// comme pour un partage. Le nombre de pièces est borné par le salon (120 par heure et par
-// siège).
+// BeginPiece : BeginUpload pour une pièce jointe du salon : ce n'est pas une création de
+// partage, le quota des créations n'est ni consulté ni débité ; octets utiles du jour,
+// envois en cours et octets abandonnés comptent comme pour un partage. Le nombre de pièces
+// est borné par le salon (120 par heure et par siège).
 func (l *Limiter) BeginPiece(ip netip.Addr, id string, bytes int64) (retryAfter time.Duration, err error) {
 	return l.begin(ip, id, bytes, true, 0)
 }
@@ -517,7 +517,7 @@ func (l *Limiter) begin(ip netip.Addr, id string, bytes int64, piece bool, tier 
 	}
 	// Id d'un envoi déjà en cours : une sonde (les id dérivent d'une K_lien aléatoire de
 	// 256 bits, une vraie collision est impossible). Elle coûte une création du quota,
-	// comme une création réussie (revue K1, I2), et ne touche pas l'envoi existant.
+	// comme une création réussie, et ne touche pas l'envoi existant.
 	if _, dup := l.uploads[id]; dup {
 		if creee {
 			l.count64[k64]++
@@ -566,10 +566,10 @@ func (l *Limiter) endLocked(id string, refund, abandoned bool, finisher *netip.A
 		m48[u.k48] -= u.counted() - u.paid()
 	}
 	if u.old && finisher != nil {
-		// Envoi de la veille finalisé aujourd'hui (audit M5, décision du propriétaire du
-		// 11 novembre) : sa création et ses octets passent de la clé de la veille, bientôt
-		// oubliée, à la clé du jour de l'adresse qui le finalise. Sans cela, il sortait de
-		// tout quota à minuit (10 Gio au lieu de 6 dans la journée). Aucune adresse gardée :
+		// Envoi de la veille finalisé aujourd'hui : sa création et ses octets passent de la
+		// clé de la veille, bientôt oubliée, à la clé du jour de l'adresse qui le finalise.
+		// Sans cela, il sortait de tout quota à minuit (10 Gio au lieu de 6 dans la
+		// journée). Aucune adresse gardée :
 		// la clé du jour est recalculée ici, comme à chaque requête.
 		if creee {
 			decr(l.count64, u.k64)
@@ -597,7 +597,7 @@ func (l *Limiter) endLocked(id string, refund, abandoned bool, finisher *netip.A
 // ManifestChunk : données utiles du morceau du manifeste (64 Kio). Les quotas comptent les
 // données utiles d'un palier sans ce morceau (share.ContentBytes) ; un envoi classique le
 // transmet pourtant avec le dernier segment. Il n'est pas compté dans les octets reçus
-// (audit F1 : sinon un partage plein coûtait plus que sa réservation, et le 3ᵉ partage
+// (sinon un partage plein coûtait plus que sa réservation, et le 3ᵉ partage
 // plein de la journée était refusé).
 const ManifestChunk = 65536
 
@@ -626,8 +626,8 @@ func (l *Limiter) debitLocked(id string, u upload, next upload, now time.Time) (
 // débités au quota du jour (refus ErrQuota, délai jusqu'à minuit UTC). Un segment effacé
 // reste compté. Un envoi de la veille reste compté sous sa clé de la veille. Un id inconnu
 // (envoi fini, abandonné, plus vieux qu'UploadLife) est refusé (ErrQuota, délai jusqu'à
-// minuit) : jamais gratuit (audit du 13 novembre, D1 : un jeton finalisé lisait des Gio hors
-// quota). Un redémarrage change la clé des jetons : aucun envoi d'avant n'arrive ici.
+// minuit) : jamais gratuit (un jeton finalisé lisait des Gio hors quota). Un redémarrage change
+// la clé des jetons : aucun envoi d'avant n'arrive ici.
 func (l *Limiter) Receive(id string, n int64) (time.Duration, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -667,7 +667,7 @@ func (l *Limiter) Reserve(id string, bytes int64) (time.Duration, error) {
 }
 
 // FinishUpload : l'envoi id est finalisé par ip ; sa création et ses octets restent comptés.
-// Un envoi de la veille passe dans les quotas du jour, sous la clé du jour de ip (audit M5).
+// Un envoi de la veille passe dans les quotas du jour, sous la clé du jour de ip.
 func (l *Limiter) FinishUpload(id string, ip netip.Addr) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -732,8 +732,8 @@ func (l *Limiter) allowPairLocked(ip netip.Addr, c64, c48 map[string]int, max64,
 
 // AllowSalonCreate : création de salon, 5 par jour (UTC) par connexion et 15 par /48 (spec
 // §39.3.6), renouvellements compris (POST /api/salons/reglages avec renouveler_h : compté
-// comme une création, révision du 13 novembre), comptée à l'appel (avant la création : un conflit ou un refus du gestionnaire
-// reste compté).
+// comme une création), comptée à l'appel (avant la création : un conflit ou un refus du
+// gestionnaire reste compté).
 func (l *Limiter) AllowSalonCreate(ip netip.Addr) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -759,12 +759,12 @@ func (l *Limiter) RefundSalonCreate(ip netip.Addr) {
 }
 
 // CleBloc : clé du bloc /48 de ip (l'adresse elle-même en IPv4), pour le plafond des salons
-// vivants par bloc (spec §39.3.6, décision du 12 novembre). HMAC-SHA-256 sous une clé tirée au
-// hasard, gardée en mémoire seulement, jamais écrite, et remplacée à minuit UTC (décision du
-// propriétaire du 22 novembre : sinon, une lecture de la mémoire relierait chaque salon vivant
-// à l'adresse IPv4 de son créateur en essayant toutes les adresses). Contrepartie : un salon
-// créé la veille compte sous l'ancienne clé, le plafond par bloc repart donc à zéro à minuit
-// (les créations du jour restent bornées par AllowSalonCreate).
+// vivants par bloc (spec §39.3.6). HMAC-SHA-256 sous une clé tirée au hasard, gardée en
+// mémoire seulement, jamais écrite, et remplacée à minuit UTC (sinon, une lecture de la
+// mémoire relierait chaque salon vivant à l'adresse IPv4 de son créateur en essayant toutes
+// les adresses). Contrepartie : un salon créé la veille compte sous l'ancienne clé, le plafond
+// par bloc repart donc à zéro à minuit (les créations du jour restent bornées par
+// AllowSalonCreate).
 func (l *Limiter) CleBloc(ip netip.Addr) [32]byte {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -805,7 +805,7 @@ func (l *Limiter) AllowCommande(ip netip.Addr) bool {
 }
 
 // AllowWebhookPayPal : un webhook PayPal, WebhooksPayPalPer64 par minute (fenêtre fixe) par
-// connexion et WebhooksPayPalPer48 par /48 (audit du 20 novembre, S3). Refus : MinuteRetry.
+// connexion et WebhooksPayPalPer48 par /48. Refus : MinuteRetry.
 func (l *Limiter) AllowWebhookPayPal(ip netip.Addr) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -829,10 +829,10 @@ func (l *Limiter) AllowFrame(ip netip.Addr) bool {
 // plafonds). L'adresse n'est lue qu'ici, à l'ouverture : la connexion ne garde que deux
 // empreintes, HMAC-SHA-256 de sa connexion et de son bloc sous le secret du jour (jamais
 // écrit, remplacé à minuit). Plus aucune adresse ne vit en mémoire pendant les heures d'un
-// WebSocket (22 novembre : l'adresse n'est jamais gardée au-delà du traitement d'une
-// requête), et une fois le secret remplacé, même une lecture de la mémoire ne permet plus de
-// retrouver l'adresse en essayant toutes les adresses IPv4. Une connexion qui passe minuit
-// garde ses empreintes de la veille : ses trames restent comptées à part, sous la même minute.
+// WebSocket (l'adresse n'est jamais gardée au-delà du traitement d'une requête), et une fois
+// le secret remplacé, même une lecture de la mémoire ne permet plus de retrouver l'adresse en
+// essayant toutes les adresses IPv4. Une connexion qui passe minuit garde ses empreintes de la
+// veille : ses trames restent comptées à part, sous la même minute.
 func (l *Limiter) FrameGuard(ip netip.Addr) func() bool {
 	l.mu.Lock()
 	l.rotateLocked(l.now())

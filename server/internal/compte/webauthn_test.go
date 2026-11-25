@@ -18,7 +18,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/compte/webauthntest"
 )
 
-// Lot S3 : cérémonies WebAuthn (go-webauthn épinglé, configuration figée), avec l'authentificateur
+// Cérémonies WebAuthn (go-webauthn épinglé, configuration figée), avec l'authentificateur
 // logiciel de webauthntest.
 
 const origineTest = "http://localhost:8080"
@@ -387,7 +387,7 @@ func TestRPIDProduction(t *testing.T) {
 	}
 }
 
-// Configuration figée (conception §6.1, revue S1 §5) : chaque champ vérifié ; aucune autre
+// Configuration figée (conception §6.1) : chaque champ vérifié ; aucune autre
 // configuration possible (construite seulement par NouvellesCeremonies).
 func TestConfigurationFigee(t *testing.T) {
 	c := ceremoniesTest(t)

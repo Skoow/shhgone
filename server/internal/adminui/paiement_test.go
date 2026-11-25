@@ -11,7 +11,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/paiement"
 )
 
-// Onglet Paiement (25 novembre) : routes refusées comme inconnues sans SHH_PAIEMENT=1, sans
+// Onglet Paiement : routes refusées comme inconnues sans SHH_PAIEMENT=1, sans
 // jeton, avec un paramètre ou la mauvaise méthode ; avec le jeton, agrégats (nombres et
 // booléens seulement) et suspension réversible.
 func TestPaiementRoutes(t *testing.T) {

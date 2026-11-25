@@ -6,12 +6,11 @@ import (
 	"time"
 )
 
-// Suppression et effacements (conception §8.5, §12.4, §21.12, §16 durées ; décision du
-// propriétaire du 14 novembre : on supprime ce dont la personne est l'auteur ou l'admin ; plan
-// lot 5).
+// Suppression et effacements (conception §8.5, §12.4, §21.12, §16 durées) : on supprime ce
+// dont la personne est l'auteur ou l'admin.
 
 // Supprimer (session récente, sans attente : conception du compte par passkey §8) : ferme
-// d'abord les salons créés par le compte (crochet du salon, lot 6 ; un échec arrête tout, le
+// d'abord les salons créés par le compte (crochet du salon ; un échec arrête tout, le
 // compte reste et la personne peut réessayer ; une seconde passe suit l'effacement), puis efface
 // dans une transaction la ligne du compte (empreinte du pseudo, v_r, Env_r, deux coffres), ses
 // passkeys (clés publiques, enveloppes), ses sessions et son bannissement (cascade : il ne

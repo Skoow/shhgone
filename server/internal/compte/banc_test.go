@@ -2,12 +2,10 @@ package compte
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +17,7 @@ import (
 )
 
 // Banc d'essai du compte : horloge figée, base dans un dossier temporaire (TMPDIR), limiteur
-// partagé. Un compte de test se crée directement (creerCompteTx) ou, à partir du lot S3, par
+// partagé. Un compte de test se crée directement (creerCompteTx) ou par
 // une vraie cérémonie WebAuthn (authentificateur logiciel, webauthn_test.go).
 
 type horloge struct {
@@ -71,17 +69,6 @@ func (b *banc) relancer(t *testing.T) {
 	b.s = s
 }
 
-var ipA = netip.MustParseAddr("2001:db8:a::1")
-
-// ipN : une connexion par /48 distinct (n < 65 536).
-func ipN(n int) netip.Addr {
-	var a [16]byte
-	a[0], a[1], a[2], a[3] = 0x20, 0x01, 0x0d, 0xb8
-	binary.BigEndian.PutUint16(a[4:], uint16(n))
-	a[15] = 1
-	return netip.AddrFrom16(a)
-}
-
 // coffreTest : coffre de la forme du serveur (en-tête, gen, nonce, chiffré au palier, étiquette),
 // contenu aléatoire (le serveur ne l'ouvre jamais).
 func coffreTest(magic string, gen uint64, palier int) []byte {
@@ -93,8 +80,6 @@ func coffreTest(magic string, gen uint64, palier int) []byte {
 }
 
 func alea32() (k [32]byte) { rand.Read(k[:]); return }
-
-func sha(b []byte) []byte { s := sha256.Sum256(b); return s[:] }
 
 // canonTest : pseudo_canon du moteur pour un pseudo ASCII (minuscules ; i et 1 → l ; 0 → o ;
 // m → rn), complété à 2 caractères pour les pseudos d'une lettre.
@@ -196,16 +181,6 @@ func (b *banc) fichiers(t *testing.T) []byte {
 		out = append(out, c...)
 	}
 	return out
-}
-
-// mustPseudo : p_empreinte attendue pour p.
-func mustPseudo(t *testing.T, c Cles, p string) []byte {
-	t.Helper()
-	pe, err := c.EmpreintePseudo([]byte(canonTest(p)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return pe[:]
 }
 
 func unhex(t *testing.T, s string) []byte {

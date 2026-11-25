@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Revue B3a : le débit du quota d'un agrandissement se fait dans Grow, sous la réservation
+// Le débit du quota d'un agrandissement se fait dans Grow, sous la réservation
 // de l'envoi (claimFinalize), avec l'ancien palier lu au même moment : jamais rendu à partir
 // d'un palier lu plus tôt, jamais débité pour une demande refusée d'avance.
 func TestGrowChargedChargesUnderClaim(t *testing.T) {
@@ -83,7 +83,7 @@ func TestGrowChargedChargesUnderClaim(t *testing.T) {
 	})
 }
 
-// Revue M1 (reste) : un brouillon réservé d'emblée à un grand palier ne peut pas être finalisé
+// Un brouillon réservé d'emblée à un grand palier ne peut pas être finalisé
 // à ce palier sans y avoir rien envoyé (le serveur écrirait jusqu'à 2 Gio d'aléa pour rien) :
 // le palier final ne dépasse pas ce que les segments reçus justifient, avec la même marge que
 // Grow (growLimit), et l'aléa ne dépasse pas padAllowed des morceaux reçus (D42-6). Le vrai

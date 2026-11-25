@@ -1,4 +1,4 @@
-// Package captcha fournit l'anti-robot ALTCHA adaptatif (spec §22, D4).
+// Package captcha fournit l'anti-robot ALTCHA adaptatif (spec §22).
 //
 // Format compatible avec le widget ALTCHA : défi = hex(SHA-256(sel ‖ nombre)),
 // signature = hex(HMAC-SHA-256(clé, défi)). Le sel a un format fixe :
@@ -10,9 +10,8 @@
 // dont le niveau est inférieur au niveau actuel de la connexion est refusé, pour que la
 // difficulté ne puisse pas être contournée en stockant des défis faciles à l'avance.
 // Tout est en mémoire ; rien n'est lié à une adresse IP en clair. La clé de liaison est tirée
-// au hasard et remplacée à minuit UTC, comme les clés du limiteur (inventaire des adresses IP
-// du 22 novembre) ; celle de la veille sert encore une heure (défis en vol, difficulté de la
-// dernière heure), puis elle est effacée.
+// au hasard et remplacée à minuit UTC, comme les clés du limiteur ; celle de la veille sert
+// encore une heure (défis en vol, difficulté de la dernière heure), puis elle est effacée.
 package captcha
 
 import (

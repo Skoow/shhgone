@@ -57,7 +57,7 @@ func TestCSPWebSocket(t *testing.T) {
 	}
 }
 
-// ---- Routes JSON du salon (plan C-2 Task 7) ----
+// ---- Routes JSON du salon ----
 
 // salonEnv : environnement de test avec le salon actif (gestionnaire sur la même base et la
 // même horloge que les partages).
@@ -582,10 +582,10 @@ func TestCreerSalonBusyRembourse(t *testing.T) {
 	}
 }
 
-// Plafond de 5 salons vivants par /48 (décision du 12 novembre) : 6ᵉ création d'un autre /64
-// du même /48 → 429 limit (même forme que les quotas de création, délai jusqu'au quart
-// d'heure suivant), quota du jour rendu ; place rendue après une destruction ; ni l'adresse
-// ni la clé du bloc dans la base ou son WAL.
+// Plafond de 5 salons vivants par /48 : 6ᵉ création d'un autre /64 du même /48 → 429 limit
+// (même forme que les quotas de création, délai jusqu'au quart d'heure suivant), quota du
+// jour rendu ; place rendue après une destruction ; ni l'adresse ni la clé du bloc dans la
+// base ou son WAL.
 func TestVivantsParBlocHTTP(t *testing.T) {
 	e, _ := salonEnv(t)
 	const r1, r2 = "[2001:db8:77:1::1]:443", "[2001:db8:77:2::1]:443"

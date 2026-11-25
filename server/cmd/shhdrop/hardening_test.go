@@ -58,7 +58,7 @@ func baseCfg(dir string) config.Config {
 	return config.Config{DataDir: dir, Listen: "127.0.0.1:0", StorageMaxBytes: 1 << 30, Now: time.Now}
 }
 
-// Audit F5 : un dossier existant qui n'est pas celui de Shhdrop (/var, $HOME…) voyait ses
+// Un dossier existant qui n'est pas celui de Shhdrop (/var, $HOME…) voyait ses
 // droits forcés à 0700, et ses fichiers de blobs/ effacés par Reconcile.
 func TestServeRefusesForeignDataDir(t *testing.T) {
 	dir := t.TempDir()
@@ -80,7 +80,7 @@ func TestServeRefusesForeignDataDir(t *testing.T) {
 	startServe(t, baseCfg(t.TempDir()))
 }
 
-// Audit F6 : SHH_STORAGE_MAX sans plafond réel.
+// SHH_STORAGE_MAX sans plafond réel.
 func TestServeStorageMaxFitsDisk(t *testing.T) {
 	orig := diskFree
 	t.Cleanup(func() { diskFree = orig })
@@ -121,7 +121,7 @@ func TestServeDefaultStorageNeeds201Gio(t *testing.T) {
 	}
 }
 
-// Audit F7 : SHH_STATIC_DIR non vérifié ; liste des dossiers et fichiers cachés servis.
+// SHH_STATIC_DIR non vérifié ; liste des dossiers et fichiers cachés servis.
 func TestServeStaticDir(t *testing.T) {
 	data := t.TempDir()
 	cfg := baseCfg(data)
@@ -169,8 +169,8 @@ func TestServeStaticDir(t *testing.T) {
 	}
 	// Repli de l'application monopage : /, et tout chemin sans extension, servent index.html,
 	// mêmes en-têtes, sans X-Robots-Tag (spec §32 : les liens sont à la racine, « /#clé »).
-	// Statut réel (audit de performance, point 5) : 200 pour les routes de l'application,
-	// 404 pour tout autre chemin (le corps reste l'application, qui affiche « introuvable »).
+	// Statut réel : 200 pour les routes de l'application, 404 pour tout autre chemin (le
+	// corps reste l'application, qui affiche « introuvable »).
 	for _, c := range []struct {
 		p    string
 		want int
@@ -187,7 +187,7 @@ func TestServeStaticDir(t *testing.T) {
 			}
 		}
 	}
-	// Pages séparées (16 novembre) : une page d'information présente dans le dossier est servie
+	// Pages séparées : une page d'information présente dans le dossier est servie
 	// à son adresse sans extension (200) ; aucun autre fichier .html ne l'est (le cadre PDF garde
 	// ses en-têtes propres à son seul chemin).
 	os.WriteFile(filepath.Join(static, "offres.html"), []byte("<!doctype html><title>Offres</title>"), 0o600)
@@ -197,7 +197,7 @@ func TestServeStaticDir(t *testing.T) {
 			t.Fatalf("%s : %d %q %v", p, code, body, h)
 		}
 	}
-	// Liens sous « /s » (16 novembre) : la page d'ouverture est servie à « /s » seulement.
+	// Liens sous « /s » : la page d'ouverture est servie à « /s » seulement.
 	os.WriteFile(filepath.Join(static, "s.html"), []byte("<!doctype html><title>Ouvrir</title>"), 0o600)
 	for _, p := range []string{"/s", "/s.html"} {
 		if code, body, h := get("GET", p); code != 200 || body != "<!doctype html><title>Ouvrir</title>" || h.Get("Content-Security-Policy") == "" || h.Get("Cache-Control") != "no-store" {
@@ -367,7 +367,7 @@ func TestPagesDuCompteSeulementAvecComptes(t *testing.T) {
 	}
 }
 
-// Pages du salon (plan C-3) : table SALON_PATHS du routeur égale à salonRoutes, et 200
+// Pages du salon : table SALON_PATHS du routeur égale à salonRoutes, et 200
 // seulement avec le salon (SHH_SALONS=1 et SHH_COMPTES=1), sinon 404 comme une page inconnue.
 func TestPagesDuSalon(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join("..", "..", "..", "web", "src", "app", "router.svelte.ts"))
@@ -409,7 +409,7 @@ func TestPagesDuSalon(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, 2e passage, stockage, H1 : SHH_DISABLE_DUMPABLE_HARDENING=1
+// SHH_DISABLE_DUMPABLE_HARDENING=1
 // (porte de sortie du test « le serveur ne voit rien ») est refusée en production
 // (SHH_BEHIND_PROXY=1), par le serveur comme par les commandes d'administration, avec un
 // message qui dit quoi retirer ; hors production, elle reste permise.

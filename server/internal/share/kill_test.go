@@ -1,6 +1,6 @@
 package share
 
-// Audit de sécurité du 13 novembre, D8 : le dossier kill/ portait hex(V_accès) en nom de
+// Le dossier kill/ portait hex(V_accès) en nom de
 // fichier, et ses dates n'étaient pas remises à l'epoch.
 
 import (

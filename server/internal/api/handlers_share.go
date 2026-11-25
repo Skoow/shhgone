@@ -87,7 +87,7 @@ type createBody struct {
 // Le partage est indexé par V_accès et V_gestion, que le serveur calcule lui-même depuis
 // K_accès et S_gestion (spec §29.8) : une création ne peut heurter un partage existant que
 // si son auteur connaît l'un de ces secrets. Qui ne connaît qu'un id (ou un vérificateur
-// lu dans la base) ne peut donc pas savoir si un partage existe (revue K1, I2). L'id
+// lu dans la base) ne peut donc pas savoir si un partage existe. L'id
 // interne est tiré ici (share.NewID), jamais choisi par le client.
 func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	var b createBody
@@ -138,7 +138,7 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	// bad_request), création comptée au quota et dans la difficulté anti-robot.
 	// Envoi dès l'ajout (spec §41.14) : la réservation (création, puis chaque grow) est
 	// débitée d'avance ; les octets reçus au-delà (segments effacés et renvoyés) aussi.
-	// Réserve de stockage des nouveaux venus (audit D2) : lu avant que BeginUpload ne compte
+	// Réserve de stockage des nouveaux venus : lu avant que BeginUpload ne compte
 	// cette création.
 	req.Returning = !s.lim.Newcomer(ip)
 	begin := func() (time.Duration, error) { return s.lim.BeginUpload(ip, req.ID, share.ContentBytes(b.Bucket)) }
@@ -208,8 +208,8 @@ func (s *server) putSegment(w http.ResponseWriter, r *http.Request) {
 		fail(w, errBadRequest)
 		return
 	}
-	// Envoi fini, abandonné ou inconnu : refusé avant toute place et toute lecture (audit du
-	// 13 novembre, D1). La connexion est fermée : le corps n'est jamais lu.
+	// Envoi fini, abandonné ou inconnu : refusé avant toute place et toute lecture. La
+	// connexion est fermée : le corps n'est jamais lu.
 	if !s.svc.UploadOpen(id) {
 		refuseUnread(w)
 		return
@@ -219,7 +219,7 @@ func (s *server) putSegment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
-	// Débit minimal mesuré par tranche (audit I3) : un client trop lent est coupé et rend sa place.
+	// Débit minimal mesuré par tranche : un client trop lent est coupé et rend sa place.
 	rc := http.NewResponseController(w)
 	p := newPacer(rc.SetReadDeadline, s.xfer)
 	if err := p.arm(); err != nil {
@@ -229,7 +229,7 @@ func (s *server) putSegment(w http.ResponseWriter, r *http.Request) {
 	buf := segBufs.Get().(*[]byte)
 	defer segBufs.Put(buf)
 	k, err := readBody(paceReader{http.MaxBytesReader(w, r.Body, maxSegmentLen), p}, r.ContentLength, *buf)
-	// Octets reçus comptés au quota du jour, en données utiles (audit F1), même si le segment
+	// Octets reçus comptés au quota du jour, en données utiles, même si le segment
 	// est effacé ensuite (§41.14) ou si le corps est incomplet (coupé, trop lent) : sinon un
 	// client pourrait tenir des places sans jamais rien payer.
 	retry, qerr := s.lim.Receive(id, share.PayloadBytes(int64(k)))
@@ -242,7 +242,7 @@ func (s *server) putSegment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := (*buf)[:k]
-	// ?from=c : plage de morceaux d'un segment de brouillon (audit H-2, petits éléments
+	// ?from=c : plage de morceaux d'un segment de brouillon (petits éléments
 	// empaquetés) ; sans : segment entier.
 	if f := r.URL.Query(); f.Has("from") {
 		c, err := segNum(f.Get("from"))
@@ -273,7 +273,7 @@ func refuseUnread(w http.ResponseWriter) {
 }
 
 // readBody lit le corps d'un segment dans buf (maxSegmentLen octets, repris de segBufs : pas
-// de tampon de 4 Mio alloué par envoi, revue B8) et rend sa longueur. Longueur annoncée
+// de tampon de 4 Mio alloué par envoi) et rend sa longueur. Longueur annoncée
 // (Content-Length, déjà plafonnée par l'appelant) : un corps plus court est une erreur, et
 // net/http ne livre jamais plus que l'annonce. Longueur inconnue (envoi par blocs) : borné
 // par le lecteur reçu (MaxBytesReader), un octet de plus est une erreur. En cas d'erreur, la
@@ -320,7 +320,7 @@ func (s *server) finalize(w http.ResponseWriter, r *http.Request) {
 		Bucket *int    `json:"bucket"`
 		Header *string `json:"header"`
 		Tail   *string `json:"tail"`
-		// Plages de morceaux de petits éléments retirés (audit H-2), remplies d'aléa.
+		// Plages de morceaux de petits éléments retirés, remplies d'aléa.
 		Void [][2]int `json:"void"`
 	}
 	if err := readJSONMax(w, r, &b, maxFinalizeJSON); err != nil {
@@ -344,13 +344,13 @@ func (s *server) finalize(w http.ResponseWriter, r *http.Request) {
 		fail(w, errBadRequest)
 		return
 	}
-	// Bourrage déjà payé : le palier final ne dépasse pas la réservation débitée (audit M1).
+	// Bourrage déjà payé : le palier final ne dépasse pas la réservation débitée.
 	left, err := s.svc.Finalize(id, req)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	// Un envoi commencé la veille compte dans les quotas du jour où il finit (audit M5).
+	// Un envoi commencé la veille compte dans les quotas du jour où il finit.
 	s.lim.FinishUpload(id, ipOf(r))
 	s.usage.EnvoiTermine()
 	writeJSON(w, http.StatusOK, map[string]int64{"expires_in_s": secs(left)})
@@ -438,7 +438,7 @@ func (s *server) unlock(w http.ResponseWriter, r *http.Request) {
 		// last_open : dernière ouverture permise (n = opens_issued, plus aucune) ; seule
 		// celle-ci se voit proposer « Détruire » (revue D42-22). Entier 0 ou 1, pas un
 		// booléen : true et false n'ont pas la même longueur, que verrait un observateur du
-		// trafic chiffré (audit des partages du 12 novembre, D2 ; spec §29.8).
+		// trafic chiffré (spec §29.8).
 		LastOpen int `json:"last_open"`
 	}{s.sig.Issue(token.Download, id, openN, time.Unix(exp, 0)), m.Segments, b64.EncodeToString(envelope), o.Grant, o.OpensLeft, b2i(o.LastOpen)})
 }
@@ -478,7 +478,7 @@ func (s *server) getSegment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer sec.Close()
-	// Débit minimal mesuré par tranche (audit M4, remplace le WriteTimeout de 300 s) : un
+	// Débit minimal mesuré par tranche (au lieu d'un WriteTimeout de 300 s) : un
 	// client trop lent est coupé et rend sa place. Absent des tests en mémoire (ErrNotSupported).
 	rc := http.NewResponseController(w)
 	p := newPacer(rc.SetWriteDeadline, s.xfer)
@@ -499,9 +499,9 @@ func (s *server) getSegment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Length", strconv.FormatInt(sec.Size(), 10))
 	w.WriteHeader(http.StatusOK)
-	// En flux depuis le fichier (audit E1). Une copie incomplète (client coupé, échéance,
+	// En flux depuis le fichier. Une copie incomplète (client coupé, échéance,
 	// erreur de lecture) coupe la connexion : une réponse tronquée ne passe pas pour complète.
-	// Tampon de 256 Kio repris d'une réserve (revue B8) ; paceWriter masque le ReadFrom de la
+	// Tampon de 256 Kio repris d'une réserve ; paceWriter masque le ReadFrom de la
 	// réponse, qui recopierait sinon par tranches de 32 Kio.
 	buf := copyBufs.Get().(*[]byte)
 	k, err := io.CopyBuffer(paceWriter{w, p}, sec, *buf)
@@ -531,7 +531,7 @@ func (s *server) done(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/shares/destroy : destruction ou signalement par le destinataire (K_accès en
 // en-tête, K_preuve dans le corps). L'expéditeur passe par /api/manage/destroy.
-// grant (octroi de l'ouverture) : toujours obligatoire (audit du 20 novembre).
+// grant (octroi de l'ouverture) : toujours obligatoire.
 // reason : absent (destruction, seulement par le dernier destinataire : sinon 409 still_open ;
 // les ouvertures actives finissent ; 204) ou exactement "report"
 // (signalement : une voix par ouverture, prouvée par `grant`, l'octroi de l'ouverture ; le
@@ -585,7 +585,7 @@ func (s *server) destroy(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	// Une même ouverture qui signale de nouveau ne compte pas deux fois (audit du 20 novembre, M2).
+	// Une même ouverture qui signale de nouveau ne compte pas deux fois.
 	if nouvelle {
 		s.reports.add(s.svc.Now())
 		s.usage.SignalementPartage(cat) // en mémoire seulement : la base n'apprend aucune catégorie
@@ -617,9 +617,9 @@ func (s *server) grow(w http.ResponseWriter, r *http.Request) {
 		fail(w, errBadRequest)
 		return
 	}
-	// Place débitée d'avance au quota du jour (audit H1), par Grow lui-même, sous la
-	// réservation de l'envoi, et rendue par lui si l'agrandissement échoue (revue B3a) : un
-	// grow refusé ou « busy » en parallèle ne touche plus au quota.
+	// Place débitée d'avance au quota du jour, par Grow lui-même, sous la réservation de
+	// l'envoi, et rendue par lui si l'agrandissement échoue : un grow refusé ou « busy » en
+	// parallèle ne touche plus au quota.
 	var retry time.Duration
 	quota := false
 	err = s.svc.GrowCharged(id, *b.Bucket, func(bucket int) error {

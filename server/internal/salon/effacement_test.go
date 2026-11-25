@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Effacement par règle et par lectures (plan C-2 Task 11, v3 §5).
+// Effacement par règle et par lectures (v3 §5).
 
 const (
 	dCinqMinutes = byte(CinqMinutes) << 1
@@ -205,8 +205,8 @@ func TestUneMinuteSeul(t *testing.T) {
 	})
 }
 
-// regleApresLecture (décision du 13 novembre) : une trame des règles 2 ou 3 attend que tous
-// les sièges présents à l'envoi l'aient lue, quel que soit le temps passé (2 h sans lecture :
+// regleApresLecture : une trame des règles 2 ou 3 attend que tous les sièges présents à
+// l'envoi l'aient lue, quel que soit le temps passé (2 h sans lecture :
 // gardée) ; elle est effacée exactement duree après la DERNIÈRE lecture (pas 1 ms avant), avec
 // un 0x0E pour tous, comptée à l'heure du serveur. La trame porte dans son contenu une heure
 // d'émission fausse (rien n'y est lu).
@@ -217,7 +217,7 @@ func regleApresLecture(t *testing.T, d byte, duree time.Duration) {
 		eg, g := b.entrerMembre(t, c, true)
 		ea, a := b.entrerMembre(t, c, false)
 		eb, bm := b.entrerMembre(t, c, false)
-		la := b.connecter(ea.Jeton, ea.Seq) // connecté une fois (N1), puis absent
+		la := b.connecter(ea.Jeton, ea.Seq) // connecté une fois, puis absent
 		synctest.Wait()
 		finir(t, la)
 		lg := b.connecter(eg.Jeton, eg.Seq)
@@ -276,10 +276,10 @@ func TestDesactiveReste(t *testing.T) {
 	}
 }
 
-// Review Focus 5 (revue finale C-2, I3) : C, hors ligne, n'a pas lu ; la trame l'attend
-// pendant toute la vie du salon (aucune libération après une absence) ; son départ (0x03), le
-// dernier attendu, fait partir le délai : les trames qui n'attendaient plus que lui sont
-// effacées 60 s plus tard (0x0E), pas avant.
+// Review Focus 5 : C, hors ligne, n'a pas lu ; la trame l'attend pendant toute la vie du
+// salon (aucune libération après une absence) ; son départ (0x03), le dernier attendu, fait
+// partir le délai : les trames qui n'attendaient plus que lui sont effacées 60 s plus tard
+// (0x0E), pas avant.
 func TestInstantaneAttendLAbsent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := nouveauBanc(t, 200)
@@ -287,7 +287,7 @@ func TestInstantaneAttendLAbsent(t *testing.T) {
 		eg, g := b.entrerMembre(t, c, true)
 		ea, a := b.entrerMembre(t, c, false)
 		ec, cm := b.entrerMembre(t, c, false)
-		lc := b.connecter(ec.Jeton, ec.Seq) // connecté une fois (N1), puis hors ligne
+		lc := b.connecter(ec.Jeton, ec.Seq) // connecté une fois, puis hors ligne
 		synctest.Wait()
 		finir(t, lc)
 		lg := b.connecter(eg.Jeton, eg.Seq)
@@ -412,7 +412,7 @@ func TestRepriseNeComptePlus(t *testing.T) {
 	})
 }
 
-// C revient après 23 h d'absence (I3 : siège réservé pour la vie du salon) : il reçoit la
+// C revient après 23 h d'absence (siège réservé pour la vie du salon) : il reçoit la
 // trame (règle 2) au rattrapage, la lit → effacée 5 min plus tard, pas avant, 0x0E pour tous.
 func TestAbsentRevientTard(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -421,7 +421,7 @@ func TestAbsentRevientTard(t *testing.T) {
 		eg, g := b.entrerMembre(t, c, true)
 		_, a := b.entrerMembre(t, c, false)
 		ec, _ := b.entrerMembre(t, c, false)
-		l0 := b.connecter(ec.Jeton, ec.Seq) // connecté une fois (N1), puis absent
+		l0 := b.connecter(ec.Jeton, ec.Seq) // connecté une fois, puis absent
 		synctest.Wait()
 		finir(t, l0)
 		lg := b.connecter(eg.Jeton, eg.Seq)
@@ -463,7 +463,7 @@ func TestAbsentRevientTard(t *testing.T) {
 	})
 }
 
-// Relecture Task 9 : client lent sorti du direct, trame déjà reçue effacée pendant son
+// Client lent sorti du direct, trame déjà reçue effacée pendant son
 // rattrapage → 0x0E reçu quand même, au retour dans le direct, après la trame.
 func TestEffaceePendantRattrapage(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -857,7 +857,7 @@ func entreeDeEfface(s *salon, seq uint64) bool {
 	return e.efface()
 }
 
-// Relecture Task 11, point 1 : les 0x0E en attente partent par lots de lotEffaces au plus,
+// Les 0x0E en attente partent par lots de lotEffaces au plus,
 // dans l'ordre et sans perte ; le reste demeure dans c.effaces et l'écrivain est réveillé.
 func TestEffacesParLots(t *testing.T) {
 	b := nouveauBanc(t, 200)
@@ -910,7 +910,7 @@ func TestEffacesParLots(t *testing.T) {
 	}
 }
 
-// Relecture Task 11, point 1, de bout en bout : 1 500 trames effacées par lecture pendant
+// 1 500 trames effacées par lecture pendant
 // une coupure ; la reconnexion reçoit les 1 500 0x0E, dans l'ordre, par lots.
 func TestReconnexionBeaucoupDe0x0E(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -937,7 +937,7 @@ func TestReconnexionBeaucoupDe0x0E(t *testing.T) {
 	})
 }
 
-// Relecture Task 11, point 2 : une connexion arrêtée ne garde rien en attente (0x0E, file,
+// Une connexion arrêtée ne garde rien en attente (0x0E, file,
 // réponses), qu'elle soit désinscrite, remplacée ou que l'écrivain voie l'arrêt.
 func TestConnexionArreteeVidee(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -998,7 +998,7 @@ func TestConnexionArreteeVidee(t *testing.T) {
 	})
 }
 
-// Relecture Task 11, point 3 : reprise par WebSocket, puis reconnexion ordinaire : aucun 0x0E
+// Reprise par WebSocket, puis reconnexion ordinaire : aucun 0x0E
 // pour une trame antérieure à la reprise (l'identité d'avant ne compte plus).
 func TestReprisePuisReconnexionSans0x0EAnterieur(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -1085,7 +1085,7 @@ func TestReconnexion0x0EUneMinuteSeul(t *testing.T) {
 	})
 }
 
-// Décision du 12 novembre (réserve 6) : reprise par WebSocket, puis reconnexion ordinaire
+// Reprise par WebSocket, puis reconnexion ordinaire
 // avec depuis = 0 : le rattrapage part du dernier 0x0A ; aucune trame antérieure n'est servie.
 func TestReprisePuisReconnexionDepuisZero(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

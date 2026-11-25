@@ -31,7 +31,7 @@ func corpsPP(typ, ressource string) []byte {
 	return []byte(`{"id":"WH-TEST","event_version":"1.0","event_type":"` + typ + `","resource":` + ressource + `}`)
 }
 
-// Audit du 20 novembre, S3 (a) : un faux webhook PayPal qui ne vise aucune commande connue chez
+// Un faux webhook PayPal qui ne vise aucune commande connue chez
 // nous (ni commande, ni abonnement, ni référence de paiement) est refusé comme une signature
 // fausse, sans aucun appel sortant, même avec un Paypal-Transmission-Id toujours nouveau.
 func TestPayPalWebhookInconnuSansAppel(t *testing.T) {

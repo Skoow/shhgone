@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Inventaire des adresses IP du 22 novembre : les places de lecture des webhooks sont tenues
+// Les places de lecture des webhooks sont tenues
 // sous la clé HMAC du jour du limiteur, jamais sous le préfixe /64 ou /48 en clair. Places de la
 // connexion prises sous cette clé : le webhook suivant est refusé (503) sans lecture ; rendues,
 // il passe. Avec le préfixe en clair, ces places ne compteraient pas et le premier passerait.

@@ -16,7 +16,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Réglages du salon (spec 2026-11-13, révision du 13 novembre) : places et renouvellement.
+// Réglages du salon (spec 2026-11-13) : places et renouvellement.
 
 // reglages0x10 : enregistrements 0x10 reçus (taille exacte vérifiée), décodés.
 type enr10 struct {
@@ -567,7 +567,7 @@ func TestRenouvelerPlaceDuBloc(t *testing.T) {
 	if _, err := b.m.Creer(r); err != nil {
 		t.Fatal(err)
 	}
-	b.entrer(t, c, true) // salon vide effacé après videMax (audit D2) : le créateur y entre
+	b.entrer(t, c, true) // salon vide effacé après videMax : le créateur y entre
 	b.h.avancer(50 * time.Minute)
 	b.regler(t, c, ReglagesReq{Heures: 6})
 	b.h.avancer(2 * time.Hour) // ancienne échéance passée

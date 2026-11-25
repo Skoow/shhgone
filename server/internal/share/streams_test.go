@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Révocation par clé (lien révoqué, Task F5 ; membre exclu d'un salon, Task C-6 ; ouverture
+// Révocation par clé (lien révoqué ; membre exclu d'un salon ; ouverture
 // d'un partage) : seuls les flux de la clé révoquée sont annulés ; registre vide ensuite.
 func TestStreamsRevokeOnlyKey(t *testing.T) {
 	var r Streams

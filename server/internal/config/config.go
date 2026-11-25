@@ -16,16 +16,16 @@ import (
 )
 
 type Config struct {
-	DataDir         string // SHH_DATA_DIR : chemin absolu (audit F5)
-	Listen          string // SHH_LISTEN : boucle locale, sauf derrière un proxy déclaré (audit M3)
+	DataDir         string // SHH_DATA_DIR : chemin absolu
+	Listen          string // SHH_LISTEN : boucle locale, sauf derrière un proxy déclaré
 	StorageMaxBytes int64
 	// ShareEgressMax (SHH_SHARE_EGRESS_MAX, octets, au moins 32 Gio) : octets servis au plus
-	// par un partage, toutes ouvertures confondues (décision du propriétaire du 24 novembre) ;
-	// 0 (absent) : share.DefaultEgressMax (250 Gio).
+	// par un partage, toutes ouvertures confondues ; 0 (absent) : share.DefaultEgressMax
+	// (250 Gio).
 	ShareEgressMax int64
 	// BehindProxy (SHH_BEHIND_PROXY=1) : une requête sans X-Shh-Client-IP valide, ou venue
 	// d'un pair qui n'est pas un proxy de confiance, est refusée au lieu de partager les
-	// limites de l'adresse locale. Active aussi le refus des fichiers creux (audit F6).
+	// limites de l'adresse locale. Active aussi le refus des fichiers creux.
 	BehindProxy bool
 	// TrustedProxies (SHH_TRUSTED_PROXY, liste de CIDR séparés par des virgules) : pairs dont
 	// X-Shh-Client-IP est cru, en plus de la boucle locale. Exige SHH_BEHIND_PROXY=1.
@@ -130,7 +130,7 @@ func FromEnv() (Config, error) {
 		}
 		for _, s := range strings.Split(v, ",") {
 			p, err := netip.ParsePrefix(strings.TrimSpace(s))
-			// Forme canonique (adresse de réseau), jamais « tout Internet » (point M3).
+			// Forme canonique (adresse de réseau), jamais « tout Internet ».
 			if err != nil || p != p.Masked() || !trustedPrefixOK(p) {
 				return Config{}, fmt.Errorf("SHH_TRUSTED_PROXY invalide (liste de CIDR canoniques, réseau local "+
 					"ou public d'au moins /24 en IPv4 et /48 en IPv6, sans notation IPv4-dans-IPv6): %q", v)
@@ -316,7 +316,7 @@ func digits(s string) bool {
 
 // checkListen : hôte:port numérique. Sans proxy déclaré, l'hôte doit être la boucle locale
 // (127.0.0.0/8, ::1 ou localhost) : sinon K_accès, K_preuve et S_gestion circuleraient
-// en HTTP clair (audit M3).
+// en HTTP clair.
 func checkListen(name, l string, proxied bool) error {
 	host, port, err := net.SplitHostPort(l)
 	if err != nil || !digits(port) || len(port) > 5 {
@@ -339,27 +339,25 @@ func checkListen(name, l string, proxied bool) error {
 
 // Jeton d'administration en clair (SHH_ADMIN_TOKEN, développement local) : au moins adminTokenMin caractères de l'alphabet base64url (43 =
 // 32 octets aléatoires), dont adminTokenDistinct différents au moins (refuse « aaaa… »).
-// 10 et non 16 (audit adverse 3, F1) : un jeton hexadécimal de 64 caractères tiré au hasard
-// n'a que 16 symboles possibles et en omet un environ une fois sur quatre ; il était alors
-// refusé et le serveur ne démarrait pas. Moins de 10 symboles distincts sur 64 tirages
-// hexadécimaux : probabilité inférieure à 10^-9.
+// 10 et non 16 : un jeton hexadécimal de 64 caractères tiré au hasard n'a que 16 symboles
+// possibles et en omet un environ une fois sur quatre ; il était alors refusé et le serveur ne
+// démarrait pas. Moins de 10 symboles distincts sur 64 tirages hexadécimaux : probabilité
+// inférieure à 10^-9.
 const adminTokenMin, adminTokenMax, adminTokenDistinct = 43, 512, 10
 
 // emptyTokenHash : SHA-256 de la chaîne vide, ce que donne la commande documentée quand la
 // variable du jeton n'est pas posée ; refusée (aucun jeton vide n'est jamais accepté).
 const emptyTokenHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
-// adminFromEnv : SHH_ADMIN_LISTEN et le jeton du tableau de bord d'administration (conception
-// du 13 novembre). Le serveur n'a besoin que de l'EMPREINTE du jeton (il ne compare que des
-// empreintes) :
+// adminFromEnv : SHH_ADMIN_LISTEN et le jeton du tableau de bord d'administration. Le serveur
+// n'a besoin que de l'EMPREINTE du jeton (il ne compare que des empreintes) :
 //
 //   - SHH_ADMIN_TOKEN_SHA256 : SHA-256 du jeton, 64 chiffres hexadécimaux en minuscules
 //     (printf %s "$JETON" | sha256sum). Le jeton lui-même reste chez l'exploitant : il n'est
 //     plus ni dans deploy/.env, ni dans la configuration du conteneur, ni dans l'environnement
-//     du processus (audit adverse du 13 novembre, 3e campagne : tableau de bord F5, stockage
-//     F3). Contrepartie : la qualité du jeton ne peut plus être contrôlée ici (une empreinte ne
-//     dit rien de ce qu'elle résume) ; c'est à la commande de tirage de la garantir
-//     (openssl rand -hex 32).
+//     du processus. Contrepartie : la qualité du jeton ne peut plus être contrôlée ici (une
+//     empreinte ne dit rien de ce qu'elle résume) ; c'est à la commande de tirage de la
+//     garantir (openssl rand -hex 32).
 //   - SHH_ADMIN_TOKEN : le jeton en clair, pour le développement local seulement. REFUSÉ avec
 //     SHH_BEHIND_PROXY=1 (production), même sans tableau de bord.
 //

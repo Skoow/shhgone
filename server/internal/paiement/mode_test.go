@@ -41,7 +41,7 @@ func TestMarquerMode(t *testing.T) {
 	}
 }
 
-// TestDroitsDisponibles : l'état ne rend que les droits codés (revue du 25 novembre) : ni la
+// TestDroitsDisponibles : l'état ne rend que les droits codés : ni la
 // première ouverture ni les salons payants, pas encore disponibles.
 func TestDroitsDisponibles(t *testing.T) {
 	for _, o := range []Offre{Plus, Pro} {

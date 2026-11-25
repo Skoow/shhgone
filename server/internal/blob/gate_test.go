@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Audit du 13 novembre, D4 : au plus n appels système de fichiers à la fois, quel que soit le
+// Au plus n appels système de fichiers à la fois, quel que soit le
 // nombre de transferts (écritures, lectures en flux, réservations, suppressions).
 func TestGateBorneLesAppels(t *testing.T) {
 	g := NewGate(3)

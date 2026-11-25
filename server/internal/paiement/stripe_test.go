@@ -301,9 +301,9 @@ func TestStripeEvenements(t *testing.T) {
 	}
 }
 
-// Risque S10 (audit du 20 novembre, S6) : un abonnement Stripe contesté ne porte, dans
-// charge.dispute.created, que le PaymentIntent de la facture ; invoice_payment.paid le range
-// avec la commande, et le litige révoque le pass.
+// Risque S10 : un abonnement Stripe contesté ne porte, dans charge.dispute.created, que le
+// PaymentIntent de la facture ; invoice_payment.paid le range avec la commande, et le litige
+// révoque le pass.
 func TestStripeAbonnementConteste(t *testing.T) {
 	b := nouveauBanc(t)
 	s, _, now := nouveauStripeTest(t, true)

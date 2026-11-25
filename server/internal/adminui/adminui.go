@@ -1,5 +1,5 @@
-// Package adminui : tableau de bord d'administration (conception du 13 novembre,
-// docs/superpowers/specs/2026-11-13-tableau-de-bord-admin-design.md). Servi par un écouteur
+// Package adminui : tableau de bord d'administration (conception
+// docs/conception/specs/2026-11-13-tableau-de-bord-admin-design.md). Servi par un écouteur
 // distinct du site public (SHH_ADMIN_LISTEN), jamais par Caddy. Il ne montre que des
 // agrégats : aucun identifiant, aucune adresse, aucun contenu, aucune date de partage ; il
 // n'écrit rien sur disque hors du fichier de gel, et ne garde rien (ni journal ni dernier
@@ -51,7 +51,7 @@ type Config struct {
 	// par l'appelant au retour : Destroy ne doit en garder aucune copie (ni chaîne ni tranche).
 	Destroy func(link []byte) (string, error)
 
-	// Lot 7 du plan du compte (conception du compte §21.14). Now : horloge des refs (nil :
+	// Comptes (conception du compte §21.14). Now : horloge des refs (nil :
 	// time.Now). Signales, ActionSalon : salons signalés en cours (SHH_SALONS=1 ; nil sinon :
 	// routes refusées comme inconnues) ; ActionSalon reçoit l'identifiant interne retrouvé par la
 	// ref et l'action « detruire », « bannir » (durée, motif vérifiés) ou « anciennete ».
@@ -103,8 +103,8 @@ var (
 	delaiFauxMax = 2 * time.Second
 )
 
-// frein : délai global après un jeton faux (audit adverse du 13 novembre, 3e campagne, tableau
-// de bord, F4 : 26 900 essais par seconde, sans aucun frein). Rien n'est gardé par adresse :
+// frein : délai global après un jeton faux (26 900 essais par seconde, sans aucun frein). Rien
+// n'est gardé par adresse :
 // une seule heure, en mémoire, « fin du délai en cours ».
 //
 //   - Chaque jeton faux repousse cette fin de delaiFaux (à partir de maintenant si le délai
@@ -165,7 +165,7 @@ type file struct {
 //	GET  /api/etat                  état agrégé (State)
 //	POST /api/geler, /api/degeler   gel et dégel des créations
 //	POST /api/detruire              lien signalé dans le CORPS (text/plain), jamais dans l'URL
-//	GET  /api/signalements          salons signalés en cours, par ref éphémère (lot 7)
+//	GET  /api/signalements          salons signalés en cours, par ref éphémère
 //	POST /api/salons/action         { ref, action, duree_jours?, motif? }
 //	POST /api/bannis                { filtre, page } (liste ; jamais de paramètre d'URL)
 //	POST /api/bannis/action         { id, action, jusqu? }
@@ -351,11 +351,10 @@ func (a *admin) peerOK(r *http.Request) bool {
 // hoteOK : nom sous lequel la page est demandée (en-tête Host de la requête, lu par net/http
 // dans http.Request.Host). Servis : localhost, 127.0.0.1 et l'adresse d'écoute (Config.Host),
 // écrits exactement ainsi, avec ou sans port, quel que soit le port (le tunnel SSH choisit le
-// port local). Tout autre nom est refusé comme une route inconnue (audit adverse du
-// 13 novembre, 3e campagne : tableau de bord H1, site F3) : un site qui fait pointer son nom
-// vers la boucle locale (« DNS rebinding ») ne devient pas de même origine que la page, et un
-// Caddy mal réglé, qui relaierait le nom public vers cet écouteur, n'est pas servi. Le nom
-// n'est ni gardé, ni journalisé, ni recopié.
+// port local). Tout autre nom est refusé comme une route inconnue : un site qui fait pointer
+// son nom vers la boucle locale (« DNS rebinding ») ne devient pas de même origine que la
+// page, et un Caddy mal réglé, qui relaierait le nom public vers cet écouteur, n'est pas
+// servi. Le nom n'est ni gardé, ni journalisé, ni recopié.
 func (a *admin) hoteOK(hote string) bool {
 	h := hote
 	if i := strings.LastIndexByte(hote, ':'); i >= 0 && !strings.HasSuffix(hote, "]") {
@@ -422,10 +421,9 @@ func (a *admin) act(w http.ResponseWriter, r *http.Request, f func() error) {
 // recopié par une croissance), effacé au retour ; Destroy le traite en octets et efface ses
 // propres copies (clés). Effacé au mieux : il reste, hors de portée de ce code, le tampon de
 // lecture de la connexion (net/http), récrit par la requête suivante ou rendu au ramasse-miettes
-// à la fermeture, et l'état interne du calcul de K_accès (audit adverse du 13 novembre, 3e
-// campagne, stockage, F4 : le commentaire promettait « effacé de la mémoire », alors que le
-// lien, clé comprise, restait en neuf exemplaires). La réponse ne reprend jamais le lien, ni
-// aucun identifiant : seulement ce qui a été détruit.
+// à la fermeture, et l'état interne du calcul de K_accès (le commentaire promettait « effacé de
+// la mémoire », alors que le lien, clé comprise, restait en neuf exemplaires). La réponse ne
+// reprend jamais le lien, ni aucun identifiant : seulement ce qui a été détruit.
 func (a *admin) destroy(w http.ResponseWriter, r *http.Request) {
 	tampon := make([]byte, maxLink+1)
 	defer clear(tampon)

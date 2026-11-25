@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// Audit adverse du 13 novembre, 3e campagne, stockage, F5 : le brouillage des dates du janitor
-// ne visitait que les dossiers des partages et du salon. Le dossier de données, frozen, kill/,
+// Le brouillage des dates du janitor ne visitait que les
+// dossiers des partages et du salon. Le dossier de données, frozen, kill/,
 // kill.key et les fichiers de la base gardaient l'heure du dernier gel, de la dernière
 // destruction par l'administrateur ou de la dernière écriture. Après ScrubDataTimes, leurs dates
 // de contenu et d'accès sont à l'epoch (le ctime, lui, prend l'heure du passage), et la base

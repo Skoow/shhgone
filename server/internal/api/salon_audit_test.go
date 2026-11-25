@@ -1,7 +1,7 @@
 package api
 
-// Tests offensifs des audits du 12 novembre (routes des pièces du salon), repris du
-// scratchpad et changés en assertions : chacun échouait avant sa correction.
+// Tests offensifs des routes des pièces du salon, écrits en assertions : chacun échouait
+// avant sa correction.
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// D2 de l'audit : un vocal ne passe par aucun quota d'octets (réserve du siège) ; il se
+// Un vocal ne passe par aucun quota d'octets (réserve du siège) ; il se
 // réécrivait sans fin (40 × 4 Mo en 204). Le total reçu par pièce est plafonné à 2 × sa
 // taille : au-delà, 413 too_large (pièce à abandonner : 429 pousserait le client à réessayer
 // la même requête, refusée pour toujours). Même plafond pour un fichier.
@@ -36,7 +36,7 @@ func TestAuditVocalReecritureHorsQuota(t *testing.T) {
 	}
 }
 
-// D4 de l'audit : HEAD sur les routes GET des segments (pièce du salon, partage) répondait
+// HEAD sur les routes GET des segments (pièce du salon, partage) répondait
 // 200 et consommait le budget de lecture sans rien servir. HEAD, et toute méthode autre que
 // GET et PUT, répondent 405 (Allow: GET, PUT), avant tout budget ; le GET suivant est servi.
 func TestAuditHeadConsommeBudget(t *testing.T) {
@@ -77,7 +77,7 @@ func TestAuditHeadConsommeBudget(t *testing.T) {
 	}
 }
 
-// D2 de l'audit des partages : la longueur de la réponse d'unlock révélait la dernière
+// La longueur de la réponse d'unlock révélait la dernière
 // ouverture (true fait un octet de moins que false) à un observateur du trafic chiffré.
 // last_open est un entier 0 ou 1 : même longueur pour les deux. Reste opens_left (1 ou 2
 // chiffres, risque résiduel faible, spec §36).

@@ -18,7 +18,7 @@ func env(t *testing.T, kv map[string]string) {
 	}
 }
 
-// Audit M3 : SHH_LISTEN=0.0.0.0:8080 (ou :8080) était accepté sans proxy.
+// SHH_LISTEN=0.0.0.0:8080 (ou :8080) était accepté sans proxy.
 func TestListenLoopbackOnly(t *testing.T) {
 	for _, l := range []string{"127.0.0.1:8080", "127.0.0.1:0", "[::1]:8080", "localhost:8080", "127.5.6.7:1"} {
 		env(t, map[string]string{"SHH_DATA_DIR": "/d", "SHH_LISTEN": l})
@@ -73,7 +73,7 @@ func TestTrustedProxy(t *testing.T) {
 	}
 }
 
-// Audit F5 : chemin relatif accepté.
+// Chemin relatif accepté.
 func TestDataDirAbsolute(t *testing.T) {
 	for _, d := range []string{"data", "./data", "../x", "~/shh"} {
 		env(t, map[string]string{"SHH_DATA_DIR": d})
@@ -98,7 +98,7 @@ func TestDataDirAbsolute(t *testing.T) {
 	}
 }
 
-// Audit F6 : « +5 » était accepté.
+// « +5 » était accepté.
 func TestStorageMaxCanonical(t *testing.T) {
 	for _, v := range []string{"+5", " 5", "5 ", "0x10", "1e9", "05"} {
 		env(t, map[string]string{"SHH_DATA_DIR": "/d", "SHH_STORAGE_MAX": v})

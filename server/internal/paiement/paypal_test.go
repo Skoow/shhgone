@@ -286,7 +286,7 @@ func (f *fauxPayPal) verifsFaites() int {
 	return n
 }
 
-// Audit du 20 novembre, S3 : un faux webhook répété (même Paypal-Transmission-Id) ne provoque
+// Un faux webhook répété (même Paypal-Transmission-Id) ne provoque
 // qu'un appel sortant ; un identifiant vérifié, ou dont la vérification a échoué chez PayPal
 // (panne), n'est pas gardé : PayPal peut le renvoyer.
 func TestPayPalTransmissionRefusee(t *testing.T) {

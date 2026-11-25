@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Appels audio et vidéo du salon (conception des appels, 20 novembre) : le média passe toujours
+// Appels audio et vidéo du salon (conception des appels) : le média passe toujours
 // par le relais TURN de notre image (deploy/shhcheck/turn.go), jamais en direct entre participants. Le
 // serveur ne relaie rien lui-même : il donne à un membre des identifiants temporaires, calculés
 // avec le secret partagé du relais.

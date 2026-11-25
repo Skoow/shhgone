@@ -77,7 +77,7 @@ func TestFromEnvProxyEtStatique(t *testing.T) {
 	}
 }
 
-// Salon (plan C-2, Task 2) : désactivé par défaut, 200 salons vivants au plus (spec §39.3.2).
+// Salon : désactivé par défaut, 200 salons vivants au plus (spec §39.3.2).
 func TestSalonsDefautDesactive(t *testing.T) {
 	env(t, map[string]string{"SHH_DATA_DIR": "/d"})
 	c, err := FromEnv()
@@ -102,7 +102,7 @@ func TestSalonsDefautDesactive(t *testing.T) {
 	if err != nil || !c.Salons || c.Origin != "https://shhdrop.app" || c.SalonsMax != 500 {
 		t.Fatalf("salon activé : %+v %v", c, err)
 	}
-	// Audit adverse du 13 novembre, front serveur : SHH_SALONS_MAX est croisé avec la mémoire
+	// SHH_SALONS_MAX est croisé avec la mémoire
 	// au démarrage (checkSalons). 10 000 salons demandent un plafond global de trames à leur
 	// mesure : refus sans lui, accepté avec ; sans effet si le salon est désactivé.
 	env(t, map[string]string{"SHH_DATA_DIR": "/d", "SHH_SALONS": "1", "SHH_ORIGIN": "https://shhdrop.app", "SHH_SALONS_MAX": "10000"})
@@ -120,7 +120,7 @@ func TestSalonsDefautDesactive(t *testing.T) {
 	}
 }
 
-// Point 13 du plan : SHH_ORIGIN sert au contrôle d'Origin du WebSocket et à la CSP.
+// SHH_ORIGIN sert au contrôle d'Origin du WebSocket et à la CSP.
 func TestOriginObligatoire(t *testing.T) {
 	env(t, map[string]string{"SHH_DATA_DIR": "/d", "SHH_SALONS": "1"})
 	if _, err := FromEnv(); err == nil {
@@ -266,7 +266,7 @@ func TestComptesJour(t *testing.T) {
 	}
 }
 
-// TestRPIDProduction : rp.id = hôte de SHH_ORIGIN (shhgone.com en production, R1) ; jamais une
+// TestRPIDProduction : rp.id = hôte de SHH_ORIGIN (shhgone.com en production) ; jamais une
 // adresse IP.
 func TestRPIDProduction(t *testing.T) {
 	for o, w := range map[string]string{"https://shhgone.com": "shhgone.com", "http://localhost:8080": "localhost",

@@ -1,6 +1,6 @@
 // Package usage : compteurs d'usage du service, pour le tableau de bord d'administration
-// (décision du propriétaire du 13 novembre : lever « aucune statistique » de §35.1 pour des
-// agrégats d'exploitation ; spec §9.5 amendée).
+// (lever « aucune statistique » de §35.1 pour des agrégats d'exploitation ; spec §9.5
+// amendée).
 //
 // Règles, vérifiées par les tests :
 //   - un entier par compteur, sans aucune clé : rien par personne, par adresse, par partage
@@ -8,9 +8,9 @@
 //   - en mémoire seulement : rien n'est écrit sur disque, tout repart de zéro au démarrage ;
 //   - lus seulement par l'écouteur d'administration, jamais par une route publique ;
 //   - signalements : un entier par catégorie (codes 1 à 10 de la conception du compte §21.10.1)
-//     et par sorte (partage, salon), depuis le démarrage (R14, décision du propriétaire du
-//     14 novembre, sous réserve de l'avis du juriste). Un signalement de partage compte aussi
-//     dans « destructions demandées ». L'alerte de /healthz reste un booléen (§15.2, §36 S21).
+//     et par sorte (partage, salon), depuis le démarrage (R14, sous réserve de l'avis du
+//     juriste). Un signalement de partage compte aussi dans « destructions demandées ».
+//     L'alerte de /healthz reste un booléen (§15.2, §36 S21).
 package usage
 
 import "sync/atomic"

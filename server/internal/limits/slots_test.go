@@ -108,7 +108,7 @@ func TestKeyed(t *testing.T) {
 	}
 }
 
-// Audit du 13 novembre, D2 : 8 adresses IPv4 prenaient les 64 places d'envoi (8 chacune), 16
+// 8 adresses IPv4 prenaient les 64 places d'envoi (8 chacune), 16
 // les 256 places de lecture (16 chacune). Part équitable : une nouvelle adresse a encore une
 // place, et il faut bien plus d'adresses pour tout prendre.
 func TestPartEquitable(t *testing.T) {

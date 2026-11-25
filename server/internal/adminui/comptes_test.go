@@ -16,7 +16,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/compte"
 )
 
-// Lot 7 du plan du compte : tableau de bord finalisé (conception du compte §21.14) :
+// Comptes : tableau de bord (conception du compte §21.14) :
 // signalements et salons signalés désignés par une ref éphémère, bannissements, comptes.
 // Jamais une adresse, une empreinte, un h, un pseudo, une IP, un lien ni un identifiant
 // interne dans une réponse.
@@ -27,7 +27,7 @@ const (
 	lienColle    = "https://shhgone.com/#cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 )
 
-// bancComptes : banc avec les crochets du lot 7, et ce qu'ils ont reçu.
+// bancComptes : banc avec les crochets des comptes, et ce qu'ils ont reçu.
 type bancComptes struct {
 	*banc
 	mu        sync.Mutex
@@ -100,7 +100,7 @@ func (b *bancComptes) get(path string) (int, string) {
 	return w.Code, w.Body.String()
 }
 
-// Les routes du lot 7 suivent les règles de toutes les autres : sans jeton, avec un paramètre
+// Les routes des comptes suivent les règles de toutes les autres : sans jeton, avec un paramètre
 // d'URL, ou comptes désactivés (SHH_COMPTES=0) : le refus uniforme, aucun crochet appelé.
 func TestRefusUniformeLot7(t *testing.T) {
 	routes := [][2]string{{"GET", "/api/signalements"}, {"POST", "/api/salons/action"}, {"POST", "/api/bannis"},
@@ -293,7 +293,7 @@ func TestRoutesBannissements(t *testing.T) {
 	}
 }
 
-// Toutes les réponses du lot 7 et la page : ni l'adresse tapée (ni sa forme normalisée), ni le
+// Toutes les réponses des comptes et la page : ni l'adresse tapée (ni sa forme normalisée), ni le
 // lien collé, ni l'identifiant interne d'un salon.
 func TestPageSansIdentite(t *testing.T) {
 	b := nouveauBancComptes(true)

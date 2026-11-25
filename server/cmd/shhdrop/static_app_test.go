@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// Accueil écrit au build (18 novembre, référencement) : « / » sert index.html (accueil écrit) ;
+// Accueil écrit au build (référencement) : « / » sert index.html (accueil écrit) ;
 // les autres adresses de l'application et le 404 servent app.html (même page sans l'accueil
 // écrit), pour qu'elles n'affichent jamais l'accueil avant le script.
 func TestAccueilEcritSeulementSurLaRacine(t *testing.T) {

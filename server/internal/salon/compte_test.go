@@ -10,7 +10,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Lot 6 du plan du compte : salon ↔ compte (création réservée aux comptes, paliers, salons du
+// Salon ↔ compte (création réservée aux comptes, paliers, salons du
 // compte, fermeture par le compte) et signalements par catégorie, en mémoire.
 
 var (
@@ -456,7 +456,7 @@ func (b *banc) lignesSalons(t *testing.T) int {
 	return n
 }
 
-// Lot 7 (tableau de bord, conception du compte §21.14.3) : un salon signalé se montre avec ses
+// Tableau de bord (conception du compte §21.14.3) : un salon signalé se montre avec ses
 // places, ses sièges et son échéance (pour « moins de 6 h » ou « 6 à 24 h », jamais l'heure
 // de création) ; son compte créateur se lit par l'identifiant interne (jamais rendu) ; la
 // page le détruit par cet identifiant comme par un lien.

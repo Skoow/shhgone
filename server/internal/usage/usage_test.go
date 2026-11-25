@@ -43,7 +43,7 @@ func TestQueDesEntiers(t *testing.T) {
 	}
 }
 
-// Signalements par catégorie (conception du compte §21.10.3, R14 ; plan lot 6) : un entier par
+// Signalements par catégorie (conception du compte §21.10.3) : un entier par
 // catégorie (codes 1 à 10) et par sorte (partage, salon), en mémoire ; un code hors de 1 à 10
 // n'est jamais compté (programmation : l'API refuse avant).
 func TestCompteursParCategorie(t *testing.T) {
@@ -67,7 +67,7 @@ func TestCompteursParCategorie(t *testing.T) {
 }
 
 // Partages payants par offre, appels ouverts et identifiants du relais (tableau de bord
-// finalisé, 25 novembre) : un entier chacun ; une offre hors de 1 et 2 n'est pas comptée.
+// finalisé) : un entier chacun ; une offre hors de 1 et 2 n'est pas comptée.
 func TestCompteursPaiementAppels(t *testing.T) {
 	var c Counters
 	c.PartagePayant(1)

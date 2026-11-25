@@ -7,8 +7,8 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Plafond de sortie d'un partage (décision du 24 novembre) : 403 egress_limit, réponse fixe,
-// sans Retry-After (définitif pour ce partage), différente du budget d'une ouverture (429).
+// Plafond de sortie d'un partage : 403 egress_limit, réponse fixe, sans Retry-After
+// (définitif pour ce partage), différente du budget d'une ouverture (429).
 func TestFailEgressLimit(t *testing.T) {
 	w := httptest.NewRecorder()
 	fail(w, share.ErrEgressLimit)

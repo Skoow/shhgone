@@ -37,7 +37,7 @@ func nouvelleConv(t *testing.T, dossier, id string) *Conversation {
 	return c
 }
 
-// Audit adverse du 13 novembre, front serveur, F1 et F2 : une conversation ne prend jamais de
+// Une conversation ne prend jamais de
 // borne des appels disque pour ses ÉCRITURES (l'appelant, Manager, en tient une place, prise
 // hors de tout verrou : redteam_dos_test.go) ; ses LECTURES passent par la borne des lectures
 // (lec), sans jamais la dépasser, même lancées par centaines (le rattrapage en lançait une par
@@ -74,12 +74,12 @@ func TestConversationBorneLesLectures(t *testing.T) {
 }
 
 // paliers : taille du fichier d'une conversation de n emplacements écrits (croissance par
-// paliers de emplacementsParPalier, audit adverse du 13 novembre, stockage F4).
+// paliers de emplacementsParPalier).
 func paliers(n int) int64 {
 	return int64((n+emplacementsParPalier-1)/emplacementsParPalier) * TaillePalier
 }
 
-// Audit adverse du 13 novembre, stockage F4 : la taille du fichier ne donne plus le nombre de
+// La taille du fichier ne donne plus le nombre de
 // trames (paliers remplis d'aléa), et un emplacement effacé ne se reconnaît plus à ses zéros :
 // 7 trames et un retrait donnent un fichier d'un palier, sans aucun emplacement nul, ni dans
 // les emplacements écrits, ni dans le reste du palier.
@@ -87,7 +87,7 @@ func TestFichierSansNombreNiZeros(t *testing.T) {
 	dir := t.TempDir()
 	c := nouvelleConv(t, dir, idConv)
 	ajouter(t, c, 7)
-	if err := c.Effacer(1); err != nil {
+	if err := c.EffacerPlusieurs([]uint32{1}); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.EffacerPlusieurs([]uint32{4}); err != nil {
@@ -272,7 +272,7 @@ func TestEffacerAlea(t *testing.T) {
 	dir := t.TempDir()
 	c := nouvelleConv(t, dir, idConv)
 	ajouter(t, c, 6)
-	if err := c.Effacer(3); err != nil {
+	if err := c.EffacerPlusieurs([]uint32{3}); err != nil {
 		t.Fatal(err)
 	}
 	brut, err := os.ReadFile(filepath.Join(dir, idConv))
@@ -293,10 +293,10 @@ func TestEffacerAlea(t *testing.T) {
 			t.Fatalf("emplacement %d : %v", i, err)
 		}
 	}
-	if err := c.Effacer(3); err != nil {
+	if err := c.EffacerPlusieurs([]uint32{3}); err != nil {
 		t.Fatal("second effacement :", err)
 	}
-	if err := c.Effacer(6); err == nil {
+	if err := c.EffacerPlusieurs([]uint32{6}); err == nil {
 		t.Fatal("effacement hors du fichier accepté")
 	}
 	if e, err := c.Ajouter(trameTest(6)); err != nil || e != 6 {
@@ -342,7 +342,7 @@ func TestEffacerPlusieurs(t *testing.T) {
 		t.Fatal("écriture en échec :", err)
 	}
 	f.ecriturePartielle = false
-	// Relecture Task 11 : une écriture ratée (emplacement 5 seul) n'empêche pas les suivantes,
+	// Une écriture ratée (emplacement 5 seul) n'empêche pas les suivantes,
 	// et les dates sont remises à l'epoch malgré l'échec.
 	for i := range 3 { // emplacements 6 à 8
 		if _, err := c.Ajouter(trameTest(10 + i)); err != nil {
@@ -393,7 +393,7 @@ func TestDetruire(t *testing.T) {
 	if _, err := c.Ajouter(trameTest(0)); err == nil {
 		t.Fatal("ajout après destruction")
 	}
-	if err := c.Effacer(0); err == nil {
+	if err := c.EffacerPlusieurs([]uint32{0}); err == nil {
 		t.Fatal("effacement après destruction")
 	}
 	if c.aead != nil {
@@ -528,7 +528,7 @@ func TestTruncateEchoue(t *testing.T) {
 	if _, err := c.Lire(0); !errors.Is(err, ErrInutilisable) {
 		t.Fatal("lecture :", err)
 	}
-	if err := c.Effacer(0); !errors.Is(err, ErrInutilisable) {
+	if err := c.EffacerPlusieurs([]uint32{0}); !errors.Is(err, ErrInutilisable) {
 		t.Fatal("effacement :", err)
 	}
 	if err := c.Detruire(); err != nil {
@@ -609,7 +609,7 @@ func TestLireConcurrent(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 40; i += 3 {
-			if err := c.Effacer(uint32(i)); err != nil && !errors.Is(err, ErrEmplacement) && !errors.Is(err, ErrDetruite) {
+			if err := c.EffacerPlusieurs([]uint32{uint32(i)}); err != nil && !errors.Is(err, ErrEmplacement) && !errors.Is(err, ErrDetruite) {
 				t.Error(err)
 			}
 		}
@@ -622,7 +622,7 @@ func TestLireConcurrent(t *testing.T) {
 	wg.Wait()
 }
 
-// Suppression du fichier en échec (relecture Task 12) : la taille n'est pas remise à zéro tant
+// Suppression du fichier en échec : la taille n'est pas remise à zéro tant
 // que le fichier existe (l'usage n'est jamais sous-compté), ni dans le total du gestionnaire ;
 // elle l'est quand une nouvelle destruction réussit.
 func TestDetruireEchecGardeTaille(t *testing.T) {

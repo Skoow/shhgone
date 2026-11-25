@@ -18,7 +18,7 @@ func runIn(cfg config.Config, stdin string, args ...string) (int, string, string
 	return c, o.String(), e.String()
 }
 
-// Audit M2 : sur un SHH_DATA_DIR mal orthographié, freeze et wipe répondaient 0 (et
+// Sur un SHH_DATA_DIR mal orthographié, freeze et wipe répondaient 0 (et
 // créaient une base vide) ; rien ne doit être créé, et le code de sortie doit être non nul.
 func TestAdminRefusesWrongDataDir(t *testing.T) {
 	parent := t.TempDir()
@@ -82,7 +82,7 @@ func TestAdminReportsPathAndCount(t *testing.T) {
 	}
 }
 
-// Audit F11 : le lien entier (avec K_lien) atterrissait dans argv et l'historique du shell.
+// Le lien entier (avec K_lien) atterrissait dans argv et l'historique du shell.
 // Spec §32 : il n'est plus lu que sur l'entrée standard.
 func TestAdminDestroyStdin(t *testing.T) {
 	cfg, s := adminSetup(t)

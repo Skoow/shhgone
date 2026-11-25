@@ -34,7 +34,7 @@ import (
 // qui donne à un appareil ses propres clés dès le premier contact n'est pas détecté par cet
 // appareil seul (§7, §15).
 
-// JoursAvance : jours de clés tirées et publiées à l'avance (S17) ; GET /api/paiement/jetons/cles
+// JoursAvance : jours de clés tirées et publiées à l'avance ; GET /api/paiement/jetons/cles
 // sert les clés d'aujourd'hui à aujourd'hui + JoursAvance, des deux formules.
 const JoursAvance = 7
 
@@ -47,7 +47,7 @@ const (
 	maxRequetes = 5 // jetons au plus par requête (§7)
 )
 
-// EmisParJour : jetons émis au plus par pass et par jour UTC (S9 : borne de ce qui survit à une
+// EmisParJour : jetons émis au plus par pass et par jour UTC (borne de ce qui survit à une
 // révocation). Plus 10, Pro 20 ; la réserve de la période (30 ou 100) reste la limite du mois.
 func EmisParJour(o Offre) int {
 	if o == Pro {

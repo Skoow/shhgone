@@ -16,9 +16,8 @@ import (
 // d'administration supprime des fichiers depuis un autre processus), brouille les dates
 // d'inode des fichiers (blob.Store.ScrubTimes), puis vide le WAL
 // (svc.Vidage.Maintenant : attente courte d'une base occupée par un autre processus, échec
-// compté pour le tableau de bord ; audit adverse du 13 novembre, stockage, F3), et enfin
-// brouille les dates du dossier de données (svc.ScrubDataTimes), à chaque période, jusqu'à
-// l'annulation de ctx.
+// compté pour le tableau de bord), et enfin brouille les dates du dossier de données
+// (svc.ScrubDataTimes), à chaque période, jusqu'à l'annulation de ctx.
 func Run(ctx context.Context, svc *share.Service, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()
@@ -34,7 +33,7 @@ func Run(ctx context.Context, svc *share.Service, every time.Duration) {
 				err = errors.Join(err, rerr)
 			}
 			// Dates d'inode des fichiers de partages ramenées à l'heure de ce passage, la même
-			// pour tous (stockage, F4).
+			// pour tous.
 			if serr := svc.Blobs.ScrubTimes(); serr != nil {
 				err = errors.Join(err, serr)
 			}
@@ -42,7 +41,7 @@ func Run(ctx context.Context, svc *share.Service, every time.Duration) {
 				err = errors.Join(err, cerr)
 			}
 			// Puis celles du dossier de données (gel, demandes de destruction, base), après le
-			// vidage qui vient d'écrire dans la base (stockage, 3e campagne, F5).
+			// vidage qui vient d'écrire dans la base.
 			if derr := svc.ScrubDataTimes(); derr != nil {
 				err = errors.Join(err, derr)
 			}
@@ -82,10 +81,10 @@ func Watch(ctx context.Context, svc *share.Service, every time.Duration) {
 // errPanic : panique récupérée dans un tour de Run ou de Watch.
 var errPanic = errors.New("janitor : panique récupérée")
 
-// protect exécute un tour de boucle et récupère une panique (audit du 13 novembre, D6 : une
-// donnée inattendue en base arrêtait tout le processus) : elle devient errPanic, donc la
-// ligne fixe habituelle sur stderr, sans la valeur ni la pile (elles pourraient contenir un
-// identifiant). Le tour suivant a lieu normalement.
+// protect exécute un tour de boucle et récupère une panique (une donnée inattendue en base
+// arrêtait tout le processus) : elle devient errPanic, donc la ligne fixe habituelle sur
+// stderr, sans la valeur ni la pile (elles pourraient contenir un identifiant). Le tour
+// suivant a lieu normalement.
 func protect(f func() error) (err error) {
 	defer func() {
 		if recover() != nil {
@@ -144,7 +143,7 @@ func Reconcile(svc *share.Service) error {
 }
 
 // Effaceur : la passe quotidienne du compte (compte.Service.Effacer : comptes inactifs depuis
-// 13 mois, sessions et bannissements échus ; plan du compte, lot 5).
+// 13 mois, sessions et bannissements échus).
 type Effaceur interface {
 	Effacer(now time.Time) (int, error)
 }

@@ -73,7 +73,7 @@ func TestPseudoVecteurs(t *testing.T) {
 	if n < 20 {
 		t.Fatalf("%d cas valides seulement", n)
 	}
-	// Depuis le 20 novembre (A-Z, a-z, 0-9), un p_canon valide fait au plus 48 octets (24
+	// Pseudo en A-Z, a-z, 0-9 : un p_canon valide fait au plus 48 octets (24
 	// caractères, « m » devenant « rn ») ; la borne du serveur (PseudoCanonMax) reste plus large.
 	if plusLong < 2 || plusLong > PseudoCanonMax {
 		t.Fatalf("p_canon le plus long des vecteurs : %d octets (borne %d)", plusLong, PseudoCanonMax)
@@ -93,7 +93,7 @@ func TestEmpreintePseudoRefus(t *testing.T) {
 			t.Errorf("%s : %v", nom, err)
 		}
 	}
-	// Forme canonique (22 novembre) : 2 à 48 octets, a-z sans i ni m, 2-9.
+	// Forme canonique : 2 à 48 octets, a-z sans i ni m, 2-9.
 	for _, ok := range []string{"ab", strings.Repeat("rn", 24), "lea", "adrnlnx", "z29"} {
 		if _, err := c.EmpreintePseudo([]byte(ok)); err != nil {
 			t.Errorf("%q refusé : %v", ok, err)
@@ -109,7 +109,7 @@ func TestEmpreintePseudoRefus(t *testing.T) {
 	}
 }
 
-// Demande du propriétaire (14 novembre) : rôles, marques, autorités et insultes refusés, sur la
+// Rôles, marques, autorités et insultes refusés, sur la
 // forme canonique du moteur (formes tirées de pseudo_canon : « m » → « rn », « 1 » et « i » → « l ») ;
 // rôles et autorités en mot entier, marques et insultes aussi en sous-chaîne. Les mots courts
 // ou ambigus (« nazi » dans « Nazim », « rapist » dans « therapist ») restent en mot entier.

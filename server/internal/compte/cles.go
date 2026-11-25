@@ -1,8 +1,7 @@
 // Package compte : compte par passkey et clé de récupération, sans e-mail, pour créer un salon
-// (conception docs/superpowers/specs/2026-11-22-compte-passkey-design.md, plan
-// 2026-11-22-compte-passkey.md). Le serveur ne reçoit jamais la sortie PRF d'une passkey, la
-// clé de récupération ni la clé du compte : seulement les clés publiques des passkeys, des
-// enveloppes chiffrées par l'appareil et l'empreinte v_r.
+// (conception docs/conception/specs/2026-11-22-compte-passkey-design.md). Le serveur ne reçoit
+// jamais la sortie PRF d'une passkey, la clé de récupération ni la clé du compte : seulement les
+// clés publiques des passkeys, des enveloppes chiffrées par l'appareil et l'empreinte v_r.
 package compte
 
 import (
@@ -16,7 +15,7 @@ import (
 )
 
 // Cles : sous-clé de K_serveur, HKDF-SHA-256 à sel vide (conception du compte §5.2, §21.2.2).
-// Depuis le 22 novembre, une seule : K_pseudo (« shhdrop/v2/serveur/compte/pseudo », inchangée) ;
+// Une seule : K_pseudo (« shhdrop/v2/serveur/compte/pseudo », inchangée) ;
 // les sous-clés email, mdp, totp et sequestre ont disparu avec l'e-mail (conception du compte par
 // passkey §7.4) : perdre K_serveur perd l'unicité des pseudos, plus les comptes.
 type Cles struct {

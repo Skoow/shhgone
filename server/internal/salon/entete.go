@@ -1,4 +1,4 @@
-// Package salon : état et protocole du salon chiffré (spécification v3, plan C-2). Le serveur
+// Package salon : état et protocole du salon chiffré (spécification v3). Le serveur
 // ne déchiffre rien : il ne lit que l'octet drapeaux de chaque trame.
 package salon
 
@@ -14,11 +14,11 @@ const marque = "SHC3"
 // Regle : règle d'effacement portée par les bits 1–2 de drapeaux.
 type Regle uint8
 
-// Effacement « vu par tous + délai » (décision du propriétaire du 13 novembre, effacement.go) :
+// Effacement « vu par tous + délai » (effacement.go) :
 // les règles 1 à 3 attendent que tous les sièges présents à l'envoi (expéditeur exclu) aient lu
 // la trame (0x05), ou soient partis, puis l'effacent après leur délai ; la règle 0 garde la
 // trame jusqu'à la fin du salon ou son renouvellement (trames de protocole, messages de
-// fichier). Avant le 13 novembre : 1 « instantané » (effacée à la dernière lecture), 2 et 3
+// fichier). Anciennes valeurs : 1 « instantané » (effacée à la dernière lecture), 2 et 3
 // comptées depuis la réception (10 min, 1 h).
 const (
 	Desactive   Regle = 0 // jamais effacée avant la fin ou le renouvellement du salon (sauf retrait)

@@ -26,7 +26,7 @@ func stateOf(t *testing.T, s *Service, id string) string {
 	return st
 }
 
-// Revue B4 : le fichier est forcé sur le disque (fdatasync) avant que le partage passe en
+// Le fichier est forcé sur le disque (fdatasync) avant que le partage passe en
 // « ready » ; plus rien n'y est écrit après la dernière synchronisation. Sans cela, une panne
 // de courant juste après la finalisation laisserait un partage « ready » au contenu perdu.
 func TestFinalizeSyncsBeforeReady(t *testing.T) {
@@ -113,7 +113,7 @@ func TestFinalizeAbortsWhenSyncFails(t *testing.T) {
 	}
 }
 
-// Rapport de performance A12 : le fichier d'un envoi est synchronisé en arrière-plan tous les
+// Le fichier d'un envoi est synchronisé en arrière-plan tous les
 // syncEvery octets reçus, jamais deux fois à la fois pour le même envoi ; Finalize synchronise
 // toujours tout le fichier avant « ready ».
 func TestSynchronisationDeFond(t *testing.T) {

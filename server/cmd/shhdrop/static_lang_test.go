@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// Pages bilingues (20 novembre) : « /en… » sert la version anglaise ; la version française reste
+// Pages bilingues : « /en… » sert la version anglaise ; la version française reste
 // la même quelle que soit la langue du navigateur (Accept-Language n'est jamais lu, §36 S2).
 func TestPagesBilingues(t *testing.T) {
 	static := t.TempDir()

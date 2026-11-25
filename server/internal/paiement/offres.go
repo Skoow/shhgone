@@ -1,6 +1,6 @@
 // Package paiement : vente des offres Plus et Pro par Stripe (carte), PayPal et NOWPayments
 // (crypto), par redirection vers la page hébergée du prestataire (conception du paiement,
-// docs/superpowers/specs/2026-11-19-paiement-design.md). Le droit est donné à un pass au porteur
+// docs/conception/specs/2026-11-19-paiement-design.md). Le droit est donné à un pass au porteur
 // P (32 octets tirés par l'appareil) ; le serveur n'en garde que l'empreinte Q, dans une base à
 // part (paiements.db) qui ne contient rien qui désigne une personne, un partage, un salon ou un
 // compte. Les webhooks signés des prestataires sont la seule source de vérité d'un paiement.
@@ -45,7 +45,7 @@ type Detail struct {
 // Droits : seulement ceux qui marchent aujourd'hui (rendus par POST /api/paiement/etat, lus
 // par le site et plus tard par les apps). `premiere_ouverture`, `salon_plus` et `salon_pro`
 // (conception §11) ne sont pas encore codés : ils seront ajoutés ici le jour où ils le seront,
-// jamais annoncés avant (revue du 25 novembre ; avant, l'état les rendait déjà).
+// jamais annoncés avant (avant, l'état les rendait déjà).
 var details = [3]Detail{
 	{},
 	{Nom: "plus", Libelle: "Shhgone Plus", Mois: 700, An: 7000, JetonsPeriod: 30,
@@ -55,8 +55,8 @@ var details = [3]Detail{
 }
 
 // Bientot : droits prévus dans le format mais pas encore disponibles (conception §11) : jamais
-// vendus ni promis ; rendus à part par l'API pour que l'écran dise « bientôt ». Vide depuis le
-// 24 novembre : les appels (appel_audio, appel_video) sont un vrai droit, vérifié par
+// vendus ni promis ; rendus à part par l'API pour que l'écran dise « bientôt ». Vide : les
+// appels (appel_audio, appel_video) sont un vrai droit, vérifié par
 // POST /api/salons/appel (conception des appels §5.1). Toujours une liste (jamais null en JSON).
 var Bientot = []string{}
 

@@ -33,7 +33,7 @@ type adminDeps struct {
 	lim    *limits.Limiter
 	probes api.Probes // alerte des signalements, compteurs d'usage, transferts en cours
 	start  time.Time  // démarrage du processus, en mémoire seulement
-	// Lot 7 : service du compte (SHH_COMPTES=1 ; nil sinon).
+	// Service du compte (SHH_COMPTES=1 ; nil sinon).
 	cpt *compte.Service
 	// pai : service du paiement (SHH_PAIEMENT=1 ; nil sinon).
 	pai *paiement.Service
@@ -41,8 +41,8 @@ type adminDeps struct {
 
 // buildID : empreinte du commit compilé, posée à la compilation (-ldflags "-X main.buildID=…",
 // deploy/Dockerfile) : l'image de production est construite sans dossier .git ni empreinte
-// vcs (-buildvcs=false), et la page ne pouvait pas dire quel code tourne (audit adverse du
-// 13 novembre, 3e campagne, tableau de bord, F6). Vide : repli sur l'empreinte vcs du binaire.
+// vcs (-buildvcs=false), et la page ne pouvait pas dire quel code tourne. Vide : repli sur
+// l'empreinte vcs du binaire.
 var buildID string
 
 // adminListen : ouverture de l'écouteur d'administration (variable pour les tests).
@@ -291,13 +291,13 @@ var errSalonMort = errors.New("salon : ligne morte, effacement à finir")
 // (DestroyAdmin). Salon : fini par le gestionnaire du serveur (salon.Manager.DetruireAdmin :
 // connexions fermées tout de suite, conversation, pièces et ligne effacées) ; salon désactivé :
 // lignes d'une configuration antérieure, sans gestionnaire (salon.DetruireHorsLigne). Dans les
-// deux cas le vidage du WAL est demandé au vidage regroupé, sans l'attendre (audit adverse du
-// 13 novembre, 3e campagne, tableau de bord F3 : un vidage direct tenait la seule connexion à
-// la base 5 s et faisait répondre « erreur » pour un salon détruit).
+// deux cas le vidage du WAL est demandé au vidage regroupé, sans l'attendre (un vidage direct
+// tenait la seule connexion à la base 5 s et faisait répondre « erreur » pour un salon
+// détruit).
 //
 // Rend « salon » seulement si la ligne et les pièces sont parties ; « salon-reste » si le
 // salon est détruit pour tous (état oublié, ligne morte) mais qu'un effacement de fichier reste
-// à finir par l'entretien (F2 : jamais « détruit » pour un salon qui survit).
+// à finir par l'entretien (jamais « détruit » pour un salon qui survit).
 func adminDestroy(cfg config.Config, d adminDeps, body []byte) (string, error) {
 	k, estSalon, err := cleAccesDuLien(body)
 	if err != nil {

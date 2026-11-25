@@ -58,7 +58,7 @@ func TestClientIPBadRemote(t *testing.T) {
 	}
 }
 
-// Audit M3 : derrière un proxy en conteneur (pair non local), X-Shh-Client-IP n'est cru
+// Derrière un proxy en conteneur (pair non local), X-Shh-Client-IP n'est cru
 // que d'un pair listé dans SHH_TRUSTED_PROXY ; la boucle locale reste de confiance.
 func TestClientIPTrustedProxies(t *testing.T) {
 	proxies := []netip.Prefix{netip.MustParsePrefix("172.18.0.0/16")}

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Lot 7 : agrégats des comptes pour le tableau de bord (conception §21.14.2). Que des
+// Agrégats des comptes pour le tableau de bord (conception §21.14.2). Que des
 // entiers : aucun champ texte, aucune liste qui désigne un compte ; lus en direct dans
 // comptes.db, compteurs depuis le démarrage en mémoire.
 

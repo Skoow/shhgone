@@ -17,7 +17,7 @@ import (
 // PayPal, conception §4.2 : Orders v2 (paiement unique), Subscriptions v1 (renouvellement),
 // webhooks vérifiés par l'API verify-webhook-signature (corps brut transmis tel quel).
 
-// Plans : identifiants des quatre plans d'abonnement créés par le propriétaire chez PayPal.
+// Plans : identifiants des quatre plans d'abonnement créés par l'exploitant chez PayPal.
 type Plans struct{ PlusMois, PlusAn, ProMois, ProAn string }
 
 func (p Plans) de(f Formule) string {
@@ -37,9 +37,9 @@ func (p Plans) de(f Formule) string {
 // verifsPayPal : vérifications de signature simultanées au plus (appel sortant chacune).
 const verifsPayPal = 4
 
-// Transmissions refusées (audit du 20 novembre, S3) : un Paypal-Transmission-Id que PayPal a
-// déjà déclaré faux (ou en cours de vérification) est refusé sans nouvel appel sortant, pendant
-// transmissionsDuree, pour transmissionsMax identifiants au plus (mémoire seulement).
+// Transmissions refusées : un Paypal-Transmission-Id que PayPal a déjà déclaré faux (ou en
+// cours de vérification) est refusé sans nouvel appel sortant, pendant transmissionsDuree, pour
+// transmissionsMax identifiants au plus (mémoire seulement).
 const (
 	transmissionsMax   = 4096
 	transmissionsDuree = time.Hour
@@ -444,10 +444,9 @@ func (p *PayPalP) Lire(ctx context.Context, h http.Header, corps []byte) ([]Even
 	return p.capturer(ctx, ordre, evs[0].Commande)
 }
 
-// Cibles : ce que vise le webhook (commande, abonnement, références), lu SANS vérification
-// (audit du 20 novembre, S3) ; sert seulement à écarter, avant tout appel sortant, un webhook
-// qui ne vise rien de connu (Service.Webhook). Même lecture que Lire : un webhook que Lire
-// ignorerait ne vise rien.
+// Cibles : ce que vise le webhook (commande, abonnement, références), lu SANS vérification ;
+// sert seulement à écarter, avant tout appel sortant, un webhook qui ne vise rien de connu
+// (Service.Webhook). Même lecture que Lire : un webhook que Lire ignorerait ne vise rien.
 func (*PayPalP) Cibles(corps []byte) []Evenement {
 	evs, _, err := traduirePayPal(corps)
 	if err != nil {

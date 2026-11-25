@@ -36,7 +36,7 @@ func TestPartagesPayants(t *testing.T) {
 	if _, err := l.BeginPaidUpload(a, "p5", 1<<20, 2); err != ErrQuota {
 		t.Fatal("au-delà de 100 Gio en Pro", err)
 	}
-	// Les quotas gratuits sont intacts : 10 créations, 6 Gio.
+	// Les quotas gratuits sont intacts : créations du jour, 6 Gio.
 	if l.count64[l.mustKey64(a)] != 0 {
 		t.Fatal("création gratuite prise par un partage payant")
 	}
@@ -106,8 +106,8 @@ func TestAllowCommandeHeure(t *testing.T) {
 	}
 }
 
-// TestAllowWebhookPayPal : 30 par minute par connexion, 60 par /48 (audit du 20 novembre, S3),
-// à part des autres compteurs, vidés à la minute suivante.
+// TestAllowWebhookPayPal : 30 par minute par connexion, 60 par /48, à part des autres
+// compteurs, vidés à la minute suivante.
 func TestAllowWebhookPayPal(t *testing.T) {
 	if WebhooksPayPalPer64 != 30 || WebhooksPayPalPer48 != 60 {
 		t.Fatal(WebhooksPayPalPer64, WebhooksPayPalPer48)

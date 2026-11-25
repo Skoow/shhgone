@@ -15,7 +15,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// ---- Exclusion et rotation de l'invitation (plan C-2 Task 14, spec §39.13) ----
+// ---- Exclusion et rotation de l'invitation (spec §39.13) ----
 
 // membreSalon : réponse de rejoindre utile à l'exclusion.
 type membreSalon struct {
@@ -193,7 +193,7 @@ func TestAnciennePreuve(t *testing.T) {
 }
 
 // Après l'exclusion, le jeton révoqué reçoit 403 excluded partout : création de pièce, PUT avec
-// un jeton d'envoi encore valable, finalisation, lecture, retrait (relecture Task 13).
+// un jeton d'envoi encore valable, finalisation, lecture, retrait.
 func TestPieceExclu(t *testing.T) {
 	e, _ := salonEnv(t)
 	k := newKeys()
@@ -208,7 +208,7 @@ func TestPieceExclu(t *testing.T) {
 	expect(t, e.putPiece(tok, 0, rnd(share.SegmentSize(1, 0))), 403, exclu)
 	expect(t, e.finaliserPiece(tok, 0, 0), 403, exclu)
 	expect(t, e.getPiece(ms[1].jeton, lisible, 0), 403, exclu)
-	// Route « retirer une pièce » retirée le 22 novembre (aucun écran ne l'appelait, audit P4).
+	// Route « retirer une pièce » retirée (aucun écran ne l'appelait).
 	if c := e.do(req{method: "POST", path: "/api/salons/pieces/retirer", hdr: pieceHdr(ms[1].jeton, id), body: []byte(`{}`)}).Code; c != 404 && c != 405 {
 		t.Fatal("route retirée encore servie :", c)
 	}

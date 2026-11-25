@@ -15,7 +15,7 @@ import (
 )
 
 // ---- Appels du salon : identifiants temporaires du relais (conception des appels), réservés
-// aux offres Plus et Pro (décision du propriétaire, 24 novembre ; conception des appels §5.1) ----
+// aux offres Plus et Pro (conception des appels §5.1) ----
 
 var secretTurn = []byte("0123456789abcdef0123456789abcdef")
 

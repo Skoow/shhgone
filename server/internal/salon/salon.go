@@ -11,13 +11,13 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// État en mémoire d'un salon (plan C-2 Tasks 6 et 8) : sièges, jetons, rangs, journal des
-// annonces et index des trames. Rien de tout cela n'est écrit sur disque (spec §39.3.5, v3
+// État en mémoire d'un salon : sièges, jetons, rangs, journal des annonces et index des
+// trames. Rien de tout cela n'est écrit sur disque (spec §39.3.5, v3
 // §5.1) : seules les trames non volatiles le sont, chiffrées (Conversation), sans rang,
-// siège, heure ni drapeau. Un redémarrage l'oublie (plan, point 11).
+// siège, heure ni drapeau. Un redémarrage l'oublie.
 
 const (
-	// nbSieges : sièges 0 à 9 ; le 0 est réservé au créateur (plan, point 1).
+	// nbSieges : sièges 0 à 9 ; le 0 est réservé au créateur.
 	nbSieges = 10
 	// journalMax : annonces (0x02, 0x03, 0x09, 0x0A) gardées au plus par salon.
 	journalMax = 4096
@@ -26,7 +26,7 @@ const (
 	// config.checkSalons en tient compte au démarrage (SHH_SALONS_MAX contre GOMEMLIMIT).
 	MemoireJournalMax = journalMax * 64
 	// jamaisConnecteMax : un siège invité qui n'a jamais ouvert de WebSocket dans ce délai après
-	// son entrée est libéré (relecture C-2, N1 : réponse de rejoindre perdue, remplissage).
+	// son entrée est libéré (réponse de rejoindre perdue, remplissage).
 	jamaisConnecteMax = 10 * time.Minute
 	// arriveesParMembre : arrivées totales < arriveesParMembre × max_members (§39.3.3).
 	arriveesParMembre = 5
@@ -40,15 +40,15 @@ type evenement struct {
 
 // siege : place occupée. jetonV : SHA-256 du jeton de membre (le jeton lui-même n'est
 // jamais gardé). emis : rang de l'annonce qui a donné le jeton (0x02 ou 0x0A) ; plancher :
-// rang à partir duquel le membre peut lire les pièces (Task 13). Un siège reste réservé
-// pendant toute la vie du salon, en ligne ou non (revue finale C-2, I3, 12 novembre : règle
-// « instantané » du propriétaire) ; seuls un départ (0x03) ou une exclusion le libèrent.
+// rang à partir duquel le membre peut lire les pièces. Un siège reste réservé pendant toute la
+// vie du salon, en ligne ou non (règle « instantané ») ; seuls un départ (0x03)
+// ou une exclusion le libèrent.
 // arrivee : rang de l'arrivée (0x02) de l'occupant, gardé par une reprise (0x0A) : borne de
 // Retirer. repris : rang du dernier 0x0A d'une reprise par WebSocket du titulaire (0 : aucune),
 // borne des 0x0E renvoyés à l'accueil (borneEffaces). reprises : heures (Config.Now) des
 // reprises par WebSocket de la dernière heure, repriseMax au plus (connexion.go). derniere :
 // minute Unix (arrondie à la minute inférieure) de la dernière déconnexion d'un WebSocket du
-// siège, 0 si inconnue (Task 9b, spec v3 §14.1) : en mémoire seulement, gardée par une
+// siège, 0 si inconnue (spec v3 §14.1) : en mémoire seulement, gardée par une
 // reprise (0x0A), oubliée avec le siège (départ, exclusion, fin du salon).
 type siege struct {
 	nonce          [16]byte
@@ -60,8 +60,8 @@ type siege struct {
 	reprises       []time.Time
 	// jamaisConnecte : siège invité entré (0x02) qui n'a encore ouvert aucun WebSocket ; entre :
 	// heure (Config.Now) de cette entrée. Mis à faux à la première connexion (inscrire), gardé
-	// par une reprise. Encore vrai jamaisConnecteMax après l'entrée : départ 0x03 (Tick ;
-	// relecture C-2, N1). Aucun KeyPackage n'a pu être publié sans WebSocket : sans effet MLS.
+	// par une reprise. Encore vrai jamaisConnecteMax après l'entrée : départ 0x03 (Tick). Aucun
+	// KeyPackage n'a pu être publié sans WebSocket : sans effet MLS.
 	jamaisConnecte bool
 	entre          time.Time
 }
@@ -101,7 +101,7 @@ type salon struct {
 	// pour un salon bâti hors de Manager.etat (tombe, tests).
 	glob *atomic.Int64
 	// part, pot, potMax : part de trames réservée à ce salon et pot commun de tout ce qui est
-	// rangé au-delà des parts (Manager.partTrames, tramesPot, potTramesMax ; F3). pot nil :
+	// rangé au-delà des parts (Manager.partTrames, tramesPot, potTramesMax). pot nil :
 	// sans plafond global.
 	part   int
 	pot    *atomic.Int64
@@ -116,14 +116,14 @@ type salon struct {
 	ancienne *Conversation
 	// aEcraser : emplacements de conv marqués effacés (retrait, échéance, trame écrite pour
 	// un membre parti entre-temps), à écraser sur le disque HORS du verrou (Manager.ecraser :
-	// aucun appel disque ni attente de la borne sous s.mu, audit adverse du 13 novembre, F1).
+	// aucun appel disque ni attente de la borne sous s.mu).
 	// Toujours des emplacements de la conversation courante : vidé quand elle est remplacée
 	// (renouvellement) ou détruite (fin).
 	aEcraser []uint32
 	// occ : sièges occupés, tenu à jour sous mu (installerLocked, oublierLocked, oublier) et lu
 	// sans verrou par Manager.Stats ; finiA : copie de fini lue sans verrou (estFini). Le
 	// tableau de bord et les parcours sous Manager.mu n'attendent ainsi jamais le verrou d'un
-	// salon (F1).
+	// salon.
 	occ   atomic.Int32
 	finiA atomic.Bool
 	// conns : connexion WebSocket de chaque siège (une au plus, connexion.go).
@@ -156,10 +156,10 @@ type salon struct {
 }
 
 // globAtteint : ce salon ne peut plus ranger de trame en mémoire (pot nil : sans plafond
-// global). Part équitable (audit adverse du 13 novembre, F3) : tant que le salon a moins de
-// trames rangées que sa part réservée, il n'est jamais refusé, quoi que fassent les autres ;
-// au-delà, il puise dans le pot commun, et n'est refusé que quand ce pot est vide. Les parts
-// de tous les salons plus le pot ne dépassent jamais le plafond global (Manager.partTrames) :
+// global). Part équitable : tant que le salon a moins de trames rangées que sa part réservée,
+// il n'est jamais refusé, quoi que fassent les autres ; au-delà, il puise dans le pot commun,
+// et n'est refusé que quand ce pot est vide. Les parts de tous les salons plus le pot ne
+// dépassent jamais le plafond global (Manager.partTrames) :
 // le garde-fou de la mémoire reste entier. Appelé sous s.mu.
 func (s *salon) globAtteint() bool {
 	return s.pot != nil && len(s.index) >= s.part && int(s.pot.Load()) >= s.potMax
@@ -226,7 +226,7 @@ func (s *salon) annoncerLocked(enr func(seq uint64) []byte, depart bool) (uint64
 
 // installerLocked tire jeton et nonce, annonce le siège (0x02 arrivée, ou 0x0A reprise si
 // reprise) et l'installe. Le jeton n'est rendu qu'à l'appelant ; seul son SHA-256 reste.
-// Une reprise retire le siège des lecteurs attendus des trames déjà rangées (plan, point 8).
+// Une reprise retire le siège des lecteurs attendus des trames déjà rangées.
 // Une reprise d'un siège occupé compte dans le plafond des reprises du siège (repriseMax par
 // heure, partagé avec les reprises par WebSocket) : au-delà, *Attente, rien n'est changé.
 func (s *salon) installerLocked(n uint8, reprise bool, now time.Time) (jeton [32]byte, x *siege, err error) {
@@ -257,7 +257,7 @@ func (s *salon) installerLocked(n uint8, reprise bool, now time.Time) (jeton [32
 	if !reprise && n != 0 {
 		// Nouvel occupant (0x02) d'un siège invité : seaux neufs (limites.go). Le siège 0 est
 		// toujours le créateur : son retour après « Quitter » n'est qu'une reprise, il garde ses
-		// seaux (revue finale C-2, mineur c).
+		// seaux.
 		s.limites[n] = nouvelleLimite()
 	}
 	x.emis, x.plancher, x.arrivee = seq, seq, seq

@@ -307,7 +307,7 @@ func TestReportCutsStream(t *testing.T) {
 	if err != nil || resp.StatusCode != 200 {
 		t.Fatal(resp, err)
 	}
-	// Deux autres ouvertures signalent : 2 voix sur 3 ouvertures permises (20 novembre) ; la
+	// Deux autres ouvertures signalent : 2 voix sur 3 ouvertures permises ; la
 	// première ne coupe rien.
 	g1, g2 := e.grant(t, k), e.grant(t, k)
 	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, g1, nil)}), 200, `{"detruit":0}`)

@@ -7,7 +7,7 @@ import (
 )
 
 // Erreurs du gestionnaire : messages fixes, sans identifiant, chemin ni secret. La couche
-// HTTP les traduit en réponses fixes (plan C-2 Task 7 ; spec §39.3.9).
+// HTTP les traduit en réponses fixes (spec §39.3.9).
 var (
 	// ErrNotFound : salon inconnu, échu, détruit, mauvaise K_accès_s ou S_gestion, jeton
 	// inconnu (place libérée, remplacé, redémarrage) : même erreur partout (aucun oracle).
@@ -43,7 +43,7 @@ var (
 )
 
 // BadPassword : K_preuve_s fausse, avec les essais restants (le 10ᵉ détruit le salon et
-// rend ErrNotFound). Champ attempts_left des réponses (plan, point 18).
+// rend ErrNotFound). Champ attempts_left des réponses.
 type BadPassword struct{ AttemptsLeft int }
 
 func (e *BadPassword) Error() string { return "salon: mot de passe incorrect" }

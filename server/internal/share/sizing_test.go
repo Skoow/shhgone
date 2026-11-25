@@ -35,7 +35,7 @@ func TestPayloadBytes(t *testing.T) {
 	}
 }
 
-// Exports pour les pièces du salon (plan C-2 Task 13) : mêmes valeurs que les fonctions internes.
+// Exports pour les pièces du salon : mêmes valeurs que les fonctions internes.
 func TestExportsPieces(t *testing.T) {
 	if TotalSize(8000) != 524416048 || TotalSize(1) != 65600 || TotalSize(16385) != totalSize(16385) {
 		t.Fatal("TotalSize", TotalSize(8000), TotalSize(1))

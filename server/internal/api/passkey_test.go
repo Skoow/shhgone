@@ -15,7 +15,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/compte/webauthntest"
 )
 
-// Lot S4 : inscription et connexion par passkey, récupération par la clé (conception du compte
+// Inscription et connexion par passkey, récupération par la clé (conception du compte
 // par passkey §6.4, §7.2), par HTTP, avec l'authentificateur logiciel.
 
 // Parcours : inscription, connexion par la passkey (réponse exacte), défi rejoué ou échu,
@@ -337,7 +337,7 @@ func TestAucunSequestre(t *testing.T) {
 			t.Errorf("%s contient A_r ou la sortie PRF", filepath.Base(f))
 		}
 	}
-	// L'AAGUID de l'authentificateur n'est jamais gardé (R9).
+	// L'AAGUID de l'authentificateur n'est jamais gardé.
 	for _, f := range []string{filepath.Join(e.dir, "comptes.db"), filepath.Join(e.dir, "comptes.db-wal")} {
 		b, _ := os.ReadFile(f)
 		if strings.Contains(string(b), string(in.auth.AAGUID[:])) {

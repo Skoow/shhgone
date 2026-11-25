@@ -38,7 +38,7 @@ func twoUploads(t *testing.T, s *Service, ba, bb int) (a, b string) {
 	return
 }
 
-// Revue du 10 novembre : le verrou des envois est par envoi. Un effacement lent (trou rendu
+// Le verrou des envois est par envoi. Un effacement lent (trou rendu
 // au système de fichiers, fsync) de l'envoi A ne retient ni les segments ni la finalisation
 // de l'envoi B ; il retient toujours les écritures de A lui-même.
 func TestSlowEraseDoesNotBlockOtherUpload(t *testing.T) {
@@ -106,7 +106,7 @@ func TestSlowEraseDoesNotBlockOtherUpload(t *testing.T) {
 	}
 }
 
-// Revue du 10 novembre : le fichier d'un partage retiré est supprimé du dossier hors de
+// Le fichier d'un partage retiré est supprimé du dossier hors de
 // gone.mu (pris par chaque lecture de segment). Pendant la suppression, le partage passe déjà
 // pour disparu (aucune lecture, aucune surveillance, aucun second retrait) ; l'ordre « fichier
 // puis ligne » est gardé, pour qu'une suppression en échec soit réessayée.
@@ -166,7 +166,7 @@ func TestRetireUnlinksOutsideGoneLock(t *testing.T) {
 	gone(t, s, id2)
 }
 
-// Revue du 10 novembre : le descripteur détaché (jusqu'à 2 Gio rendus au système de fichiers
+// Le descripteur détaché (jusqu'à 2 Gio rendus au système de fichiers
 // à sa fermeture) est fermé hors de gone.mu, et sa place reste comptée jusque-là.
 func TestDetachedClosedOutsideGoneLock(t *testing.T) {
 	s, c := newSvc(t)
@@ -205,7 +205,7 @@ func TestDetachedClosedOutsideGoneLock(t *testing.T) {
 	}
 }
 
-// Revue du 10 novembre : un brouillon détruit pendant sa finalisation, juste avant d'être
+// Un brouillon détruit pendant sa finalisation, juste avant d'être
 // ramené au palier final, est « introuvable » (404), pas une erreur du serveur (500).
 func TestFinalizeDraftGoneBeforeResizeIsNotFound(t *testing.T) {
 	s, _ := newSvc(t)
@@ -242,7 +242,7 @@ func TestUploadLifeCoversUploadWindow(t *testing.T) {
 	}
 }
 
-// Optimisation (audit du 11 novembre) : la lecture de la ligne et l'ouverture du fichier d'un
+// Optimisation : la lecture de la ligne et l'ouverture du fichier d'un
 // segment se font hors du verrou global des disparitions (gone.mu) : une ouverture lente
 // (disque chargé) ne retient ni les autres lectures ni les surveillances. Un partage retiré
 // pendant cette ouverture n'est pas servi (revérification sous le verrou).

@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// Lot 7 du plan du compte : bannissement révisé (conception §13, §21.11, §21.14.4), par compte
-// depuis le 22 novembre (conception du compte par passkey §7.4). Durée
+// Bannissement (conception §13, §21.11, §21.14.4), par compte
+// seulement (conception du compte par passkey §7.4). Durée
 // choisie (30 jours, 1 an), identifiant opaque B-…, suspendre, réactiver, changer
 // l'échéance (5 ans au plus), lever, annuler ; 20 bannissements par heure au plus.
 
@@ -280,7 +280,7 @@ func TestVingtBannissementsParHeure(t *testing.T) {
 }
 
 // Le motif, l'échéance et l'identifiant B-… (recours, conception du compte par passkey §7.4) sont
-// montrés à la personne à la connexion (GET /api/compte, R16).
+// montrés à la personne à la connexion (GET /api/compte).
 func TestMotifMontreALaConnexion(t *testing.T) {
 	b := nouveauBanc(t)
 	h, _, _ := b.inscrire(t, "lea")

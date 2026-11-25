@@ -15,7 +15,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/compte"
 )
 
-// Tableau de bord finalisé (conception du compte §21.14 ; plan lot 7) : salons signalés en
+// Tableau de bord finalisé (conception du compte §21.14) : salons signalés en
 // cours, désignés par une ref éphémère ; bannissements ; agrégats des comptes. Rien qui
 // désigne une personne ou un salon : ni adresse, ni empreinte, ni h, ni pseudo, ni lien, ni
 // identifiant interne. Tout passe par le corps JSON des requêtes, jamais par l'URL.
@@ -63,7 +63,7 @@ type Agregats struct {
 
 // Comptes : crochets du compte (SHH_COMPTES=1 ; nil sinon : routes refusées comme inconnues).
 // Le tampon du lien est effacé par la page au retour : les crochets n'en gardent aucune copie.
-// Plus de recherche ni de bannissement par adresse (compte sans e-mail, 22 novembre) : le recours
+// Plus de recherche ni de bannissement par adresse (compte sans e-mail) : le recours
 // passe par l'identifiant B-… que la personne bannie voit (conception du compte par passkey §7.4).
 type Comptes struct {
 	Agregats func() (Agregats, error)
@@ -76,7 +76,7 @@ type Comptes struct {
 // dureeRef : une ref de salon signalé vaut 10 min (conception §21.14.3).
 const dureeRef = 10 * time.Minute
 
-// maxCorps : corps JSON d'une requête du lot 7 (un lien au plus).
+// maxCorps : corps JSON d'une requête des comptes et des salons signalés (un lien au plus).
 const maxCorps = 8 << 10
 
 // refs : ref aléatoire (16 octets) → identifiant interne d'un salon signalé, en mémoire,

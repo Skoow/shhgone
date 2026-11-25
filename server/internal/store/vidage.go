@@ -9,15 +9,14 @@ import (
 )
 
 // Vidage : vidages du WAL demandés après chaque suppression ou réécriture sensible (partages
-// et salons), regroupés : au plus un par VidageIntervalle (audit adverse du 13 novembre,
-// stockage, F1 : seules les destructions explicites vidaient le WAL ; une fin de
-// téléchargement, 5 essais faux, toute fin de salon ou un renouvellement laissaient
-// identifiants, vérificateurs, sel et échéance dans shares.db-wal et dans shares.db jusqu'au
-// passage du janitor, 60 s au plus). Demander ne fait que lever un drapeau : ni la requête ni
-// l'entretien n'attendent le vidage, fait par la goroutine de Run.
+// et salons), regroupés : au plus un par VidageIntervalle (seules les destructions explicites
+// vidaient le WAL ; une fin de téléchargement, 5 essais faux, toute fin de salon ou un
+// renouvellement laissaient identifiants, vérificateurs, sel et échéance dans shares.db-wal
+// et dans shares.db jusqu'au passage du janitor, 60 s au plus). Demander ne fait que lever un
+// drapeau : ni la requête ni l'entretien n'attendent le vidage, fait par la goroutine de Run.
 //
 // Chaque vidage attend au plus vidageAttenteMs un lecteur ou un écrivain d'un AUTRE processus
-// (F3 : avec les 5 s du reste des requêtes, un outil qui lisait la base figeait l'API à chaque
+// (avec les 5 s du reste des requêtes, un outil qui lisait la base figeait l'API à chaque
 // destruction). Un vidage raté est compté (Rates, tableau de bord) et redemandé.
 //
 // Une valeur nil ne fait rien (tests, commandes hors du serveur).

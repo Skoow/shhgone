@@ -17,21 +17,21 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 )
 
-// Fichier de conversation (v3 §5.1, plan C-2 « Protocole ») : un emplacement de
+// Fichier de conversation (v3 §5.1) : un emplacement de
 // TailleEmplacement octets par trame non volatile, dans l'ordre d'arrivée :
 // nonce (12, aléatoire) ‖ AES-256-GCM(clé, nonce, trame, adConv ‖ numéro d'emplacement (8)).
 // La clé est tirée à l'ouverture et ne vit qu'en mémoire : un disque saisi ou copié, ou un
 // redémarrage, ne donne que des emplacements illisibles. Aucun seq, siège, heure ni drapeau
 // en clair. Aucun fsync : le fichier ne sert plus après un redémarrage (clé perdue).
 //
-// Ce que le fichier ne dit pas à qui lit le disque (audit adverse du 13 novembre, stockage F4) :
+// Ce que le fichier ne dit pas à qui lit le disque :
 //   - trame effacée = emplacement écrasé d'octets ALÉATOIRES (et non de zéros) : il ne
 //     s'authentifie plus (ErrEfface) et ne se distingue pas d'un emplacement vivant ;
 //   - le fichier grandit par PALIERS de emplacementsParPalier emplacements, remplis d'aléa à
 //     leur création : sa taille ne donne que l'ordre de grandeur du nombre de trames.
 //
-// Borne des appels disque (audit adverse du 13 novembre, front serveur, F1 et F2) : aucune
-// méthode n'attend une place sous un verrou. Les ÉCRITURES (Ajouter, Effacer,
+// Borne des appels disque : aucune
+// méthode n'attend une place sous un verrou. Les ÉCRITURES (Ajouter,
 // EffacerPlusieurs) ne prennent aucune borne ici : l'appelant (Manager) tient une place de la
 // borne des écritures, prise hors de tout verrou de salon. Les LECTURES (Lire) prennent une
 // place de la borne des lectures (lec) AVANT le verrou de la conversation.
@@ -107,12 +107,12 @@ type Conversation struct {
 	lecteur *os.File        // lectures, ouvert avec O_NOATIME quand le système le permet
 	// lec : borne des lectures de conversation (Manager.lec), posée par le Manager après
 	// l'ouverture (etat, renouvellement) ; nil : sans borne (tests). Prise avant mu, jamais
-	// dessous (F2 : les lectures du rattrapage tenaient un fil du système par connexion).
+	// dessous (les lectures du rattrapage tenaient un fil du système par connexion).
 	lec *blob.Gate
 	// aead : seule copie de la clé gardée (tirée dans OuvrirConversation, jamais rangée
 	// ailleurs) ; lâchée par Detruire. La bibliothèque standard ne permet pas d'effacer le
-	// calendrier de clés d'un chiffrement AES : la clé est oubliée, pas effacée de la mémoire
-	// (audit adverse du 13 novembre, stockage F5).
+	// calendrier de clés d'un chiffrement AES : la clé est oubliée, pas effacée de la
+	// mémoire.
 	aead cipher.AEAD
 	n    uint32 // emplacements écrits
 	// inutilisable : Truncate a échoué après une écriture ratée ; tailleMax borne alors le
@@ -162,8 +162,8 @@ func idValide(id string) bool {
 func sansDate(p string) error { return es(os.Chtimes(p, time.Unix(0, 0), time.Unix(0, 0))) }
 
 // dossierSansDate : dates du dossier de p remises à l'epoch après la création ou la
-// suppression de p (audit du 12 novembre, D7), au mieux : un échec n'annule pas l'opération
-// faite ; la date de changement d'inode (ctime) ne peut pas être remise.
+// suppression de p, au mieux : un échec n'annule pas l'opération faite ; la date de
+// changement d'inode (ctime) ne peut pas être remise.
 func dossierSansDate(p string) { _ = sansDate(filepath.Dir(p)) }
 
 // etat : erreur fixe si la conversation ne sert plus (appelant sous c.mu).
@@ -334,25 +334,9 @@ func alea() []byte {
 	return b
 }
 
-// Effacer écrase l'emplacement e d'octets aléatoires. L'appelant tient une place de la borne
-// des écritures.
-func (c *Conversation) Effacer(e uint32) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if err := c.etat(); err != nil {
-		return err
-	}
-	if e >= c.n {
-		return ErrEmplacement
-	}
-	// Emplacement déjà écrit : la taille du fichier ne change pas, même en cas d'échec.
-	return c.ecrire(alea(), decalage(e))
-}
-
 // Detruire oublie la clé (mise à zéro), ferme le fichier puis le supprime. Idempotent : un
 // nouvel appel ne refait que la suppression si elle avait échoué. La taille ne retombe à 0
-// qu'une fois le fichier supprimé : tant qu'il existe, sa place reste comptée (relecture
-// Task 12).
+// qu'une fois le fichier supprimé : tant qu'il existe, sa place reste comptée.
 func (c *Conversation) Detruire() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

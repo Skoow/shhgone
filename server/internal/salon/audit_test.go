@@ -1,7 +1,7 @@
 package salon
 
-// Tests offensifs des audits du 12 novembre (serveur du salon), repris du scratchpad et
-// changés en assertions : chacun échouait avant sa correction.
+// Tests offensifs du serveur du salon, écrits en assertions : chacun échouait avant sa
+// correction.
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// D1 de l'audit : amplification par le bourrage. Deux segments reçus ne font plus écrire
+// Amplification par le bourrage. Deux segments reçus ne font plus écrire
 // 123 segments d'aléa au serveur : l'aléa est borné comme celui des partages (padAllowed,
 // D42-17), au plus 4 × morceaux reçus + 512, sinon ErrBadRequest (400) sans rien écrire. La
 // place reste réservée dès la création (budget honnête).
@@ -81,7 +81,7 @@ func TestBourrageBorneExacte(t *testing.T) {
 	}
 }
 
-// D2 de l'audit : un segment réécrit sans fin (vocal hors de tout quota d'octets). Le total
+// Un segment réécrit sans fin (vocal hors de tout quota d'octets). Le total
 // reçu par pièce, réécritures comprises, est plafonné à 2 × sa taille (une reprise complète
 // après coupure reste possible) : au-delà, ErrTropEcrit (413), pour un vocal comme pour un
 // fichier, sans rien écrire.
@@ -123,7 +123,7 @@ func TestAuditReecriturePlafonnee(t *testing.T) {
 	}
 }
 
-// D3 de l'audit : la reprise du siège 0 (rejoindre, appareil perdu ou volé) et tout départ
+// La reprise du siège 0 (rejoindre, appareil perdu ou volé) et tout départ
 // (Quitter, exclusion) coupent la lecture en cours de l'ancien jeton
 // (clé "m:" + hex(SHA-256(jeton))), pas seulement les lectures suivantes.
 func TestAuditRepriseNeCoupePasLecture(t *testing.T) {
@@ -164,7 +164,7 @@ func TestAuditRepriseNeCoupePasLecture(t *testing.T) {
 	}
 }
 
-// D5 de l'audit : un effacement de pièce en échec se perdait avec la tombe (index et fichier
+// Un effacement de pièce en échec se perdait avec la tombe (index et fichier
 // gardés pour toujours). La tombe reste tant que des pièces sont à purger ; Tick réessaie.
 func TestAuditPurgeEchoueePerdueAvecTombe(t *testing.T) {
 	b := nouveauBanc(t, 200)
@@ -205,7 +205,7 @@ func TestAuditPurgeEchoueePerdueAvecTombe(t *testing.T) {
 	}
 }
 
-// Constat de l'audit pour la Task 15 : à l'échéance naturelle (sans destruction), Tick
+// À l'échéance naturelle (sans destruction), Tick
 // n'effaçait ni le fichier ni la ligne d'une pièce, ni la conversation. Il détruit désormais
 // le salon échu : pièces (fichier puis ligne), conversation, ligne du salon, index.
 func TestAuditEcheanceNaturelle(t *testing.T) {
@@ -245,7 +245,7 @@ func TestAuditEcheanceNaturelle(t *testing.T) {
 	}
 }
 
-// D6 de l'audit : une pièce effacée entre-temps (PieceSansLien, puis Tick) fermait le
+// Une pièce effacée entre-temps (PieceSansLien, puis Tick) fermait le
 // WebSocket en 4003 et perdait la trame. La trame est désormais rangée sans lien.
 func TestAuditLienPieceEchue(t *testing.T) {
 	b := nouveauBanc(t, 200)
@@ -299,7 +299,7 @@ func TestAuditAutreSalon(t *testing.T) {
 	}
 }
 
-// D7 de l'audit : les dossiers salon-pieces/ et salons/ gardaient l'heure de la dernière
+// Les dossiers salon-pieces/ et salons/ gardaient l'heure de la dernière
 // création ou suppression d'une pièce ou d'une conversation. Leur date de modification est
 // remise à l'epoch après chacune (la date de changement d'inode, ctime, ne peut pas l'être).
 func TestAuditDateDossier(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Salons du compte (conception §11, §21.6.2 « GET salons », « salons/detruire », §21.10 ; plan
-// lot 6) : palier et bannissement lus à la création d'un salon, ancienneté remise à zéro par
+// Salons du compte (conception §11, §21.6.2 « GET salons », « salons/detruire », §21.10) :
+// palier et bannissement lus à la création d'un salon, ancienneté remise à zéro par
 // un signalement, et salons vivants créés par le compte, désignés par une ref aléatoire
 // éphémère : aucun identifiant de salon ne sort du serveur.
 
@@ -52,8 +52,8 @@ func (s *Service) Palier(h [16]byte) (Limites, error) {
 	return lim, nil
 }
 
-// Signale : premier signalement d'un salon du compte h : compte_des = aujourd'hui (§11 ;
-// décision D4). Compte inconnu (supprimé) : rien.
+// Signale : premier signalement d'un salon du compte h : compte_des = aujourd'hui (§11).
+// Compte inconnu (supprimé) : rien.
 func (s *Service) Signale(h [16]byte) error {
 	_, err := s.db.Exec(`UPDATE comptes SET compte_des=? WHERE h=?`, jourDe(s.now()), h[:])
 	return err

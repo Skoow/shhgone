@@ -15,7 +15,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/blob"
 )
 
-// Fin de vie, destruction, purge au démarrage (plan C-2 Task 15).
+// Fin de vie, destruction, purge au démarrage.
 
 // creerPermis : salon de max membres dont les participants peuvent détruire.
 func (b *banc) creerPermis(t *testing.T, max int) cles {
@@ -210,7 +210,7 @@ func TestDixFauxDetruit(t *testing.T) {
 	})
 }
 
-// Relecture Task 9 : le 0x05 atteint aussi une connexion en rattrapage (hors du direct).
+// Le 0x05 atteint aussi une connexion en rattrapage (hors du direct).
 func TestFinEnRattrapage(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := nouveauBanc(t, 200)
@@ -532,7 +532,7 @@ func TestAttendreConnexions(t *testing.T) {
 	})
 }
 
-// Revue finale C-2, I2 : un salon échu sans état en mémoire (personne n'y est entré, ou
+// Un salon échu sans état en mémoire (personne n'y est entré, ou
 // personne ne l'a rejoint depuis un redémarrage) perd sa ligne au tick qui suit l'échéance,
 // sans attendre un redémarrage ; un salon vivant sans état garde la sienne, et une pièce en
 // base sans fichier connu est effacée d'abord (fichier puis ligne).
@@ -573,7 +573,7 @@ func TestLigneEchueSansEtatEffacee(t *testing.T) {
 	}
 }
 
-// Revue finale C-2, mineur (d) : DetruireSignaler ne rend premier que pour le premier
+// DetruireSignaler ne rend premier que pour le premier
 // signalement du salon (salon.signale, partagé avec QuitterSignaler), et jamais pour un appel
 // qui arrive sur un salon déjà détruit (deux « détruire » simultanés : le second, qui a lu la
 // ligne avant qu'elle soit rendue morte, ne compte pas).
@@ -606,7 +606,7 @@ func TestDetruireSignalerUneFois(t *testing.T) {
 	}
 }
 
-// Revue finale C-2, mineur (f) : une panique pendant un Tick (ici au début de la partie
+// Une panique pendant un Tick (ici au début de la partie
 // disque d'une fin) est récupérée par Run, sans sortie ; le tick suivant repart et reprend
 // la fin restée à faire (ligne effacée), et Run s'arrête toujours à l'annulation.
 func TestRunRecupereUnePanique(t *testing.T) {
@@ -643,7 +643,7 @@ func TestRunRecupereUnePanique(t *testing.T) {
 	})
 }
 
-// Relecture C-2, N2 : une panique dans oublier, après le passage à « fini », laisse la fin
+// Une panique dans oublier, après le passage à « fini », laisse la fin
 // « à faire » ; Run la récupère et le tick suivant reprend la partie disque (ligne effacée).
 func TestPaniqueDansOublierReprise(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -676,7 +676,7 @@ func TestPaniqueDansOublierReprise(t *testing.T) {
 	})
 }
 
-// Relecture C-2, N6 : plus de lotLignes lignes échues dont les premières ont un état en
+// Plus de lotLignes lignes échues dont les premières ont un état en
 // mémoire (tombes encore gardées) : la ligne échue sans état qui vient après est quand même
 // effacée au tick suivant (curseur id > ? d'un tick à l'autre), jamais affamée.
 func TestEchuesSansEtatAuDelaDuLot(t *testing.T) {
@@ -715,7 +715,7 @@ func TestEchuesSansEtatAuDelaDuLot(t *testing.T) {
 	}
 }
 
-// Relecture C-2, N7 : chaque panique récupérée dans un Tick compte dans un simple entier,
+// Chaque panique récupérée dans un Tick compte dans un simple entier,
 // sans identifiant ni sortie ; un tick sans panique ne compte pas.
 func TestPaniquesTickComptees(t *testing.T) {
 	b := nouveauBanc(t, 200)

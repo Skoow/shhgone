@@ -13,12 +13,12 @@ import (
 	"github.com/skoow/shhdrop/server/internal/salon"
 )
 
-// WebSocket du salon (plan C-2 Task 10, « Protocole », Review Focus 3) : GET /api/salons/ws.
+// WebSocket du salon : GET /api/salons/ws.
 // Aucun secret dans l'URL : le jeton de membre arrive dans le premier message (accueil).
 
 // Places des WebSocket ouverts : 2 000 au total, 8 par connexion (/64 ou IPv4), 16 par /48
-// (revue finale C-2, I4, 12 novembre : 4 refusait le 5ᵉ membre d'une famille ou d'un bureau
-// derrière un même NAT IPv4 ; 8 laisse en plus un second onglet à certains).
+// (4 refusait le 5ᵉ membre d'une famille ou d'un bureau derrière un même NAT IPv4 ; 8
+// laisse en plus un second onglet à certains).
 const wsTotal, wsPer64, wsPer48 = 2000, 8, 16
 
 // salonWS : Origin présent une seule fois et égal à SHH_ORIGIN octet pour octet, sinon 403

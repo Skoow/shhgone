@@ -8,9 +8,9 @@ import (
 	"unicode/utf8"
 )
 
-// PseudoCanonMax : longueur au plus de p_canon, en octets. Le lot 1 a mesuré 336 octets pour un
-// p_canon valide (24 graphèmes de plusieurs points de code) ; 96, prévu par le plan, aurait
-// refusé des pseudos valides. 512 laisse de la marge et borne le calcul.
+// PseudoCanonMax : longueur au plus de p_canon, en octets. Un p_canon valide peut atteindre
+// 336 octets (24 graphèmes de plusieurs points de code) ; 96 aurait refusé des pseudos
+// valides. 512 laisse de la marge et borne le calcul.
 const PseudoCanonMax = 512
 
 var (
@@ -41,8 +41,8 @@ func lireReserves(s string) []string {
 	return out
 }
 
-// interdits.txt : pseudos interdits côté serveur seulement (demande du propriétaire du
-// 14 novembre : rôles, autorités, marques, insultes), lus une fois au démarrage.
+// interdits.txt : pseudos interdits côté serveur seulement (rôles, autorités, marques,
+// insultes), lus une fois au démarrage.
 //
 //go:embed interdits.txt
 var interditsTxt string
@@ -93,17 +93,17 @@ func interdit(p string) bool {
 	return false
 }
 
-// Pseudo : 2 à 24 caractères A-Z, a-z, 0-9 (décision du propriétaire, 20 novembre) ; sa clé
-// (pseudo_canon du moteur) n'a donc que des minuscules et des chiffres, sans « i » ni « 1 »
-// (devenus « l »), sans « 0 » (« o ») ni « m » (« rn ») : de 2 à 48 octets.
+// Pseudo : 2 à 24 caractères A-Z, a-z, 0-9 ; sa clé (pseudo_canon du moteur) n'a donc que
+// des minuscules et des chiffres, sans « i » ni « 1 » (devenus « l »), sans « 0 » (« o »)
+// ni « m » (« rn ») : de 2 à 48 octets.
 const (
 	pseudoCanonMin      = 2
 	pseudoCanonMaxForme = 48
 )
 
-// FormeCanonique : p_canon a la forme que pseudo_canon donne à un pseudo valable (22 novembre,
-// tests croisés : sans ce contrôle, « Lea » ou « adm1n » envoyés par un client modifié ou ancien
-// auraient une autre empreinte que « lea » ou « adrnln » et passeraient l'unicité).
+// FormeCanonique : p_canon a la forme que pseudo_canon donne à un pseudo valable (sans ce
+// contrôle, « Lea » ou « adm1n » envoyés par un client modifié ou ancien auraient une autre
+// empreinte que « lea » ou « adrnln » et passeraient l'unicité).
 func FormeCanonique(p []byte) bool {
 	if len(p) < pseudoCanonMin || len(p) > pseudoCanonMaxForme {
 		return false

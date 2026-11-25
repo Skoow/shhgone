@@ -242,7 +242,7 @@ func compteMaps(l *Limiter) map[string]int {
 	return out
 }
 
-// Plus aucune limite d'e-mail ni de TOTP (22 novembre).
+// Plus aucune limite d'e-mail ni de TOTP.
 func TestPlusDeLimitesEmail(t *testing.T) {
 	ty := reflect.TypeFor[Limiter]()
 	for _, n := range []string{"mail64", "mail48", "mailAdr", "mailAdr48", "echecCpt", "totpCpt"} {

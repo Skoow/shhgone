@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Protocole du WebSocket du salon (plan C-2, « Protocole ») : messages binaires, entiers
+// Protocole du WebSocket du salon : messages binaires, entiers
 // gros-boutistes.
 
 const (
@@ -17,7 +17,7 @@ const (
 	// (trame ‖ pièce) fait 4 157 octets.
 	LimiteLecture = 4200
 	// DepuisReprise : valeur de depuis qui demande une reprise (nouveau nonce_arrivée, aucun
-	// rattrapage ; plan, point 5).
+	// rattrapage).
 	DepuisReprise uint64 = 1<<64 - 1
 )
 
@@ -117,8 +117,8 @@ func LireDemande(b []byte) (Demande, error) {
 	return d, nil
 }
 
-// Raisons de fin (enregistrement 0x05). 3 (« budget de flux ») est réservé, jamais émis
-// (plan, point 20). 7 (« interrompu par le serveur ») : le salon a dû finir faute de pouvoir
+// Raisons de fin (enregistrement 0x05). 3 (« budget de flux ») est réservé, jamais émis. 7
+// (« interrompu par le serveur ») : le salon a dû finir faute de pouvoir
 // recréer sa conversation pendant un renouvellement (reglages.go) ; comme 1 et 2, fermeture
 // 1000, le salon n'existe plus.
 const (
@@ -130,8 +130,8 @@ const (
 	RaisonInterrompu uint8 = 7
 )
 
-// Codes de fermeture du WebSocket (plan, point 19, et table « Codes de fermeture » du
-// « Protocole ») ; 1011 : CodeInterne (connexion.go) ; 1009 : posé par la bibliothèque.
+// Codes de fermeture du WebSocket ; 1011 : CodeInterne (connexion.go) ; 1009 : posé par la
+// bibliothèque.
 const (
 	CodeFin      = 1000 // fin du salon, ou départ demandé (0x03)
 	CodeArret    = 1001 // arrêt du serveur, ou silence de 45 s (même conduite du client : reconnexion)
@@ -147,7 +147,7 @@ const (
 const SansExclu uint8 = 0xFF
 
 // Annonce : siège occupé, son nonce_arrivée et la dernière connexion de son occupant
-// (enregistrement 0x0D ; minutes Unix, 0 = inconnue ou en ligne, Task 9b).
+// (enregistrement 0x0D ; minutes Unix, 0 = inconnue ou en ligne).
 type Annonce struct {
 	Siege       uint8
 	Nonce       [16]byte
@@ -185,7 +185,7 @@ func EnrDepart(seq uint64, siege uint8) []byte { return append(enr(0x03, seq, 1)
 func EnrFin(seq uint64, raison uint8) []byte { return append(enr(0x05, seq, 1), raison) }
 
 // EnrPresence : 0x07, siège ‖ 1 en ligne / 0 hors ligne ‖ dernière connexion (minutes Unix,
-// 8 octets), 19 octets en tout (Task 9b, spec v3 §14.1). 0 = inconnue ou en ligne : en
+// 8 octets), 19 octets en tout (spec v3 §14.1). 0 = inconnue ou en ligne : en
 // ligne, derniereMin est ignorée.
 func EnrPresence(seq uint64, siege uint8, enLigne bool, derniereMin uint64) []byte {
 	var v byte
@@ -234,8 +234,8 @@ func EnrListe(seq uint64, createur uint8, liste []Annonce) []byte {
 // tailleAnnonce : siège (1) ‖ nonce_arrivée (16) ‖ dernière connexion (8).
 const tailleAnnonce = 1 + 16 + 8
 
-// minuteUnix : minutes Unix de t, arrondies à la minute inférieure (dernière connexion,
-// Task 9b) ; 0 (inconnue) avant 1970.
+// minuteUnix : minutes Unix de t, arrondies à la minute inférieure (dernière connexion) ;
+// 0 (inconnue) avant 1970.
 func minuteUnix(t time.Time) uint64 {
 	u := t.Unix()
 	if u < 0 {
@@ -244,7 +244,7 @@ func minuteUnix(t time.Time) uint64 {
 	return uint64(u / 60)
 }
 
-// EnrAcceptee : 0x0F, 9 octets ; seq = rang de la trame 0x01 acceptée (revue finale C-2, I1).
+// EnrAcceptee : 0x0F, 9 octets ; seq = rang de la trame 0x01 acceptée.
 // Remis à l'expéditeur seul, en direct comme en rattrapage : il règle sa trame en vol même
 // s'il n'en verra jamais l'écho (volatile, trame effacée à son échéance avant son rattrapage). Ne
 // prend pas de rang ; en rattrapage, il peut précéder l'écho de sa trame.

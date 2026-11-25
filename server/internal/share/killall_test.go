@@ -43,7 +43,7 @@ func killRequests(s *Service) int {
 	return len(es)
 }
 
-// Revue B5 : « shhdrop admin wipe » (autre processus) coupe aussi les partages déjà retirés
+// « shhdrop admin wipe » (autre processus) coupe aussi les partages déjà retirés
 // dont une ouverture finissait sur un descripteur détaché (jusqu'à 2 h de grâce) : le serveur
 // en marche coupe tous ses flux détachés, ferme les descripteurs et efface la demande.
 func TestCutAllDetached(t *testing.T) {
@@ -103,7 +103,7 @@ func TestCutAllDetached(t *testing.T) {
 	})
 }
 
-// Audit F9 : un envoi en cours effacé par « shhdrop admin destroy » ou « wipe » (autre
+// Un envoi en cours effacé par « shhdrop admin destroy » ou « wipe » (autre
 // processus : ligne et fichier retirés hors du serveur) est oublié au balayage suivant
 // (échéances en mémoire) et signalé à OnAbandon (place d'envoi en cours rendue aux quotas).
 // Un envoi en cours de création (échéance posée, ligne pas encore écrite) n'est pas touché.

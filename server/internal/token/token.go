@@ -20,7 +20,7 @@ const (
 	Upload       byte = 'u'
 	Download     byte = 'd'
 	CaptchaShown byte = 'c'
-	// SalonPiece : jeton d'envoi d'une pièce jointe du salon (plan C-2 Task 13).
+	// SalonPiece : jeton d'envoi d'une pièce jointe du salon.
 	SalonPiece byte = 'p'
 )
 
@@ -67,12 +67,6 @@ func (s *Signer) Issue(kind byte, id string, openN int, exp time.Time) string {
 	return s.encode(b)
 }
 
-// Check vérifie la signature, le type, l'id et l'expiration, et rend le n° d'ouverture.
-func (s *Signer) Check(tok string, kind byte, id string) (int, error) {
-	n, _, err := s.CheckExp(tok, kind, id)
-	return n, err
-}
-
 // CheckExp est Check, et rend aussi l'expiration signée (zéro en cas d'erreur).
 func (s *Signer) CheckExp(tok string, kind byte, id string) (int, time.Time, error) {
 	n, exp, err := s.check(tok, kind, id)
@@ -114,7 +108,7 @@ func (s *Signer) parse(tok string, kind byte) (string, int, int64, error) {
 	if len(tok) > maxTokenLen {
 		return fail()
 	}
-	// Alphabet base64url et « . » seulement : le décodeur de Go ignore \r et \n (audit F3).
+	// Alphabet base64url et «. » seulement : le décodeur de Go ignore \r et \n.
 	for i := 0; i < len(tok); i++ {
 		c := tok[i]
 		if !(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-' || c == '_' || c == '.') {

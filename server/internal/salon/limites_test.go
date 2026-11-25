@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Limites des trames et garde-fou du disque (plan C-2 Task 12, Review Focus 4).
+// Limites des trames et garde-fou du disque.
 
 // bancLimite : banc dont les limites par siège jouent (nouveauBanc les coupe pour les autres
 // tests, qui envoient des centaines de trames à horloge figée).
@@ -324,7 +324,7 @@ func TestDisquePleinENOSPC(t *testing.T) {
 	})
 }
 
-// Décision du 12 novembre (réserve 3) : un nouvel occupant (0x02) trouve des seaux neufs, il
+// Un nouvel occupant (0x02) trouve des seaux neufs, il
 // n'hérite pas du compte de l'occupant précédent ; une reprise (0x0A par WebSocket, ou le
 // créateur qui revient par rejoindre) garde les compteurs.
 func TestLimiteNouvelOccupant(t *testing.T) {
@@ -391,7 +391,7 @@ func limiteDe(mb Membre) limiteSiege {
 	return s.limites[mb.siege]
 }
 
-// Relecture Task 12 (a) : un refus de la cadence ne prend aucun jeton horaire.
+// Un refus de la cadence ne prend aucun jeton horaire.
 func TestRefusCadenceSansJetonHoraire(t *testing.T) {
 	b := bancLimite(t)
 	c := b.creer(t, 4)
@@ -411,7 +411,7 @@ func TestRefusCadenceSansJetonHoraire(t *testing.T) {
 	}
 }
 
-// Relecture Task 12 (b) : un refus du seau horaire ne prend aucun jeton de cadence.
+// Un refus du seau horaire ne prend aucun jeton de cadence.
 func TestRefusHoraireSansJetonCadence(t *testing.T) {
 	b := bancLimite(t)
 	c := b.creer(t, 4)
@@ -429,7 +429,7 @@ func TestRefusHoraireSansJetonCadence(t *testing.T) {
 	}
 }
 
-// Relecture Task 12 (c) : un refus « disque plein » ne prend aucun jeton.
+// Un refus « disque plein » ne prend aucun jeton.
 func TestRefusDisqueSansJeton(t *testing.T) {
 	b := bancLimite(t)
 	partages := b.partagesInjectes()
@@ -449,7 +449,7 @@ func TestRefusDisqueSansJeton(t *testing.T) {
 	}
 }
 
-// Relecture Task 12, mineur 1 : ENOSPC rend les jetons pris avant l'écriture.
+// ENOSPC rend les jetons pris avant l'écriture.
 func TestENOSPCRendLeJeton(t *testing.T) {
 	b := bancLimite(t)
 	c := b.creer(t, 4)
@@ -473,7 +473,7 @@ func TestENOSPCRendLeJeton(t *testing.T) {
 	}
 }
 
-// Relecture Task 12, mineur 2 : total atomique des conversations (Manager.octetsConv) égal à
+// Total atomique des conversations (Manager.octetsConv) égal à
 // la somme des tailles après des ajouts, des échecs (annulé, puis Truncate en échec) et des
 // destructions ; UsedBytes le lit sans parcourir les salons.
 func TestUsageAtomiqueCoherent(t *testing.T) {
@@ -525,7 +525,7 @@ func TestUsageAtomiqueCoherent(t *testing.T) {
 	verifier("tout détruit", 0)
 }
 
-// Revue finale C-2, mineur (c) : le siège 0 est toujours le créateur ; « Quitter » puis
+// Le siège 0 est toujours le créateur ; « Quitter » puis
 // rejoindre avec S_gestion n'est qu'une reprise (hors du plafond des arrivées) : ses seaux
 // ne sont pas remis à neuf (sinon jusqu'à 3 600 trames non volatiles par heure).
 func TestLimiteCreateurRevenu(t *testing.T) {
@@ -555,9 +555,9 @@ func TestLimiteCreateurRevenu(t *testing.T) {
 	})
 }
 
-// Point D9 du rapport de performance (décision du 13 novembre) : les trames volatiles
-// (« en train d'écrire », accusés) ont leur propre seau (rafale de 30, puis 2 par seconde) ;
-// elles ne retiennent plus les messages, et les messages ne les retiennent pas.
+// Point D9 du rapport de performance : les trames volatiles (« en train d'écrire », accusés)
+// ont leur propre seau (rafale de 30, puis 2 par seconde) ; elles ne retiennent plus les
+// messages, et les messages ne les retiennent pas.
 func TestSeauVolatile(t *testing.T) {
 	b := bancLimite(t)
 	c := b.creer(t, 4)

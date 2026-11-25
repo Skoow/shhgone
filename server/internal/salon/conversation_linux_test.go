@@ -41,7 +41,7 @@ func TestSansDate(t *testing.T) {
 		t.Fatal(err)
 	}
 	verifier("lecture (O_NOATIME)")
-	if err := c.Effacer(0); err != nil {
+	if err := c.EffacerPlusieurs([]uint32{0}); err != nil {
 		t.Fatal(err)
 	}
 	verifier("effacement")
@@ -82,7 +82,7 @@ func TestSansDateApresEchec(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre, stockage, F4 : le ctime du fichier de conversation donnait
+// Le ctime du fichier de conversation donnait
 // l'heure du dernier message. Après BrouillerDates (une fois par minute, passe disque de
 // l'entretien), le ctime des conversations, des pièces et de leurs dossiers est l'heure du
 // passage.

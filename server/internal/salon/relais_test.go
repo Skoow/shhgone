@@ -16,7 +16,7 @@ import (
 	"unsafe"
 )
 
-// Relais et stockage des trames (plan C-2 Task 8).
+// Relais et stockage des trames.
 
 // trameD : trame de test d'octet drapeaux d (bit 0 volatile, bits 1–2 règle).
 func trameD(d byte, i int) []byte {
@@ -337,8 +337,8 @@ func TestSuiteFusionnee(t *testing.T) {
 	b.recevoir(t, g, trameD(dVolatile, 2))
 	e0b, g := b.entrerMembre(t, c, true) // reprise du créateur
 	attendu = append(attendu, att{0x0A, e0b.Seq})
-	// Règle 1 dont A est le seul lecteur attendu : effacée 60 s après son départ (plus bas,
-	// Task 11), donc absente de la suite.
+	// Règle 1 dont A est le seul lecteur attendu : effacée 60 s après son départ (plus
+	// bas), donc absente de la suite.
 	b.recevoir(t, g, trameD(dUneMinute, 3))
 	eb, bb := b.entrerMembre(t, c, false)
 	attendu = append(attendu, att{0x02, eb.Seq})
@@ -420,10 +420,9 @@ func TestEtatAu(t *testing.T) {
 	}
 }
 
-// Exigence 4 (plan, point 9) : la trame de contrôle d'un arrivant (son KeyPackage, non
+// Exigence 4 : la trame de contrôle d'un arrivant (son KeyPackage, non
 // volatile) reste servie au rattrapage d'un membre qui revient 30 min plus tard, que
-// l'arrivant soit encore là (hors ligne, siège réservé : I3) ou parti entre-temps (relecture
-// C-2, N4 : b.depart).
+// l'arrivant soit encore là (hors ligne, siège réservé) ou parti entre-temps (b.depart).
 func TestKeyPackageGardePourLeRattrapage(t *testing.T) {
 	for _, parti := range []bool{false, true} {
 		b := nouveauBanc(t, 200)
@@ -441,7 +440,7 @@ func TestKeyPackageGardePourLeRattrapage(t *testing.T) {
 			b.depart(s, arrivant.siege)
 		}
 		b.h.avancer(30 * time.Minute)
-		b.m.Tick() // ne libère personne (revue finale C-2, I3 : siège réservé pour la vie du salon)
+		b.m.Tick() // ne libère personne (siège réservé pour la vie du salon)
 		if _, err := b.m.Membre(eg.Jeton[:]); err != nil {
 			t.Fatal("créateur libéré :", err)
 		}
@@ -513,7 +512,7 @@ func TestEnTeteRefuse(t *testing.T) {
 }
 
 // « Instantané » : lecteurs attendus = sièges occupés à la réception, moins l'expéditeur, un
-// bit par siège (Task 11) ; autres règles : 0.
+// bit par siège ; autres règles : 0.
 func TestAttendus(t *testing.T) {
 	b := nouveauBanc(t, 200)
 	c := b.creer(t, 4)
@@ -570,7 +569,7 @@ func TestJournalBorne(t *testing.T) {
 	_, a := b.entrerMembre(t, c, false)
 	s := a.salon
 	// Journal rempli directement jusqu'à deux places du seuil (les reprises par rejoindre
-	// sont plafonnées à repriseMax par heure, Task 9).
+	// sont plafonnées à repriseMax par heure).
 	sous(s, func() {
 		for len(s.journal) < journalMax-nbSieges-2 {
 			s.annoncerLocked(func(seq uint64) []byte { return EnrDepart(seq, 9) }, false)
@@ -624,7 +623,7 @@ func TestRecevoirApresDestruction(t *testing.T) {
 	}
 }
 
-// Décision du propriétaire (12 novembre) : « supprimer pour tout le monde » survit à une
+// « supprimer pour tout le monde » survit à une
 // reprise. La borne est le rang d'arrivée (0x02) de l'occupant du siège, gardé par 0x0A ;
 // au siège 0 (toujours le créateur), tout depuis la création.
 func TestRetirerApresReprise(t *testing.T) {
@@ -641,7 +640,7 @@ func TestRetirerApresReprise(t *testing.T) {
 		}
 		return false
 	}
-	// Invité : reprise (0x0A, nouveau jeton) simulée comme la fera la Task 9.
+	// Invité : reprise (0x0A, nouveau jeton) simulée comme le fait la connexion.
 	xa := b.recevoir(t, a, trameD(0, 1))
 	var jeton [32]byte
 	var x *siege
@@ -690,7 +689,7 @@ func TestRetirerApresReprise(t *testing.T) {
 	}
 }
 
-// I-1 : index de 24 octets par trame au plus (plan, point 10).
+// I-1 : index de 24 octets par trame au plus.
 func TestTailleEntree(t *testing.T) {
 	if n := unsafe.Sizeof(entree{}); n > 24 {
 		t.Fatalf("entree : %d octets, 24 au plus", n)
@@ -738,7 +737,7 @@ func TestHeureMonotone(t *testing.T) {
 	}
 }
 
-// Audit du 13 novembre, D3 : plafond de trames rangées par salon. Au-delà, 0x0C pour ce
+// Plafond de trames rangées par salon. Au-delà, 0x0C pour ce
 // salon seulement, sans rang consommé ; les volatiles passent ; un autre salon range encore.
 func TestPlafondTramesParSalon(t *testing.T) {
 	b := nouveauBanc(t, 200)
@@ -765,7 +764,7 @@ func TestPlafondTramesParSalon(t *testing.T) {
 	}
 }
 
-// Audit adverse du 13 novembre (front serveur) : plafond GLOBAL des trames rangées en
+// Plafond GLOBAL des trames rangées en
 // mémoire, calé sur GOMEMLIMIT et partagé par tous les salons. Au-delà, 0x0C même si chaque
 // salon reste sous son plafond propre (sinon 200 salons pleins feraient tuer le processus
 // faute de mémoire) ; les volatiles passent ; un renouvellement, qui vide l'index d'un salon,

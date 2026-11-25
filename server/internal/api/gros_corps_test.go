@@ -12,11 +12,11 @@ import (
 	"github.com/skoow/shhdrop/server/internal/compte"
 )
 
-// Gros corps JSON (audit du 20 novembre) : refusés avant toute lecture sans longueur annoncée,
+// Gros corps JSON : refusés avant toute lecture sans longueur annoncée,
 // au-delà du plafond, ou quand les places sont prises ; les petits corps ne sont pas touchés.
 //
-// Places tenues sous la clé HMAC du jour du limiteur (inventaire des adresses IP du
-// 22 novembre) : jamais sous le préfixe /64 ou /48 en clair.
+// Places tenues sous la clé HMAC du jour du limiteur : jamais sous le préfixe /64 ou /48
+// en clair.
 func TestGrosCorpsBornes(t *testing.T) {
 	const gros = 1 << 20
 	e := newEnv(t, false, nil)

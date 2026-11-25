@@ -72,7 +72,7 @@ func comptesFromEnv(c *Config) error {
 }
 
 // RPID : hôte de l'origine (sans port), ou "" si c'est une adresse IP ou une origine vide. C'est
-// l'identifiant WebAuthn des passkeys : le changer les rend toutes inutilisables (R1).
+// l'identifiant WebAuthn des passkeys : le changer les rend toutes inutilisables.
 func RPID(origin string) string {
 	_, hp, ok := strings.Cut(origin, "://")
 	if !ok || hp == "" {
@@ -99,7 +99,7 @@ func origineAndroidOK(o string) bool {
 	return err == nil && len(b) == 32 && base64.RawURLEncoding.EncodeToString(b) == h
 }
 
-// sansEmail : le compte par e-mail a été retiré le 22 novembre (conception du compte par passkey
+// sansEmail : le compte par e-mail a été retiré (conception du compte par passkey
 // §8, §17) ; une ancienne variable d'envoi d'e-mails encore posée fait refuser le démarrage
 // (jamais ignorée en silence : elle désigne un secret qui traîne ou un déploiement ancien).
 func sansEmail() error {

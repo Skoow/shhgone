@@ -32,7 +32,7 @@ func TestSetupComptesDesactive(t *testing.T) {
 }
 
 // Compte activé : clé du serveur lue (refus au démarrage si elle est fausse), comptes.db créée
-// en 0600 dans SHH_DATA_DIR ; rien n'est encore servi (lot 4).
+// en 0600 dans SHH_DATA_DIR ; rien n'est encore servi.
 func TestSetupComptesActive(t *testing.T) {
 	dir, secrets := t.TempDir(), t.TempDir()
 	cle := filepath.Join(secrets, "cle")
@@ -91,7 +91,7 @@ func TestBrancherComptesActive(t *testing.T) {
 	}
 }
 
-// SHH_COMPTES=1 et SHH_SALONS=1 (lot 6) : le gestionnaire lit le palier dans le service du
+// SHH_COMPTES=1 et SHH_SALONS=1 : le gestionnaire lit le palier dans le service du
 // compte (une création pour un compte inconnu est refusée), et le service voit les salons du
 // compte (liste) par les crochets du gestionnaire.
 func TestBrancherComptesSalons(t *testing.T) {

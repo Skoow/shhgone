@@ -38,7 +38,7 @@ func (a compteAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/compte/connexion/debut", a.connexionDebut)
 	mux.HandleFunc("POST /api/compte/connexion/fin", a.connexionFin)
 	mux.HandleFunc("POST /api/compte/recup", a.recup)
-	// Lot S5 : passkeys du compte, réauthentification, nouvelle clé de récupération.
+	// Passkeys du compte, réauthentification, nouvelle clé de récupération.
 	mux.HandleFunc("POST /api/compte/reauth/debut", a.reauthDebut)
 	mux.HandleFunc("POST /api/compte/reauth/fin", a.reauthFin)
 	mux.HandleFunc("GET /api/compte/passkeys", a.passkeys)
@@ -62,7 +62,7 @@ func (a compteAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/compte", a.etat)
 	mux.HandleFunc("GET /api/compte/export", a.export)
 	mux.HandleFunc("POST /api/compte/supprimer", a.supprimer)
-	// Lot 6 : salons vivants créés par le compte, désignés par une ref éphémère.
+	// Salons vivants créés par le compte, désignés par une ref éphémère.
 	mux.HandleFunc("GET /api/compte/salons", a.salons)
 	mux.HandleFunc("POST /api/compte/salons/detruire", a.salonsDetruire)
 }
@@ -113,12 +113,12 @@ func failCompte(w http.ResponseWriter, err error) {
 }
 
 // lire : corps JSON strict (readJSONMax) et sans aucun `null`. Même échéance de lecture que
-// readJSONMax (audit du 13 novembre, D5), posée avant la première lecture.
+// readJSONMax, posée avant la première lecture.
 //
-// Gros corps (max au-delà de maxJSON : coffres, fin d'inscription, récupération ; audit du
-// 20 novembre) : le jeton est dans le corps, donc tout est lu avant de pouvoir refuser. Sans
-// borne, quelques centaines de connexions tenaient chacune 1 Mio pendant l'échéance de lecture
-// et faisaient tuer le serveur par le noyau. Trois garde-fous avant la première lecture :
+// Gros corps (max au-delà de maxJSON : coffres, fin d'inscription, récupération) : le jeton est
+// dans le corps, donc tout est lu avant de pouvoir refuser. Sans borne, quelques centaines de
+// connexions tenaient chacune 1 Mio pendant l'échéance de lecture et faisaient tuer le serveur
+// par le noyau. Trois garde-fous avant la première lecture :
 // longueur annoncée exigée et sous le plafond (pas d'envoi par blocs), et une place de
 // grosCorps (16 en tout, 2 par connexion, 4 par bloc /48), sinon 503 busy et connexion fermée :
 // lireGros seulement, lire refuse un tel plafond (erreur de programmation).
@@ -130,8 +130,7 @@ func lire(w http.ResponseWriter, r *http.Request, v any, max int64) error {
 }
 
 // lireGros : lire, avec les garde-fous des gros corps. Places tenues sous la clé HMAC du jour du
-// limiteur (inventaire des adresses IP du 22 novembre) : jamais le préfixe /64 ou /48 en clair
-// comme clé de table.
+// limiteur : jamais le préfixe /64 ou /48 en clair comme clé de table.
 func (s *server) lireGros(w http.ResponseWriter, r *http.Request, v any, max int64) error {
 	if max > maxJSON {
 		if r.ContentLength < 0 || r.ContentLength > max {
@@ -321,7 +320,7 @@ func (a compteAPI) fermer(w http.ResponseWriter, r *http.Request) {
 }
 
 // etiquette : { etiquette } (64 octets chiffrés par l'appareil) → {} ; nom d'appareil de la
-// session courante, posé après la connexion (lot 10 : K_etiquette vient de K_compte, que
+// session courante, posé après la connexion (K_etiquette vient de K_compte, que
 // l'appareil n'a qu'après la réponse de connexion).
 func (a compteAPI) etiquette(w http.ResponseWriter, r *http.Request) {
 	c, err := a.session(r)
@@ -588,7 +587,7 @@ func (a compteAPI) export(w http.ResponseWriter, r *http.Request) {
 	}{x.CreeLe, x.AncienneteDepuis, x.VuMois, ouNull(x.BanniJusqu), motifOuNull(x.BanniMotif), x.SalonsActifs, ss, ps})
 }
 
-// supprimer : {} → { salons_fermes } (session récente ; plus d'attente, 22 novembre).
+// supprimer : {} → { salons_fermes } (session récente ; plus d'attente).
 func (a compteAPI) supprimer(w http.ResponseWriter, r *http.Request) {
 	c, err := a.session(r)
 	if err != nil {

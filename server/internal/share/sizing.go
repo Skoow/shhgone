@@ -53,8 +53,8 @@ func ContentBytes(bucket int) int64 { return int64(bucket-1) * 65536 }
 // ValidBucket : b est un palier gratuit (spec §41.2).
 func ValidBucket(b int) bool { return validBucket(b) }
 
-// PayloadBytes : données utiles portées par n octets chiffrés reçus (unité des quotas, audit
-// F1) : 64 Kio par morceau chiffré entier, l'en-tête de 48 octets du segment 0 ne compte pas.
+// PayloadBytes : données utiles portées par n octets chiffrés reçus (unité des quotas) :
+// 64 Kio par morceau chiffré entier, l'en-tête de 48 octets du segment 0 ne compte pas.
 // Un reste plus long que l'en-tête (corps mal formé, refusé ensuite) compte pour un morceau :
 // un corps refusé n'est jamais gratuit.
 func PayloadBytes(n int64) int64 {
@@ -68,7 +68,7 @@ func PayloadBytes(n int64) int64 {
 	return k * 65536
 }
 
-// TotalSize : taille réservée pour un palier (pièces du salon, plan C-2 Task 13).
+// TotalSize : taille réservée pour un palier (pièces du salon).
 func TotalSize(bucket int) int64 { return totalSize(bucket) }
 
 // SegOffset : position du segment n dans le fichier (pièces du salon).
