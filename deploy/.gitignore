@@ -5,6 +5,8 @@
 /.release.prev
 /.release.version
 /.release.prev.version
+/.release.commit
+/.release.prev.commit
 # Manifestes signés déjà vérifiés (deploy/provenance.sh), revérifiés à chaque installation.
 /.provenance/
 /.deploy.lock
