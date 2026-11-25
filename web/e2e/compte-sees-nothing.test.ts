@@ -302,7 +302,11 @@ describe("le serveur ne voit rien : compte par passkey", () => {
     const cols = etat.colonnes as { t: string; c: string; ty: string }[];
     expect(cols.length).toBeGreaterThan(25);
     for (const x of cols) expect(["BLOB", "INTEGER"], `${x.t}.${x.c}`).toContain(x.ty);
-    expect(cols.map((x) => x.c).filter((c) => /aaguid|compteur|sign|e_canon|mdp|totp|transport|cle_profil/.test(c))).toEqual([]);
+    // Seule exception : passkeys.sign_count (schéma 4, conception du compte §6.3), le compteur de
+    // signatures WebAuthn qui fait refuser une passkey clonée ; ni identité ni appareil.
+    const autorisees = new Set(["passkeys.sign_count"]);
+    expect(cols.filter((x) => !autorisees.has(`${x.t}.${x.c}`)).map((x) => x.c).filter((c) => /aaguid|compteur|sign|e_canon|mdp|totp|transport|cle_profil/.test(c))).toEqual([]);
+    expect(cols.some((x) => x.t === "passkeys" && x.c === "sign_count" && x.ty === "INTEGER")).toBe(true);
     const jour = (v: number) => v % 86_400 === 0;
     const mois = (v: number) => new Date(v * 1000).toISOString().endsWith("-01T00:00:00.000Z");
     const d = etat.dates as { comptes: any[]; passkeys: any[]; sessions: any[] };
