@@ -111,17 +111,13 @@
     copies = noteCopy(copies, what);
     if (!was && secured(copies)) onsecured?.();
   }
-  // L'état est lu au moment de l'événement (pas d'ajout ni de retrait différé par un effet) : une
-  // sortie déjà confirmée par la garde du routeur (secrets oubliés, `result` à null) ne redemande rien.
-  $effect(() => {
-    const warn = (e: BeforeUnloadEvent) => {
-      if (!result || !warnOnUnload(copies, finished)) return;
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  });
+  // Écouteur posé par <svelte:window> ; l'état est lu au moment de l'événement : une sortie déjà
+  // confirmée par la garde du routeur (secrets oubliés, `result` à null) ne redemande rien.
+  function warnUnload(e: BeforeUnloadEvent) {
+    if (!result || !warnOnUnload(copies, finished)) return;
+    e.preventDefault();
+    e.returnValue = "";
+  }
 
   // ---------- Arrivée : focus sur le titre, annonce, montée en éventail (M18) ----------
   let heading: HTMLHeadingElement | undefined = $state();
@@ -215,6 +211,8 @@
     await logo?.erase();
   }
 </script>
+
+<svelte:window onbeforeunload={warnUnload} />
 
 {#if deleted || !result}
   <section class="gone" aria-labelledby="gone-title">
@@ -580,6 +578,19 @@
     border-radius: 50%;
     background: var(--accent-tint);
     color: var(--accent);
+    /* Retour du geste : la coche se pose (fondu et léger grossissement), une fois. */
+    animation: kept-in var(--dur-base) var(--ease-out) both;
+  }
+  @keyframes kept-in {
+    from {
+      opacity: 0;
+      transform: scale(0.6);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kept {
+      animation: none;
+    }
   }
   .ticket .mdp .kept {
     top: calc(var(--sp-5) + 2px);

@@ -20,7 +20,7 @@ async function toReady(page: Page, context: BrowserContext, origin: string, text
 const clip = (page: Page) => readClipboard(page);
 const newShare = (page: Page) => page.locator(".ready .done").getByRole("button", { name: "Nouveau partage", exact: true });
 /** Captures demandées (PC, téléphone) : test-results/captures/<nom>-{d1440,m}.png. */
-const shot = (page: Page, name: string, isMobile: boolean) => page.screenshot({ path: `test-results/captures/${name}-${isMobile ? "m" : "d1440"}.png`, fullPage: isMobile });
+const shot = async (page: Page, name: string, isMobile: boolean) => (await page.evaluate(() => window.scrollTo(0, 0)), await page.screenshot({ path: `test-results/captures/${name}-${isMobile ? "m" : "d1440"}.png`, fullPage: isMobile }));
 const linkCard = (page: Page) => page.getByRole("group", { name: "Lien", exact: true });
 const pwCard = (page: Page) => page.getByRole("group", { name: "Mot de passe", exact: true });
 /** Valeur complète d'un CopyField (texte pour lecteur d'écran). */
