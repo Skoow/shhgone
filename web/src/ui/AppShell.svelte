@@ -625,6 +625,39 @@
       justify-self: stretch;
     }
   }
+  /* Grand écran (1100 px et plus) : la marque et les colonnes de liens se répartissent sur toute
+     la largeur du contenu, à intervalles égaux (plus de grand vide entre la marque, à gauche, et
+     les liens) ; la dernière colonne finit au bord droit du contenu, comme « Se connecter » dans
+     l'en-tête. Pistes : marque, vide, colonne, vide, colonne (, vide, colonne) ; les vides se
+     partagent l'espace à parts égales. Les colonnes de liens prennent les pistes de la grille du
+     pied (subgrid) : la nav garde son rôle de repère. Phrase de la marque plus grande.
+     Téléphone et tablette : inchangés. */
+  @media (min-width: 1100px) {
+    @supports (grid-template-columns: subgrid) {
+      .foot-in {
+        grid-template-columns: max-content repeat(3, minmax(0, 1fr) max-content);
+      }
+      .foot-in:has(> .cols.two) {
+        grid-template-columns: max-content repeat(2, minmax(0, 1fr) max-content);
+      }
+      .cols,
+      .cols.two {
+        grid-column: 3 / -1;
+        grid-template-columns: subgrid;
+      }
+      .col:nth-child(2) {
+        grid-column: 3;
+      }
+      .col:nth-child(3) {
+        grid-column: 5;
+      }
+    }
+    .tag {
+      max-width: 30ch;
+      font-size: 1.125rem;
+      line-height: 1.55;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .fl {
       transition: none;

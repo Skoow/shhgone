@@ -29,4 +29,11 @@
   .hd {
     margin-block-start: clamp(16px, 3vw, 32px);
   }
+  /* Grand écran : toute la largeur du contenu, comme l'en-tête pleine largeur (ui/base.css). */
+  @media (min-width: 1100px) {
+    .offers {
+      max-width: none;
+      gap: var(--sp-6);
+    }
+  }
 </style>

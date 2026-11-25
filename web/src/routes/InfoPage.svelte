@@ -1,7 +1,7 @@
 <script lang="ts">
   // Page d'information (Sécurité, Confidentialité, Conditions, Mentions légales, Signaler un
-  // abus) : lecture d'abord, colonne de texte étroite, titres ancrés par id (sans
-  // « # » dans l'adresse : le « # » est réservé aux clés). Bandeau « En cours de rédaction »
+  // abus, Vérifier) : lecture d'abord, colonne de texte de 70 à 80 signes par ligne, titres
+  // ancrés par id (sans « # » dans l'adresse : le « # » est réservé aux clés). Bandeau « En cours de rédaction »
   // pour les pages juridiques que doit compléter.
   // Refonte (« ancien, trop serré, pavé ») : plus de carte ni de
   // cadre ; un grand en-tête sur le fond du site, fermé par une couture en demi-teinte ; sur
@@ -231,6 +231,25 @@
     gap: clamp(48px, 6vw, 72px);
     min-width: 0;
     max-width: 68ch;
+  }
+  /* Grand écran (1100 px et plus) : la page prend toute la largeur du contenu (en-tête pleine
+     largeur, ui/base.css). La largeur gagnée va au sommaire et aux marges, pas aux lignes : le
+     texte garde 70 à 80 signes par ligne. Le sommaire reste aligné sur le bord gauche du titre. */
+  @media (min-width: 1100px) {
+    .info {
+      max-width: none;
+    }
+    .body {
+      grid-template-columns: minmax(260px, 320px) minmax(0, 37rem);
+      column-gap: clamp(72px, 9vw, 176px);
+      padding-block-start: 88px;
+    }
+    .text {
+      max-width: none;
+    }
+    .toc button {
+      font-size: 0.9375rem;
+    }
   }
   .blk {
     display: grid;
