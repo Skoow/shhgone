@@ -545,6 +545,8 @@ export const en = {
   "err.unexpected": "An unexpected error stopped the upload. Try again.",
   // ---------- Recipient ----------
   "open.title": "An encrypted share is waiting for you",
+  "open.options": "Options",
+  "open.options.kept": "kept on this device",
   "open.loading": "Reading the share…",
   "open.oneOpen.one": "Last open left; afterwards, coming back from this browser usually does not count another one, until it expires.",
   "open.oneOpen.other": "Opening uses 1\u00a0of the {n}\u00a0opens left; afterwards, coming back from this browser usually does not count another one, until it expires.",
@@ -772,6 +774,7 @@ export const en = {
   "clean.confirm.local": "It's done on this device, before encryption. The file sent will no longer have the same fingerprint (SHA-256) as the original.",
   "compose.hash.computing": "computing…",
   "compose.hash.failed": "unavailable",
+  "compose.hash.details": "Details",
   "clean.confirm.go": "Clean",
   "compose.clean.failed": "{name}: cleaning did not succeed, the file is sent as is",
   "names.tip": "File names are encrypted too: we can't read them.",

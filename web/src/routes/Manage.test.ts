@@ -14,7 +14,8 @@ vi.mock("../index", async (orig) => ({
   destroyShare: (...a: unknown[]) => destroy(...a),
 }));
 const sync = vi.fn();
-vi.mock("../history/live.svelte", () => ({ syncManaged: (...a: unknown[]) => sync(...a) }));
+const summary = vi.fn();
+vi.mock("../history/live.svelte", () => ({ syncManaged: (...a: unknown[]) => sync(...a), managedSummary: (...a: unknown[]) => summary(...a) }));
 const { default: Manage } = await import("./Manage.svelte");
 
 const LINK = "https://x.test/#m" + "B".repeat(43);
@@ -37,6 +38,7 @@ afterEach(() => {
   status.mockReset();
   destroy.mockReset();
   sync.mockReset();
+  summary.mockReset();
 });
 const show = () => {
   app = mount(Manage as never, { target: document.body, props: { take: () => ({ kind: "m", link: LINK }) } }) as Record<string, unknown>;
@@ -45,6 +47,40 @@ const show = () => {
 const button = (text: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.includes(text))!;
 
 describe("Manage", () => {
+  beforeEach(() => summary.mockResolvedValue(null));
+
+  // Audit du 25 novembre : le contexte du partage en tête, la pastille d'état, et « Supprimer
+  // maintenant » en bouton secondaire (contour corail), confirmation gardée.
+  it("contexte lu dans l'historique de l'appareil (nom, éléments, taille) ; rien sans entrée", async () => {
+    status.mockResolvedValue(S);
+    summary.mockResolvedValue({ label: "Photos du week-end", itemsCount: 3, sizeBytes: 3_984_588 });
+    show();
+    await settle();
+    expect(summary).toHaveBeenCalledWith(LINK);
+    expect(document.querySelector("[data-manage-context]")!.textContent!.replace(/[ \n\t]+/g, " ").trim()).toBe("Photos du week-end · 3\u202féléments · 3,8\u202fMo");
+    void unmount(app!);
+    app = null;
+    document.body.innerHTML = "";
+    summary.mockResolvedValue(null);
+    show();
+    await settle();
+    expect(document.querySelector("[data-manage-context]")).toBeNull();
+  });
+
+  it("pastille d'état ; « Supprimer maintenant » en contour corail, puis confirmation", async () => {
+    status.mockResolvedValue(S);
+    show();
+    await settle();
+    expect(document.querySelector("[data-state-chip]")!.textContent!.trim()).toBe("Actif");
+    const del = button("Supprimer maintenant");
+    expect(del.classList.contains("danger-line")).toBe(true);
+    expect(del.classList.contains("danger")).toBe(false);
+    del.click();
+    await settle();
+    expect(destroy).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("Supprimer ce partage pour tout le monde");
+  });
+
   it("M13 : heure de la dernière lecture affichée ; relue toutes les 60 s page visible", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 10, 11, 9, 41, 0));

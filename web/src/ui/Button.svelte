@@ -3,7 +3,8 @@
   import type { HTMLButtonAttributes } from "svelte/elements";
 
   type Props = Omit<HTMLButtonAttributes, "onclick" | "children" | "type" | "disabled" | "class"> & {
-    variant?: "primary" | "secondary" | "ghost" | "danger";
+    /** `danger-line` : action irréversible secondaire (contour et texte corail, fond transparent). */
+    variant?: "primary" | "secondary" | "ghost" | "danger" | "danger-line";
     /** 44 px au lieu de 48 px. */
     dense?: boolean;
     /** Chargement imposé de l'extérieur (en plus de celui d'un `onpress` en cours). */
@@ -165,6 +166,11 @@
     color: var(--on-danger);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35);
   }
+  .danger-line {
+    background: transparent;
+    color: var(--danger);
+    border-color: color-mix(in oklab, var(--danger) 70%, transparent);
+  }
   @media (hover: hover) {
     .primary:hover:not(:disabled, [aria-disabled="true"]) {
       background: var(--accent-hover);
@@ -182,6 +188,10 @@
     }
     .danger:hover:not(:disabled, [aria-disabled="true"]) {
       filter: brightness(1.08);
+    }
+    .danger-line:hover:not(:disabled, [aria-disabled="true"]) {
+      background: color-mix(in oklab, var(--danger) 12%, transparent);
+      border-color: var(--danger);
     }
   }
   .btn:disabled {

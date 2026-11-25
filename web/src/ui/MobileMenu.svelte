@@ -501,11 +501,10 @@
   .mm-h {
     margin: 0 0 var(--sp-2);
     padding-inline: var(--sp-2);
+    /* Casse de phrase (audit du 25 novembre : plus de capitales espacées). */
     color: var(--text-3);
-    font-size: var(--fs-micro);
+    font-size: var(--fs-small);
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
   .mm-auth {
     display: grid;

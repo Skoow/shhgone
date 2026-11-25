@@ -274,11 +274,14 @@ html.kbd-open .dock {
 
 /* Accueil v3 : révélations au défilement (UI §20.4). Animées par la vue où le navigateur sait
    le faire (animation-timeline: view()) ; sinon repli IntersectionObserver (ui/attach.ts,
-   classes rv-wait puis in). Jamais en mouvement réduit ; le contenu n'est jamais caché sans JS. */
+   classes rv-wait puis in). Jamais en mouvement réduit ; le contenu n'est jamais caché sans JS.
+   Jamais caché non plus hors du défilement (audit du 25 novembre) : `forwards` et non `both`,
+   donc rien n'est appliqué avant l'entrée dans l'écran (capture pleine page, élément plus bas
+   que l'écran) ; l'élément visé par l'ancre, et tout à l'impression, sans animation. */
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: view()) {
     .rv {
-      animation: rv-in linear both;
+      animation: rv-in linear forwards;
       animation-timeline: view();
       animation-range: entry 0% entry 25%;
     }
@@ -293,6 +296,25 @@ html.kbd-open .dock {
   .rv-wait:not(.in) {
     opacity: 0;
     transform: translateY(16px);
+  }
+}
+.rv:target,
+:target .rv {
+  animation: none;
+}
+.rv-wait:target,
+:target .rv-wait {
+  opacity: 1;
+  transform: none;
+}
+@media print {
+  .rv {
+    animation: none !important;
+  }
+  .rv-wait {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
 }
 @keyframes rv-in {

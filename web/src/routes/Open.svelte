@@ -20,7 +20,8 @@
   import { copyText } from "../ui/clipboard";
   import Deadline from "../ui/Deadline.svelte";
   import DestroyedArt from "../ui/DestroyedArt.svelte";
-  import { ChevronDown, Copy, Eye, EyeOff, Lock, LockOpen, ShieldCheck, TriangleAlert } from "../ui/Icon";
+  import { ChevronDown, Copy, Eye, EyeOff, Info, Lock, LockOpen, ShieldCheck, TriangleAlert } from "../ui/Icon";
+  import StateChip from "../ui/StateChip.svelte";
   import TimeRim from "../ui/TimeRim.svelte";
   import { finish } from "../flows/endoflife";
   import { createGone } from "../flows/gone.svelte";
@@ -219,6 +220,8 @@
   });
 </script>
 
+{#snippet costIcon()}<Info size={16} strokeWidth={1.9} aria-hidden="true" />{/snippet}
+
 {#if r.state === "invalid" || r.state === "incomplete" || r.state === "return_lost" || r.state === "corrupt" || r.state === "egress"}
   <Invalid kind={r.state} limit={r.state === "return_lost" && r.error === "reopen_limit"} />
 {:else if r.state === "error"}
@@ -245,6 +248,10 @@
         </span>
       {/if}
       <div class="cap-tx">
+        {#if (r.state === "locked" || r.state === "reopen" || r.state === "unlocking") && r.expiresInS > 0}
+          <!-- Pastille d'état (audit du 25 novembre) : l'état est dit ici, plus par un contour menthe. -->
+          <span class="chip"><StateChip state="ready" /></span>
+        {/if}
         {#if r.state === "open"}
           {#if end === null && !gone.closed}
             <p class="banner num">
@@ -269,6 +276,12 @@
           {/if}
         {/if}
       </div>
+      {#if r.state === "open" && end === null && !expired && !gone.closed}
+        <!-- Contenu : même pastille, au bout de la barre (passe dessous si la place manque) ;
+             « Actif » même à la dernière ouverture : le partage reste lisible ici jusqu'à
+             l'échéance (la dernière ouverture est dite sous la barre, sans alarme jaune). -->
+        <span class="chip end"><StateChip state="ready" /></span>
+      {/if}
     </div>
 
     {#if r.state === "inapp"}
@@ -315,22 +328,31 @@
           </div>
         {/if}
         <p id="open-tries" class="small">{t("open.tries", { n: PW_TRIES })}</p>
-        <Case label={shares.account ? t("open.keep.account") : t("open.keep")} hint={t("open.keep.hint")} bind:checked={() => r.keep, (v) => ((keepTouched = true), (r.keep = v))} />
-        {#if r.reopening}
-          <p id="open-cost" class="cost">{t("open.reopen.body")}</p>
-        {:else if r.otherTab}
-          <p id="open-cost" class="cost">{t("open.otherTab")}</p>
-        {:else if r.opensLeft > 0}
-          <p id="open-cost" class="cost">{t("open.oneOpen", { n: r.opensLeft })}</p>
-        {/if}
-<div class="cta dock">
+        <!-- Audit du 25 novembre : le mot de passe puis le bouton d'abord ; le coût d'ouverture est
+             une information neutre sous le bouton (plus d'encadré jaune) ; les options, repliées. -->
+        <div class="cta dock">
           <Button variant="primary" busy={busy} disabled={pw === "" || limited} onpress={unlock} aria-describedby={r.reopening || r.otherTab || r.opensLeft > 0 ? "open-cost" : undefined}>
-          {#snippet icon()}<LockOpen size={18} />{/snippet}
-          {busy ? t("open.unlocking") : r.reopening ? t("open.reopen") : t("open.unlock")}
-        </Button>
+            {#snippet icon()}<LockOpen size={18} />{/snippet}
+            {busy ? t("open.unlocking") : r.reopening ? t("open.reopen") : t("open.unlock")}
+          </Button>
         </div>
+        {#if r.reopening}
+          <p id="open-cost" class="cost">{@render costIcon()}<span>{t("open.reopen.body")}</span></p>
+        {:else if r.otherTab}
+          <p id="open-cost" class="cost">{@render costIcon()}<span>{t("open.otherTab")}</span></p>
+        {:else if r.opensLeft > 0}
+          <p id="open-cost" class="cost">{@render costIcon()}<span>{t("open.oneOpen", { n: r.opensLeft })}</span></p>
+        {/if}
         <p class="trust"><ShieldCheck size={18} aria-hidden="true" /> <span>{t("open.trust")}</span></p>
       </div>
+      <details class="private" data-open-options>
+        <summary
+          ><span>{t("open.options")}{#if r.keep}<span class="on">{" · "}{t("open.options.kept")}</span>{/if}</span><ChevronDown size={18} aria-hidden="true" /></summary
+        >
+        <div class="opts">
+          <Case label={shares.account ? t("open.keep.account") : t("open.keep")} hint={t("open.keep.hint")} bind:checked={() => r.keep, (v) => ((keepTouched = true), (r.keep = v))} />
+        </div>
+      </details>
       <details class="private">
         <summary><span>{t("open.private")}</span><ChevronDown size={18} aria-hidden="true" /></summary>
         <ul>
@@ -395,6 +417,8 @@
     display: block;
   }
   .capsule.bar {
+    flex-wrap: wrap;
+    row-gap: var(--sp-2);
     position: sticky;
     inset-block-start: calc(64px + var(--sp-2));
     z-index: 5;
@@ -466,12 +490,6 @@
   .banner {
     color: var(--text);
     font-size: var(--fs-small);
-  }
-  @media (max-width: 759px) {
-    .cost {
-      font-size: var(--fs-small);
-      line-height: var(--lh-small);
-    }
   }
   .num {
     font-variant-numeric: tabular-nums;
@@ -593,13 +611,37 @@
     color: var(--text-3);
     font-size: var(--fs-small);
   }
+  /* Information neutre (plus d'encadré jaune) : le coût d'ouverture n'est pas un danger. */
   .cost {
     margin: 0;
-    padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--warn-tint);
-    color: var(--warn);
-    font-weight: 520;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    color: var(--text-2);
+    font-size: var(--fs-small);
+    line-height: var(--lh-small);
+  }
+  .cost :global(svg) {
+    flex: none;
+    margin-top: 2px;
+    color: var(--info);
+  }
+  .chip {
+    justify-self: start;
+    display: inline-flex;
+    margin-block-end: var(--sp-1);
+  }
+  .chip.end {
+    flex: none;
+    margin-block-end: 0;
+    margin-inline-start: auto;
+  }
+  .private .on {
+    color: var(--text-2);
+    font-weight: 450;
+  }
+  .opts {
+    padding-block: var(--sp-2) 0;
   }
   .trust {
     margin: 0;

@@ -311,6 +311,24 @@ export type ManagedResult = { kind: "status"; status: Status } | { kind: "missin
 const secretOf = (manage: string) => manage.slice(manage.lastIndexOf("#m"));
 
 /**
+ * Contexte de la vue de gestion `#m…` : nom, nombre d'éléments et taille, lus dans l'entrée
+ * d'historique du même partage si elle existe sur cet appareil. Lecture locale seulement :
+ * aucune requête, aucune entrée ni aucun historique créés (peek). Le serveur ne connaît ni le
+ * nom ni le contenu : sans entrée ici, rien à montrer (null).
+ */
+export async function managedSummary(manage: string): Promise<Pick<HistoryEntry, "label" | "itemsCount" | "sizeBytes"> | null> {
+  try {
+    const h = await peek();
+    if (!h || h === "absent") return null;
+    const key = secretOf(manage);
+    const e = (await h.list()).find((x) => x.sorte === "envoi" && secretOf(x.manage) === key);
+    return e ? { label: e.label, itemsCount: e.itemsCount, sizeBytes: e.sizeBytes } : null;
+  } catch {
+    return null; // historique illisible : la vue de gestion marche sans lui
+  }
+}
+
+/**
  * Vue de gestion `#m…` : reporte une relecture ou une
  * destruction sur l'entrée d'historique du même partage, si elle existe. Aucune requête,
  * aucune entrée créée, et aucun historique créé s'il n'y en a pas encore (peek).

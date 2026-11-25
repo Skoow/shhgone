@@ -93,7 +93,7 @@
       {:else}
         <!-- Une note ne montre que son titre : le contenu se lit avec « Voir ». -->
         <span>{t(kind === "text" ? "compose.cat.text" : typeKey(format))}</span><span aria-hidden="true">·</span><span>{formatBytes(row.total, lang)}</span>
-        {#if kind === "file" && sha256}<HashLine sum={sha256} />{/if}
+        {#if kind === "file" && sha256}<HashLine sum={sha256} {name} />{/if}
         <!-- Téléchargé : dit par la pastille de l'icône. -->
         {#if row.state !== "done" && estimate !== null && !viewOnly}
           <span aria-hidden="true">·</span><span class="eta" title={t("dl.estimate.title")}>{t("dl.estimate", { time: formatDuration(estimate, lang) })}<span class="sr-only"> ({t("dl.estimate.title")})</span></span>

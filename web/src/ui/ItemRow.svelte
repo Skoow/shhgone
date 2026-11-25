@@ -237,7 +237,7 @@
         <!-- Empreinte SHA-256 : sur sa propre ligne, sous le nom ;
              sélectionnée d'un toucher pour la copier, entière au survol. Elle change si le
              fichier est nettoyé. -->
-        <span class="sumline"><HashLine sum={digestOf(item.data)} /></span>
+        <div class="sumline"><HashLine sum={digestOf(item.data)} {name} /></div>
       {/if}
       <span class="meta">
         {#if upload}

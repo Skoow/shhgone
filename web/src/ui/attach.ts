@@ -16,13 +16,23 @@ export function scrollTimeline(): boolean {
  * l'élément (opacité, translation) jusqu'à son entrée dans l'écran, puis `in` le révèle une fois.
  * Rien en mouvement réduit, ni quand le CSS s'en charge, ni sans IntersectionObserver : le
  * contenu n'est jamais caché si ce code ne tourne pas.
+ * Seul un élément encore plus bas que l'écran à la première mesure est caché : un élément déjà
+ * visible au chargement ne l'est jamais, et un élément sauté (ancre, défilement rapide), passé
+ * au-dessus de l'écran, est révélé tout de suite (audit du 25 novembre).
  */
 export function reveal(node: Element): (() => void) | void {
   if (reducedMotion() || scrollTimeline() || typeof IntersectionObserver === "undefined") return;
-  node.classList.add("rv-wait");
+  let first = true;
   const io = new IntersectionObserver(
     ([e]) => {
-      if (!e!.isIntersecting) return;
+      const below = !e!.isIntersecting && e!.boundingClientRect.top > 0;
+      if (first) {
+        first = false;
+        if (below) node.classList.add("rv-wait");
+        else io.disconnect();
+        return;
+      }
+      if (below) return;
       node.classList.add("in");
       io.disconnect();
     },

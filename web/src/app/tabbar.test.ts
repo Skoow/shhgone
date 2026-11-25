@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { en } from "../i18n/en";
+import { fr } from "../i18n/fr";
 import { currentTab, tabBarVisible, tabBarUseful, tabPath, tabsFor, TABS } from "./tabbar";
 
 const base = { supported: true, sending: false, composing: false };
@@ -51,5 +53,12 @@ describe("barre d'onglets (téléphone)", () => {
     expect(currentTab("home")).toBe("send");
     expect(tabBarVisible({ ...base, route: "profil", connected: true })).toBe(true);
     expect(tabBarVisible({ ...base, route: "profil" })).toBe(false);
+  });
+
+  // Audit du 25 novembre : « Téléchargem… » tronqué sur téléphone. Quatre onglets sur 320 px :
+  // 10 caractères au plus par libellé, en français comme en anglais.
+  it("libellés courts, jamais tronqués (10 caractères au plus)", () => {
+    for (const d of [fr, en] as Record<string, string>[]) for (const t of tabsFor(true)) expect(d[`tabs.${t.id}`]!.length).toBeLessThanOrEqual(10);
+    expect(fr["tabs.downloads"]).toBe("Fichiers");
   });
 });

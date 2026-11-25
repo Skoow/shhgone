@@ -820,11 +820,13 @@
         <div class="side-scroll">
           <Options {options} {unviewable} part="controls" />
         </div>
+        <!-- Audit du 25 novembre : « Chiffrer et envoyer » juste sous le résumé (plus en bas de
+             colonne) ; les offres ensuite, en bas. -->
         <div class="sendbar foot">
           <Options {options} {unviewable} part="summary" />
-          <div class="offers side-offers">{@render offers()}</div>
           <Button variant="primary" lock disabled={reasonText !== ""} aria-describedby={reasonText ? "send-reason" : undefined} onpress={send}>{t("options.submit")}</Button>
           {#if reasonText}<p id="send-reason" class="reason">{reasonText}</p>{:else if uncleaned + unsupported > 0}{@render uncleanSum()}{/if}
+          <div class="offers side-offers">{@render offers()}</div>
         </div>
       </div>
     {/if}
@@ -1642,25 +1644,27 @@
     .dropzone.empty {
       min-height: 184px;
     }
-    /* Filigrane : occupe l'espace vide sous la liste, discret (texte plus clair, sans cadre) ;
-       le cadre réapparaît au survol et pendant un glisser-déposer. */
+    /* Filigrane : une ligne de 64 px sous la liste, discrète (texte plus clair, sans cadre) ;
+       le cadre réapparaît au survol et pendant un glisser-déposer ; on dépose aussi n'importe où
+       sur la page. Réduite dès qu'un élément est ajouté (audit du 25 novembre : plus de grand
+       cadre vide sous la liste). */
     .dropzone.ghost {
-      flex: 1 0 128px;
-      flex-direction: column;
+      flex: none;
+      flex-direction: row;
       justify-content: center;
-      gap: var(--sp-2);
-      min-height: 128px;
+      gap: var(--sp-3);
+      min-height: 64px;
       border-color: transparent;
       background: none;
       color: var(--text-3);
-      text-align: center;
+      text-align: start;
     }
     .dropzone.ghost .dz-ic {
       background: none;
       color: var(--text-3);
     }
     .dropzone.ghost .dz-tx {
-      justify-items: center;
+      justify-items: start;
     }
     .dropzone.ghost .dz-t {
       font-weight: 560;

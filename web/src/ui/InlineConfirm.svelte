@@ -14,7 +14,7 @@
     cancelLabel?: string;
     onconfirm: () => void | Promise<void>;
     kind?: "default" | "danger" | "warn";
-    triggerVariant?: "primary" | "secondary" | "ghost" | "danger";
+    triggerVariant?: "primary" | "secondary" | "ghost" | "danger" | "danger-line";
     icon?: Snippet;
     disabled?: boolean;
     /** Nom accessible du bouton d'origine, s'il doit en dire plus que `label` (il commence par `label`, WCAG 2.5.3). */

@@ -154,7 +154,8 @@ test.describe("fr-FR", () => {
     expect((await clear.boundingBox())!.width).toBeLessThanOrEqual(44);
     expect((await clear.boundingBox())!.y).toBeLessThan((await page.locator(".cap").boundingBox())!.y);
     await expect(rows(page).filter({ hasText: "anniversaire-lou.webm" })).toContainText("1:12");
-    await expect(page.locator(".group .meta").first()).toContainText(/^1 · /);
+    // Un seul élément dans la catégorie : ni nombre ni total redits dans son en-tête.
+    await expect(page.locator(".group").first().locator(".head .meta")).toHaveCount(0);
     expect(await noHScroll(page)).toBe(true);
 
     if (isMobile) {

@@ -1,6 +1,8 @@
 <script lang="ts">
   // Barre d'onglets du téléphone (< 768 px), façon app : Envoyer, Mes partages, Téléchargements (conception compte §21.15.5). Plus d'onglet Réglages : langue, nettoyage et liens sont dans le pied de page.
   // Visibilité décidée par app/tabbar.ts ; masquée sur ordinateur par la CSS seule.
+  // Libellés courts (tabs.*) : quatre onglets tiennent sur 320 px sans « … » (« Fichiers » pour
+  // Téléchargements, audit du 25 novembre).
   import { currentTab, tabPath, tabsFor, type TabId } from "../app/tabbar";
   import { accountFlag } from "../app/account-flag.svelte";
   import { followLink, href, router } from "../app/router.svelte";

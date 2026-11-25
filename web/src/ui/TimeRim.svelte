@@ -2,6 +2,9 @@
   // Contour de temps (benchmark S3) : le contour de la capsule se raccourcit avec le temps
   // restant, mis à jour à la minute (aucune boucle d'animation) ; les ouvertures restantes sont
   // de petites encoches. Décoratif : le texte complet est porté par le parent (Countdown, état).
+  // Filet discret (audit du 25 novembre) : le temps restant en menthe atténuée et fine, l'état
+  // est dit par une pastille du parent ; les encoches sont des coupures du filet (masque), qui
+  // ne dépassent jamais du bord de la carte (plus de petit trait clair sous la carte).
   import { untrack } from "svelte";
   import { capPath } from "./motion";
   import { notches, rimOffset } from "./rim";
@@ -19,6 +22,7 @@
   };
   let { remainingS, totalS, opensLeft = null, radius = 24, now = () => Date.now() }: Props = $props();
 
+  const uid = $props.id();
   let w = $state(0);
   let h = $state(0);
   const d = $derived(w > 4 && h > 4 ? capPath(w - 2, h - 2, radius) : "");
@@ -58,10 +62,15 @@
 <div class="rim" aria-hidden="true" bind:clientWidth={w} bind:clientHeight={h} data-rim-offset={offset} data-notches={notches(opensLeft).length}>
   {#if d}
     <svg width={w} height={h} focusable="false">
-      <g transform="translate(1 1)">
+      {#if notchDash}
+        <mask id="{uid}-cut" maskUnits="userSpaceOnUse" x="-4" y="-4" width={w + 8} height={h + 8}>
+          <rect x="-4" y="-4" width={w + 8} height={h + 8} fill="#fff" />
+          <path class="cut" {d} pathLength="100" stroke-dasharray={notchDash} />
+        </mask>
+      {/if}
+      <g transform="translate(1 1)" mask={notchDash ? `url(#${uid}-cut)` : undefined}>
         <path class="track" {d} pathLength="100" />
         <path class="time" {d} pathLength="100" stroke-dasharray="100 100" stroke-dashoffset={offset} />
-        {#if notchDash}<path class="notch" {d} pathLength="100" stroke-dasharray={notchDash} />{/if}
       </g>
     </svg>
   {/if}
@@ -85,14 +94,15 @@
     stroke-width: 1;
   }
   .time {
-    stroke: var(--accent);
-    stroke-width: 2;
+    stroke: color-mix(in oklab, var(--accent) 45%, transparent);
+    stroke-width: 1.25;
     stroke-linecap: round;
     transition: stroke-dashoffset var(--dur-slow) var(--ease-out);
   }
-  .notch {
-    stroke: var(--seal-light);
-    stroke-width: 5;
+  .cut {
+    fill: none;
+    stroke: #000;
+    stroke-width: 6;
   }
   @media (prefers-reduced-motion: reduce) {
     .time {
@@ -100,8 +110,7 @@
     }
   }
   @media (forced-colors: active) {
-    .time,
-    .notch {
+    .time {
       stroke: CanvasText;
     }
     .track {

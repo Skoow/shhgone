@@ -249,3 +249,16 @@ describe("renameShare : titre d'un envoi sur cet appareil", () => {
     expect(await live.renameShare(recu.id, "x")).toBeNull();
   });
 });
+
+describe("managedSummary : contexte de la vue de gestion, lu sur l'appareil", () => {
+  it("entrée du même partage : nom, éléments et taille ; une autre : null", async () => {
+    const now = Date.now();
+    await live.recordShare({ manage: MANAGE, label: "Contrat", createdAt: now, sizeBytes: 2048, itemsCount: 3, expiresAt: now + 3600_000, maxOpens: 1 });
+    expect(await live.managedSummary("https://x.test/shhdrop/#m" + "A".repeat(43))).toEqual({ label: "Contrat", itemsCount: 3, sizeBytes: 2048 });
+    expect(await live.managedSummary(OTHER)).toBeNull();
+  });
+  it("aucun historique encore : null, et rien n'est écrit dans le navigateur", async () => {
+    expect(await live.managedSummary(MANAGE)).toBeNull();
+    expect(idb.raw().size).toBe(0);
+  });
+});

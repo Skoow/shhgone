@@ -6,8 +6,8 @@
   import { tick, untrack } from "svelte";
   import type { LinkState } from "../app/link";
   import { followLink, href } from "../app/router.svelte";
-  import { syncManaged, type ManagedResult } from "../history/live.svelte";
-  import { formatClock, formatDuration } from "../i18n/format";
+  import { managedSummary, syncManaged, type ManagedResult } from "../history/live.svelte";
+  import { formatBytes, formatClock, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { LimitError, NotFoundError, destroyShare, shareStatus } from "../index";
   import { announce } from "../ui/announce";
@@ -18,6 +18,7 @@
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import DestroyedArt from "../ui/DestroyedArt.svelte";
   import Logo from "../ui/Logo.svelte";
+  import StateChip from "../ui/StateChip.svelte";
   import TimeRim from "../ui/TimeRim.svelte";
   import Invalid from "./Invalid.svelte";
 
@@ -39,6 +40,10 @@
   type Status = { opensUsed: number; maxOpens: number; expiresInS: number; state: string };
   let status = $state.raw<Status | null>(null);
   let total = $state(0); // durée de référence du contour : la première mesure de la session
+  // Contexte en tête (audit du 25 novembre) : nom, éléments et taille, seulement s'ils sont dans
+  // l'historique de cet appareil (lecture locale, aucune requête ; le serveur ne les connaît pas).
+  let summary = $state.raw<Awaited<ReturnType<typeof managedSummary>>>(null);
+  if (secret !== null) void managedSummary(secret).then((v) => (summary = v));
   let phase = $state<"loading" | "ready" | "gone" | "incomplete">(secret === null ? "incomplete" : "loading");
   let error = $state("");
   let pausedUntil = 0;
@@ -151,17 +156,27 @@
   </section>
 {:else}
   <section class="manage" aria-labelledby="m-title" aria-busy={phase === "loading" ? "true" : undefined}>
-    <h1 id="m-title" class="title titre-bandeau" tabindex="-1" data-large-title bind:this={title}>{t("manage.title")}</h1>
+    <div class="head titre-bandeau">
+      <h1 id="m-title" class="title" tabindex="-1" data-large-title bind:this={title}>{t("manage.title")}</h1>
+      {#if summary}
+        <p class="ctx num" data-manage-context>
+          {#if summary.label}<bdi class="nm" translate="no">{summary.label}</bdi><span aria-hidden="true">{" · "}</span>{/if}{t("hist.items", { n: summary.itemsCount })}<span aria-hidden="true">{" · "}</span>{formatBytes(summary.sizeBytes, lang)}
+        </p>
+      {/if}
+    </div>
     <div class="card" bind:this={card} data-capsule data-state="open">
       {#if status}
         {#key reads}
           <TimeRim remainingS={status.expiresInS} totalS={total} opensLeft={Math.max(0, status.maxOpens - status.opensUsed)} radius={23} />
         {/key}
-        <p class="status num" data-status={status.state}>
-          {#key reads}
-            {t("manage.status", { u: status.opensUsed, max: status.maxOpens })}
-          {/key}
-        </p>
+        <div class="st-row">
+          <p class="status num" data-status={status.state}>
+            {#key reads}
+              {t("manage.status", { u: status.opensUsed, max: status.maxOpens })}
+            {/key}
+          </p>
+          <StateChip state={status.state === "draining" ? "draining" : "ready"} />
+        </div>
         <p class="when">
           {#key reads}
             <Deadline expiresInS={status.expiresInS} onexpire={() => void refresh()} />
@@ -181,7 +196,7 @@
       </Button>
     </div>
     <div class="danger-zone">
-      <InlineConfirm label={t("manage.delete")} message={t("manage.delete.confirm")} confirmLabel={t("manage.delete.yes")} kind="danger" triggerVariant="danger" onconfirm={remove}>
+      <InlineConfirm label={t("manage.delete")} message={t("manage.delete.confirm")} confirmLabel={t("manage.delete.yes")} kind="danger" triggerVariant="danger-line" onconfirm={remove}>
         {#snippet icon()}<Trash2 size={18} />{/snippet}
       </InlineConfirm>
       {#if deleteError}<p class="err" role="alert">{deleteError}</p>{/if}
@@ -211,6 +226,27 @@
   }
   .title:focus {
     outline: none;
+  }
+  .head {
+    display: grid;
+    gap: var(--sp-1);
+  }
+  .ctx {
+    margin: 0;
+    color: var(--text-2);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .ctx .nm {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .st-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2) var(--sp-3);
   }
   .card {
     position: relative;

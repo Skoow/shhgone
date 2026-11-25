@@ -29,10 +29,11 @@ const READY_NOTE = {
   fr: "Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.",
   en: "Demo: this link only works in this tab. Nothing is sent.",
 } as const;
-/** Pages du compte : aucune passkey créée, le compte n'existe que dans cet onglet. */
+/** Pages du compte : aucune passkey créée, le compte n'existe que dans cet onglet. Une ligne
+ *  courte (audit du 25 novembre), plus un paragraphe de quatre lignes. */
 const COMPTE_NOTE = {
-  fr: "Dans la démo, aucune passkey n'est créée (la feuille du système est simulée)\u202f; ce compte n'existe que dans cet onglet et disparaît à sa fermeture.",
-  en: "In the demo, no passkey is created (the system sheet is simulated); this account only exists in this tab and disappears when it closes.",
+  fr: "Dans la démo, aucune passkey n'est créée\u202f; ce compte disparaît avec cet onglet.",
+  en: "In the demo, no passkey is created; this account disappears with this tab.",
 } as const;
 /** Bouton de l'inscription : la démo ne crée aucune vraie passkey. */
 const SIGNUP_PASSKEY = {

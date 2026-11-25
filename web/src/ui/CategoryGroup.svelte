@@ -134,9 +134,9 @@
 <section class={["group", { compact }]} aria-labelledby="{uid}-h">
   <div class="head">
     <h3 id="{uid}-h">{t(KEY[category])}</h3>
-    <span class="meta num"
-      >{items.length} · {formatBytes(bytes, getLang())}</span
-    >
+    <!-- Nombre et total seulement à partir de deux éléments : un seul, la ligne dit déjà sa
+         taille (audit du 25 novembre : plus de méta redite). -->
+    {#if items.length > 1}<span class="meta num">{items.length} · {formatBytes(bytes, getLang())}</span>{/if}
   </div>
   <ol bind:this={list} class="rows">
     {#each items as item (item.id)}

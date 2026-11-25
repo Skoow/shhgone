@@ -500,7 +500,8 @@
     <section class="group" aria-labelledby="g-{g.c}" data-group={g.c}>
       <div class="gh">
         <h2 id="g-{g.c}" class="gt">{cat}</h2>
-        <span class="gm num">{g.items.length} · {formatBytes(bytes, lang)}</span>
+        <!-- Un seul élément : sa ligne dit déjà sa taille (audit du 25 novembre). -->
+        {#if g.items.length > 1}<span class="gm num">{g.items.length} · {formatBytes(bytes, lang)}</span>{/if}
         {#if !viewOnly && rate !== null && files.length > 0 && s.active === 0}<span class="gm eta num" title={t("dl.estimate.title")}>{t("dl.estimate", { time: formatDuration(transferSeconds(bytes, rate!), lang) })}</span>{/if}
         {#if !viewOnly && files.length > 0}
           <div class="gacts">
