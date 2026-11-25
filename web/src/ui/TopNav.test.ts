@@ -151,6 +151,178 @@ describe("TopNav", () => {
   });
 });
 
+// Souris sur PC : le survol ouvre (délai d'intention), referme (délai de grâce), bascule d'un
+// menu à l'autre ; clic et clavier restent ; le tactile et les appareils sans survol n'ouvrent
+// qu'au clic.
+describe("TopNav au survol", () => {
+  let fine = true;
+  const dd = (name: string) => btn(name).parentElement!;
+  const ptr = (el: Element, type: "pointerenter" | "pointerleave", pointerType = "mouse") => {
+    el.dispatchEvent(new PointerEvent(type, { pointerType }));
+    flushSync();
+  };
+  const wait = (ms: number) => {
+    vi.advanceTimersByTime(ms);
+    flushSync();
+  };
+  const expanded = (name: string) => btn(name).getAttribute("aria-expanded");
+  beforeEach(() => {
+    fine = true;
+    vi.useFakeTimers();
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (q: string) => ({ matches: fine && q === "(hover: hover) and (pointer: fine)", media: q, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList,
+    );
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("ouvre après le délai d'intention, pas en traversant la barre ; sans voler le focus", () => {
+    show();
+    const before = document.activeElement;
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(60);
+    expect(expanded("Envoyer")).toBe("false");
+    ptr(dd("Envoyer"), "pointerleave");
+    wait(500);
+    expect(expanded("Envoyer")).toBe("false");
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(100);
+    expect(expanded("Envoyer")).toBe("true");
+    expect(panel(btn("Envoyer")).hidden).toBe(false);
+    expect(document.activeElement).toBe(before);
+  });
+
+  it("délai de grâce : glisser du bouton au panneau garde le menu, partir le ferme", () => {
+    show();
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(100);
+    ptr(dd("Envoyer"), "pointerleave");
+    wait(150);
+    expect(expanded("Envoyer")).toBe("true");
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(1000);
+    expect(expanded("Envoyer")).toBe("true");
+    ptr(dd("Envoyer"), "pointerleave");
+    wait(249);
+    expect(expanded("Envoyer")).toBe("true");
+    wait(1);
+    expect(expanded("Envoyer")).toBe("false");
+  });
+
+  it("un seul menu : d'un bouton à l'autre, bascule immédiate", () => {
+    show();
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(100);
+    ptr(dd("Envoyer"), "pointerleave");
+    ptr(dd("Sécurité"), "pointerenter");
+    expect(expanded("Envoyer")).toBe("false");
+    expect(expanded("Sécurité")).toBe("true");
+    wait(1000);
+    expect(expanded("Sécurité")).toBe("true");
+  });
+
+  it("clic après survol : le menu reste ouvert, même en partant ; un second clic le ferme", () => {
+    show();
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(100);
+    btn("Envoyer").click();
+    flushSync();
+    expect(expanded("Envoyer")).toBe("true");
+    ptr(dd("Envoyer"), "pointerleave");
+    wait(1000);
+    expect(expanded("Envoyer")).toBe("true");
+    btn("Envoyer").click();
+    flushSync();
+    expect(expanded("Envoyer")).toBe("false");
+  });
+
+  it("clic pendant le délai d'intention : ouvre une fois, le minuteur ne referme rien", () => {
+    show();
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(40);
+    btn("Envoyer").click();
+    flushSync();
+    wait(1000);
+    expect(expanded("Envoyer")).toBe("true");
+  });
+
+  it("clavier après survol : flèche bas va au premier élément, Échap ferme et rend le focus", () => {
+    show();
+    ptr(dd("Sécurité"), "pointerenter");
+    wait(100);
+    const b = btn("Sécurité");
+    b.focus();
+    key(b, "ArrowDown");
+    const items = [...panel(b).querySelectorAll<HTMLElement>("[data-nav-item]")];
+    expect(document.activeElement).toBe(items[0]);
+    // Focus dans le panneau : la souris qui part ne le referme pas.
+    ptr(dd("Sécurité"), "pointerleave");
+    wait(1000);
+    expect(expanded("Sécurité")).toBe("true");
+    key(items[0]!, "Escape");
+    expect(expanded("Sécurité")).toBe("false");
+    expect(document.activeElement).toBe(b);
+  });
+
+  it("Échap ferme un menu ouvert au survol quand le focus est ailleurs, sans le déplacer", () => {
+    show();
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(100);
+    key(document.body, "Escape");
+    expect(expanded("Envoyer")).toBe("false");
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("clic ailleurs ferme un menu ouvert au survol", () => {
+    show();
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(100);
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    flushSync();
+    expect(expanded("Envoyer")).toBe("false");
+  });
+
+  it("changement d'écran : ferme et annule un survol en attente", async () => {
+    const { navigate } = await import("../app/router.svelte");
+    show();
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(100);
+    navigate("/envois");
+    flushSync();
+    expect(expanded("Envoyer")).toBe("false");
+    ptr(dd("Sécurité"), "pointerenter");
+    wait(50);
+    navigate("/");
+    flushSync();
+    wait(1000);
+    expect(expanded("Sécurité")).toBe("false");
+  });
+
+  it("tactile, stylet ou appareil sans survol fin : rien au survol, le toucher ouvre", () => {
+    show();
+    ptr(dd("Envoyer"), "pointerenter", "touch");
+    ptr(dd("Envoyer"), "pointerenter", "pen");
+    wait(1000);
+    expect(expanded("Envoyer")).toBe("false");
+    fine = false;
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(1000);
+    expect(expanded("Envoyer")).toBe("false");
+    btn("Envoyer").click();
+    flushSync();
+    expect(expanded("Envoyer")).toBe("true");
+  });
+
+  it("pendant un envoi : le survol n'ouvre rien", () => {
+    show({ busy: true });
+    ptr(dd("Envoyer"), "pointerenter");
+    wait(1000);
+    expect(expanded("Envoyer")).toBe("false");
+  });
+});
+
 // Conception compte §21.15.1 : connecté, « Mes partages » devient « Accueil » ;
 // sans compte, rien ne change.
 describe("TopNav connecté", () => {

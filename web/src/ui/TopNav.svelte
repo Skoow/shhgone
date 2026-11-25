@@ -4,6 +4,10 @@
   // boutons, pas un role="menu"), « Salon » bientôt, « Offres » ; à droite « Mes partages » et
   // « Partager ». Clavier : Entrée et Espace ouvrent, flèches haut et bas parcourent, Échap ferme
   // et rend le focus au bouton, Tab hors du menu le ferme ; un clic ailleurs le ferme aussi.
+  // Souris (pointeur fin qui survole) : le survol ouvre après un court délai d'intention et
+  // referme après un délai de grâce (pour glisser du bouton au panneau) ; d'un menu ouvert à
+  // l'autre, la bascule est immédiate. Un clic sur un menu ouvert au survol le garde ouvert.
+  // Le survol ne déplace jamais le focus. Tactile : clic ou toucher seulement.
   // Téléphone (< 768 px) : rien de tout ça, la barre d'onglets du bas tient la navigation.
   import { flushSync, type Component } from "svelte";
   import { chrome, goToSend, type AddGesture } from "../app/chrome.svelte";
@@ -22,6 +26,8 @@
 
   type MenuId = "share" | "security";
   let open = $state<MenuId | null>(null);
+  /** Ouvert au survol (se referme quand la souris s'en va) ou au clic et au clavier (reste). */
+  let byHover = false;
   let wrap: HTMLElement | undefined = $state();
   const uid = $props.id();
 
@@ -35,16 +41,25 @@
     return document.querySelector<HTMLButtonElement>(`[aria-controls="${uid}-${id}"]`);
   }
   function toggle(id: MenuId) {
+    stopTimers();
     if (busy) return;
-    open = open === id ? null : id;
+    // Ouvert au survol : le clic le garde ouvert (il ne se refermera plus en partant).
+    if (open === id && byHover) byHover = false;
+    else {
+      open = open === id ? null : id;
+      byHover = false;
+    }
   }
   function openAt(id: MenuId, which: "first" | "last") {
+    stopTimers();
     if (busy) return;
+    byHover = false;
     flushSync(() => (open = id));
     const list = items(id);
     (which === "first" ? list[0] : list[list.length - 1])?.focus();
   }
   function close(focusBack = false) {
+    stopTimers();
     const was = open;
     open = null;
     if (focusBack && was) button(was)?.focus();
@@ -77,6 +92,59 @@
       close(true);
     }
   }
+  // Survol à la souris : délai d'intention à l'ouverture, délai de grâce à la fermeture.
+  const HOVER_OPEN_MS = 100;
+  const HOVER_CLOSE_MS = 250;
+  let openTimer: ReturnType<typeof setTimeout> | undefined;
+  let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  function stopTimers() {
+    clearTimeout(openTimer);
+    clearTimeout(closeTimer);
+    openTimer = closeTimer = undefined;
+  }
+  /** Souris sur un appareil qui survole vraiment ; le tactile et le stylet n'ouvrent qu'au toucher. */
+  function hovers(e: PointerEvent): boolean {
+    return e.pointerType === "mouse" && !busy && (window.matchMedia?.("(hover: hover) and (pointer: fine)").matches ?? false);
+  }
+  /** Focus dans le panneau ouvert (navigation au clavier en cours) : le survol n'y touche pas. */
+  function focusIn(id: MenuId): boolean {
+    return !!document.getElementById(`${uid}-${id}`)?.contains(document.activeElement);
+  }
+  function onEnter(e: PointerEvent, id: MenuId) {
+    if (!hovers(e)) return;
+    stopTimers();
+    if (open === id) return;
+    if (open && focusIn(open)) return;
+    const show = () => {
+      open = id;
+      byHover = true;
+    };
+    if (open) show();
+    else openTimer = setTimeout(show, HOVER_OPEN_MS);
+  }
+  function onLeave(e: PointerEvent, id: MenuId) {
+    if (e.pointerType !== "mouse") return;
+    clearTimeout(openTimer);
+    openTimer = undefined;
+    if (open !== id || !byHover) return;
+    clearTimeout(closeTimer);
+    closeTimer = setTimeout(() => {
+      closeTimer = undefined;
+      if (open === id && byHover && !focusIn(id)) open = null;
+    }, HOVER_CLOSE_MS);
+  }
+  $effect(() => stopTimers);
+  // Survol : complément de la souris, le bouton reste l'élément interactif (clic, clavier).
+  const hoverOf = (id: MenuId) => (node: HTMLElement) => {
+    const enter = (e: PointerEvent) => onEnter(e, id);
+    const leave = (e: PointerEvent) => onLeave(e, id);
+    node.addEventListener("pointerenter", enter);
+    node.addEventListener("pointerleave", leave);
+    return () => {
+      node.removeEventListener("pointerenter", enter);
+      node.removeEventListener("pointerleave", leave);
+    };
+  };
   const keysOf = (id: MenuId) => (node: HTMLElement) => {
     const h = (e: KeyboardEvent) => onPanelKey(e, id);
     node.addEventListener("keydown", h);
@@ -85,20 +153,29 @@
   function onFocusOut(e: FocusEvent, id: MenuId) {
     const next = e.relatedTarget as Node | null;
     const box = document.getElementById(`${uid}-${id}`)?.parentElement;
-    if (open === id && (!next || !box?.contains(next))) open = null;
+    if (open === id && (!next || !box?.contains(next))) close();
   }
-  // Clic ailleurs : ferme, sans voler le focus.
+  // Clic ailleurs : ferme, sans voler le focus. Échap ferme aussi un menu ouvert au survol
+  // quand le focus est ailleurs (dans la barre, les touches du bouton et du panneau s'en chargent).
   $effect(() => {
     if (!open) return;
     const down = (e: Event) => {
-      if (!wrap?.contains(e.target as Node)) open = null;
+      if (!wrap?.contains(e.target as Node)) close();
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !wrap?.contains(document.activeElement)) close();
     };
     document.addEventListener("pointerdown", down, true);
-    return () => document.removeEventListener("pointerdown", down, true);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("keydown", esc);
+    };
   });
   // Changement d'écran : menus fermés.
   $effect(() => {
     void router.current;
+    stopTimers();
     open = null;
   });
 
@@ -140,7 +217,7 @@
 {/snippet}
 
 {#snippet menu(id: MenuId, label: string, list: Item[])}
-  <div class="dd" onfocusout={(e) => onFocusOut(e, id)}>
+  <div class="dd" onfocusout={(e) => onFocusOut(e, id)} {@attach hoverOf(id)}>
     <button
       type="button"
       class={["nl", "dd-b", { on: open === id }]}
