@@ -336,7 +336,7 @@ Objectif : une conversation aussi proche que possible d'une messagerie moderne. 
 ### 14.1 En ligne, hors ligne, dernière connexion
 
 - **En ligne** : point vert sur l'avatar et « en ligne » sous le pseudonyme, d'après `0x07`.
-- **Hors ligne** : « vu aujourd'hui à 14:32 », « vu hier à 22:05 » ou « vu le 11 nov. à 09:10 », à la minute près, heure de l'appareil qui affiche.
+- **Hors ligne** : pastille rouge sur la photo et, depuis le 25 novembre (décision du propriétaire), durée écoulée : « vu à l'instant », « vu il y a 12 min », « vu il y a 3 h » jusqu'à 24 h, puis jour et heure (« vu le 11 nov. à 09:10 »), à la minute près, heure de l'appareil qui affiche, mis à jour tout seul. Même source qu'avant (trames de présence déjà reçues), rien de nouveau n'est envoyé au serveur.
 - **Source de l'heure** : le serveur, qui connaît déjà les connexions (§10). Il garde **en mémoire seulement** l'heure de la dernière déconnexion de chaque siège, arrondie à la minute, et la joint à `0x07` hors ligne et à l'accueil (`0x0D` étendu). Rien sur le disque, rien après la fin du salon. Changement de protocole : côté serveur (ci-dessous).
 - **Pas de masquage** : tout le monde voit la dernière connexion de chacun, sans réglage pour la cacher.
 - **Signalement (moyen, confidentialité), accepté** : l'heure de dernière connexion apprend aux autres membres quand chacun utilise le salon, sans moyen de la cacher ; c'est dit sur la page d'explication avant d'entrer.
