@@ -9,6 +9,7 @@
   import { AFFICHE_MAX } from "../../salon/pieces";
   import type { Bulle } from "../../salon/conversation";
   import Button from "../../ui/Button.svelte";
+  import { FileArchive, FileText } from "../../ui/Icon";
 
   let { b }: { b: Bulle } = $props();
   const p = $derived(b.piece!);
@@ -18,6 +19,10 @@
   const auto = $derived((p.sorte === "image" || p.sorte === "vocal") && p.taille <= AFFICHE_MAX);
   // Photo ou vidéo affichée : nom et taille en une ligne discrète sous la vignette, « Enregistrer » au bout.
   const media = $derived(!!url && (p.sorte === "image" || p.sorte === "video"));
+  // Fichier (ni photo, ni vidéo, ni vocal affichés) : une ligne comme dans une messagerie,
+  // icône, nom et taille, « Enregistrer » au bout.
+  const fichier = $derived(p.sorte === "fichier");
+  const archive = $derived(/zip|x-7z|x-rar|x-tar|gzip/.test(p.mime));
   let nom = $derived.by(() => {
     try {
       return S.moteur()?.nettoyerNom(p.nom) || t("salon.piece.sans.nom");
@@ -36,7 +41,7 @@
   });
 </script>
 
-<div class={["piece", { media }]}>
+<div class={["piece", { media, fichier }]}>
   {#if url && p.sorte === "image"}
     <img src={url} alt={nom} class="img" onload={() => S.estVu(b) && S.accuserPiece(b, "piece_ouverte")} />
   {:else if url && p.sorte === "vocal"}
@@ -60,6 +65,7 @@
       {/if}
     </div>
   {:else}
+    {#if fichier}<span class="ficone" aria-hidden="true">{#if archive}<FileArchive size={20} />{:else}<FileText size={20} />{/if}</span>{/if}
     <p class="fic">
       <bdi class="nom">{nom}</bdi>
       <span class="taille">{formatBytes(p.taille, lang)}{#if p.dureeMs} · {formatDuration(p.dureeMs / 1000, lang, { precise: true })}{/if}</span>
@@ -144,6 +150,42 @@
   .taille {
     color: var(--text-2);
     font-size: 0.8125rem;
+  }
+  .fichier {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    padding-top: 2px;
+  }
+  .fichier > * {
+    grid-column: 1 / -1;
+  }
+  .fichier > .ficone {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .fichier > .fic {
+    grid-column: 2;
+    grid-row: 1;
+    display: grid;
+    gap: 0;
+    min-width: 7em;
+  }
+  .fichier .nom {
+    overflow-wrap: break-word;
+  }
+  .fichier > .acts {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .ficone {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgb(255 255 255 / 0.06);
+    color: var(--text-2);
   }
   progress {
     width: 100%;

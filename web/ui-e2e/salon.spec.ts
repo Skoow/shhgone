@@ -275,7 +275,9 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
       { name: `album-2-${r}.jpg`, mimeType: "image/jpeg", buffer: image },
     ]);
     await expect(fil(pageB).locator("li.msg.album img.img")).toHaveCount(2, { timeout: 60_000 });
-    await expect(fil(pageB).locator("li.msg.album .auteur")).toHaveCount(1);
+    // Album : une grille ; le nom de l'auteur au plus une fois, au-dessus (début de série), jamais sur chaque photo.
+    expect(await fil(pageB).locator("li.albums .auteur").count()).toBeLessThanOrEqual(1);
+    await expect(fil(pageB).locator("li.msg.album .auteur")).toHaveCount(0);
     await fil(pageB).locator("li.msg.album").last().scrollIntoViewIfNeeded();
     await captureB("salon-album");
     // Mode sélection dans la conversation (v3 §14.3) : appui long sur une photo de l'album, toucher

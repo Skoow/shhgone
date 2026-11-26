@@ -73,3 +73,4 @@ export { default as MicOff } from "./icons/MicOff.svelte";
 export { default as VolumeX } from "./icons/VolumeX.svelte";
 export { default as Folder } from "./icons/Folder.svelte";
 export { default as Users } from "./icons/Users.svelte";
+export { default as Smile } from "./icons/Smile.svelte";

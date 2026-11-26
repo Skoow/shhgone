@@ -140,7 +140,7 @@ test("conversation : cadre, paramètres, coches, effacement, fin", async ({ page
     await envoyer(pageB, t2);
     await expect(bulle(page, t2)).toBeVisible({ timeout: 30_000 });
     const droite = async (p: Page, texte: string) => {
-      const li = (await bulle(p, texte).boundingBox())!;
+      const li = (await bulle(p, texte).locator(".bulle").boundingBox())!; // la bulle (la rangée prend toute la largeur)
       const fl = (await fil(p).boundingBox())!;
       return li.x + li.width / 2 > fl.x + fl.width / 2;
     };

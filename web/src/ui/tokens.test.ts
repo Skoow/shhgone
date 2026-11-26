@@ -455,6 +455,8 @@ describe("Icon.ts (UI §6, jeu maison UI8)", () => {
     "phone", "phone-off", "video", "video-off", "mic-off",
     // En-tête du salon sur téléphone.
     "volume-x", "folder", "users",
+    // Saisie du salon (sélecteur d'émojis).
+    "smile",
   ];
   const pascal = (s: string) =>
     s.split("-").map((p) => p[0]!.toUpperCase() + p.slice(1)).join("");

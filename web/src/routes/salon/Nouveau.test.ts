@@ -67,7 +67,10 @@ describe("Salon, sans session : vitrine et bloc d'action", () => {
     expect(v.querySelector("[data-ecrit]")!.textContent).toContain("Noé écrit…");
     expect(v.querySelector("[data-appels] .badge")!.textContent).toBe(fr["salon.appel.badge"]);
     // L'échéance n'est dite qu'à un endroit : l'en-tête (pas de bandeau « se ferme dans » en plus).
-    expect(v.querySelector(".etat")!.textContent!.replace(/\s+/g, " ")).toMatch(/^3 en ligne · 2 places libres · s'efface dans 15 min$/);
+    // En-tête compact (comme le vrai salon) : en ligne, places libres, échéance (forme longue ;
+    // la forme courte « 15 min » ne sert que sur téléphone).
+    const statut = [...v.querySelectorAll(".statut > span:not(.sep)")].map((e) => e.querySelector(".long")?.textContent ?? e.textContent);
+    expect(statut.map((x) => x!.replace(/\s+/g, " ").trim())).toEqual(["3 en ligne", "2 places libres", "s'efface dans 15 min"]);
     expect(v.querySelector("[data-fin]")).toBeNull();
     expect(vt).not.toContain(fr["salon.fin.alerte.other"].replace("{n}", "15"));
 

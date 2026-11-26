@@ -6,15 +6,17 @@
   // côté (jamais la couleur seule). Décoratif en entier : aria-hidden.
   import * as S from "../../salon/salon.svelte";
 
-  type Props = { siege: number; nom: string; taille?: number; enLigne?: boolean | null };
-  let { siege, nom, taille = 32, enLigne = null }: Props = $props();
+  // `photo` faux : l'initiale seulement (message d'un siège redonné depuis : la photo serait celle
+  // de la personne qui l'occupe maintenant).
+  type Props = { siege: number; nom: string; taille?: number; enLigne?: boolean | null; photo?: boolean };
+  let { siege, nom, taille = 32, enLigne = null, photo = true }: Props = $props();
 
-  const url = $derived((void S.vue.rev, S.avatarUrl(siege)));
+  const url = $derived(photo ? (void S.vue.rev, S.avatarUrl(siege)) : null);
   const initiale = $derived([...nom.trim()][0]?.toLocaleUpperCase() ?? "");
   // Photo annoncée : lue et déchiffrée une fois (avatarDe ne relit pas une photo déjà là).
   $effect(() => {
     void S.vue.rev;
-    void S.avatarDe(siege);
+    if (photo) void S.avatarDe(siege);
   });
 </script>
 

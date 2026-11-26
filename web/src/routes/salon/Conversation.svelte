@@ -26,7 +26,8 @@
   import { texteVu } from "./presence";
   import IconButton from "../../ui/IconButton.svelte";
   import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
-  import { Clock, Ellipsis, Folder, Hourglass, Mic, Paperclip, Phone, SlidersHorizontal, TriangleAlert, Video, Volume, VolumeX, X } from "../../ui/Icon";
+  import { ArrowDown, Clock, Ellipsis, Folder, Hourglass, Mic, Paperclip, Phone, Send, SlidersHorizontal, Smile, TriangleAlert, Users, Video, Volume, VolumeX, X } from "../../ui/Icon";
+  import { rangs, sorteJour } from "./fil";
   import { reducedMotion } from "../../ui/motion";
   import { doitSonner, jouer, SILENCE_TOUJOURS } from "../../salon/son";
   import { SvelteSet } from "svelte/reactivity";
@@ -430,20 +431,82 @@
   $effect(() => () => observateur?.disconnect());
 
   // --- Défilement, non-lus, annonces ----------------------------------------------------------------
+  // Comme une application : la page ne défile pas, seul le fil défile (en-tête et saisie fixes).
 
-  let repere: HTMLElement | undefined = $state();
-  /** Défile jusqu'à la fin de la conversation (saisie comprise), jamais jusqu'au pied de page. */
+  let zoneFil: HTMLElement | undefined = $state();
+  let listeFil: HTMLElement | undefined = $state();
+  /** Défile jusqu'au dernier message du fil. */
   function aller(force = false): void {
     if (!force && !enBas) return;
-    const r = repere?.getBoundingClientRect();
-    if (r) window.scrollTo({ top: Math.max(0, window.scrollY + r.bottom - window.innerHeight), behavior: "instant" as ScrollBehavior });
+    if (zoneFil) zoneFil.scrollTop = zoneFil.scrollHeight;
+    enBas = true;
     nonLus = 0;
   }
   function defile(): void {
-    const r = repere?.getBoundingClientRect();
-    enBas = r ? r.top <= window.innerHeight + 80 : true;
+    const z = zoneFil;
+    enBas = z ? z.scrollHeight - z.scrollTop - z.clientHeight <= 80 : true;
     if (enBas) nonLus = 0;
   }
+  // Une photo qui se charge, une réaction, un menu qui s'ouvre : le fil grandit ; s'il était en
+  // bas, il y reste (comme une messagerie). Premier affichage : en bas.
+  $effect(() => {
+    const l = listeFil;
+    if (!l || typeof ResizeObserver === "undefined") return;
+    untrack(() => aller(true));
+    const ro = new ResizeObserver(() => aller());
+    ro.observe(l);
+    return () => ro.disconnect();
+  });
+
+  // --- Mise en page d'application ---------------------------------------------------------------------
+  // La page entière est l'écran du salon : pas de défilement ni de pied de page pendant la
+  // conversation (html.salon-app, ôtée en quittant). Ordinateur : sous la barre du site
+  // (--haut, mesurée) ; téléphone : plein écran, à la hauteur de la partie visible
+  // (visualViewport : le clavier virtuel ne cache jamais la saisie, iOS compris).
+  let salon: HTMLElement | undefined = $state();
+  $effect(() => {
+    const el = salon;
+    if (!el) return;
+    const html = document.documentElement;
+    html.classList.add("salon-app");
+    window.scrollTo(0, 0);
+    const barre = document.querySelector<HTMLElement>("header.top");
+    const vv = window.visualViewport;
+    const maj = () => {
+      el.style.setProperty("--haut", `${Math.max(0, barre?.getBoundingClientRect().bottom ?? 0)}px`);
+      el.style.setProperty("--vv-h", `${vv?.height ?? window.innerHeight}px`);
+      el.style.setProperty("--vv-top", `${vv?.offsetTop ?? 0}px`);
+      aller();
+    };
+    maj();
+    const ro = barre && typeof ResizeObserver !== "undefined" ? new ResizeObserver(maj) : null;
+    if (barre) ro?.observe(barre);
+    vv?.addEventListener("resize", maj);
+    vv?.addEventListener("scroll", maj);
+    window.addEventListener("resize", maj);
+    return () => {
+      html.classList.remove("salon-app");
+      ro?.disconnect();
+      vv?.removeEventListener("resize", maj);
+      vv?.removeEventListener("scroll", maj);
+      window.removeEventListener("resize", maj);
+    };
+  });
+  /** Colonne des participants (ordinateur large) : repliable, ouverte par défaut. */
+  let colonne = $state(true);
+
+  // Champ de saisie qui grandit avec le texte : CSS (field-sizing) là où il existe, sinon la
+  // hauteur suit le contenu (Safari, Firefox), jusqu'à 160 px.
+  const grandit = typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content");
+  $effect(() => {
+    void texte;
+    const s = saisie;
+    if (!s || grandit) return;
+    s.style.height = "auto";
+    s.style.height = `${Math.min(s.scrollHeight + 2, 160)}px`;
+  });
+
+  const envoiPossible = $derived(texte.trim() !== "" || edition !== null);
   let vusAnnonce = untrack(() => conv.elements.length);
   let rafale: { n: number; t: number } = { n: 0, t: 0 };
   /** Dernier son joué (ms) : au plus un toutes les 2 s (v3 §14.4). */
@@ -485,6 +548,15 @@
 
   // --- Affichage ---------------------------------------------------------------------------------------
 
+  // Fil mis en page : jour, séries d'un même auteur, albums, « Nouveaux messages ».
+  const rangsFil = $derived(rangs(elements, albums, (b) => `${b.moi}:${b.siege}:${nomDe(b)}`, separateur));
+  function jour(ms: number): string {
+    const s = sorteJour(ms, maintenant);
+    if (s === "today" || s === "yesterday") return t(`salon.room.jour.${s}`);
+    return new Intl.DateTimeFormat(lang, { weekday: "long", day: "numeric", month: "long", ...(s === "annee" ? { year: "numeric" } : {}) }).format(ms);
+  }
+  // Pastilles empilées de l'en-tête : les trois premiers autres participants.
+  const pile = $derived(autres.slice(0, 3));
   function coche(b: Bulle): string {
     if (vuPartiel(b)) return t("salon.room.tick.vupar", { n: b.vus.length, total: b.attendus.length });
     return t(`salon.room.tick.${conv.coche(b)}`);
@@ -545,56 +617,155 @@
   }
 </script>
 
-<svelte:window onscroll={defile} onkeydown={echappe} />
+<svelte:window onkeydown={echappe} />
 
-<!-- Scène (fond de la vitrine) et cadre de la conversation, qui a son propre fond. -->
-<div class="salon">
-<div class="ecran">
+<!-- Un message (bulle, rangée d'actions, réactions, menu). `album` : case d'un album de photos. -->
+{#snippet message(e: Bulle, premier: boolean, dernier: boolean, album: boolean)}
+  {@const dc = decompte(e)}
+  {@const media = !e.retire && e.piece !== null && (e.piece.sorte === "image" || e.piece.sorte === "video")}
+  <li class={["msg", { moi: e.moi, premier, dernier, album, choisi: selection && choix.has(e.cle) }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e} use:appuiLong={e} out:dissoudre>
+    {#if !e.moi && !album}
+      <!-- Photo de l'auteur : sur le premier message de la série seulement (décorative, le nom est dans la bulle). -->
+      <span class="gout" aria-hidden="true">{#if premier}<Avatar siege={e.siege} nom={nomDe(e)} taille={32} photo={!e.fige} />{/if}</span>
+    {/if}
+    <div class="contenu">
+      <div class="rang">
+        {#if selection && selectionnable(e)}
+          <input type="checkbox" class="sel" id="sel-{e.cle}" checked={choix.has(e.cle)} aria-label={t("salon.files.choisir", { nom: nomPiece(e) })} onchange={() => basculer(e.cle)} />
+        {/if}
+        <div class={["bulle", { media }]}>
+          {#if !e.moi && premier && !album}<span class="auteur">{nomDe(e)}</span>{/if}
+          {#if e.retire}
+            <p class="retire">{t("salon.room.retracted")}</p>
+          {:else}
+            {@const q = cite(e)}
+            {#if q}<blockquote class="cite"><span class="qn">{q.nom}</span> <bdi>{q.texte}</bdi></blockquote>{/if}
+            {#if e.piece}
+              <Piece b={e} />
+            {:else}
+              <p class="texte"><bdi
+                  >{#each morceaux(e.texte) as m, i (i)}{#if m.lien}<a href={m.t} target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">{m.t}</a>{:else}{m.t}{/if}{/each}</bdi
+                ></p>
+            {/if}
+          {/if}
+          {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>
+            {#if e.echec === "trop_grand" && !e.piece && e.texte}<Button variant="secondary" dense onpress={() => enFichier(e.texte)}>{t("salon.room.toolong.txt")}</Button>{/if}{/if}
+          <!-- Effacement (règle du salon) : sablier et temps restant, avant l'heure. -->
+          {#if dc}<span class="minuteur" data-decompte><Hourglass size={12} strokeWidth={2} aria-hidden="true" />{#if dc.court}<span aria-hidden="true">{dc.court}</span>{/if}<span class="sr-only">{dc.long}</span></span>{/if}
+          <!-- Bas de la bulle, à droite : « modifié », heure, puis accusés (nos messages). -->
+          <p class="meta">
+            {#if e.modifie && !e.retire}<span class="modifie">{t("salon.room.edited")}</span>{/if}
+            <time>{formatClock(e.heureMs, lang)}</time>
+            {#if e.moi}
+              {@const c = conv.coche(e)}
+              <span class={["coche", c, { partiel: vuPartiel(e) }]}>
+                {#if c === "attente"}<Clock size={13} strokeWidth={2} aria-hidden="true" />
+                {:else if c === "echec"}<TriangleAlert size={13} strokeWidth={2} aria-hidden="true" />
+                {:else}
+                  <svg class="tic" viewBox="0 0 18 12" width="18" height="12" aria-hidden="true" focusable="false">
+                    {#if c === "envoye" && !vuPartiel(e)}<path d="M3.5 6.6l2.9 2.9L13 2.9" />{:else}<path d="M1 6.6l2.9 2.9L10.5 2.9" /><path d="M7.6 9.2l.3.3L14.5 2.9" />{/if}
+                  </svg>
+                {/if}
+                {#if vuPartiel(e)}<span aria-hidden="true">{e.vus.length}/{e.attendus.length}</span>{/if}
+                <span class={c === "echec" ? "" : "sr-only"}>{coche(e)}</span>
+              </span>
+            {/if}
+          </p>
+        </div>
+        {#if !e.retire && e.id}
+          <button type="button" class="plus" aria-label={t("salon.room.actions")} aria-expanded={menu === e.cle} onclick={() => (menu = menu === e.cle ? null : e.cle)}><Ellipsis size={18} aria-hidden="true" /></button>
+        {/if}
+      </div>
+      {#if e.reactions.length > 0}
+        <ul class="reactions">
+          {#each e.reactions as r (r.emoji)}
+            <li><button type="button" class={{ mien: r.sieges.includes(conv.moi) }} aria-label="{r.emoji} {r.sieges.length} — {r.sieges.map(nom).join(', ')}" onclick={() => reagir(e, r.emoji)}>{r.emoji} {r.sieges.length}</button></li>
+          {/each}
+        </ul>
+      {/if}
+      {#if !e.retire && e.id && menu === e.cle}
+        <div class="actions-msg" role="group" aria-label={t("salon.room.actions")}>
+          <div class="rapides">
+            {#each QUICK as q (q)}<button type="button" aria-label="{t('salon.room.react')} {q}" onclick={() => reagir(e, q)}>{q}</button>{/each}
+          </div>
+          <Button variant="ghost" dense onpress={() => repondre(e)}>{t("salon.room.reply")}</Button>
+          {#if selectionnable(e)}<Button variant="ghost" dense onpress={() => selectionner(e)}>{t("salon.sel.choisir")}</Button>{/if}
+          <Button variant="ghost" dense onpress={() => copier(e)}>{t("salon.room.copy")}</Button>
+          {#if e.moi && e.seq !== null}
+            <Button variant="ghost" dense onpress={() => ouvrirInfos(e)}>{t("salon.infos")}</Button>
+            <Button variant="ghost" dense onpress={() => editer(e)}>{t("salon.room.edit")}</Button>
+            <InlineConfirm label={t("salon.room.retract")} message={t("salon.room.retract.confirm")} confirmLabel={t("salon.room.retract")} kind="danger" triggerVariant="ghost" onconfirm={() => ((menu = null), S.retirer(e))} />
+          {/if}
+        </div>
+      {/if}
+    </div>
+  </li>
+{/snippet}
+
+<!-- L'écran du salon, comme une application de messagerie : en-tête, participants (colonne sur
+     grand écran, ligne ailleurs), fil qui défile seul, saisie collée en bas. -->
+<div bind:this={salon} class={["salon", { replie: !colonne, seul: autres.length === 0 }]} data-salon>
   <header class="tete">
-    <div class="titre">
-      <h1 tabindex="-1">{t("title.salon")}</h1>
-      <p class="etat">
-        <span>{t("salon.room.online", { n: enLigne })}</span> · <span>{t("salon.room.free", { n: libres })}</span> ·
-        <span>{t("salon.room.expires", { duree: formatDuration(reste, lang, { precise: reste < 300 }) })}</span>
-      </p>
+    <div class="ident">
+      <span class="pile" aria-hidden="true">
+        {#each pile as m (m.s)}<span class={["pp", `c${m.couleur}`]}><Avatar siege={m.s} nom={m.nom} taille={36} /></span>{:else}<span class="pp vide"><Users size={18} /></span>{/each}
+      </span>
+      <div class="titre">
+        <h1 tabindex="-1">{t("title.salon")}</h1>
+        <p class="etat">
+          <!-- « Noé écrit… » remplace l'état le temps de l'écriture (annoncé poliment). -->
+          <span class="ecrit" aria-live="polite">{#if ecrivent.length === 1}{t("salon.room.typing.un", { nom: nom(ecrivent[0]!) })}{:else if ecrivent.length > 1}{t("salon.room.typing.plusieurs")}{/if}</span>
+          {#if ecrivent.length === 0}
+            <span>{t("salon.room.online", { n: enLigne })}</span><span class="sep" aria-hidden="true">·</span><span class="libres">{t("salon.room.free", { n: libres })}</span><span class="sep libres" aria-hidden="true">·</span>
+            <span class="echeance"><Hourglass size={12} strokeWidth={2} aria-hidden="true" /><span class="long">{t("salon.room.expires", { duree: formatDuration(reste, lang, { precise: reste < 300 }) })}</span><span class="court" aria-hidden="true">{formatDuration(reste, lang, { precise: reste < 300 })}</span></span>
+          {/if}
+        </p>
+      </div>
     </div>
     <div class="boutons">
       {#if vue.appels && etatAppel === "aucun"}
-        <!-- Lancer un appel : réservé à Plus et Pro. Sans pass sur cet appareil, le badge le dit
-             d'emblée (et la description des boutons, pour les lecteurs d'écran) ; rejoindre un
-             appel en cours reste ouvert à tous. -->
-        <span class={["appels", { reserve: !vue.offreAppel }]} data-appels>
-          <IconButton label={t("salon.appel.audio")} aria-describedby={vue.offreAppel ? undefined : "appels-reserve"} variant="secondary" onpress={() => void S.lancerAppel(false)}><Phone size={20} /></IconButton>
-          <IconButton label={t("salon.appel.video")} aria-describedby={vue.offreAppel ? undefined : "appels-reserve"} variant="secondary" onpress={() => void S.lancerAppel(true)}><Video size={20} /></IconButton>
+        <!-- Lancer un appel : réservé à Plus et Pro. Sans pass sur cet appareil, les deux boutons
+             sont dans un cadre étiqueté « Plus · Pro » (et la description des boutons le dit aux
+             lecteurs d'écran) ; rejoindre un appel en cours reste ouvert à tous. -->
+        <div class={["appels", { reserve: !vue.offreAppel }]} role="group" aria-label={t("salon.appel.groupe")} data-appels>
           {#if !vue.offreAppel}<span class="badge" aria-hidden="true">{t("salon.appel.badge")}</span><span class="sr-only" id="appels-reserve">{t("salon.appel.reserve")}</span>{/if}
-        </span>
+          <button type="button" class="ic" aria-label={t("salon.appel.audio")} aria-describedby={vue.offreAppel ? undefined : "appels-reserve"} onclick={() => void S.lancerAppel(false)}><Phone size={20} aria-hidden="true" /></button>
+          <button type="button" class="ic" aria-label={t("salon.appel.video")} aria-describedby={vue.offreAppel ? undefined : "appels-reserve"} onclick={() => void S.lancerAppel(true)}><Video size={20} aria-hidden="true" /></button>
+        </div>
       {/if}
-      <!-- Sur téléphone, boutons à icône de 44 px sur une ligne (le
-           libellé reste le nom accessible) ; ailleurs, icône et libellé. -->
       {#if silencieux}
-        <button type="button" class="bt coupe" aria-label={t("salon.son.reactiver")} onclick={() => S.silencieux(null)}><VolumeX size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.son.reactiver")}</span></button>
+        <button type="button" class="ic coupe" aria-label={t("salon.son.reactiver")} onclick={() => S.silencieux(null)}><VolumeX size={20} aria-hidden="true" /></button>
       {:else}
-        <button type="button" class="bt" aria-label={t("salon.son.silence")} aria-expanded={choixSilence} onclick={() => (choixSilence = !choixSilence)}><Volume size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.son.silence")}</span></button>
+        <button type="button" class="ic" aria-label={t("salon.son.silence")} aria-expanded={choixSilence} onclick={() => (choixSilence = !choixSilence)}><Volume size={20} aria-hidden="true" /></button>
       {/if}
-      <button type="button" class="bt" aria-label={t("salon.files.title")} onclick={() => (fichiers = true)}><Folder size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.files.title")}</span></button>
-      <!-- Participants, règle d'effacement et gestion : dans le panneau, la conversation garde toute la largeur. -->
-      <button type="button" class="bt" aria-label={t("salon.params")} aria-haspopup="dialog" aria-expanded={params} aria-controls="salon-params" onclick={() => (params = !params)}><SlidersHorizontal size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.params.court")}</span></button>
+      <button type="button" class="ic" aria-label={t("salon.files.title")} onclick={() => (fichiers = true)}><Folder size={20} aria-hidden="true" /></button>
+      <!-- Grand écran : la colonne des participants se replie. -->
+      <button type="button" class="ic bascule" aria-label={t("salon.room.presents.afficher")} aria-expanded={colonne} aria-controls="salon-presents" onclick={() => (colonne = !colonne)}><Users size={20} aria-hidden="true" /></button>
+      <!-- Participants, règle d'effacement et gestion : dans le panneau. -->
+      <button type="button" class="ic" aria-label={t("salon.params")} aria-haspopup="dialog" aria-expanded={params} aria-controls="salon-params" onclick={() => (params = !params)}><SlidersHorizontal size={20} aria-hidden="true" /></button>
     </div>
   </header>
-  {#if autres.length > 0}
-    <!-- Les autres participants : photo, pastille verte ou rouge, et l'état en texte. -->
-    <ul class="presents" aria-label={t("salon.room.presents")} data-presents>
-      {#each autres as m (m.s)}
-        <li class={[`c${m.couleur}`, { hors: !m.enLigne }]}>
-          <Avatar siege={m.s} nom={m.nom} taille={30} enLigne={m.enLigne} />
-          <span class="pq"><bdi class="pn">{m.nom}</bdi><span class="pv">{texteVu(conv.presence.get(m.s), maintenant, lang)}</span></span>
-        </li>
-      {/each}
-    </ul>
-  {/if}
 
-  <div class="corps">
-    <section class="col" aria-label={t("salon.room.label")} ondragover={(e) => e.dataTransfer?.types.includes("Files") && e.preventDefault()} ondrop={deposer}>
+  <!-- Les autres participants : photo, pastille verte ou rouge, et l'état en texte. -->
+  <div class="cote" id="salon-presents">
+    <p class="cote-t" aria-hidden="true">{t("salon.room.presents")}<span class="nb">{autres.length + 1}</span></p>
+    {#if autres.length > 0}
+      <ul class="presents" aria-label={t("salon.room.presents")} data-presents>
+        {#each autres as m (m.s)}
+          <li class={[`c${m.couleur}`, { hors: !m.enLigne }]}>
+            <Avatar siege={m.s} nom={m.nom} taille={32} enLigne={m.enLigne} />
+            <span class="pq"><bdi class="pn">{m.nom}</bdi><span class="pv">{texteVu(conv.presence.get(m.s), maintenant, lang)}</span></span>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="cote-vide">{t("salon.room.presents.vide")}</p>
+    {/if}
+  </div>
+
+  <section class="conv" aria-label={t("salon.room.label")} ondragover={(e) => e.dataTransfer?.types.includes("Files") && e.preventDefault()} ondrop={deposer}>
+    <!-- Au-dessus du fil : appel, bandeaux, choix du silencieux, sélection. -->
+    <div class="hauts">
       {#if vue.appels}<Appel />{/if}
       {#if vue.connexion === "coupe"}<p class="bandeau" role="status">{t("salon.room.reconnect")}</p>{/if}
       {#if !vue.dansLeGroupe && !vue.createur}<p class="bandeau" role="status">{t("salon.room.waitgroup")}</p>{/if}
@@ -621,160 +792,98 @@
           {#if selMessage}<p class="err" role="alert">{selMessage}</p>{/if}
         </div>
       {/if}
-      <div role="log" aria-live="off">
-      <ol class="fil">
-        {#each elements as e (e.cle)}
-          {#if e.cle === separateur}<li class="sys nouveaux">{t("salon.room.nouveaux")}</li>{/if}
-          {#if e.k === "sys"}
-            <li class="sys">{ligne(e)}</li>
-          {:else}
-            {@const al = albums.get(e.cle)}
-            {@const dc = decompte(e)}
-            <li class={["msg", { moi: e.moi, album: al !== undefined, choisi: selection && choix.has(e.cle) }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e} use:appuiLong={e} out:dissoudre>
-              <!-- Rangée : case de sélection, bulle, bouton « ⋯ » (toujours à côté de la bulle). -->
-              <div class="rang">
-              {#if selection && selectionnable(e)}
-                <input type="checkbox" class="sel" id="sel-{e.cle}" checked={choix.has(e.cle)} aria-label={t("salon.files.choisir", { nom: nomPiece(e) })} onchange={() => basculer(e.cle)} />
-              {/if}
-              <div class="bulle">
-                {#if (!e.moi && al !== "suite") || dc}
-                  <div class="haut">
-                    {#if !e.moi && al !== "suite"}<span class="auteur">{nomDe(e)}</span>{/if}
-                    <!-- Effacement (règle du salon) : temps restant court, en haut à droite. -->
-                    {#if dc}<span class="minuteur" data-decompte><Hourglass size={12} strokeWidth={2} aria-hidden="true" />{#if dc.court}<span aria-hidden="true">{dc.court}</span>{/if}<span class="sr-only">{dc.long}</span></span>{/if}
-                  </div>
-                {/if}
-                {#if e.retire}
-                  <p class="retire">{t("salon.room.retracted")}</p>
-                {:else}
-                  {@const q = cite(e)}
-                  {#if q}<blockquote class="cite"><span class="qn">{q.nom}</span> <bdi>{q.texte}</bdi></blockquote>{/if}
-                  {#if e.piece}
-                    <Piece b={e} />
-                  {:else}
-                    <p class="texte"><bdi
-                        >{#each morceaux(e.texte) as m, i (i)}{#if m.lien}<a href={m.t} target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">{m.t}</a>{:else}{m.t}{/if}{/each}</bdi
-                      ></p>
-                  {/if}
-                {/if}
-                {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>
-                  {#if e.echec === "trop_grand" && !e.piece && e.texte}<Button variant="secondary" dense onpress={() => enFichier(e.texte)}>{t("salon.room.toolong.txt")}</Button>{/if}{/if}
-                <!-- Bas de la bulle, à droite : « modifié », heure, puis accusés (nos messages). -->
-                <p class="meta">
-                  {#if e.modifie && !e.retire}<span class="modifie">{t("salon.room.edited")}</span>{/if}
-                  <time>{formatClock(e.heureMs, lang)}</time>
-                  {#if e.moi}
-                    {@const c = conv.coche(e)}
-                    <span class={["coche", c, { partiel: vuPartiel(e) }]}>
-                      {#if c === "attente"}<Clock size={13} strokeWidth={2} aria-hidden="true" />
-                      {:else if c === "echec"}<TriangleAlert size={13} strokeWidth={2} aria-hidden="true" />
-                      {:else}
-                        <svg class="tic" viewBox="0 0 18 12" width="18" height="12" aria-hidden="true" focusable="false">
-                          {#if c === "envoye" && !vuPartiel(e)}<path d="M3.5 6.6l2.9 2.9L13 2.9" />{:else}<path d="M1 6.6l2.9 2.9L10.5 2.9" /><path d="M7.6 9.2l.3.3L14.5 2.9" />{/if}
-                        </svg>
-                      {/if}
-                      {#if vuPartiel(e)}<span aria-hidden="true">{e.vus.length}/{e.attendus.length}</span>{/if}
-                      <span class={c === "echec" ? "" : "sr-only"}>{coche(e)}</span>
-                    </span>
-                  {/if}
-                </p>
-                {#if e.reactions.length > 0}
-                  <ul class="reactions">
-                    {#each e.reactions as r (r.emoji)}
-                      <li><button type="button" class={{ mien: r.sieges.includes(conv.moi) }} aria-label="{r.emoji} {r.sieges.length} — {r.sieges.map(nom).join(', ')}" onclick={() => reagir(e, r.emoji)}>{r.emoji} {r.sieges.length}</button></li>
-                    {/each}
-                  </ul>
-                {/if}
-              </div>
-              {#if !e.retire && e.id}
-                <button type="button" class="plus" aria-label={t("salon.room.actions")} aria-expanded={menu === e.cle} onclick={() => (menu = menu === e.cle ? null : e.cle)}><Ellipsis size={20} aria-hidden="true" /></button>
-              {/if}
-              </div>
-              {#if !e.retire && e.id}
-                {#if menu === e.cle}
-                  <div class="actions-msg" role="group" aria-label={t("salon.room.actions")}>
-                    <div class="rapides">
-                      {#each QUICK as q (q)}<button type="button" aria-label="{t('salon.room.react')} {q}" onclick={() => reagir(e, q)}>{q}</button>{/each}
-                    </div>
-                    <Button variant="ghost" dense onpress={() => repondre(e)}>{t("salon.room.reply")}</Button>
-                    {#if selectionnable(e)}<Button variant="ghost" dense onpress={() => selectionner(e)}>{t("salon.sel.choisir")}</Button>{/if}
-                    <Button variant="ghost" dense onpress={() => copier(e)}>{t("salon.room.copy")}</Button>
-                    {#if e.moi && e.seq !== null}
-                      <Button variant="ghost" dense onpress={() => ouvrirInfos(e)}>{t("salon.infos")}</Button>
-                      <Button variant="ghost" dense onpress={() => editer(e)}>{t("salon.room.edit")}</Button>
-                      <InlineConfirm label={t("salon.room.retract")} message={t("salon.room.retract.confirm")} confirmLabel={t("salon.room.retract")} kind="danger" triggerVariant="ghost" onconfirm={() => ((menu = null), S.retirer(e))} />
-                    {/if}
-                  </div>
-                {/if}
-              {/if}
-            </li>
-          {/if}
-        {/each}
-      </ol>
-      </div>
-      <p class="ecrit" aria-live="polite">
-        {#if ecrivent.length === 1}{t("salon.room.typing.un", { nom: nom(ecrivent[0]!) })}{:else if ecrivent.length > 1}{t("salon.room.typing.plusieurs")}{/if}
-      </p>
-      {#if nonLus > 0 && !enBas}
-        <button type="button" class="bas" aria-label={`${t("salon.room.unread", { n: nonLus })} · ${t("salon.room.down")}`} onclick={() => aller(true)}><span aria-hidden="true">↓ </span><span>{t("salon.room.unread", { n: nonLus })}</span></button>
-      {/if}
+    </div>
 
-      <div class="saisie">
-        {#if secondesFin !== null}
-          <p class="fin-proche" data-alerte-fin="rebours">{t("salon.fin.rebours", { n: secondesFin })}</p>
-        {:else if vue.alerteFin !== null && etatAppel === "dans"}
-          <p class="fin-proche" data-alerte-fin="minutes">{t("salon.fin.alerte", { n: vue.alerteFin })}</p>
-        {/if}
-        {#if attente}<p class="note" role="status">{attente}</p>{/if}
-        {#if S.pieces.avertissement}<p class="err" role="status">{t("salon.piece.err.trop_gros")}</p>{/if}
-        {#if S.pieces.aConfirmer.length > 0}
-          <div class="confirmer" role="group" aria-label={t("salon.piece.nonnettoye")}>
-            <p class="note">{t("salon.piece.nonnettoye")}</p>
-            <ul>{#each S.pieces.aConfirmer as f, i (i)}<li><bdi>{f.name}</bdi></li>{/each}</ul>
-            <div class="ligne">
-              <Button variant="secondary" dense onpress={() => S.confirmerTelQuel(true)}>{t("salon.piece.telquel")}</Button>
-              <Button variant="ghost" dense onpress={() => S.confirmerTelQuel(false)}>{t("salon.piece.annuler")}</Button>
-            </div>
-          </div>
-        {/if}
-        {#if vue.gestionCollee}
-          <div class="confirmer" id="salon-colle" tabindex="-1" role="group" aria-label={t("salon.colle.titre")}>
-            {#if vue.gestionCollee === "proposee"}
-              <p class="note">{t("salon.colle.proposee")}</p>
-              <p class="note">{t("salon.colle.deloge")}</p>
-              <div class="ligne">
-                <Button variant="secondary" dense onpress={reprendreDroits}>{t("salon.colle.reprendre")}</Button>
-                <Button variant="ghost" dense onpress={fermerColle}>{t("salon.colle.annuler")}</Button>
-              </div>
+    <div class="zone-fil">
+      <div class="defile" role="log" aria-live="off" bind:this={zoneFil} onscroll={defile}>
+        <ol class="fil" bind:this={listeFil}>
+          {#each rangsFil as r (r.cle)}
+            {#if r.k === "jour"}
+              <li class="jour"><span>{jour(r.ms)}</span></li>
+            {:else if r.k === "nouveaux"}
+              <li class="sys nouveaux"><span>{t("salon.room.nouveaux")}</span></li>
+            {:else if r.k === "sys"}
+              <li class="sys"><span>{ligne(r.e)}</span></li>
+            {:else if r.k === "msg"}
+              {@render message(r.e, r.premier, r.dernier, false)}
             {:else}
-              <p class={vue.gestionCollee === "fait" || vue.gestionCollee === "deja" ? "note" : "err"} role="status">{t(`salon.colle.${vue.gestionCollee}`)}</p>
-              <div class="ligne"><Button variant="ghost" dense onpress={fermerColle}>{t("salon.colle.fermer")}</Button></div>
+              {@const a = r.items[0]!}
+              <!-- Album (v3 §14.3) : chaque photo reste un message à part (accusés, réactions, retrait). -->
+              <li class={["albums", { moi: a.moi, premier: r.premier, dernier: r.dernier }, `c${conv.couleurDe(a)}`]}>
+                {#if !a.moi}<span class="gout" aria-hidden="true">{#if r.premier}<Avatar siege={a.siege} nom={nomDe(a)} taille={32} photo={!a.fige} />{/if}</span>{/if}
+                <div class="contenu">
+                  {#if !a.moi && r.premier}<span class="auteur">{nomDe(a)}</span>{/if}
+                  <ol class="photos" data-n={Math.min(r.items.length, 3)}>
+                    {#each r.items as p (p.cle)}{@render message(p, false, false, true)}{/each}
+                  </ol>
+                </div>
+              </li>
             {/if}
+          {/each}
+        </ol>
+      </div>
+      {#if nonLus > 0 && !enBas}
+        <button type="button" class="bas" aria-label={`${t("salon.room.unread", { n: nonLus })} · ${t("salon.room.down")}`} onclick={() => aller(true)}><ArrowDown size={16} strokeWidth={2} aria-hidden="true" /><span>{t("salon.room.unread", { n: nonLus })}</span></button>
+      {/if}
+    </div>
+
+    <div class="saisie">
+      {#if secondesFin !== null}
+        <p class="fin-proche" data-alerte-fin="rebours">{t("salon.fin.rebours", { n: secondesFin })}</p>
+      {:else if vue.alerteFin !== null && etatAppel === "dans"}
+        <p class="fin-proche" data-alerte-fin="minutes">{t("salon.fin.alerte", { n: vue.alerteFin })}</p>
+      {/if}
+      {#if attente}<p class="note" role="status">{attente}</p>{/if}
+      {#if S.pieces.avertissement}<p class="err" role="status">{t("salon.piece.err.trop_gros")}</p>{/if}
+      {#if S.pieces.aConfirmer.length > 0}
+        <div class="confirmer" role="group" aria-label={t("salon.piece.nonnettoye")}>
+          <p class="note">{t("salon.piece.nonnettoye")}</p>
+          <ul>{#each S.pieces.aConfirmer as f, i (i)}<li><bdi>{f.name}</bdi></li>{/each}</ul>
+          <div class="choix">
+            <Button variant="secondary" dense onpress={() => S.confirmerTelQuel(true)}>{t("salon.piece.telquel")}</Button>
+            <Button variant="ghost" dense onpress={() => S.confirmerTelQuel(false)}>{t("salon.piece.annuler")}</Button>
           </div>
-        {/if}
-        {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}
-        {#if ralenti !== null}<p class="note" role="status">{t("salon.room.ralenti", { duree: formatDuration(ralenti, lang, { precise: true }) })}</p>{/if}
-        {#if tropLong}<Button variant="secondary" dense onpress={() => {
-            if (tropLong) enFichier(tropLong);
-          }}>{t("salon.room.toolong.txt")}</Button>{/if}
-        {#if reponse}
-          <div class="contexte">
-            <span>{t("salon.room.reply.to", { nom: nomDe(reponse) })}</span>
-            <button type="button" aria-label={t("salon.room.reply.cancel")} onclick={() => (reponse = null)}><X size={18} aria-hidden="true" /></button>
-          </div>
-        {/if}
-        {#if edition}
-          <div class="contexte">
-            <span>{t("salon.room.edit.mode")} — {t("salon.room.edit.note")}</span>
-            <button type="button" aria-label={t("salon.room.edit.cancel")} onclick={annulerEdition}><X size={18} aria-hidden="true" /></button>
-          </div>
-        {/if}
-        {#if emojis}<Emojis onpick={(x) => ((texte += x), saisie?.focus())} onclose={() => ((emojis = false), saisie?.focus())} />{/if}
-        <div class="ligne">
-          <button type="button" class="emo" aria-label={emojis ? t("salon.room.emoji.close") : t("salon.room.emoji")} aria-expanded={emojis} onclick={() => (emojis = !emojis)}>☺</button>
-          <button type="button" class="emo" aria-label={t("salon.piece.joindre")} onclick={() => joindre?.click()}><Paperclip size={20} aria-hidden="true" /></button>
-          <button type="button" class="emo" aria-label={t("salon.piece.vocal")} onclick={() => (vocal = true)}><Mic size={20} aria-hidden="true" /></button>
-          <input bind:this={joindre} type="file" multiple hidden onchange={choisis} />
+        </div>
+      {/if}
+      {#if vue.gestionCollee}
+        <div class="confirmer" id="salon-colle" tabindex="-1" role="group" aria-label={t("salon.colle.titre")}>
+          {#if vue.gestionCollee === "proposee"}
+            <p class="note">{t("salon.colle.proposee")}</p>
+            <p class="note">{t("salon.colle.deloge")}</p>
+            <div class="choix">
+              <Button variant="secondary" dense onpress={reprendreDroits}>{t("salon.colle.reprendre")}</Button>
+              <Button variant="ghost" dense onpress={fermerColle}>{t("salon.colle.annuler")}</Button>
+            </div>
+          {:else}
+            <p class={vue.gestionCollee === "fait" || vue.gestionCollee === "deja" ? "note" : "err"} role="status">{t(`salon.colle.${vue.gestionCollee}`)}</p>
+            <div class="choix"><Button variant="ghost" dense onpress={fermerColle}>{t("salon.colle.fermer")}</Button></div>
+          {/if}
+        </div>
+      {/if}
+      {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}
+      {#if ralenti !== null}<p class="note" role="status">{t("salon.room.ralenti", { duree: formatDuration(ralenti, lang, { precise: true }) })}</p>{/if}
+      {#if tropLong}<div class="choix"><Button variant="secondary" dense onpress={() => {
+          if (tropLong) enFichier(tropLong);
+        }}>{t("salon.room.toolong.txt")}</Button></div>{/if}
+      {#if reponse}
+        <div class="contexte">
+          <span>{t("salon.room.reply.to", { nom: nomDe(reponse) })}</span>
+          <button type="button" aria-label={t("salon.room.reply.cancel")} onclick={() => (reponse = null)}><X size={18} aria-hidden="true" /></button>
+        </div>
+      {/if}
+      {#if edition}
+        <div class="contexte">
+          <span>{t("salon.room.edit.mode")} — {t("salon.room.edit.note")}</span>
+          <button type="button" aria-label={t("salon.room.edit.cancel")} onclick={annulerEdition}><X size={18} aria-hidden="true" /></button>
+        </div>
+      {/if}
+      {#if emojis}<Emojis onpick={(x) => ((texte += x), saisie?.focus())} onclose={() => ((emojis = false), saisie?.focus())} />{/if}
+      <!-- Saisie : pièce jointe, champ arrondi qui grandit (émojis au bout), puis le bouton rond :
+           « Envoyer » dès qu'il y a du texte, « Message vocal » sinon. -->
+      <div class="ligne">
+        <button type="button" class="rond outil" aria-label={t("salon.piece.joindre")} onclick={() => joindre?.click()}><Paperclip size={22} aria-hidden="true" /></button>
+        <input bind:this={joindre} type="file" multiple hidden onchange={choisis} />
+        <div class="champ">
           <label class="sr-only" for="salon-saisie">{t("salon.room.input")}</label>
           <textarea
             id="salon-saisie"
@@ -790,14 +899,16 @@
             oninput={frappe}
             onpaste={coller}
           ></textarea>
-          <Button dense onpress={envoyer}>{t("salon.room.send")}</Button>
+          <button type="button" class="emo" aria-label={emojis ? t("salon.room.emoji.close") : t("salon.room.emoji")} aria-expanded={emojis} onclick={() => (emojis = !emojis)}><Smile size={22} aria-hidden="true" /></button>
         </div>
+        {#if envoiPossible}
+          <button type="button" class="rond envoi" aria-label={t("salon.room.send")} onclick={envoyer}><Send size={20} strokeWidth={2} aria-hidden="true" /></button>
+        {:else}
+          <button type="button" class="rond vocal" aria-label={t("salon.piece.vocal")} onclick={() => (vocal = true)}><Mic size={22} aria-hidden="true" /></button>
+        {/if}
       </div>
-      <!-- Repère dans le flux (la saisie est collée en bas) : la fin de la conversation. -->
-      <div bind:this={repere}></div>
-    </section>
-  </div>
-</div>
+    </div>
+  </section>
 </div>
 
 <Panneau bind:open={params} id="salon-params" title={t("salon.params")}><Membres /></Panneau>
@@ -831,18 +942,27 @@
 <VoiceRecorder bind:open={vocal} ondone={(v) => S.envoyerVocal(v)} />
 
 <style>
-  /* Scène : le fond de la vitrine (Vitrine.svelte), d'un bord à l'autre de la fenêtre (100cqw,
-     comme Nouveau.svelte), collée sous l'en-tête du site. */
+  /* ---------- L'écran ---------- */
+  /* Toute la fenêtre sous la barre du site (ordinateur) ou toute la partie visible (téléphone) ;
+     la page elle-même ne défile plus (html.salon-app), le pied de page attend la sortie. */
+  :global(html.salon-app),
+  :global(html.salon-app body) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  :global(html.salon-app footer[data-foot]) {
+    display: none;
+  }
   .salon {
-    position: relative;
-    isolation: isolate;
-    margin-inline: calc(50% - 50cqw);
-    margin-block-start: calc(-1 * var(--sp-5));
-    padding: var(--sp-5) clamp(16px, 4vw, 72px) var(--sp-6);
-    background:
-      radial-gradient(70% 60% at 20% 30%, rgb(95 227 181 / 0.08), transparent 70%),
-      radial-gradient(60% 70% at 90% 90%, rgb(51 102 255 / 0.1), transparent 70%),
-      var(--bg-deep);
+    position: fixed;
+    inset: var(--haut, 64px) 0 0 0;
+    z-index: 5;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 288px;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "tete cote" "conv cote";
+    background: var(--bg);
+    box-shadow: inset 0 1px 0 var(--hair);
     /* Couleurs des participants (§39.4 point 5) : ≥ 6,7:1 sur --surface-3. */
     --p0: #5fe3b5;
     --p1: #7cc4ff;
@@ -854,115 +974,329 @@
     --p7: #4fd8e0;
     --p8: #e0a8f0;
     --p9: #d9c3a0;
+    /* Bulles : les autres sur une surface, les miennes en menthe sourde. */
+    --b-autre: #1a1e29;
+    --b-moi: #153a30;
+    --b-moi-meta: #a9d4c4;
+    --gout: 40px;
+    --marge: clamp(16px, 3vw, 40px);
   }
-  .salon::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: radial-gradient(circle, rgb(233 236 242 / 0.08) 1.1px, transparent 1.6px) 0 0 / 14px 14px;
-    -webkit-mask-image: radial-gradient(80% 70% at 30% 40%, #000 20%, transparent 75%);
-    mask-image: radial-gradient(80% 70% at 30% 40%, #000 20%, transparent 75%);
-    pointer-events: none;
+  .salon.replie {
+    grid-template-columns: minmax(0, 1fr) 0;
   }
-  /* Cadre de la conversation (l'« écran » de la vitrine) : son propre fond, bord fin, ombre
-     douce. La saisie reste collée en bas de la fenêtre, le pied de page sous la ligne de flottaison. */
-  .ecran {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    width: min(100%, 880px);
-    min-height: calc(100dvh - 64px - var(--sp-5) - var(--sp-6));
-    box-sizing: border-box;
-    margin-inline: auto;
-    padding: var(--sp-3) var(--sp-5) 0;
-    border-radius: 20px;
-    background: var(--bg);
-    box-shadow:
-      inset 0 0 0 1px var(--hair-2),
-      0 40px 80px -40px rgb(0 0 0 / 0.9);
+  .salon.replie .cote {
+    display: none;
   }
+  @media (max-width: 1099px) {
+    .salon {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, 1fr);
+      grid-template-areas: "tete" "cote" "conv";
+    }
+    .salon.replie .cote {
+      display: block;
+    }
+    .salon.seul .cote,
+    .ic.bascule {
+      display: none;
+    }
+  }
+  /* Téléphone et tablette : plein écran, par-dessus la barre du site, à la hauteur de la partie
+     visible (clavier virtuel ouvert compris). */
   @media (max-width: 899px) {
     .salon {
-      margin-block-start: calc(-1 * var(--sp-3));
-      padding: var(--sp-2) var(--sp-2) var(--sp-4);
+      inset: var(--vv-top, 0px) 0 auto 0;
+      height: var(--vv-h, 100dvh);
+      z-index: 30;
+      box-shadow: none;
+      --gout: 36px;
+      --marge: 12px;
     }
-    .ecran {
-      min-height: calc(100dvh - 56px - var(--sp-2) - var(--sp-4));
-      padding-inline: var(--sp-3);
-      border-radius: 16px;
-    }
+  }
+  .c0 { --pc: var(--p0); }
+  .c1 { --pc: var(--p1); }
+  .c2 { --pc: var(--p2); }
+  .c3 { --pc: var(--p3); }
+  .c4 { --pc: var(--p4); }
+  .c5 { --pc: var(--p5); }
+  .c6 { --pc: var(--p6); }
+  .c7 { --pc: var(--p7); }
+  .c8 { --pc: var(--p8); }
+  .c9 { --pc: var(--p9); }
+
+  /* ---------- En-tête compact ---------- */
+  .tete {
+    grid-area: tete;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    min-width: 0;
+    padding: 12px var(--marge) 10px;
+    background: var(--surface-1);
+    box-shadow: 0 1px 0 var(--hair);
+    z-index: 2;
+  }
+  .ident {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-width: 0;
+  }
+  /* Photos empilées des autres participants (la photo du salon : il n'a pas d'autre nom). */
+  .pile {
+    display: flex;
+    flex: none;
+  }
+  .pp {
+    display: inline-flex;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--surface-1);
+  }
+  .pp + .pp {
+    margin-inline-start: -14px;
+  }
+  .pp.vide {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    background: var(--surface-3);
+    color: var(--text-2);
+  }
+  .titre {
+    min-width: 0;
+  }
+  .tete h1 {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tete h1:focus {
+    outline: none;
+  }
+  .etat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin: 1px 0 0;
+    color: var(--text-2);
+    font-size: 0.8125rem;
+    line-height: 1.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .etat .sep {
+    color: var(--text-3);
+  }
+  .ecrit:empty {
+    margin-inline-end: -6px;
+  }
+  .ecrit {
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .echeance {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .echeance :global(svg) {
+    flex: none;
+    color: var(--text-3);
+  }
+  .court {
+    display: none;
   }
   .boutons {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    justify-content: flex-end;
+    align-items: center;
+    gap: 2px;
+    flex: none;
   }
-  /* Appels réservés à Plus et Pro : filet doré et badge « Plus · Pro » posé sur le coin. */
+  /* Boutons d'en-tête : icône seule (le libellé est le nom accessible et la bulle d'aide). */
+  .ic {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .ic:hover {
+      background: rgb(255 255 255 / 0.06);
+      color: var(--text);
+    }
+  }
+  .ic:active {
+    transform: scale(0.92);
+  }
+  .ic[aria-expanded="true"] {
+    background: rgb(255 255 255 / 0.07);
+    color: var(--text);
+  }
+  .ic.coupe {
+    color: var(--accent);
+  }
+  .ic:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  /* Appels réservés à Plus et Pro : les deux boutons dans un cadre aux couleurs des offres,
+     l'étiquette « Plus · Pro » posée sur le filet du haut. Avec un pass : pas de cadre. */
   .appels {
     position: relative;
     display: flex;
-    gap: var(--sp-2);
+    gap: 2px;
+    margin-inline-end: 6px;
+    padding: 2px;
+    border-radius: 14px;
   }
-  .appels.reserve :global(.ib) {
-    border-color: rgb(242 196 109 / 0.38);
-    background: rgb(242 196 109 / 0.06);
+  .appels.reserve {
+    padding: 3px;
+    background: linear-gradient(135deg, rgb(62 193 245 / 0.08), rgb(92 128 255 / 0.1));
+    box-shadow: inset 0 0 0 1px rgb(92 160 255 / 0.42);
+  }
+  .appels.reserve .ic {
+    color: #b8d9ff;
   }
   .badge {
     position: absolute;
-    top: -9px;
-    inset-inline-end: -8px;
-    padding: 1px 7px;
+    top: 0;
+    left: 50%;
+    translate: -50% -58%;
+    padding: 0 7px;
     border-radius: 999px;
-    background: linear-gradient(180deg, #f7d68f, #e8b14a);
-    box-shadow: 0 0 0 2px var(--bg);
-    color: #1c1405;
-    font-size: 0.6875rem;
+    background: linear-gradient(90deg, var(--plus-tint), var(--pro-tint));
+    box-shadow:
+      inset 0 0 0 1px rgb(92 160 255 / 0.55),
+      0 0 0 2px var(--surface-1);
+    color: #d6e9ff;
+    font-size: 0.625rem;
     font-weight: 700;
-    line-height: 1rem;
-    letter-spacing: 0.01em;
+    line-height: 0.9375rem;
+    letter-spacing: 0.02em;
     white-space: nowrap;
     pointer-events: none;
   }
-  @media (forced-colors: active) {
-    .badge {
-      border: 1px solid CanvasText;
+  @media (max-width: 599px) {
+    .tete {
+      gap: var(--sp-2);
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    }
+    .ident {
+      gap: 10px;
+    }
+    .pile .pp:nth-child(n + 2) {
+      display: none;
+    }
+    .etat {
+      gap: 4px;
+      font-size: 0.75rem;
+    }
+    .boutons .ic {
+      width: 36px;
+    }
+    .libres {
+      display: none;
+    }
+    .long {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .court {
+      display: inline;
+    }
+    .appels {
+      margin-inline-end: 2px;
     }
   }
-  /* Présence : une ligne sous l'en-tête ; elle défile sur elle-même quand il y a du monde. */
-  .presents {
-    display: flex;
-    gap: var(--sp-2) var(--sp-4);
-    margin: 0;
-    padding: var(--sp-2) 2px;
-    list-style: none;
-    overflow-x: auto;
-    scrollbar-width: none;
-    border-bottom: 1px solid var(--line);
+  @media (max-width: 899px) and (min-width: 600px) {
+    .tete {
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    }
   }
-  .presents::-webkit-scrollbar {
-    display: none;
+
+  /* ---------- Participants : colonne (grand écran) ou ligne sous l'en-tête ---------- */
+  .cote {
+    grid-area: cote;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px var(--sp-4) var(--sp-4);
+    background: var(--surface-1);
+    box-shadow: inset 1px 0 0 var(--hair);
+    scrollbar-width: thin;
+  }
+  .cote-t {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    color: var(--text-2);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .cote-t .nb {
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--surface-3);
+    color: var(--text-2);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .cote-vide {
+    margin: 0;
+    color: var(--text-3);
+    font-size: 0.8125rem;
+  }
+  .presents {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
   .presents li {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    flex: none;
+    gap: var(--sp-3);
     min-width: 0;
-    padding-block: 2px;
+    padding: 6px 8px;
+    margin-inline: -8px;
+    border-radius: 10px;
   }
   .pq {
     display: grid;
     min-width: 0;
-    line-height: 1.15;
+    line-height: 1.2;
   }
   .pn {
-    max-width: 14ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     font-weight: 600;
   }
   .pv {
@@ -973,12 +1307,756 @@
   .presents .hors .pn {
     color: var(--text-2);
   }
+  @media (max-width: 1099px) {
+    .cote {
+      padding: 6px var(--marge);
+      overflow: visible;
+      box-shadow: 0 1px 0 var(--hair);
+      z-index: 1;
+    }
+    .cote-t {
+      display: none;
+    }
+    .presents {
+      display: flex;
+      gap: var(--sp-4);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .presents::-webkit-scrollbar {
+      display: none;
+    }
+    .presents li {
+      flex: none;
+      gap: var(--sp-2);
+      padding: 2px 0;
+      margin: 0;
+    }
+    .pn {
+      max-width: 12ch;
+      font-size: 0.8125rem;
+    }
+  }
+
+  /* ---------- Conversation : au-dessus du fil, fil, saisie ---------- */
+  .conv {
+    grid-area: conv;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .hauts {
+    flex: none;
+    max-height: 55%;
+    overflow-y: auto;
+    display: grid;
+    gap: var(--sp-2);
+    padding-inline: var(--marge);
+  }
+  .hauts > :global(:first-child) {
+    margin-top: var(--sp-2);
+  }
+  .bandeau {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: 10px;
+    background: var(--warn-tint);
+    color: var(--warn);
+    font-size: var(--fs-small);
+  }
+  .alerte {
+    color: var(--warn, var(--text));
+  }
+  .silence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  .barre-sel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    background: var(--surface-2);
+  }
+  .barre-sel .nb {
+    font-weight: 600;
+  }
+  .barre-sel .err {
+    flex-basis: 100%;
+  }
+  /* Le fil : seul à défiler ; trame de points très discrète, comme un fond d'application. */
+  .zone-fil {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    background:
+      radial-gradient(circle, rgb(233 236 242 / 0.035) 1px, transparent 1.5px) 0 0 / 18px 18px,
+      #090b10;
+  }
+  .defile {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  .fil {
+    list-style: none;
+    margin: 0;
+    padding: var(--sp-3) var(--marge) var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    /* Peu de messages : ils se posent en bas, contre la saisie, comme dans une messagerie. */
+    min-height: 100%;
+    justify-content: flex-end;
+    box-sizing: border-box;
+  }
+  /* Jour : pastille centrée. */
+  .jour {
+    align-self: center;
+    margin: var(--sp-4) 0 var(--sp-2);
+    pointer-events: none;
+  }
+  .jour span,
+  .sys span {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgb(26 30 41 / 0.92);
+    box-shadow: inset 0 0 0 1px var(--hair);
+    color: var(--text-2);
+    font-size: 0.75rem;
+    font-weight: 560;
+    line-height: 1.1rem;
+  }
+  /* Messages système : centrés, discrets. */
+  .sys {
+    align-self: center;
+    max-width: min(90%, 36rem);
+    margin: var(--sp-2) 0;
+    text-align: center;
+  }
+  .sys span {
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-3);
+    font-weight: 450;
+  }
+  .nouveaux {
+    align-self: stretch;
+    max-width: none;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+  .nouveaux::before,
+  .nouveaux::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgb(95 227 181 / 0.35);
+  }
+  .nouveaux span {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ---------- Messages : séries serrées, nom et photo sur le premier ---------- */
+  .msg,
+  .albums {
+    display: flex;
+    align-items: flex-start;
+    max-width: 100%;
+    margin-top: 10px;
+  }
+  .msg:not(.premier),
+  .albums:not(.premier) {
+    margin-top: 2px;
+  }
+  .msg.moi,
+  .albums.moi {
+    flex-direction: row-reverse;
+  }
+  .gout {
+    flex: none;
+    width: var(--gout);
+  }
+  .contenu {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    max-width: min(78%, 36rem);
+  }
+  .moi > .contenu {
+    align-items: flex-end;
+  }
+  .rang {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    max-width: 100%;
+  }
+  .moi .rang {
+    flex-direction: row-reverse;
+  }
+  /* Bulle : coins de 18 px, resserrés du côté de l'auteur entre deux messages d'une série. */
+  .bulle {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    column-gap: var(--sp-2);
+    min-width: 0;
+    padding: 7px 12px 6px;
+    border-radius: 18px;
+    border-start-start-radius: 6px;
+    border-end-start-radius: 6px;
+    background: var(--b-autre);
+    box-shadow: inset 0 0 0 1px var(--hair);
+    overflow-wrap: anywhere;
+  }
+  .premier .bulle {
+    border-start-start-radius: 18px;
+  }
+  .moi .bulle {
+    border-radius: 18px;
+    border-start-end-radius: 6px;
+    border-end-end-radius: 6px;
+    background: var(--b-moi);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.12);
+    /* Textes secondaires (pièces, accusés) teintés de menthe : ≥ 4,5:1 sur la bulle. */
+    --text-2: #c6e4d8;
+    --text-3: var(--b-moi-meta);
+  }
+  .moi.premier .bulle {
+    border-start-end-radius: 18px;
+  }
+  .bulle > :global(*) {
+    flex-basis: 100%;
+  }
+  .bulle > .texte,
+  .bulle > .retire {
+    flex-basis: auto;
+    max-width: 100%;
+  }
+  .bulle > .minuteur,
+  .bulle > .meta {
+    flex-basis: auto;
+  }
+  .bulle > .meta {
+    margin-inline-start: auto;
+  }
+  /* Photo ou vidéo : la vignette donne la largeur (bloc, pas de rangée souple qui additionne
+     les largeurs de ses enfants). */
+  .bulle.media {
+    display: block;
+    width: min(100%, 22rem);
+    padding: 4px 4px 6px;
+  }
+  .bulle.media :global(.img) {
+    width: 100%;
+    max-height: 60vh;
+    object-fit: cover;
+    border-radius: 14px;
+  }
+  .bulle.media > .minuteur {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .bulle.media > .auteur,
+  .bulle.media > .meta,
+  .bulle.media > .minuteur,
+  .bulle.media > .cite {
+    margin-inline: 8px;
+  }
+  .bulle.media > .meta {
+    margin-inline-start: auto;
+  }
+  .bulle.media :global(.legende) {
+    padding-inline: 8px;
+  }
+  .auteur {
+    display: block;
+    margin-bottom: 1px;
+    color: var(--pc);
+    font-weight: 650;
+    font-size: 0.8125rem;
+    line-height: 1.1rem;
+  }
+  .texte {
+    margin: 0;
+    white-space: pre-wrap;
+    line-height: 1.4;
+  }
+  .texte a {
+    color: var(--accent);
+    text-underline-offset: 2px;
+  }
+  .retire {
+    margin: 0;
+    color: var(--text-3);
+    font-style: italic;
+  }
+  .cite {
+    margin: 2px 0 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgb(255 255 255 / 0.05);
+    box-shadow: inset 2px 0 0 var(--pc, var(--line-strong));
+    color: var(--text-2);
+    font-size: 0.875rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .qn {
+    font-weight: 600;
+  }
+  .minuteur {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-inline-start: auto;
+    color: var(--text-3);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+  .minuteur + .meta {
+    margin-inline-start: 0;
+  }
+  .minuteur :global(svg) {
+    flex: none;
+  }
+  /* Bas de la bulle : « modifié », heure, coches ; sur la dernière ligne du texte s'il y a la place. */
+  .meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin: 2px 0 0;
+    color: var(--text-3);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+  .moi .meta,
+  .moi .minuteur {
+    color: var(--b-moi-meta);
+  }
+  .coche {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .tic {
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  /* Lu : deux coches bleues ; envoyé et reçu : de la couleur de l'heure. */
+  .coche.vu {
+    color: #6cb6ff;
+  }
+  .coche.echec {
+    color: var(--danger);
+  }
+  /* Réactions : pastilles posées sous la bulle, qui la chevauchent un peu. */
+  .reactions {
+    list-style: none;
+    margin: -4px 8px 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    position: relative;
+  }
+  .reactions button,
+  .rapides button {
+    min-height: 28px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--surface-3);
+    box-shadow: 0 0 0 2px #090b10;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+  .reactions button.mien {
+    background: #1d3d35;
+    box-shadow:
+      0 0 0 2px #090b10,
+      inset 0 0 0 1px rgb(95 227 181 / 0.55);
+  }
+  /* « ⋯ » : à côté de la bulle ; sur ordinateur, il apparaît au survol ou au clavier. */
+  .plus {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    transition:
+      opacity var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .plus {
+      opacity: 0;
+    }
+    .msg:hover .plus,
+    .plus:focus-visible,
+    .plus[aria-expanded="true"] {
+      opacity: 1;
+    }
+    .plus:hover {
+      background: rgb(255 255 255 / 0.06);
+      color: var(--text);
+    }
+  }
+  .plus[aria-expanded="true"] {
+    color: var(--text);
+  }
+  .plus:focus-visible,
+  .rond:focus-visible,
+  .emo:focus-visible,
+  .bas:focus-visible,
+  .contexte button:focus-visible,
+  .reactions button:focus-visible,
+  .rapides button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .actions-msg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+    max-width: min(100%, 26rem);
+    margin-top: 6px;
+    padding: var(--sp-2);
+    border-radius: 14px;
+    background: var(--surface-2);
+    box-shadow:
+      inset 0 0 0 1px var(--hair-2),
+      var(--e-2);
+  }
+  .rapides {
+    display: flex;
+    gap: var(--sp-1);
+    flex-wrap: wrap;
+    flex-basis: 100%;
+  }
+  .rapides button {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 1.25rem;
+    box-shadow: none;
+    background: var(--surface-3);
+  }
+  input.sel {
+    align-self: center;
+    inline-size: 22px;
+    block-size: 22px;
+    margin: 8px;
+    accent-color: var(--accent);
+  }
+  .choisi .bulle {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Albums : grille de photos, chaque photo est un message ---------- */
+  .albums > .contenu {
+    max-width: min(78%, 26rem);
+  }
+  .albums > .contenu > .auteur {
+    margin: 0 0 4px 4px;
+  }
+  .photos {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px;
+    width: min(100%, 22rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .photos[data-n="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .album {
+    margin: 0;
+    max-width: none;
+  }
+  .album > .contenu {
+    max-width: none;
+    width: 100%;
+  }
+  .album .rang {
+    width: 100%;
+    position: relative;
+  }
+  .album .bulle {
+    flex: 1;
+    border-radius: 6px;
+    padding: 0;
+    overflow: hidden;
+  }
+  .album .bulle > :global(*) {
+    margin: 0;
+  }
+  .album .bulle.media :global(.img) {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 0;
+  }
+  .album :global(.legende) {
+    display: none;
+  }
+  /* Heure et coches posées sur la photo, sur un voile sombre. */
+  .album .meta {
+    position: absolute;
+    inset: auto 6px 6px auto;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgb(5 7 10 / 0.6);
+    color: #e9ecf2;
+  }
+  .album .plus {
+    position: absolute;
+    inset: 4px 4px auto auto;
+    width: 32px;
+    height: 32px;
+    background: rgb(5 7 10 / 0.6);
+    color: #e9ecf2;
+  }
+  .photos > :global(li:first-child .bulle) {
+    border-start-start-radius: 16px;
+  }
+  .albums.moi .photos > :global(li:first-child .bulle) {
+    border-start-start-radius: 6px;
+  }
+  .albums.moi .photos > :global(li:nth-child(2) .bulle) {
+    border-start-end-radius: 16px;
+  }
+
+  /* ---------- Bouton « nouveaux messages » ---------- */
+  .bas {
+    position: absolute;
+    inset: auto var(--marge) var(--sp-3) auto;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--surface-3);
+    box-shadow:
+      inset 0 0 0 1px var(--hair-2),
+      var(--e-2);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-small);
+    font-weight: 560;
+    cursor: pointer;
+  }
+
+  /* ---------- Saisie ---------- */
+  .saisie {
+    flex: none;
+    display: grid;
+    gap: var(--sp-2);
+    padding: 10px var(--marge) max(12px, env(safe-area-inset-bottom));
+    background: var(--surface-1);
+    box-shadow: 0 -1px 0 var(--hair);
+    z-index: 1;
+  }
+  :global(html.kbd-open) .saisie {
+    padding-bottom: 10px;
+  }
+  .ligne {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--sp-2);
+  }
+  .rond {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+  .rond:active {
+    transform: scale(0.92);
+  }
+  .outil,
+  .vocal {
+    background: transparent;
+    color: var(--text-2);
+  }
+  @media (hover: hover) {
+    .outil:hover,
+    .vocal:hover {
+      background: rgb(255 255 255 / 0.06);
+      color: var(--text);
+    }
+    .envoi:hover {
+      background: var(--accent-hover);
+    }
+  }
+  .envoi {
+    background: var(--accent);
+    color: var(--on-accent);
+    animation: apparait var(--dur-fast) var(--ease-out);
+  }
+  .envoi :global(svg) {
+    translate: -1px 1px;
+  }
+  @keyframes apparait {
+    from {
+      scale: 0.6;
+      opacity: 0;
+    }
+  }
+  /* Champ arrondi qui grandit avec le texte ; émojis au bout. */
+  .champ {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: flex-end;
+    border-radius: 22px;
+    background: var(--surface-3);
+    box-shadow: inset 0 0 0 1px var(--hair-2);
+    transition: box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .champ:focus-within {
+    box-shadow: inset 0 0 0 1.5px rgb(95 227 181 / 0.7);
+  }
+  textarea {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    max-height: 160px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 11px 4px 11px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    line-height: 1.375rem;
+    resize: none;
+    field-sizing: content;
+    scrollbar-width: thin;
+  }
+  textarea::placeholder {
+    color: var(--text-3);
+  }
+  textarea:focus {
+    outline: none;
+  }
+  .emo {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .emo[aria-expanded="true"] {
+    color: var(--accent);
+  }
+  @media (max-width: 599px) {
+    .contenu {
+      max-width: min(86%, 36rem);
+    }
+    .ligne {
+      gap: 4px;
+    }
+    .outil {
+      width: 40px;
+    }
+  }
+  .contexte {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    padding: 2px 2px 2px 12px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    box-shadow: inset 2px 0 0 var(--accent);
+    color: var(--text-2);
+    font-size: 0.875rem;
+  }
+  .contexte button {
+    display: inline-grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .fin-proche {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: 10px;
+    background: var(--warn-tint);
+    color: var(--warn);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
   .confirmer {
     display: grid;
     gap: var(--sp-2);
     padding: var(--sp-2) var(--sp-3);
     border: 1px solid var(--warn);
     border-radius: 12px;
+  }
+  .confirmer ul {
+    margin: 0;
+    padding-inline-start: 1.2em;
+  }
+  .choix {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
   }
   .infos {
     list-style: none;
@@ -1000,543 +2078,6 @@
   .infos dd {
     margin: 0;
   }
-  .confirmer ul {
-    margin: 0;
-    padding-inline-start: 1.2em;
-  }
-  .tete {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    padding-block: var(--sp-2) var(--sp-3);
-    border-bottom: 1px solid var(--line);
-  }
-  /* Titre à l'échelle des en-têtes d'écran, en version compacte (l'écran est un outil). */
-  .tete h1 {
-    margin: 0;
-    font-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
-    font-weight: 700;
-    font-stretch: var(--wd-display, 112%);
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-  }
-  .tete h1:focus {
-    outline: none;
-  }
-  .etat {
-    margin: 0;
-    color: var(--text-2);
-    font-size: 0.875rem;
-  }
-  /* Boutons de l'en-tête : icône et libellé (mesures de Button dense, secondaire). */
-  .bt {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-2);
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0 14px;
-    border: 1px solid var(--hair-2);
-    border-radius: 10px;
-    background: rgb(255 255 255 / 0.045);
-    box-shadow: var(--edge-hi);
-    color: var(--text);
-    font: inherit;
-    font-size: var(--fs-small);
-    font-weight: 560;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    transition:
-      background-color var(--dur-fast) var(--ease-out),
-      transform var(--dur-press) var(--ease-out);
-  }
-  .bt :global(svg) {
-    flex: none;
-  }
-  .bt.coupe {
-    color: var(--accent);
-  }
-  @media (hover: hover) {
-    .bt:hover {
-      background: rgb(255 255 255 / 0.08);
-    }
-  }
-  .bt:active {
-    transform: scale(0.97);
-  }
-  .bt:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  /* Téléphone (en-tête de ~170 px) : titre et boutons à icône seule
-     de 44 px sur une ligne, l'état du salon sur une ligne dessous. */
-  @media (max-width: 600px) {
-    .tete {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas: "titre boutons" "etat etat";
-      align-items: center;
-      column-gap: var(--sp-2);
-      row-gap: var(--sp-1);
-    }
-    .titre {
-      display: contents;
-    }
-    .tete h1 {
-      grid-area: titre;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .etat {
-      grid-area: etat;
-      font-size: var(--fs-micro);
-      line-height: var(--lh-micro);
-    }
-    .boutons {
-      grid-area: boutons;
-      flex-wrap: nowrap;
-      gap: var(--sp-1);
-    }
-    .bt {
-      width: 44px;
-      padding: 0;
-    }
-    .lib {
-      display: none;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .bt {
-      transition: none;
-    }
-    .bt:active {
-      transform: none;
-    }
-  }
-  @media (forced-colors: active) {
-    .bt {
-      border-color: ButtonText;
-    }
-  }
-  .corps {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  .col {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-  }
-  .bandeau {
-    margin: var(--sp-2) 0 0;
-    padding: var(--sp-2) var(--sp-3);
-    border-radius: 10px;
-    background: var(--warn-tint);
-    color: var(--warn);
-  }
-  .fin-proche {
-    margin: 0;
-    padding: var(--sp-2) var(--sp-3);
-    border-radius: 10px;
-    background: var(--warn-tint);
-    color: var(--warn);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-  }
-  .fil {
-    list-style: none;
-    margin: 0;
-    padding: var(--sp-3) 0;
-    display: grid;
-    /* Albums : jusqu'à 4 photos par rangée (2 sur téléphone) ; tout le reste prend la rangée. */
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--sp-2);
-    min-height: 40vh;
-  }
-  .fil > :global(li) {
-    grid-column: 1 / -1;
-  }
-  .fil > .msg.album {
-    grid-column: auto;
-  }
-  /* Album : la photo prend toute la case, le bouton « ⋯ » passe dessous. */
-  .album,
-  .album .rang {
-    align-items: stretch;
-  }
-  .album .rang {
-    flex-wrap: wrap;
-  }
-  .album .bulle {
-    flex: 1 1 100%;
-  }
-  .album :global(.img) {
-    width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
-  }
-  @media (max-width: 600px) {
-    .fil {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-  .silence {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-  .alerte {
-    color: var(--warn, var(--text));
-  }
-  .nouveaux {
-    justify-self: stretch;
-    border-top: 1px solid var(--line-strong);
-    padding-top: var(--sp-1);
-    color: var(--accent);
-  }
-  .sys {
-    justify-self: center;
-    color: var(--text-3);
-    font-size: 0.8125rem;
-    text-align: center;
-  }
-  /* Mes messages à droite, ceux des autres à gauche (chez chacun). */
-  .msg {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-1);
-    max-width: min(92%, 600px);
-  }
-  .msg.moi {
-    justify-self: end;
-    align-items: flex-end;
-  }
-  .rang {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-1);
-    max-width: 100%;
-  }
-  .moi .rang {
-    flex-direction: row-reverse;
-  }
-  /* Bulle : surface et filet, sans barre de couleur sur le côté (la couleur de la personne reste
-     sur son nom) ; le coin du bas, du côté de l'auteur, est resserré. */
-  .bulle {
-    min-width: 0;
-    padding: var(--sp-2) var(--sp-3);
-    border-radius: 16px 16px 16px 6px;
-    background: var(--surface-1);
-    box-shadow: inset 0 0 0 1px var(--hair);
-    overflow-wrap: anywhere;
-  }
-  .barre-sel {
-    position: sticky;
-    top: var(--sp-2);
-    z-index: 2;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    border: 1px solid var(--line-strong);
-    border-radius: 12px;
-    background: var(--surface-2);
-  }
-  .barre-sel .nb {
-    font-weight: 600;
-  }
-  .barre-sel .err {
-    flex-basis: 100%;
-    margin: 0;
-  }
-  input.sel {
-    align-self: center;
-    inline-size: 24px;
-    block-size: 24px;
-    margin: 10px;
-    accent-color: var(--accent);
-  }
-  .choisi .bulle {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .moi .bulle {
-    border-radius: 16px 16px 6px 16px;
-    background: var(--accent-tint);
-    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.14);
-  }
-  .c0 { --pc: var(--p0); }
-  .c1 { --pc: var(--p1); }
-  .c2 { --pc: var(--p2); }
-  .c3 { --pc: var(--p3); }
-  .c4 { --pc: var(--p4); }
-  .c5 { --pc: var(--p5); }
-  .c6 { --pc: var(--p6); }
-  .c7 { --pc: var(--p7); }
-  .c8 { --pc: var(--p8); }
-  .c9 { --pc: var(--p9); }
-  .auteur {
-    display: block;
-    color: var(--pc);
-    font-weight: 600;
-    font-size: 0.8125rem;
-  }
-  .texte {
-    margin: 0;
-    white-space: pre-wrap;
-  }
-  .texte a {
-    color: var(--accent);
-    text-underline-offset: 2px;
-  }
-  .retire {
-    margin: 0;
-    color: var(--text-3);
-    font-style: italic;
-  }
-  .cite {
-    margin: 0 0 var(--sp-1);
-    padding: var(--sp-1) var(--sp-2);
-    border-inline-start: 2px solid var(--line-strong);
-    color: var(--text-2);
-    font-size: 0.875rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .qn {
-    font-weight: 600;
-  }
-  /* Haut de la bulle : l'auteur à gauche, le décompte d'effacement à droite. */
-  .haut {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-3);
-  }
-  .minuteur {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    margin-inline-start: auto;
-    color: var(--text-3);
-    font-size: 0.6875rem;
-    line-height: 1rem;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-  .minuteur :global(svg) {
-    flex: none;
-  }
-  /* Bas de la bulle, à droite : « modifié », coches, heure ; chiffres alignés. */
-  .meta {
-    margin: 2px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    flex-wrap: wrap;
-    color: var(--text-3);
-    font-size: 0.75rem;
-    line-height: 1rem;
-  }
-  .coche {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-  }
-  .tic {
-    display: block;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  /* Lu : deux coches bleues (≥ 7:1 sur la bulle) ; envoyé et reçu : gris. */
-  .coche.vu {
-    color: #6cb6ff;
-  }
-  .coche.echec {
-    color: var(--danger);
-  }
-  .reactions {
-    list-style: none;
-    margin: var(--sp-1) 0 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-1);
-  }
-  .reactions button,
-  .rapides button {
-    min-height: 32px;
-    padding: 0 var(--sp-2);
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text);
-    font: inherit;
-    cursor: pointer;
-  }
-  .reactions button.mien {
-    border-color: var(--accent);
-  }
-  .plus {
-    display: inline-grid;
-    place-items: center;
-    flex: none;
-    min-width: 44px;
-    min-height: 44px;
-    border: 0;
-    background: transparent;
-    color: var(--text-2);
-    font-size: 1.25rem;
-    cursor: pointer;
-    border-radius: 10px;
-    transition: background-color var(--dur-fast) var(--ease-out);
-  }
-  @media (hover: hover) {
-    .plus:hover {
-      background: rgb(255 255 255 / 0.06);
-      color: var(--text);
-    }
-  }
-  .plus[aria-expanded="true"] {
-    color: var(--text);
-  }
-  .plus:focus-visible,
-  .emo:focus-visible,
-  .bas:focus-visible,
-  .contexte button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .actions-msg {
-    align-self: stretch;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-1);
-    padding: var(--sp-2);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: var(--surface-1);
-  }
-  .rapides {
-    display: flex;
-    gap: var(--sp-1);
-    flex-wrap: wrap;
-    flex-basis: 100%;
-  }
-  .rapides button {
-    min-width: 44px;
-    min-height: 44px;
-    font-size: 1.25rem;
-  }
-  .ecrit {
-    min-height: 1.25rem;
-    margin: 0;
-    color: var(--text-2);
-    font-size: 0.8125rem;
-  }
-  .bas {
-    position: sticky;
-    bottom: 6.5rem;
-    justify-self: end;
-    min-height: 44px;
-    padding: 0 var(--sp-3);
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text);
-    cursor: pointer;
-  }
-  .saisie {
-    margin-top: auto;
-    position: sticky;
-    bottom: 0;
-    display: grid;
-    gap: var(--sp-2);
-    padding: var(--sp-2) 0 max(var(--sp-3), env(safe-area-inset-bottom));
-    background: var(--bg);
-    border-top: 1px solid var(--line);
-  }
-  .ligne {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--sp-2);
-  }
-  /* Téléphone (le champ ne faisait plus que 93 px) : le message prend
-     toute la largeur, les outils et « Envoyer » passent dessous. */
-  @media (max-width: 600px) {
-    .ligne {
-      flex-wrap: wrap;
-    }
-    .ligne textarea {
-      order: -1;
-      flex: 1 0 100%;
-    }
-    .ligne > :global(:last-child) {
-      margin-inline-start: auto;
-    }
-  }
-  textarea {
-    flex: 1;
-    min-height: 44px;
-    max-height: 40vh;
-    resize: none;
-    field-sizing: content;
-    padding: var(--sp-2) var(--sp-3);
-    border: 1px solid var(--line-strong);
-    border-radius: 12px;
-    background: var(--surface-1);
-    color: var(--text);
-    font: inherit;
-  }
-  textarea:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .emo {
-    min-width: 44px;
-    min-height: 44px;
-    border: 0;
-    border-radius: 12px;
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: 1.25rem;
-    cursor: pointer;
-  }
-  .contexte {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2);
-    padding: var(--sp-1) var(--sp-2);
-    border-inline-start: 2px solid var(--accent);
-    color: var(--text-2);
-    font-size: 0.875rem;
-  }
-  .contexte button {
-    min-width: 44px;
-    min-height: 44px;
-    border: 0;
-    background: transparent;
-    color: var(--text-2);
-    cursor: pointer;
-  }
   .note {
     margin: 0;
     color: var(--text-2);
@@ -1547,9 +2088,31 @@
     color: var(--danger);
     font-size: 0.875rem;
   }
+  @media (prefers-reduced-motion: reduce) {
+    .ic,
+    .rond,
+    .plus,
+    .champ {
+      transition: none;
+    }
+    .ic:active,
+    .rond:active {
+      transform: none;
+    }
+    .envoi {
+      animation: none;
+    }
+  }
   @media (forced-colors: active) {
-    .bulle {
+    .bulle,
+    .champ,
+    .appels.reserve,
+    .badge {
       border: 1px solid CanvasText;
+    }
+    .ic,
+    .rond {
+      border: 1px solid ButtonText;
     }
     .auteur {
       text-decoration: underline;
