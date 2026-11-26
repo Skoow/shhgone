@@ -123,7 +123,7 @@ export async function rejoindre(n: Net, kAcces: Uint8Array, kPreuve: Uint8Array,
   const jeton = o.member_token;
   if (typeof jeton !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(jeton) || typeof o.members_can_destroy !== "boolean") throw invalide();
   const siege = entier(o, "seat");
-  if (siege > 49) throw invalide();
+  if (siege > 9) throw invalide();
   return {
     jeton,
     siege,
@@ -181,7 +181,7 @@ export type Preuve = { altcha: string; hp: ""; shown_at: string };
 export async function reglages(
   n: Net,
   jGestion: Uint8Array,
-  r: { maxMembers?: number; renouvelerH?: 1 | 6 | 12 | 24 | 72 | 168 | 336 | 720; preuve?: Preuve },
+  r: { maxMembers?: number; renouvelerH?: 1 | 6 | 12 | 24; preuve?: Preuve },
 ): Promise<{ maxMembers: number; expiresInS: number; depuis: number }> {
   const body: Obj = {};
   if (r.maxMembers !== undefined) body.max_members = r.maxMembers;
@@ -247,7 +247,7 @@ export async function lireSegment(n: Net, jeton: string, piece: Uint8Array, seg:
 
 /** Corps de la création (POST /api/salons) ; les en-têtes sont posés par account/api.ts. */
 export type CorpsCreation = {
-  ttl_hours: 1 | 6 | 12 | 24 | 72 | 168 | 336 | 720;
+  ttl_hours: 1 | 6 | 12 | 24;
   max_members: number;
   members_can_destroy: boolean;
   salt: string;

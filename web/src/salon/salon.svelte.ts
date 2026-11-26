@@ -1322,7 +1322,7 @@ export async function quitterEtSignaler(): Promise<boolean> {
   return true;
 }
 
-/** Créateur : nombre de places (2 à 10, 50 pour un compte sur mesure ; jamais sous les présents). Rend le code d'erreur, ou null. */
+/** Créateur : nombre de places (2 à 10, jamais sous les présents). Rend le code d'erreur, ou null. */
 export async function reglerPlaces(n: number): Promise<string | null> {
   const x = s;
   const j = x?.client?.jetonGestion();
@@ -1339,8 +1339,7 @@ export async function reglerPlaces(n: number): Promise<string | null> {
 }
 
 /**
- * Créateur : renouvellement (1, 6, 12 ou 24 h depuis maintenant, ou 3 à 30 jours pour un compte
- * sur mesure, conversation effacée pour tous,
+ * Créateur : renouvellement (1, 6, 12 ou 24 h depuis maintenant, conversation effacée pour tous,
  * groupe recréé ; compte comme une création : preuve anti-robot). Rend le code d'erreur, ou null.
  */
 export async function renouveler(h: Duree): Promise<string | null> {

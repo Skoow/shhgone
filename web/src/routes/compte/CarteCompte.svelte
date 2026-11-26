@@ -29,9 +29,7 @@
   {#if etat}
     <p>{t("account.card.since", { date: jourAvecAnnee(etat.creeLe) })}</p>
     <p class="val">
-      {#if etat.surMesure}
-        {t("account.card.surmesure", { salons: etat.limites.salons, places: etat.limites.places, jours: Math.floor(etat.limites.heures / 24) })}
-      {:else if etat.palier === "neuf"}
+      {#if etat.palier === "neuf"}
         {t("account.card.neuf", { salons: etat.limites.salons, places: etat.limites.places, heures: etat.limites.heures, date: etat.confirmeLe ? jourLong(etat.confirmeLe) : "" })}
       {:else}
         {t("account.card.confirme", { salons: etat.limites.salons, places: etat.limites.places })}

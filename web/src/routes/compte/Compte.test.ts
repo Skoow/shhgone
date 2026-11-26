@@ -41,7 +41,7 @@ const AV = vi.hoisted(() => ({ reencoder: vi.fn() }));
 vi.mock("../../ui/avatar", async (orig) => ({ ...(await orig<object>()), ...AV }));
 const { CompteError, account, REGLAGES_DEFAUT } = await import("../../account/session.svelte");
 const { default: Compte } = await import("./Compte.svelte");
-const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, surMesure: false, salonsActifs: 1, banniId: null, banniJusqu: null, banniMotif: null };
+const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salonsActifs: 1, banniId: null, banniJusqu: null, banniMotif: null };
 
 beforeEach(() => {
   setLang("fr");

@@ -198,7 +198,9 @@ describe("Confidentialité : section paiement", () => {
         // Appels réservés à Plus et Pro : une preuve anonyme ouvre les appels du salon ; ce
         // que voit le serveur, y compris quand c'est le créateur (connu par son compte).
         /appels audio et vidéo des salons sont réservés à Plus et Pro/u,
-        /ouvre les appels pour tout le salon jusqu'à sa fin \(24 heures au plus\) ; les autres participants n'ont besoin d'aucune offre/u,
+        /ouvre les appels pour tout le salon jusqu'à sa fin ; les autres participants n'ont besoin d'aucune offre/u,
+        // Accès offert nommé par l'exploitant (noms_offerts, 25 novembre) : dit sur la page.
+        /offrir un accès sans paiement et y associer un nom ou une note/u,
         /si c'est le créateur du salon[^.]*ce compte a Plus ou Pro/u,
         /de même pour un appel lancé juste après/u,
       ])
@@ -226,7 +228,8 @@ describe("Confidentialité : section paiement", () => {
         /refuses, with a warning, a different key for a day already announced/u,
         /from the very first contact would not be detected by that device alone/u,
         /calls in rooms are reserved for Plus and Pro/u,
-        /opens calls for the whole room until it ends \(24 hours at most\); the other participants need no plan/u,
+        /opens calls for the whole room until it ends; the other participants need no plan/u,
+        /give an access without payment and attach a name or a note to it/u,
         /if it is the room's creator[^.]*this account has Plus or Pro/u,
         /the same goes for a call started right after/u,
       ])
