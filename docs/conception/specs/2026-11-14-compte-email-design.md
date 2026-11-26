@@ -332,9 +332,8 @@ Bouton « Créer un salon » sans session → `/compte/connexion?suite=salon` (p
 |---|---|---|---|---|
 | **Neuf** | moins de 7 jours depuis `compte_des` | 1 | 4 | 1 à 24 h |
 | **Confirmé** | 7 jours ou plus depuis `compte_des` | 3 | 10 | 1 à 24 h |
-| **Sur mesure** (25 novembre) | posé par l'exploitant au tableau de bord | 1 à 10 | 2 à 50 | 1 h à 30 jours |
 
-- **Sur mesure** : voir la conception du compte par passkey, §18. Un bannissement actif l'emporte ; retirer le sur mesure rend le palier neuf ou confirmé.
+- Le palier « sur mesure » du 25 novembre est retiré le 26 novembre (conception du compte par passkey, §18).
 
 - `compte_des` = jour de création ; **remis au jour d'un signalement** d'un salon du compte (« Quitter et signaler », premier signalement de ce salon). « 7 jours sans signalement » = 7 jours pleins depuis le dernier signalement.
 - **Signalement (faible, ambiguïté)** : « 4 places » est lu comme `max_members = 4`, créateur compris (le serveur compte ainsi, 2 à 10). Pour 4 invités, ce serait `max_members = 5`.
