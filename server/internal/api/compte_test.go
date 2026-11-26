@@ -406,8 +406,7 @@ func TestEtatExportSuppressionHTTP(t *testing.T) {
 	w := e.do(req{method: "GET", path: "/api/compte", hdr: S})
 	expect(t, w, 200, "")
 	et := jsonOf(t, w)
-	if cles(et) != "banni,banni_id,banni_jusqu,banni_motif,confirme_le,cree_le,h,limites,palier,salons_actifs,sur_mesure" ||
-		et["sur_mesure"] != false ||
+	if cles(et) != "banni,banni_id,banni_jusqu,banni_motif,confirme_le,cree_le,h,limites,palier,salons_actifs" ||
 		et["h"] != a.h || et["palier"] != "neuf" || et["banni_motif"] != nil ||
 		fmt.Sprint(et["limites"]) != "map[heures:24 places:4 salons:1]" {
 		t.Fatal(w.Body.String())

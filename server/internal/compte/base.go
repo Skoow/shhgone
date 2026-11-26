@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 
-	"github.com/skoow/shhdrop/server/internal/nom"
 	"github.com/skoow/shhdrop/server/internal/store"
 )
 
@@ -38,10 +36,6 @@ import (
 // bannis : id (8, montré au fondateur) ; h (effacé avec le compte : un nouveau compte se crée
 // sans coût) ; début et échéance ; actif ; motif (catégorie 1 à 10, §21.10.1) ; salons
 // fermés.
-// sur_mesure (version 5, surmesure.go) : limites sur mesure données par l'exploitant à un
-// compte (salons à la fois, places, jours au plus), son nom ou sa note (texte UTF-8 en clair,
-// nom.Propre : seul texte libre de cette base, décision du propriétaire du 25 novembre) et le
-// jour où il a été posé ; effacé avec le compte.
 var schemaComptes = `
 CREATE TABLE IF NOT EXISTS comptes(
   h BLOB PRIMARY KEY CHECK(` + blobN("h", 16) + `),
@@ -92,14 +86,7 @@ CREATE TABLE IF NOT EXISTS bannis(
   actif INTEGER NOT NULL CHECK(actif IN (0,1)),
   motif INTEGER NOT NULL CHECK(motif BETWEEN 1 AND 10),
   salons_fermes INTEGER NOT NULL CHECK(salons_fermes >= 0)) WITHOUT ROWID;
-CREATE UNIQUE INDEX IF NOT EXISTS bannis_h ON bannis(h);
-CREATE TABLE IF NOT EXISTS sur_mesure(
-  h BLOB PRIMARY KEY REFERENCES comptes(h) ON DELETE CASCADE CHECK(` + blobN("h", 16) + `),
-  salons INTEGER NOT NULL CHECK(typeof(salons)='integer' AND salons BETWEEN 1 AND ` + strconv.Itoa(SurMesureSalonsMax) + `),
-  places INTEGER NOT NULL CHECK(typeof(places)='integer' AND places BETWEEN 2 AND ` + strconv.Itoa(SurMesurePlacesMax) + `),
-  jours INTEGER NOT NULL CHECK(typeof(jours)='integer' AND jours BETWEEN 1 AND ` + strconv.Itoa(SurMesureJoursMax) + `),
-  nom BLOB NOT NULL CHECK(typeof(nom)='blob' AND length(nom) BETWEEN 1 AND ` + strconv.Itoa(nom.OctetsMax) + `),
-  depuis_jour INTEGER NOT NULL CHECK(` + jourCheck("depuis_jour") + `)) WITHOUT ROWID`
+CREATE UNIQUE INDEX IF NOT EXISTS bannis_h ON bannis(h)`
 
 func blobN(col string, n int) string {
 	return fmt.Sprintf("typeof(%s)='blob' AND length(%s)=%d", col, col, n)
@@ -124,10 +111,11 @@ func coffreCheck(col string) string {
 
 // VersionBase : version du schéma de comptes.db (PRAGMA user_version). 3 : compte par
 // passkey ; 4 : colonne passkeys.sign_count (ajout en place, 0 pour les passkeys déjà
-// enregistrées) ; 5 : table sur_mesure (créée en place, vide : aucun compte sur mesure avant).
-// Les versions 1 et 2 (compte par e-mail) ne sont jamais migrées : le service
-// n'a jamais été ouvert (conception du compte par passkey §15).
-const VersionBase = 5
+// enregistrées) ; 5 : table sur_mesure (comptes sur mesure, 25 novembre) ; 6 : table sur_mesure
+// retirée (décision du propriétaire du 26 novembre ; une base de version 4 passe directement à
+// 6). Les versions 1 et 2 (compte par e-mail) ne sont jamais migrées : le service n'a jamais été
+// ouvert (conception du compte par passkey §15).
+const VersionBase = 6
 
 // signCountCheck : compteur de signatures WebAuthn (entier de 32 bits non signé).
 const signCountCheck = `typeof(sign_count)='integer' AND sign_count BETWEEN 0 AND 4294967295`
@@ -187,6 +175,13 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 			return nil, fmt.Errorf("migration 3 → 4 de comptes.db : %w", err)
 		}
 	}
+	if v == 5 {
+		// Version 5 → 6 : comptes sur mesure retirés (limites et noms donnés par l'exploitant).
+		if err := retirerSurMesure(db); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("migration 5 → 6 de comptes.db : %w", err)
+		}
+	}
 	if _, err := db.Exec(schemaComptes); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("création du schéma de comptes.db : %w", err)
@@ -230,6 +225,34 @@ func retirerSchemaEmail(db *sql.DB) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// retirerSurMesure : table sur_mesure (version 5) réécrite de zéros puis supprimée, dans une
+// transaction (secure_delete écrase aussi les pages libérées), puis WAL vidé : les noms donnés
+// par l'exploitant ne restent ni dans la base ni dans le WAL. Table absente : rien à faire.
+func retirerSurMesure(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='sur_mesure'`).Scan(&n); err != nil {
+		return err
+	}
+	if n == 0 {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, q := range []string{`UPDATE sur_mesure SET nom=zeroblob(length(nom))`, `DELETE FROM sur_mesure`,
+		`DROP TABLE sur_mesure`} {
+		if _, err := tx.Exec(q); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return store.Checkpoint(db)
 }
 
 // serrer : base et annexes en 0600 (SQLite crée -wal et -shm avec les droits de la base).

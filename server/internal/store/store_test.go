@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func pragma(t *testing.T, db *sql.DB, name string) string {
@@ -385,8 +386,8 @@ func TestSchemaVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v := pragma(t, db, "user_version"); v != "4" {
-		t.Fatalf("user_version = %s, attendu 4 (salons.max_members jusqu'à 50)", v)
+	if v := pragma(t, db, "user_version"); v != "5" {
+		t.Fatalf("user_version = %s, attendu 5 (salons.max_members revenu à 10)", v)
 	}
 	if _, err := db.Exec(`PRAGMA user_version=0`); err != nil { // base d'avant la version
 		t.Fatal(err)
@@ -481,7 +482,7 @@ func TestSalonsContraintes(t *testing.T) {
 	}
 	bad := map[string]string{
 		"max_members 1":         `VALUES('b',randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,1,0)`,
-		"max_members 51":        `VALUES('b',randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,51,0)`,
+		"max_members 11":        `VALUES('b',randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,11,0)`,
 		"members_can_destroy 2": `VALUES('b',randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,10,2)`,
 		"access_v de 31":        `VALUES('b',randomblob(31),randomblob(32),randomblob(32),randomblob(16),3,67108864,900,10,0)`,
 		"manage_v de 33":        `VALUES('b',randomblob(32),randomblob(33),randomblob(32),randomblob(16),3,67108864,900,10,0)`,
@@ -626,24 +627,24 @@ func TestMigreV1VersV2(t *testing.T) {
 	}
 }
 
-// Une base du schéma 5 (binaire plus récent) est refusée sans rien toucher : ni tables du
+// Une base du schéma 6 (binaire plus récent) est refusée sans rien toucher : ni tables du
 // salon créées, ni version réécrite.
-func TestRefuseV5(t *testing.T) {
+func TestRefuseV6(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")
-	baseV1(t, path, 5)
+	baseV1(t, path, 6)
 	db, err := Open(path)
 	if !errors.Is(err, ErrNewerSchema) {
 		if db != nil {
 			db.Close()
 		}
-		t.Fatal("base du schéma 5 acceptée :", err)
+		t.Fatal("base du schéma 6 acceptée :", err)
 	}
 	raw, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer raw.Close()
-	if v := pragma(t, raw, "user_version"); v != "5" {
+	if v := pragma(t, raw, "user_version"); v != "6" {
 		t.Fatal("version touchée", v)
 	}
 	if got := strings.Join(masterNames(t, raw), ","); got != "index:shares_access_v,index:shares_manage_v,table:shares" {
@@ -808,69 +809,108 @@ func TestSalonsCompte(t *testing.T) {
 	}
 }
 
-// Schéma 3 → 4 : la table salons est reconstruite pour accepter 50 places (comptes sur
-// mesure) ; salon, compte et pièce gardés (aucune cascade pendant la copie), contraintes
-// et index identiques à ceux d'une base neuve ; clés étrangères de nouveau actives.
-func TestMigreV3VersV4(t *testing.T) {
+// Schéma 4 → 5 (comptes sur mesure retirés, 26 novembre) : une base de préproduction dont la
+// table salons accepte 50 places, avec un salon de 50 places et 30 jours, sa pièce et sa ligne de
+// reprise. La table est reconstruite : salon, compte, pièce et ligne de reprise gardés (aucune
+// cascade pendant la copie), places ramenées à 10, échéance à 24 h au plus (quart d'heure
+// supérieur) ; un salon ordinaire n'est pas touché ; contraintes et index identiques à ceux
+// d'une base neuve ; clés étrangères de nouveau actives ; rejouée sans rien refaire.
+func TestMigreV4VersV5(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")
-	baseV2(t, path)
-	raw, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(ON)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, q := range []string{`ALTER TABLE salons ADD COLUMN compte BLOB ` + compteCheck, salonsIndexes,
-		`UPDATE salons SET compte=randomblob(16) WHERE id='s'`, `PRAGMA user_version=3`} {
-		if _, err := raw.Exec(q); err != nil {
-			t.Fatal(q, err)
-		}
-	}
-	raw.Close()
 	db, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
+	def4 := strings.Replace(salonsDef, "max_members BETWEEN 2 AND 10", "max_members BETWEEN 2 AND 50", 1)
+	loin := time.Now().Unix() + 30*24*3600
+	for _, q := range []string{`PRAGMA foreign_keys=OFF`, `DROP TABLE salons`, `CREATE TABLE salons` + def4,
+		salonsIndexUniques, salonsIndexes, `PRAGMA foreign_keys=ON`, `PRAGMA user_version=4`} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	for _, s := range []struct {
+		id     string
+		places int
+		exp    int64
+	}{{"long", 50, loin}, {"court", 4, 1800}} {
+		if _, err := db.Exec(`INSERT INTO salons(id,access_v,manage_v,proof_v,salt,kdf_ops,kdf_mem,expires_at,max_members,
+			members_can_destroy,compte) VALUES(?,randomblob(32),randomblob(32),randomblob(32),randomblob(16),3,67108864,?,?,0,
+			randomblob(16))`, s.id, s.exp, s.places); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO salon_pieces(id,salon_id,bucket,state,segments_mask) VALUES('p','long',1,'ready',x'00')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO salons_reprise(salon_id,cle,etat) VALUES('long',randomblob(60),x'01')`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	avant := time.Now().Unix()
+	if db, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
-	if v := pragma(t, db, "user_version"); v != "4" {
+	if v := pragma(t, db, "user_version"); v != "5" {
 		t.Fatal("user_version", v)
 	}
+	var places int
+	var exp int64
+	if err := db.QueryRow(`SELECT max_members, expires_at FROM salons WHERE id='long' AND length(compte)=16`).Scan(&places, &exp); err != nil {
+		t.Fatal("salon ou compte perdu :", err)
+	}
+	if places != 10 || exp%900 != 0 || exp < avant+24*3600 || exp > time.Now().Unix()+24*3600+900 {
+		t.Fatal("salon long non ramené aux bornes :", places, exp-avant)
+	}
+	if err := db.QueryRow(`SELECT max_members, expires_at FROM salons WHERE id='court'`).Scan(&places, &exp); err != nil ||
+		places != 4 || exp != 1800 {
+		t.Fatal("salon ordinaire touché :", places, exp, err)
+	}
 	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM salons WHERE id='s' AND length(compte)=16`).Scan(&n); err != nil || n != 1 {
-		t.Fatal("salon ou compte perdu :", n, err)
-	}
-	if err := db.QueryRow(`SELECT count(*) FROM salon_pieces WHERE salon_id='s'`).Scan(&n); err != nil || n != 1 {
-		t.Fatal("pièce perdue par la reconstruction :", n, err)
-	}
-	if got := strings.Join(masterNames(t, db), ","); got != wantMaster {
-		t.Fatalf("sqlite_master = %s", got)
+	for q, want := range map[string]int{`SELECT count(*) FROM salon_pieces WHERE salon_id='long'`: 1,
+		`SELECT count(*) FROM salons_reprise WHERE salon_id='long'`: 1} {
+		if err := db.QueryRow(q).Scan(&n); err != nil || n != want {
+			t.Fatal("perdu par la reconstruction :", q, n, err)
+		}
 	}
 	neuve, err := Open(filepath.Join(t.TempDir(), "n.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer neuve.Close()
-	def := func(d *sql.DB) string {
-		var x string
-		d.QueryRow(`SELECT sql FROM sqlite_master WHERE name='salons'`).Scan(&x)
-		return x
+	schema := func(d *sql.DB) string {
+		var out []string
+		rows, err := d.Query(`SELECT name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var a, b string
+			rows.Scan(&a, &b)
+			out = append(out, a+":"+strings.NewReplacer(`"salons"`, "salons", "salons_m5", "salons",
+				"CREATE TABLE IF NOT EXISTS", "CREATE TABLE", "CREATE UNIQUE INDEX IF NOT EXISTS", "CREATE UNIQUE INDEX",
+				"CREATE INDEX IF NOT EXISTS", "CREATE INDEX").Replace(b))
+		}
+		return strings.Join(out, "\n")
 	}
-	if a, b := def(db), def(neuve); !strings.Contains(a, "BETWEEN 2 AND 50") || strings.ReplaceAll(a, `"salons"`, "salons") != b &&
-		strings.ReplaceAll(a, "salons_m4", "salons") != b {
-		t.Fatalf("table migrée :\n%s\nneuve :\n%s", a, b)
+	if a, b := schema(db), schema(neuve); a != b {
+		t.Fatalf("schéma migré :\n%s\nneuve :\n%s", a, b)
 	}
-	if _, err := db.Exec(`UPDATE salons SET max_members=50 WHERE id='s'`); err != nil {
-		t.Fatal("50 places refusées :", err)
-	}
-	if _, err := db.Exec(`UPDATE salons SET max_members=51 WHERE id='s'`); err == nil {
-		t.Fatal("51 places acceptées")
+	if _, err := db.Exec(`UPDATE salons SET max_members=11 WHERE id='long'`); err == nil {
+		t.Fatal("11 places acceptées")
 	}
 	if v := pragma(t, db, "foreign_keys"); v != "1" {
 		t.Fatal("clés étrangères coupées après la migration :", v)
 	}
-	if _, err := db.Exec(`DELETE FROM salons WHERE id='s'`); err != nil {
+	if _, err := db.Exec(`DELETE FROM salons WHERE id='long'`); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRow(`SELECT count(*) FROM salon_pieces`).Scan(&n); err != nil || n != 0 {
-		t.Fatal("cascade perdue après la migration :", n, err)
+	for _, q := range []string{`SELECT count(*) FROM salon_pieces`, `SELECT count(*) FROM salons_reprise`} {
+		if err := db.QueryRow(q).Scan(&n); err != nil || n != 0 {
+			t.Fatal("cascade perdue après la migration :", q, n, err)
+		}
 	}
 	db.Close()
 	db2, err := Open(path) // rien à refaire

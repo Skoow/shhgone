@@ -18,15 +18,15 @@ func TestCapaciteCalculee(t *testing.T) {
 		// Sans GOMEMLIMIT ni limite connue : valeurs fixes (plafond global des
 		// trames : defaultSalonFramesTotal).
 		{"sans limites", math.MaxInt64, 0, Capacity{64, 256, 256, 2000, 64, 1500, 100000, 1000000, 16}},
-		// compose.yaml : GOMEMLIMIT 900 Mio, nofile 65 536 (plafond global = 10 % / 64 o ;
+		// compose.yaml : GOMEMLIMIT 900 Mio, nofile 65 536 (plafond global = 10 % / 48 o ;
 		// WebSocket = 10 % / 64 Kio, 2 000 au plus).
-		{"production", 900 << 20, 65536, Capacity{67, 360, 360, 1440, 64, 1500, 100000, 1474560, 16}},
+		{"production", 900 << 20, 65536, Capacity{67, 360, 360, 1440, 64, 1500, 100000, 1966080, 16}},
 		// 4 Gio de mémoire : 307 envois, 1 638 lectures, le plafond global monte avec la mémoire.
-		{"4 Gio", 4 << 30, 1 << 20, Capacity{307, 1638, 1638, 2000, 64, 1500, 100000, 6710886, 16}},
+		{"4 Gio", 4 << 30, 1 << 20, Capacity{307, 1638, 1638, 2000, 64, 1500, 100000, 8947848, 16}},
 		// Descripteurs rares : nofile / 8 par catégorie (sans effet sur le plafond global).
-		{"1 024 descripteurs", 4 << 30, 1024, Capacity{128, 128, 128, 128, 64, 1500, 100000, 6710886, 16}},
+		{"1 024 descripteurs", 4 << 30, 1024, Capacity{128, 128, 128, 128, 64, 1500, 100000, 8947848, 16}},
 		// Très peu de mémoire : planchers.
-		{"64 Mio", 64 << 20, 65536, Capacity{8, 25, 25, 102, 64, 1500, 100000, 104857, 16}},
+		{"64 Mio", 64 << 20, 65536, Capacity{8, 25, 25, 102, 64, 1500, 100000, 139810, 16}},
 	}
 	for _, c := range cas {
 		if got := computeCapacity(c.mem, c.nofile); got != c.want {
@@ -166,7 +166,7 @@ func TestSalonsContreMemoire(t *testing.T) {
 	if err := checkSalons(200, c, 900<<20); err != nil {
 		t.Fatal("configuration livrée refusée :", err)
 	}
-	if part := SalonFramesShare(c.SalonFramesTotal, 200, c.SalonFrames); part != 3686 { // 4 915 avant l'index de 32 o
+	if part := SalonFramesShare(c.SalonFramesTotal, 200, c.SalonFrames); part != 4915 {
 		t.Fatal("part par salon :", part)
 	}
 	if err := checkSalons(360, c, 900<<20); err != nil {

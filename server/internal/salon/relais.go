@@ -15,8 +15,7 @@ import (
 // indexée (son rang est consommé : trou normal). La diffusion aux connexions en direct, rangée
 // ou non, se fait sous le verrou du salon (connexion.go).
 
-// entree : trame non volatile rangée, 32 octets (TestTailleEntree ; 24 avant les 50 sièges des
-// salons sur mesure : attendus est passé de 16 à 64 bits).
+// entree : trame non volatile rangée, 24 octets (TestTailleEntree).
 // recuMs : heure de réception du serveur (ms Unix), jamais lue dans la trame ni écrite sur
 // disque. emplacement : numéro dans la conversation, ou effaceMarque une fois l'emplacement
 // écrasé (retrait, règle). attendus : lecteurs attendus d'une trame des règles 1 à 3, un bit
@@ -26,8 +25,8 @@ import (
 type entree struct {
 	seq         uint64
 	recuMs      int64
-	attendus    uint64
 	emplacement uint32
+	attendus    uint16
 	siege       uint8
 	drapeaux    uint8
 }
@@ -190,7 +189,7 @@ func (m *Manager) ranger(s *salon, mb Membre, h EnTete, trame []byte, lien *[16]
 	}
 	// Règles 1 à 3 : lecteurs attendus (sièges occupés, moins l'expéditeur) ; expéditeur seul :
 	// personne à attendre, l'échéance part tout de suite (effacement.go).
-	var attendus uint64
+	var attendus uint16
 	_, avecDelai := delaiApresLecture(h.Regle)
 	if avecDelai {
 		attendus = s.attendusLocked(mb.siege)

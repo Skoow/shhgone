@@ -56,15 +56,12 @@ func (h *echeances) Pop() any {
 	return x
 }
 
-// bitSiege : bit du siège n dans entree.attendus (nbSieges ≤ 64, contrôlé à la compilation).
-func bitSiege(n uint8) uint64 { return 1 << n }
-
-// Un siège de plus que 64 ne tiendrait plus dans entree.attendus.
-var _ = [64 - nbSieges]struct{}{}
+// bitSiege : bit du siège n dans entree.attendus (nbSieges ≤ 16).
+func bitSiege(n uint8) uint16 { return 1 << n }
 
 // attendusLocked : sièges occupés sauf l'expéditeur. Appelé sous s.mu.
-func (s *salon) attendusLocked(expediteur uint8) uint64 {
-	var a uint64
+func (s *salon) attendusLocked(expediteur uint8) uint16 {
+	var a uint16
 	for n, x := range s.sieges {
 		if x != nil && uint8(n) != expediteur {
 			a |= bitSiege(uint8(n))

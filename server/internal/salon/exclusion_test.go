@@ -322,7 +322,7 @@ func TestExclureSoiMeme(t *testing.T) {
 		"siège 0":           reqExclure(c, n, siegeP(0), &e0.Nonce, 1),
 		"siège sans nonce":  mod(func(r *ExclureReq) { r.Nonce = nil }),
 		"nonce sans siège":  mod(func(r *ExclureReq) { r.Siege = nil }),
-		"siège 50":          mod(func(r *ExclureReq) { r.Siege = siegeP(nbSieges) }),
+		"siège 10":          mod(func(r *ExclureReq) { r.Siege = siegeP(10) }),
 		"siège 0xFF":        mod(func(r *ExclureReq) { r.Siege = siegeP(SansExclu) }),
 		"sel court":         mod(func(r *ExclureReq) { r.Salt = r.Salt[:15] }),
 		"preuve courte":     mod(func(r *ExclureReq) { r.ProofV = r.ProofV[:31] }),

@@ -551,14 +551,13 @@ func (a compteAPI) etat(w http.ResponseWriter, r *http.Request) {
 		Palier       string  `json:"palier"`
 		ConfirmeLe   *string `json:"confirme_le"`
 		Limites      limites `json:"limites"`
-		SurMesure    bool    `json:"sur_mesure"`
 		SalonsActifs int     `json:"salons_actifs"`
 		Banni        bool    `json:"banni"`
 		BanniID      *string `json:"banni_id"`
 		BanniJusqu   *string `json:"banni_jusqu"`
 		BanniMotif   *uint8  `json:"banni_motif"`
 	}{b64.EncodeToString(et.H[:]), et.CreeLe, et.Palier, ouNull(et.ConfirmeLe),
-		limites{et.Limites.Salons, et.Limites.Places, et.Limites.Heures}, et.SurMesure, et.SalonsActifs, et.Banni,
+		limites{et.Limites.Salons, et.Limites.Places, et.Limites.Heures}, et.SalonsActifs, et.Banni,
 		ouNull(et.BanniID), ouNull(et.BanniJusqu), motifOuNull(et.BanniMotif)})
 }
 

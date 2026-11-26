@@ -54,7 +54,6 @@ type vecteursV3 struct {
 	CoffrePrive  []vecteurCoffreV3 `json:"coffre_prive"`
 	Pseudo       []struct {
 		Label     string `json:"label"`
-		EntreeHex string `json:"entree_hex"`
 		PCanonHex string `json:"p_canon_hex"`
 		Reserve   bool   `json:"reserve"`
 		Error     string `json:"error"`

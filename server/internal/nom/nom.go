@@ -1,6 +1,6 @@
 // Package nom : nom ou note que l'exploitant donne, depuis le tableau de bord, à un accès offert
-// (paiement) ou à un compte sur mesure (compte), pour des personnes qu'il connaît (décision du
-// propriétaire, 25 novembre). Gardé en clair sur le serveur : c'est le seul texte libre des
+// (paiement), pour des personnes qu'il connaît (décision du propriétaire, 25 novembre ; les
+// comptes sur mesure, qui en avaient aussi un, sont retirés le 26 novembre). Gardé en clair sur le serveur : c'est le seul texte libre des
 // bases, écrit par l'exploitant seul, jamais par un visiteur.
 package nom
 

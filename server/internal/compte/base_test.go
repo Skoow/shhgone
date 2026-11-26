@@ -43,11 +43,10 @@ func lignes(t *testing.T, db *sql.DB, q string, args ...any) []string {
 // index), rien d'autre ; aucune colonne texte ; aucune colonne d'adresse, de mot de passe, de
 // TOTP, de séquestre, d'AAGUID, de BS ni de date d'usage. Schéma 4 : sign_count, compteur de
 // signatures WebAuthn (refus d'un compteur qui recule, demande de l'audit du 25 novembre).
-// Schéma 5 : sur_mesure (limites et nom donnés par l'exploitant, décision du 25 novembre).
 func TestSchemaComptes(t *testing.T) {
 	db, _ := ouvrir(t)
 	const wantMaster = "index:bannis_h,index:comptes_p_empreinte,index:comptes_v_r,index:passkeys_h," +
-		"index:sessions_h,index:sessions_sid,table:bannis,table:comptes,table:enveloppes,table:passkeys,table:sessions,table:sur_mesure"
+		"index:sessions_h,index:sessions_sid,table:bannis,table:comptes,table:enveloppes,table:passkeys,table:sessions"
 	if got := strings.Join(lignes(t, db, `SELECT type || ':' || name FROM sqlite_master ORDER BY 1`), ","); got != wantMaster {
 		t.Fatalf("sqlite_master = %s\nattendu        %s", got, wantMaster)
 	}
@@ -58,8 +57,7 @@ func TestSchemaComptes(t *testing.T) {
 		"enveloppes": "cred_id:BLOB,n:INTEGER,env:BLOB",
 		"sessions": "t_v:BLOB,sid:BLOB,h:BLOB,etiquette:BLOB,cree_mois:INTEGER,expire_jour:INTEGER,persistante:INTEGER," +
 			"par_recup:INTEGER",
-		"bannis":     "id:BLOB,h:BLOB,debut_jour:INTEGER,jusqu_jour:INTEGER,actif:INTEGER,motif:INTEGER,salons_fermes:INTEGER",
-		"sur_mesure": "h:BLOB,salons:INTEGER,places:INTEGER,jours:INTEGER,nom:BLOB,depuis_jour:INTEGER",
+		"bannis": "id:BLOB,h:BLOB,debut_jour:INTEGER,jusqu_jour:INTEGER,actif:INTEGER,motif:INTEGER,salons_fermes:INTEGER",
 	}
 	interdits := []string{"e_", "email", "adresse", "mdp", "cle_profil", "totp", "recup_jour", "aaguid", "compteur",
 		"bs", "vu_jour", "transport", "attestation", "ip", "heure", "pseudo_canon", "p_canon"}
@@ -80,7 +78,7 @@ func TestSchemaComptes(t *testing.T) {
 			}
 		}
 	}
-	if v := lignes(t, db, `PRAGMA user_version`); len(v) != 1 || v[0] != "5" {
+	if v := lignes(t, db, `PRAGMA user_version`); len(v) != 1 || v[0] != "6" {
 		t.Fatalf("user_version = %v", v)
 	}
 	for p, w := range map[string]string{"secure_delete": "1", "journal_mode": "wal", "foreign_keys": "1", "temp_store": "2",
@@ -345,7 +343,7 @@ func TestBaseVersionEtDroits(t *testing.T) {
 			t.Errorf("%s : droits %o", filepath.Base(f), st.Mode().Perm())
 		}
 	}
-	if _, err := db.Exec(`PRAGMA user_version=6`); err != nil {
+	if _, err := db.Exec(`PRAGMA user_version=7`); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -418,7 +416,7 @@ func TestSchema2VideRecree(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "5" {
+	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "6" {
 		t.Fatal(v)
 	}
 	if c := lignes(t, db, `SELECT name FROM pragma_table_info('comptes') WHERE name='e_canon'`); len(c) != 0 {
@@ -471,7 +469,7 @@ func TestMigrationCompteur(t *testing.T) {
 		t.Fatal("migration 3 → 4 :", err)
 	}
 	defer db.Close()
-	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "5" {
+	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "6" {
 		t.Fatal(v)
 	}
 	var n int64
@@ -480,5 +478,59 @@ func TestMigrationCompteur(t *testing.T) {
 	}
 	if _, err := db.Exec(`UPDATE passkeys SET sign_count=-1`); err == nil {
 		t.Fatal("compteur négatif accepté")
+	}
+}
+
+// Migration 5 → 6 (comptes sur mesure retirés, 26 novembre) : une base de préproduction qui a
+// la table sur_mesure, avec une ligne et son nom, s'ouvre ; la table disparaît, son nom n'est
+// plus dans les fichiers (base, WAL), comptes et passkeys sont gardés, et le schéma est celui
+// d'une base neuve ; rejouée sans erreur.
+func TestMigrationSansSurMesure(t *testing.T) {
+	b := nouveauBanc(t)
+	h, _, _ := b.inscrire(t, "lea")
+	const nomSecret = "Nom-Donne-Par-Lexploitant"
+	for _, q := range []string{`CREATE TABLE sur_mesure(h BLOB PRIMARY KEY REFERENCES comptes(h) ON DELETE CASCADE,
+		salons INTEGER NOT NULL, places INTEGER NOT NULL, jours INTEGER NOT NULL, nom BLOB NOT NULL,
+		depuis_jour INTEGER NOT NULL) WITHOUT ROWID`, `PRAGMA user_version=5`} {
+		if _, err := b.db.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if _, err := b.db.Exec(`INSERT INTO sur_mesure VALUES(?,2,50,30,?,0)`, h[:], []byte(nomSecret)); err != nil {
+		t.Fatal(err)
+	}
+	b.db.Close()
+	neuve, err := OuvrirBase(filepath.Join(t.TempDir(), "neuve.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := func(db *sql.DB) string {
+		return strings.Join(lignes(t, db, `SELECT type || ':' || name || ':' || coalesce(sql,'') FROM sqlite_master ORDER BY name`), "\n")
+	}
+	want := schema(neuve)
+	neuve.Close()
+	for range 2 {
+		db, err := OuvrirBase(b.chemin)
+		if err != nil {
+			t.Fatal("migration 5 → 6 :", err)
+		}
+		if v := lignes(t, db, `PRAGMA user_version`); v[0] != "6" {
+			t.Fatal(v)
+		}
+		if got := schema(db); got != want {
+			t.Fatalf("schéma migré :\n%s\nneuve :\n%s", got, want)
+		}
+		if n := lignes(t, db, `SELECT count(*) FROM comptes WHERE h=?`, h[:]); n[0] != "1" {
+			t.Fatal("compte perdu")
+		}
+		if n := lignes(t, db, `SELECT count(*) FROM passkeys WHERE h=?`, h[:]); n[0] != "1" {
+			t.Fatal("passkey perdue")
+		}
+		db.Close()
+	}
+	for _, f := range []string{b.chemin, b.chemin + "-wal"} {
+		if c, err := os.ReadFile(f); err == nil && strings.Contains(string(c), nomSecret) {
+			t.Fatalf("%s garde le nom", filepath.Base(f))
+		}
 	}
 }

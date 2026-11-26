@@ -206,9 +206,6 @@ func TestCreerSalonGelEtFormat(t *testing.T) {
 	for _, bad := range []func(map[string]any){
 		func(b map[string]any) { b["ttl_hours"] = 2 },
 		func(b map[string]any) { b["max_members"] = 11 },
-		func(b map[string]any) { b["max_members"] = 50 },
-		func(b map[string]any) { b["ttl_hours"] = 720 },
-		func(b map[string]any) { b["ttl_hours"] = 48 },
 		func(b map[string]any) { b["max_members"] = 1 },
 		func(b map[string]any) { b["kdf_ops"] = 2 },
 		func(b map[string]any) { b["kdf_mem"] = 33554432 },

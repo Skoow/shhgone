@@ -36,9 +36,9 @@ type refSalon struct {
 	expire time.Time
 }
 
-// Palier : limites du compte h pour créer ou régler un salon (§11), sur mesure si l'exploitant
-// en a posé (surmesure.go). Compte banni (bannissement actif, non échu, lu dans bannis comme
-// Etat) : ErrBanni, avant tout sur mesure ; compte inconnu (supprimé entre-temps) : ErrSession.
+// Palier : limites du compte h pour créer ou régler un salon (§11). Adresse bannie
+// (bannissement actif, non échu, lu dans bannis comme Etat) : ErrBanni ; compte inconnu
+// (supprimé entre-temps) : ErrSession.
 func (s *Service) Palier(h [16]byte) (Limites, error) {
 	now := s.now()
 	l, err := s.lireEtat(h, now)
@@ -48,8 +48,8 @@ func (s *Service) Palier(h [16]byte) (Limites, error) {
 	if l.banni {
 		return Limites{}, ErrBanni{dateJour(l.banniJusqu)}
 	}
-	_, lim, _, _, err := s.limitesEnVigueur(h, l.des, now)
-	return lim, err
+	_, lim, _ := palier(l.des, now)
+	return lim, nil
 }
 
 // Signale : premier signalement d'un salon du compte h : compte_des = aujourd'hui (§11).

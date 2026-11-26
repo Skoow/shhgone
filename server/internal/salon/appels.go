@@ -7,13 +7,6 @@ import "time"
 // appeler jusqu'à la fin du salon. Le gestionnaire ne garde que l'heure de fin (en mémoire) : ni
 // le jeton, ni l'offre, ni le siège qui l'a ouvert.
 
-// AppelsParJetonMax : un jeton ouvre les appels jusqu'à la fin du salon, mais jamais plus de
-// 24 h 15 min : la plus longue durée d'un salon ordinaire, arrondie au quart d'heure (aucun
-// changement pour eux). Un salon sur
-// mesure de 30 jours demande donc un jeton par jour d'appels (sinon un seul jeton payait
-// 30 jours de relais TURN pour 50 personnes) ; un membre qui a une offre payante les rouvre.
-const AppelsParJetonMax = HeuresStandardMax*time.Hour + quart*time.Second
-
 // membreActuelLocked : mb occupe encore son siège (ni parti, ni exclu, ni remplacé) dans un
 // salon vivant à now. Appelé sous s.mu.
 func membreActuelLocked(s *salon, mb Membre, now time.Time) error {
@@ -58,8 +51,8 @@ func (m *Manager) AppelsOuverts(mb Membre) (time.Duration, bool, error) {
 	return reste, true, nil
 }
 
-// OuvrirAppels : ouvre les appels du salon de mb jusqu'à sa fin, AppelsParJetonMax au plus
-// (après la vérification d'un jeton payant par l'appelant). Rend le temps restant et deja = vrai s'ils étaient déjà
+// OuvrirAppels : ouvre les appels du salon de mb jusqu'à sa fin (après la vérification d'un
+// jeton payant par l'appelant). Rend le temps restant et deja = vrai s'ils étaient déjà
 // ouverts (deux membres en même temps : le second jeton est à rendre). Un renouvellement
 // ultérieur du salon ne les prolonge pas : ils se ferment à la fin prévue au moment de
 // l'ouverture, et un membre qui a une offre payante les rouvre.
@@ -77,11 +70,7 @@ func (m *Manager) OuvrirAppels(mb Membre) (reste time.Duration, deja bool, err e
 	if r := finAppelsLocked(s).Sub(now); r >= time.Second {
 		return r, true, nil
 	}
-	fin := s.expires
-	if borne := now.Add(AppelsParJetonMax); fin.After(borne) {
-		fin = borne
-	}
-	s.appelsJusqua = fin
-	s.appelsFin.Store(fin.Unix())
-	return fin.Sub(now), false, nil
+	s.appelsJusqua = s.expires
+	s.appelsFin.Store(s.expires.Unix())
+	return s.expires.Sub(now), false, nil
 }

@@ -2,6 +2,7 @@ package store
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -28,7 +29,7 @@ func TestTableReprise(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if v := pragma(t, db, "user_version"); v != "4" {
+	if v := pragma(t, db, "user_version"); v != strconv.Itoa(SchemaVersion) {
 		t.Fatal("user_version", v)
 	}
 	if got := strings.Join(masterNames(t, db), ","); got != wantMaster {

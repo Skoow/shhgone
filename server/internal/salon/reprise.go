@@ -514,7 +514,7 @@ func (s *salon) encoderLocked() []byte {
 	for _, e := range s.index {
 		b = binary.BigEndian.AppendUint64(b, e.seq)
 		b = binary.BigEndian.AppendUint64(b, uint64(e.recuMs))
-		b = binary.BigEndian.AppendUint64(b, e.attendus)
+		b = binary.BigEndian.AppendUint64(b, uint64(e.attendus))
 		b = binary.BigEndian.AppendUint32(b, e.emplacement)
 		b = append(b, e.siege, e.drapeaux)
 	}
@@ -715,9 +715,10 @@ func (s *salon) decoder(corps []byte, n uint32) ([]*piece, error) {
 		s.index = make([]entree, 0, k)
 	}
 	for range k {
-		e := entree{seq: l.u64(), recuMs: int64(l.u64()), attendus: l.u64(), emplacement: l.u32(), siege: l.u8(), drapeaux: l.u8()}
+		seq, recu, att := l.u64(), int64(l.u64()), l.u64()
+		e := entree{seq: seq, recuMs: recu, attendus: uint16(att), emplacement: l.u32(), siege: l.u8(), drapeaux: l.u8()}
 		if e.seq <= prec || e.seq > s.seq || e.siege >= nbSieges || (!e.efface() && e.emplacement >= n) ||
-			e.attendus>>nbSieges != 0 {
+			att>>nbSieges != 0 {
 			return nil, errReprise
 		}
 		prec = e.seq

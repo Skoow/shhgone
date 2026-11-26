@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -55,12 +56,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS shares_manage_v ON shares(manage_v)`
 // ancien exclure rejoué après un redémarrage ne fasse pas revivre une invitation morte (colonne
 // ajoutée au schéma 2 sans migration : jamais publié en production).
 //
-// max_members : 2 à 50 depuis le schéma 4 (comptes sur mesure, 25 novembre ; 2 à 10 avant) ; un
-// salon ordinaire reste à 10 au plus (salon.PlacesStandardMax, vérifié par le gestionnaire).
+// max_members : 2 à 10 (2 à 50 au seul schéma 4, comptes sur mesure du 25 novembre, retirés le
+// 26 : migration 4 → 5, migrerPlaces).
 const salonsDef = `(
   id TEXT PRIMARY KEY, access_v BLOB NOT NULL, manage_v BLOB NOT NULL, proof_v BLOB NOT NULL,
   salt BLOB NOT NULL, kdf_ops INTEGER NOT NULL, kdf_mem INTEGER NOT NULL, expires_at INTEGER NOT NULL,
-  max_members INTEGER NOT NULL CHECK(max_members BETWEEN 2 AND 50),
+  max_members INTEGER NOT NULL CHECK(max_members BETWEEN 2 AND 10),
   members_can_destroy INTEGER NOT NULL CHECK(members_can_destroy IN (0,1)),
   failed_attempts INTEGER NOT NULL DEFAULT 0,
   pieces_bytes INTEGER NOT NULL DEFAULT 0 CHECK(pieces_bytes BETWEEN 0 AND 2147483648),
@@ -68,11 +69,11 @@ const salonsDef = `(
   compte BLOB ` + compteCheck + `,
   CHECK(length(access_v)=32 AND length(manage_v)=32 AND length(proof_v)=32 AND length(salt)=16)) WITHOUT ROWID`
 
-// salonsColonnes : colonnes recopiées par la migration 3 → 4 (toutes celles de salonsDef).
+// salonsColonnes : colonnes recopiées par la migration 4 → 5 (toutes celles de salonsDef).
 const salonsColonnes = `id,access_v,manage_v,proof_v,salt,kdf_ops,kdf_mem,expires_at,max_members,members_can_destroy,
   failed_attempts,pieces_bytes,rotation_r,compte`
 
-// salonsIndexUniques : index de la table salons recréés par la migration 3 → 4.
+// salonsIndexUniques : index de la table salons recréés par la migration 4 → 5.
 const salonsIndexUniques = `CREATE UNIQUE INDEX IF NOT EXISTS salons_access_v ON salons(access_v);
 CREATE UNIQUE INDEX IF NOT EXISTS salons_manage_v ON salons(manage_v)`
 
@@ -136,8 +137,10 @@ const busyTimeoutMs = "5000"
 // base qu'il ne connaît pas. À incrémenter avec toute migration.
 // 1 : partages ; 2 : tables salons et salon_pieces (tables neuves, aucune donnée migrée) ;
 // 3 : colonne salons.compte et index salons_compte (ajout en place, salons gardés, compte NULL) ;
-// 4 : salons.max_members de 2 à 50 (table salons reconstruite, salons et pièces gardés).
-const SchemaVersion = 4
+// 4 : salons.max_members de 2 à 50 (comptes sur mesure, 25 novembre) ; 5 : retour à 2 à 10
+// (comptes sur mesure retirés le 26 novembre ; table salons reconstruite, salons et pièces
+// gardés, places et échéance ramenées aux bornes d'un salon ordinaire : migrerPlaces).
+const SchemaVersion = 5
 
 var (
 	// ErrNewerSchema : message fixe, sans chemin.
@@ -265,7 +268,7 @@ func Open(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, fmt.Errorf("migration du schéma (salons.compte) : %w", err)
 	}
-	if err := migratePlaces(db); err != nil {
+	if err := migrerPlaces(db, time.Now().Unix()); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migration du schéma (salons.max_members) : %w", err)
 	}
@@ -300,21 +303,30 @@ func migrateCompte(db *sql.DB) error {
 	return err
 }
 
-// migratePlaces : schéma 3 → 4, CHECK de salons.max_members élargi de 2..10 à 2..50 (salons
-// des comptes sur mesure). SQLite ne change pas un CHECK en place : la table est reconstruite
-// (procédure de la documentation de SQLite, « ALTER TABLE », 12 étapes), dans une transaction,
-// sur une connexion tenue, avec les clés étrangères coupées le temps de la copie (sinon le DROP
-// de l'ancienne table effacerait les pièces par ON DELETE CASCADE) puis vérifiées
-// (foreign_key_check) avant la validation. Déjà fait : rien.
-func migratePlaces(db *sql.DB) error {
+// migrerPlaces : schéma 4 → 5. Les comptes sur mesure (schéma 4) permettaient 50 places et
+// 30 jours ; ils sont retirés, et le CHECK de salons.max_members revient à 2..10. SQLite ne
+// change pas un CHECK en place : la table est reconstruite (procédure de la documentation de
+// SQLite, « ALTER TABLE », 12 étapes), dans une transaction, sur une connexion tenue, avec les
+// clés étrangères coupées le temps de la copie (sinon le DROP de l'ancienne table effacerait
+// pièces et lignes de reprise par ON DELETE CASCADE) puis vérifiées (foreign_key_check) avant
+// la validation. Déjà fait (ou base d'avant le schéma 4) : rien.
+//
+// Stratégie pour un salon d'un compte sur mesure encore vivant (préproduction seulement) : il
+// est GARDÉ, lien et mot de passe valables, ramené aux bornes d'un salon ordinaire : 10 places
+// au plus (max_members = min(max_members, 10)) et une échéance d'au plus 24 h à partir de la
+// migration (au quart d'heure supérieur, comme toute échéance). Ni salon détruit sans prévenir,
+// ni démarrage refusé, ni exception laissée en base (un salon de 30 jours ouvrirait encore les
+// appels pour 30 jours par un seul jeton). S'il avait plus de 10 personnes, son état rangé ne
+// se reprend pas (sièges au-delà de 9) : les membres rentrent par « rejoindre », 10 au plus.
+func migrerPlaces(db *sql.DB, now int64) error {
 	var def string
 	if err := db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='salons'`).Scan(&def); err != nil {
 		return err
 	}
-	if !strings.Contains(def, "max_members BETWEEN 2 AND 10") {
+	if !strings.Contains(def, "max_members BETWEEN 2 AND 50") {
 		return nil
 	}
-	if err := reconstruireSalons(db); err != nil {
+	if err := reconstruireSalons(db, (now+24*3600+899)/900*900); err != nil {
 		return err
 	}
 	// Pages de l'ancienne table : effacées par secure_delete ; le WAL est vidé (après avoir
@@ -322,8 +334,9 @@ func migratePlaces(db *sql.DB) error {
 	return Checkpoint(db)
 }
 
-// reconstruireSalons : la reconstruction elle-même, sur une connexion tenue puis rendue.
-func reconstruireSalons(db *sql.DB) error {
+// reconstruireSalons : la reconstruction elle-même, sur une connexion tenue puis rendue ;
+// places ramenées à 10 au plus, échéances à expMax au plus.
+func reconstruireSalons(db *sql.DB, expMax int64) error {
 	ctx := context.Background()
 	c, err := db.Conn(ctx)
 	if err != nil {
@@ -340,11 +353,12 @@ func reconstruireSalons(db *sql.DB) error {
 	}
 	defer tx.Rollback()
 	for _, stmt := range []string{
-		`DROP TABLE IF EXISTS salons_m4`,
-		`CREATE TABLE salons_m4` + salonsDef,
-		`INSERT INTO salons_m4(` + salonsColonnes + `) SELECT ` + salonsColonnes + ` FROM salons`,
-		`DROP TABLE salons`, // ses index avec elle ; salon_pieces garde sa référence à « salons »
-		`ALTER TABLE salons_m4 RENAME TO salons`,
+		`DROP TABLE IF EXISTS salons_m5`,
+		`CREATE TABLE salons_m5` + salonsDef,
+		`INSERT INTO salons_m5(` + salonsColonnes + `) SELECT ` + strings.NewReplacer("expires_at",
+			fmt.Sprintf("min(expires_at,%d)", expMax), "max_members", "min(max_members,10)").Replace(salonsColonnes) + ` FROM salons`,
+		`DROP TABLE salons`, // ses index avec elle ; salon_pieces et salons_reprise gardent leur référence à « salons »
+		`ALTER TABLE salons_m5 RENAME TO salons`,
 		salonsIndexUniques,
 		salonsIndexes,
 	} {
