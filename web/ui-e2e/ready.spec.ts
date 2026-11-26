@@ -14,7 +14,7 @@ async function toReady(page: Page, context: BrowserContext, origin: string, text
   await grantClipboard(context, origin);
   await page.goto(origin + "/");
   await addText(page, text);
-  await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+  await protectOn(page); // D42-28 : mot de passe désactivé par défaut
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
 }
@@ -261,7 +261,7 @@ test.describe("fr-FR", () => {
     await p2.getByRole("radiogroup", { name: "Durée" }).getByRole("radio", { name: /^6\sh$/ }).evaluate((e: HTMLInputElement) => e.click());
     await p2.getByRole("radiogroup", { name: "Ouvertures" }).getByRole("radio", { name: "3", exact: true }).evaluate((e: HTMLInputElement) => e.click());
     if (isMobile) await p2.keyboard.press("Escape");
-    await protectOn(p2); // D42-27 : mot de passe désactivé par défaut
+    await protectOn(p2); // D42-28 : mot de passe désactivé par défaut
     await sendButton(p2).click();
     await expect(readyHeading(p2)).toBeVisible({ timeout: 60_000 });
     await expect(p2.getByText(/^S'efface tout seul\s: après 3\souvertures, ou à cette heure \(6\sh après l'envoi, arrondie au quart d'heure supérieur\)\.$/)).toBeVisible();
@@ -310,7 +310,7 @@ test.describe("fr-FR", () => {
     await p2.emulateMedia({ reducedMotion: "reduce" });
     await p2.goto(shh.origin + "/");
     await addText(p2, "réduit");
-    await protectOn(p2); // D42-27 : mot de passe désactivé par défaut
+    await protectOn(p2); // D42-28 : mot de passe désactivé par défaut
     await sendButton(p2).click();
     await expect(readyHeading(p2)).toBeVisible({ timeout: 60_000 });
     expect(
@@ -360,7 +360,7 @@ test.describe("en-US", () => {
     const dlg = page.getByRole("dialog");
     await dlg.locator("textarea").fill("The door code is 4471.");
     await dlg.getByRole("button", { name: "Add", exact: true }).click();
-    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+    await protectOn(page); // D42-28 : mot de passe désactivé par défaut
     await page.getByRole("button", { name: "Encrypt and send" }).click();
     await expect(page.getByRole("heading", { name: "Link ready" })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("group", { name: "Password" })).toBeVisible();

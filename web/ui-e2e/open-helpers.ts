@@ -87,7 +87,7 @@ export async function sendShare(
     }
     if (protect) {
       const sw = opts.getByRole("switch", { name: "Protéger par un mot de passe" });
-      await expect(sw).toHaveAttribute("aria-checked", "false"); // désactivé par défaut (D42-27)
+      await expect(sw).toHaveAttribute("aria-checked", "false"); // désactivé par défaut (D42-28)
       await sw.click();
       await expect(sw).toHaveAttribute("aria-checked", "true");
     }
@@ -111,7 +111,7 @@ export async function sendShare(
   return { link, password, manage };
 }
 
-/** Bouton « Ouvrir » d'un partage sans mot de passe (D42-27). */
+/** Bouton « Ouvrir » d'un partage sans mot de passe (D42-28). */
 export const openButton = (page: Page) => page.getByRole("button", { name: /^(Ouvrir|Ouverture…)$/ });
 
 /** Ouvre un partage sans mot de passe (geste « Ouvrir ») ; attend l'écran de contenu. */

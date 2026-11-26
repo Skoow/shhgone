@@ -574,7 +574,7 @@ pub fn share_link(
     Ok(secret_string(Zeroizing::new(l)))
 }
 
-/// Lien d'un partage sans mot de passe `origine + base + s#l + K_lien` (D42-27).
+/// Lien d'un partage sans mot de passe `origine + base + s#l + K_lien` (D42-28).
 #[wasm_bindgen(js_name = shareLinkNoPassword)]
 pub fn share_link_no_password(
     origin: &str,
@@ -599,7 +599,7 @@ pub fn manage_link(
 }
 
 /// Lit un lien (UTF-8) : `{ kind: "s", origin, kLien, noPassword }` ou
-/// `{ kind: "m", origin, sGestion }`. `noPassword` : lien `#l…` (D42-27).
+/// `{ kind: "m", origin, sGestion }`. `noPassword` : lien `#l…` (D42-28).
 #[wasm_bindgen(
     js_name = parseLink,
     unchecked_return_type = "{ kind: \"s\"; origin: string; kLien: Uint8Array; noPassword: boolean } | { kind: \"m\"; origin: string; sGestion: Uint8Array }"
@@ -766,7 +766,7 @@ pub fn password_key(
 }
 
 /// K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp ») : tient la place de K_mdp dans un partage sans
-/// mot de passe (D42-27). Aucun Argon2id : rendue tout de suite, l'appelant l'efface.
+/// mot de passe (D42-28). Aucun Argon2id : rendue tout de suite, l'appelant l'efface.
 #[wasm_bindgen(js_name = noPasswordKey)]
 pub fn no_password_key(k_lien: &Uint8Array) -> core::result::Result<Uint8Array, JsValue> {
     let k = KLien::from_slice(&secret(k_lien)).map_err(js_err)?;

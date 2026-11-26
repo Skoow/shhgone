@@ -1,4 +1,4 @@
-// Mot de passe facultatif, désactivé par défaut (D42-27), sur le vrai serveur et le vrai site :
+// Mot de passe facultatif, désactivé par défaut (D42-28), sur le vrai serveur et le vrai site :
 // création et ouverture SANS mot de passe (lien « #l », bouton « Ouvrir », jamais d'ouverture au
 // chargement) et AVEC (interrupteur, mot de passe généré, « Générer un autre », champ à
 // l'ouverture). Ordinateur et téléphone (projets Playwright). Captures dans SHH_CAPTURES_SANSMDP

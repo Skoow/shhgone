@@ -1,4 +1,4 @@
-// Vecteurs du partage SANS MOT DE PASSE (D42-27) : engine/vectors/v6-sans-mdp.json, PRODUIT
+// Vecteurs du partage SANS MOT DE PASSE (D42-28) : engine/vectors/v6-sans-mdp.json, PRODUIT
 // PAR CE MOTEUR. Chaque cas donne ses entrées et ses sorties ; le test les recalcule à partir des
 // seules entrées du fichier et compare (Rust natif ici, WebAssembly et TypeScript dans
 // web/src/engine/sans-mdp.test.ts ; les apps devront le rejouer de même).
@@ -294,7 +294,7 @@ fn keys() -> Value {
 
 fn build() -> Value {
     json!({
-        "about": "Partage sans mot de passe (D42-27), produit par le moteur Rust (engine/core/tests/sans_mdp.rs) ; voir engine/vectors/README.md.",
+        "about": "Partage sans mot de passe (D42-28), produit par le moteur Rust (engine/core/tests/sans_mdp.rs) ; voir engine/vectors/README.md.",
         "constants": {
             "NO_PASSWORD_INFO": NO_PASSWORD_INFO,
             "NO_PASSWORD_MARK": NO_PASSWORD_MARK.to_string(),

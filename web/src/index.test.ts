@@ -68,7 +68,7 @@ describe("interface publique", () => {
         "SHARE_FRAGMENT",
         "SHARE_LINK_SHAPE",
         "SHARE_PW_FRAGMENT",
-        // Partage sans mot de passe (D42-27) : forme du lien « #l », lien écrit par le moteur.
+        // Partage sans mot de passe (D42-28) : forme du lien « #l », lien écrit par le moteur.
         "NO_PASSWORD_FRAGMENT",
         "NO_PASSWORD_LINK_SHAPE",
         "isNoPasswordLink",

@@ -10,7 +10,7 @@ import { addFile, addText, readyHeading, sendButton, protectOn } from "./send-he
 // origine partagée par tous les sites GitHub Pages du compte : « ne mettez rien de réel ».
 const BANNER_FR = "Démo : rien n'est envoyé, le lien ne marche que dans cet onglet. N'y mettez rien de réel.";
 const BANNER_EN = "Demo: nothing is sent, the link only works in this tab. Don't put anything real in it.";
-const TITLE_FR = "Un lien, un mot de passe, puis ça s'efface.";
+const TITLE_FR = "Un lien chiffré, puis ça s'efface.";
 
 const ID = Buffer.from(Uint8Array.from({ length: 16 }, (_, i) => i * 11 + 3)).toString("base64url");
 const KEY = Buffer.from(Uint8Array.from({ length: 32 }, (_, i) => 200 - i * 5)).toString("base64url");
@@ -306,7 +306,7 @@ test.describe("fr-FR : envoi (–18)", () => {
     await page.goto(demo.url);
     await addText(page, "Le code de la porte est 4471.");
     await addFile(page, "releve.bin", 2 * 1048576);
-    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+    await protectOn(page); // D42-28 : mot de passe désactivé par défaut
     await sendButton(page).click();
     // Les étapes peuvent défiler très vite (démo locale) : n'importe quel écran du parcours d'envoi.
     await expect(page.getByRole("heading", { name: /^(Préparation des clés|Vérification anti-robot|Chiffrement et envoi|Finalisation|Lien prêt)$/ }).first()).toBeVisible();
@@ -366,7 +366,7 @@ test.describe("fr-FR : envoi (–18)", () => {
     test.setTimeout(90_000);
     await page.goto(demo.url);
     await addText(page, "À supprimer.");
-    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+    await protectOn(page); // D42-28 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     const link = (await page.getByRole("group", { name: "Lien", exact: true }).locator(".sr-only").first().textContent()) ?? "";
@@ -384,7 +384,7 @@ test.describe("fr-FR : envoi (–18)", () => {
     test.setTimeout(120_000);
     await page.goto(demo.url + "?coupure");
     await addFile(page, "releve.bin", 3 * 1048576);
-    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+    await protectOn(page); // D42-28 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(page.getByRole("status").filter({ hasText: /Connexion perdue|Hors ligne/ })).toBeVisible({ timeout: 30_000 });
     await capture(page, "demo-seal-offline");

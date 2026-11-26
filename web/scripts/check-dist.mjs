@@ -16,7 +16,7 @@ import { checkSri, sha384 } from "./sri.mjs";
 const MARK = "__SHH_DEMO__";
 /** Phrase du dictionnaire anglais (titre de l'accueil) : absente du script principal de production. */
 // Phrase propre au dictionnaire anglais (titre de l'accueil), à garder égale à en.ts (test).
-const EN_PROBE = "One link, one password, then it's gone.";
+const EN_PROBE = "One encrypted link, then it's gone.";
 /**
  * Appel des passkeys du navigateur (account/navigateur.ts) : jamais dans la démo, qui simule la
  * passkey (conception du compte par passkey §11, Q8 : aucune passkey de démo laissée dans le

@@ -57,7 +57,7 @@ test("premier écran : titre, zone de dépôt compacte, offres et Salon, sans d�
   await expect(page.getByRole("heading", { level: 1, name: "Nouveau partage" })).toHaveCount(1);
   await expect(page.locator("[data-assure]")).toHaveCount(0);
   await expect(page.getByRole("list", { name: "En bref" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis ça s'efface." })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Un lien chiffré, puis ça s'efface." })).toHaveCount(0);
   const dz = page.locator(".dropzone").filter({ visible: true });
   await expect(dz).toBeInViewport({ ratio: 1 });
   const h = await dz.evaluate((e) => e.getBoundingClientRect().height);
@@ -173,8 +173,8 @@ test.describe("langue du navigateur", () => {
   test("anglais choisi tout seul, sans bouton ; balai nommé « Clean this file: nom »", async ({ page, shh, isMobile }) => {
     await openSend(page, shh.origin);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    const items = page.getByRole("list", { name: "In short" }).getByRole("listitem");
-    for (const [i, l] of ["Encrypted in your browser", "Share without an account", "The link self-destructs"].entries()) await expect(items.nth(i)).toContainText(l);
+    // Pastilles « Chiffré · Sans compte · S'autodétruit » : dites seulement sous le héros de l'accueil (D42-27).
+    await expect(page.getByRole("list", { name: "In short" })).toHaveCount(0);
     if (isMobile) return; // sélecteur ouvert par la zone de dépôt : ordinateur
     const chooser = page.waitForEvent("filechooser");
     await page.locator(".dropzone").click();

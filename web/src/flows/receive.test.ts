@@ -261,7 +261,7 @@ describe("createReceiver (UI §9.7)", () => {
     expect([r.state, r.error, r.attemptsLeft]).toEqual(["locked", "password_required", 4]);
   });
 
-  it("partage sans mot de passe (lien « #l », D42-27) : jamais ouvert au chargement ; « Ouvrir » sans mot de passe consomme une ouverture", async () => {
+  it("partage sans mot de passe (lien « #l », D42-28) : jamais ouvert au chargement ; « Ouvrir » sans mot de passe consomme une ouverture", async () => {
     const NOPW = "https://x.test/s#l" + "A".repeat(43);
     const { r, openShare, store } = setup({}, NOPW);
     await flush();

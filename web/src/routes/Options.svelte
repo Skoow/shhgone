@@ -2,7 +2,7 @@
   // Options de l'envoi (UI §9.3, benchmark M4) : durée et ouvertures (phrase « S'efface dans
   // 12 h ou après 1 ouverture… » sur ordinateur), destinataire (interrupteur
   // « Autoriser le téléchargement » ; plus de sous-option du coffre), estimation du temps d'envoi.
-  // Mot de passe (D42-27) : interrupteur « Protéger par un mot de passe », désactivé par défaut ;
+  // Mot de passe (D42-28) : interrupteur « Protéger par un mot de passe », désactivé par défaut ;
   // activé, le mot de passe généré, « Générer un autre », « Copier » et le rappel de l'envoyer
   // par un autre moyen.
 // `compact` : feuille du téléphone, une ligne d'aide au plus par réglage.
@@ -70,7 +70,7 @@
     <p class="line" data-pw-off><ShieldAlert size={16} strokeWidth={1.9} aria-hidden="true" /><span>{t("options.pw.off")}</span></p>
   {/if}
 {/snippet}
-<!-- Mot de passe facultatif (D42-27) : désactivé par défaut ; activé, toujours généré (D41-15). -->
+<!-- Mot de passe facultatif (D42-28) : désactivé par défaut ; activé, toujours généré (D41-15). -->
 {#snippet protection()}
   <div class="block" data-protect>
     <Switch label={t("options.pw.switch")} hint={options.protect ? undefined : t("options.pw.off")} checked={options.protect} onchange={(v) => (options.protect = v)} />
@@ -139,7 +139,7 @@
     </div>
   </div>
 
-  <!-- Mot de passe (D42-27) : choisi ici, généré sur l'appareil, montré de nouveau sous le lien
+  <!-- Mot de passe (D42-28) : choisi ici, généré sur l'appareil, montré de nouveau sous le lien
        (« Lien prêt ») s'il est activé. -->
   {@render protection()}
   {#if part === "all" && options.protect}<div class="block">{@render trust()}</div>{/if}

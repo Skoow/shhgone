@@ -32,7 +32,7 @@ describe("options : mot de passe généré seulement, aucun choix payant", () =>
     show(Options, { options, unviewable: [] });
     return { options };
   }
-  it("aucune saisie de mot de passe ; « Protéger par un mot de passe » désactivé par défaut (D42-27), activé : mot de passe généré, Générer un autre, Copier, rappel", () => {
+  it("aucune saisie de mot de passe ; « Protéger par un mot de passe » désactivé par défaut (D42-28), activé : mot de passe généré, Générer un autre, Copier, rappel", () => {
     const { options } = opts();
     const fieldsOk = () => {
       // Seul champ de texte : le nom du partage, jamais un mot de passe.

@@ -75,7 +75,7 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     expect(fake.inspect()[0]).toMatchObject({ bucket: 160 });
   });
 
-  it("sans mot de passe (D42-27, password: null) : lien « #l », ouvert par le lien seul ; finalize porte les mêmes champs, de mêmes tailles, qu'avec un mot de passe", async () => {
+  it("sans mot de passe (D42-28, password: null) : lien « #l », ouvert par le lien seul ; finalize porte les mêmes champs, de mêmes tailles, qu'avec un mot de passe", async () => {
     const bodies: Record<string, unknown>[] = [];
     const links: string[] = [];
     for (const password of [PW, null]) {

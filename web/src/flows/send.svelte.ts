@@ -55,7 +55,7 @@ export type SendOpts = {
   base: string;
   ttlHours: TtlHours;
   maxOpens: number;
-  /** null : partage sans mot de passe (D42-27). */
+  /** null : partage sans mot de passe (D42-28). */
   password: string | null;
   rights?: Rights;
   keepTtlH?: KeepTtl;

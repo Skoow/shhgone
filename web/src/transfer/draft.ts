@@ -5,7 +5,7 @@
 // `password`, spec §29.4.4) et fait l'enveloppe, chiffre le manifeste des seuls éléments gardés (dans l'ordre affiché) et finalise. Le lien n'existe qu'après.
 // Le serveur ne reçoit que K_accès et S_gestion (création), des segments chiffrés, des numéros
 // de segments, et à la fin le sel, Argon2id, V_preuve, E, l'en-tête et le manifeste chiffré.
-// Partage sans mot de passe (D42-27, `password: null`) : mêmes champs, K_sans à la place de K_mdp,
+// Partage sans mot de passe (D42-28, `password: null`) : mêmes champs, K_sans à la place de K_mdp,
 // lien « #l » ; rien ne dit au serveur lequel des deux il reçoit.
 import {
   CHUNK_CT,
@@ -672,7 +672,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     /**
      * Mot de passe généré affiché (A5) : K_mdp calculé d'avance, recalculé à chaque changement.
      * Un mot de passe d'une autre forme n'est pas calculé (finalize le refusera). null : partage
-     * sans mot de passe (D42-27), rien à calculer (un K_mdp d'avance est effacé).
+     * sans mot de passe (D42-28), rien à calculer (un K_mdp d'avance est effacé).
      */
     password(pw: string | null) {
       if (closed) return;
@@ -729,7 +729,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     if (!Number.isInteger(f.maxOpens) || f.maxOpens < 1 || f.maxOpens > lim.maxOpens) throw new Error("ouvertures_invalides");
     f.prepared?.proof.catch(() => undefined);
     // Mot de passe de la forme générée (D41-15) : refusé avant toute requête. Sans mot de passe
-    // (D42-27) : null explicite seulement (un oubli, undefined, reste refusé).
+    // (D42-28) : null explicite seulement (un oubli, undefined, reste refusé).
     const noPassword = f.password === null;
     if (!noPassword && (typeof f.password !== "string" || !isGeneratedPassword(f.password))) throw new Error("mot_de_passe_non_genere");
     throwIfAborted(f.signal);
@@ -854,7 +854,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   }
 
   async function finish(cr: Created, list: { id: string; item: Item }[], f: CreateOpts) {
-    // Forme déjà vérifiée par finalize (null : sans mot de passe, D42-27).
+    // Forme déjà vérifiée par finalize (null : sans mot de passe, D42-28).
     const noPassword = f.password === null;
     // R neuve à chaque finalisation (une ContentKeys par R, jamais recréée : moteur), opaque.
     const r = await newSeed();
@@ -892,7 +892,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
         );
       });
       throwIfAborted(f.signal);
-      // Sans mot de passe (D42-27) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp ») à la place de
+      // Sans mot de passe (D42-28) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp ») à la place de
       // K_mdp ; tout le reste (sel tiré, paramètres, V_preuve, E) part à l'identique : le serveur
       // ne distingue pas les deux sortes de partage.
       if (noPassword) dropKMdp();

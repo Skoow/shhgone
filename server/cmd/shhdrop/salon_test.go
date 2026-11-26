@@ -359,7 +359,7 @@ func TestSalonAccessKeyOfVecteurs(t *testing.T) {
 	}
 }
 
-// Vecteurs « keys » de engine/vectors/v6-sans-mdp.json (D42-27) : un lien sans mot de passe
+// Vecteurs « keys » de engine/vectors/v6-sans-mdp.json (D42-28) : un lien sans mot de passe
 // (#l<43>) donne la même K_accès que #<43> de la même K_lien ; ce n'est pas un lien de salon.
 func TestAccessKeyOfSansMotDePasse(t *testing.T) {
 	raw, err := os.ReadFile("../../../engine/vectors/v6-sans-mdp.json")

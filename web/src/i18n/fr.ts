@@ -1,7 +1,7 @@
 // Dictionnaire de référence (UI §10). Les espaces fines insécables (U+202F) avant : ; ! ? sont
 // écrites en \u202f ; un test (i18n.test.ts) vérifie qu'aucune ponctuation haute n'en manque.
 export const fr = {
-  "hero.title": "Un lien, un mot de passe, puis ça s'efface.",
+  "hero.title": "Un lien chiffré, puis ça s'efface.",
   "hero.lede2.salon": "Vos fichiers, mais aussi des {voice}, des {notes} et un {room}\u202f: tout est chiffré sur votre appareil avant de partir. Il faut le lien pour l'ouvrir, et le mot de passe si vous en avez mis un.",
   "hero.lede2": "Vos fichiers, mais aussi des {voice}, des {notes} et bientôt un {room}\u202f: tout est chiffré sur votre appareil avant de partir. Il faut le lien pour l'ouvrir, et le mot de passe si vous en avez mis un.",
   "hero.lede.voice": "messages vocaux",

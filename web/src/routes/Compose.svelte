@@ -43,7 +43,7 @@
   import Options from "./Options.svelte";
 
   /** ids : identifiants des lignes, dans l'ordre de `items` (brouillon d'envoi, spec §41.14). */
-  export type SendState = { items: Item[]; ids: string[]; ttlHours: number; maxOpens: number; /** null : sans mot de passe (D42-27). */ password: string | null; rights: Rights; keepTtlH?: KeepTtl; /** Nom du partage, tel que saisi. */ title?: string };
+  export type SendState = { items: Item[]; ids: string[]; ttlHours: number; maxOpens: number; /** null : sans mot de passe (D42-28). */ password: string | null; rights: Rights; keepTtlH?: KeepTtl; /** Nom du partage, tel que saisi. */ title?: string };
   type Props = {
     /** Envoi. Sans lui : avis « Envoi : prochaine étape ». */
     onsend?: (state: SendState) => void;

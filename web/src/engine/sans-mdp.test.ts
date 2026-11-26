@@ -1,4 +1,4 @@
-// Partage sans mot de passe (D42-27) : engine/vectors/v6-sans-mdp.json, produit par le moteur
+// Partage sans mot de passe (D42-28) : engine/vectors/v6-sans-mdp.json, produit par le moteur
 // Rust (engine/core/tests/sans_mdp.rs), rejoué ici par le build WebAssembly avec le fournisseur
 // WebCrypto du site, et pour les liens par la partie TypeScript (pure.ts, app/link.ts) : mêmes
 // sorties, mêmes refus, à partir des seules entrées du fichier.
@@ -68,7 +68,7 @@ function pureParse(url: string, base: string): Parsed {
   return f.kind === "s" ? { kind: "s", origin: f.origin, key, no_password: f.noPassword } : { kind: "m", origin: f.origin, key };
 }
 
-describe("v6-sans-mdp.json : liens (D42-27)", () => {
+describe("v6-sans-mdp.json : liens (D42-28)", () => {
   it("constantes : étiquette HKDF, marque du fragment, taille de E", () => {
     expect(V.constants).toEqual({ ENVELOPE_LEN: 60, NO_PASSWORD_INFO: "shhdrop/v2/sans-mdp", NO_PASSWORD_MARK: "l" });
     expect(P.NO_PASSWORD_MARK).toBe(V.constants.NO_PASSWORD_MARK);
@@ -117,7 +117,7 @@ describe("v6-sans-mdp.json : liens (D42-27)", () => {
   });
 });
 
-describe("v6-sans-mdp.json : dérivations (D42-27)", () => {
+describe("v6-sans-mdp.json : dérivations (D42-28)", () => {
   it("K_sans, K_accès, id, K_preuve, V_preuve, en-tête et E de chaque cas ; E rouverte par le lien seul", async () => {
     for (const c of V.keys) {
       const kLien = unhex(c.k_lien);

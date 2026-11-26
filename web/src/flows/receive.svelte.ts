@@ -6,7 +6,7 @@
 // d'application (S4), où le « # » reste jusqu'à « Continuer ici quand même ». Le mot de passe
 // n'est jamais gardé : il ne vit que le temps de l'appel à unlock().
 //
-// Partage sans mot de passe (lien « #l », D42-27) : `noPassword`, aucun champ ; « Ouvrir » est
+// Partage sans mot de passe (lien « #l », D42-28) : `noPassword`, aucun champ ; « Ouvrir » est
 // le geste qui appelle unlock (jamais au chargement : aperçus de liens, robots).
 //
 // Rechargement et autres onglets (spec §41.4, UI §9.7.1) : après un déverrouillage, K_lien et
@@ -163,7 +163,7 @@ export type Receiver = {
 
 const isCode = (e: unknown, code: string) => e instanceof Error && e.message === code;
 
-/** Fragment d'un lien de partage `${origin}/s#<clé>` : K_lien (43 caractères), précédé de « l » sans mot de passe (D42-27). */
+/** Fragment d'un lien de partage `${origin}/s#<clé>` : K_lien (43 caractères), précédé de « l » sans mot de passe (D42-28). */
 const keyOf = (l: string) => l.slice(l.lastIndexOf("#") + 1);
 
 export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}): Receiver {
@@ -221,7 +221,7 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     grant = stored.grant;
     reloaded = true;
   }
-  // Partage sans mot de passe (D42-27) : lu sur la forme du lien (marque « l » du fragment, aussi
+  // Partage sans mot de passe (D42-28) : lu sur la forme du lien (marque « l » du fragment, aussi
   // gardée dans l'entrée de l'onglet), jamais demandé au serveur.
   const noPassword = secret !== null && isNoPasswordLink(secret);
   // Heure de sortie de page notée dans l'entrée (RESTORE_MS). Jamais retirée : sans entrée,

@@ -93,7 +93,7 @@ Notes à l'usage des apps :
 - **Note (`kind: text`) au scellement** : le moteur refuse au manifeste une note que le lecteur refuserait (UTF-8 strict, au plus 100 000 points de code, `texte_invalide` / `texte_trop_long`). Le scelleur garde le verdict du texte qu'il a chiffré (`ElementSealer::check_note`) ; une app passe par `FinalEntry::note(&scelleur, nom, type)` et `FinalEntry::file(…)`, qui prennent aussi la taille, la place et la graine du scelleur. La couche WebAssembly fait la même vérification dans `sealFinal`.
 - **Mot de passe à l'ouverture** : blancs ASCII de bord (espace, tabulation, retour chariot, saut de ligne) retirés avant NFC et Argon2id (`kdf::trim_password`) ; rien d'autre n'est retiré.
 
-# Partage sans mot de passe (`v6-sans-mdp.json`, D42-27)
+# Partage sans mot de passe (`v6-sans-mdp.json`, D42-28)
 
 **Produit par le moteur Rust** : `engine/core/tests/sans_mdp.rs` l'écrit (`SHH_GEN_SANS_MDP=1 cargo test -p shhdrop-core --test sans_mdp`), de façon déterministe, puis le relit ; sans la variable, le test échoue si le fichier n'est plus exactement celui que le moteur produit, et rejoue chaque cas à partir de ses seules entrées. `web/src/engine/sans-mdp.test.ts` rejoue les mêmes cas avec le build WebAssembly et le fournisseur WebCrypto du site (le HKDF de `K_sans` aussi par WebCrypto), et les liens avec `pure.ts` et `app/link.ts`. Le serveur Go en rejoue `keys` (`TestAccessKeyOfSansMotDePasse` : `K_accès` d'un lien `#l…`). Les apps devront le rejouer comme `v2.json`.
 

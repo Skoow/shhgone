@@ -29,7 +29,7 @@ export function readLink(href: string, expected: "s" | "m", base: string = impor
   try {
     const p = linkForm(href, base);
     if (p.kind !== expected) return INCOMPLETE;
-    // Marque du fragment gardée : « m » (gestion), « l » (partage sans mot de passe, D42-27).
+    // Marque du fragment gardée : « m » (gestion), « l » (partage sans mot de passe, D42-28).
     return { kind: p.kind, link: `${p.origin}/s#${p.kind === "m" ? "m" : p.noPassword ? NO_PASSWORD_MARK : ""}${p.key}` };
   } catch {
     return INCOMPLETE;

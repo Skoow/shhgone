@@ -8,7 +8,7 @@
   // à valider : le lien marche déjà ; confirmation seulement tant que le lien et le mot de passe
   // n'ont pas été copiés, ready-copies.ts). Les valeurs ne viennent que des props (Copier lit l'état, jamais le
   // DOM) ; rien n'est écrit dans la console, le titre, l'URL ou un stockage. Sans mot de passe
-  // (D42-27, `password: null`) : le lien seul (ticket sans perforation, « Copier le lien »,
+  // (D42-28, `password: null`) : le lien seul (ticket sans perforation, « Copier le lien »,
   // Partager et QR du lien seul), et la phrase « quiconque a ce lien peut ouvrir ».
   import { tick, untrack } from "svelte";
   import { getDemo } from "../app/demo-hooks";
@@ -32,7 +32,7 @@
   import { NOTHING_COPIED, confirmLeave, noteCopy, secured, warnOnUnload, type Copied } from "./ready-copies";
 
   /** `title` : nom du partage tel que le moteur l'a écrit (nettoyé) ; absent sans nom. */
-  /** `password` : null pour un partage sans mot de passe (D42-27) : seul le lien est montré. */
+  /** `password` : null pour un partage sans mot de passe (D42-28) : seul le lien est montré. */
   export type ReadyResult = { link: string; manage: string; expiresInS: number; password: string | null; title?: string };
   type Props = {
     /** null après Nouveau partage ou Supprimer : plus aucune référence aux secrets. */
@@ -59,7 +59,7 @@
 
   // ---------- Garde de sortie : jusqu'à la copie des deux, Nouveau partage ou Supprimer (UI §9.5, A12) ----------
   // État en mémoire seulement : quelles valeurs ont été copiées (ou partagées), jamais les valeurs.
-  // Sans mot de passe (D42-27) : seul le lien est à mettre de côté.
+  // Sans mot de passe (D42-28) : seul le lien est à mettre de côté.
   const noPw = untrack(() => result?.password === null);
   let copies = $state(noPw ? { ...NOTHING_COPIED, password: true } : NOTHING_COPIED);
   let finished = $state(false);
@@ -102,7 +102,7 @@
   // Une seule ouverture par défaut : même envoyés au même endroit, personne d'autre ne pourra
   // voir le contenu ensuite, et le destinataire verrait qu'il a déjà été ouvert (spec D41-29).
   const canShare = canShareLink();
-  // Sans mot de passe : le lien seul (D42-27).
+  // Sans mot de passe : le lien seul (D42-28).
   const both = (r: ReadyResult) => (r.password === null ? r.link : t("ready.share.text", { link: r.link, password: r.password }));
   let sheet = $state(false);
   let qrShown = $state(false);
@@ -315,7 +315,7 @@
     </div>
     {#if qrShown}
       <figure class="qr">
-        <!-- Sans mot de passe (D42-27) : le QR code ne porte que le lien. -->
+        <!-- Sans mot de passe (D42-28) : le QR code ne porte que le lien. -->
         <QrCode text={result.password === null ? result.link : shareLinkWithPassword(result.link, result.password)} label={t(noPw ? "ready.qr.alt.link" : "ready.qr.alt")} />
         <figcaption>{t("ready.qr.caption")}</figcaption>
       </figure>
@@ -466,7 +466,7 @@
       radial-gradient(circle var(--encoche) at 0 0, #0000 98%, #000) left / 51% 100% no-repeat,
       radial-gradient(circle var(--encoche) at 100% 0, #0000 98%, #000) right / 51% 100% no-repeat;
   }
-  /* Sans mot de passe (D42-27) : le lien seul, sans perforation ni encoches. */
+  /* Sans mot de passe (D42-28) : le lien seul, sans perforation ni encoches. */
   .ticket.seul .lien {
     padding-bottom: var(--sp-5);
     border-radius: var(--r-xl);

@@ -457,7 +457,7 @@ func cleAccesDuLien(lien []byte) (k []byte, estSalon bool, err error) {
 	case len(cle) == 44 && cle[0] == 'c':
 		cle, estSalon, info = cle[1:], true, "shhdrop/v2/salon/acces"
 	case len(cle) == 44 && cle[0] == 'l':
-		// Partage sans mot de passe (« #l<43> », spec D42-27) : même K_accès, la marque « l »
+		// Partage sans mot de passe (« #l<43> », spec D42-28) : même K_accès, la marque « l »
 		// n'est qu'une indication pour le navigateur (le serveur ne la reçoit jamais en ligne).
 		cle = cle[1:]
 	}

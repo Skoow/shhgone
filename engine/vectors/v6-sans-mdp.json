@@ -1,5 +1,5 @@
 {
-  "about": "Partage sans mot de passe (D42-27), produit par le moteur Rust (engine/core/tests/sans_mdp.rs) ; voir engine/vectors/README.md.",
+  "about": "Partage sans mot de passe (D42-28), produit par le moteur Rust (engine/core/tests/sans_mdp.rs) ; voir engine/vectors/README.md.",
   "constants": {
     "ENVELOPE_LEN": 60,
     "NO_PASSWORD_INFO": "shhdrop/v2/sans-mdp",

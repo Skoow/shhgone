@@ -123,7 +123,7 @@ export async function rejoindre(n: Net, kAcces: Uint8Array, kPreuve: Uint8Array,
   const jeton = o.member_token;
   if (typeof jeton !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(jeton) || typeof o.members_can_destroy !== "boolean") throw invalide();
   const siege = entier(o, "seat");
-  if (siege > 9) throw invalide();
+  if (siege > 49) throw invalide();
   return {
     jeton,
     siege,

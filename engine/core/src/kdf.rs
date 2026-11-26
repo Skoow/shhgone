@@ -152,10 +152,10 @@ pub fn password_key(pw: &str, salt: &[u8], ops: u32, mem: u32) -> Result<KMdp> {
     Ok(KMdp::from_bytes(*k))
 }
 
-/// Étiquette HKDF de la clé qui tient la place de K_mdp dans un partage sans mot de passe (D42-27).
+/// Étiquette HKDF de la clé qui tient la place de K_mdp dans un partage sans mot de passe (D42-28).
 pub const NO_PASSWORD_INFO: &str = "shhdrop/v2/sans-mdp";
 
-/// Partage **sans mot de passe** (D42-27, spec §29.2) : K_sans = HKDF(K_lien,
+/// Partage **sans mot de passe** (D42-28, spec §29.2) : K_sans = HKDF(K_lien,
 /// « shhdrop/v2/sans-mdp »), 32 octets, tient la place de K_mdp. Le reste de la chaîne est
 /// inchangé (K_maître = HKDF(K_lien ‖ K_sans, « shhdrop/v2/maitre »), K_env, K_preuve, E) :
 /// le serveur reçoit les mêmes champs, de mêmes tailles, qu'avec un mot de passe, et ne peut pas

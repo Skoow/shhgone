@@ -67,8 +67,8 @@ describe("dictionnaires", () => {
     expect(en["destroyed.body"]).toBe(
       "This share has been destroyed. It has been erased from the server. Anything you already saved on this device is not affected.",
     );
-    expect(fr["hero.title"]).toBe("Un lien, un mot de passe, puis ça s'efface.");
-    expect(en["hero.title"]).toBe("One link, one password, then it's gone.");
+    expect(fr["hero.title"]).toBe("Un lien chiffré, puis ça s'efface.");
+    expect(en["hero.title"]).toBe("One encrypted link, then it's gone.");
   });
 
   // Textes exacts de la conception (§12.1, §12.2, §21.2.4, §21.3, §21.15).

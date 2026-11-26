@@ -9,8 +9,8 @@ use crate::whatwg::Url;
 use zeroize::{Zeroize, Zeroizing};
 
 /// Lien analysé : K_lien pour un lien de partage, S_gestion pour un lien de gestion.
-/// `no_password` : lien d'un partage **sans mot de passe** (`#l…`, D42-27) ; K_mdp est alors
-/// remplacée par `kdf::no_password_key(K_lien)`. Un lien `#<43>` (forme d'avant D42-27, et de
+/// `no_password` : lien d'un partage **sans mot de passe** (`#l…`, D42-28) ; K_mdp est alors
+/// remplacée par `kdf::no_password_key(K_lien)`. Un lien `#<43>` (forme d'avant D42-28, et de
 /// tout partage protégé) demande toujours le mot de passe.
 #[derive(Debug)]
 pub enum ParsedLink {
@@ -45,10 +45,10 @@ fn manage_fragment(hash: &str) -> Option<&str> {
         .filter(|k| k.len() == KEY_CHARS && k.bytes().all(is_b64u_char))
 }
 
-/// Marque du lien d'un partage sans mot de passe, juste après le « # » (D42-27).
+/// Marque du lien d'un partage sans mot de passe, juste après le « # » (D42-28).
 pub const NO_PASSWORD_MARK: char = 'l';
 
-/// `^#l[A-Za-z0-9_-]{43}$` (partage sans mot de passe, D42-27) : rend les 43 caractères. Même
+/// `^#l[A-Za-z0-9_-]{43}$` (partage sans mot de passe, D42-28) : rend les 43 caractères. Même
 /// longueur que la gestion (45), autre lettre ; 44 pour un partage protégé : aucun fragment n'a
 /// deux formes.
 fn no_password_fragment(hash: &str) -> Option<&str> {
@@ -101,7 +101,7 @@ pub fn share_link(origin: &str, k_lien: &KLien, base: &str) -> Result<String> {
     ))
 }
 
-/// `{origine}{base}s#l{K_lien}` : lien d'un partage sans mot de passe (D42-27), un caractère de
+/// `{origine}{base}s#l{K_lien}` : lien d'un partage sans mot de passe (D42-28), un caractère de
 /// plus que `share_link`. La marque reste dans le fragment : le serveur ne la voit jamais.
 pub fn share_link_no_password(origin: &str, k_lien: &KLien, base: &str) -> Result<String> {
     let origin = check_origin(origin)?;
@@ -173,7 +173,7 @@ pub fn parse_link(url: &str, base: &str) -> Result<ParsedLink> {
 /// Lien de partage suivi du mot de passe (QR code, D41-29) : `{lien}.{base64url(UTF-8)}`. Le
 /// « . » n'est pas dans l'alphabet base64url : aucune ambiguïté avec un lien simple. Refuse
 /// (`lien_invalide`) tout lien qui n'est pas un lien de partage, un mot de passe vide ou un
-/// mot de passe encodé sur plus de 64 caractères. Un lien sans mot de passe (`#l…`, D42-27)
+/// mot de passe encodé sur plus de 64 caractères. Un lien sans mot de passe (`#l…`, D42-28)
 /// est refusé aussi : son QR code est le lien seul.
 pub fn share_link_with_password(link: &str, password: &str) -> Result<String> {
     // JavaScript levait « Invalid URL » sur une adresse illisible : ici, `lien_invalide`.
@@ -322,7 +322,7 @@ mod tests {
         )
     }
 
-    /// D42-27 : `#l` + 43 caractères, lu comme un partage sans mot de passe ; `#<43>` (ancienne
+    /// D42-28 : `#l` + 43 caractères, lu comme un partage sans mot de passe ; `#<43>` (ancienne
     /// forme et partage protégé) toujours lu avec mot de passe.
     #[test]
     fn lien_sans_mot_de_passe() {

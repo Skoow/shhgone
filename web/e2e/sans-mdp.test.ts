@@ -1,4 +1,4 @@
-// « Le serveur ne voit rien » pour un partage SANS mot de passe (D42-27) — BLOQUANT comme
+// « Le serveur ne voit rien » pour un partage SANS mot de passe (D42-28) — BLOQUANT comme
 // sees-nothing.test.ts. Vrai serveur Go, vrai client du site, vrai moteur WebAssembly.
 //
 // Un partage protégé et un partage sans mot de passe sont créés, ouverts et détruits l'un après
@@ -73,7 +73,7 @@ function shape(buf: Buffer): Shape {
   );
 }
 
-describe("partage sans mot de passe : le serveur ne voit rien et ne distingue pas les deux sortes (D42-27)", () => {
+describe("partage sans mot de passe : le serveur ne voit rien et ne distingue pas les deux sortes (D42-28)", () => {
   let srv: TestServer;
   const logProtected: Captured[] = [];
   const logOpen: Captured[] = [];
@@ -193,7 +193,7 @@ describe("partage sans mot de passe : le serveur ne voit rien et ne distingue pa
   });
 });
 
-describe("compatibilité et lien abîmé (D42-27)", () => {
+describe("compatibilité et lien abîmé (D42-28)", () => {
   let srv: TestServer;
   beforeAll(async () => {
     srv = await startServer();

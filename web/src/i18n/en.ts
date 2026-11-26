@@ -1,7 +1,7 @@
 import type { fr } from "./fr";
 
 export const en = {
-  "hero.title": "One link, one password, then it's gone.",
+  "hero.title": "One encrypted link, then it's gone.",
   "hero.lede2.salon": "Your files, but also {voice}, {notes} and a {room}: everything is encrypted on your device before it leaves. Opening it takes the link, and the password if you set one.",
   "hero.lede2": "Your files, but also {voice}, {notes} and soon a {room}: everything is encrypted on your device before it leaves. Opening it takes the link, and the password if you set one.",
   "hero.lede.voice": "voice messages",

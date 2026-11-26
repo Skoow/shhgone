@@ -84,7 +84,7 @@ const longParagraphs = (scope: Locator) =>
   scope.locator("p, .h, .line").evaluateAll((els) =>
     els
 
-      // [data-protect] : avertissement exigé à la création (D42-27, « Sans mot de passe, quiconque a
+      // [data-protect] : avertissement exigé à la création (D42-28, « Sans mot de passe, quiconque a
       // le lien peut ouvrir… »), une phrase de sécurité, pas une aide : trois lignes permises au téléphone.
       .filter((e) => (e as HTMLElement).offsetParent !== null && !e.closest(".sr-only, .cnote, [data-protect]") && e.textContent!.trim() !== "")
       .filter((e) => {

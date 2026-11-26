@@ -281,7 +281,7 @@ export type CreateOpts = api.Net & {
   maxOpens: number;
   /**
    * Mot de passe généré (generatePassword, 11 caractères, seule forme acceptée : D41-15), ou null
-   * pour un partage SANS mot de passe (D42-27, désactivé par défaut) : lien « #l », K_sans à la
+   * pour un partage SANS mot de passe (D42-28, désactivé par défaut) : lien « #l », K_sans à la
    * place de K_mdp ; le serveur reçoit les mêmes champs (sel, paramètres, V_preuve, E).
    */
   password: GeneratedPassword | string | null;
@@ -513,7 +513,7 @@ async function keysFromMeta(kLien: KLien, m: api.Meta, password: string | null) 
     throw new api.BadResponse();
   }
   // Sel et paramètres Argon2id vérifiés même sans mot de passe : le serveur les rend pour tout
-  // partage (il ne sait pas lequel n'en a pas, D42-27) ; une réponse mal formée reste refusée.
+  // partage (il ne sait pas lequel n'en a pas, D42-28) ; une réponse mal formée reste refusée.
   checkKdfParams(m.kdf); // le minimum est imposé par le navigateur, pas par le serveur
   let salt: Uint8Array<ArrayBuffer>;
   try {
@@ -522,7 +522,7 @@ async function keysFromMeta(kLien: KLien, m: api.Meta, password: string | null) 
     throw new api.BadResponse();
   }
   if (salt.length !== 16) throw new api.BadResponse();
-  // Partage sans mot de passe (lien « #l », D42-27) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp »)
+  // Partage sans mot de passe (lien « #l », D42-28) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp »)
   // à la place de K_mdp, sans Argon2id ; le sel lu n'y entre pas.
   const kMdp = password === null ? await noPasswordKey(kLien) : await passwordKey(password, salt, m.kdf);
   try {
@@ -636,7 +636,7 @@ export async function openShare(
   try {
     // Avant toute requête et toute dérivation (coûteuse) : un champ vide, ou fait seulement des
     // blancs que le moteur retire en bord (D42-21), n'est pas un mot de passe. Lien d'un partage
-    // sans mot de passe (« #l », D42-27) : `password` est ignoré, le lien seul ouvre.
+    // sans mot de passe (« #l », D42-28) : `password` est ignoré, le lien seul ouvre.
     if (!p.noPassword && /^[ \t\r\n]*$/.test(password)) throw new Error("mot_de_passe_requis");
     idBytes = await shareId(p.kLien); // données authentifiées seulement, jamais envoyé
     return await openWith(p, idBytes, p.noPassword ? null : password, onProgress, grant, net);
@@ -873,7 +873,7 @@ export async function collectToBlob(open: Opened, i: number, foldBytes = FOLD_BY
  */
 export async function destroyShare(link: string, expectedOrigin: string, opts: { password?: string } & api.Net = {}): Promise<void> {
   const p = await parseFor(link, expectedOrigin);
-  // Lien d'un partage sans mot de passe (« #l », D42-27) : le lien seul suffit.
+  // Lien d'un partage sans mot de passe (« #l », D42-28) : le lien seul suffit.
   if (p.kind === "s" && !p.noPassword && (opts.password === undefined || opts.password === "")) throw new Error("mot_de_passe_requis");
   const c = api.ctx(p.origin, opts);
   await guarded(async () => {

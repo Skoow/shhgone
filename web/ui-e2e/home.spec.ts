@@ -22,7 +22,7 @@ async function drag(page: Page, type: "dragenter" | "dragover" | "dragleave" | "
   );
 }
 
-const TITLE_FR = "Un lien, un mot de passe, puis ça s'efface.";
+const TITLE_FR = "Un lien chiffré, puis ça s'efface.";
 
 test.describe("fr-FR", () => {
   test.use({ locale: "fr-FR" });
@@ -494,7 +494,7 @@ test.describe("en-US", () => {
     await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1280, height: 900 });
     // Version anglaise de l'accueil : « /en » (pages bilingues).
     await page.goto(shh.origin + "/en");
-    await expect(page.getByRole("heading", { level: 1, name: "One link, one password, then it's gone." })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "One encrypted link, then it's gone." })).toBeVisible();
     await expect(page.locator("[data-demo-steps] li").nth(1)).toContainText("Encrypted on your device");
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
     await expect(page.getByRole("group", { name: "Or create something here" })).toBeVisible();

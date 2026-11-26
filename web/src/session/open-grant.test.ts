@@ -46,7 +46,7 @@ describe("open-grant (spec §41.4)", () => {
     expect(loadOpenGrant()).toBeNull();
   });
 
-  it("partage sans mot de passe (D42-27) : la marque « l » est gardée devant la clé ; toute autre lettre refusée", () => {
+  it("partage sans mot de passe (D42-28) : la marque « l » est gardée devant la clé ; toute autre lettre refusée", () => {
     saveOpenGrant({ v: 1, link: "l" + LINK, grant: GRANT, last: 5 });
     expect(loadOpenGrant()).toEqual({ v: 1, link: "l" + LINK, grant: GRANT, last: 5 });
     clearOpenGrant();

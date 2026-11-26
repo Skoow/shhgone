@@ -103,7 +103,7 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
     await new Promise((res) => setTimeout(res, 2500));
     await r.continue();
   });
-  await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+  await protectOn(page); // D42-28 : mot de passe désactivé par défaut
   await sendButton(page).click();
   await page.waitForTimeout(1500);
   await shot(page, "06-envoi");

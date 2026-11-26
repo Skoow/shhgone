@@ -106,7 +106,7 @@
   });
 
   async function unlock() {
-    // Sans mot de passe (D42-27) : « Ouvrir » seul, jamais au chargement (aperçus de liens des
+    // Sans mot de passe (D42-28) : « Ouvrir » seul, jamais au chargement (aperçus de liens des
     // messageries, robots) ; il consomme une ouverture comme un déverrouillage.
     if (r.noPassword) {
       if (!busy && !limited) await r.unlock("");
@@ -595,7 +595,7 @@
       opacity: 0;
     }
   }
-  /* Sans mot de passe (D42-27) : une phrase à la place du champ. */
+  /* Sans mot de passe (D42-28) : une phrase à la place du champ. */
   .nopw {
     margin: 0;
     color: var(--text-2);

@@ -143,14 +143,14 @@ describe("check-dist.mjs, production", () => {
   });
 
   it("D4 : fichier de langue cité avec son empreinte, jamais orphelin ; anglais absent du script principal", () => {
-    const lang = '{"hero.title":"One link, one password, then it\'s gone."}';
+    const lang = '{"hero.title":"One encrypted link, then it\'s gone."}';
     const ok = site({ "index.html": PROD_INDEX, "assets/index-a.js": `const s="/assets/locale-en-AbCdEf12.js",i="${sha384(Buffer.from(lang))}";`, "assets/locale-en-AbCdEf12.js": lang });
     expect(checkDist(ok, false)).toEqual([]);
     const orphan = site({ "index.html": PROD_INDEX, "assets/locale-en-AbCdEf12.js": lang });
     expect(checkDist(orphan, false).join("\n")).toContain("assets/locale-en-AbCdEf12.js : orphelin");
     const noSri = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'const s="/assets/locale-en-AbCdEf12.js";', "assets/locale-en-AbCdEf12.js": lang });
     expect(checkDist(noSri, false).join("\n")).toContain("assets/locale-en-AbCdEf12.js : son empreinte SHA-384");
-    const both = site({ "index.html": PROD_INDEX, "assets/index-a.js": `const s="/assets/locale-en-AbCdEf12.js",i="${sha384(Buffer.from(lang))}",t="One link, one password, then it's gone.";`, "assets/locale-en-AbCdEf12.js": lang });
+    const both = site({ "index.html": PROD_INDEX, "assets/index-a.js": `const s="/assets/locale-en-AbCdEf12.js",i="${sha384(Buffer.from(lang))}",t="One encrypted link, then it's gone.";`, "assets/locale-en-AbCdEf12.js": lang });
     expect(checkDist(both, false).join("\n")).toContain("dictionnaire anglais dans le script principal");
   });
 

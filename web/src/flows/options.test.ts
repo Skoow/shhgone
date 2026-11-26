@@ -10,7 +10,7 @@ function make(over: Partial<OptionsDeps> = {}) {
 }
 
 describe("createOptions (UI §9.3)", () => {
-  it("défauts : 12 h, 1 ouverture, SANS mot de passe (D42-27 : désactivé par défaut, mot de passe déjà généré), voir et enregistrer", () => {
+  it("défauts : 12 h, 1 ouverture, SANS mot de passe (D42-28 : désactivé par défaut, mot de passe déjà généré), voir et enregistrer", () => {
     const o = make();
     expect(o.ttlHours).toBe(12);
     expect(o.maxOpens).toBe(1);
@@ -20,7 +20,7 @@ describe("createOptions (UI §9.3)", () => {
     expect(o.rights).toBe("enregistrer");
   });
 
-  it("« Protéger par un mot de passe » (D42-27) : activé, le mot de passe généré est utilisé ; désactivé, null", () => {
+  it("« Protéger par un mot de passe » (D42-28) : activé, le mot de passe généré est utilisé ; désactivé, null", () => {
     const o = make();
     o.protect = true;
     expect(o.password).toBe("Gen1abcd");

@@ -59,7 +59,7 @@ test("composeur et destinataire allégés ; captures", async ({ page, shh, brows
   await expect(page.locator("main")).not.toContainText(/Ctrl|Cmd|collez/i);
   await light(page.locator("section.group").first(), ".li");
   await shot(page, "composeur", isMobile);
-  await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+  await protectOn(page); // D42-28 : mot de passe désactivé par défaut
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const read = async (name: string) => {

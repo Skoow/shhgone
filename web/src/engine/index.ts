@@ -187,7 +187,7 @@ export function passwordKey(password: string, salt: Uint8Array<ArrayBuffer>, par
 }
 
 /**
- * Partage sans mot de passe (D42-27) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp »), à la place
+ * Partage sans mot de passe (D42-28) : K_sans = HKDF(K_lien, « shhdrop/v2/sans-mdp »), à la place
  * de K_mdp (même chaîne ensuite : accessKeys). Aucun Argon2id ; l'appelant l'efface.
  */
 export function noPasswordKey(kLien: KLien): Promise<KMdp> {
@@ -548,7 +548,7 @@ export function shareLink(origin: string, kLien: KLien, base = "/"): Promise<str
   return run((e) => String(e.wasm.shareLink(origin, kLien, base)));
 }
 
-/** `${origin}${base}s#l<K_lien>` : partage sans mot de passe (D42-27), marque dans le fragment. */
+/** `${origin}${base}s#l<K_lien>` : partage sans mot de passe (D42-28), marque dans le fragment. */
 export function shareLinkNoPassword(origin: string, kLien: KLien, base = "/"): Promise<string> {
   return run((e) => String(e.wasm.shareLinkNoPassword(origin, kLien, base)));
 }

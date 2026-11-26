@@ -145,7 +145,7 @@
   });
   // Mot de passe affiché par le composeur : K_mdp calculé pendant la composition (A5). Le
   // brouillon le reçoit de nouveau quand il est remplacé (liste vidée, envoi fini).
-  // null : partage sans mot de passe (D42-27), rien à calculer.
+  // null : partage sans mot de passe (D42-28), rien à calculer.
   let shownPassword: string | null | undefined;
   function onpassword(pw: string | null) {
     shownPassword = pw;

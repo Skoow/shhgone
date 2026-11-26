@@ -96,7 +96,7 @@ export async function addRealFile(page: Page, name: string) {
 export const sendButton = (page: Page) => page.getByRole("button", { name: "Chiffrer et envoyer" });
 
 /**
- * Active « Protéger par un mot de passe » (D42-27 : désactivé par défaut) dans les options du
+ * Active « Protéger par un mot de passe » (D42-28 : désactivé par défaut) dans les options du
  * composeur : colonne sur ordinateur, feuille « Options » sur téléphone (refermée ensuite). Pour
  * les tests écrits avec un mot de passe (lecture sur « Lien prêt », champ à l'ouverture).
  */

@@ -1,7 +1,7 @@
 // Options de l'envoi (UI §9.3, spec §31, §34) : nom du partage, durée,
 // ouvertures, mot de passe, droits du destinataire. En mémoire seulement : le mot de passe
 // n'est jamais rangé ni journalisé.
-// Le mot de passe est facultatif, désactivé par défaut (D42-27) ; activé, il est toujours généré
+// Le mot de passe est facultatif, désactivé par défaut (D42-28) ; activé, il est toujours généré
 // (D41-15) : aucune saisie, donc aucun contrôle ici.
 import { OPENS_DEFAULT, TITLE_MAX, TTL_DEFAULT, previewKindOf, type TtlHours } from "../index";
 import { limitesDe, type Formule } from "../limits";
@@ -24,7 +24,7 @@ export function createOptions(deps: OptionsDeps) {
   let formules = $state<readonly Formule[]>([]);
   const lim = $derived(limitesDe(formule));
   let generated = $state(deps.generate());
-  // « Protéger par un mot de passe » (D42-27) : désactivé par défaut ; activé, le mot de passe
+  // « Protéger par un mot de passe » (D42-28) : désactivé par défaut ; activé, le mot de passe
   // généré (toujours généré, D41-15) est demandé à l'ouverture. Désactivé : le lien seul ouvre.
   let protect = $state(false);
   // Nom du partage : texte libre, nettoyé par le moteur au scellement (cleanTitle).
@@ -73,7 +73,7 @@ export function createOptions(deps: OptionsDeps) {
     get limites() {
       return lim;
     },
-    /** « Protéger par un mot de passe » (D42-27), désactivé par défaut. */
+    /** « Protéger par un mot de passe » (D42-28), désactivé par défaut. */
     get protect(): boolean {
       return protect;
     },
@@ -86,7 +86,7 @@ export function createOptions(deps: OptionsDeps) {
     },
     /**
      * Mot de passe qui sera utilisé : le dernier généré si la protection est activée ; null sinon
-     * (partage sans mot de passe, lien « #l », D42-27).
+     * (partage sans mot de passe, lien « #l », D42-28).
      */
     get password(): string | null {
       return protect ? generated : null;

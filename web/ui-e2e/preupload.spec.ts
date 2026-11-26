@@ -84,7 +84,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator(".cap")).toContainText("3");
     await expect(page.locator(".cap")).not.toContainText("12");
 
-    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+    await protectOn(page); // D42-28 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     const read = async (name: string) => {
@@ -128,7 +128,7 @@ test.describe("fr-FR", () => {
     expect(putBytes).toBeLessThan(sum * 1.06); // morceaux de 64 Kio ; avant : 20 × 4 Mio = 80 Mio
     await removeItem(page, "photo-01.bin");
     await expect(page.locator("[data-row]")).toHaveCount(19);
-    await protectOn(page); // D42-27 : mot de passe désactivé par défaut
+    await protectOn(page); // D42-28 : mot de passe désactivé par défaut
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     expect(erases).toEqual([]);

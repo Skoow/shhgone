@@ -6,7 +6,7 @@
 // que K_lien (43 caractères, déjà dans le « # » du lien) et l'octroi : JAMAIS le mot de passe,
 // R, une clé de contenu ni le clair. Partage protégé : sans le mot de passe, elle n'ouvre rien ;
 // elle évite seulement qu'un rechargement compte une ouverture de plus. Partage SANS mot de passe
-// (marque « l », D42-27) : elle rouvre le contenu, comme le lien lui-même (déjà dans l'historique
+// (marque « l », D42-28) : elle rouvre le contenu, comme le lien lui-même (déjà dans l'historique
 // du navigateur, spec §5.3) ; elle reste bornée à l'onglet, 30 min d'inactivité et RESTORE_MS.
 
 export const OPEN_GRANT_KEY = "shh.og";
@@ -19,10 +19,10 @@ export const INACTIVITY_MS = 30 * 60_000;
  */
 export const RESTORE_MS = 2 * 60_000;
 
-export type OpenGrantEntry = { v: 1; link: string /* K_lien, 43 car. (précédé de « l » sans mot de passe, D42-27) */; grant: string /* 54 car. */; last: number };
+export type OpenGrantEntry = { v: 1; link: string /* K_lien, 43 car. (précédé de « l » sans mot de passe, D42-28) */; grant: string /* 54 car. */; last: number };
 
 // Fragment du lien sans le « # » : K_lien (43), précédé de la marque « l » pour un partage sans mot
-// de passe (D42-27) : 44 caractères, jamais confondus (longueurs différentes).
+// de passe (D42-28) : 44 caractères, jamais confondus (longueurs différentes).
 const LINK = /^l?[A-Za-z0-9_-]{43}$/;
 const GRANT = /^[A-Za-z0-9_-]{54}$/;
 

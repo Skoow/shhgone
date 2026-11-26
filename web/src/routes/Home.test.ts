@@ -55,7 +55,7 @@ describe("Home (UI §9.1)", () => {
   it("accueil : sur-titre, titre, phrase, deux boutons, méta, infographie, composeur, sections", () => {
     show();
     const h1 = document.querySelector("h1")!;
-    expect(title(h1)).toBe("Un lien, un mot de passe, puis ça s'efface.");
+    expect(title(h1)).toBe("Un lien chiffré, puis ça s'efface.");
     expect(document.querySelectorAll("h1")).toHaveLength(1);
     expect(h1.getAttribute("tabindex")).toBe("-1");
     expect(h1.classList.contains("compact")).toBe(false);
@@ -148,10 +148,10 @@ describe("Home (UI §9.1)", () => {
   it("titre (K1, K8) : phrase entière lisible, copie mot par mot cachée, respiration avant « puis »", () => {
     show();
     const h1 = document.querySelector("h1")!;
-    expect(h1.querySelector(".sr-only")!.textContent).toBe("Un lien, un mot de passe, puis ça s'efface.");
+    expect(h1.querySelector(".sr-only")!.textContent).toBe("Un lien chiffré, puis ça s'efface.");
     const copy = h1.querySelector('[aria-hidden="true"]')!;
     const words = [...copy.querySelectorAll<HTMLElement>(".w")];
-    expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "ça", "s'efface."]);
+    expect(words.map((w) => w.textContent)).toEqual(["Un", "lien", "chiffré,", "puis", "ça", "s'efface."]);
     // Titre affiché d'emblée dans son état final : aucun délai d'entrée par mot.
     expect(words.map((w) => w.style.getPropertyValue("--d"))).toEqual(words.map(() => ""));
     // « plus rien. » (« La trame » ; « puis » reste plein) : chaque lettre a son rang, qui décale son
@@ -220,7 +220,7 @@ describe("Home (UI §9.1)", () => {
   it("anglais", () => {
     setLang("en");
     show();
-    expect(title(document.querySelector("h1")!)).toBe("One link, one password, then it's gone.");
+    expect(title(document.querySelector("h1")!)).toBe("One encrypted link, then it's gone.");
     expect(document.querySelector("#hero-make")!.textContent).toBe("Or create something here");
     expect([...document.querySelectorAll("[data-lede] b.hl")].map((b) => b.textContent)).toEqual(["voice messages", "notes", "chat room"]);
     expect(document.querySelector("[data-pick]")!.textContent!.trim()).toBe("Choose files");
