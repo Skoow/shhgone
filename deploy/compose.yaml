@@ -337,7 +337,7 @@ services:
     # Caddy 2.11.9 officiel (2.10 au minimum pour x25519mlkem768), épinglé par empreinte,
     # relevée le 10 novembre 2026. Changer l'étiquette ET l'empreinte ensemble, puis
     # relancer deploy/test-proxy.sh avec ce binaire.
-    image: caddy:2.11.9@sha256:0c2243efcf437ab7f7a978f1027fcf0d4f9be8a75df27b1b3fbc5dbe0ffa8cf0
+    image: caddy:2.11.9@sha256:4851e54a46b206517c574821bb5cc67f170d2156041e9fbc4c9193b45e84a75b
     restart: unless-stopped
     # Réseau de la machine : Caddy écoute directement sur 80/tcp, 443/tcp et 443/udp (HTTP/3,
     # QUIC). Aucune ligne « ports: » : Docker l'ignore avec
