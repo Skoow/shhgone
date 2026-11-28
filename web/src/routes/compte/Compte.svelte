@@ -65,7 +65,7 @@
   const actuel = () => account.profil?.pseudo ?? "";
 
   async function verifier(p: string): Promise<string> {
-    if (p.trim() === actuel()) return "";
+    if (p.trim() === actuel()) return "actuel";
     const r = await verifierSaisie({ pseudo: p });
     if (r.pseudo) return r.pseudo;
     return (await pseudoLibre(p)) ? "libre" : "pris";

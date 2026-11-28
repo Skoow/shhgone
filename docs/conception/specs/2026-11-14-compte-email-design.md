@@ -874,6 +874,8 @@ Liste de sections (`<section aria-labelledby>`, titres `--fs-h3`), chaque régla
 
 #### 21.15.5 Historique des téléchargements (`/telechargements`, avec ou sans compte)
 
+*(Retiré le 28 novembre, D42-33 de la spécification principale : page, onglet, réglage et base `shhdrop-telechargements` supprimés ; la base d'un appareil qui l'avait activée est effacée au démarrage. Ce qui suit est gardé pour l'historique.)*
+
 > **15 novembre (UI §26)** : sans compte, la page reste joignable par son adresse mais n'est plus dans la navigation (ni onglet, ni menu, ni pied de page) ; plus de barre d'onglets sans compte sur le site.
 
 `AppShell` ; titre « Téléchargements » ; sous-titre `--text-2` : « Sur cet appareil seulement. Nous ne gardons rien : les fichiers sont dans le dossier Téléchargements de votre appareil. » ; ligne d'outils : `Switch` « Garder l'historique » et « Effacer tout » (`ghost` `danger`, `InlineConfirm` « Effacer tout l'historique de cet appareil ? »). Liste groupée par jour (« Aujourd'hui », « Hier », « 12 novembre »), lignes de 64 px : `FormatIcon` 40 px, nom (`<bdi>`, troncature au milieu, extension visible, `midname.ts`), taille, puce de source (« Partage reçu » / « Salon »), heure ; `IconButton` `x` « Retirer de l'historique ». Pied : « Les entrées de plus de 30 jours sont effacées. » États : vide (`EmptyArt`, « Aucun téléchargement pour l'instant. ») ; désactivé (« L'historique est désactivé » + « L'activer »). Onglet « Téléchargements » de la barre du téléphone, aussi sans compte (la barre a alors trois onglets : Envoyer, Mes partages, Téléchargements).

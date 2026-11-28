@@ -33,15 +33,15 @@ afterEach(() => {
 });
 
 describe("Salon prêt : Mes partages", () => {
-  it("gardé : « Retrouvez ce salon dans Mes partages » (nouvel onglet), aucun lien de gestion affiché ; l'entrée n'a ni mot de passe", async () => {
+  it("gardé : « Retrouvez ce salon dans Mes salons » (nouvel onglet), aucun lien de gestion affiché ; l'entrée n'a ni mot de passe", async () => {
     configurerPartages(memoryBackend());
     await montrer();
     expect(document.querySelector("[data-manage]")).toBeNull();
     expect(document.body.textContent).not.toContain(GESTION);
     const k = document.querySelector("[data-kept]")!;
-    expect(k.textContent).toContain("Retrouvez ce salon dans Mes partages");
+    expect(k.textContent).toContain("Retrouvez ce salon dans Mes salons");
     const a = k.querySelector<HTMLAnchorElement>("a[data-shares-link]")!;
-    expect(a.getAttribute("href")).toBe("/envois");
+    expect(a.getAttribute("href")).toBe("/salons");
     expect(a.target).toBe("_blank");
     expect(k.textContent).toContain(fr["ready.kept.device"]);
     const [p] = await tousLesPartages();

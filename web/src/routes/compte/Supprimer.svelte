@@ -6,9 +6,9 @@
   // copies de sauvegarde). Décision du propriétaire du 28 novembre : supprimer le compte supprime
   // TOUJOURS l'abonnement aussi (pass Plus ou Pro, accès offert, trouvé dans le coffre privé ou sur
   // l'appareil : account/abonnements.ts), et efface toutes les données du site sur cet appareil
-  // (plus de case : l'appareil revient à zéro, Mes partages créés sans compte compris). Fenêtre Oui / Non : « Êtes-vous sûr ? », et avec un abonnement « Vous allez perdre
-  // votre abonnement {offre}, valable jusqu'au {date} » (rien n'est remboursé automatiquement : les
-  // remboursements se font à la main, conception du paiement §5.5). Puis geste de passkey (session
+  // (plus de case : l'appareil revient à zéro, Mes partages créés sans compte compris). Fenêtre (28 novembre) : liste courte de ce qui part, et avec un abonnement « Votre
+  // abonnement {offre}, valable jusqu'au {date}, s'arrête aujourd'hui » (« Aucun remboursement possible. », dernière
+  // ligne avec un abonnement payé, conception du paiement §5.5). Puis geste de passkey (session
   // « récente », conception du compte par passkey §3.6), et suppression.ts : renouvellement arrêté,
   // pass révoqué, compte supprimé, pass effacé. Abonnement impossible à arrêter (réseau) : rien
   // n'est supprimé, le message le dit, « Réessayer » reprend sans nouveau geste. Fin : chaque
@@ -144,17 +144,25 @@
       </div>
     </form>
   </Cadre>
+  <!-- Fenêtre (28 novembre) : ce qui part, en liste courte ; l'abonnement à part, en évidence ;
+       « Aucun remboursement possible. » en dernière ligne s'il y a un abonnement payé. -->
   <ConfirmDialog bind:open={confirmer} title={t("account.delete.confirm.title")} yesLabel={t("account.delete.yes")} noLabel={t("account.delete.no")} danger onyes={supprimer}>
-    <p class="msg sur">{t("account.delete.sure")}</p>
-    {#each abonnements as a, i (i)}
-      <div class="perte" data-delete-sub>
-        <p class="warn">{perte(a)}</p>
-        {#if a.renouvelle}<p class="note">{t("account.delete.sub.renew")}</p>{/if}
-        {#if !a.offert}<p class="note">{t("account.delete.sub.refund")}</p>{/if}
-      </div>
-    {/each}
-    <p class="msg">{t("account.delete.confirm", { salons })}</p>
-    <p class="msg" data-delete-device>{t("account.delete.device.all")}</p>
+    <div class="fen" data-delete-dialog>
+      <p class="msg">{t("account.delete.will")}</p>
+      <ul class="liste">
+        <li>{t("account.delete.item.account")}</li>
+        {#if salons > 0}<li>{t("account.delete.item.salons", { n: salons })}</li>{/if}
+        <li data-delete-device>{t("account.delete.item.device")}</li>
+      </ul>
+      {#each abonnements as a, i (i)}
+        <div class="perte" data-delete-sub>
+          <p class="warn">{perte(a)}</p>
+          {#if a.renouvelle}<p class="note">{t("account.delete.sub.stops")}</p>{/if}
+        </div>
+      {/each}
+      <p class="msg fin">{t("account.delete.final")}</p>
+      {#if abonnements.some((a) => !a.offert)}<p class="msg fin" data-delete-refund>{t("account.delete.sub.refund")}</p>{/if}
+    </div>
   </ConfirmDialog>
 {/if}
 
@@ -183,7 +191,14 @@
   .perte .note {
     margin: 0;
   }
-  .sur {
+  .fen {
+    display: grid;
+    gap: var(--sp-3);
+  }
+  .liste {
+    color: var(--text);
+  }
+  .fin {
     font-weight: 600;
   }
   .perte {

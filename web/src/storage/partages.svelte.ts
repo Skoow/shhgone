@@ -1,4 +1,4 @@
-// État de « Mes partages » pour les écrans (page /envois, « Lien prêt », « Salon prêt ») et pour
+// État de « Mes partages » pour les écrans (pages /envois et /salons, « Lien prêt », « Salon prêt ») et pour
 // la synchronisation du compte (account/session.svelte.ts). Ouvre le stockage une seule fois :
 // IndexedDB en production (base PARTAGES_DB), mémoire dans la démo (origine partagée de
 // GitHub Pages : rien n'y est écrit) ; indisponible → `statut: "indisponible"`, et « Lien prêt »
@@ -8,7 +8,7 @@
 import { getDemo } from "../app/demo-hooks";
 import { destroyShare, shareStatus } from "../index";
 import { idbBackend, memoryBackend, type Backend } from "./idb";
-import { PARTAGES_DB, ouvrirPartages, type NouveauPartage, type Partage, type Partages } from "./partages";
+import { PARTAGES_DB, estActif, ouvrirPartages, type NouveauPartage, type Partage, type Partages, type Sorte } from "./partages";
 import { patchDetruit, relecteur, type ErreurRelecture, type Relecteur } from "./partages-relecture";
 
 export const mesPartages = $state({
@@ -133,6 +133,25 @@ export async function retirerPartage(id: string): Promise<void> {
   delete mesPartages.erreurs[id];
   await recharger(s).catch(() => undefined);
   if (p) signaler({ sorte: "retrait", partage: p });
+}
+
+/**
+ * « Effacer l'historique » (Mes partages, Mes salons ; 28 novembre) : retire de la liste les
+ * entrées TERMINÉES de la sorte donnée (détruites ou échues), sur cet appareil et dans le compte ;
+ * les entrées en cours restent. Rien n'est détruit sur le serveur (une entrée terminée n'y existe
+ * plus). Rend le nombre d'entrées retirées.
+ */
+export async function retirerTermines(sorte: Sorte, now = Date.now()): Promise<number> {
+  const s = await stock();
+  if (!s) return 0;
+  const finis = (await s.liste().catch(() => [] as Partage[])).filter((p) => p.sorte === sorte && !estActif(p, now));
+  for (const p of finis) {
+    await s.retirer(p.id).catch(() => undefined);
+    delete mesPartages.erreurs[p.id];
+    signaler({ sorte: "retrait", partage: p });
+  }
+  await recharger(s).catch(() => undefined);
+  return finis.length;
 }
 
 /** « Supprimer » sur « Lien prêt » : l'entrée du même partage est notée détruite. */

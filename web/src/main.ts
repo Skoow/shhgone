@@ -16,7 +16,8 @@ if (!moved && import.meta.env.MODE === "demo") await (await import("./demo/insta
 
 // Retours gardés (D42-22) : entrées échues retirées au démarrage, sans rien créer.
 if (!moved) void pageReturns().sweep();
-// Historique local des liens retiré (spec §33) : la base d'avant est supprimée, sans erreur.
+// Bases retirées (historique des liens, spec §33 ; historique des téléchargements, D42-33) :
+// supprimées, sans erreur.
 if (!moved) void effacerAncienHistorique();
 
 // Langue du navigateur : le dictionnaire anglais est lu avant l'affichage (production).

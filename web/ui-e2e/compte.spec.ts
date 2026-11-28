@@ -276,7 +276,7 @@ test("suppression du compte par un geste de passkey ; ensuite la passkey ne conn
   await bouton(page, "Supprimer le compte").click();
   await expect(page.getByText("Une confirmation par passkey vous sera demandée.")).toBeVisible();
   await bouton(page, "Supprimer définitivement").click();
-  await bouton(page, "Oui, supprimer").click(); // fenêtre Oui / Non (D42-30)
+  await bouton(page, "Supprimer mon compte").click(); // fenêtre Oui / Non (D42-30)
   await expect(titre(page, "Compte supprimé.")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("[data-passkey-gestionnaire]")).toContainText(`Supprimez aussi la passkey « ${pseudo} »`);
   await page.goto(shh.origin + "/compte/connexion");

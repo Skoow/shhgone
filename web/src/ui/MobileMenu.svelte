@@ -2,15 +2,14 @@
   // Menu du téléphone (< 768 px) : remplace la barre
   // d'onglets du bas sur le site. Motif disclosure (bouton aria-expanded qui montre une liste de
   // liens, pas un role="menu"), comme les menus de TopNav. Échap ferme et rend le focus au bouton ;
-  // un clic ailleurs ou un changement d'écran le ferme. « Téléchargements » n'y figure qu'avec un
-  // compte : sans compte, l'historique des téléchargements ne vit que dans ce navigateur et ne
-  // permet de rien retélécharger (le lien n'est jamais gardé), il n'a pas sa place dans le menu.
+  // un clic ailleurs ou un changement d'écran le ferme. « Mes partages » puis « Mes salons » (deux
+  // pages depuis le 28 novembre ; « Mes salons » seulement avec __SALONS__) ; plus de
+  // « Téléchargements » (D42-33).
   import { currentPath, followLink, href, router } from "../app/router.svelte";
   import { accountFlag } from "../app/account-flag.svelte";
-  import { presence } from "../downloads/presence.svelte";
   import { t } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
-  import { ChevronDown, ChevronRight, Clock, Compass, Download, MessagesSquare, Server, ShieldCheck, Tag, User } from "./Icon";
+  import { ChevronDown, ChevronRight, Clock, Compass, MessagesSquare, Server, ShieldCheck, Tag, User, Users } from "./Icon";
   import { allerSection } from "./section";
   import type { Component } from "svelte";
 
@@ -35,8 +34,7 @@
   type Link = { label: string; path: string; icon: Component; soon?: string; subs?: Sub[]; page?: string };
   const links = $derived<Link[]>([
     { label: t("nav.shares"), path: "/envois", icon: Clock },
-    // « Téléchargements » sans compte seulement si l'historique est activé ici.
-    ...(accountFlag.connected || presence.downloads ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
+    ...(__SALONS__ ? [{ label: t("nav.rooms"), path: "/salons", icon: Users }] : []),
     // Salon : la création ; « bientôt » seulement sans __SALONS__ (démo, site sans compte).
     __SALONS__ ? { label: t("nav.room"), path: "/salon/nouveau", icon: MessagesSquare } : { label: t("nav.room"), path: "", icon: MessagesSquare, soon: t("tabs.soon.chat") },
     {

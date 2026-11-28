@@ -90,9 +90,9 @@ describe("inscription par passkey", () => {
     const etat = () => document.querySelector("[data-field-status]")?.getAttribute("data-field-status") ?? null;
     try {
       await monter(Inscription);
-      expect(etat()).toBeNull();
+      expect(etat()).toBe("vide");
       saisir("Pseudo", "Lea");
-      // Anti-rebond : rond qui tourne, aucune requête avant 500 ms.
+      // Anti-rebond : rond qui tourne, aucune requête avant 400 ms.
       expect(etat()).toBe("verif");
       expect(C.pseudoLibre).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(600);
@@ -129,8 +129,12 @@ describe("inscription par passkey", () => {
       await vi.advanceTimersByTimeAsync(600);
       await attendre();
       expect(document.querySelector("[data-field-status]")!.getAttribute("data-field-status")).toBe("ko");
-      expect(erreurDe("Pseudo")).not.toBe("");
+      // La règle non tenue est barrée dans la liste reliée au champ, sans requête.
+      expect(champ("Pseudo").getAttribute("aria-invalid")).toBe("true");
+      expect(document.querySelector("[data-regle=caracteres]")!.getAttribute("data-etat")).toBe("ko");
       expect(C.pseudoLibre).not.toHaveBeenCalled();
+      await presser("Créer avec une passkey");
+      expect(C.creerPasskey).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

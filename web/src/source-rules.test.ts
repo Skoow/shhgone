@@ -83,18 +83,21 @@ describe("règles de sources", () => {
   });
   it("aucun stockage navigateur (hors exceptions écrites, ci-dessous)", () =>
     expect(
-      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "storage/returns.ts" && r !== "storage/ancien-historique.ts" && r !== "storage/partages.svelte.ts" && r !== "downloads/live.svelte.ts" && r !== "downloads/probe.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
+      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "storage/returns.ts" && r !== "storage/ancien-historique.ts" && r !== "storage/partages.svelte.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
     ).toEqual([]));
   // Spec §33 : historique local des liens retiré (D42-27). Plus de module history/ ; l'ancienne
   // base n'est que supprimée (storage/ancien-historique.ts, deleteDatabase seulement, aucune
-  // lecture). Accès IndexedDB typés seulement dans les modules de stockage écrits.
-  it("ancien historique : aucun module history/, la base n'est que supprimée ; IDB* seulement dans les modules de stockage", () => {
-    expect(files.filter((f) => f.rel.startsWith("history/"))).toEqual([]);
+  // lecture). De même l'historique des téléchargements (D42-33) : plus de module downloads/, sa
+  // base `shhdrop-telechargements` n'est que supprimée. Accès IndexedDB typés seulement dans les
+  // modules de stockage écrits.
+  it("bases retirées : aucun module history/ ni downloads/, leurs bases ne sont que supprimées ; IDB* seulement dans les modules de stockage", () => {
+    expect(files.filter((f) => f.rel.startsWith("history/") || f.rel.startsWith("downloads/"))).toEqual([]);
     const a = files.find((f) => f.rel === "storage/ancien-historique.ts")!.text;
-    expect(a).toMatch(/deleteDatabase\(ANCIEN_HISTORIQUE\)/);
+    expect(a).toMatch(/BASES_RETIREES: readonly string\[\] = \[ANCIEN_HISTORIQUE, ANCIENS_TELECHARGEMENTS\]/);
+    expect(a).toMatch(/idb\.deleteDatabase\(nom\)/);
     expect(a).not.toMatch(/\.open\(|localStorage|sessionStorage|document\.cookie/);
-    expect(offenders(/shhdrop-history/, (r) => r !== "storage/ancien-historique.ts")).toEqual([]);
-    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("storage/") && !r.startsWith("downloads/") && !r.startsWith("account/") && !r.startsWith("paiement/") && r !== "salon/preuve.ts")).toEqual([]);
+    expect(offenders(/shhdrop-history|shhdrop-telechargements/, (r) => r !== "storage/ancien-historique.ts")).toEqual([]);
+    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("storage/") && !r.startsWith("account/") && !r.startsWith("paiement/") && r !== "salon/preuve.ts")).toEqual([]);
   });
   // Spec §33, D42-30 : exception écrite, « Mes partages » (partages envoyés et salons créés,
   // gardés d'office). Seul storage/partages.svelte.ts lit `indexedDB` (base `shhdrop-partages`,
@@ -124,27 +127,6 @@ describe("règles de sources", () => {
     expect(r.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
     const type = r.text.match(/export type ReturnEntry = \{([\s\S]*?)\n\};/)![1]!;
     expect([...type.matchAll(/^\s+(\w+):/gm)].map((m) => m[1])).toEqual(["tag", "grant", "expiresAt"]);
-  });
-  // Conception compte §21.9 (R12) : exception écrite, l'historique des téléchargements, chiffré
-  // comme l'historique des envois. Seul downloads/live.svelte.ts lit `indexedDB` ; la base
-  // `shhdrop-telechargements` n'est nommée que dans downloads/ ; aucune requête dans ce module ;
-  // l'entrée n'a que nom, taille, format, source et date (jamais lien, clé, mot de passe).
-  it("téléchargements : base seulement dans downloads/, indexedDB lu par downloads/live.svelte.ts, aucun fetch, entrée sans secret", () => {
-    expect(offenders(/shhdrop-telechargements/, (r) => !r.startsWith("downloads/"))).toEqual([]);
-    expect(files.find((f) => f.rel === "downloads/store.ts")?.text).toMatch(/shhdrop-telechargements/);
-    const live = files.find((f) => f.rel === "downloads/live.svelte.ts")!;
-    expect(live.text).toMatch(/indexedDB/);
-    expect(live.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
-    expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("downloads/"))).toEqual([]);
-    // downloads/probe.ts (pages d'information) : lecture seule du drapeau « on »,
-    // jamais d'écriture ni d'entrée lue.
-    const probe = files.find((f) => f.rel === "downloads/probe.ts")!.text;
-    expect(probe).toMatch(/"readonly"/);
-    expect(probe).not.toMatch(/"readwrite"|\.put\(|\.add\(|\.delete\(|\.clear\(|"entries"|localStorage|sessionStorage|document\.cookie/);
-    expect([...probe.matchAll(/\.get\("([^"]+)"\)/g)].map((m) => m[1])).toEqual(["flag:on"]);
-    const store = files.find((f) => f.rel === "downloads/store.ts")!;
-    const type = store.text.match(/export type DownloadEntry = \{([\s\S]*?)\n\};/)![1]!;
-    expect([...type.matchAll(/^\s+(\w+):/gm)].map((m) => m[1])).toEqual(["id", "name", "sizeBytes", "format", "source", "savedAt"]);
   });
   // Conception compte §8.5, §9, §15 : web/src/account/ est le seul détenteur du jeton
   // de session, de K_compte et de s_profil. Une seule couche réseau (account/api.ts) : X-Shh-Session

@@ -39,7 +39,8 @@
   const uid = $props.id();
 
   const off = $derived(busy ? { "aria-disabled": "true" as const, "aria-describedby": "foot-busy" } : {});
-  const here = (p: string) => (currentPath() === href(p) ? "page" : undefined);
+  // Relue à chaque changement de route (router.current) : l'adresse seule n'est pas réactive.
+  const here = (p: string) => (void router.current, currentPath() === href(p) ? "page" : undefined);
 
   function items(id: MenuId): HTMLElement[] {
     return [...(document.getElementById(`${uid}-${id}`)?.querySelectorAll<HTMLElement>("[data-nav-item]") ?? [])];
@@ -278,6 +279,10 @@
   </ul>
   <div class="acts">
     <a class="btn ghost" href={href("/envois")} aria-current={here("/envois")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/envois"))} {...off} data-nav-shares>{t("nav.shares")}</a>
+    {#if __SALONS__}
+      <!-- « Mes salons » (28 novembre) : les salons créés, à côté de « Mes partages ». -->
+      <a class="btn ghost" href={href("/salons")} aria-current={here("/salons")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/salons"))} {...off} data-nav-rooms>{t("nav.rooms")}</a>
+    {/if}
     {#if __COMPTES__}
       <!-- Compte : « Se connecter », ou « Mon compte » et « Se déconnecter » une fois connecté. -->
       {#if accountFlag.connected}

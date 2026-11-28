@@ -99,7 +99,6 @@ describe("textes publics et compte par passkey", () => {
       /bannissement/u,
       /recours/u,
       /7 jours/u,
-      /30 jours/u,
       /13 mois/u,
       /la page Compte montre ce que nous gardons/u,
     ])
@@ -124,11 +123,10 @@ describe("textes publics et compte par passkey", () => {
     expect(texte("signaler", "en", false)).toMatch(/only the category you chose/u);
   });
 
-  test("Confidentialité : l'historique des téléchargements (public) est dit, désactivé par défaut", () => {
-    expect(texte("confidentialite", "fr", false)).toMatch(/historique des téléchargements est désactivé par défaut[^.]*vous-même\. Activé, il garde chiffrés sur cet appareil/u);
-    expect(texte("confidentialite", "fr", false)).toMatch(/le désactiver efface tout/u);
-    expect(texte("confidentialite", "en", false)).toMatch(/downloads history is off by default[^.]*yourself\. When on[^.]*encrypted on this device/u);
-    expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
+  test("Confidentialité : plus d'historique des téléchargements (D42-33), l'ancien est effacé", () => {
+    expect(texte("confidentialite", "fr", false)).toMatch(/Aucun historique des fichiers que vous recevez n'est gardé/u);
+    expect(texte("confidentialite", "fr", false)).not.toMatch(/historique des téléchargements est désactivé/u);
+    expect(texte("confidentialite", "en", false)).toMatch(/No history of the files you receive is kept/u);
   });
 
   // 26 novembre (spec §33, D42-30) : « Mes partages » gardé d'office, ce qui y est (et jamais), la
@@ -136,10 +134,10 @@ describe("textes publics et compte par passkey", () => {
   test("Confidentialité, « Sur votre appareil » : Mes partages (texte exact), jamais le lien d'un partage ni un mot de passe", () => {
     for (const comptes of [false, true]) {
       const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!;
-      expect(fr).toContain("Mes partages : chaque partage que vous envoyez et chaque salon que vous créez sont gardés chiffrés sur cet appareil, pour les suivre et les supprimer : le lien de gestion, le nom du partage, sa taille, son nombre d'éléments, son échéance et ses ouvertures ; pour un salon, son lien de gestion et son lien d'invitation. Jamais le lien d'un partage, ni un mot de passe, ni le nom d'un fichier. Une entrée s'efface 7 jours après la fin du partage, et vous pouvez la retirer à tout moment. Sans compte, effacer les données de ce navigateur efface la liste, et avec elle la gestion de ces partages. Aucune liste des liens reçus n'est gardée.");
+      expect(fr).toContain("Mes partages et Mes salons : chaque partage que vous envoyez et chaque salon que vous créez sont gardés chiffrés sur cet appareil, pour les suivre et les supprimer : le lien de gestion, le nom du partage, sa taille, son nombre d'éléments, son échéance et ses ouvertures ; pour un salon, son lien de gestion et son lien d'invitation. Jamais le lien d'un partage, ni un mot de passe, ni le nom d'un fichier. Une entrée s'efface 7 jours après la fin du partage, et vous pouvez la retirer à tout moment. Sans compte, effacer les données de ce navigateur efface la liste, et avec elle la gestion de ces partages. Aucune liste des liens reçus n'est gardée.");
       expect(fr.join(" ")).not.toMatch(/Garder dans mon historique|Garder ce partage/u);
       const en = infoPage("confidentialite", "en", comptes).blocks.find((b) => b.h === "On your device")!.list!;
-      expect(en.join(" ")).toMatch(/My shares: every share you send and every room you create are kept encrypted on this device/u);
+      expect(en.join(" ")).toMatch(/My shares and My rooms: every share you send and every room you create are kept encrypted on this device/u);
       expect(en.join(" ")).toMatch(/No list of the links you receive is kept/u);
     }
     expect(texte("confidentialite", "fr", true)).toMatch(/Ce second coffre garde aussi « Mes partages »/u);

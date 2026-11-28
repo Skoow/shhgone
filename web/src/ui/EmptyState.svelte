@@ -1,5 +1,5 @@
 <script lang="ts">
-  // État vide commun (Mes partages, Téléchargements ; passe de finition du 25 novembre) : un
+  // État vide commun (Mes partages, Mes salons ; passe de finition du 25 novembre) : un
   // dessin au trait dans une pastille, un titre, le texte et l'action, sur une surface à peine
   // levée, bordée d'un filet en pointillés (« rien ici pour l'instant »), alignés à gauche.
   import type { Snippet } from "svelte";

@@ -47,7 +47,7 @@
       <!-- Nouvel onglet : quitter cette page fermerait le salon dans cet onglet. -->
       <div class="gestion" data-kept={garde === "oui" ? "" : undefined}>
         <p class="ligne">
-          {t("salon.ready.kept.before")}<a href={href("/envois")} target="_blank" rel="noopener" data-shares-link>{t("nav.shares")}<span class="sr-only"> {t("salon.ready.kept.newTab")}</span></a>{t("ready.kept.after")}
+          {t("salon.ready.kept.before")}<a href={href("/salons")} target="_blank" rel="noopener" data-shares-link>{t("nav.rooms")}<span class="sr-only"> {t("salon.ready.kept.newTab")}</span></a>{t("ready.kept.after")}
         </p>
         {#if !accountFlag.connected}<p class="note" data-kept-device>{t("ready.kept.device")}</p>{/if}
       </div>

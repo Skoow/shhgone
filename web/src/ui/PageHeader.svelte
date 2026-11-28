@@ -4,7 +4,7 @@
   // (.titre-bandeau, ui/base.css). Une seule échelle, deux tailles :
   //   - « display » : pages à lire (informations, Offres), grand titre ; centré sur téléphone et
   //     tablette, aligné à gauche à partir de 1100 px (comme avant) ;
-  //   - « screen » : écrans d'outil (Mes partages, Téléchargements, Suivi), titre plus court,
+  //   - « screen » : écrans d'outil (Mes partages, Mes salons, Suivi), titre plus court,
   //     toujours aligné à gauche ; l'action passe dessous, pleine largeur, sur téléphone.
   // Le titre prend le focus à l'arrivée (tabindex -1, sans anneau) et porte data-large-title
   // (titre réduit dans la barre du téléphone, AppShell).

@@ -15,7 +15,8 @@ if (import.meta.env.MODE === "demo") await (await import("../demo/install")).ins
 
 // Retours gardés (D42-22) : entrées échues retirées au démarrage, sans rien créer.
 void pageReturns().sweep();
-// Historique local des liens retiré (spec §33) : la base d'avant est supprimée, sans erreur.
+// Bases retirées (historique des liens, spec §33 ; historique des téléchargements, D42-33) :
+// supprimées, sans erreur.
 void effacerAncienHistorique();
 
 await langReady;

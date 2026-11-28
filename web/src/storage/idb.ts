@@ -1,7 +1,7 @@
 // Stockage chiffré de l'appareil : accès à une base IndexedDB (ou à la mémoire, pour la démo et
 // les tests) qui garde des enregistrements déjà chiffrés et leur clé WebCrypto non extractible.
-// Utilisé par les retours sur un partage ouvert (storage/returns.ts), l'historique des
-// téléchargements (downloads/store.ts), le pass des offres (paiement/pass.ts) et la session du
+// Utilisé par les retours sur un partage ouvert (storage/returns.ts), « Mes partages »
+// (storage/partages.ts), le pass des offres (paiement/pass.ts) et la session du
 // compte (account/persist.ts), chacun dans sa propre base. Aucune requête réseau ici.
 
 /** Enregistrement chiffré tel qu'il est stocké. */

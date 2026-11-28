@@ -21,6 +21,7 @@ const C = vi.hoisted(() => ({
   ajouterPasskey: vi.fn(),
   deuxiemeGesteAjout: vi.fn(),
   parcoursRetenu: vi.fn(),
+  arreterRenouvellementsSiBanni: vi.fn(),
 }));
 vi.mock("../../account/session.svelte", async (orig) => ({ ...(await orig<object>()), ...C }));
 // Preuve anti-robot (routes/compte/preuve.ts) : double ; `pret` : calcul fini ou non au moment de partir.
@@ -38,6 +39,7 @@ beforeEach(() => {
   C.preparerConnexion.mockResolvedValue(undefined);
   C.passkeysDisponibles.mockReturnValue(true);
   C.etatCompte.mockResolvedValue(ETAT);
+  C.arreterRenouvellementsSiBanni.mockResolvedValue("rien");
   C.seConnecter.mockImplementation(async () => {
     account.etat = "ouvert";
     return "ouvert";
@@ -135,6 +137,28 @@ describe("connexion par passkey", () => {
     await presser("Se connecter avec une passkey");
     expect(texte()).toContain("vos données s'ouvrent grâce à une clé gardée ici");
     expect(texte()).toContain("B-ABCD-EFGH-JKMNP");
+    // Compte banni : le renouvellement de ses abonnements est arrêté à la connexion, et c'est dit.
+    expect(C.arreterRenouvellementsSiBanni).toHaveBeenCalledWith(expect.objectContaining({ banniJusqu: "2027-01-01" }));
+  });
+
+  it("compte banni : renouvellement arrêté, dit à l'écran ; échec : dit aussi ; non banni : rien n'est arrêté", async () => {
+    C.etatCompte.mockResolvedValue({ ...ETAT, banniId: "B-ABCD-EFGH-JKMNP", banniJusqu: "2027-01-01", banniMotif: 6 });
+    C.arreterRenouvellementsSiBanni.mockResolvedValue("arretes");
+    await monter(Connexion);
+    await presser("Se connecter avec une passkey");
+    expect(document.querySelector("[data-banni-arret]")!.textContent).toContain("le renouvellement automatique de votre abonnement a été arrêté");
+  });
+  it("compte banni, arrêt impossible : l'écran le dit", async () => {
+    C.etatCompte.mockResolvedValue({ ...ETAT, banniId: "B-ABCD-EFGH-JKMNP", banniJusqu: "2027-01-01", banniMotif: 6 });
+    C.arreterRenouvellementsSiBanni.mockResolvedValue("erreur");
+    await monter(Connexion);
+    await presser("Se connecter avec une passkey");
+    expect(document.querySelector("[data-banni-arret-erreur]")!.textContent).toContain("n'a pas pu être arrêté");
+  });
+  it("compte non banni : aucun arrêt demandé", async () => {
+    await monter(Connexion);
+    await presser("Se connecter avec une passkey");
+    expect(C.arreterRenouvellementsSiBanni).not.toHaveBeenCalled();
   });
 
   it("navigateur sans passkeys : message, et le lien de la clé de récupération reste", async () => {

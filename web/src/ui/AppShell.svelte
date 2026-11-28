@@ -14,8 +14,6 @@
   import TabBar from "./TabBar.svelte";
   import TopNav from "./TopNav.svelte";
   import MobileMenu from "./MobileMenu.svelte";
-  import { accountFlag } from "../app/account-flag.svelte";
-  import { presence } from "../downloads/presence.svelte";
   import { maintenance, surveiller } from "../maintenance/etat.svelte";
   import MaintenanceBanner from "./MaintenanceBanner.svelte";
 
@@ -84,15 +82,13 @@
   // fois défilé (titre marqué data-large-title, sinon le h1 de l'écran). Sur ordinateur, rien ne change.
   // Pages d'information : leur propre fichier HTML (pages séparées) ; en-tête ordinaire (logo,
   // menu), pas de « Retour » comme un écran de l'application.
-  const BACK: ReadonlySet<string> = new Set(["notfound", "manage", "envois", "telechargements"]);
+  const BACK: ReadonlySet<string> = new Set(["notfound", "manage", "envois", "salons"]);
   // Pied de page sur toutes les pages, ordinateur et téléphone, composeur compris ; sur ordinateur, le composeur tient dans l'écran et le pied est juste dessous.
   type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean };
   const footCols = $derived<{ id: string; title: string; links: FootLink[] }[]>([
     // Plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » ;
-    // plus d'« Offres » (l'en-tête et le menu y mènent). Colonne « Produit »
-    // seulement avec un compte (Téléchargements, comme le menu ☰), ou sans
-    // compte si l'historique des téléchargements est activé sur cet appareil.
-    ...(accountFlag.connected || presence.downloads ? [{ id: "product", title: t("foot.product"), links: [{ label: t("foot.downloads"), path: "/telechargements" }] }] : []),
+    // plus d'« Offres » (l'en-tête et le menu y mènent). Plus de colonne « Produit » : elle ne
+    // menait qu'à « Téléchargements », retirée le 28 novembre (D42-33).
     {
       id: "trust",
       title: t("foot.trust"),
@@ -116,8 +112,8 @@
   ]);
   // « Envoyer » (/) n'est la page courante que sur l'accueil : un partage ouvert a aussi « / » pour chemin.
   const pathHere = (p: string) => (router.current.name !== "notfound" && currentPath() === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
-  // « Mes partages » et « Téléchargements » sont des onglets racine quand la barre d'onglets est là : pas de Retour.
-  const back = $derived(BACK.has(router.current.name) && !(tabs && (router.current.name === "envois" || router.current.name === "telechargements")));
+  // « Mes partages » et « Mes salons » sont des onglets racine quand la barre d'onglets est là : pas de Retour.
+  const back = $derived(BACK.has(router.current.name) && !(tabs && (router.current.name === "envois" || router.current.name === "salons")));
   let small = $state("");
   let raf = 0;
   function measure() {

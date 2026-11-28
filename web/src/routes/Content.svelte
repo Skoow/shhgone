@@ -5,8 +5,6 @@
   // titre, l'adresse ni un stockage. « Voir seulement » : aucune action de téléchargement ni de
   // copie dans le DOM (ni barre, ni ligne, ni visionneuse).
   import { lowMemory } from "../app/env";
-  import { downloads, loadDownloads, recordDownload, setDownloadsEnabled } from "../downloads/live.svelte";
-  import { afterSave } from "../downloads/store";
   import { guardUnload } from "../app/lifecycle";
   import { createDownloads, readSkipping, summarize, type Target } from "../flows/downloads.svelte";
   import { destroyFromContent, release, type DestroyOutcome } from "../flows/endoflife";
@@ -139,12 +137,8 @@
       const b = previews.get(i);
       return b ? blobRead(b, from, on) : serverRead(i, from, on);
     },
-    // Historique des téléchargements (conception compte §21.9) : une entrée quand le fichier est
-    // entièrement écrit (close réussi) ; arrêt, échec ou sélecteur fermé : rien.
-    openSink: async (i, target) => {
-      const sink = await (target as (name: string) => Promise<ItemSink | null>)(fileName(i));
-      return sink && afterSave(sink, () => recordDownload({ name: fileName(i), sizeBytes: totals[i]!, format: formats[i]!, source: "partage", savedAt: Date.now() }));
-    },
+    // Plus d'historique des téléchargements (D42-33) : le fichier va tout droit au navigateur.
+    openSink: (i, target) => (target as (name: string) => Promise<ItemSink | null>)(fileName(i)),
     meter,
     now: () => performance.now(),
     track: (i) => closer.begin(names[i]!, totals[i]!),
@@ -238,10 +232,7 @@
       return;
     }
     if (!sink) return;
-    // L'archive enregistrée est un seul fichier : une seule entrée « shhgone.zip ».
-    const zipTotal = savableBytes;
-    const saved = afterSave(sink, () => recordDownload({ name, sizeBytes: zipTotal, format: { family: "archive", label: "ZIP" }, source: "partage", savedAt: Date.now() }));
-    const z = createZip(saved as Parameters<typeof createZip>[0]);
+    const z = createZip(sink as Parameters<typeof createZip>[0]);
     dl.startZip({
       total: savableBytes,
       abort: () => z.abort(),
@@ -407,20 +398,6 @@
     };
   });
 
-  // ---------- Historique des téléchargements : réglage sur place ----------
-  // Désactivé par défaut (remplace l'« activé » de
-  // R12) : une ligne le dit près des téléchargements, avec « Les garder 30 jours » ; activé, elle
-  // dit qu'ils sont gardés, avec « Ne pas garder » (désactive et efface). Ici parce que c'est le
-  // seul écran où l'on enregistre des fichiers, avec ou sans compte. Lecture seule à
-  // l'ouverture : rien n'est créé tant que la personne n'active pas.
-  void loadDownloads().catch(() => undefined);
-  let erased = $state(false);
-  async function setKept(v: boolean) {
-    await setDownloadsEnabled(v);
-    erased = !v;
-    announce(t(v ? "downloads.on.done" : "downloads.off.done"));
-  }
-
   // ---------- Visionneuse ----------
   let viewAt = $state<number | null>(null);
   function openViewer(i: number) {
@@ -482,13 +459,6 @@
       onresumezip={() => dl.resumeZip()}
       onstopzip={() => dl.stopZip()}
     />
-    {#if downloads.status === "ready"}
-      <p class="kept" data-downloads-notice>
-        <!-- Après « Ne pas garder » : la phrase dit que la liste est effacée. -->
-        <span>{downloads.enabled ? t("downloads.notice") : t(erased ? "downloads.off.done" : "downloads.notice.off")}</span>
-        <button type="button" class="kept-no" onclick={() => void setKept(!downloads.enabled)}>{t(downloads.enabled ? "downloads.notice.no" : "downloads.notice.on")}</button>
-      </p>
-    {/if}
   {/if}
 
   {#each groups as g (g.c)}
@@ -736,38 +706,6 @@
   }
   .hint:empty {
     display: none;
-  }
-  /* Historique des téléchargements (désactivé par défaut) : une ligne discrète, le réglage en lien. */
-  .kept {
-    margin: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: var(--sp-2);
-    max-width: 65ch;
-    color: var(--text-2);
-    font-size: var(--fs-small);
-  }
-  .kept-no {
-    min-height: 44px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--text-2);
-    font: inherit;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
-  .kept-no:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-  @media (hover: hover) {
-    .kept-no:hover {
-      color: var(--text);
-    }
   }
   /* Lien discret : texte souligné, cible d'appui de 44 px. */
   .forget {

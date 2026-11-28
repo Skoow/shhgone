@@ -38,10 +38,14 @@ func TestAccueilEcritSeulementSurLaRacine(t *testing.T) {
 	if code, body := get("/"); code != 200 || !strings.Contains(body, "ACCUEIL ECRIT") {
 		t.Fatalf("/ : %d, accueil écrit attendu", code)
 	}
-	for _, p := range []string{"/envoyer", "/envois", "/telechargements"} {
+	for _, p := range []string{"/envoyer", "/envois"} {
 		if code, body := get(p); code != 200 || strings.Contains(body, "ACCUEIL ECRIT") {
 			t.Fatalf("%s : %d, app.html attendu (sans l'accueil écrit)", p, code)
 		}
+	}
+	// Page « Téléchargements » retirée (D42-33) : introuvable, comme toute adresse inconnue.
+	if code, _ := get("/telechargements"); code != 404 {
+		t.Fatalf("/telechargements : %d, 404 attendu (page retirée)", code)
 	}
 	if code, body := get("/inconnu"); code != 404 || strings.Contains(body, "ACCUEIL ECRIT") {
 		t.Fatalf("/inconnu : %d, 404 sans l'accueil écrit attendu", code)

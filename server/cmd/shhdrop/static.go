@@ -250,7 +250,7 @@ var appRoutes = map[string]bool{
 	"/offres":           true,
 	"/envoyer":          true,
 	"/envois":           true, // « Mes partages » (spec §33, D42-30) : liste de l'appareil, aucun secret
-	"/telechargements":  true,
+	// « /telechargements » retirée le 28 novembre (D42-33) : 404 comme une adresse inconnue.
 	// Accès offert (conception du paiement, « Accès offerts ») : écran de l'application ; le pass
 	// suit « # », jamais envoyé au serveur.
 	"/offres/offert": true,
@@ -307,6 +307,7 @@ var enVersion = map[string]string{
 var salonRoutes = map[string]bool{
 	"/salon":         true,
 	"/salon/nouveau": true,
+	"/salons":        true, // « Mes salons » (28 novembre) : liste de l'appareil et du compte, aucun secret
 }
 
 var compteRoutes = map[string]bool{

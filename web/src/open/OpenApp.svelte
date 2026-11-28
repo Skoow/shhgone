@@ -15,15 +15,12 @@
   import Open from "../routes/Open.svelte";
   import Unsupported from "../routes/Unsupported.svelte";
   import { watchOpenGrant } from "../session/open-grant";
-  import { loadDownloads } from "../downloads/live.svelte";
   import AppShell from "../ui/AppShell.svelte";
 
   const supported = isSupported(globalThis);
   const demo = getDemo();
 
   reloadIfRestored(window);
-  // « Téléchargements » sans compte seulement si l'historique est activé : lecture seule.
-  if (supported) void loadDownloads().catch(() => undefined);
   // Page d'un partage : la clé est déjà retirée de l'adresse, une actualisation par le geste
   // « tirer vers le bas » perdrait l'écran verrouillé (base.css : no-pull).
   if (typeof document !== "undefined") document.documentElement.classList.add("no-pull");

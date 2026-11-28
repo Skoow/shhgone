@@ -1,30 +1,31 @@
 <script lang="ts">
-  // « Mes partages » (/envois ; spec §33, D42-30) : les partages envoyés et les salons créés sur
-  // cet appareil, gardés d'office (storage/partages.svelte.ts), et ceux du compte s'il est ouvert.
+  // « Mes partages » (/envois) et « Mes salons » (/salons) (spec §33, D42-30 ; deux pages depuis le
+  // 28 novembre, décision du propriétaire) : une page par sorte, rien de mélangé. Seulement ce que
+  // la personne a ELLE-MÊME créé (partages envoyés, salons créés), sur cet appareil et dans son
+  // compte s'il est ouvert ; jamais un lien reçu. Gardés d'office (storage/partages.svelte.ts).
   // D'abord l'état LOCAL (lecture d'IndexedDB, aucune requête) ; puis, page visible, une relecture
   // des envois actifs dont l'état date de plus de 5 min, l'un après l'autre, après une gigue
   // (storage/partages-relecture.ts). Jamais en arrière-plan, aucune boucle.
-  // Par entrée : état (mot et icône), ouvertures, échéance, taille et nombre d'éléments, nom du
-  // partage ; « Supprimer » (destruction par le lien de gestion, pour tout le monde) et « Retirer
-  // de la liste » (sur l'appareil et dans le compte ; le partage n'est pas détruit). Un salon :
-  // « Gérer le salon » (sa page de gestion, qui peut le détruire) et « Copier l'invitation ».
-  // Une entrée finie est retirée 7 jours après sa fin. Jamais le lien de partage ni le mot de passe.
-  // Deux parties (demande du propriétaire, 28 novembre), rien de mélangé : « Partages de fichiers »
-  // puis « Salons », chacune avec son titre, son compteur et son état vide. Ordre FIXE (et non « la
-  // plus récente d'abord ») : la page garde la même forme d'une visite à l'autre, un lecteur d'écran
-  // retrouve chaque partie au même rang, et l'envoi est l'usage premier du site. « Salons »
-  // n'apparaît que si le site a des salons (__SALONS__) ou qu'un salon est déjà dans la liste.
-  // Chaque ligne a l'icône de son type (bulles : salon ; fichier : partage), du jeu maison
-  // (ui/Icon.ts), et le type est dit en texte (titre de partie, « Salon », « Partage de fichiers : »
-  // lu avant le nom). L'icône du contenu (photo, vidéo, vocal, texte) demanderait de garder le
-  // genre du contenu dans l'entrée, hors de la liste fermée de §33 : non fait, signalé.
+  // Par ligne : l'icône du type (fichier, salon), le nom, une étiquette d'état en mot (« En cours »
+  // en vert, « Terminé » grisé : le mot se lit, la couleur ne fait que l'appuyer), la date de fin
+  // avec l'heure entre parenthèses (« Se termine le 29 nov. (12 h 14) », « Terminé le … ») ; pour
+  // un envoi, les ouvertures, le nombre d'éléments et la taille.
+  // Actions, dites pour qui elles comptent :
+  //   - « Supprimer le partage » : détruit le partage pour tout le monde (lien de gestion) ;
+  //   - « Retirer de la liste » : l'enlève seulement de cette liste (appareil et compte), le partage
+  //     ou le salon continue jusqu'à son échéance ;
+  //   - « Gérer le salon » : la page de gestion du créateur (elle seule peut le fermer) ;
+  //   - terminé : « Retirer » un par un, et « Effacer l'historique » (Oui / Non) retire tous les
+  //     terminés de la page, les actifs restent.
+  // Une entrée finie est aussi retirée seule 7 jours après sa fin. Jamais le lien de partage ni le
+  // mot de passe.
   import { untrack } from "svelte";
   import { accountFlag } from "../app/account-flag.svelte";
   import { followLink, href, navigate } from "../app/router.svelte";
-  import { formatBytes, formatDayTime, formatDuration } from "../i18n/format";
+  import { formatBytes, formatDayParen } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
-  import { arreterRelecture, chargerPartages, detruirePartage, mesPartages, relirePartages, retirerPartage } from "../storage/partages.svelte";
-  import { estActif, etatVu, type Partage } from "../storage/partages";
+  import { arreterRelecture, chargerPartages, detruirePartage, mesPartages, relirePartages, retirerPartage, retirerTermines } from "../storage/partages.svelte";
+  import { estActif, etatVu, finDe, type Partage, type Sorte } from "../storage/partages";
   import { announce } from "../ui/announce";
   import Button from "../ui/Button.svelte";
   import { copyText } from "../ui/clipboard";
@@ -32,7 +33,9 @@
   import { Copy, File, MessagesSquare, Plus, Trash2, X } from "../ui/Icon";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import PageHeader from "../ui/PageHeader.svelte";
-  import StateChip from "../ui/StateChip.svelte";
+
+  let { sorte = "envoi" }: { sorte?: Sorte } = $props();
+  const salon = $derived(sorte === "salon");
 
   const lang = $derived(getLang());
   let now = $state(Date.now());
@@ -54,24 +57,19 @@
     };
   });
 
-  type Partie = "envoi" | "salon";
-  /** Entrées d'une partie, dans l'ordre de la liste (actifs d'abord, storage/partages.ts trier). */
-  const de = (s: Partie) => mesPartages.liste.filter((p) => p.sorte === s);
-  const envois = $derived(de("envoi"));
-  const salons = $derived(de("salon"));
-  const avecSalons = $derived(__SALONS__ || salons.length > 0);
-  const actifsDe = (l: readonly Partage[]) => l.filter((p) => estActif(p, now)).length;
+  /** Entrées de la page, dans l'ordre de la liste (actifs d'abord, storage/partages.ts trier). */
+  const liste = $derived(mesPartages.liste.filter((p) => p.sorte === sorte));
+  const termines = $derived(liste.filter((p) => !estActif(p, now)).length);
 
   let title: HTMLHeadingElement | undefined = $state();
   $effect(() => {
     if (title) untrack(() => title?.focus({ preventScroll: true }));
   });
 
-  /** État pour StateChip (mêmes mots que la page de gestion). */
-  const CHIP = { actif: "ready", epuise: "draining", detruit: "gone", expire: "expired" } as const;
-  const etat = (p: Partage) => CHIP[etatVu(p, now)];
   // L'échéance du serveur est au quart d'heure ; arrondie à la minute pour l'affichage.
-  const finVers = (p: Partage) => formatDayTime(Math.round((etatVu(p, now) === "expire" ? p.echeance : p.finLe || p.echeance) / 60_000) * 60_000, lang);
+  const minute = (ms: number) => Math.round(ms / 60_000) * 60_000;
+  /** « Se termine le 29 nov. (12 h 14) » ou « Terminé le 29 nov. (12 h 14) ». */
+  const fin = (p: Partage) => (estActif(p, now) ? t("shares.ends", { date: formatDayParen(minute(p.echeance), lang) }) : t("shares.ended", { date: formatDayParen(minute(finDe(p, now)), lang) }));
   const erreurTexte = (p: Partage) => {
     const e = mesPartages.erreurs[p.id];
     return e === "reseau" ? t("shares.err.reseau") : e === "limite" ? t("shares.err.limite") : e === "serveur" ? t("shares.err.serveur") : "";
@@ -84,20 +82,25 @@
     await retirerPartage(p.id);
     announce(t("shares.removed"));
   }
+  async function effacerHistorique() {
+    const n = await retirerTermines(sorte);
+    announce(t("shares.history.cleared", { n }));
+  }
   let copie = $state<{ id: string; texte: string } | null>(null);
   async function copierInvitation(p: Partage) {
     const r = await copyText(p.invitation);
     copie = { id: p.id, texte: r === "copied" ? t("shares.invite.copied") : t("shares.copy.manual") };
     announce(copie.texte);
   }
+  const nouveau = $derived(salon ? "/salon/nouveau" : "/envoyer");
 </script>
 
-<section class="parts" aria-labelledby="p-title" aria-busy={mesPartages.statut === "attente" || mesPartages.statut === "lecture" ? "true" : undefined}>
-  <PageHeader id="p-title" title={t("shares.title")} bind:titleEl={title}>
+<section class="parts" aria-labelledby="p-title" data-shares-page={sorte} aria-busy={mesPartages.statut === "attente" || mesPartages.statut === "lecture" ? "true" : undefined}>
+  <PageHeader id="p-title" title={t(salon ? "rooms.title" : "shares.title")} lede={t(salon ? "rooms.sub" : "shares.sub")} bind:titleEl={title}>
     {#snippet actions()}
-      <Button variant="primary" onpress={() => navigate("/envoyer")}>
+      <Button variant="primary" onpress={() => navigate(nouveau)}>
         {#snippet icon()}<Plus size={20} strokeWidth={2} />{/snippet}
-        {t("shares.new")}
+        {t(salon ? "rooms.new" : "shares.new")}
       </Button>
     {/snippet}
   </PageHeader>
@@ -110,9 +113,30 @@
     <ul class="list" role="list" aria-label={t("shares.loading")}>
       {#each [0, 1] as k (k)}<li class="skel" aria-hidden="true"></li>{/each}
     </ul>
+  {:else if liste.length === 0}
+    <EmptyState level="p" title={t(salon ? "shares.rooms.empty.title" : "shares.files.empty.title")} data-shares-empty={sorte}>
+      {#snippet art()}
+        {#if salon}<MessagesSquare size={32} strokeWidth={1.5} />{:else}<File size={32} strokeWidth={1.5} />{/if}
+      {/snippet}
+      <p>{t(salon ? "shares.rooms.empty.body" : "shares.files.empty.body")}</p>
+      <a class="cta" href={href(nouveau)} onclick={(e) => followLink(e, nouveau)}>{t(salon ? "shares.rooms.empty.cta" : "shares.files.empty.cta")}</a>
+    </EmptyState>
   {:else}
-    {@render partie("envoi", envois)}
-    {#if avecSalons}{@render partie("salon", salons)}{/if}
+    <div class="ph">
+      <p class="counts num" data-counts>{t("shares.count.active", { n: liste.length - termines })} · {t("shares.count.ended", { n: termines })}</p>
+      {#if termines > 0}
+        <div data-history-clear>
+          <InlineConfirm label={t("shares.history.clear")} message={t("shares.history.confirm", { n: termines })} confirmLabel={t("shares.history.yes")} cancelLabel={t("shares.history.no")} kind="warn" triggerVariant="ghost" dense onconfirm={effacerHistorique}>
+            {#snippet icon()}<Trash2 size={18} strokeWidth={1.75} />{/snippet}
+          </InlineConfirm>
+        </div>
+      {/if}
+    </div>
+    <ul class="list" role="list">
+      {#each liste as p (p.id)}
+        {@render carte(p)}
+      {/each}
+    </ul>
   {/if}
 
   {#if mesPartages.statut === "pret"}
@@ -122,43 +146,6 @@
     </div>
   {/if}
 </section>
-
-{#snippet partie(s: Partie, liste: Partage[])}
-  {@const id = s === "envoi" ? "p-envois" : "p-salons"}
-  {@const actifs = actifsDe(liste)}
-  <section class="partie" aria-labelledby={id} data-shares-part={s}>
-    <div class="ph">
-      <h2 {id} class="pt">
-        <span class="pi" aria-hidden="true">
-          {#if s === "salon"}<MessagesSquare size={18} strokeWidth={1.8} />{:else}<File size={18} strokeWidth={1.8} />{/if}
-        </span>
-        {t(s === "envoi" ? "shares.files.title" : "shares.rooms.title")}
-        {#if liste.length > 0}<span class="n num" aria-hidden="true">{liste.length}</span>{/if}
-      </h2>
-      {#if liste.length > 0}
-        <p class="counts num" data-counts>{t("shares.count.active", { n: actifs })} · {t("shares.count.ended", { n: liste.length - actifs })}</p>
-      {/if}
-    </div>
-    {#if liste.length === 0}
-      {@const cible = s === "envoi" ? "/envoyer" : "/salon/nouveau"}
-      <EmptyState level="p" title={t(s === "envoi" ? "shares.files.empty.title" : "shares.rooms.empty.title")} data-shares-empty={s}>
-        {#snippet art()}
-          {#if s === "salon"}<MessagesSquare size={32} strokeWidth={1.5} />{:else}<File size={32} strokeWidth={1.5} />{/if}
-        {/snippet}
-        <p>{t(s === "envoi" ? "shares.files.empty.body" : "shares.rooms.empty.body")}</p>
-        {#if s === "envoi" || __SALONS__}
-          <a class="cta" href={href(cible)} onclick={(e) => followLink(e, cible)}>{t(s === "envoi" ? "shares.files.empty.cta" : "shares.rooms.empty.cta")}</a>
-        {/if}
-      </EmptyState>
-    {:else}
-      <ul class="list" role="list">
-        {#each liste as p (p.id)}
-          {@render carte(p)}
-        {/each}
-      </ul>
-    {/if}
-  </section>
-{/snippet}
 
 {#snippet carte(p: Partage)}
   {@const vu = etatVu(p, now)}
@@ -172,25 +159,21 @@
       {#if p.sorte === "salon"}
         <h3 class="name">{t("shares.room")}</h3>
       {:else if p.nom}
-        <h3 class="name" data-share-title><span class="sr-only">{t("shares.kind.file")}</span><bdi translate="no">{p.nom}</bdi></h3>
+        <h3 class="name" data-share-title><bdi translate="no">{p.nom}</bdi></h3>
       {:else}
         <h3 class="name">{t("shares.share")}</h3>
       {/if}
-      <StateChip state={etat(p)} destroyedHere={p.detruitIci} />
+      <span class={["tag", actif ? "on" : "off"]} data-share-tag={actif ? "en-cours" : "termine"}>{t(actif ? "shares.tag.on" : "shares.tag.off")}</span>
     </div>
     <ul class="m num" role="list">
+      <li class="fin" data-share-end>{fin(p)}</li>
       {#if p.sorte === "envoi"}
         <li data-opens>{t("shares.opens", { u: p.ouvertures, max: p.ouverturesMax })}</li>
         <li>{t("shares.items", { n: p.elements })} · {formatBytes(p.taille, lang)}</li>
       {/if}
-      {#if actif}
-        <li data-expires>{t("shares.expires", { duration: formatDuration(Math.max(0, (p.echeance - now) / 1000), lang) })}</li>
-      {:else}
-        <li>{t("shares.ended", { time: finVers(p) })}</li>
-      {/if}
     </ul>
-    <p class="sub">{t("shares.created", { date: formatDayTime(p.creeLe, lang) })}</p>
     {#if vu === "epuise"}<p class="sub">{t("manage.draining")}</p>{/if}
+    {#if vu === "detruit"}<p class="sub">{t(p.detruitIci ? "shares.gone.here" : "shares.gone")}</p>{/if}
     {#if p.sorte === "salon" && actif}<p class="sub">{t("shares.room.note")}</p>{/if}
     {#if !actif}<p class="sub">{t("shares.autoremove")}</p>{/if}
     {#if err}<p class="stale" role="status" data-stale>{err}</p>{/if}
@@ -212,9 +195,9 @@
           {#snippet icon()}<X size={18} strokeWidth={1.75} />{/snippet}
         </InlineConfirm>
       {:else}
-        <Button variant="ghost" dense onpress={() => retirer(p)}>
+        <Button variant="ghost" dense aria-label={t("shares.remove.ended.name")} onpress={() => retirer(p)} data-share-remove>
           {#snippet icon()}<X size={18} strokeWidth={1.75} />{/snippet}
-          {t("shares.remove")}
+          {t("shares.remove.ended")}
         </Button>
       {/if}
     </div>
@@ -228,48 +211,16 @@
     margin-inline: auto;
     padding: 0 var(--sp-4) var(--sp-8);
     display: grid;
-    gap: var(--sp-5);
+    gap: var(--sp-4);
     min-width: 0;
-  }
-  .partie {
-    display: grid;
-    gap: var(--sp-3);
-    min-width: 0;
-  }
-  .partie + .partie {
-    padding-top: var(--sp-3);
   }
   .ph {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--sp-1) var(--sp-4);
     min-width: 0;
-  }
-  .pt {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    font-size: var(--fs-h3);
-  }
-  .pi {
-    display: inline-grid;
-    color: var(--text-3);
-  }
-  .n {
-    display: inline-grid;
-    place-items: center;
-    min-width: 1.6em;
-    padding: 0 6px;
-    border-radius: var(--r-pill);
-    background: var(--surface-1);
-    box-shadow: inset 0 0 0 1px var(--hair);
-    color: var(--text-2);
-    font-size: var(--fs-small);
-    font-weight: 600;
-    line-height: 1.6;
   }
   .counts {
     margin: 0;
@@ -321,23 +272,45 @@
     box-shadow: var(--edge-hi);
   }
   .card.fini {
-    opacity: 0.8;
+    background: var(--surface-1);
   }
   .hd {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2) var(--sp-3);
+    gap: var(--sp-3);
     min-width: 0;
   }
   .name {
     flex: 1 1 0;
-    min-width: 8ch;
+    min-width: 0;
     margin: 0;
     font-size: var(--fs-body, 1rem);
     font-weight: 600;
     color: var(--text);
     overflow-wrap: anywhere;
+  }
+  .card.fini .name {
+    color: var(--text-2);
+  }
+  /* Étiquette d'état : petit carré arrondi, le mot porte l'information (jamais la couleur seule). */
+  .tag {
+    flex: none;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: var(--fs-small);
+    font-weight: 650;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .tag.on {
+    background: var(--accent-tint);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .tag.off {
+    background: var(--surface-2);
+    color: var(--text-2);
+    box-shadow: inset 0 0 0 1px var(--hair);
   }
   .m {
     display: flex;
@@ -346,7 +319,15 @@
     margin: 0;
     padding: 0;
     list-style: none;
+    color: var(--text-2);
+  }
+  .m .fin {
+    flex-basis: 100%;
+    color: var(--text);
     font-weight: 600;
+  }
+  .card.fini .m .fin {
+    color: var(--text-2);
   }
   .num {
     font-variant-numeric: tabular-nums;
@@ -385,10 +366,14 @@
     padding-top: var(--sp-4);
     border-top: 1px solid var(--line);
   }
+  @media (forced-colors: active) {
+    .tag {
+      border: 1px solid CanvasText;
+    }
+  }
   @media (max-width: 899px) {
     .parts {
       padding: 0 0 var(--sp-6);
-      gap: var(--sp-4);
     }
     .card {
       border-radius: var(--r-lg);

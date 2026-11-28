@@ -1,7 +1,7 @@
 // Accès au stockage chiffré de l'appareil (storage/idb.ts) et effacement de l'ancien historique
 // des liens (storage/ancien-historique.ts, retiré le 25 novembre, spec §33).
 import { describe, expect, it } from "vitest";
-import { ANCIEN_HISTORIQUE, effacerAncienHistorique } from "./ancien-historique";
+import { ANCIEN_HISTORIQUE, ANCIENS_TELECHARGEMENTS, effacerAncienHistorique } from "./ancien-historique";
 import { fakeIndexedDB } from "./fake-idb.test-helper";
 import { idbBackend, memoryBackend } from "./idb";
 
@@ -57,6 +57,19 @@ describe("ancien historique des liens (retiré le 25 novembre)", () => {
     expect(idb.raw().has(ANCIEN_HISTORIQUE)).toBe(true);
     await effacerAncienHistorique(idb);
     expect(idb.raw().has(ANCIEN_HISTORIQUE)).toBe(false);
+  });
+  it("l'historique des téléchargements retiré (D42-33) : sa base est supprimée au démarrage, clé et entrées comprises", async () => {
+    const idb = fakeIndexedDB();
+    const ancienne = idbBackend(idb, ANCIENS_TELECHARGEMENTS);
+    await ancienne.key(await cle());
+    await ancienne.put("entree", rec());
+    await ancienne.setFlag("on", true);
+    const partages = idbBackend(idb, "shhdrop-partages");
+    await partages.put("garde", rec());
+    await effacerAncienHistorique(idb);
+    expect(idb.raw().has(ANCIENS_TELECHARGEMENTS)).toBe(false);
+    // Les autres bases restent (Mes partages).
+    expect(idb.raw().has("shhdrop-partages")).toBe(true);
   });
   it("aucune base : rien n'est créé, aucune erreur ; IndexedDB absent ou qui lève : aucune erreur", async () => {
     const idb = fakeIndexedDB();

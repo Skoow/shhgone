@@ -1,8 +1,8 @@
 <script lang="ts">
   // Inscription (/compte/inscription ; conception du compte par passkey §3.1, §5.2). Page montée
   // seulement si __COMPTES__ (App.svelte).
-  // 1. Pseudo (vérifié pendant la saisie : icône dans le champ, rond, coche ou croix ; la raison
-  //    d'un refus sous le champ ; réservé à l'étape) ;
+  // 1. Pseudo (vérifié pendant la saisie : règles à cocher et petit carré dans le champ, rond,
+  //    coche ou croix ; la raison d'un refus sous le champ ; réservé à l'étape) ;
   //    la preuve anti-robot et inscription/debut partent dès l'ouverture : le clic sur « Créer
   //    avec une passkey » appelle navigator.credentials.create sans aucune requête avant (Safari).
   //    Anti-robot invisible (décision du 26 novembre) : le bouton garde son texte ; un clic avant la
@@ -30,7 +30,7 @@
   import Banner from "../../ui/Banner.svelte";
   import Button from "../../ui/Button.svelte";
   import { User } from "../../ui/Icon";
-  import TextField from "../../ui/TextField.svelte";
+  import PseudoField from "../../ui/PseudoField.svelte";
   import Cadre from "./Cadre.svelte";
   import Case from "./Case.svelte";
   import NoteDemo from "./NoteDemo.svelte";
@@ -56,9 +56,10 @@
   let etape = $state<"saisie" | "second" | "cle" | "verif" | "fini" | "echec">("saisie");
   let pseudo = $state(pseudoInviteRetenu() ?? "");
   let errPseudo = $state("");
-  let libre = $state<boolean | null>(null);
-  // Vérification en cours (de la frappe à la réponse) : rond qui tourne dans le champ.
-  let verif = $state(false);
+  /** Dernier état du champ (ui/PseudoField.svelte) : « libre », « pris », « verif », code pseudo_*… */
+  let statutPseudo = $state("");
+  /** Changé quand l'étape devient prête : le champ revérifie la disponibilité. */
+  let relance = $state(0);
   let bandeau = $state("");
   let pret = $state(false);
   /** Clic avant la fin de la préparation (preuve anti-robot, inscription/debut) : « Vérification en cours… ». */
@@ -85,7 +86,7 @@
         attentePreuve = false;
         announce(t("account.robot.ready"));
       }
-      if (pseudo) void verifierPseudo(pseudo);
+      if (pseudo) relance++; // l'étape existe : la disponibilité peut être vérifiée
     } catch (e) {
       attentePreuve = false;
       bandeau = erreur(e, "inscription").texte;
@@ -111,42 +112,19 @@
     }),
   );
 
-  // Disponibilité du pseudo pendant la frappe (500 ms après la dernière touche).
-  let attente: ReturnType<typeof setTimeout> | undefined;
-  async function verifierPseudo(v: string) {
-    libre = null;
-    verif = true;
+  // Disponibilité du pseudo pendant la frappe (ui/PseudoField.svelte : règles à cocher, petit carré
+  // dans le champ ; 400 ms après la dernière touche) : règle du moteur sur l'appareil, puis le
+  // serveur une fois l'étape prête ; avant, rien n'est affirmé (« plus_tard »).
+  async function verifier(v: string): Promise<string> {
+    const r = await verifierSaisie({ pseudo: v });
+    if (r.pseudo) return r.pseudo;
+    if (!inscriptionPrete()) return "plus_tard";
     try {
-      const r = await verifierSaisie({ pseudo: v });
-      if (v !== pseudo) return;
-      if (r.pseudo) {
-        errPseudo = erreur(new Error(r.pseudo), "inscription").texte;
-        return;
-      }
-      if (!inscriptionPrete()) return;
-      try {
-        const l = await pseudoLibre(v);
-        if (v === pseudo) libre = l;
-      } catch {
-        // vérification indisponible (réseau) : redite au clic par le serveur
-      }
-    } finally {
-      if (v === pseudo) verif = false;
+      return (await pseudoLibre(v)) ? "libre" : "pris";
+    } catch {
+      return "erreur"; // vérification indisponible (réseau) : redite au clic par le serveur
     }
   }
-  function tape() {
-    errPseudo = "";
-    libre = null;
-    clearTimeout(attente);
-    const v = pseudo;
-    verif = v.trim() !== "";
-    if (verif) attente = setTimeout(() => void verifierPseudo(v), 500);
-  }
-  // Pseudo refusé (invalide ou déjà pris) : la raison sous le champ, reliée à lui (aria-invalid,
-  // aria-describedby, annoncée) ; l'icône dans le champ ne fait que la montrer.
-  const errAffichee = $derived(errPseudo || (libre === false ? t("account.pseudo.taken") : ""));
-  const etatPseudo = $derived(errAffichee ? "ko" : verif ? "verif" : libre === true ? "ok" : undefined);
-  $effect(() => () => clearTimeout(attente));
 
   async function focusPseudo() {
     await tick();
@@ -166,10 +144,8 @@
       return;
     }
     bandeau = "";
-    if (libre === false) {
-      errPseudo = t("account.pseudo.taken");
-      return focusPseudo();
-    }
+    // Pseudo déjà refusé à l'écran (règle non tenue, pris, réservé) : rien n'est lancé.
+    if (statutPseudo === "pris" || statutPseudo === "regles" || statutPseudo.startsWith("pseudo_")) return focusPseudo();
     enCreation = true;
     try {
       const r = await creerPasskey(pseudo, getLang(), parcours);
@@ -272,10 +248,7 @@
     <p class="note" data-sans-passkey>{t("account.nopasskey")}</p>
   {:else if etape === "saisie"}
     <form novalidate onsubmit={(e) => e.preventDefault()}>
-      <TextField label={t("account.pseudo")} hint={t("account.pseudo.hint")} autocomplete="username" autocapitalize="off" spellcheck="false" maxlength={64} error={errAffichee || undefined} status={etatPseudo} bind:value={pseudo} bind:el={elPseudo} oninput={tape} />
-      <!-- « Disponible » : la coche dans le champ, et ce texte pour les lecteurs d'écran seulement
-           (région présente dès l'affichage, pour être annoncée). -->
-      <p class="sr-only" role="status" data-dispo>{etatPseudo === "ok" ? t("account.pseudo.free") : ""}</p>
+      <PseudoField bind:value={pseudo} {verifier} autocomplete="username" error={errPseudo || undefined} {relance} bind:el={elPseudo} onstatut={(s) => (statutPseudo = s)} onsaisie={() => (errPseudo = "")} />
       {#if !mobile && prefere === "hybride"}<IndiceQr texte={t("account.signup.phone.how")} />{/if}
       <!-- Redémarrage annoncé (D42-32) : aucune inscription d'ici la fin de la maintenance (la passkey resterait orpheline). -->
       {#if creationsFermees()}<p class="note" id="inscription-fermee" data-maintenance>{texteBandeau()}</p>{/if}

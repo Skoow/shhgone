@@ -12,7 +12,7 @@
   // de l'appareil (abonnements()), lecture locale seulement : aucune requête ne relie le pass au
   // compte. Seule cette carte parle de l'abonnement dans l'espace compte (décision du propriétaire).
   // Gestion ici (28 novembre) : abonnement qui se renouvelle → « Arrêter l'abonnement », fenêtre
-  // Oui / Non (un mois commencé est dû : rien n'est remboursé), puis arreterAbonnement (POST
+  // Oui / Non (un mois commencé est dû : « Aucun remboursement possible. »), puis arreterAbonnement (POST
   // /api/paiement/resilier avec le pass, sans session) ; la carte dit alors « ne sera pas
   // renouvelé ». Paiement unique, crypto, accès offert : pas de bouton. Échec : message, « Réessayer ».
   import { abonnements, account, arreterAbonnement, type Abonnement, type EtatServeur } from "../../account/session.svelte";
@@ -115,6 +115,7 @@
         ? t("account.card.stop.body", { offre: t(offre.offre === "pro" ? "paid.badge.pro" : "paid.badge.plus"), date: jusqua(offre.fin) })
         : t("account.card.stop.body.nodate", { offre: t(offre.offre === "pro" ? "paid.badge.pro" : "paid.badge.plus") })}
     </p>
+    <p class="remb" data-carte-arret-remboursement>{t("account.card.stop.refund")}</p>
   </ConfirmDialog>
 {/if}
 
@@ -157,6 +158,9 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
+  }
+  .remb {
+    font-weight: 600;
   }
   .sq {
     height: 1em;

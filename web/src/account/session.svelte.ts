@@ -1083,6 +1083,24 @@ export async function arreterAbonnement(id: string): Promise<"ok" | "erreur"> {
   return "ok";
 }
 
+/**
+ * Compte banni (décision du propriétaire, 28 novembre : « on annule le prélèvement »). Le serveur
+ * ne relie pas un compte à son pass (conception du paiement §6.2) : c'est le site qui, à la
+ * connexion d'un compte banni, arrête le renouvellement de chaque pass du compte qui se renouvelle
+ * (coffre privé et appareil, comme « Arrêter l'abonnement »). « rien » : pas banni, ou rien qui se
+ * renouvelle ; « arretes » : tout est arrêté ; « erreur » : au moins un n'a pas pu l'être (réessayé
+ * à la connexion suivante). Limite écrite dans la conception du paiement §6.4 : un banni qui ne se
+ * reconnecte jamais reste prélevé, jusqu'à la règle des 12 mois sans jeton du serveur.
+ */
+export async function arreterRenouvellementsSiBanni(e: Pick<api.EtatServeur, "banniJusqu">): Promise<"rien" | "arretes" | "erreur"> {
+  if (!e.banniJusqu) return "rien";
+  const l = (await abonnements().catch(() => [] as Abonnement[])).filter((a) => a.renouvelle);
+  if (l.length === 0) return "rien";
+  let ok = true;
+  for (const a of l) if ((await arreterAbonnement(a.id).catch(() => "erreur" as const)) !== "ok") ok = false;
+  return ok ? "arretes" : "erreur";
+}
+
 // --- Rechargement, déconnexion ----------------------------------------------------------------
 
 /** Au démarrage : rouvre une session gardée (« Rester connecté ») ; sinon rien. Session échue : oubliée. */

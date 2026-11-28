@@ -252,7 +252,8 @@ function afficherPaiement(a) {
     tb.append(tr);
   }
   $('revocations-main').textContent = 'Révocations à la main (shhdrop admin paiement revoquer) depuis le démarrage : ' +
-    nombre.format(a.revocations_a_la_main) + '.';
+    nombre.format(a.revocations_a_la_main) + '. Renouvellements arrêtés après 12 mois sans jeton : ' +
+    nombre.format(a.renouvellements_arretes_inactifs ?? 0) + '.';
   if (!armeVentes) boutonVentes();
 }
 

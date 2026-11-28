@@ -1125,6 +1125,24 @@ describe("pass et compte : jamais divergents (conception du paiement §6.4)", ()
     paiement.resilier.mockImplementationOnce(async () => "erreur");
     expect(await C.arreterAbonnement(a!.id)).toBe("erreur");
   });
+
+  it("compte banni : le renouvellement de chaque pass qui se renouvelle est arrêté ; non banni : rien ; échec : « erreur », réessayé ensuite", async () => {
+    const g = paye();
+    const offert = paye({ offre: "pro", moyen: "offert", renouvelle: false });
+    await garder(idb, g);
+    await garder(idb, offert);
+    await inscription();
+    expect(await C.arreterRenouvellementsSiBanni({ banniJusqu: null })).toBe("rien");
+    expect(paiement.resilier).not.toHaveBeenCalled();
+    paiement.resilier.mockImplementationOnce(async () => "erreur");
+    expect(await C.arreterRenouvellementsSiBanni({ banniJusqu: "2027-01-01" })).toBe("erreur");
+    expect(await C.arreterRenouvellementsSiBanni({ banniJusqu: "2027-01-01" })).toBe("arretes");
+    expect(paiement.resilier).toHaveBeenCalledWith(g.pass);
+    expect(paiement.resilier).not.toHaveBeenCalledWith(offert.pass);
+    expect((await C.abonnements()).filter((a) => a.renouvelle)).toEqual([]);
+    // Plus rien qui se renouvelle : rien à refaire.
+    expect(await C.arreterRenouvellementsSiBanni({ banniJusqu: "2027-01-01" })).toBe("rien");
+  });
 });
 
 describe("redémarrage du serveur pendant une cérémonie (D42-32)", () => {

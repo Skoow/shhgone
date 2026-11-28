@@ -11,8 +11,6 @@
   import { getLang } from "./i18n/i18n.svelte";
   import { watchKeyboard } from "./app/viewport";
   import { watchOpenGrant } from "./session/open-grant";
-  import { loadDownloads } from "./downloads/live.svelte";
-  import Downloads from "./routes/Downloads.svelte";
   import Partages from "./routes/Partages.svelte";
   import NotFound from "./routes/NotFound.svelte";
   import Offert from "./routes/Offert.svelte";
@@ -56,10 +54,6 @@
     document.documentElement.classList.toggle("no-pull", chrome.composing || sending);
     return () => document.documentElement.classList.remove("no-pull");
   });
-
-  // « Téléchargements » sans compte seulement si l'historique est activé : lecture
-  // seule, rien n'est créé s'il n'a jamais été activé ici.
-  if (supported) void loadDownloads().catch(() => undefined);
 
   // UI §12.2 : une page restaurée du cache « page précédente » est rechargée.
   reloadIfRestored(window);
@@ -151,8 +145,9 @@
     <!-- Ouverture rechargée sous « / » : la page part vers « /s » (onRoute), rien n'est affiché ici. -->
   {:else if router.current.name === "envois"}
     <Partages />
-  {:else if router.current.name === "telechargements"}
-    <Downloads />
+  {:else if router.current.name === "salons"}
+    <!-- « Mes salons » (28 novembre) : seulement avec __SALONS__ (match() ne rend pas la route sans). -->
+    <Partages sorte="salon" />
   {:else if router.current.name === "inscription"}
     <Inscription />
   {:else if router.current.name === "recuperation"}

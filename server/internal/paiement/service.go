@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"errors"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -153,6 +155,9 @@ type Service struct {
 	// suspendues par l'exploitant (tableau de bord), en mémoire seulement.
 	cpt      compteurs
 	suspendu atomic.Bool
+
+	// journal : lignes fixes de la passe quotidienne (inactifs.go), nombres seulement ; os.Stderr.
+	journal io.Writer
 }
 
 // compterRecente : d (+1 ou -1) commande créée dans l'heure de now.
@@ -186,7 +191,7 @@ func NewService(c Config) (*Service, error) {
 	if c.DB == nil || c.Now == nil || c.Origine == "" || c.Regime == 0 || len(c.Prestataires) == 0 {
 		return nil, errors.New("paiement : configuration incomplète")
 	}
-	s := &Service{db: c.DB, now: c.Now, origine: c.Origine, regime: c.Regime}
+	s := &Service{db: c.DB, now: c.Now, origine: c.Origine, regime: c.Regime, journal: os.Stderr}
 	if c.Emetteur != "" {
 		s.jetons = NouveauxJetons(c.DB, c.Now, c.Emetteur)
 	}

@@ -116,6 +116,16 @@ export function formatDayTime(epochMs: number, lang: Lang): string {
   return `${date} at ${formatClock(epochMs, lang)}`;
 }
 
+/**
+ * Date, puis l'heure entre parenthèses (Mes partages, Mes salons ; 28 novembre) :
+ * « 29 nov. (12 h 14) » ; « Nov 29 (12:14 PM) ». Insécable entre le jour et le mois.
+ */
+export function formatDayParen(epochMs: number, lang: Lang): string {
+  const d = new Date(epochMs);
+  const day = lang === "fr" ? `${d.getDate()} ${new Intl.DateTimeFormat("fr", { month: "short" }).format(d)}` : new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(d);
+  return `${day} (${formatClock(epochMs, lang)})`;
+}
+
 /** Temps écoulé (historique) : « à l'instant », « il y a 3 min », « il y a 2 h », « il y a 3 jours ». */
 export function formatAgo(ms: number, lang: Lang): string {
   const x = sp(lang);

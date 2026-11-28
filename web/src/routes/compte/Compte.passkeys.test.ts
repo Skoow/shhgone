@@ -155,7 +155,7 @@ describe("suppression du compte", () => {
   }
   const AB = (o: object = {}) => ({ id: "p1", offre: "plus", fin: "2026-12-27", renouvelle: true, arrete: false, offert: false, ...o });
 
-  it("geste de passkey (session récente), puis suppression ; « Êtes-vous sûr ? » ; données de l'appareil toujours effacées, sans case ; fin : supprimer la passkey du gestionnaire", async () => {
+  it("geste de passkey (session récente), puis suppression ; fenêtre « Supprimer définitivement votre compte ? » ; données de l'appareil toujours effacées, sans case ; fin : supprimer la passkey du gestionnaire", async () => {
     C.supprimerTout.mockImplementation(() => fin());
     await monter(Compte);
     await presser("Supprimer le compte");
@@ -165,13 +165,19 @@ describe("suppression du compte", () => {
     expect(document.querySelector("input[type=checkbox]")).toBeNull();
     await presser("Supprimer définitivement");
     const d = document.querySelector("[data-confirm-dialog]")!.textContent!.replace(/\s+/g, " ");
-    expect(d).toContain("Êtes-vous sûr ?");
+    expect(document.querySelector("[role=dialog] h2, dialog h2")?.textContent ?? d).toContain("Supprimer définitivement votre compte");
+    // Liste courte de ce qui part ; plus aucune mention des téléchargements (D42-33).
+    const items = [...document.querySelectorAll("[data-delete-dialog] li")].map((x) => x.textContent!.trim());
+    expect(items[0]).toBe("votre compte, votre pseudo et vos appareils connectés\u202f;");
+    expect(items.at(-1)).toBe("toutes les données du site sur cet appareil, Mes partages compris.");
+    expect(items.length).toBeLessThanOrEqual(3);
     expect(d).toContain("Cette action ne peut pas être annulée.");
-    expect(d).toContain("Toutes les données du site sur cet appareil sont aussi effacées (Mes partages, même ceux créés sans compte");
-    // Sans abonnement, rien sur une offre.
+    expect(d).not.toMatch(/[Tt]éléchargement/);
+    // Sans abonnement, rien sur une offre ni sur un remboursement.
     expect(document.querySelector("[data-delete-sub]")).toBeNull();
+    expect(document.querySelector("[data-delete-refund]")).toBeNull();
     expect(C.confirmerParPasskey).not.toHaveBeenCalled();
-    await presser("Oui, supprimer");
+    await presser("Supprimer mon compte");
     expect(C.confirmerParPasskey).toHaveBeenCalled();
     expect(C.supprimerTout).toHaveBeenCalledWith();
     expect(texte()).toContain("Compte supprimé.");
@@ -183,23 +189,24 @@ describe("suppression du compte", () => {
     await monter(Compte);
     await presser("Supprimer le compte");
     await presser("Supprimer définitivement");
-    await presser("Oui, supprimer");
+    await presser("Supprimer mon compte");
     expect(C.supprimerTout).not.toHaveBeenCalled();
     expect(document.querySelector("[role=alert]")).toBeNull();
   });
 
-  it("« Non » : rien n'est demandé ni supprimé", async () => {
+  it("« Annuler » : rien n'est demandé ni supprimé", async () => {
     await monter(Compte);
     await presser("Supprimer le compte");
     await presser("Supprimer définitivement");
-    await presser("Non");
+    await presser("Annuler");
     expect(C.confirmerParPasskey).not.toHaveBeenCalled();
     expect(C.supprimerTout).not.toHaveBeenCalled();
   });
 
   // Décision du 28 novembre : l'abonnement part toujours avec le compte (renouvellement arrêté, pass
-  // révoqué) ; date de fin = veille de `fin` (exclue) ; un mois commencé est dû (rien remboursé).
-  it("abonnement : « Vous allez perdre votre abonnement Plus, valable jusqu'au… », renouvellement arrêté d'abord, rien remboursé", async () => {
+  // révoqué) ; date de fin = veille de `fin` (exclue) ; un mois commencé est dû : « Aucun
+  // remboursement possible. », dernière ligne.
+  it("abonnement : « Votre abonnement Plus, valable jusqu'au…, s'arrête aujourd'hui », renouvellement arrêté, « Aucun remboursement possible. » en dernier", async () => {
     C.abonnements.mockResolvedValue([AB()]);
     await monter(Compte);
     await presser("Supprimer le compte");
@@ -208,9 +215,9 @@ describe("suppression du compte", () => {
     expect(document.querySelector("[data-delete-subs]")).toBeNull();
     await presser("Supprimer définitivement");
     const d = document.querySelector("[data-confirm-dialog]")!.textContent!.replace(/\s+/g, " ");
-    expect(d).toContain("Êtes-vous sûr ? Vous allez perdre votre abonnement Plus, valable jusqu'au 26 décembre 2026.");
-    expect(d).toContain("Son renouvellement automatique est arrêté d'abord.");
-    expect(d).toContain("Rien n'est remboursé automatiquement.");
+    expect(d).toContain("Votre abonnement Plus, valable jusqu'au 26 décembre 2026, s'arrête aujourd'hui sur tous vos appareils.");
+    expect(d).toContain("Son renouvellement est arrêté : plus aucun prélèvement.");
+    expect(d).toMatch(/Cette action ne peut pas être annulée\. ?Aucun remboursement possible\. ?Annuler ?Supprimer mon compte$/);
   });
 
   it("accès offert sans date connue ici : perdu, ni remboursement ni renouvellement", async () => {
@@ -219,8 +226,8 @@ describe("suppression du compte", () => {
     await presser("Supprimer le compte");
     await presser("Supprimer définitivement");
     const d = document.querySelector("[data-confirm-dialog]")!.textContent!.replace(/\s+/g, " ");
-    expect(d).toContain("Vous allez perdre votre accès offert Pro (date de fin inconnue sur cet appareil).");
-    expect(d).not.toContain("remboursé");
+    expect(d).toContain("Votre accès offert Pro s'arrête aujourd'hui.");
+    expect(d).not.toContain("remboursement");
     expect(d).not.toContain("renouvellement");
   });
 
@@ -237,7 +244,7 @@ describe("suppression du compte", () => {
     await monter(Compte);
     await presser("Supprimer le compte");
     await presser("Supprimer définitivement");
-    await presser("Oui, supprimer");
+    await presser("Supprimer mon compte");
     expect(document.querySelector("[data-delete-error]")!.textContent).toContain("Votre abonnement n'a pas pu être arrêté");
     expect(document.querySelector("[data-delete-error]")!.textContent).toContain("Rien n'a été supprimé");
     expect(texte()).not.toContain("Compte supprimé.");

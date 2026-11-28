@@ -58,10 +58,13 @@ export type CompteRoute = "compte" | "inscription" | "connexion" | "recuperation
  * « /salon/nouveau » (création, compte exigé). Relue par TestAppRoutesMatchClientRouter
  * (server/cmd/shhdrop), comparée à salonRoutes, servies en 200 avec SHH_SALONS=1 et SHH_COMPTES=1.
  */
-export type SalonRoute = "salon" | "salonnouveau";
+export type SalonRoute = "salon" | "salonnouveau" | "salons";
 const SALON_PATHS: Readonly<Record<string, SalonRoute>> = {
   "/salon": "salon",
   "/salon/nouveau": "salonnouveau",
+  // « Mes salons » (28 novembre, décision du propriétaire) : les salons créés, liste de l'appareil
+  // et du compte, aucun secret dans l'adresse.
+  "/salons": "salons",
 };
 // Relue par TestAppRoutesMatchClientRouter (server/cmd/shhdrop) et comparée à compteRoutes du
 // serveur, qui ne les sert en 200 qu'avec SHH_COMPTES=1 (sinon 404, comme toute page inconnue).
@@ -76,7 +79,7 @@ const COMPTE_PATHS: Readonly<Record<string, CompteRoute>> = {
 
 export type Route = {
   /** envoyer : page d'envoi (composeur, même vide), où mène « Commencer » (retours DROP). */
-  name: "home" | "envoyer" | "envois" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | "offert" | CompteRoute | SalonRoute | "notfound";
+  name: "home" | "envoyer" | "envois" | "open" | "manage" | InfoRoute | "offres" | "offert" | CompteRoute | SalonRoute | "notfound";
 };
 
 /**
@@ -131,8 +134,6 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
   if (p === "/envoyer") return { name: "envoyer" };
   // « Mes partages » (spec §33, D42-30) : liste locale, aucun secret dans l'adresse.
   if (p === "/envois") return { name: "envois" };
-  // Historique des téléchargements (conception compte §21.15.5) : sur l'appareil, aucun secret dans l'adresse.
-  if (p === "/telechargements") return { name: "telechargements" };
   // Pages du compte : sans __COMPTES__ (défaut, démo), la même 404 qu'une adresse inconnue.
   const compte = comptes && Object.hasOwn(COMPTE_PATHS, p) ? COMPTE_PATHS[p] : undefined;
   if (compte !== undefined) return { name: compte };

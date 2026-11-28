@@ -97,10 +97,10 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   expect(mdp).toMatch(/^.{11}$/);
   expect(page.url()).not.toContain("#");
   await expect(page.locator("[data-manage]")).toHaveCount(0);
-  await expect(page.locator("[data-kept]")).toContainText("Retrouvez ce salon dans Mes partages");
-  // Lien de gestion relu dans « Mes partages » (autre onglet du même navigateur : « Gérer le salon »).
+  await expect(page.locator("[data-kept]")).toContainText("Retrouvez ce salon dans Mes salons");
+  // Lien de gestion relu dans « Mes salons » (autre onglet du même navigateur : « Gérer le salon »).
   const liste = await page.context().newPage();
-  await liste.goto(shh.origin + "/envois");
+  await liste.goto(shh.origin + "/salons");
   const gestion = (await liste.locator("[data-share-card][data-sorte=salon] a[data-room-manage]").getAttribute("href"))!;
   await liste.close();
   expect(gestion).toMatch(/\/salon#s[A-Za-z0-9_-]{43}$/);

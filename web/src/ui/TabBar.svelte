@@ -1,6 +1,7 @@
 <script lang="ts">
   // Barre d'onglets du téléphone (< 768 px), façon app, avec un compte ouvert seulement :
-  // « Nouveau » (le bouton « Nouveau partage » du bas), Partages, Fichiers, Compte, et à droite
+  // « Nouveau » (le bouton « Nouveau partage » du bas), Partages, Salons (avec __SALONS__ ; plus
+  // d'onglet Fichiers, D42-33), Compte, et à droite
   // « Déconnexion » (bouton, confirmation légère : un appui au bord de l'écran se fait vite ;
   // décision du propriétaire, 26 novembre). Après la déconnexion, on reste sur la page (la page
   // Compte montre alors la connexion).
@@ -49,7 +50,9 @@
     {#if accountFlag.connected && accountFlag.logout}
       <li>
         <button type="button" class="tab out" aria-haspopup="dialog" onclick={() => (confirmer = true)} data-tab-logout>
-          <TabIcon id="logout" /><span class="lb">{t("tabs.logout")}</span>
+          <!-- Sous 360 px, « Déconnexion » ne tient pas dans un cinquième d'écran : « Quitter » (le
+               libellé caché est retiré de l'arbre d'accessibilité par display: none). -->
+          <TabIcon id="logout" /><span class="lb long">{t("tabs.logout")}</span><span class="lb court">{t("tabs.logout.short")}</span>
         </button>
       </li>
     {/if}
@@ -91,7 +94,7 @@
     padding: 0;
     max-width: 560px;
     display: grid;
-    /* Connecté : quatre onglets et « Déconnexion » (26 novembre). */
+    /* Connecté : trois ou quatre onglets et « Déconnexion » (26 et 28 novembre). */
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
   }
@@ -132,6 +135,19 @@
   .tab.out .lb {
     font-size: 0.6875rem;
     letter-spacing: -0.01em;
+  }
+  .tab.out .court {
+    display: none;
+  }
+  @media (max-width: 359px) {
+    .tab.out .long {
+      display: none;
+    }
+    .tab.out .court {
+      display: block;
+      font-size: 0.75rem;
+      letter-spacing: 0;
+    }
   }
   .tab.soon {
     color: var(--text-disabled);

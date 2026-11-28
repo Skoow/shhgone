@@ -32,8 +32,10 @@ type compteursPrestataire struct {
 	commandes, credits, anomalies, revocations, refuses atomic.Int64
 }
 
+// inactifs : renouvellements arrêtés par la règle des 12 mois sans jeton (inactifs.go).
 type compteurs struct {
-	par [4]compteursPrestataire
+	par      [4]compteursPrestataire
+	inactifs atomic.Int64
 }
 
 func (c *compteurs) refuse(pr Prestataire) { c.par[indiceDe(pr)].refuses.Add(1) }
@@ -92,6 +94,9 @@ type Agregats struct {
 	PayPal          AgregatsPrestataire `json:"paypal"`
 	NOWPayments     AgregatsPrestataire `json:"nowpayments"`
 	RevocationsMain int64               `json:"revocations_a_la_main"`
+	// ArretsInactifs : renouvellements arrêtés depuis le démarrage par la règle des 12 mois sans
+	// jeton (conception du paiement §6.4).
+	ArretsInactifs int64 `json:"renouvellements_arretes_inactifs"`
 	// Lus à l'instant dans paiements.db : pass payés valables (non révoqués, non échus) par
 	// offre ; pass payés révoqués encore gardés ; accès offerts valables (comptés à part : ni
 	// vendus ni payés) ; commandes en attente de paiement (gardées 7 jours) ; abonnements payés
@@ -126,7 +131,7 @@ func (s *Service) Agregats() (Agregats, error) {
 	now := s.now()
 	auj := jourDe(now)
 	a := Agregats{Suspendu: s.suspendu.Load(), Stripe: s.prestataire(Carte), PayPal: s.prestataire(PayPal),
-		NOWPayments: s.prestataire(Crypto), RevocationsMain: s.cpt.par[0].revocations.Load(),
+		NOWPayments: s.prestataire(Crypto), RevocationsMain: s.cpt.par[0].revocations.Load(), ArretsInactifs: s.cpt.inactifs.Load(),
 		Recentes: s.nRecentes(now), RecentesMax: maxEnAttente, JetonsActif: s.jetons != nil}
 	if err := s.db.QueryRow(`SELECT coalesce(sum(offert=0 AND revoque=0 AND fin_jour>?1 AND offre=1), 0),
 		coalesce(sum(offert=0 AND revoque=0 AND fin_jour>?1 AND offre=2), 0), coalesce(sum(offert=0 AND revoque=1), 0),

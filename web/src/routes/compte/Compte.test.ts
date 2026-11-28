@@ -181,7 +181,10 @@ describe("carte « Votre compte » : abonnement", () => {
     await monter(Compte);
     await presser("Arrêter l'abonnement");
     const d = document.querySelector("[data-confirm-dialog]")!.textContent!.replace(/\s+/g, " ");
-    expect(d).toContain("Votre abonnement Plus ne sera pas renouvelé. Vous le gardez jusqu'au 26 décembre 2026, puis votre compte repasse en Gratuit. Rien n'est remboursé pour la période en cours.");
+    expect(document.body.textContent).toContain("Arrêter votre abonnement\u202f?");
+    expect(d).toContain("Votre abonnement Plus ne sera pas renouvelé. Vous en profitez jusqu'au 26 décembre 2026, puis votre compte repasse en Gratuit.");
+    // Dernière phrase : « Aucun remboursement possible. »
+    expect(d.trim()).toMatch(/Aucun remboursement possible\. ?Non ?Oui, arrêter$/);
     // « Non » : rien.
     await presser("Non");
     expect(C.arreterAbonnement).not.toHaveBeenCalled();

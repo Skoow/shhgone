@@ -27,7 +27,10 @@ describe("match", () => {
     expect(match("/envoyer", `#${KEY}`)).toEqual({ name: "envoyer" });
     // « Mes partages » (spec §33, D42-30).
     expect(match("/envois")).toEqual({ name: "envois" });
-    expect(match("/telechargements")).toEqual({ name: "telechargements" });
+    // Page « Téléchargements » retirée (D42-33) : introuvable ; « Mes salons » seulement avec les salons.
+    expect(match("/telechargements")).toEqual({ name: "notfound" });
+    expect(match("/salons", "", "/", false, true, true)).toEqual({ name: "salons" });
+    expect(match("/salons", "", "/", false, true, false)).toEqual({ name: "notfound" });
   });
 
   it("spec §41.4 : rechargement d'une ouverture déverrouillée (marque + octroi gardé) → ouverture ; sinon accueil", () => {
@@ -72,7 +75,7 @@ describe("match", () => {
     expect(match("/shhdrop/securite", "", base)).toEqual({ name: "securite" });
     expect(match("/shhdrop/envoyer", "", base)).toEqual({ name: "envoyer" });
     expect(match("/shhdrop/envois", "", base)).toEqual({ name: "envois" });
-    expect(match("/shhdrop/telechargements", "", base)).toEqual({ name: "telechargements" });
+    expect(match("/shhdrop/telechargements", "", base)).toEqual({ name: "notfound" });
     expect(match("/", `#${KEY}`, base)).toEqual({ name: "notfound" });
     expect(match("/shhdropx/", `#${KEY}`, base)).toEqual({ name: "notfound" });
   });
@@ -119,9 +122,9 @@ describe("pages du compte", () => {
 
 describe("navigate", () => {
   it("met à jour l'adresse et la route, sans rechargement", () => {
-    navigate("/telechargements");
-    expect(location.pathname).toBe("/telechargements");
-    expect(router.current).toEqual({ name: "telechargements" });
+    navigate("/envoyer");
+    expect(location.pathname).toBe("/envoyer");
+    expect(router.current).toEqual({ name: "envoyer" });
     navigate("/envois");
     expect(location.pathname).toBe("/envois");
     expect(router.current).toEqual({ name: "envois" });
@@ -201,7 +204,7 @@ describe("navigate", () => {
   });
 
   it("popstate resynchronise la route, fragment compris (lien collé dans la barre)", () => {
-    navigate("/telechargements");
+    navigate("/envoyer");
     history.replaceState(null, "", `/s#m${KEY}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(router.current).toEqual({ name: "manage" });
@@ -217,7 +220,7 @@ describe("navigate", () => {
     history.replaceState(null, "", "/envois#ancre");
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(router.current).toBe(before);
-    navigate("/telechargements");
+    navigate("/envoyer");
     expect(router.current).not.toBe(before);
     navigate("/");
   });

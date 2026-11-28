@@ -37,8 +37,7 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   }
   // Sans compte, plus de colonne « Produit » (« Offres » retiré du pied).
   await expect(foot.getByText("Produit", { exact: true })).toHaveCount(0);
-  // Sans compte, pas de « Téléchargements » tant que l'historique n'est pas activé sur cet appareil
-  // (désactivé par défaut ; qui change celle).
+  // Plus de « Téléchargements » (page retirée, D42-33).
   await expect(foot.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
   // Plus d'« Envoyer », de « Mes partages » ni de « Salon » dans le pied : le logo, l'en-tête et le menu y mènent.
   for (const l of ["Envoyer", "Mes partages"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}$`) })).toHaveCount(0);
@@ -73,40 +72,37 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   expect(await axe(page)).toEqual([]);
 });
 
-test("Téléchargements sans compte : dans le menu et le pied de page seulement une fois l'historique activé ici, retiré à la désactivation", async ({ page, shh, isMobile }) => {
+// D42-33 (28 novembre) : page « Téléchargements » retirée. Jamais dans le menu ni le pied de page,
+// adresse introuvable ; la base `shhdrop-telechargements` d'avant est supprimée à la visite.
+test("Téléchargements retiré : ni menu ni pied de page, adresse introuvable, ancienne base supprimée", async ({ page, shh, isMobile }) => {
   const foot = page.locator("footer[data-foot]");
-  const link = () => foot.getByRole("link", { name: /^Téléchargements/ });
-  const menuHas = async (n: number) => {
-    if (!isMobile) return;
-    await page.getByRole("banner").getByRole("button", { name: "Ouvrir le menu" }).click();
-    await expect(page.locator("[data-menu]").getByRole("link", { name: /^Téléchargements/ })).toHaveCount(n);
-    await page.keyboard.press("Escape");
-  };
-  await page.goto(shh.origin + "/");
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(link()).toHaveCount(0);
-  await menuHas(0);
-  // Activé par la personne (page joignable par son adresse) : le lien apparaît.
-  await page.goto(shh.origin + "/telechargements");
-  await page.getByRole("button", { name: "L'activer" }).click();
-  await expect(page.getByRole("switch", { name: /^Garder l'historique/ })).toHaveAttribute("aria-checked", "true");
-  await expect(link()).toHaveCount(1);
-  // Relu depuis l'appareil : application et page d'information.
-  await page.goto(shh.origin + "/");
-  await expect(link()).toHaveCount(1);
-  await menuHas(1);
   await page.goto(shh.origin + "/securite");
-  await expect(link()).toHaveCount(1);
-  await menuHas(1);
-  // Désactivé (et effacé) : le lien disparaît, partout.
-  await page.goto(shh.origin + "/telechargements");
-  await page.getByRole("switch", { name: /^Garder l'historique/ }).click();
-  await expect(page.getByRole("switch", { name: /^Garder l'historique/ })).toHaveAttribute("aria-checked", "false");
-  await expect(link()).toHaveCount(0);
-  await page.goto(shh.origin + "/securite");
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(link()).toHaveCount(0);
-  await menuHas(0);
+  // Une base d'avant, activée sur cet appareil.
+  await page.evaluate(
+    () =>
+      new Promise<void>((ok) => {
+        const r = indexedDB.open("shhdrop-telechargements");
+        r.onupgradeneeded = () => r.result.createObjectStore("meta");
+        r.onsuccess = () => {
+          const t = r.result.transaction("meta", "readwrite");
+          t.objectStore("meta").put(true, "flag:on");
+          t.oncomplete = () => (r.result.close(), ok());
+        };
+      }),
+  );
+  for (const path of ["/", "/securite"]) {
+    await page.goto(shh.origin + path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(foot.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
+    if (isMobile) {
+      await page.getByRole("banner").getByRole("button", { name: "Ouvrir le menu" }).click();
+      await expect(page.locator("[data-menu]").getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
+      await page.keyboard.press("Escape");
+    }
+    await expect.poll(() => page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))).not.toContain("shhdrop-telechargements");
+  }
+  const r = await page.goto(shh.origin + "/telechargements");
+  expect(r!.status()).toBe(404);
 });
 });
 

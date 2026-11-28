@@ -1,6 +1,7 @@
 package paiement
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -56,13 +57,22 @@ func VerifierStripe(cle, webhook string, essai bool) error {
 	return nil
 }
 
-// Effacer : passe quotidienne (janitor.Quotidien).
+// Effacer : passe quotidienne (janitor.Quotidien) : purge, puis arrêt du renouvellement des
+// abonnements inactifs depuis 12 mois (ArreterInactifs). Un prestataire injoignable ne fait pas
+// échouer la passe (sinon elle serait refaite à chaque tour) : l'arrêt est réessayé le
+// lendemain, et la journalisation le dit, sans identifiant.
 func (s *Service) Effacer(time.Time) (int, error) {
 	if err := s.Purger(); err != nil {
 		return 0, err
 	}
 	if s.jetons != nil {
-		return 0, s.jetons.Purger()
+		if err := s.jetons.Purger(); err != nil {
+			return 0, err
+		}
 	}
-	return 0, nil
+	ctx, fin := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer fin()
+	arretes, echecs, err := s.ArreterInactifs(ctx)
+	s.journaliserInactifs(arretes, echecs)
+	return 0, err
 }

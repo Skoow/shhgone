@@ -7,7 +7,8 @@
   // l'appareil n'en garde aucune clé, la clé de récupération est demandée UNE fois, avec la raison
   // (jamais de repli silencieux) ; l'enveloppe de la passkey est alors réparée.
   // Compte banni : la connexion reste permise (exporter, supprimer), avec la date, le motif et
-  // l'identifiant B-… à donner pour un recours (§7.4).
+  // l'identifiant B-… à donner pour un recours (§7.4). Le renouvellement de ses abonnements est
+  // alors arrêté tout seul, et l'écran le dit (28 novembre ; conception du paiement §6.4).
   // Sur ordinateur (décision du 25 novembre, conception §18) : le téléphone d'abord (QR du
   // navigateur, parcours « hybride »), puis « Utiliser une passkey de cet ordinateur » (« local »).
   // Le chemin qui a marché la dernière fois sur cet ordinateur (lu sur l'appareil, jamais envoyé ;
@@ -17,7 +18,7 @@
   // s'intercale entre le clic et navigator.credentials.get. Invisible, sauf si le calcul n'est
   // pas fini quand la passkey a répondu : « Vérification en cours… » (annoncé).
   import { tick, untrack } from "svelte";
-  import { account, annulerCle, cleRequise, estMobile, etatCompte, ouvrirAvecCle, parcoursRetenu, passkeysDisponibles, preparerConnexion, seConnecter, type Parcours, type ParcoursRetenu, type Preuve } from "../../account/session.svelte";
+  import { account, annulerCle, arreterRenouvellementsSiBanni, cleRequise, estMobile, etatCompte, ouvrirAvecCle, parcoursRetenu, passkeysDisponibles, preparerConnexion, seConnecter, type Parcours, type ParcoursRetenu, type Preuve } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
   import { t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
@@ -46,6 +47,8 @@
   let errCle = $state("");
   let bandeau = $state<{ kind: "info" | "danger"; texte: string } | null>(null);
   let banni = $state<{ date: string; motif: number | null; id: string } | null>(null);
+  /** Compte banni : renouvellement des abonnements arrêté (« arretes ») ou en échec (« erreur »). */
+  let arretBanni = $state<"rien" | "arretes" | "erreur">("rien");
   let envoi = $state(false);
   /** La preuve anti-robot n'était pas finie au moment de partir : « Vérification en cours… ». */
   let attente = $state(false);
@@ -86,9 +89,13 @@
   async function ouvert() {
     cle = "";
     banni = null;
+    arretBanni = "rien";
     try {
       const e = await etatCompte();
-      if (e.banniJusqu) banni = { date: e.banniJusqu, motif: e.banniMotif, id: e.banniId ?? "" };
+      if (e.banniJusqu) {
+        banni = { date: e.banniJusqu, motif: e.banniMotif, id: e.banniId ?? "" };
+        arretBanni = await arreterRenouvellementsSiBanni(e);
+      }
     } catch {
       // état indisponible (réseau) : la session est ouverte, rien d'autre à dire ici
     }
@@ -166,6 +173,8 @@
     {#if account.cleLocale}<p class="note" data-cle-locale>{t("account.localKey")}</p>{/if}
     {#if banni}
       <Banner kind="warn">{t("account.banned", { date: jourLong(banni.date), motif: t(MOTIFS[(banni.motif ?? 10) - 1] ?? "report.cat.10"), id: banni.id })}</Banner>
+      {#if arretBanni === "arretes"}<p class="note" role="status" data-banni-arret>{t("account.banned.stopped")}</p>{/if}
+      {#if arretBanni === "erreur"}<p class="note" role="alert" data-banni-arret-erreur>{t("account.banned.stop.err")}</p>{/if}
     {/if}
     <div class="actions">
       <Button onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{t("account.continue")}</Button>

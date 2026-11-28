@@ -53,9 +53,9 @@ test("finition : pages d'information, pied, menu, erreurs", async ({ page, shh, 
   await page.goto(`${shh.origin}/s#${KEY}`);
   await expect(page.locator("h1")).toBeVisible({ timeout: 20_000 });
   await shot(page, isMobile, "lien-invalide");
-  await page.goto(shh.origin + "/telechargements");
+  await page.goto(shh.origin + "/envois");
   await expect(page.locator("h1")).toBeVisible();
-  await shot(page, isMobile, "telechargements-vide");
+  await shot(page, isMobile, "envois-vide");
 });
 
 test("finition : envoi, ouverture, contenu, suivi", async ({ page, shh, isMobile, browser }) => {
