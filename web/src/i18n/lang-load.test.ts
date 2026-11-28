@@ -43,6 +43,17 @@ describe("langue chargée à la demande", () => {
     expect(document.documentElement.lang).toBe("en");
   });
 
+  it("pendant la lecture du dictionnaire anglais, html lang reste celui de la page (jamais « fr » un instant)", async () => {
+    document.documentElement.lang = "en"; // page anglaise écrite au build
+    let fin!: () => void;
+    src.reply = () => new Promise((ok) => (fin = () => ok(JSON.parse(JSON.stringify(en)))));
+    const m = await fresh(["en-US"]);
+    expect(document.documentElement.lang).toBe("en");
+    fin();
+    await m.langReady;
+    expect(document.documentElement.lang).toBe("en");
+  });
+
   it("autre langue à la demande (setLang) : lue puis appliquée ; une seule lecture", async () => {
     const m = await fresh(["fr"]);
     await m.langReady;
@@ -66,6 +77,7 @@ describe("langue chargée à la demande", () => {
       await m.langReady;
       expect(m.getLang()).toBe("fr");
       expect(m.t("hero.pick")).toBe("Choisir des fichiers");
+      expect(document.documentElement.lang).toBe("fr");
     }
   });
 });

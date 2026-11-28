@@ -92,9 +92,9 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/");
     const cadre = page.locator("[data-demo-now]");
     await cadre.scrollIntoViewIfNeeded();
-    await expect(cadre.locator(".cap")).toBeVisible();
+    await expect(cadre.locator(".cap:not(.gabarit)")).toBeVisible();
     const c = (await cadre.boundingBox())!;
-    const t = (await cadre.locator(".cap").boundingBox())!;
+    const t = (await cadre.locator(".cap:not(.gabarit)").boundingBox())!;
     expect(Math.abs(t.x + t.width / 2 - (c.x + c.width / 2))).toBeLessThan(2);
   });
 
@@ -180,7 +180,7 @@ test.describe("fr-FR", () => {
     const h1 = page.getByRole("heading", { level: 1, name: TITLE_FR, exact: true });
     await expect(h1).toBeVisible();
     await expect(h1.locator(".words")).toHaveAttribute("aria-hidden", "true");
-    await expect(h1.locator(".words .w")).toHaveCount(9);
+    await expect(h1.locator(".words .w")).toHaveCount(TITLE_FR.split(" ").length);
   });
 
   test("rien n'attend : à 100 ms, « Créer sur place » mène à la page d'envoi vide (grand cadre de dépôt), puis le sélecteur multiple", async ({ page, shh, isMobile }) => {
@@ -505,4 +505,33 @@ test.describe("en-US", () => {
     await page.waitForTimeout(900);
     await capture(page, "home-en");
   });
+});
+
+// Décalage à l'arrivée de la police (28 novembre) : Mona Sans retardée de 1,2 s, l'accueil ne doit
+// pas bouger (CLS < 0,02 ; 0,18 à 0,35 avant, titre et accroche qui changeaient de nombre de lignes :
+// largeurs maximales en « ch » et titre anglais trop large pour 360 à 405 px). Chromium seul
+// (API layout-shift) ; toute la largeur, téléphone, tablette et ordinateur.
+test.describe("police tardive", () => {
+  for (const path of ["/", "/en"])
+    test(`aucun décalage à l'arrivée de Mona Sans : ${path}`, async ({ page, shh, browserName }) => {
+      test.skip(browserName !== "chromium", "API layout-shift : Chromium seul");
+      await page.route(/\.woff2$/, async (r) => {
+        await new Promise((ok) => setTimeout(ok, 1200));
+        await r.continue();
+      });
+      for (const width of [320, 360, 390, 412, 430, 560, 768, 1024, 1440]) {
+        await page.setViewportSize({ width, height: 860 });
+        await page.goto(shh.origin + path);
+        await page.evaluate(() => {
+          (window as unknown as { cls: number }).cls = 0;
+          new PerformanceObserver((l) => {
+            for (const e of l.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) if (!e.hadRecentInput) (window as unknown as { cls: number }).cls += e.value;
+          }).observe({ type: "layout-shift", buffered: true });
+        });
+        await page.waitForFunction(() => document.fonts.check('700 40px "Mona Sans"') && document.fonts.status === "loaded", undefined, { timeout: 10_000 });
+        await page.waitForTimeout(300);
+        const cls = await page.evaluate(() => (window as unknown as { cls: number }).cls);
+        expect(cls, `${path} à ${width} px`).toBeLessThan(0.02);
+      }
+    });
 });

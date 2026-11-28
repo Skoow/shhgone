@@ -370,7 +370,7 @@ export const en = {
   "seo.conditions": "Terms of use of Shhgone, an end-to-end encrypted sharing service, with no account needed to share.",
   "seo.mentions": "Legal notice of Shhgone: publisher, host and contact.",
   "seo.contact": "Write to Shhgone: questions, illegal content, requests from authorities, rights over your data, security flaws.",
-  "title.landing": "Share in secret, then it's gone",
+  "title.landing": "End-to-end encrypted sharing, no account needed",
   "title.home": "Send",
   "title.envoyer": "Send",
   "title.sealing": "Sending",

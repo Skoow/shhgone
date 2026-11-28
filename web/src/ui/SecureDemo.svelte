@@ -347,6 +347,9 @@
        (storyboard). -->
   {#if !reduced}
     <div class="now-cap" aria-hidden="true" data-demo-now>
+      <!-- Place de la plus longue légende, invisible : le cadre garde sa hauteur d'une étape à
+           l'autre (à 320 px, la légende passait de 3 à 5 lignes et la page sautait). -->
+      {#each STEPS as n (n)}<p class="cap gabarit"><span class="st">{t(`demo.s${n}.t` as "demo.s1.t")}</span><span class="sd">{t(`demo.s${n}.d` as "demo.s1.d")}</span></p>{/each}
       {#key shown}
         <p class="cap"><span class="st">{t(`demo.s${shown}.t` as "demo.s1.t")}</span><span class={["sd", { off: !descOn }]} data-demo-desc>{t(`demo.s${shown}.d` as "demo.s1.d")}</span></p>
       {/key}
@@ -1053,6 +1056,10 @@
     font-size: 0.9375rem;
     line-height: 1.5;
     text-wrap: pretty;
+  }
+  .cap.gabarit {
+    visibility: hidden;
+    animation: none;
   }
   /* Description du cadre : place gardée (rien ne saute), fondu quand le journal tape l'état. */
   .now-cap .sd {

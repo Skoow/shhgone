@@ -277,14 +277,22 @@
   .pitch > * {
     max-width: 100%;
   }
+  /* --h1-fit : largeur de la plus longue ligne du titre en Mona Sans, en multiples de sa taille
+     (« puis ça s'efface. » : 7,6 ; « One encrypted link, » : 9,34), plus 5 à 10 % de jeu (barre de
+     défilement de 15 px des ordinateurs comprise, que 100vw ne retire pas). Sert à borner
+     la taille sur téléphone (plus bas). */
   h1 {
+    --h1-fit: 8;
     margin: 0;
     font-size: clamp(2.5rem, 0.8rem + 3.7vw, 5.5rem);
     line-height: 0.98;
     font-weight: 700;
     font-stretch: var(--wd-display);
     letter-spacing: -0.04em;
-    max-width: 13ch;
+    /* = 13ch en Mona Sans (0,72em par ch à cette graisse et cette chasse), écrit en em : un « ch »
+       dépend de la police affichée (293 px dans la police de repli contre 374 px en Mona Sans à
+       40 px), le titre et l'accroche changeaient de nombre de lignes à l'arrivée de la police. */
+    max-width: 9.36em;
     /* Texte agrandi sur téléphone : un mot plus large que l'écran se coupe au lieu de déborder. */
     overflow-wrap: break-word;
     min-width: 0;
@@ -292,6 +300,9 @@
     view-transition-name: hero-title;
     /* Les points de « n. » partent vers la droite : coupés au bord du titre, jamais hors de l'écran. */
     overflow-x: clip;
+  }
+  h1:lang(en) {
+    --h1-fit: 10.3;
   }
   h1:focus {
     outline: none;
@@ -301,7 +312,8 @@
   }
   .lede {
     margin: 0;
-    max-width: 48ch;
+    /* = 48ch en Mona Sans (0,615em par ch), en em pour la même raison que le titre. */
+    max-width: 29.52em;
     overflow-wrap: break-word;
     color: #aab6d3;
     font-size: 1.0625rem;
@@ -429,6 +441,15 @@
   }
   .mk :global(svg) {
     color: var(--accent);
+  }
+  /* Téléphone : deux lignes réservées à chaque libellé. Sans cela, à 412 px (Pixel 7, accueil
+     anglais), « Photo or video » tient sur une ligne en Mona Sans mais pas dans la police de repli :
+     les trois boutons grandissaient puis rétrécissaient à l'arrivée de la police (décalage). */
+  @media (max-width: 479px) {
+    .mk > span:not(.pill) {
+      min-height: 3em;
+      line-height: 1.5;
+    }
   }
   .mk:hover {
     background: rgb(95 227 181 / 0.08);
@@ -711,8 +732,11 @@
     .home:not(.compact) .pitch {
       gap: var(--sp-3);
     }
+    /* Bornée pour que la plus longue ligne tienne dans l'écran moins ses marges (2rem) : sinon le
+       titre anglais tenait sur 2 lignes dans la police de repli et passait à 3 à l'arrivée de Mona
+       Sans (320 à 405 px, iPhone compris : tout l'accueil descendait d'une ligne, CLS 0,18). */
     .home:not(.compact) h1 {
-      font-size: clamp(2.125rem, 1.2rem + 4.6vw, 2.75rem);
+      font-size: min(clamp(2.125rem, 1.2rem + 4.6vw, 2.75rem), (100vw - 2rem) / var(--h1-fit));
     }
     .lede {
       font-size: 1rem;

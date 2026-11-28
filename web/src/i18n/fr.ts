@@ -371,7 +371,7 @@ export const fr = {
   "seo.conditions": "Conditions d'utilisation de Shhgone, service de partage chiffré de bout en bout, sans compte pour partager.",
   "seo.mentions": "Mentions légales de Shhgone\u202f: éditeur, hébergeur et contact.",
   "seo.contact": "Écrire à Shhgone\u202f: questions, contenus illicites, demandes des autorités, droits sur vos données, failles de sécurité.",
-  "title.landing": "Partagez en secret, puis ça s'efface",
+  "title.landing": "Partage chiffré de bout en bout, sans compte",
   "title.home": "Envoyer",
   "title.envoyer": "Envoyer",
   "title.sealing": "Envoi en cours",

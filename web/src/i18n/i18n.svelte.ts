@@ -71,7 +71,10 @@ let lang = $state<Lang>(dicts[wanted] !== undefined ? wanted : "fr");
 function applyHtmlLang(l: Lang): void {
   if (typeof document !== "undefined") document.documentElement.lang = l;
 }
-applyHtmlLang(lang);
+// Langue voulue pas encore chargée (accueil anglais « /en ») : la page écrite au build porte déjà le
+// bon lang ; ne pas le remettre à « fr » le temps du dictionnaire (le titre reprenait un instant sa
+// taille française : décalage de l'accueil, et lecteurs d'écran dans la mauvaise langue).
+if (lang === wanted) applyHtmlLang(lang);
 
 export function getLang(): Lang {
   return lang;
@@ -91,7 +94,8 @@ export function setLang(l: Lang): Promise<void> {
 
 /** Langue du navigateur prête (main.ts l'attend avant l'affichage : aucun texte ne change sous les yeux). */
 // getLang() et non `lang` : lecture voulue de la valeur de départ, hors de toute dépendance réactive.
-export const langReady: Promise<void> = wanted === getLang() ? Promise.resolve() : setLang(wanted);
+// Dictionnaire introuvable : on reste en français, et le lang de la page le dit.
+export const langReady: Promise<void> = wanted === getLang() ? Promise.resolve() : setLang(wanted).then(() => applyHtmlLang(getLang()));
 
 export function t(key: Key, params?: Record<string, string | number>): string {
   const d = dicts[lang] ?? fr;
