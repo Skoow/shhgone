@@ -226,7 +226,7 @@
            ordre (celui du DOM : lien, mot de passe, informations, Supprimer, Nouveau partage). -->
       <div class="corps" data-ready-card>
         <div class="gauche">
-          <!-- Le ticket : lien, perforation, mot de passe (masqué à l'arrivée, œil pour l'afficher,
+          <!-- Le panneau : lien, trait, mot de passe (masqué à l'arrivée, œil pour l'afficher,
                copiable masqué). Rien entre les deux : la paire reste ensemble. -->
           <!-- Apparition propre au ticket (CSS, coupée en mouvement réduit), pas l'éventail data-fan. -->
           <div class={["ticket", noPw && "seul"]} data-ticket>
@@ -454,131 +454,56 @@
     line-height: var(--lh-small, 1.45);
   }
 
-  /* ---------- Le ticket ----------
-     Un objet : relief fin (filet clair en haut, ombre portée), bord menthe lumineux, deux parties
-     séparées par une perforation : vraies encoches découpées (masque, le fond passe au travers) et
-     rangée de trous ronds. En haut le lien (papier sombre), en bas le mot de passe (nuit). */
+  /* ---------- Le lien et le mot de passe ----------
+     Un seul panneau calme (28 novembre, demande du propriétaire : l'ancien « billet » à encoches,
+     perforation, reflet et halo faisait trop de couches). Fond un ton au-dessus de la page, filet
+     fin ; les deux valeurs séparées par un trait. Le menthe ne vient qu'avec le geste : une valeur
+     copiée a son trait, son bouton et sa coche menthe. */
   .ticket {
-    --encoche: 13px;
-    --bord: rgb(95 227 181 / 0.32);
-    position: relative;
     display: grid;
     min-width: 0;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.04)) drop-shadow(0 22px 30px rgb(0 0 0 / 0.5)) drop-shadow(0 0 22px rgb(95 227 181 / 0.08));
-    animation: ticket-arrive 640ms cubic-bezier(0.16, 1, 0.3, 1) 80ms backwards;
+    border: 1px solid var(--hair-2);
+    border-radius: var(--r-xl);
+    background: var(--surface-1);
+    box-shadow: 0 18px 40px -24px rgb(0 0 0 / 0.7);
+    animation: ticket-arrive 420ms var(--ease-out) 60ms backwards;
   }
   .ticket .cell {
     position: relative;
-    isolation: isolate;
-    overflow: hidden;
+    min-width: 0;
+    padding: var(--sp-4) var(--sp-5) var(--sp-5);
   }
-  .ticket .lien {
-    padding: var(--sp-5) var(--sp-5) calc(var(--sp-5) + 2px);
-    border-radius: var(--r-xl) var(--r-xl) 0 0;
-    background:
-      radial-gradient(120% 90% at 0% 0%, rgb(255 255 255 / 0.06), transparent 55%),
-      linear-gradient(180deg, #232938, #1a1f2b);
-    box-shadow:
-      inset 0 1px 0 var(--bord),
-      inset 0 2px 0 rgb(255 255 255 / 0.06),
-      inset 1px 0 0 var(--bord),
-      inset -1px 0 0 var(--bord);
-    -webkit-mask:
-      radial-gradient(circle var(--encoche) at 0 100%, #0000 98%, #000) left / 51% 100% no-repeat,
-      radial-gradient(circle var(--encoche) at 100% 100%, #0000 98%, #000) right / 51% 100% no-repeat;
-    mask:
-      radial-gradient(circle var(--encoche) at 0 100%, #0000 98%, #000) left / 51% 100% no-repeat,
-      radial-gradient(circle var(--encoche) at 100% 100%, #0000 98%, #000) right / 51% 100% no-repeat;
+  /* Entre le lien et le mot de passe : un espace seulement (chaque valeur a déjà son trait). */
+  .perfo {
+    height: 0;
   }
   .ticket .mdp {
-    padding: calc(var(--sp-5) + 2px) var(--sp-5) var(--sp-5);
-    border-radius: 0 0 var(--r-xl) var(--r-xl);
-    background:
-      radial-gradient(90% 120% at 100% 100%, rgb(95 227 181 / 0.1), transparent 60%),
-      linear-gradient(180deg, #0f1c19, #080b0e);
-    box-shadow:
-      inset 1px 0 0 var(--bord),
-      inset -1px 0 0 var(--bord),
-      inset 0 -1px 0 var(--bord);
-    -webkit-mask:
-      radial-gradient(circle var(--encoche) at 0 0, #0000 98%, #000) left / 51% 100% no-repeat,
-      radial-gradient(circle var(--encoche) at 100% 0, #0000 98%, #000) right / 51% 100% no-repeat;
-    mask:
-      radial-gradient(circle var(--encoche) at 0 0, #0000 98%, #000) left / 51% 100% no-repeat,
-      radial-gradient(circle var(--encoche) at 100% 0, #0000 98%, #000) right / 51% 100% no-repeat;
-  }
-  /* Sans mot de passe (D42-28) : le lien seul, sans perforation ni encoches. */
-  .ticket.seul .lien {
-    padding-bottom: var(--sp-5);
-    border-radius: var(--r-xl);
-    box-shadow:
-      inset 0 1px 0 var(--bord),
-      inset 0 2px 0 rgb(255 255 255 / 0.06),
-      inset 1px 0 0 var(--bord),
-      inset -1px 0 0 var(--bord),
-      inset 0 -1px 0 var(--bord);
-    -webkit-mask: none;
-    mask: none;
-  }
-  /* Reflet qui traverse le haut du ticket une fois, à l'arrivée. */
-  .ticket .lien::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.07) 50%, transparent 65%) -100% 0 / 200% 100% no-repeat;
-    animation: ticket-reflet 1.4s cubic-bezier(0.65, 0, 0.35, 1) 420ms both;
-    pointer-events: none;
-  }
-  /* Perforation : une rangée de trous ronds entre les deux encoches. */
-  .perfo {
-    position: relative;
-    z-index: 1;
-    height: 0;
-    margin-inline: calc(var(--encoche) + 6px);
-  }
-  .perfo::before {
-    content: "";
-    position: absolute;
-    inset: -3px 0 auto;
-    height: 6px;
-    background: radial-gradient(circle at 3px 3px, rgb(0 0 0 / 0.75) 2.2px, rgb(255 255 255 / 0.08) 2.6px, transparent 3px) 0 0 / 11px 6px repeat-x;
-  }
-  .perfo::after {
-    display: none;
+    padding-top: 0;
   }
   @keyframes ticket-arrive {
     from {
       opacity: 0;
-      transform: translateY(18px) rotate(-0.6deg) scale(0.98);
-    }
-  }
-  @keyframes ticket-reflet {
-    to {
-      background-position: 200% 0;
+      transform: translateY(8px);
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .ticket,
-    .ticket .lien::after {
+    .ticket {
       animation: none;
     }
   }
 
-  /* Copiée : petite coche menthe en haut à droite de la case, à hauteur du libellé. */
+  /* Copiée : petite coche menthe à hauteur du libellé, en haut à droite. */
   .kept {
     position: absolute;
-    top: var(--sp-5);
+    top: var(--sp-4);
     inset-inline-end: var(--sp-5);
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
-    margin-top: -3px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     background: var(--accent-tint);
     color: var(--accent);
-    /* Retour du geste : la coche se pose (fondu et léger grossissement), une fois. */
     animation: kept-in var(--dur-base) var(--ease-out) both;
   }
   @keyframes kept-in {
@@ -592,66 +517,64 @@
       animation: none;
     }
   }
-  .ticket .mdp .kept {
-    top: calc(var(--sp-5) + 2px);
-  }
   .works {
     margin: 0;
     font-size: var(--fs-small);
     color: var(--text-2);
   }
 
-  /* Valeurs dans le ticket : une seule boîte par valeur, « Copier » intégré à droite ; police
-     à chasse fixe, chiffres tabulaires, zéro barré. Copié : bord et bouton menthe (2 s). */
+  /* Valeurs : une ligne nette par valeur, sans boîte de plus, « Copier » à droite ; police à chasse
+     fixe, chiffres tabulaires, zéro barré. Un trait sous la valeur, menthe une fois copiée. */
   .ticket :global(.cf) {
-    gap: var(--sp-3);
+    gap: var(--sp-2);
   }
   .ticket :global(.cf .lbl) {
-    color: var(--text-3);
-    font-size: var(--fs-micro);
-    font-weight: 650;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--text-2);
+    font-size: var(--fs-small);
+    font-weight: 600;
   }
   .ticket :global(.cf .row) {
-    gap: 0;
-    padding: 4px;
-    border: 1px solid rgb(233 236 242 / 0.12);
-    border-radius: 14px;
-    background: rgb(0 0 0 / 0.28);
-    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
-    transition:
-      border-color var(--dur-fast) var(--ease-out),
-      box-shadow var(--dur-fast) var(--ease-out);
+    gap: var(--sp-3);
+  }
+  .ticket :global(.cf .val),
+  .ticket :global(.cf .box) {
+    border: 0;
+    border-bottom: 1px solid var(--hair-2);
+    border-radius: 0;
+    background: transparent;
+    transition: border-color var(--dur-fast) var(--ease-out);
+  }
+  .ticket :global(.cf .box .val) {
+    border-bottom: 0;
   }
   .ticket :global(.cf .val) {
-    border: 0;
-    background: transparent;
+    padding-inline: 0;
     font-variant-numeric: tabular-nums slashed-zero;
     font-feature-settings: "tnum", "zero";
   }
   .ticket .lien :global(.cf .val) {
-    font-size: 0.9375rem;
+    font-size: 1rem;
     color: var(--text);
   }
   .ticket .mdp :global(.cf .val) {
-    font-size: 1.1875rem;
-    letter-spacing: 0.08em;
-    color: #f3fff9;
+    font-size: 1.25rem;
+    letter-spacing: 0.06em;
+    color: var(--text);
   }
   .ticket .mdp :global(.cf .val.masked) {
     color: var(--text-2);
+    letter-spacing: 0.12em;
   }
   .ticket :global(.cf .row > .btn) {
     flex: none;
     min-height: 44px;
-    border-radius: 10px;
   }
-  .ticket :global(.cf[data-copied] .row) {
-    border-color: rgb(95 227 181 / 0.6);
-    box-shadow:
-      inset 0 1px 2px rgb(0 0 0 / 0.35),
-      0 0 0 3px rgb(95 227 181 / 0.12);
+  .ticket :global(.cf[data-copied] .val),
+  .ticket :global(.cf[data-copied] .box) {
+    border-bottom-color: var(--accent);
+  }
+  .ticket :global(.cf[data-copied] .box .val) {
+    border-bottom: 0;
   }
   .ticket :global(.cf[data-copied] .row > .btn) {
     background: var(--accent-tint);
@@ -659,15 +582,8 @@
     color: var(--accent);
   }
   @media (forced-colors: active) {
-    .ticket .lien,
-    .ticket .mdp {
-      border: 1px solid CanvasText;
-      -webkit-mask: none;
-      mask: none;
-    }
-    .perfo::before {
-      border-top: 1px dashed CanvasText;
-      background: none;
+    .ticket {
+      border-color: CanvasText;
     }
   }
   .demo-zone {
