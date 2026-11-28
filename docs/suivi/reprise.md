@@ -4,7 +4,7 @@
 
 ## 1. État de `main`
 
-- Dernière version poussée : **`8849d21`** (envoi de partage reprenable après redémarrage, D42-31).
+- Dernière version poussée : voir `git log` (référencement et rapidité fusionnés le 28 novembre, après `8849d21`).
 - Mise à jour de la préproduction (session sur le serveur) : `git fetch origin puis deploy/preprod.sh <commit complet>` ; le commit complet se lit par `git rev-parse <court>` après le `git fetch`.
 - `shares.db` est au schéma 6 : une image d'avant le 28 novembre ne l'ouvre plus (le retour arrière sûr est en cours, § 2.2).
 - Prochain numéro de décision libre au registre : **D42-34** (D42-32 et D42-33 sont réservés aux travaux du § 2).
@@ -32,9 +32,17 @@ Ils ont été lancés le 28 novembre dans des copies de travail locales (`git wo
 2. Reprise après redémarrage encore à faire : pièces de salon en cours d'envoi ; étapes d'inscription (pas de passkey orpheline) ; lien session ↔ passkey. Corriger aussi `deploy/README.md` « Sortie par partage » et le texte `salon.intro.2`.
 3. Retour arrière sûr : copie cohérente des bases avant toute mise à jour qui change un `user_version`, restaurée en cas de retour arrière.
 
-### 2.3 Référencement et rapidité
+### 2.3 Référencement et rapidité — fusionné le 28 novembre
 
-Audit SEO (titres, descriptions, `hreflang`, `canonical`, `noindex` des écrans d'application, sitemap, `robots.txt`, Open Graph, JSON-LD sans donnée personnelle, préproduction non indexée) et mesures Lighthouse avant/après (mobile et ordinateur) avec améliorations (poids JS, chargement différé du moteur, images, police, compression, cache en production seulement ; préproduction gardée en `no-store`). Liste de ce que le propriétaire fera à l'ouverture (Search Console et Bing par enregistrement DNS TXT, sitemap).
+Fait : référencement complet (aperçus de lien Open Graph locaux, JSON-LD sans donnée personnelle, `X-Robots-Tag: noindex` côté serveur, redirection des barres obliques finales) ; premier affichage mobile de l'accueil 3,75 s → 2,10 s. Restes à décider :
+- titre de l'accueil sans mot-clé recherché (proposition « Shhgone · Partage chiffré de bout en bout, sans compte ») ;
+- décalage d'affichage de l'accueil anglais sur téléphone (boutons « Photo or video » pendant la police de secours) ;
+- poids JS de l'accueil (≈ 612 Ko non compressés, dont salon et compte) : leur donner leurs propres pages HTML (chantier) ;
+- `/salon` pourrait être écrite au build et indexée à l'ouverture ;
+- spec UI §12.5 assouplie (balises `og:*` sur les pages publiques) : à confirmer.
+Tests Playwright dont le texte attendu ne correspond plus au contenu : `pages.spec.ts:83`, `home.spec.ts:178` (K8) ; échecs non analysés lors d'une série complète : audit-1111, drop, no-preview, send 429, appel, salon4 — à passer en revue.
+
+Audit SEO initial (titres, descriptions, `hreflang`, `canonical`, `noindex` des écrans d'application, sitemap, `robots.txt`, Open Graph, JSON-LD sans donnée personnelle, préproduction non indexée) et mesures Lighthouse avant/après (mobile et ordinateur) avec améliorations (poids JS, chargement différé du moteur, images, police, compression, cache en production seulement ; préproduction gardée en `no-store`). Liste de ce que le propriétaire fera à l'ouverture (Search Console et Bing par enregistrement DNS TXT, sitemap).
 
 ### 2.4 À lancer ensuite : noms, images et rangement des partages et des salons (demande du 28 novembre)
 
