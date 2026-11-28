@@ -574,8 +574,9 @@ sudo deploy/maintenance.sh annoncer "2026-12-02 06:00" 30
 sudo deploy/maintenance.sh etat          # où en est l'annonce (aussi dans etat.sh)
 # 2. À l'heure : redémarrer.
 sudo reboot
-# 3. Se reconnecter en SSH (1 à 3 min), puis, dans VOTRE fenêtre SSH (la phrase de passe du volume
-#    se tape au clavier, saisie masquée ; jamais dans une session Claude) :
+# 3. Se reconnecter en SSH (1 à 3 min ; l'e-mail « URGENT redemarre » de l'alerte arrive : c'est
+#    vous), puis, dans VOTRE fenêtre SSH (la phrase de passe du volume se tape au clavier, saisie
+#    masquée ; jamais dans une session Claude) :
 sudo cryptsetup open /dev/sdb shhdrop
 sudo mount -o noatime,nodev,nosuid,noexec /dev/mapper/shhdrop /srv/shhdrop
 # 4. Remettre le service (provenance et verrous revérifiés, §3.4, §3.5) :

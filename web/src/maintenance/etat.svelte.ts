@@ -46,15 +46,21 @@ export async function rafraichir(f: typeof fetch = (i, o) => globalThis.fetch(i,
 export function surveiller(w: Window, f?: typeof fetch): () => void {
   let minuterie: ReturnType<typeof setTimeout> | undefined;
   let fini = false;
+  let enCours = false; // une seule lecture à la fois (retour sur l'onglet pendant une lecture)
   const tour = async () => {
-    await rafraichir(f);
+    if (enCours) return;
+    enCours = true;
+    clearTimeout(minuterie);
+    try {
+      await rafraichir(f);
+    } finally {
+      enCours = false;
+    }
     if (fini) return;
     minuterie = setTimeout(tour, maintenance.annonce ? PERIODE_ANNONCE_MS : PERIODE_MS);
   };
   const visible = () => {
-    if (w.document.visibilityState !== "visible") return;
-    clearTimeout(minuterie);
-    void tour();
+    if (w.document.visibilityState === "visible") void tour();
   };
   void tour();
   w.document.addEventListener("visibilitychange", visible);

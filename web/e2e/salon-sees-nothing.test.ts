@@ -385,6 +385,9 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
       "table:salons_reprise",
       "table:salons_reprise_blocs",
       "table:shares",
+      // Envois et ouvertures repris après un redémarrage (D42-31) : tables vides ici (aucun partage).
+      "table:shares_envoi",
+      "table:shares_ouvertures",
     ]);
     expect(s.salonCols).toEqual([
       "id", "access_v", "manage_v", "proof_v", "salt", "kdf_ops", "kdf_mem", "expires_at",
