@@ -36,6 +36,20 @@ Ils ont été lancés le 28 novembre dans des copies de travail locales (`git wo
 
 Audit SEO (titres, descriptions, `hreflang`, `canonical`, `noindex` des écrans d'application, sitemap, `robots.txt`, Open Graph, JSON-LD sans donnée personnelle, préproduction non indexée) et mesures Lighthouse avant/après (mobile et ordinateur) avec améliorations (poids JS, chargement différé du moteur, images, police, compression, cache en production seulement ; préproduction gardée en `no-store`). Liste de ce que le propriétaire fera à l'ouverture (Search Console et Bing par enregistrement DNS TXT, sitemap).
 
+### 2.4 À lancer ensuite : noms, images et rangement des partages et des salons (demande du 28 novembre)
+
+Demande du propriétaire :
+- Nommer un partage de fichiers ou un salon (facultatif) à la création, ou après coup dans « Mes partages » / « Mes salons » (petit crayon), par son créateur. Exemples : « Entre amis », « Projet privé », « Carrosserie ».
+- Le nom se met à jour **pour tous ceux qui sont dans le salon ou le partage**, pour qu'un membre qui a plusieurs salons sache à quoi chacun correspond.
+- Plus tard : une image (logo) par salon, l'ordre des salons modifiable (épingler en premier), une couleur par salon (contour de la carte) pour le repérer d'un coup d'œil.
+
+Points de conception à trancher avant de coder (proposer au propriétaire) :
+1. **Nom et image d'un salon** : le protocole salon v3 n'a pas de nom. Les faire passer **chiffrés de bout en bout** (message applicatif MLS du créateur, gardé dans l'état du groupe), jamais lisibles par le serveur ; mis à jour chez tous les membres ; image ré-encodée sur l'appareil et bornée en taille comme la photo de profil. Les apps (moteur Rust commun) doivent suivre le même format : vecteurs communs.
+2. **Nom d'un partage** : il existe déjà (§29.3), chiffré dans le manifeste, posé à la création et vu par le destinataire. Le changer après coup **pour le destinataire** demande une nouveauté (étiquette chiffrée modifiable par le lien de gestion, que le serveur garde sans pouvoir la lire). Le renommer **seulement dans sa propre liste** est simple (coffre local / compte).
+3. **Les membres n'ont pas de liste de leurs salons** : « Mes salons » ne liste que ceux qu'on a créés (D42-30, liste `rejoints` vidée). Pour qu'un membre voie ses salons avec leur nom, il faut une liste « salons rejoints » (appareil + coffre du compte), à décider (confidentialité : lien d'invitation gardé, jamais le mot de passe).
+4. **Ordre, épingle, couleur** : préférences de chaque personne, gardées sur l'appareil et dans le coffre du compte ; rien sur le serveur.
+5. Prochain numéro de décision libre : D42-34.
+
 ## 3. Décisions déjà prises (rappel)
 
 - Mot de passe des partages facultatif, désactivé par défaut (D42-28). Anti-robot ALTCHA partout, chemin de passkey retenu sur ordinateur (D42-29). « Mes partages » automatique, lien de gestion retiré de « Lien prêt » (D42-30). Rien perdu au redémarrage (D42-31).
