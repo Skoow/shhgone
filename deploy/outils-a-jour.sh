@@ -106,5 +106,26 @@ else
 	erreur=1
 fi
 
+# gosec : analyse de notre code Go (securite.yml) ; publié par le proxy Go.
+gosec=$(lire .github/workflows/securite.yml 'gosec/v2/cmd/gosec@(v[0-9]+\.[0-9]+\.[0-9]+)')
+if json=$(telecharger "https://proxy.golang.org/github.com/securego/gosec/v2/@latest"); then
+	comparer gosec "$gosec" "$(jq -r '.Version // empty' <<<"$json")" "$(jq -r '.Time // empty' <<<"$json")" .github/workflows/securite.yml
+else
+	echo "ERREUR : gosec : proxy.golang.org injoignable" >&2
+	erreur=1
+fi
+
+# Semgrep : analyse de notre code (securite.yml) ; publié sur PyPI. (Ses règles, épinglées à un
+# commit de semgrep/semgrep-rules, sont remontées à la main avec lui.)
+semgrep=$(lire .github/workflows/securite.yml 'semgrep==([0-9]+\.[0-9]+\.[0-9]+)')
+if json=$(telecharger "https://pypi.org/pypi/semgrep/json"); then
+	v=$(jq -r '.info.version // empty' <<<"$json")
+	d=$(jq -r --arg v "$v" '.releases[$v][0].upload_time_iso_8601 // empty' <<<"$json")
+	comparer semgrep "$semgrep" "$v" "$d" .github/workflows/securite.yml
+else
+	echo "ERREUR : semgrep : pypi.org injoignable" >&2
+	erreur=1
+fi
+
 if [ "$erreur" -ne 0 ]; then exit 2; fi
 exit "$en_retard"

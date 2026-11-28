@@ -1,0 +1,252 @@
+# Exceptions motivées de gosec (deploy/analyse-acceptes.sh, job gosec de .github/workflows/securite.yml).
+# Une ligne par résultat accepté : « règle <tab> fichier <tab> ligne de code » (espaces resserrés).
+# Relu le 28 novembre 2026 : aucun vrai problème trouvé. Tout résultat absent d'ici fait échouer le job :
+# le corriger (avec un test), ou l'ajouter sous le bon motif après relecture. Jamais de règle coupée partout.
+
+# G101 (1) : Faux positif : empreinte SHA-256 de la chaîne vide (jeton absent), constante publique, pas un secret.
+G101	server/internal/config/config.go	const emptyTokenHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+# G104 (126) : Erreurs ignorées volontairement : Close() de lecture ou de nettoyage, Rollback() après Commit, Write() vers
+# un client déjà parti (rien à faire), suppressions et remises de dates en nettoyage d'un chemin d'échec
+# (le chemin d'erreur principal est déjà rendu). Relu le 28 novembre 2026 : Detruire() (salon) oublie la clé
+# avant de supprimer le fichier, une erreur ne laisse que du chiffré illisible ; tx.Commit() de Revoquer
+# termine une transaction en lecture seule ; os.Remove des fichiers de signalement (kill) et des blocs
+# alloués ne portent aucun contenu en clair.
+G104	deploy/shhcheck/relais.go	c.Close()
+G104	deploy/shhcheck/relais.go	c.SetDeadline(fin)
+G104	deploy/shhcheck/relais.go	fermer := func() { une.Do(func() { c.Close(); u.Close() }) }
+G104	deploy/shhcheck/relais.go	fermer := func() { une.Do(func() { c.Close(); u.Close() }) }
+G104	deploy/shhcheck/relais.go	go func() { defer wg.Done(); io.Copy(c, u); fermer() }()
+G104	deploy/shhcheck/relais.go	go func() { defer wg.Done(); io.Copy(u, c); fermer() }()
+G104	deploy/shhcheck/relais.go	u.SetDeadline(fin)
+G104	deploy/shhcheck/turn.go	tcp.Close()
+G104	deploy/shhcheck/turn.go	udp.Close()
+G104	deploy/shhcheck/turn.go	udp.Close()
+G104	deploy/shhcheck/turn_garde.go	cn.Close()
+G104	server/cmd/shhdrop/admin.go	db.Close()
+G104	server/cmd/shhdrop/admin.go	return svc, func() { db.Close() }, nil
+G104	server/cmd/shhdrop/admin_serve.go	go func() { srv.Serve(ln); close(done) }()
+G104	server/cmd/shhdrop/admin_serve.go	return func() { srv.Close(); <-done }
+G104	server/cmd/shhdrop/main.go	io.WriteString(w, "<!doctype html><html lang=\"fr\"><meta charset=\"utf-8\"><title>Shhgone</title><p>Shhgone</p></html>\n")
+G104	server/cmd/shhdrop/main.go	ln.Close()
+G104	server/cmd/shhdrop/main.go	srv.Close()
+G104	server/cmd/shhdrop/paiement.go	db.Close()
+G104	server/cmd/shhdrop/paiement.go	db.Close()
+G104	server/cmd/shhdrop/static.go	f.Close()
+G104	server/cmd/shhdrop/static.go	f.Close()
+G104	server/cmd/shhdrop/static.go	f.Close()
+G104	server/cmd/shhdrop/static.go	io.Copy(w, rs)
+G104	server/cmd/shhdrop/static.go	root.Close()
+G104	server/internal/adminui/adminui.go	w.Write(body)
+G104	server/internal/adminui/adminui.go	w.Write(f.body)
+G104	server/internal/api/api.go	p.setLocked(t)
+G104	server/internal/api/api.go	w.Write(b)
+G104	server/internal/api/apps.go	w.Write(corps)
+G104	server/internal/blob/blob.go	f.Close()
+G104	server/internal/blob/blob.go	f.Close()
+G104	server/internal/blob/blob.go	f.Close()
+G104	server/internal/blob/blob.go	h.Write([]byte(id))
+G104	server/internal/blob/blob.go	os.Remove(p)
+G104	server/internal/blob/blob.go	os.Remove(p)
+G104	server/internal/blob/gate.go	f.Close()
+G104	server/internal/blob/gate.go	r.g.do(func() error { n, err = r.r.ReadAt(p, off); return nil })
+G104	server/internal/compte/base.go	db.Close()
+G104	server/internal/compte/base.go	db.Close()
+G104	server/internal/compte/base.go	db.Close()
+G104	server/internal/compte/base.go	db.Close()
+G104	server/internal/compte/base.go	db.Close()
+G104	server/internal/compte/base.go	db.Close()
+G104	server/internal/compte/base.go	db.Close()
+G104	server/internal/compte/base.go	f.Close()
+G104	server/internal/compte/base.go	tx.Rollback()
+G104	server/internal/compte/passkeys.go	rows.Close()
+G104	server/internal/compte/passkeys.go	rows.Close()
+G104	server/internal/compte/passkeys.go	rows.Close()
+G104	server/internal/compte/service.go	rows.Close()
+G104	server/internal/compte/service.go	rows.Close()
+G104	server/internal/compte/service.go	s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
+G104	server/internal/compte/service.go	tx.Rollback()
+G104	server/internal/compte/sessions.go	rows.Close()
+G104	server/internal/compte/sessions.go	rows.Close()
+G104	server/internal/compte/surmesure.go	rows.Close()
+G104	server/internal/compte/surmesure.go	rows.Close()
+G104	server/internal/janitor/janitor.go	rs.Close()
+G104	server/internal/janitor/janitor.go	rs.Close()
+G104	server/internal/paiement/base.go	db.Close()
+G104	server/internal/paiement/base.go	db.Close()
+G104	server/internal/paiement/base.go	db.Close()
+G104	server/internal/paiement/base.go	db.Close()
+G104	server/internal/paiement/base.go	db.Close()
+G104	server/internal/paiement/base.go	db.Close()
+G104	server/internal/paiement/base.go	f.Close()
+G104	server/internal/paiement/service.go	s.db.Exec(`DELETE FROM commandes WHERE id=?`, c[:])
+G104	server/internal/paiement/service.go	s.db.Exec(`DELETE FROM commandes WHERE id=?`, c[:])
+G104	server/internal/paiement/service.go	tx.Commit()
+G104	server/internal/salon/conversation.go	c.Detruire()
+G104	server/internal/salon/conversation.go	c.f.Close()
+G104	server/internal/salon/conversation.go	c.f.Close()
+G104	server/internal/salon/conversation.go	c.lecteur.Close()
+G104	server/internal/salon/conversation.go	c.lecteur.Close()
+G104	server/internal/salon/exclusion.go	s.annoncerLocked(enr, true)
+G104	server/internal/salon/fin.go	rows.Close()
+G104	server/internal/salon/fin.go	rows.Close()
+G104	server/internal/salon/fin.go	rows.Close()
+G104	server/internal/salon/manager.go	conv.Detruire() // une destruction (tombe) ou une autre création est passée entre-temps
+G104	server/internal/salon/manager.go	h.Write([]byte(id))
+G104	server/internal/salon/manager.go	s.annoncerLocked(enr, true)
+G104	server/internal/salon/pieces.go	annuler = append(annuler, func() { m.rendreBudget(s.id, taille) })
+G104	server/internal/salon/pieces.go	m.cfg.DB.Exec(`DELETE FROM salon_pieces WHERE id=?`, id)
+G104	server/internal/salon/pieces.go	sec.Close()
+G104	server/internal/salon/reprise.go	conv.Detruire()
+G104	server/internal/salon/reprise.go	os.Remove(chemin)
+G104	server/internal/salon/reprise.go	rows.Close()
+G104	server/internal/share/detached.go	closeDetached(d.f)
+G104	server/internal/share/detached.go	d.f.Close() // fichier encore dans le dossier : rien n'est rendu au disque ici
+G104	server/internal/share/detached.go	return s.startLocked(parent, k, sec, size, func() { sec.Close() }, nil), false, 0, nil
+G104	server/internal/share/detached.go	rs.Close()
+G104	server/internal/share/detached.go	rs.Close()
+G104	server/internal/share/detached.go	sec.Close()
+G104	server/internal/share/detached.go	sec.Close()
+G104	server/internal/share/draft.go	charge(old) // plus bas que le débit : ne peut pas être refusé
+G104	server/internal/share/kill.go	epoch0(dir)
+G104	server/internal/share/kill.go	epoch0(p)
+G104	server/internal/share/kill.go	epoch0(s.killDir())
+G104	server/internal/share/kill.go	f.Close()
+G104	server/internal/share/kill.go	os.Remove(p)
+G104	server/internal/share/service.go	h.Write([]byte(id))
+G104	server/internal/share/service.go	h.Write([]byte(id))
+G104	server/internal/share/service.go	rows.Close()
+G104	server/internal/share/service.go	rows.Close()
+G104	server/internal/share/service.go	rows.Close()
+G104	server/internal/share/service.go	rows.Close()
+G104	server/internal/share/service.go	rs.Close()
+G104	server/internal/share/service.go	rs.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	db.Close()
+G104	server/internal/store/store.go	rows.Close()
+
+# G115 (51) : Conversions d'entiers relues le 28 novembre 2026 : bornes vérifiées avant (siège 0..255, ports 1024..65535,
+# offres et motifs lus de nos propres bases), longueurs bornées par le protocole (≤ 255 ou ≤ 2^32),
+# dates Unix positives, tailles de statfs. Aucun dépassement atteignable par une entrée extérieure.
+G115	deploy/shhcheck/turn.go	RelayAddress: net.IP(c.ip.AsSlice()), Address: ecoute, MinPort: uint16(c.min), MaxPort: uint16(c.max),
+G115	deploy/shhcheck/turn.go	RelayAddress: net.IP(c.ip.AsSlice()), Address: ecoute, MinPort: uint16(c.min), MaxPort: uint16(c.max),
+G115	server/cmd/shhdrop/diskfree_linux.go	return availBytes(uint64(st.Bavail), uint64(st.Bsize), uint64(st.Frsize)), nil
+G115	server/cmd/shhdrop/diskfree_linux.go	return availBytes(uint64(st.Bavail), uint64(st.Bsize), uint64(st.Frsize)), nil
+G115	server/cmd/shhdrop/diskfree_linux.go	return availBytes(uint64(st.Blocks), uint64(st.Bsize), uint64(st.Frsize)), nil
+G115	server/cmd/shhdrop/diskfree_linux.go	return availBytes(uint64(st.Blocks), uint64(st.Bsize), uint64(st.Frsize)), nil
+G115	server/cmd/shhdrop/main.go	avail := free + uint64(used)
+G115	server/cmd/shhdrop/main.go	if avail < storageMargin || uint64(max) > avail-storageMargin {
+G115	server/internal/api/handlers_salon.go	siege := uint8(*b.Seat)
+G115	server/internal/api/handlers_salon_appel.go	if !paiement.Offre(tier).A("appel_audio") {
+G115	server/internal/api/handlers_share.go	s.usage.PartagePayant(uint8(tier)) // 1 Plus, 2 Pro : jamais lequel ni par qui
+G115	server/internal/compte/bannir.go	Motif: uint8(l.motif), SalonsFermes: int(l.fermes)}
+G115	server/internal/compte/parametres.go	et.BanniID, et.BanniJusqu, et.BanniMotif = idBan([8]byte(l.banniID)), dateJour(l.banniJusqu), uint8(l.banniMotif)
+G115	server/internal/compte/webauthntest/webauthntest.go	ad = binary.BigEndian.AppendUint16(ad, uint16(len(p.ID)))
+G115	server/internal/paiement/jetons.go	d = binary.BigEndian.AppendUint16(d, uint16(len(emetteur)))
+G115	server/internal/paiement/service.go	e.Etat, e.Offre, e.Renouvelle = nomsEtats[etat], Offre(offre), renouv == 1 && etat == etatPayee
+G115	server/internal/paiement/service.go	e.Offre, e.Fin = Offre(offre), fin
+G115	server/internal/salon/protocole.go	b := append(enr(0x0D, seq, 2+tailleAnnonce*len(liste)), createur, uint8(len(liste)))
+G115	server/internal/salon/protocole.go	b = binary.BigEndian.AppendUint64(b, uint64(recuMs))
+G115	server/internal/salon/reglages.go	return EnrReglages(s.seq, s.depart, uint32(reste), uint8(s.maxMembers))
+G115	server/internal/salon/reprise.go	b = append(b, uint8(len(ev.enr)))
+G115	server/internal/salon/reprise.go	b = append(b, uint8(len(p.id)))
+G115	server/internal/salon/reprise.go	b = append(b, uint8(len(x.reprises)))
+G115	server/internal/salon/reprise.go	b = append(b, uint8(s.occupesLocked()))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(k))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(len(p.lus)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(len(pretes)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(len(s.aEcraser)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(len(s.echeances)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(len(s.index)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(len(s.journal)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(len(s.revoques)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(p.bucket))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint32(b, uint32(s.arrivees))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint64(b, uint64(e.ms))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint64(b, uint64(e.recuMs))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint64(b, uint64(k))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint64(b, uint64(ms(s.appelsJusqua)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint64(b, uint64(ms(t)))
+G115	server/internal/salon/reprise.go	b = binary.BigEndian.AppendUint64(b, uint64(ms(x.entre)))
+G115	server/internal/salon/reprise.go	e := echeance{ms: int64(l.u64()), seq: l.u64()}
+G115	server/internal/salon/reprise.go	e := entree{seq: l.u64(), recuMs: int64(l.u64()), attendus: l.u64(), emplacement: l.u32(), siege: l.u8(), drapeaux: l.u8()}
+G115	server/internal/salon/reprise.go	for _, v := range []uint64{p.rang, p.lien, p.gen, uint64(p.places), uint64(ms(p.activite)), uint64(p.servis)} {
+G115	server/internal/salon/reprise.go	for _, v := range []uint64{p.rang, p.lien, p.gen, uint64(p.places), uint64(ms(p.activite)), uint64(p.servis)} {
+G115	server/internal/salon/reprise.go	for _, v := range []uint64{p.rang, p.lien, p.gen, uint64(p.places), uint64(ms(p.activite)), uint64(p.servis)} {
+G115	server/internal/share/grant.go	binary.BigEndian.PutUint32(b[4:], uint32(exp.Unix()))
+G115	server/internal/share/grant.go	return IssueGrant(s.grantKey, id, uint32(k.openN), time.Unix(exp, 0))
+G115	server/internal/share/service.go	if state == "draining" && bits.OnesCount64(uint64(mask)) == issued {
+G115	server/internal/token/token.go	b = append(b, kind, byte(len(id)))
+G115	server/internal/token/token.go	b = binary.BigEndian.AppendUint64(b, uint64(exp.Unix()))
+G115	server/internal/token/token.go	exp := int64(binary.BigEndian.Uint64(raw[2+l+4:]))
+
+# G202 (9) : Faux positif : seuls des « ?,?,… » (strings.Repeat) ou des noms de colonnes choisis dans une liste fixe du
+# code sont concaténés ; toutes les valeurs passent en paramètres liés.
+G202	server/internal/compte/bannir.go	rows, err := s.db.Query(`SELECT `+colonnesBan+` FROM bannis`+cond+` ORDER BY debut_jour DESC, id LIMIT ? OFFSET ?`,
+G202	server/internal/compte/base.go	var schemaComptes = `
+G202	server/internal/compte/coffres.go	_, err := tx.Exec(`UPDATE comptes SET `+col+`=?, `+gcol+`=? WHERE h=?`, blob, gen, c.H[:])
+G202	server/internal/compte/passkeys.go	r, err := s.db.Exec(`UPDATE passkeys SET `+col+`=? WHERE cred_id=? AND h=?`, v, credID, c.H[:])
+G202	server/internal/salon/fin.go	rows, err := m.cfg.DB.Query(`SELECT id FROM salons WHERE id IN (?`+strings.Repeat(",?", len(lot)-1)+
+G202	server/internal/salon/reprise.go	if _, err := tx.Exec(`DELETE FROM salons_reprise`+cond, args...); err != nil {
+G202	server/internal/salon/reprise.go	if _, err := tx.Exec(`UPDATE salons_reprise SET cle=zeroblob(length(cle)), etat=zeroblob(length(etat))`+cond, args...); err != nil {
+G202	server/internal/share/detached.go	rs, err := s.DB.Query(`SELECT id FROM shares WHERE id IN (?`+strings.Repeat(",?", len(part)-1)+`)`, part...)
+G202	server/internal/share/service.go	rs, err := s.DB.Query(`SELECT id FROM shares WHERE id IN (?`+strings.Repeat(",?", len(part)-1)+`)`, part...)
+
+# G302 (2) : Faux positif : chmod 0700 sur des DOSSIERS (le x est nécessaire) ; les fichiers sont en 0600 ou 0400.
+G302	server/cmd/shhdrop/main.go	if err := os.Chmod(d, 0o700); err != nil {
+G302	server/internal/salon/fin.go	return es(os.Chmod(d, 0o700))
+
+# G304 (18) : Faux positif : chemins venus de la configuration de l'exploitant (SHH_DATA_DIR, fichiers de secrets) ou
+# construits par le serveur (identifiants tirés au hasard), jamais d'une requête.
+G304	deploy/shhcheck/turn.go	b, err := os.ReadFile(chemin)
+G304	server/cmd/shhdrop/admin.go	f, err := os.OpenFile(frozen, os.O_CREATE|os.O_WRONLY, 0o600)
+G304	server/internal/blob/blob.go	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
+G304	server/internal/blob/blob.go	f, err := os.OpenFile(path, os.O_WRONLY, 0)
+G304	server/internal/blob/blob.go	fh, err := os.OpenFile(path, os.O_WRONLY, 0)
+G304	server/internal/blob/gate.go	f, err := os.OpenFile(path, os.O_WRONLY, 0)
+G304	server/internal/blob/reserve_linux.go	f, err := os.OpenFile(path, os.O_RDONLY|unix.O_NOATIME, 0)
+G304	server/internal/blob/reserve_linux.go	return os.Open(path)
+G304	server/internal/compte/base.go	f, err := os.OpenFile(chemin, os.O_RDWR|os.O_CREATE, 0o600)
+G304	server/internal/compte/cles.go	f, err := os.Open(chemin)
+G304	server/internal/config/appels.go	b, err := os.ReadFile(chemin)
+G304	server/internal/config/capacity.go	b, err := os.ReadFile(f)
+G304	server/internal/paiement/base.go	f, err := os.OpenFile(chemin, os.O_RDWR|os.O_CREATE, 0o600)
+G304	server/internal/paiement/secrets.go	f, err := os.Open(chemin)
+G304	server/internal/salon/reprise.go	f, err := os.OpenFile(chemin, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+G304	server/internal/salon/reprise.go	f, err := os.OpenFile(chemin, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o400)
+G304	server/internal/share/kill.go	f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+G304	server/internal/share/kill.go	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE, 0o600)
+
+# G505 (1) : HMAC-SHA1 imposé par le protocole TURN (identifiants temporaires « REST »), validé par le propriétaire le
+# 22 novembre (CLAUDE.md) ; jamais pour protéger un contenu.
+G505	server/internal/api/handlers_salon_appel.go	"crypto/sha1" //nolint:gosec // HMAC-SHA1 imposé par le protocole TURN (identifiants temporaires « REST »), pas un choix
+
+# G602 (5) : Faux positif : index bornés juste avant (n < nbSieges ; i ≥ 0 et i < len(nomsPlans)).
+G602	server/internal/config/paiement.go	if !ok || i < 0 || out[i] != "" || !strings.HasPrefix(id, "P-") || !jeton(id, 64) {
+G602	server/internal/config/paiement.go	out[i] = id
+G602	server/internal/salon/relais.go	copy(nonces[n][:], ev.enr[10:26])
+G602	server/internal/salon/relais.go	occupe[n] = false
+G602	server/internal/salon/relais.go	occupe[n] = true
+
+# G703 (2) : Faux positif (relais TURN) : chemin du secret fixé par la configuration du conteneur, lu en Lstat puis
+# ReadFile, jamais d'une requête.
+G703	deploy/shhcheck/turn.go	b, err := os.ReadFile(chemin)
+G703	deploy/shhcheck/turn.go	fi, err := os.Lstat(chemin)
+
+# G704 (2) : Faux positif (shhcheck) : adresses de contrôle fixées par l'exploitant (santé locale, essai STUN).
+G704	deploy/shhcheck/main.go	resp, err := c.Get("http://" + addr + "/healthz")
+G704	deploy/shhcheck/turn.go	c, err := net.Dial("udp4", addr)

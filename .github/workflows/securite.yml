@@ -120,6 +120,155 @@ jobs:
         run: |
           npm audit
           cd tools/svelte-check && npm audit
+  # Analyse de NOTRE code Go (serveur et deploy/shhcheck) par gosec, décision du propriétaire du
+  # 28 novembre. Chaque résultat est soit corrigé, soit une exception motivée, ligne par ligne,
+  # dans deploy/analyse/gosec-acceptes.txt (deploy/analyse-acceptes.sh) : un résultat nouveau fait
+  # échouer le job. gosec v2.30.0, publié le 23 octobre 2026 (proxy.golang.org), donc plus de
+  # 7 jours avant son épinglage ; compilé ici par le Go de server/go.mod, rien d'envoyé.
+  gosec:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      - name: gosec v2.30.0
+        run: |
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
+          # Code de sortie ignoré ici : le rapport JSON fait foi (analyse-acceptes.sh refuse aussi
+          # une erreur d'analyse). Un rapport absent fait échouer l'étape suivante.
+          (cd server && "$RUNNER_TEMP/bin/gosec" -quiet -fmt json -out "$RUNNER_TEMP/gosec-server.json" ./... || true)
+          (cd deploy/shhcheck && "$RUNNER_TEMP/bin/gosec" -quiet -fmt json -out "$RUNNER_TEMP/gosec-shhcheck.json" ./... || true)
+      - name: Résultats nouveaux ?
+        run: |
+          jq -s '{"Golang errors": (.[0]."Golang errors" + .[1]."Golang errors"), Issues: (.[0].Issues + .[1].Issues)}' \
+            "$RUNNER_TEMP/gosec-server.json" "$RUNNER_TEMP/gosec-shhcheck.json" > "$RUNNER_TEMP/gosec.json"
+          deploy/analyse-acceptes.sh gosec "$RUNNER_TEMP/gosec.json" deploy/analyse/gosec-acceptes.txt
+  # Analyse de NOTRE code Go, TypeScript et JavaScript par Semgrep OSS (même décision), sans compte
+  # ni envoi de code (--metrics=off, aucune connexion au registre : règles publiques lues depuis
+  # leur dépôt, à un commit épinglé). Semgrep 1.186.0, publié le 18 novembre 2026 (PyPI) ; règles
+  # semgrep/semgrep-rules au commit a5ad1714 du 10 novembre 2026 (dossiers go, javascript,
+  # typescript : règles de sécurité et de justesse, celles de p/ci et p/security-audit pour ces
+  # langages). Exceptions motivées : deploy/analyse/semgrep-acceptes.txt. Limite : les
+  # dépendances Python de Semgrep ne sont pas épinglées par empreinte (pip, sans --require-hashes).
+  semgrep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Semgrep 1.186.0 et règles épinglées
+        run: |
+          python3 -m venv "$RUNNER_TEMP/sg"
+          "$RUNNER_TEMP/sg/bin/pip" install --quiet semgrep==1.186.0
+          git init -q "$RUNNER_TEMP/regles"
+          git -C "$RUNNER_TEMP/regles" fetch -q --depth 1 https://github.com/semgrep/semgrep-rules a5ad1714f00c9f7fde980cab0ea1d6dc6d414fd2
+          git -C "$RUNNER_TEMP/regles" checkout -q FETCH_HEAD
+      - name: Semgrep
+        env:
+          SEMGREP_SEND_METRICS: "off"
+          SEMGREP_ENABLE_VERSION_CHECK: "0"
+          R: ${{ runner.temp }}/regles
+        run: |
+          # --timeout 0 : aucune règle abandonnée en route (résultats identiques d'un passage à l'autre).
+          "$RUNNER_TEMP/sg/bin/semgrep" scan --metrics=off --disable-version-check --timeout 0 \
+            --config "$R/go" --config "$R/javascript" --config "$R/typescript" \
+            --json -o "$RUNNER_TEMP/semgrep.json" server deploy/shhcheck web/src web/scripts
+          deploy/analyse-acceptes.sh semgrep "$RUNNER_TEMP/semgrep.json" deploy/analyse/semgrep-acceptes.txt
+  # Contrôle externe du site en ligne (décision du 28 novembre), en plus de sonde.yml (le site
+  # répond, certificat, toutes les 15 min) et de verifier-site.yml (site servi = une Release
+  # signée, toutes les heures : rien de refait ici) : ports ouverts attendus seulement, TLS 1.3
+  # avec X25519MLKEM768 (shhcheck de ce dépôt : OpenSSL de l'exécuteur trop ancien), TLS 1.2
+  # refusé, HTTP redirigé, en-têtes de sécurité. Aucun secret : en préproduction, les en-têtes du
+  # serveur (derrière la barrière, jeton exigé) ne sont pas vérifiés, et c'est dit. Inactif tant
+  # que SHH_SONDE_HOTE n'est pas posée. IPv4 seulement (les exécuteurs de GitHub n'ont pas
+  # d'IPv6). UDP : 443 (HTTP/3) et 3478 (relais des appels) sont attendus ouverts, mais un
+  # balayage UDP ne prouve rien (pas de réponse = ouvert ou filtré) : seul 3478 est essayé (STUN).
+  site:
+    if: ${{ vars.SHH_SONDE_HOTE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: deploy/shhcheck/go.mod
+          cache: false
+      - name: Préparation
+        env:
+          HOTE: ${{ vars.SHH_SONDE_HOTE }}
+        run: |
+          [[ $HOTE =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || { echo "SHH_SONDE_HOTE hors format : $HOTE" >&2; exit 1; }
+          (cd deploy/shhcheck && CGO_ENABLED=0 go build -o "$RUNNER_TEMP/shhcheck" .)
+          sudo apt-get install -y --no-install-recommends nmap >/dev/null
+      - name: Ports TCP ouverts (attendus seulement 22, 80, 443, 3478)
+        env:
+          HOTE: ${{ vars.SHH_SONDE_HOTE }}
+        run: |
+          nmap -4 -Pn -p- -T4 --open -oG "$RUNNER_TEMP/ports" "$HOTE" >/dev/null
+          ouverts=$(grep -oE '[0-9]+/open/tcp' "$RUNNER_TEMP/ports" | cut -d/ -f1 | sort -n | paste -sd' ' -)
+          echo "ports TCP ouverts : ${ouverts:-aucun}"
+          ok=1
+          for p in $ouverts; do
+            case $p in 22 | 80 | 443 | 3478) ;; *) echo "::error::port TCP $p ouvert sur $HOTE : inattendu (pare-feu, README §1)"; ok=0 ;; esac
+          done
+          for p in 80 443; do
+            case " $ouverts " in *" $p "*) ;; *) echo "::error::port TCP $p fermé sur $HOTE"; ok=0 ;; esac
+          done
+          [ "$ok" = 1 ]
+      - name: UDP 3478 (relais des appels, STUN)
+        env:
+          HOTE: ${{ vars.SHH_SONDE_HOTE }}
+        run: |
+          "$RUNNER_TEMP/shhcheck" stun "$HOTE:3478" || echo "::warning::le relais des appels ne répond pas en UDP sur $HOTE:3478 (appels coupés, SHH_APPELS=0 ?)"
+      - name: TLS 1.3 avec X25519MLKEM768, TLS 1.2 refusé, HTTP redirigé
+        env:
+          HOTE: ${{ vars.SHH_SONDE_HOTE }}
+        run: |
+          "$RUNNER_TEMP/shhcheck" tls "$HOTE:443" "$HOTE"
+          if curl -sS --tls-max 1.2 -o /dev/null --max-time 20 "https://$HOTE/" 2>/dev/null; then
+            echo "::error::TLS 1.2 accepté par $HOTE"; exit 1
+          fi
+          r=$(curl -sS -o /dev/null --max-time 20 -w '%{http_code} %{redirect_url}' "http://$HOTE/a?b=1")
+          echo "HTTP : $r"
+          [ "$r" = "308 https://$HOTE/a?b=1" ]
+      - name: En-têtes de sécurité
+        env:
+          HOTE: ${{ vars.SHH_SONDE_HOTE }}
+        run: |
+          code=$(curl -sS -D "$RUNNER_TEMP/h" -o /dev/null --max-time 20 -w '%{http_code}' "https://$HOTE/")
+          tr -d '\r' <"$RUNNER_TEMP/h" >"$RUNNER_TEMP/h2"
+          if [ "$code" = 503 ] && grep -qix 'x-shhdrop-etat: maintenance' "$RUNNER_TEMP/h2"; then
+            echo "::notice::préproduction : en-têtes du serveur non vérifiés (derrière la barrière, le jeton de préproduction n'est jamais dans la CI)"
+            grep -qi '^strict-transport-security:' "$RUNNER_TEMP/h2" || echo "::warning::page de maintenance sans Strict-Transport-Security"
+            exit 0
+          fi
+          [ "$code" = 200 ]
+          ok=1
+          # Les 8 en-têtes du serveur Go (README §7, vérification 1), une seule fois chacun.
+          for h in content-security-policy strict-transport-security referrer-policy x-content-type-options \
+            permissions-policy cross-origin-opener-policy cross-origin-resource-policy cache-control; do
+            n=$(grep -ci "^$h:" "$RUNNER_TEMP/h2" || true)
+            [ "$n" = 1 ] || { echo "::error::en-tête $h présent $n fois (1 attendu)"; ok=0; }
+          done
+          grep -qi '^strict-transport-security:.*max-age=[1-9][0-9]\{6,\}' "$RUNNER_TEMP/h2" || { echo "::error::HSTS trop court"; ok=0; }
+          grep -qix 'x-content-type-options: nosniff' "$RUNNER_TEMP/h2" || { echo "::error::nosniff absent"; ok=0; }
+          if grep -i '^content-security-policy:' "$RUNNER_TEMP/h2" | grep -qiE "'unsafe-inline'|'unsafe-eval'|\*"; then
+            grep -i '^content-security-policy:' "$RUNNER_TEMP/h2"
+            echo "::error::CSP trop large"; ok=0
+          fi
+          grep -qi '^server:' "$RUNNER_TEMP/h2" && echo "::warning::en-tête Server présent"
+          [ "$ok" = 1 ]
+      - name: Version servie
+        run: |
+          echo "::notice::version servie = Release signée : vérifiée toutes les heures par verifier-site.yml (rien de refait ici)"
   engine:
     runs-on: ubuntu-latest
     # Rust épinglé + compilation de cargo-audit (≈ 2-3 min).
