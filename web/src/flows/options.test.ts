@@ -107,7 +107,7 @@ describe("createOptions (UI §9.3)", () => {
       "S'efface dans 12 h ou après 1 ouverture, au premier des deux.",
     );
     expect(t("options.opens.count", { n: 3 })).toBe("3 ouvertures");
-    expect(t("options.tries", { n: PW_TRIES })).toBe(`${PW_TRIES} essais ratés, et le partage est détruit.`);
+    expect(t("options.tries", { n: PW_TRIES })).toBe(`${PW_TRIES} essais ratés, et le partage est supprimé.`);
     setLang("en");
     expect(t("options.opens.count", { n: 1 })).toBe("1 open");
     setLang("fr");

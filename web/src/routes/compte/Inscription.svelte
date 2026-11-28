@@ -275,7 +275,7 @@
     <CleRecup {texte} avertissement={t("account.key.notyet")} bind:sauvee={cleSauvee} onnotee={() => void (etape = "verif")} />
   {:else if etape === "verif"}
     <VerifCle {texte} bouton={t("account.verify.done")} onjuste={terminer} onrevoir={() => void (etape = "cle")}>
-      <Case label={t("account.stay")} bind:checked={rester} />
+      <Case label={t("account.stay")} bind:checked={rester} hint={rester ? undefined : t("account.stay.off")} />
     </VerifCle>
   {:else if etape === "echec"}
     {#if orpheline}<p class="note" data-orpheline>{t("account.signup.orphan", { pseudo: pseudoCree })}</p>{/if}

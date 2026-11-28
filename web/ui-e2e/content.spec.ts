@@ -162,11 +162,11 @@ test.describe("390 × 844", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await capture(page, "content-390");
     // Détruire atteignable au clavier (M10).
-    const destroy = page.getByRole("button", { name: "Détruire ce partage", exact: true });
+    const destroy = page.getByRole("button", { name: "Supprimer ce partage", exact: true });
     await destroy.focus();
     await page.keyboard.press("Enter");
-    await page.getByRole("button", { name: "Détruire", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Supprimé" })).toBeVisible({ timeout: 20_000 });
     await settle(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await capture(page, "destroyed-390");
@@ -188,7 +188,7 @@ test.describe("en-US", () => {
     await page.getByLabel("Password", { exact: true }).fill(sent.password);
     await page.getByRole("button", { name: "Unlock" }).click();
     await expect(page.getByRole("heading", { name: "Contents", exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: "Destroy this share", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Delete this share", exact: true })).toBeVisible();
     await settle(page);
     await capture(page, "content-en");
   });

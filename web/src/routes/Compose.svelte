@@ -94,8 +94,16 @@
   const narrow = $derived(narrowMq.current);
   const options = createOptions({ generate: generatePassword });
   $effect(() => onpassword?.(options.password));
+  // Offre payante détenue : choisie d'office (Pro avant Plus) tant que rien n'est ajouté (28
+  // novembre : une personne Pro n'a plus à choisir « Pro » à chaque envoi). Une fois des
+  // éléments ajoutés, rien ne change tout seul (changer de formule recommence l'envoi).
+  let formuleAuto = false;
   $effect(() => {
     options.formules = formules;
+    if (!formuleAuto && formules.length > 0 && untrack(() => composer.count) === 0 && options.formule === "free") {
+      formuleAuto = true;
+      options.formule = formules.includes("pro") ? "pro" : formules[0]!;
+    }
   });
   $effect(() => onformule?.(options.formule));
 
@@ -669,7 +677,7 @@
 {/snippet}
 
 <!-- Offre en cours : un petit cadre, plus la bande Gratuit / Plus / Pro. -->
-{#snippet offers()}<CurrentOffer newTab={filled} />{/snippet}
+{#snippet offers()}<CurrentOffer newTab={filled} formule={options.formule} />{/snippet}
 
 {#snippet app()}
   <div class={["app", { narrow }]} data-composer {@attach fitViewport}>

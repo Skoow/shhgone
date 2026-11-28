@@ -106,7 +106,7 @@ describe("GoneScreen", () => {
         { id: 2, name: "b.bin", total: 1, done: 0, state: "failed" },
       ],
     });
-    expect(document.querySelector("h2")!.textContent).toBe("This share has been destroyed.");
+    expect(document.querySelector("h2")!.textContent).toBe("This share has been deleted.");
     expect(txt()).toContain("The 2 files in progress are allowed to finish");
     expect(txt()).toContain("Download interrupted.");
   });

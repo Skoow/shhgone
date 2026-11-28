@@ -114,7 +114,7 @@
   {#if vue === "cle"}
     <form novalidate onsubmit={(e) => e.preventDefault()}>
       <TextField label={t("account.key.field")} hint={t("account.key.field.hint")} autocomplete="off" autocapitalize="characters" spellcheck="false" error={errCle || undefined} bind:value={cle} bind:el={elCle} oninput={() => (errCle = "")} />
-      <Case label={t("account.stay")} bind:checked={rester} />
+      <Case label={t("account.stay")} bind:checked={rester} hint={rester ? undefined : t("account.stay.off")} />
       <Button type="submit" busy={attente} onpress={ouvrir}>{attente ? t("account.robot.wait") : envoi ? t("account.verifying") : t("account.key.open")}</Button>
       <NoteDemo />
     </form>

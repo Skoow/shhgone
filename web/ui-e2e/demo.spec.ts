@@ -349,9 +349,9 @@ test.describe("fr-FR : envoi (–18)", () => {
     await page.getByRole("button", { name: /^(Rouvrir|Déchiffrement)/ }).click();
     await expect(page.getByRole("heading", { name: "Contenu", exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('li.row[data-kind="note"]')).toBeVisible();
-    await page.getByRole("button", { name: "Détruire ce partage", exact: true }).click();
-    await page.getByRole("button", { name: "Détruire", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Supprimer ce partage", exact: true }).click();
+    await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Supprimé" })).toBeVisible({ timeout: 20_000 });
     await expect(page.locator("[data-receipt]")).toBeVisible();
     expect(await storage(page)).toBe(0);
     // Le lien collé à nouveau dans le même onglet : le partage n'existe plus.

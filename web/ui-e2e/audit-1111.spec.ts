@@ -85,12 +85,12 @@ test("I4 : « Détruire » depuis le bas du contenu : l'écran « Détruit » ar
   await expect(page.locator("[data-last-top]")).toHaveText("Dernière ouverture\u202f: personne d'autre ne pourra l'ouvrir. En général, vous pouvez y revenir depuis ce navigateur jusqu'à l'échéance.");
   await expect(page.getByText(/En général, vous pouvez y revenir depuis ce navigateur jusqu'à son échéance, puis il sera effacé du serveur/)).toBeVisible();
   await shot(page, "i5-contenu-derniere-ouverture", isMobile);
-  const destroy = page.getByRole("button", { name: "Détruire ce partage" });
+  const destroy = page.getByRole("button", { name: "Supprimer ce partage" });
   await destroy.scrollIntoViewIfNeeded();
   await page.evaluate(() => window.scrollTo(0, document.scrollingElement!.scrollHeight));
   await destroy.click();
-  await page.getByRole("button", { name: "Détruire", exact: true }).filter({ visible: true }).click();
-  const title = page.getByRole("heading", { name: "Détruit", exact: true });
+  await page.getByRole("button", { name: "Supprimer", exact: true }).filter({ visible: true }).click();
+  const title = page.getByRole("heading", { name: "Supprimé", exact: true });
   await expect(title).toBeVisible({ timeout: 20_000 });
   await expect(title).toBeFocused();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
@@ -110,11 +110,11 @@ test("M20 : page du mot de passe : coût d'ouverture en une ligne ; dernier essa
     await expect(page.locator("#open-err p")).toHaveCount(1, { timeout: 20_000 });
     if (k > 1) await expect(page.locator("#open-err p")).toContainText(`${k}`);
   }
-  await expect(page.locator("#open-err p")).toHaveText("Mot de passe incorrect · dernier essai\u202f: au prochain échec, le partage sera détruit.");
+  await expect(page.locator("#open-err p")).toHaveText("Mot de passe incorrect · dernier essai\u202f: au prochain échec, le partage sera supprimé.");
   await shot(page, "m20-dernier-essai", isMobile);
   await pwField(page).fill("faux-0");
   await unlockButton(page).click();
-  const title = page.getByRole("heading", { name: "Mot de passe incorrect. Le partage a été détruit." });
+  const title = page.getByRole("heading", { name: "Mot de passe incorrect. Le partage a été supprimé." });
   await expect(title).toBeVisible({ timeout: 20_000 });
   await expect(title).toBeFocused();
   // Téléphone : l'illustration au-dessus, le titre garde la largeur.

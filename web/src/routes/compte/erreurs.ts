@@ -50,7 +50,9 @@ export function erreur(e: unknown, moment: Moment): Erreur {
       return { texte: t("account.err.etape") };
     case "limit":
     case "limite":
-      return { texte: t("account.err.limit", { duration: formatDuration(x.retryAfterS ?? 60, getLang()) }) };
+      // Inscription : la limite porte sur les comptes créés depuis la connexion (essais du 28
+      // novembre : « Trop de tentatives » ne disait ni quoi, ni que tout un réseau compte ensemble).
+      return { texte: t(moment === "inscription" ? "account.err.limit.inscription" : "account.err.limit", { duration: formatDuration(x.retryAfterS ?? 60, getLang()) }) };
     case "busy":
       return { texte: t(moment === "inscription" ? "account.err.busy" : "account.err.busyAutre") };
     case "reseau":

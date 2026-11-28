@@ -97,7 +97,7 @@ describe("paramètres", () => {
     await monter(Compte);
     expect(() => bouton("Retirer iPhone")).toThrow();
     expect(texte()).toContain("Ajoutez d'abord une autre passkey");
-    expect(texte()).toContain("Toutes vos passkeys sont liées à un seul appareil.");
+    expect(texte()).toContain("Chacune de vos passkeys ne marche que sur son appareil");
   });
 
   it("ajouter : « Ajouter une passkey », nom, « Créer la passkey » ; session plus récente : confirmation par passkey d'abord", async () => {

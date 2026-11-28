@@ -24,6 +24,7 @@
   import { commander, lireOffre, type ErreurCommande, type Moyen, type OffreServeur, type Preuve } from "../paiement/api";
   import { garder, idbDuNavigateur, lirePasses, nouvelId, oublier, tirerPass } from "../paiement/pass";
   import { paysProbable } from "../paiement/pays";
+  import { formulesDisponibles } from "../paiement/disponibles";
   import { href } from "../app/router.svelte";
   import { LimiteDefi, obtenirPreuve, preparerPreuve } from "../paiement/preuve";
   import { Check, Lock, Timer } from "./Icon";
@@ -106,6 +107,7 @@
   // sa page (état, arrêt du renouvellement à tout moment, note de vente ; :
   // la résiliation n'était joignable qu'au retour du paiement).
   let mien = $state(false);
+  let detenue = $state<"free" | PaidTier>("free");
   $effect(() => {
     let vivant = true;
     void lireOffre().then((o) => {
@@ -114,10 +116,17 @@
       lue = true;
     });
     const idb = idbDuNavigateur();
-    if (idb !== null)
+    if (idb !== null) {
       void lirePasses(idb).then((l) => {
         if (vivant) mien = l.length > 0;
       });
+      // Offre réellement détenue (28 novembre) : « votre offre » sur sa carte, plus sur Gratuit.
+      void formulesDisponibles(idb)
+        .then((l) => {
+          if (vivant) detenue = l.includes("pro") ? "pro" : l.includes("plus") ? "plus" : "free";
+        })
+        .catch(() => undefined);
+    }
     return () => {
       vivant = false;
     };
@@ -251,8 +260,9 @@
               <p class="alt num">{billing === "month" ? t("offers.card.year", { price: eur(PAID[x].year) }) : t("offers.card.monthAlt", { price: eur(PAID[x].month) })}</p>
             {/if}
             <p class="key num">{key(x)}</p>
+            {#if x === detenue && x !== "free"}<p class="cur-mark" data-current-tier>{t("offers.free.now")}</p>{/if}
             {#if x === "free"}
-              <span class="cta cur"><span class="cap">{t("offers.free.now")}</span></span>
+              <span class="cta cur"><span class="cap">{x === detenue ? t("offers.free.now") : "\u00a0"}</span></span>
             {:else}
               {@const tier = x}
               <label class="cta pick">
@@ -552,6 +562,17 @@
     border-radius: var(--r-pill);
     background: var(--plus);
     color: #04121b;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  /* Offre payante détenue (28 novembre) : dite sur sa carte. */
+  .cur-mark {
+    justify-self: start;
+    margin: 0;
+    padding: 2px 10px;
+    border-radius: var(--r-pill);
+    background: var(--accent-tint);
+    color: var(--accent);
     font-size: 0.75rem;
     font-weight: 700;
   }

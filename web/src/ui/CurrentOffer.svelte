@@ -1,23 +1,25 @@
 <script lang="ts">
-  // Page d'envoi : un petit cadre qui dit l'offre de la
-  // personne en ce moment (aujourd'hui toujours Gratuit : aucune vente n'est ouverte) et ses
-  // limites, lues dans les constantes ; « Voir les offres » mène à /offres. Remplace la bande
+  // Page d'envoi : un petit cadre qui dit la formule de CE partage (28 novembre : l'offre
+  // réellement utilisée, Gratuit, Plus ou Pro, plus « Gratuit » en dur) et ses limites, lues dans
+  // les constantes (limitesDe) ; « Voir les offres » mène à /offres. Remplace la bande
   // Gratuit / Plus / Pro et sa feuille « Bientôt disponible ». `newTab` : la liste en cours serait
   // perdue en quittant la page, la page des offres s'ouvre alors dans un nouvel onglet.
   import { followLink, href } from "../app/router.svelte";
   import { formatBytes, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
-  import { CONTENT_MAX, MAX_OPENS, TTL_MAX_HOURS } from "../limits";
+  import { limitesDe, type Formule } from "../limits";
   import { ArrowRight } from "./Icon";
 
-  let { newTab = false }: { newTab?: boolean } = $props();
+  let { newTab = false, formule = "free" }: { newTab?: boolean; formule?: Formule } = $props();
   const lang = $derived(getLang());
-  const limits = $derived([formatBytes(CONTENT_MAX, lang), formatDuration(TTL_MAX_HOURS * 3600, lang), t("options.opens.count", { n: MAX_OPENS })]);
+  const lim = $derived(limitesDe(formule));
+  const limits = $derived([formatBytes(lim.contentMax, lang), formatDuration(Math.max(...lim.ttlHours) * 3600, lang), t("options.opens.count", { n: lim.maxOpens })]);
+  const nom = $derived(formule === "free" ? t("offers.free") : t(formule === "pro" ? "paid.badge.pro" : "paid.badge.plus"));
   const uid = $props.id();
 </script>
 
 <section class="cur" aria-labelledby="{uid}-t" data-current-offer>
-  <p class="nm" id="{uid}-t"><span class="k">{t("offers.current")}</span> <b>{t("offers.free")}</b></p>
+  <p class="nm" id="{uid}-t"><span class="k">{t("offers.current")}</span> <b>{nom}</b></p>
   <p class="lim num">{limits.join(" · ")}</p>
   {#if newTab}
     <a class="more" href={href("/offres")} target="_blank" rel="noopener" data-offer-link>{t("offers.strip.more")}<span class="sr-only"> {t("offers.strip.newTab")}</span><ArrowRight size={15} strokeWidth={2} aria-hidden="true" /></a>

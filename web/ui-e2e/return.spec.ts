@@ -95,11 +95,11 @@ test("dernière ouverture : fermer l'onglet puis rouvrir le lien revient sans co
   await c.ctx.close();
 
   // La dernière personne détruit : supprimé tout de suite, et le retour est oublié.
-  const destroy = other.getByRole("button", { name: "Détruire ce partage" });
+  const destroy = other.getByRole("button", { name: "Supprimer ce partage" });
   await destroy.scrollIntoViewIfNeeded();
   await destroy.click();
-  await other.getByRole("button", { name: "Détruire", exact: true }).filter({ visible: true }).click();
-  await expect(other.getByRole("heading", { name: "Détruit", exact: true })).toBeVisible({ timeout: 20_000 });
+  await other.getByRole("button", { name: "Supprimer", exact: true }).filter({ visible: true }).click();
+  await expect(other.getByRole("heading", { name: "Supprimé", exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(fetchMeta(sent.link, shh.origin)).rejects.toBeInstanceOf(NotFoundError);
   await other.goto(sent.link);
   await expect(other.getByRole("heading", { name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible({ timeout: 30_000 });
@@ -152,7 +152,7 @@ test("D42-22 : la première personne revient après la dernière : ni « derniè
   await comeBack(other, sent.link, sent.password);
   await expect(other.locator("[data-eol]")).toContainText("Toutes les ouvertures sont prises.");
   await expect(other.locator("[data-last-top]")).toHaveCount(0);
-  await expect(other.getByRole("button", { name: /^Détruire/ })).toHaveCount(0);
+  await expect(other.getByRole("button", { name: /^Supprimer ce partage/ })).toHaveCount(0);
 });
 
 test("D42-22 : limite des retours atteinte sur un partage sans ouverture restante → « Impossible de revenir », cause dite", async ({ page, shh, browser }) => {

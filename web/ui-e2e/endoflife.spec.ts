@@ -24,10 +24,10 @@ test("Détruire (dernière ouverture permise) : pied séparé par un filet, conf
   const eol = page.locator("[data-eol]");
   expect(await eol.evaluate((e) => e === e.parentElement?.lastElementChild)).toBe(true);
   expect(await eol.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe("solid");
-  const destroy = page.getByRole("button", { name: "Détruire ce partage", exact: true });
+  const destroy = page.getByRole("button", { name: "Supprimer ce partage", exact: true });
   await expect(destroy).toHaveClass(/ghost/);
   // Texte exact (D42-22 : retour possible jusqu'à l'échéance, plus de suppression au départ).
-  await expect(page.getByText("Personne d'autre ne pourra ouvrir ce partage. En général, vous pouvez y revenir depuis ce navigateur jusqu'à son échéance, puis il sera effacé du serveur. Vous pouvez aussi le détruire maintenant.")).toBeVisible();
+  await expect(page.getByText("Personne d'autre ne pourra ouvrir ce partage. En général, vous pouvez y revenir depuis ce navigateur jusqu'à son échéance, puis il sera effacé du serveur. Vous pouvez aussi le supprimer maintenant.")).toBeVisible();
   // Dit aussi en haut de la page.
   await expect(page.locator("[data-last-top]")).toHaveText("Dernière ouverture\u202f: personne d'autre ne pourra l'ouvrir. En général, vous pouvez y revenir depuis ce navigateur jusqu'à l'échéance.");
 
@@ -38,17 +38,17 @@ test("Détruire (dernière ouverture permise) : pied séparé par un filet, conf
     await r.continue();
   });
   await destroy.click();
-  await expect(page.getByText("Détruire ce partage pour tout le monde ? C'est immédiat et définitif.")).toBeVisible();
+  await expect(page.getByText("Supprimer ce partage pour tout le monde ? C'est immédiat et définitif.")).toBeVisible();
   await settle(page);
   await capture(page, "destroy-confirm");
-  await page.getByRole("button", { name: "Détruire", exact: true }).click();
+  await page.getByRole("button", { name: "Supprimer", exact: true }).click();
   await page.waitForTimeout(800);
   await expect(page.locator("[data-receipt]")).toHaveCount(0); // rien avant la réponse
   await expect(noteRow(page)).toBeVisible();
   release();
 
-  await expect(page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/^Ce partage a été détruit\. Il a été effacé du serveur\./)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Supprimé" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/^Ce partage a été supprimé\. Il a été effacé du serveur\./)).toBeVisible();
   const receipt = page.locator("[data-receipt]");
   await expect(receipt).toContainText("Effacé du serveur : le contenu chiffré et son entrée.");
   await expect(receipt).toContainText("Pas concerné : ce qui a été enregistré sur un appareil.");
@@ -72,15 +72,15 @@ test("429 pendant Détruire : « Trop de demandes, réessayez dans un instant »
     if (!limited) return r.continue();
     await r.fulfill({ status: 429, contentType: "application/json", headers: { "Retry-After": "1" }, body: '{"error":"limit","retry_after_s":1}' });
   });
-  await page.getByRole("button", { name: "Détruire ce partage", exact: true }).click();
-  await page.getByRole("button", { name: "Détruire", exact: true }).click();
+  await page.getByRole("button", { name: "Supprimer ce partage", exact: true }).click();
+  await page.getByRole("button", { name: "Supprimer", exact: true }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Trop de demandes, réessayez dans un instant." })).toBeVisible({ timeout: 20_000 });
   await expect(noteRow(page)).toBeVisible();
   await expect(page.locator("[data-receipt]")).toHaveCount(0);
   limited = false;
-  await page.getByRole("button", { name: "Détruire ce partage", exact: true }).click();
-  await page.getByRole("button", { name: "Détruire", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Supprimer ce partage", exact: true }).click();
+  await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Supprimé" })).toBeVisible({ timeout: 20_000 });
 });
 
 test("maxOpens = 1 (draining) : Détruire fonctionne quand même", async ({ page, shh, browser }) => {
@@ -88,9 +88,9 @@ test("maxOpens = 1 (draining) : Détruire fonctionne quand même", async ({ page
   const sent = await opened(browser, shh.origin, 1);
   await page.goto(sent.link);
   await unlock(page, sent.password);
-  await page.getByRole("button", { name: "Détruire ce partage", exact: true }).click();
-  await page.getByRole("button", { name: "Détruire", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Supprimer ce partage", exact: true }).click();
+  await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Supprimé" })).toBeVisible({ timeout: 20_000 });
   await expect(fetchMeta(sent.link, shh.origin)).rejects.toBeInstanceOf(NotFoundError);
 });
 
@@ -137,7 +137,7 @@ test("Signaler : bouton visible sous le contenu, dix catégories, « Autre » pa
   const sheet2 = b.page.getByRole("dialog", { name: "Signaler ce contenu" });
   await sheet2.getByRole("button", { name: "Continuer" }).click();
   await sheet2.getByRole("button", { name: "Signaler", exact: true }).click();
-  await expect(b.page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
+  await expect(b.page.getByRole("heading", { name: "Supprimé" })).toBeVisible({ timeout: 20_000 });
   await b.ctx.close();
   await expect(fetchMeta(sent.link, shh.origin)).rejects.toBeInstanceOf(NotFoundError);
 });
@@ -148,7 +148,7 @@ test("ouverture non dernière : ni « Détruire » ni « Terminer » ; « Ce lie
   await page.goto(sent.link);
   await unlock(page, sent.password);
   await expect(page.locator("[data-eol] p").first()).toHaveText("Ce lien peut encore être ouvert 2\u202ffois. En général, vous pouvez revenir sur ce partage depuis ce navigateur jusqu'à son échéance sans compter d'ouverture.");
-  await expect(page.getByRole("button", { name: /^Détruire/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Supprimer ce partage/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Terminer|J'ai fini/ })).toHaveCount(0);
   await expect(page.locator("header.top").getByRole("button", { name: /Signaler/ })).toHaveCount(0);
   const report = page.locator("footer[data-foot]").getByRole("button", { name: "Signaler ce partage" });

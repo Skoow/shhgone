@@ -196,7 +196,7 @@
       {#if !mobile && prefere === "hybride"}<IndiceQr texte={t("account.login.phone.how")} />{/if}
       <Button type="submit" busy={attente} onpress={() => connecter()}>{attente ? t("account.robot.wait") : envoi ? t("account.verifying") : mobile ? t("account.login.passkey") : prefere === "local" ? t("account.login.here") : t("account.login.phone")}</Button>
       <NoteDemo />
-      <Case label={t("account.stay")} bind:checked={rester} />
+      <Case label={t("account.stay")} bind:checked={rester} hint={rester ? undefined : t("account.stay.off")} />
       {#if !mobile}<button type="button" class="discret" onclick={() => void connecter(autre)} data-autre={autre}>{autre === "local" ? t("account.login.here") : t("account.login.phone")}</button>{/if}
     </form>
     <p class="ou" aria-hidden="true"><span>{t("account.login.or")}</span></p>

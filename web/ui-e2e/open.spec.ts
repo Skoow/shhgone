@@ -47,7 +47,7 @@ test("mauvais mot de passe deux fois → « 3 essais restants », bon → conten
   await expect(page.getByText(cost)).toBeVisible();
   await expect(unlockButton(page)).toHaveAccessibleDescription(cost);
   await expect(page.getByText("Le serveur ne reçoit que des données chiffrées, jamais la clé.")).toBeVisible();
-  await expect(page.getByText(`${PW_TRIES} essais ratés, et le partage est détruit.`)).toBeVisible();
+  await expect(page.getByText(`${PW_TRIES} essais ratés, et le partage est supprimé.`)).toBeVisible();
   await expect(page.locator("[data-deadline] .left")).toHaveText(/^\d+\sh/);
   await expect(page.getByText("Disponible encore")).toHaveCount(0);
   // Mot de passe vide : bouton désactivé.
@@ -105,7 +105,7 @@ test("mauvais mot de passe deux fois → « 3 essais restants », bon → conten
   expect(api.filter((p) => !/^(GET \/api\/shares\/meta|POST \/api\/shares\/unlock|GET \/api\/shares\/segments\/\d+|POST \/api\/shares\/done|GET \/api\/shares\/watch)$/.test(p))).toEqual([]);
 });
 
-test("cinq mauvais mots de passe → « Le partage a été détruit. », partage absent en Node", async ({ page, shh, browser }) => {
+test("cinq mauvais mots de passe → « Le partage a été supprimé. », partage absent en Node", async ({ page, shh, browser }) => {
   test.setTimeout(150_000);
   const s = await freshPage(browser);
   const sent = await sendShare(s.page, shh.origin + "/", { text: TEXT });
@@ -117,10 +117,10 @@ test("cinq mauvais mots de passe → « Le partage a été détruit. », partage
     if (k > 1) await expect(page.locator("#open-err").getByText(new RegExp(`Mot de passe incorrect · ${k}\\s(essai|essais) restants?`))).toBeVisible({ timeout: 20_000 });
   }
   // Dernier essai : une seule ligne d'erreur.
-  await expect(page.locator("#open-err p")).toHaveText(["Mot de passe incorrect · dernier essai\u202f: au prochain échec, le partage sera détruit."]);
+  await expect(page.locator("#open-err p")).toHaveText(["Mot de passe incorrect · dernier essai\u202f: au prochain échec, le partage sera supprimé."]);
   await pwField(page).fill("faux-0");
   await unlockButton(page).click();
-  await expect(page.getByRole("heading", { name: "Mot de passe incorrect. Le partage a été détruit." })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Mot de passe incorrect. Le partage a été supprimé." })).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("[data-capsule]")).toHaveAttribute("data-state", "destroyed");
   await expect(fetchMeta(sent.link, shh.origin)).rejects.toBeInstanceOf(NotFoundError);
 });

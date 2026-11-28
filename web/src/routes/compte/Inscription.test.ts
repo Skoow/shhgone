@@ -158,7 +158,7 @@ describe("inscription par passkey", () => {
     expect(document.querySelector("[data-rappel]")!.getAttribute("role")).toBe("status");
     await presser("Je l'ai notée");
     expect(document.querySelector("#compte-titre")!.textContent).toBe("Votre clé de récupération"); // on reste sur la clé
-    expect(document.querySelector("[data-rappel]")!.textContent).toBe("Copiez ou téléchargez d'abord votre clé : sans elle, le compte peut être perdu.");
+    expect(document.querySelector("[data-rappel]")!.textContent).toBe("Copiez, téléchargez ou recopiez d'abord votre clé : sans elle, le compte peut être perdu.");
     expect(document.activeElement).toBe(bouton("Copier"));
     await presser("Télécharger (.txt)");
     expect(bouton("Je l'ai notée").getAttribute("aria-disabled")).toBeNull();

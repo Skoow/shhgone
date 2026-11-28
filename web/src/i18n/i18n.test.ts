@@ -62,10 +62,10 @@ describe("dictionnaires", () => {
 
   it("partage détruit : texte honnête K7 (UI §20.2), titre d'accueil intact", () => {
     expect(fr["destroyed.body"]).toBe(
-      "Ce partage a été détruit. Il a été effacé du serveur. Ce que vous avez déjà enregistré sur cet appareil n'est pas concerné.",
+      "Ce partage a été supprimé. Il a été effacé du serveur. Ce que vous avez déjà enregistré sur cet appareil n'est pas concerné.",
     );
     expect(en["destroyed.body"]).toBe(
-      "This share has been destroyed. It has been erased from the server. Anything you already saved on this device is not affected.",
+      "This share has been deleted. It has been erased from the server. Anything you already saved on this device is not affected.",
     );
     expect(fr["hero.title"]).toBe("Un lien chiffré, puis ça s'efface.");
     expect(en["hero.title"]).toBe("One encrypted link, then it's gone.");

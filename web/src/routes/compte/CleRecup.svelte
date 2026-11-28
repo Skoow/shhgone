@@ -5,7 +5,9 @@
   // adresse du site), puis « Je l'ai notée ». Rien n'est envoyé ici. Demande du propriétaire
   // (25 novembre) : « Je l'ai notée » reste grisé (aria-disabled, focalisable) tant que ni
   // « Copier » ni « Télécharger » n'a servi ; cliqué quand même, une phrase courte dit pourquoi
-  // (role=status, annoncée) et le focus va sur « Copier ».
+  // (role=status, annoncée) et le focus va sur « Copier ». 28 novembre (essais) : troisième geste
+  // « Je l'ai recopiée à la main », pour qui la note sur papier sans passer par le presse-papiers ;
+  // une phrase dit dès l'arrivée ce que le bouton attend.
   import { tick } from "svelte";
   import { fichierTexte } from "../../account/session.svelte";
   import { t } from "../../i18n/i18n.svelte";
@@ -34,6 +36,10 @@
     sauvee = true;
     rappel = false;
     announce((await copyText(texte)) === "copied" ? t("account.key.copied") : t("account.key.manual"));
+  }
+  function recopiee() {
+    sauvee = true;
+    rappel = false;
   }
   function telecharger() {
     sauvee = true;
@@ -64,8 +70,10 @@
     {#snippet icon()}<Download size={18} strokeWidth={1.75} aria-hidden="true" />{/snippet}
     {t("account.key.download")}
   </Button>
+  <Button variant="ghost" onpress={recopiee} data-recopiee>{t("account.key.byhand")}</Button>
   <Button softDisabled={!sauvee} onpress={notee}>{t("account.key.noted")}</Button>
 </div>
+{#if !sauvee && !rappel}<p class="note" data-attente>{t("account.key.waiting")}</p>{/if}
 
 <style>
   .cle {

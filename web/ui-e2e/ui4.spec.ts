@@ -29,9 +29,9 @@ test("destinataire, dernière ouverture : bulle du cadenas, groupes, « Détruir
   // Groupe allégé (retours LIGHT, remplace le bandeau d'UI4) : en-tête discret, sans bandeau ni filet.
   const head = page.locator('[data-group="texte"] .gh');
   expect(await head.evaluate((e) => getComputedStyle(e).borderBottomStyle)).toBe("none");
-  // Dernière ouverture : « Détruire ce partage » et sa phrase ; Signaler dans le pied de page seulement (UI7).
+  // Dernière ouverture : « Supprimer ce partage » et sa phrase ; Signaler dans le pied de page seulement (UI7).
   await expect(page.getByText(/^Personne d'autre ne pourra ouvrir ce partage\./)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Détruire ce partage", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Supprimer ce partage", exact: true })).toBeVisible();
   await expect(page.locator("header.top").getByRole("button", { name: /Signaler/ })).toHaveCount(0);
   await expect(page.locator("footer[data-foot]").getByRole("button", { name: "Signaler ce partage" })).toBeVisible();
   const eolAlign = await page.locator("[data-eol]").evaluate((e) => getComputedStyle(e).textAlign);
@@ -58,7 +58,7 @@ test("destinataire, ouverture non dernière : « Ce lien peut encore être ouver
   await page.goto(sent.link);
   await unlock(page, sent.password);
   await expect(page.locator("[data-eol] p").first()).toHaveText("Ce lien peut encore être ouvert 2 fois. En général, vous pouvez revenir sur ce partage depuis ce navigateur jusqu'à son échéance sans compter d'ouverture.");
-  await expect(page.getByRole("button", { name: /^Détruire/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Supprimer ce partage/ })).toHaveCount(0);
   await settle(page);
   await page.screenshot({ path: `${SHOTS}content-not-last-${w(isMobile)}.png`, fullPage: true });
 });

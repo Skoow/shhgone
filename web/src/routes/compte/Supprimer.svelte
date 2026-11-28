@@ -116,7 +116,7 @@
         <li>{t("account.delete.account")}</li>
         <li>{t("account.delete.device.all")}</li>
         {#each abonnements as a, i (i)}
-          <li data-delete-sub-item>{t("account.delete.sub.item", { offre: nomOffre(a) })}</li>
+          <li data-delete-sub-item>{t(a.offert ? "account.delete.sub.item.gift" : a.renouvelle ? "account.delete.sub.item" : "account.delete.sub.item.once", { offre: nomOffre(a) })}</li>
         {/each}
       </ul>
     </div>
