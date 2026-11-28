@@ -157,6 +157,8 @@ export function fauxServeur() {
     return t;
   };
   const sansNull = (s: string) => !/:null[,}\]]/.test(s);
+  /** Preuve anti-robot présente (serveur : antiRobot ; sa vérification : tests Go). */
+  const preuveOk = (b: Obj) => typeof b.altcha === "string" && b.altcha !== "" && b.hp === "" && typeof b.shown_at === "string" && b.shown_at !== "";
   const sansSortie = (c: unknown) => !/"results"|hmacGetSecret|hmac-secret/.test(JSON.stringify(c));
   const passkeyDe = (credId: string): [CompteFaux, PasskeyServeur] | null => {
     for (const c of comptes.values()) for (const p of c.passkeys) if (p.credId === credId) return [c, p];
@@ -192,7 +194,7 @@ export function fauxServeur() {
     const recente = () => s?.recente === true;
     switch (`${init.method} ${r}`) {
       case "POST inscription/debut": {
-        if (typeof body.altcha !== "string") return err(400, "bad_request");
+        if (!preuveOk(body)) return err(400, "bad_request");
         const e = b64u(rnd(32));
         const h = rnd(16);
         etapes.set(e, { sorte: "inscription", h });
@@ -232,6 +234,8 @@ export function fauxServeur() {
         return ok({ etape: e, options: options([]) });
       }
       case "POST connexion/fin": {
+        // Preuve anti-robot vérifiée avant l'étape (serveur : antiRobot) : l'étape reste valable.
+        if (!preuveOk(body)) return err(400, "bad_request");
         const e = etapes.get(body.etape as string);
         if (!e || e.sorte !== "connexion") return err(404, "not_found");
         etapes.delete(body.etape as string);
@@ -245,6 +249,7 @@ export function fauxServeur() {
         return ok({ session: ses, h: b64u(cc.h), cred_id: p.credId, enveloppes: p.envs, ...coffres(cc) });
       }
       case "POST recup": {
+        if (!preuveOk(body)) return err(400, "bad_request");
         const vR = b64u(sha256(unb64u(body.a_r as string)));
         const cc = [...comptes.values()].find((x) => x.vR === vR);
         if (!cc) return err(403, "identifiants");

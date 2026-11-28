@@ -62,7 +62,7 @@ func TestChallengeFormat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ch.Algorithm != "SHA-256" || ch.MaxNumber != 50000 || len(ch.Signature) != 64 {
+	if ch.Algorithm != "SHA-256" || ch.MaxNumber != 20000 || len(ch.Signature) != 64 {
 		t.Fatalf("défi : %+v", ch)
 	}
 	if !strings.HasSuffix(ch.Salt, "?expires="+strconv.FormatInt(t0.Add(2*time.Minute).Unix(), 10)+"&") {
@@ -202,7 +202,7 @@ func TestForged(t *testing.T) {
 func TestDifficulty(t *testing.T) {
 	now := t0
 	c := newCap(&now)
-	want := []int64{50000, 100000, 200000, 400000, 800000, 1600000, 1600000, 1600000}
+	want := []int64{20000, 40000, 80000, 160000, 320000, 640000, 1280000, 1280000, 1280000}
 	for i, w := range want {
 		ch, err := c.Challenge(ipA)
 		if err != nil {
@@ -214,13 +214,21 @@ func TestDifficulty(t *testing.T) {
 		c.RecordCreate(ipA)
 		now = now.Add(time.Minute)
 	}
+	// Le plafond (niveau 6) se vérifie comme les autres : le format du sel l'accepte.
+	ch, err := c.Challenge(ipA)
+	if err != nil || !strings.Contains(ch.Salt, ".6?expires=") {
+		t.Fatalf("niveau 6 : %+v %v", ch, err)
+	}
+	if err := c.Verify(payload(ch, solve(t, ch)), ipA, "", now.Add(-time.Minute)); err != nil {
+		t.Fatalf("solution au niveau 6 : %v", err)
+	}
 	// Une autre connexion garde la difficulté de base.
-	if ch, _ := c.Challenge(ipB); ch.MaxNumber != 50000 {
+	if ch, _ := c.Challenge(ipB); ch.MaxNumber != 20000 {
 		t.Fatalf("autre connexion : %d", ch.MaxNumber)
 	}
 	// Une heure après la dernière création, tout est oublié.
 	now = now.Add(time.Hour)
-	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 50000 {
+	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 20000 {
 		t.Fatalf("après une heure : %d", ch.MaxNumber)
 	}
 }
@@ -241,7 +249,7 @@ func TestStockpiledChallenge(t *testing.T) {
 		t.Fatalf("défi trop facile accepté : %v", err)
 	}
 	ch, p3 := solved(t, c, ipA)
-	if ch.MaxNumber != 100000 {
+	if ch.MaxNumber != 20000<<1 {
 		t.Fatalf("maxNumber = %d", ch.MaxNumber)
 	}
 	if err := c.Verify(p3, ipA, "", t0); err != nil {
@@ -306,16 +314,16 @@ func TestCreateTimesRoundedToMinute(t *testing.T) {
 		}
 	}
 	c.mu.Unlock()
-	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 50000<<3 {
+	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 20000<<3 {
 		t.Fatalf("difficulté après 3 créations : %d", ch.MaxNumber)
 	}
 	// 12:00:17 → 12:01 : comptée jusqu'à 13:01 (jamais moins d'une heure).
 	now = t0.Add(time.Hour + 30*time.Second)
-	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 50000<<3 {
+	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 20000<<3 {
 		t.Fatalf("oubliée avant une heure : %d", ch.MaxNumber)
 	}
 	now = t0.Add(time.Hour + time.Minute)
-	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 50000 {
+	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 20000 {
 		t.Fatalf("après l'heure : %d", ch.MaxNumber)
 	}
 }
@@ -347,11 +355,11 @@ func TestBindKeyRotatesAtMidnight(t *testing.T) {
 		t.Fatal("liaison inchangée après minuit UTC")
 	}
 	// La difficulté de la dernière heure est gardée (deux créations : niveau 2).
-	if ch2.MaxNumber != 200000 {
+	if ch2.MaxNumber != 20000<<2 {
 		t.Fatalf("difficulté perdue à minuit : %d", ch2.MaxNumber)
 	}
 	c.RecordCreate(ipA) // sous la nouvelle clé
-	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 400000 {
+	if ch, _ := c.Challenge(ipA); ch.MaxNumber != 20000<<3 {
 		t.Fatalf("créations de part et d'autre de minuit : %d", ch.MaxNumber)
 	}
 

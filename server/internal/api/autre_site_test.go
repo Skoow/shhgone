@@ -30,7 +30,7 @@ func TestCorpsJSONTypeExige(t *testing.T) {
 			hdr: map[string]string{"Content-Type": "text/plain"}})
 	}
 	expect(t, e.do(req{method: "POST", path: "/api/compte/recup", remote: "203.0.113.64:1",
-		body: mustJSON(map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""})}), 200, "")
+		body: mustJSON(e.preuve(t, "203.0.113.64:1", map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""}))}), 200, "")
 	// Routes des partages (readJSONMax) : de même.
 	w := e.do(req{method: "POST", path: "/api/shares/unlock", body: []byte(`{"proof":"x"}`),
 		hdr: map[string]string{"Content-Type": "text/plain", "X-Shh-Access": enc.EncodeToString(rnd(32))}})

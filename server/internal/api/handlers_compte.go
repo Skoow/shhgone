@@ -224,14 +224,21 @@ func options(pers *bool, etiq *string) (compte.OptionsSession, error) {
 	return o, nil
 }
 
-// recup : { a_r, persistante, etiquette } → { session, h, env_r, blob_profil, gen_profil,
-// blob_prive, gen_prive } (conception du compte par passkey §6.4) ; session récente, marquée
-// « ouverte par la clé de récupération ». A_r n'est gardé nulle part (tampon effacé).
+// recup : { a_r, persistante, etiquette, altcha, hp, shown_at } → { session, h, env_r,
+// blob_profil, gen_profil, blob_prive, gen_prive } (conception du compte par passkey §6.4) ;
+// session récente, marquée « ouverte par la clé de récupération ». A_r n'est gardé nulle part
+// (tampon effacé). Preuve anti-robot exigée (décision du 26 novembre), vérifiée avant tout essai
+// de clé : refusée, 400 bad_request, sans compter d'essai. Clé inconnue : la difficulté de la
+// connexion double pour l'heure qui suit (captcha.RecordCreate), comme après une création, ce qui
+// ralentit les essais en série en plus des 10 essais par heure.
 func (a compteAPI) recup(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		AR          string  `json:"a_r"`
 		Persistante *bool   `json:"persistante"`
 		Etiquette   *string `json:"etiquette"`
+		Altcha      string  `json:"altcha"`
+		HP          string  `json:"hp"`
+		ShownAt     string  `json:"shown_at"`
 	}
 	if err := lire(w, r, &b, maxJSON); err != nil {
 		failCompte(w, err)
@@ -241,11 +248,21 @@ func (a compteAPI) recup(w http.ResponseWriter, r *http.Request) {
 	b.AR = ""
 	o, err2 := options(b.Persistante, b.Etiquette)
 	if err != nil || err2 != nil {
+		clear(aR[:])
 		failCompte(w, errBadRequest)
 		return
 	}
-	ov, err := a.c.Recup(ipOf(r), aR, o)
+	ip := ipOf(r)
+	if err := a.antiRobot(b.Altcha, b.ShownAt, b.HP, ip); err != nil {
+		clear(aR[:])
+		failCompte(w, err)
+		return
+	}
+	ov, err := a.c.Recup(ip, aR, o)
 	clear(aR[:])
+	if errors.Is(err, compte.ErrIdentifiants) {
+		a.cap.RecordCreate(ip)
+	}
 	if err != nil {
 		failCompte(w, err)
 		return

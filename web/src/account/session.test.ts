@@ -19,6 +19,12 @@ import { garder, lirePasses, nouvelId, tirerPass } from "../paiement/pass";
 import { formulesDisponibles } from "../paiement/jetons";
 
 const PREUVE = { altcha: "preuve", hp: "", shown_at: "t" };
+/** Preuve anti-robot de connexion/fin et de recup : comptée, pour savoir QUAND elle est demandée. */
+let preuvesDemandees = 0;
+const P = async () => {
+  preuvesDemandees++;
+  return { altcha: `preuve-${preuvesDemandees}`, hp: "", shown_at: "t" };
+};
 const UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -143,12 +149,12 @@ describe("inscription par passkey", () => {
     // Rechargement : la passkey connecte, la clé locale ouvre les données, sans clé de récupération.
     recharger();
     await C.preparerConnexion();
-    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
     expect(C.account.cleLocale).toBe(true);
     // Déconnexion : clé locale effacée ; la connexion suivante demande la clé de récupération.
     await C.seDeconnecter();
     expect([...idb.raw().keys()]).toEqual([]);
-    expect(await C.seConnecter(false)).toBe("cle_requise");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("cle_requise");
     expect(C.cleRequise()).toBe(true);
   });
 
@@ -203,7 +209,7 @@ describe("1Password et sorties PRF non conformes", () => {
       await inscription();
       expect(compte().passkeys[0]!.envs).toHaveLength(1);
       recharger();
-      expect(await C.seConnecter(false)).toBe("ouvert");
+      expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
       expect(C.account.cleLocale).toBe(false);
       rienDePrf();
     });
@@ -225,7 +231,7 @@ describe("connexion et réparation des enveloppes", () => {
     recharger();
     await C.preparerConnexion();
     const n = srv.requetes.length;
-    expect(await C.seConnecter(true)).toBe("ouvert");
+    expect(await C.seConnecter(true, "defaut", P)).toBe("ouvert");
     expect(srv.requetes[n]!.path).toBe("/api/compte/connexion/fin"); // aucune requête avant le geste
     expect(C.account.profil?.pseudo).toBe("Lea");
     expect(C.account.persistante).toBe(true);
@@ -240,7 +246,7 @@ describe("connexion et réparation des enveloppes", () => {
     auth.o.prf = "creation";
     auth.passkeys[0]!.secret = new Uint8Array(32).fill(3) as Bytes;
     recharger();
-    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
     const p = compte().passkeys[0]!;
     expect(p.envs).toHaveLength(1);
     const kc = await ouvrirEnveloppesPrf(auth.sortie(auth.passkeys[0]!, await entreePrf())!, compte().h, auth.passkeys[0]!.id, p.envs.map(unb64u));
@@ -248,7 +254,7 @@ describe("connexion et réparation des enveloppes", () => {
     expect(C.account.cleLocale).toBe(false);
     // Sans la clé locale, la connexion suivante s'ouvre par l'enveloppe.
     await C.seDeconnecter();
-    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
     expect(C.cleRequise()).toBe(false);
     rienDePrf();
   });
@@ -257,10 +263,10 @@ describe("connexion et réparation des enveloppes", () => {
     const texte = await inscription();
     await C.seDeconnecter();
     auth.changerSortie(auth.passkeys[0]!); // iCloud en QR, autre version d'iOS
-    expect(await C.seConnecter(false)).toBe("cle_requise");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("cle_requise");
     expect(C.account.etat).toBe("absent");
     const avant = compte().passkeys[0]!.envs.length;
-    expect(await C.ouvrirAvecCle(texte.toLowerCase())).toBe("posee");
+    expect(await C.ouvrirAvecCle(texte.toLowerCase(), P)).toBe("posee");
     expect(C.account.etat).toBe("ouvert");
     expect(C.account.recupere).toBe(true);
     expect(C.account.cleLocale).toBe(false);
@@ -274,7 +280,7 @@ describe("connexion et réparation des enveloppes", () => {
     expect([...srv.sessions.values()].filter((s) => s.parRecup)).toHaveLength(1);
     // La connexion suivante s'ouvre sans la clé.
     await C.seDeconnecter();
-    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
     rienDePrf();
   });
 
@@ -283,8 +289,8 @@ describe("connexion et réparation des enveloppes", () => {
     await C.seDeconnecter();
     srv.reglages.enveloppesMax = 1; // plein
     auth.changerSortie(auth.passkeys[0]!);
-    expect(await C.seConnecter(false)).toBe("cle_requise");
-    expect(await C.ouvrirAvecCle(texte)).toBe("plein");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("cle_requise");
+    expect(await C.ouvrirAvecCle(texte, P)).toBe("plein");
     expect(C.account.etat).toBe("ouvert");
     expect(C.account.cleLocale).toBe(true);
     expect([...idb.raw().keys()]).toEqual(["shhdrop-compte"]);
@@ -299,23 +305,23 @@ describe("connexion et réparation des enveloppes", () => {
     await C.seDeconnecter();
     brancher(authLea);
     authLea.changerSortie(authLea.passkeys[0]!);
-    expect(await C.seConnecter(false)).toBe("cle_requise");
-    await expect(C.ouvrirAvecCle(cleBob)).rejects.toThrow("cle_autre_compte");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("cle_requise");
+    await expect(C.ouvrirAvecCle(cleBob, P)).rejects.toThrow("cle_autre_compte");
     expect(C.account.etat).toBe("absent");
   });
 
   it("clé mal recopiée : erreur locale, aucune requête ; clé inconnue : identifiants", async () => {
     const n = srv.requetes.length;
-    await expect(C.ouvrirAvecCle("ABCD")).rejects.toThrow("cle_recup_longueur");
+    await expect(C.ouvrirAvecCle("ABCD", P)).rejects.toThrow("cle_recup_longueur");
     expect(srv.requetes.length).toBe(n);
-    await expect(C.ouvrirAvecCle("0000-0000-0000-0000-0000-0000-000")).rejects.toMatchObject({ code: "identifiants" });
+    await expect(C.ouvrirAvecCle("0000-0000-0000-0000-0000-0000-000", P)).rejects.toMatchObject({ code: "identifiants" });
   });
 
   it("annuler la clé après une connexion par passkey : la session ouverte au serveur est fermée", async () => {
     await inscription();
     await C.seDeconnecter();
     auth.changerSortie(auth.passkeys[0]!);
-    expect(await C.seConnecter(false)).toBe("cle_requise");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("cle_requise");
     expect(srv.sessions.size).toBe(1);
     await C.annulerCle();
     expect(srv.sessions.size).toBe(0);
@@ -327,7 +333,7 @@ describe("récupération et nouvelle clé", () => {
   it("par la clé seule : session marquée, coffres ouverts ; nouvelle clé enregistrée, l'ancienne ne sert plus", async () => {
     const texte = await inscription();
     await C.seDeconnecter();
-    expect(await C.ouvrirAvecCle(texte, true)).toBe("recup");
+    expect(await C.ouvrirAvecCle(texte, P, true)).toBe("recup");
     expect(C.account.recupere).toBe(true);
     expect(C.account.persistante).toBe(true);
     expect((await C.appareils()).filter((a) => a.parRecup)).toHaveLength(1);
@@ -336,8 +342,8 @@ describe("récupération et nouvelle clé", () => {
     await C.enregistrerNouvelleCle();
     expect(C.account.recupere).toBe(false);
     await C.seDeconnecter();
-    await expect(C.ouvrirAvecCle(texte)).rejects.toMatchObject({ code: "identifiants" });
-    expect(await C.ouvrirAvecCle(nouvelle)).toBe("recup");
+    await expect(C.ouvrirAvecCle(texte, P)).rejects.toMatchObject({ code: "identifiants" });
+    expect(await C.ouvrirAvecCle(nouvelle, P)).toBe("recup");
   });
 
   it("nouvelle clé sans session récente : recent, puis confirmerParPasskey et c'est fait", async () => {
@@ -457,8 +463,8 @@ describe("parcours téléphone (QR) sur ordinateur", () => {
     // Le téléphone (autre appareil, sans clé locale) : la passkey connecte, la clé de récupération ouvre.
     C._oublierMemoire();
     idb = fakeIndexedDB();
-    expect(await C.seConnecter(false, "defaut")).toBe("cle_requise");
-    expect(await C.ouvrirAvecCle(cle)).toBe("sans_prf");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("cle_requise");
+    expect(await C.ouvrirAvecCle(cle, P)).toBe("sans_prf");
     expect(C.account.etat).toBe("ouvert");
     rienDePrf();
   });
@@ -475,7 +481,7 @@ describe("parcours téléphone (QR) sur ordinateur", () => {
     await inscription();
     for (const [p, h] of [["hybride", ["hybrid"]], ["local", ["client-device"]], ["defaut", undefined]] as const) {
       await C.seDeconnecter();
-      expect(await C.seConnecter(false, p)).toBe("ouvert");
+      expect(await C.seConnecter(false, p, P)).toBe("ouvert");
       expect(indices(auth.assertions.at(-1) as never)).toEqual(h);
     }
   });
@@ -492,7 +498,7 @@ describe("parcours téléphone (QR) sur ordinateur", () => {
     expect((await C.listePasskeys()).map((p) => p.nom)).toEqual(["Firefox · ordinateur", "Téléphone"]);
     // Le téléphone ouvre ensuite les données avec sa propre sortie PRF.
     await C.seDeconnecter();
-    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
     expect(C.account.cleLocale).toBe(false);
     rienDePrf();
   });
@@ -521,7 +527,7 @@ describe("pseudo d'un invité du salon", () => {
     expect(await C.pseudoLibreSalon("Admin")).toBe(false);
     expect(srv.requetes.length).toBe(n);
     expect(await C.pseudoLibreSalon("Leo")).toBe(true);
-    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
     const m = srv.requetes.length;
     expect(await C.pseudoLibreSalon("LEA")).toBe(true);
     expect(srv.requetes.length).toBe(m);
@@ -658,7 +664,7 @@ describe("session et déconnexion", () => {
     recharger();
     await C.restaurer();
     expect(C.account.etat).toBe("absent");
-    expect(await C.seConnecter(false)).toBe("ouvert"); // clé locale toujours là
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert"); // clé locale toujours là
   });
 
   it("aucune requête hors de /api/compte/* ; jeton seulement en X-Shh-Session", async () => {
@@ -674,7 +680,7 @@ describe("session et déconnexion", () => {
   it("appareils : noms déchiffrés sur l'appareil, « cet appareil » ; déconnecter un appareil ou tous les autres", async () => {
     await inscription();
     recharger();
-    await C.seConnecter(false);
+    await C.seConnecter(false, "defaut", P);
     const l = await C.appareils();
     expect(l).toHaveLength(2);
     expect(l.map((a) => a.nom)).toEqual(["Firefox · ordinateur", "Firefox · ordinateur"]);
@@ -784,7 +790,7 @@ describe("pass d'un accès offert et compte", () => {
     const g2 = offert();
     await garder(idb, g2);
     await C.preparerConnexion();
-    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
     expect(dansCoffre(g.pass) && dansCoffre(g2.pass)).toBe(true);
   });
 
@@ -798,7 +804,7 @@ describe("pass d'un accès offert et compte", () => {
     idb = fakeIndexedDB();
     expect(await lirePasses(idb)).toHaveLength(0);
     await C.preparerConnexion();
-    expect(await C.seConnecter(false)).toBe("ouvert");
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
     const l = await lirePasses(idb);
     expect(l).toHaveLength(1);
     expect(memes(l[0]!.pass, g.pass)).toBe(true);
@@ -823,5 +829,113 @@ describe("REGLAGES_DEFAUT", () => {
   it("le profil de l'inscription porte les réglages par défaut", async () => {
     await inscription();
     expect(C.account.profil?.reglages).toEqual(REGLAGES_DEFAUT);
+  });
+});
+
+// Décision du 26 novembre (conception du compte §19) : sur ordinateur, le chemin de passkey qui a
+// marché est retenu sur l'appareil (base shhdrop-compte, chiffré, jamais envoyé), effacé par « Se
+// déconnecter » ; rien sur téléphone (parcours « defaut »).
+describe("chemin de passkey retenu sur ordinateur", () => {
+  it("création « local » retenue ; passkey de plateforme demandée par le téléphone : « local » ; connexion par QR : « hybride » ; déconnexion : oublié", async () => {
+    expect(await C.parcoursRetenu()).toBeNull();
+    await C.preparerInscription(PREUVE);
+    await C.creerPasskey("Lea", "fr", "local");
+    await C.terminerInscription(false);
+    expect(await C.parcoursRetenu()).toBe("local");
+    expect([...idb.raw().keys()]).toEqual(["shhdrop-compte"]);
+    // Rien de ce choix ne part au serveur.
+    expect(srv.requetes.map((r) => r.brut).join("\n")).not.toMatch(/parcours|hybride|"local"/);
+    // Connexion par le téléphone (le navigateur ne dit pas où était la passkey) : « hybride ».
+    recharger();
+    expect(await C.seConnecter(false, "hybride", P)).toBe("ouvert");
+    expect(await C.parcoursRetenu()).toBe("hybride");
+    await C.seDeconnecter();
+    expect(await C.parcoursRetenu()).toBeNull();
+    expect([...idb.raw().keys()]).toEqual([]);
+    // Passkey créée « par le téléphone » mais rendue par la plateforme (synchronisée ici) : « local ».
+    brancher(new FauxAuthentificateur({ prf: "creation", attachement: "platform" }));
+    await C.preparerInscription(PREUVE);
+    await C.creerPasskey("Zoe", "fr", "hybride");
+    await C.terminerInscription(false);
+    expect(await C.parcoursRetenu()).toBe("local");
+  });
+
+  it("parcours « defaut » (téléphone) : rien n'est écrit", async () => {
+    await inscription();
+    recharger();
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
+    expect([...idb.raw().keys()]).toEqual([]);
+  });
+});
+
+// Anti-robot du compte (décision du 26 novembre) : la preuve de la connexion n'est demandée
+// qu'APRÈS navigator.credentials.get et part avec connexion/fin ; celle de recup après le
+// contrôle local de la clé. Rien entre le geste et la cérémonie.
+describe("preuve anti-robot de la connexion et de la récupération", () => {
+  /** Branche un navigateur qui note, au moment de la cérémonie, les requêtes et preuves déjà faites. */
+  function noterAuGeste(a: FauxAuthentificateur) {
+    const vu: { requetes: number; preuves: number }[] = [];
+    auth = a;
+    configurerNavigateur(() => {
+      const n = a.navigateur(signalees);
+      return {
+        ...n,
+        credentials: {
+          create: (o) => n.credentials!.create(o),
+          get: (o) => {
+            vu.push({ requetes: srv.requetes.length, preuves: preuvesDemandees });
+            return n.credentials!.get(o);
+          },
+        },
+      };
+    });
+    return vu;
+  }
+
+  it("connexion : aucune requête ni preuve entre le geste et la cérémonie ; la preuve part avec connexion/fin", async () => {
+    await inscription();
+    recharger();
+    const vu = noterAuGeste(auth);
+    await C.preparerConnexion();
+    const n = srv.requetes.length;
+    const p0 = preuvesDemandees;
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
+    expect(vu).toEqual([{ requetes: n, preuves: p0 }]); // rien avant navigator.credentials.get
+    expect(preuvesDemandees).toBe(p0 + 1); // une seule, après
+    const fin = srv.requetes[n]!;
+    expect(fin.path).toBe("/api/compte/connexion/fin");
+    expect(fin.body).toMatchObject({ altcha: `preuve-${p0 + 1}`, hp: "", shown_at: "t" });
+    // connexion/debut, chargée avant le geste, ne porte aucune preuve.
+    expect(srv.requetes.filter((r) => r.path.endsWith("connexion/debut")).every((r) => !("altcha" in r.body))).toBe(true);
+  });
+
+  it("connexion : preuve impossible après la cérémonie → erreur, connexion/fin jamais envoyée", async () => {
+    await inscription();
+    recharger();
+    await C.preparerConnexion();
+    const n = srv.requetes.length;
+    await expect(C.seConnecter(false, "defaut", () => Promise.reject(new Error("pow_indisponible")))).rejects.toThrow("pow_indisponible");
+    expect(srv.requetes.length).toBe(n);
+    expect(C.account.etat).toBe("absent");
+  });
+
+  it("connexion : sans preuve, le serveur refuse (bad_request) et rien n'est ouvert", async () => {
+    await inscription();
+    recharger();
+    await C.preparerConnexion();
+    await expect(C.seConnecter(false, "defaut", async () => ({ altcha: "", hp: "", shown_at: "" }))).rejects.toMatchObject({ code: "bad_request" });
+    expect(C.account.etat).toBe("absent");
+  });
+
+  it("récupération : preuve jointe à recup ; clé mal recopiée : aucune preuve demandée", async () => {
+    const cle = await inscription();
+    await C.seDeconnecter();
+    const p0 = preuvesDemandees;
+    await expect(C.ouvrirAvecCle("ABCD", P)).rejects.toThrow("cle_recup_longueur");
+    expect(preuvesDemandees).toBe(p0);
+    expect(await C.ouvrirAvecCle(cle, P)).toBe("recup");
+    expect(preuvesDemandees).toBe(p0 + 1);
+    const r = srv.requetes.filter((x) => x.path === "/api/compte/recup").at(-1)!;
+    expect(r.body).toMatchObject({ altcha: `preuve-${p0 + 1}`, hp: "", shown_at: "t" });
   });
 });

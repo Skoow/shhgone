@@ -95,6 +95,15 @@ func (e envCompte) debutInscription(t *testing.T, remote string) (string, json.R
 	return d.Etape, d.Options
 }
 
+// preuve : m complété de la preuve anti-robot d'un défi résolu pour remote (connexion/fin, recup ;
+// horloge avancée de 3 s, comme captchaFor).
+func (e envCompte) preuve(t *testing.T, remote string, m map[string]any) map[string]any {
+	t.Helper()
+	alt, shown := e.captchaFor(t, remote)
+	m["altcha"], m["hp"], m["shown_at"] = alt, "", shown
+	return m
+}
+
 // corpsFin : corps d'inscription/fin (enveloppes et coffres aléatoires : le serveur ne les
 // ouvre jamais) ; aR : A_r tiré pour ce compte.
 func corpsFin(etape string, cred []byte, pseudo string, aR []byte) map[string]any {
@@ -143,8 +152,8 @@ func (e envCompte) connecter(t *testing.T, remote string, in inscrit) map[string
 	if err != nil {
 		t.Fatal(err)
 	}
-	w = e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: remote, body: mustJSON(map[string]any{
-		"etape": d.Etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""})})
+	w = e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: remote, body: mustJSON(e.preuve(t, remote, map[string]any{
+		"etape": d.Etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""}))})
 	expect(t, w, 200, "")
 	return jsonOf(t, w)
 }
@@ -153,7 +162,7 @@ func (e envCompte) connecter(t *testing.T, remote string, in inscrit) map[string
 func (e envCompte) recup(t *testing.T, remote string, in inscrit) string {
 	t.Helper()
 	w := e.do(req{method: "POST", path: "/api/compte/recup", remote: remote,
-		body: mustJSON(map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""})})
+		body: mustJSON(e.preuve(t, remote, map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""}))})
 	expect(t, w, 200, "")
 	d := jsonOf(t, w)
 	s, _ := d["session"].(string)
@@ -228,7 +237,7 @@ func TestRecupHTTP(t *testing.T) {
 	e := newEnvCompte(t)
 	in := e.inscrire(t, "203.0.113.60:1", "lea")
 	w := e.do(req{method: "POST", path: "/api/compte/recup", remote: "203.0.113.61:1",
-		body: mustJSON(map[string]any{"a_r": in.aR, "persistante": true, "etiquette": enc.EncodeToString(rnd(64))})})
+		body: mustJSON(e.preuve(t, "203.0.113.61:1", map[string]any{"a_r": in.aR, "persistante": true, "etiquette": enc.EncodeToString(rnd(64))}))})
 	expect(t, w, 200, "")
 	d := jsonOf(t, w)
 	if cles(d) != "blob_prive,blob_profil,env_r,gen_prive,gen_profil,h,session" || len(d["env_r"].(string)) != 80 ||
@@ -249,11 +258,11 @@ func TestRecupHTTP(t *testing.T) {
 	}
 	for i := 0; i < 10; i++ {
 		expect(t, e.do(req{method: "POST", path: "/api/compte/recup", remote: "203.0.113.63:1",
-			body: mustJSON(map[string]any{"a_r": enc.EncodeToString(rnd(32)), "persistante": false, "etiquette": ""})}),
+			body: mustJSON(e.preuve(t, "203.0.113.63:1", map[string]any{"a_r": enc.EncodeToString(rnd(32)), "persistante": false, "etiquette": ""}))}),
 			403, `{"error":"identifiants"}`)
 	}
 	expect(t, e.do(req{method: "POST", path: "/api/compte/recup", remote: "203.0.113.63:1",
-		body: mustJSON(map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""})}), 429, "")
+		body: mustJSON(e.preuve(t, "203.0.113.63:1", map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""}))}), 429, "")
 }
 
 // Parcours par HTTP : coffres, sessions, étiquette, pseudo, déconnexion.
@@ -418,5 +427,5 @@ func TestEtatExportSuppressionHTTP(t *testing.T) {
 	expect(t, e.do(req{method: "POST", path: "/api/compte/supprimer", hdr: S, body: []byte(`{}`)}), 200, `{"salons_fermes":0}`)
 	expect(t, e.do(req{method: "GET", path: "/api/compte", hdr: S}), 401, `{"error":"session"}`)
 	expect(t, e.do(req{method: "POST", path: "/api/compte/recup", remote: ip,
-		body: mustJSON(map[string]any{"a_r": a.aR, "persistante": false, "etiquette": ""})}), 403, `{"error":"identifiants"}`)
+		body: mustJSON(e.preuve(t, ip, map[string]any{"a_r": a.aR, "persistante": false, "etiquette": ""}))}), 403, `{"error":"identifiants"}`)
 }

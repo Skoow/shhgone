@@ -122,8 +122,13 @@ async function appel(n: Net, method: "GET" | "POST" | "PUT", route: string, opts
 
 // --- Inscription (conception du compte par passkey §6.4) ------------------------------------------
 
-/** Preuve anti-robot ALTCHA (mêmes champs que POST /api/shares). */
+/**
+ * Preuve anti-robot ALTCHA (mêmes champs que POST /api/shares), exigée par inscription/debut
+ * (avant le geste), connexion/fin (après le geste) et recup (décision du 26 novembre).
+ */
 export type Preuve = { altcha: string; hp: string; shown_at: string };
+/** Champs anti-robot d'une requête : jamais d'autres champs que ceux de la preuve. */
+const champsPreuve = (p: Preuve) => ({ altcha: p.altcha, hp: p.hp, shown_at: p.shown_at });
 
 /** Options WebAuthn (JSON niveau 3) et étape qui porte le défi (5 min, usage unique). */
 export type Ceremonie = { etape: string; options: Obj };
@@ -139,7 +144,7 @@ const cred = (c: Obj) => sansSortiePrf(c);
 const opt = (b: Bytes | null) => (b === null ? "" : b64u(b));
 
 export async function inscriptionDebut(n: Net, p: Preuve): Promise<Ceremonie> {
-  return ceremonie(await appel(n, "POST", "inscription/debut", { body: { altcha: p.altcha, hp: p.hp, shown_at: p.shown_at } }));
+  return ceremonie(await appel(n, "POST", "inscription/debut", { body: champsPreuve(p) }));
 }
 
 export type FinInscription = {
@@ -194,8 +199,12 @@ export async function connexionDebut(n: Net): Promise<Ceremonie> {
 /** Ce que rend une connexion par passkey : enveloppes PRF de la passkey qui a signé (0 à 4). */
 export type Ouverture = { session: string; h: Bytes; credId: Bytes; enveloppes: Bytes[]; blobProfil: Bytes; genProfil: number; blobPrive: Bytes; genPrive: number };
 
-export async function connexionFin(n: Net, b: { etape: string; credential: Obj; persistante: boolean; etiquette: Bytes | null }): Promise<Ouverture> {
-  const o = await appel(n, "POST", "connexion/fin", { body: { etape: b.etape, credential: cred(b.credential), persistante: b.persistante, etiquette: opt(b.etiquette) } });
+/**
+ * Fin de connexion, avec la preuve anti-robot (décision du 26 novembre) : elle part ici, APRÈS
+ * le geste, jamais avec connexion/debut, chargée avant le geste.
+ */
+export async function connexionFin(n: Net, b: { etape: string; credential: Obj; persistante: boolean; etiquette: Bytes | null }, p: Preuve): Promise<Ouverture> {
+  const o = await appel(n, "POST", "connexion/fin", { body: { etape: b.etape, credential: cred(b.credential), persistante: b.persistante, etiquette: opt(b.etiquette), ...champsPreuve(p) } });
   const id = octets(o, "cred_id");
   if (id.length < 1 || id.length > 1023) throw invalide();
   return {
@@ -213,8 +222,8 @@ export async function connexionFin(n: Net, b: { etape: string; credential: Obj; 
 /** Par la clé de récupération : A_r seulement (jamais R ni KEK_r) ; session récente, marquée « par la clé ». */
 export type OuvertureRecup = { session: string; h: Bytes; envR: Bytes; blobProfil: Bytes; genProfil: number; blobPrive: Bytes; genPrive: number };
 
-export async function recup(n: Net, b: { aR: Bytes; persistante: boolean; etiquette: Bytes | null }): Promise<OuvertureRecup> {
-  const o = await appel(n, "POST", "recup", { body: { a_r: b64u(b.aR), persistante: b.persistante, etiquette: opt(b.etiquette) } });
+export async function recup(n: Net, b: { aR: Bytes; persistante: boolean; etiquette: Bytes | null }, p: Preuve): Promise<OuvertureRecup> {
+  const o = await appel(n, "POST", "recup", { body: { a_r: b64u(b.aR), persistante: b.persistante, etiquette: opt(b.etiquette), ...champsPreuve(p) } });
   return {
     session: jeton(o, "session"),
     h: octets(o, "h", 16),

@@ -223,6 +223,8 @@ export type Assertion = {
   credential: Obj;
   credId: Bytes;
   prf: Bytes | null;
+  /** Où était la passkey, si le navigateur le dit (jamais envoyé ; §19 : chemin retenu). */
+  attachement: "platform" | "cross-platform" | null;
 };
 
 /** navigator.credentials.get : appelé directement depuis le geste (aucune requête avant). */
@@ -239,7 +241,8 @@ export async function obtenir(options: PublicKeyCredentialRequestOptions): Promi
   const response: Obj = { clientDataJSON: champ(r.response, "clientDataJSON"), authenticatorData: champ(r.response, "authenticatorData"), signature: champ(r.response, "signature") };
   const uh = r.response.userHandle;
   if (uh !== null && uh !== undefined) response.userHandle = champ(r.response, "userHandle");
-  return { credential: { id: b64u(id), rawId: b64u(id), type: "public-key", response, clientExtensionResults: extensionsPourServeur(ext) }, credId: id, prf: sortiePrf(ext) };
+  const att = r.authenticatorAttachment;
+  return { credential: { id: b64u(id), rawId: b64u(id), type: "public-key", response, clientExtensionResults: extensionsPourServeur(ext) }, credId: id, prf: sortiePrf(ext), attachement: att === "platform" || att === "cross-platform" ? att : null };
 }
 
 /**

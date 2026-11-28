@@ -292,3 +292,45 @@ test("suppression du compte par un geste de passkey ; ensuite la passkey ne conn
   expect(findIn(shh.server.stdout(), reperes)).toEqual([]);
   expect(findIn(shh.server.stderr(), reperes)).toEqual([]);
 });
+
+/** Preuve ALTCHA d'un corps de requête : temps de calcul rapporté par le Worker (ms), niveau du défi. */
+function preuveDe(body: string): { took: number; niveau: number } {
+  const j = JSON.parse(body) as { altcha?: string };
+  expect(typeof j.altcha).toBe("string");
+  const p = JSON.parse(Buffer.from(j.altcha!, "base64").toString()) as { took: number; salt: string };
+  return { took: p.took, niveau: Number(/\.(\d)\?expires=/.exec(p.salt)![1]) };
+}
+
+// Décision du 26 novembre : anti-robot ALTCHA sur la création de compte (inscription/debut, avant le
+// geste), la connexion (connexion/fin, après le geste) et la récupération (recup) ; temps de calcul
+// mesurés tels quels, puis avec le processeur ralenti 4 fois (téléphone moyen). Sur ordinateur, le
+// chemin « cet ordinateur » qui a servi est ensuite proposé d'abord.
+for (const ralenti of [1, 4]) {
+  test(`anti-robot du compte : preuve jointe, calculée avant le geste (processeur ×${ralenti})`, async ({ page, shh, requetes, isMobile }) => {
+    await crochetPrf(page.context());
+    const { cdp } = await authentificateur(page, true);
+    if (ralenti > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: ralenti });
+    const cle = await inscrire(page, shh.origin, `Ana${randomBytes(3).toString("hex")}`);
+    if (!isMobile) {
+      // Page rechargée (session en mémoire seulement : oubliée) ; « cet ordinateur », qui a servi, d'abord.
+      await page.goto(shh.origin + "/compte/connexion");
+      await expect(bouton(page, "Utiliser une passkey de cet ordinateur")).toHaveAttribute("type", "submit");
+      await expect(page.locator("[data-indice-qr]")).toHaveCount(0);
+    } else await deconnecter(page, shh.origin);
+    expect(await connecter(page, shh.origin)).toBe("ouvert");
+    await deconnecter(page, shh.origin);
+    await page.goto(shh.origin + "/compte/recuperation");
+    await champ(page, "Clé de récupération").fill(cle);
+    await bouton(page, "Ouvrir").click();
+    await expect(titre(page, "Créez une passkey sur cet appareil")).toBeVisible({ timeout: 30_000 });
+    const de = (fin: string) => requetes.filter((r) => new URL(r.url).pathname === "/api/compte/" + fin).map((r) => preuveDe(r.body));
+    const [ins, cx, rc] = [de("inscription/debut"), de("connexion/fin"), de("recup")];
+    expect(ins.length).toBeGreaterThanOrEqual(1);
+    expect(cx).toHaveLength(1);
+    expect(rc).toHaveLength(1);
+    // connexion/debut (chargée avant le geste) ne porte aucune preuve.
+    for (const r of requetes.filter((x) => new URL(x.url).pathname === "/api/compte/connexion/debut")) expect(r.body).not.toContain("altcha");
+    const m = { ralenti, inscription: ins[0], connexion: cx[0], recup: rc[0] };
+    console.log(`[mesure anti-robot] ${test.info().project.name} ${JSON.stringify(m)}`);
+  });
+}

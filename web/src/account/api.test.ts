@@ -15,6 +15,7 @@ const CEREMONIE = { etape: S(32, 4), options: OPTS };
 const COFFRES = { blob_profil: S(4141, 6), gen_profil: 1, blob_prive: S(4141, 7), gen_prive: 2 };
 const OUV = { session: S(32, 2), h: S(16, 3), cred_id: S(20, 5), enveloppes: [S(60, 4), S(60, 8)], ...COFFRES };
 const RECUP = { session: S(32, 2), h: S(16, 3), env_r: S(60, 4), ...COFFRES };
+const PREUVE_A: A.Preuve = { altcha: "cHJldXZl", hp: "", shown_at: "jeton" };
 /** Credential tel qu'un gestionnaire non conforme le rendrait : la sortie PRF doit être retirée. */
 const CRED = { id: S(20, 5), rawId: S(20, 5), type: "public-key", response: { clientDataJSON: S(10) }, clientExtensionResults: { prf: { enabled: true, results: { first: S(32, 0xee) } }, hmacGetSecret: { output1: S(32, 0xee) } } };
 const CRED_NET = { ...CRED, clientExtensionResults: { prf: { enabled: true } } };
@@ -44,8 +45,9 @@ const CALLS: [string, (n: A.Net) => Promise<unknown>, string, unknown, unknown][
     { session: S(32), h: S(16) },
   ],
   ["connexionDebut", (n) => A.connexionDebut(n), "POST connexion/debut", {}, CEREMONIE],
-  ["connexionFin", (n) => A.connexionFin(n, { etape: S(32), credential: CRED, persistante: true, etiquette: null }), "POST connexion/fin", { etape: S(32), credential: CRED_NET, persistante: true, etiquette: "" }, OUV],
-  ["recup", (n) => A.recup(n, { aR: B(32, 2), persistante: false, etiquette: null }), "POST recup", { a_r: S(32, 2), persistante: false, etiquette: "" }, RECUP],
+  // Preuve anti-robot jointe à connexion/fin (après le geste) et à recup : ses trois champs seulement.
+  ["connexionFin", (n) => A.connexionFin(n, { etape: S(32), credential: CRED, persistante: true, etiquette: null }, { ...PREUVE_A, autre: "x" } as A.Preuve), "POST connexion/fin", { etape: S(32), credential: CRED_NET, persistante: true, etiquette: "", ...PREUVE_A }, OUV],
+  ["recup", (n) => A.recup(n, { aR: B(32, 2), persistante: false, etiquette: null }, PREUVE_A), "POST recup", { a_r: S(32, 2), persistante: false, etiquette: "", ...PREUVE_A }, RECUP],
   ["reauthDebut", (n) => A.reauthDebut(n, JETON), "POST reauth/debut", {}, CEREMONIE],
   ["reauthFin", (n) => A.reauthFin(n, JETON, S(32), CRED), "POST reauth/fin", { etape: S(32), credential: CRED_NET }, { enveloppes: [] }],
   ["passkeys", (n) => A.passkeys(n, JETON), "GET passkeys", undefined, { passkeys: [{ cred_id: S(20), ajoutee: "2026-11", etiquette: "", be: false, prf: true }] }],
@@ -122,15 +124,15 @@ describe("réponses", () => {
   });
 
   it("connexion : session, h, passkey, 0 à 4 enveloppes de 60 octets, coffres", async () => {
-    const o = await A.connexionFin(net(() => ok(OUV)).n, { etape: S(32), credential: CRED, persistante: false, etiquette: null });
+    const o = await A.connexionFin(net(() => ok(OUV)).n, { etape: S(32), credential: CRED, persistante: false, etiquette: null }, PREUVE_A);
     expect(o).toEqual({ session: S(32, 2), h: B(16, 3), credId: B(20, 5), enveloppes: [B(60, 4), B(60, 8)], blobProfil: B(4141, 6), genProfil: 1, blobPrive: B(4141, 7), genPrive: 2 });
     for (const bad of [{ ...OUV, enveloppes: [S(59)] }, { ...OUV, enveloppes: [S(60), S(60), S(60), S(60), S(60)] }, { ...OUV, enveloppes: null }, { ...OUV, cred_id: "" }, { ...OUV, h: S(15) }])
-      await expect(A.connexionFin(net(() => ok(bad)).n, { etape: S(32), credential: CRED, persistante: false, etiquette: null })).rejects.toThrow("reponse_invalide");
+      await expect(A.connexionFin(net(() => ok(bad)).n, { etape: S(32), credential: CRED, persistante: false, etiquette: null }, PREUVE_A)).rejects.toThrow("reponse_invalide");
   });
 
   it("recup : Env_r de 60 octets ; passkeys : libellé de 64 octets ou aucun", async () => {
-    expect(await A.recup(net(() => ok(RECUP)).n, { aR: B(32), persistante: false, etiquette: null })).toMatchObject({ envR: B(60, 4), h: B(16, 3) });
-    await expect(A.recup(net(() => ok({ ...RECUP, env_r: S(61) })).n, { aR: B(32), persistante: false, etiquette: null })).rejects.toThrow("reponse_invalide");
+    expect(await A.recup(net(() => ok(RECUP)).n, { aR: B(32), persistante: false, etiquette: null }, PREUVE_A)).toMatchObject({ envR: B(60, 4), h: B(16, 3) });
+    await expect(A.recup(net(() => ok({ ...RECUP, env_r: S(61) })).n, { aR: B(32), persistante: false, etiquette: null }, PREUVE_A)).rejects.toThrow("reponse_invalide");
     expect(await A.passkeys(net(() => ok({ passkeys: [{ cred_id: S(20), ajoutee: "2026-11", etiquette: S(64, 2), be: true, prf: false }] })).n, JETON)).toEqual([{ credId: B(20), ajoutee: "2026-11", etiquette: B(64, 2), be: true, prf: false }]);
     for (const bad of [{ passkeys: [{ cred_id: S(20), ajoutee: "2026-11", etiquette: S(63), be: true, prf: false }] }, { passkeys: [{ cred_id: S(20), ajoutee: "2026-11-02", etiquette: "", be: true, prf: false }] }, { passkeys: [{ cred_id: S(20), ajoutee: "2026-11", etiquette: "", be: "oui", prf: false }] }, { passkeys: {} }])
       await expect(A.passkeys(net(() => ok(bad)).n, JETON)).rejects.toThrow("reponse_invalide");

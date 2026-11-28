@@ -5,7 +5,7 @@
 // « Créez une passkey sur cet appareil » après la clé. Le module de compte est remplacé par un double.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../../i18n/i18n.svelte";
-import { appareil, bouton, cocher, demonter, erreurDe, monter, presser, saisir } from "./pages.test-helper";
+import { appareil, attendre, bouton, cocher, demonter, erreurDe, monter, presser, PREUVE, saisir } from "./pages.test-helper";
 
 const texte = () => document.body.textContent!.replace(/\s+/g, " ");
 const C = vi.hoisted(() => ({
@@ -20,8 +20,12 @@ const C = vi.hoisted(() => ({
   preparerAjout: vi.fn(),
   ajouterPasskey: vi.fn(),
   deuxiemeGesteAjout: vi.fn(),
+  parcoursRetenu: vi.fn(),
 }));
 vi.mock("../../account/session.svelte", async (orig) => ({ ...(await orig<object>()), ...C }));
+// Preuve anti-robot (routes/compte/preuve.ts) : double ; `pret` : calcul fini ou non au moment de partir.
+const PV = vi.hoisted(() => ({ preparerPreuve: vi.fn(), preuvePrete: vi.fn(), obtenirPreuve: vi.fn() }));
+vi.mock("./preuve", () => PV);
 const { CompteError, account } = await import("../../account/session.svelte");
 const { default: Connexion } = await import("./Connexion.svelte");
 const { default: Recuperation } = await import("./Recuperation.svelte");
@@ -44,6 +48,10 @@ beforeEach(() => {
   });
   C.preparerAjout.mockResolvedValue("pret");
   C.ajouterPasskey.mockResolvedValue("ajoutee");
+  C.parcoursRetenu.mockResolvedValue(null);
+  for (const f of Object.values(PV)) f.mockReset();
+  PV.preuvePrete.mockReturnValue(true);
+  PV.obtenirPreuve.mockResolvedValue(PREUVE);
 });
 afterEach(() => {
   demonter();
@@ -60,7 +68,7 @@ describe("connexion par passkey", () => {
     expect(texte()).not.toMatch(/Mot de passe|Adresse e-mail/);
     cocher("Rester connecté sur cet appareil");
     await presser("Se connecter avec une passkey");
-    expect(C.seConnecter).toHaveBeenCalledWith(true, "defaut");
+    expect(C.seConnecter).toHaveBeenCalledWith(true, "defaut", expect.any(Function));
     expect(texte()).toContain("Vous êtes connecté sur cet appareil.");
   });
 
@@ -90,7 +98,7 @@ describe("connexion par passkey", () => {
     await presser("Ouvrir");
     expect(erreurDe("Clé de récupération")).toBe("Cette clé ouvre un autre compte que celui de la passkey.");
     await presser("Ouvrir");
-    expect(C.ouvrirAvecCle).toHaveBeenLastCalledWith("abcd");
+    expect(C.ouvrirAvecCle).toHaveBeenLastCalledWith("abcd", expect.any(Function));
     expect(texte()).toContain("Vous êtes connecté sur cet appareil.");
   });
 
@@ -147,7 +155,7 @@ describe("récupération par la clé", () => {
     cocher("Rester connecté sur cet appareil");
     account.recupere = true;
     await presser("Ouvrir");
-    expect(C.ouvrirAvecCle).toHaveBeenCalledWith("AB12-…", true);
+    expect(C.ouvrirAvecCle).toHaveBeenCalledWith("AB12-…", expect.any(Function), true);
     expect(texte()).toContain("Créez une passkey sur cet appareil");
     expect(C.preparerAjout).toHaveBeenCalled();
     await presser("Créer la passkey");
@@ -178,13 +186,97 @@ describe("connexion sur ordinateur", () => {
     expect(texte()).toContain("Scannez-le avec l'appareil photo du téléphone qui garde votre passkey");
     expect(() => bouton("Se connecter avec une passkey")).toThrow();
     await presser("Se connecter avec mon téléphone");
-    expect(C.seConnecter).toHaveBeenLastCalledWith(false, "hybride");
+    expect(C.seConnecter).toHaveBeenLastCalledWith(false, "hybride", expect.any(Function));
     expect(C.preparerConnexion).toHaveBeenCalledTimes(1);
     account.etat = "absent";
     demonter();
     await monter(Connexion);
     await presser("Utiliser une passkey de cet ordinateur");
-    expect(C.seConnecter).toHaveBeenLastCalledWith(false, "local");
+    expect(C.seConnecter).toHaveBeenLastCalledWith(false, "local", expect.any(Function));
   });
 });
 
+// Décision du 26 novembre : le chemin qui a marché la dernière fois sur cet ordinateur est proposé
+// d'abord (lu sur l'appareil par parcoursRetenu) ; l'autre reste en second.
+describe("connexion sur ordinateur : chemin retenu", () => {
+  beforeEach(() => appareil("ordinateur"));
+
+  it("« cet ordinateur » retenu : la passkey locale d'abord, sans le QR ; le téléphone en second", async () => {
+    C.parcoursRetenu.mockResolvedValue("local");
+    await monter(Connexion);
+    expect(texte()).not.toContain("Scannez-le avec l'appareil photo");
+    const boutons = [...document.querySelectorAll("form.connexion button")].map((b) => b.textContent!.trim());
+    expect(boutons.indexOf("Utiliser une passkey de cet ordinateur")).toBeLessThan(boutons.indexOf("Se connecter avec mon téléphone"));
+    expect(bouton("Utiliser une passkey de cet ordinateur").getAttribute("type")).toBe("submit");
+    await presser("Utiliser une passkey de cet ordinateur");
+    expect(C.seConnecter).toHaveBeenLastCalledWith(false, "local", expect.any(Function));
+    account.etat = "absent";
+    demonter();
+    await monter(Connexion);
+    await presser("Se connecter avec mon téléphone");
+    expect(C.seConnecter).toHaveBeenLastCalledWith(false, "hybride", expect.any(Function));
+  });
+
+  it("téléphone retenu ou rien retenu : le téléphone d'abord (QR expliqué)", async () => {
+    for (const r of ["hybride", null] as const) {
+      C.parcoursRetenu.mockResolvedValue(r);
+      await monter(Connexion);
+      expect(texte()).toContain("Scannez-le avec l'appareil photo du téléphone");
+      expect(bouton("Se connecter avec mon téléphone").getAttribute("type")).toBe("submit");
+      demonter();
+    }
+  });
+});
+
+describe("preuve anti-robot (connexion, clé de récupération)", () => {
+  it("calculée dès l'ouverture ; passée à seConnecter comme fonction, appelée par lui seulement", async () => {
+    await monter(Connexion);
+    expect(PV.preparerPreuve).toHaveBeenCalled();
+    expect(PV.obtenirPreuve).not.toHaveBeenCalled();
+    C.seConnecter.mockImplementation(async (_r: boolean, _p: string, f: () => Promise<unknown>) => {
+      expect(PV.obtenirPreuve).not.toHaveBeenCalled(); // rien avant la cérémonie
+      expect(await f()).toEqual(PREUVE);
+      account.etat = "ouvert";
+      return "ouvert";
+    });
+    await presser("Se connecter avec une passkey");
+    expect(PV.obtenirPreuve).toHaveBeenCalledTimes(1);
+    expect(texte()).not.toContain("Vérification en cours");
+    expect(texte()).toContain("Vous êtes connecté sur cet appareil.");
+  });
+
+  it("calcul pas fini après la cérémonie : « Vérification en cours… » (annoncé), puis plus rien", async () => {
+    PV.preuvePrete.mockReturnValue(false);
+    let finir!: (p: unknown) => void;
+    PV.obtenirPreuve.mockReturnValue(new Promise((r) => (finir = r)));
+    let fin!: Promise<unknown>;
+    C.seConnecter.mockImplementation((_r: boolean, _p: string, f: () => Promise<unknown>) => {
+      fin = f().then(() => {
+        account.etat = "ouvert";
+        return "ouvert";
+      });
+      return fin;
+    });
+    await monter(Connexion);
+    await presser("Se connecter avec une passkey");
+    expect(bouton("Vérification en cours…").getAttribute("aria-busy")).toBe("true");
+    const statut = document.querySelector("[data-attente-preuve]")!;
+    expect(statut.textContent).toBe("Vérification en cours…");
+    expect(statut.getAttribute("role")).toBe("status");
+    finir(PREUVE);
+    await fin;
+    await attendre();
+    expect(texte()).not.toContain("Vérification en cours");
+    expect(texte()).toContain("Vous êtes connecté sur cet appareil.");
+  });
+
+  it("récupération : preuve calculée à l'ouverture, passée à ouvrirAvecCle ; calcul impossible : message", async () => {
+    await monter(Recuperation);
+    expect(PV.preparerPreuve).toHaveBeenCalled();
+    C.ouvrirAvecCle.mockRejectedValue(new Error("pow_indisponible"));
+    saisir("Clé de récupération", "AB12");
+    await presser("Ouvrir");
+    expect(C.ouvrirAvecCle).toHaveBeenLastCalledWith("AB12", expect.any(Function), false);
+    expect(texte()).toContain("La vérification anti-robot n'a pas pu se faire sur cet appareil.");
+  });
+});

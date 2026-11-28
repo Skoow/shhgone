@@ -147,8 +147,8 @@ func TestPasskeysDuCompteHTTP(t *testing.T) {
 	if strings.Contains(w.Body.String(), "allowCredentials") {
 		t.Fatal(w.Body.String())
 	}
-	r := e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: "203.0.113.122:1", body: mustJSON(map[string]any{
-		"etape": etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""})})
+	r := e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: "203.0.113.122:1", body: mustJSON(e.preuve(t, "203.0.113.122:1", map[string]any{
+		"etape": etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""}))})
 	if (r.Code == 200) == (l.Passkeys[len(l.Passkeys)-1]["cred_id"] != enc.EncodeToString(in.pk.ID)) {
 		t.Fatal("connexion par une passkey retirée :", r.Code)
 	}
@@ -169,9 +169,9 @@ func TestRecupRenouvelerHTTP(t *testing.T) {
 	expect(t, e.do(req{method: "POST", path: "/api/compte/recup/renouveler", hdr: sess(in.session), body: mustJSON(map[string]any{
 		"v_r": enc.EncodeToString(vr2[:]), "env_r": enc.EncodeToString(rnd(60))})}), 200, `{}`)
 	expect(t, e.do(req{method: "POST", path: "/api/compte/recup", remote: "203.0.113.132:1",
-		body: mustJSON(map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""})}), 403, `{"error":"identifiants"}`)
+		body: mustJSON(e.preuve(t, "203.0.113.132:1", map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""}))}), 403, `{"error":"identifiants"}`)
 	w := e.do(req{method: "POST", path: "/api/compte/recup", remote: "203.0.113.132:1",
-		body: mustJSON(map[string]any{"a_r": enc.EncodeToString(aR2), "persistante": false, "etiquette": ""})})
+		body: mustJSON(e.preuve(t, "203.0.113.132:1", map[string]any{"a_r": enc.EncodeToString(aR2), "persistante": false, "etiquette": ""}))})
 	if w.Code != 200 || jsonOf(t, w)["h"] != in.h {
 		t.Fatal(w.Code, w.Body.String())
 	}

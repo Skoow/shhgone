@@ -51,12 +51,12 @@ describe("faux serveur du compte (démo)", () => {
     await A.deconnexion(net, session);
     const d = await A.connexionDebut(net);
     const g = await pk.credentials.get({ publicKey: assertion(d.options) });
-    const o = await A.connexionFin(net, { etape: d.etape, credential: await cred(g), persistante: false, etiquette: null });
+    const o = await A.connexionFin(net, { etape: d.etape, credential: await cred(g), persistante: false, etiquette: null }, PREUVE);
     expect(o.h).toEqual(h);
     expect(o.enveloppes).toEqual([octets(60, 1)]);
-    const r = await A.recup(net, { aR: AR, persistante: false, etiquette: null });
+    const r = await A.recup(net, { aR: AR, persistante: false, etiquette: null }, PREUVE);
     expect(r.envR).toEqual(octets(60, 2));
-    await expect(A.recup(net, { aR: octets(32, 1), persistante: false, etiquette: null })).rejects.toMatchObject({ code: "identifiants" });
+    await expect(A.recup(net, { aR: octets(32, 1), persistante: false, etiquette: null }, PREUVE)).rejects.toMatchObject({ code: "identifiants" });
     expect((await A.sessions(net, r.session)).filter((s) => s.parRecup)).toHaveLength(1);
   });
 
@@ -76,7 +76,7 @@ describe("faux serveur du compte (démo)", () => {
     await A.passkeysEnveloppe(net, session, octets(60, 1)); // doublon : sans effet
     for (const v of [3, 4, 5]) await A.passkeysEnveloppe(net, session, octets(60, v));
     await expect(A.passkeysEnveloppe(net, session, octets(60, 6))).rejects.toMatchObject({ code: "enveloppes_max" });
-    const r = await A.recup(net, { aR: AR, persistante: false, etiquette: null });
+    const r = await A.recup(net, { aR: AR, persistante: false, etiquette: null }, PREUVE);
     await expect(A.passkeysEnveloppe(net, r.session, octets(60, 8))).rejects.toMatchObject({ code: "sans_passkey" });
     t += 6 * 60_000;
     await expect(A.passkeysEnveloppe(net, session, octets(60, 9))).rejects.toMatchObject({ code: "recent" });
@@ -97,7 +97,7 @@ describe("faux serveur du compte (démo)", () => {
     await A.passkeysRetirer(net, session, l[1]!.credId);
     await expect(A.passkeysRetirer(net, session, l[0]!.credId)).rejects.toMatchObject({ code: "derniere" });
     await A.recupRenouveler(net, session, octets(32, 4), octets(60, 4));
-    await expect(A.recup(net, { aR: AR, persistante: false, etiquette: null })).rejects.toMatchObject({ code: "identifiants" });
+    await expect(A.recup(net, { aR: AR, persistante: false, etiquette: null }, PREUVE)).rejects.toMatchObject({ code: "identifiants" });
   });
 
   it("pseudo réservé à l'étape ; état de l'onglet rechargé tel quel ; suppression libère le pseudo", async () => {

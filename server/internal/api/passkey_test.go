@@ -51,8 +51,8 @@ func TestInscriptionConnexionHTTP(t *testing.T) {
 		code int
 		body string
 	} {
-		w := e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: ip, body: mustJSON(map[string]any{
-			"etape": etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""})})
+		w := e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: ip, body: mustJSON(e.preuve(t, ip, map[string]any{
+			"etape": etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""}))})
 		return &struct {
 			code int
 			body string
@@ -230,8 +230,8 @@ func TestLimitesPasskeyHTTP(t *testing.T) {
 			Options *json.RawMessage `json:"options"`
 		}{&o})
 		cred, _ := autre.Obtenir(o, origineCompte, p)
-		expect(t, e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: "203.0.113.89:1", body: mustJSON(map[string]any{
-			"etape": d["etape"], "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""})}), 403, `{"error":"identifiants"}`)
+		expect(t, e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: "203.0.113.89:1", body: mustJSON(e.preuve(t, "203.0.113.89:1", map[string]any{
+			"etape": d["etape"], "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""}))}), 403, `{"error":"identifiants"}`)
 	}
 	w = e.do(req{method: "POST", path: "/api/compte/connexion/debut", remote: "203.0.113.89:1", body: []byte(`{}`)})
 	d := jsonOf(t, w)
@@ -240,8 +240,8 @@ func TestLimitesPasskeyHTTP(t *testing.T) {
 		Options *json.RawMessage `json:"options"`
 	}{&o})
 	cred, _ := in.auth.Obtenir(o, origineCompte, in.pk)
-	expect(t, e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: "203.0.113.89:1", body: mustJSON(map[string]any{
-		"etape": d["etape"], "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""})}), 429, "")
+	expect(t, e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: "203.0.113.89:1", body: mustJSON(e.preuve(t, "203.0.113.89:1", map[string]any{
+		"etape": d["etape"], "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""}))}), 429, "")
 }
 
 // Plafond global de comptes créés par jour (SHH_COMPTES_JOUR) : 503 busy, à inscription/debut et
@@ -299,7 +299,7 @@ func TestRecupVecteurs(t *testing.T) {
 		expect(t, w, 201, "")
 		h := jsonOf(t, w)["h"]
 		w = e.do(req{method: "POST", path: "/api/compte/recup", remote: remote,
-			body: mustJSON(map[string]any{"a_r": enc.EncodeToString(ar), "persistante": false, "etiquette": ""})})
+			body: mustJSON(e.preuve(t, remote, map[string]any{"a_r": enc.EncodeToString(ar), "persistante": false, "etiquette": ""}))})
 		if w.Code != 200 || jsonOf(t, w)["h"] != h {
 			t.Fatalf("%s : %d %s", x.Label, w.Code, w.Body.String())
 		}
@@ -317,7 +317,7 @@ func TestAucunSequestre(t *testing.T) {
 	c := e.connecter(t, "203.0.113.110:1", in)
 	tout.WriteString(string(mustJSON(c)))
 	w := e.do(req{method: "POST", path: "/api/compte/recup", remote: "203.0.113.111:1",
-		body: mustJSON(map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""})})
+		body: mustJSON(e.preuve(t, "203.0.113.111:1", map[string]any{"a_r": in.aR, "persistante": false, "etiquette": ""}))})
 	note(w.Body)
 	for _, p := range []string{"/api/compte", "/api/compte/export", "/api/compte/sessions", "/api/compte/coffre/profil"} {
 		note(e.do(req{method: "GET", path: p, hdr: sess(in.session)}).Body)

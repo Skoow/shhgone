@@ -3,7 +3,7 @@
 // Format compatible avec le widget ALTCHA : défi = hex(SHA-256(sel ‖ nombre)),
 // signature = hex(HMAC-SHA-256(clé, défi)). Le sel a un format fixe :
 //
-//	<24 hex aléatoires>.<16 hex liés à la connexion>.<niveau 0–5>?expires=<10 chiffres>
+//	<24 hex aléatoires>.<16 hex liés à la connexion>.<niveau 0–6>?expires=<10 chiffres>
 //
 // Le format fixe empêche de déplacer des chiffres entre le nombre et le sel (la chaîne
 // hachée étant la même). Le niveau est la difficulté au moment de l'émission : un défi
@@ -33,9 +33,13 @@ import (
 	"github.com/skoow/shhdrop/server/internal/limits"
 )
 
+// Difficulté (décision du 26 novembre, §22 D4) : toujours exigée, niveau 0 « invisible »
+// (20 000 au plus, 10 000 condensés en moyenne : environ 0,4 s sur un téléphone moyen, mesuré
+// au navigateur ralenti 4 fois), puis doublée à chaque création de la connexion dans l'heure,
+// jusqu'au niveau 6 (1 280 000 au plus : le plafond d'avant, environ 30 s en moyenne).
 const (
-	baseMax    = 50000
-	maxLevel   = 5
+	baseMax    = 20000
+	maxLevel   = 6
 	ttl        = 2 * time.Minute
 	minFill    = 3 * time.Second
 	window     = time.Hour
@@ -48,7 +52,7 @@ var ErrInvalid = errors.New("anti-robot invalide")
 
 // Le « & » final est le délimiteur ajouté par altcha-lib-go ≥ 1.0.0 contre le
 // raboutage du sel et du nombre (GO-2025-4239) ; le format strict ci-dessous le bloquait déjà.
-var saltRe = regexp.MustCompile(`^[0-9a-f]{24}\.([0-9a-f]{16})\.([0-5])\?expires=([0-9]{10})&$`)
+var saltRe = regexp.MustCompile(`^[0-9a-f]{24}\.([0-9a-f]{16})\.([0-6])\?expires=([0-9]{10})&$`)
 
 type Captcha struct {
 	sigKey []byte

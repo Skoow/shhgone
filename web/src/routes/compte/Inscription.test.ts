@@ -28,11 +28,13 @@ const C = vi.hoisted(() => ({
   preparerAjout: vi.fn(),
   ajouterPasskey: vi.fn(),
   deuxiemeGesteAjout: vi.fn(),
+  parcoursRetenu: vi.fn(),
 }));
 vi.mock("../../account/session.svelte", async (orig) => ({ ...(await orig<object>()), ...C }));
 vi.mock("./preuve", () => ({ obtenirPreuve: async () => PREUVE }));
 const { CompteError, account } = await import("../../account/session.svelte");
 const { default: Inscription } = await import("./Inscription.svelte");
+const { onAnnounce } = await import("../../ui/announce");
 
 beforeEach(() => {
   setLang("fr");
@@ -51,6 +53,7 @@ beforeEach(() => {
   C.passkeyCreee.mockReturnValue("ici");
   C.preparerAjout.mockResolvedValue("pret");
   C.ajouterPasskey.mockResolvedValue("ajoutee");
+  C.parcoursRetenu.mockResolvedValue(null);
 });
 afterEach(() => {
   demonter();
@@ -281,5 +284,54 @@ describe("inscription sur ordinateur", () => {
     await terminer();
     expect(() => bouton("Ajouter mon téléphone")).toThrow();
     expect(bouton("Continuer")).toBeTruthy();
+  });
+});
+
+// Décision du 26 novembre : anti-robot invisible ; un clic avant la fin de la préparation ne lance
+// aucune cérémonie (Safari refuserait une feuille ouverte après une attente) et le dit.
+describe("anti-robot de l'inscription", () => {
+  it("clic avant la fin : « Vérification en cours… », aucune feuille ; prête : annoncé, le clic suivant crée", async () => {
+    const annonces: string[] = [];
+    const stop = onAnnounce((x) => annonces.push(x));
+    let finir!: () => void;
+    C.preparerInscription.mockReturnValue(new Promise<void>((r) => (finir = r)));
+    C.inscriptionPrete.mockReturnValue(false);
+    await monter(Inscription);
+    // Rien de visible avant le clic : le bouton garde son texte.
+    expect(bouton("Créer avec une passkey").disabled).toBe(false);
+    expect(texte()).not.toContain("Vérification en cours");
+    saisir("Pseudo", "Lea");
+    await presser("Créer avec une passkey");
+    expect(C.creerPasskey).not.toHaveBeenCalled();
+    expect(bouton("Vérification en cours…").getAttribute("aria-busy")).toBe("true");
+    expect(document.querySelector("[data-attente-preuve]")!.getAttribute("role")).toBe("status");
+    C.inscriptionPrete.mockReturnValue(true);
+    finir();
+    await attendre();
+    expect(texte()).not.toContain("Vérification en cours");
+    await vi.waitFor(() => expect(annonces).toContain("Vérification terminée. Appuyez de nouveau sur le bouton."), { timeout: 5000 });
+    stop();
+    await presser("Créer avec une passkey");
+    expect(C.creerPasskey).toHaveBeenCalledWith("Lea", "fr", "defaut");
+  });
+});
+
+describe("inscription sur ordinateur : chemin retenu", () => {
+  beforeEach(() => appareil("ordinateur"));
+
+  it("« cet ordinateur » retenu : « Garder le compte sur cet ordinateur » d'abord, sans le QR ; le téléphone en second", async () => {
+    C.parcoursRetenu.mockResolvedValue("local");
+    await monter(Inscription);
+    expect(texte()).not.toContain("Scannez-le avec l'appareil photo");
+    expect(bouton("Garder le compte sur cet ordinateur").getAttribute("type")).toBe("submit");
+    saisir("Pseudo", "Lea");
+    await presser("Garder le compte sur cet ordinateur");
+    expect(C.creerPasskey).toHaveBeenLastCalledWith("Lea", "fr", "local");
+    demonter();
+    C.parcoursRetenu.mockResolvedValue("local");
+    await monter(Inscription);
+    saisir("Pseudo", "Lea");
+    await presser("Créer avec mon téléphone");
+    expect(C.creerPasskey).toHaveBeenLastCalledWith("Lea", "fr", "hybride");
   });
 });

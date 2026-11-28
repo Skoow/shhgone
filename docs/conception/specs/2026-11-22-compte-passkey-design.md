@@ -47,7 +47,7 @@ Réussite :
 
 Règles d'écran communes de la conception du compte (§12, §21.15) inchangées : étiquettes visibles, `LiveRegion`, focus sur l'erreur, 44 px, 320 px, tout au clavier, rien dans l'URL ni le titre d'onglet. Annuler la feuille de passkey (`NotAllowedError`) n'affiche **aucune** erreur et ne crée rien.
 
-**Contrainte technique qui fixe l'ordre des appels (signalement moyen, exactitude)** : Safari exige que `navigator.credentials.create` et `get` partent du geste de l'utilisateur ; un `fetch` des options entre le clic et l'appel fait échouer la cérémonie. Les options (défi) sont donc **chargées avant le clic** : à l'ouverture de la page de connexion, et à l'inscription dès que la preuve ALTCHA est prête ; défi valable 5 min, rechargé sans bruit s'il a expiré.
+**Contrainte technique qui fixe l'ordre des appels (signalement moyen, exactitude)** : Safari exige que `navigator.credentials.create` et `get` partent du geste de l'utilisateur ; un `fetch` des options entre le clic et l'appel fait échouer la cérémonie. Les options (défi) sont donc **chargées avant le clic** : à l'ouverture de la page de connexion, et à l'inscription dès que la preuve ALTCHA est prête ; défi valable 5 min, rechargé sans bruit s'il a expiré. **Anti-robot (décision du 26 novembre, §21)** : la preuve ALTCHA est calculée en tâche de fond dès l'ouverture de l'écran ; elle part **avant** le geste avec `inscription/debut`, **après** le geste avec `connexion/fin`, et avec `recup` ; jamais aucun calcul, aucune attente ni aucune requête entre le clic et `navigator.credentials`.
 
 ### 3.1 Créer un compte (`/compte/inscription`)
 
@@ -254,8 +254,8 @@ Les objets WebAuthn suivent les formats JSON de WebAuthn niveau 3 (`PublicKeyCre
 | `POST pseudo/verifier` | étape ou session (inchangée) | `{ etape?, p_canon }` | `{ libre }` ; libre → **réservé à l'étape** jusqu'à son échéance (évite une passkey créée pour un pseudo pris entre-temps) |
 | `POST inscription/fin` | étape | `{ etape, credential, p_canon, env, v_r, env_r, blob_profil, blob_prive, persistante, etiquette, cred_etiquette }` (`env`, `etiquette`, `cred_etiquette` : `""` pour « aucune », jamais `null` ; `env` devient l'enveloppe `n = 0`) | 201 `{ session, h }` ; `pseudo_pris` (409, étape gardée) |
 | `POST connexion/debut` | — | `{}` | `{ etape, options }` |
-| `POST connexion/fin` | étape | `{ etape, credential, persistante, etiquette }` | `{ session, h, cred_id, enveloppes, blob_profil, gen_profil, blob_prive, gen_prive }` (`enveloppes` : celles de la passkey qui a signé, ordre `n`, `[]` si aucune) ; met `vu_mois` à jour ; la session est **liée** à cette passkey |
-| `POST recup` | `A_r` | `{ a_r, persistante, etiquette }` | `{ session, h, env_r, blob_profil, gen_profil, blob_prive, gen_prive }` (session **récente**) |
+| `POST connexion/fin` | étape et ALTCHA (§21) | `{ etape, credential, persistante, etiquette, altcha, hp, shown_at }` ; preuve vérifiée **avant** l'étape : refusée, 400 `bad_request`, étape gardée, aucun échec compté | `{ session, h, cred_id, enveloppes, blob_profil, gen_profil, blob_prive, gen_prive }` (`enveloppes` : celles de la passkey qui a signé, ordre `n`, `[]` si aucune) ; met `vu_mois` à jour ; la session est **liée** à cette passkey |
+| `POST recup` | `A_r` et ALTCHA (§21) | `{ a_r, persistante, etiquette, altcha, hp, shown_at }` ; preuve vérifiée avant l'essai de la clé (refusée : 400 `bad_request`, aucun essai compté) | `{ session, h, env_r, blob_profil, gen_profil, blob_prive, gen_prive }` (session **récente**) |
 | `POST reauth/debut`, `reauth/fin` | session | `{}` puis `{ etape, credential }` | `{ options }` puis `{ enveloppes }` (session récente, 5 min ; session liée à la passkey qui a signé) ; la passkey doit être du compte |
 | `GET passkeys` | session | — | `{ passkeys: [{ cred_id, ajoutee: "2026-11", etiquette, be, prf, courante }] }` |
 | `POST passkeys/debut`, `passkeys/fin` | session récente | `{}` puis `{ etape, credential, env, etiquette }` (`env` : `""` ou enveloppe `n = 0`) | `{ options }` puis `{}` |
@@ -299,11 +299,11 @@ Avant : une adresse confirmée non jetable. Maintenant : une preuve de travail e
 
 | Quoi | Limite |
 |---|---|
-| `inscription/debut` | ALTCHA ; difficulté qui **double** après chaque compte créé par la même connexion dans la journée ; 20 par heure par connexion |
+| `inscription/debut` | ALTCHA ; difficulté qui **double** après chaque compte créé par la même connexion dans l'heure (comme une création de partage, spec §22 D4) ; 20 par heure par connexion |
 | Comptes créés (`inscription/fin`) | 3 par jour par connexion, 10 par /48 (inchangé) ; **plafond global de 500 par jour** (coupe-circuit contre une ferme d'adresses, 503 `busy`, réglable `SHH_COMPTES_JOUR`) ; `SHH_COMPTES_MAX` inchangé |
 | `connexion/debut` | 60 par minute par connexion (sans preuve : la connexion doit rester un clic) ; défis vivants bornés (§6.2) |
-| `connexion/fin` | 20 échecs par heure par connexion, 60 par /48 |
-| `recup` | 10 essais par heure par connexion, 30 par /48 (128 bits : la limite protège la machine, pas la clé) |
+| `connexion/fin` | ALTCHA (§21) ; 20 échecs par heure par connexion, 60 par /48 |
+| `recup` | ALTCHA (§21) ; clé inconnue : la difficulté de la connexion **double** pour l'heure qui suit ; 10 essais par heure par connexion, 30 par /48 (128 bits : la limite protège la machine, pas la clé) |
 | `pseudo/verifier`, `pseudo/libre` | inchangés (30 par heure, 90 par /48) |
 | Passkeys | 10 par compte ; `passkeys/debut` 10 par heure par compte |
 
@@ -491,7 +491,7 @@ Ordre : P1 → S1 → S2 → W1 → W2 → T1 → D1, chaque lot avec ses tests 
 - Deuxième geste (`prf.enabled` sans sortie, §3.1 2 bis) : il garde l'indice `hybrid`, la passkey étant sur le téléphone (un second QR).
 
 **Signalements.**
-- *Moyen, simplicité d'usage* : sur un Mac avec trousseau iCloud ou un PC avec le gestionnaire de Google, la passkey du téléphone est souvent **déjà** sur l'ordinateur (synchronisée) ; le QR proposé d'abord ajoute un pas inutile. Correction possible plus tard : proposer d'abord « cet ordinateur » quand une connexion précédente sur cet appareil l'a utilisé (préférence locale, sans rien envoyer).
+- *Moyen, simplicité d'usage* : sur un Mac avec trousseau iCloud ou un PC avec le gestionnaire de Google, la passkey du téléphone est souvent **déjà** sur l'ordinateur (synchronisée) ; le QR proposé d'abord ajoute un pas inutile. **Corrigé le 26 novembre (§21.2)** : le chemin qui a marché est retenu sur l'appareil et proposé d'abord.
 - *Faible, compatibilité* : `hints` est récent (Chrome et Edge le lisent ; Safari et Firefox peuvent l'ignorer). Sans lui, `cross-platform` à la création suffit le plus souvent à ouvrir le parcours « téléphone ou clé de sécurité » ; à la connexion, la feuille habituelle s'affiche (le QR y reste proposé). Test manuel bloquant (§14) sur Windows (Chrome, Edge, Firefox) et macOS (Safari, Chrome) avec un iPhone et un Android.
 - *Faible, exactitude* : le parcours « téléphone » accepte aussi une clé de sécurité (même attachement) ; c'est voulu, elle marche comme avant.
 
@@ -509,3 +509,22 @@ Remplace, pour le site, les écrans de la conception compte §21.15.1 (accueil c
 - **Navigation** : en-tête (ordinateur) « Mon compte » → `/compte`, plus d'« Accueil » ni de « Mes partages » ; menu du téléphone : plus de « Nouveau partage » ni d'« Accueil », une seule entrée de compte « Mon compte » ; barre d'onglets (connecté seulement) : « Nouveau » (page d'envoi : c'est le bouton « Nouveau partage » du bas), « Fichiers » (Téléchargements), « Compte ».
 - **« Se déconnecter »** : retiré aussi de l'état « déjà connecté » de la page de connexion (`Connexion.svelte`) ; il ne reste que sur la page Compte.
 
+## 21. Anti-robot partout, chemin de passkey retenu sur ordinateur (décision du propriétaire, 26 novembre ; spec D42-29)
+
+### 21.1 Anti-robot ALTCHA sur les points d'entrée du compte
+
+- **Où** : `inscription/debut` (inchangé : avant le geste), `connexion/fin` (nouveau : après le geste) et `recup` (nouveau). Mêmes champs, même vérification que `POST /api/shares` (`antiRobot`, spec §22 D4) : défi signé, usage unique, lié au bloc d'adresses en mémoire, 2 min, 3 s au moins après l'affichage, champ piège ; toute preuve absente, fausse, réutilisée, échue, d'une autre connexion ou trop rapide rend la même réponse 400 `bad_request` (aucun oracle). Les limites de §7.2 restent.
+- **Pourquoi `connexion/fin` et pas `connexion/debut`** : la cérémonie est chargée avant le clic (Safari) ; une preuve à `connexion/debut` obligerait à attendre 3 s et le calcul avant de pouvoir cliquer, ou à cliquer deux fois. Jointe à `connexion/fin`, elle est calculée pendant que la personne regarde l'écran et répond à la feuille de passkey ; le serveur ne fait aucun travail coûteux (base, session) sans elle. `connexion/debut` reste sans preuve (60 par minute, défis vivants bornés, §6.2) : **signalé (faible, charge)**, un robot peut encore créer des défis en mémoire dans ces limites.
+- **Vérifiée avant l'étape** : une preuve refusée ne consomme ni l'étape de connexion ni un échec de connexion, ni un essai de clé de récupération ; l'appareil peut renvoyer la même assertion avec une nouvelle preuve, sans nouveau geste.
+- **Adaptatif** : `recup` avec une clé inconnue double la difficulté de la connexion pour l'heure qui suit (même compteur que les créations, spec §22 D4). Une connexion réussie ne la change pas.
+- **Site** (`web/src/routes/compte/preuve.ts`) : défi lu et résolu dans le Worker vérifié dès l'ouverture des écrans d'inscription, de connexion et de récupération ; renouvelé sans bruit avant son échéance (toutes les 30 s, s'il lui reste moins de 45 s). `seConnecter` reçoit une **fonction** qui rend la preuve et ne l'appelle qu'après `navigator.credentials.get` ; `ouvrirAvecCle` l'appelle après le contrôle local de la clé (une clé mal recopiée ne consomme pas de défi). Règle de source (`source-rules.test.ts`) : rien de la preuve avant la cérémonie, ni dans `account/session.svelte.ts`, ni dans le geste de `Connexion.svelte`.
+- **Textes** : rien de visible quand le calcul est fini à temps. Sinon : à la connexion et à la récupération, le bouton dit « Vérification en cours… » (annoncé par une région `role=status`) le temps que la preuve finisse, après la cérémonie ; à l'inscription, un clic avant la fin ne lance **pas** la feuille (Safari la refuserait après une attente), le bouton dit « Vérification en cours… », puis « Vérification terminée. Appuyez de nouveau sur le bouton. » est annoncé. Calcul impossible sur l'appareil : « La vérification anti-robot n'a pas pu se faire sur cet appareil. … ».
+- **Évalués, sans preuve** : `pseudo/verifier` pendant l'inscription (l'étape vient déjà d'une preuve, 30 par heure et par étape) ; `pseudo/libre` des invités d'un salon (vérifié pendant la frappe : une preuve par frappe serait visible ; 30 par heure par connexion) : **signalé (faible, confidentialité)**, il permet de savoir si un pseudo est pris, ce que montre déjà sa présence dans un salon ; correction possible : une preuve par saisie validée plutôt que par frappe. Les routes avec session (`reauth`, `passkeys/*`) n'en ont pas besoin.
+- **Démo** : son faux serveur exige les champs, la preuve est factice (aucun Worker livré).
+
+### 21.2 Chemin de passkey retenu sur ordinateur (§19)
+
+- Sur ordinateur seulement, après une cérémonie **réussie** (compte créé ; connexion par passkey), l'appareil retient le chemin qui a marché : « local » si le navigateur dit que la passkey était de plateforme (`authenticatorAttachment: "platform"`, passkey synchronisée sur ce Mac ou ce Chrome, même demandée « par le téléphone »), « hybride » si elle était sur un autre appareil, sinon le chemin demandé. La fois suivante, à la connexion comme à la création, ce chemin est le bouton principal ; l'autre reste en second (le QR n'est expliqué que si le téléphone est proposé d'abord).
+- **Rangé dans la base `shhdrop-compte`** (`persist.ts`, enregistrement « parcours », chiffré comme les autres par la clé non extractible) plutôt que dans un nouveau stockage : `source-rules.test.ts` interdit `localStorage` et toute autre base au compte. Un mot (« hybride » ou « local »), jamais envoyé ; écrit même sans « Rester connecté » ; **effacé par « Se déconnecter »** (la base entière part, comme le veut la règle de `CLAUDE.md`). Téléphone et tablette : rien n'est écrit.
+- **Signalé (moyen, règle du dépôt)** : `CLAUDE.md` dit que la base `shhdrop-compte` garde « la session si “Rester connecté”, la clé locale si la passkey n'ouvre pas les données » ; ce troisième enregistrement l'étend. À valider par le propriétaire, et la phrase de `CLAUDE.md` à compléter (« … et le chemin de passkey retenu sur ordinateur »).
+- **Signalé (faible, confidentialité)** : la base existe alors sur l'appareil même sans « Rester connecté » ; qui a accès à la session du navigateur voit qu'un compte Shhgone a servi ici (pas lequel). « Se déconnecter » l'efface.

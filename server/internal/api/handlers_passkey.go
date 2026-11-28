@@ -147,16 +147,25 @@ func (a compteAPI) connexionDebut(w http.ResponseWriter, r *http.Request) {
 	ecrireEtapeOptions(w, e, opts)
 }
 
-// connexionFin : { etape, credential, persistante, etiquette } → { session, h, cred_id,
-// enveloppes, blob_profil, gen_profil, blob_prive, gen_prive } ; enveloppes : les enveloppes PRF
-// de la passkey qui a signé (0 à 4, base64url de 60 octets) : l'appareil les essaie toutes ;
-// aucune ne s'ouvre : K_compte autrement (conception §5.5), puis passkeys/enveloppe.
+// connexionFin : { etape, credential, persistante, etiquette, altcha, hp, shown_at } → { session,
+// h, cred_id, enveloppes, blob_profil, gen_profil, blob_prive, gen_prive } ; enveloppes : les
+// enveloppes PRF de la passkey qui a signé (0 à 4, base64url de 60 octets) : l'appareil les essaie
+// toutes ; aucune ne s'ouvre : K_compte autrement (conception §5.5), puis passkeys/enveloppe.
+//
+// Preuve anti-robot (décision du 26 novembre, conception du compte par passkey §6.4) : jointe ici,
+// à la requête qui SUIT le geste, jamais à connexion/debut (chargée avant le geste, pour
+// qu'aucune requête ni aucune attente ne s'intercale entre le clic et navigator.credentials.get).
+// Vérifiée avant l'étape : une preuve absente, fausse, rejouée ou échue rend 400 bad_request sans
+// consommer l'étape ni compter d'échec de connexion.
 func (a compteAPI) connexionFin(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		Etape       string          `json:"etape"`
 		Credential  json.RawMessage `json:"credential"`
 		Persistante *bool           `json:"persistante"`
 		Etiquette   *string         `json:"etiquette"`
+		Altcha      string          `json:"altcha"`
+		HP          string          `json:"hp"`
+		ShownAt     string          `json:"shown_at"`
 	}
 	if err := lire(w, r, &b, maxJSON); err != nil {
 		failCompte(w, err)
@@ -169,7 +178,12 @@ func (a compteAPI) connexionFin(w http.ResponseWriter, r *http.Request) {
 		failCompte(w, errBadRequest)
 		return
 	}
-	ov, err := a.c.ConnexionFin(ipOf(r), e, cr, o)
+	ip := ipOf(r)
+	if err := a.antiRobot(b.Altcha, b.ShownAt, b.HP, ip); err != nil {
+		failCompte(w, err)
+		return
+	}
+	ov, err := a.c.ConnexionFin(ip, e, cr, o)
 	if err != nil {
 		failCompte(w, err)
 		return

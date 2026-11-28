@@ -6,8 +6,10 @@
   // 2. « Créez une passkey sur cet appareil » : la cérémonie d'ajout est chargée dès la session
   //    ouverte (récente), le clic appelle navigator.credentials.create sans requête avant.
   //    « Plus tard » reste possible (la personne a peut-être ses passkeys sur un autre appareil).
-  import { tick } from "svelte";
-  import { account, ajouterPasskey, deuxiemeGesteAjout, ouvrirAvecCle, passkeysDisponibles, preparerAjout } from "../../account/session.svelte";
+  // Anti-robot (décision du 26 novembre) : preuve calculée en tâche de fond dès l'ouverture,
+  // jointe à recup ; « Vérification en cours… » seulement si elle n'est pas finie à l'envoi.
+  import { tick, untrack } from "svelte";
+  import { account, ajouterPasskey, deuxiemeGesteAjout, ouvrirAvecCle, passkeysDisponibles, preparerAjout, type Preuve } from "../../account/session.svelte";
   import { navigate, suite } from "../../app/router.svelte";
   import { t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
@@ -18,6 +20,7 @@
   import Case from "./Case.svelte";
   import NoteDemo from "./NoteDemo.svelte";
   import { annulee, erreur } from "./erreurs";
+  import { obtenirPreuve, preparerPreuve, preuvePrete } from "./preuve";
 
   const apres = suite(location.search);
   const dispo = passkeysDisponibles();
@@ -31,13 +34,33 @@
   let pret = $state(false);
   let ajoutee = $state(false);
   let elCle: HTMLInputElement | undefined = $state();
+  /** La preuve anti-robot n'était pas finie à l'envoi : « Vérification en cours… ». */
+  let attente = $state(false);
+
+  $effect(() =>
+    untrack(() => {
+      if (vue !== "cle") return;
+      preparerPreuve();
+      const p = setInterval(() => vue === "cle" && preparerPreuve(), 30_000);
+      return () => clearInterval(p);
+    }),
+  );
+  async function preuve(): Promise<Preuve> {
+    attente = !preuvePrete();
+    try {
+      return await obtenirPreuve();
+    } finally {
+      attente = false;
+      preparerPreuve(); // la suivante, pour un nouvel essai
+    }
+  }
 
   async function ouvrir() {
     errCle = "";
     bandeau = "";
     envoi = true;
     try {
-      await ouvrirAvecCle(cle, rester);
+      await ouvrirAvecCle(cle, preuve, rester);
     } catch (e) {
       const x = erreur(e, "cle");
       if (x.champ === "cle") {
@@ -86,12 +109,13 @@
 
 <Cadre forme="panneaux" titre={vue === "cle" ? t("account.recover.title") : vue === "fini" ? t("account.connected.title") : t("account.recover.passkey.title")} sous={vue === "cle" ? t("account.recover.sub") : undefined}>
   {#if bandeau}<Banner kind="danger">{bandeau}</Banner>{/if}
+  <p class="sr-only" role="status" data-attente-preuve>{attente ? t("account.robot.wait") : ""}</p>
 
   {#if vue === "cle"}
     <form novalidate onsubmit={(e) => e.preventDefault()}>
       <TextField label={t("account.key.field")} hint={t("account.key.field.hint")} autocomplete="off" autocapitalize="characters" spellcheck="false" error={errCle || undefined} bind:value={cle} bind:el={elCle} oninput={() => (errCle = "")} />
       <Case label={t("account.stay")} bind:checked={rester} />
-      <Button type="submit" onpress={ouvrir}>{envoi ? t("account.verifying") : t("account.key.open")}</Button>
+      <Button type="submit" busy={attente} onpress={ouvrir}>{attente ? t("account.robot.wait") : envoi ? t("account.verifying") : t("account.key.open")}</Button>
       <NoteDemo />
     </form>
   {:else if vue === "passkey"}

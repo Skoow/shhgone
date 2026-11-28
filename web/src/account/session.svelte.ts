@@ -26,8 +26,8 @@ import { synchroniserPass } from "./pass";
 import { netParDefaut, type Ceremonie, type Net, type Preuve } from "./api";
 import { aleatoire32, clesDuCompte, enveloppePrf, enveloppeRecup, ouvrirEnveloppesPrf, ouvrirRecup, type ClesCompte } from "./keys";
 import { creerCoffre, ouvrir, priveDeJson, priveEnJson, priveVide, profilDeJson, profilEnJson, sceller, type Coffre, type CoffrePrive, type Profil, type Sorte } from "./vaults";
-import { nomAppareil, ouvrirEtiquette, scellerEtiquette } from "./device";
-import { effacer, idbDuNavigateur, lire, lireCle, oublierSession, sauver, sauverCle } from "./persist";
+import { estMobile, nomAppareil, ouvrirEtiquette, scellerEtiquette } from "./device";
+import { effacer, idbDuNavigateur, lire, lireCle, lireParcours, oublierSession, sauver, sauverCle, sauverParcours, type ParcoursRetenu } from "./persist";
 import { reparer, type Lien, type Resultat } from "./reparation";
 import * as recupCle from "./recup";
 import { creer, obtenir, optionsAssertion, optionsCreation, passkeysDisponibles, prfApresCreation, signalerInconnue, type Creation, type Parcours } from "./webauthn";
@@ -44,7 +44,7 @@ export { CompteError, type Preuve, type EtatServeur } from "./api";
 export type { Progres } from "./suppression";
 export { passkeysDisponibles };
 export { estMobile } from "./device";
-export type { Parcours };
+export type { Parcours, ParcoursRetenu };
 
 type Bytes = Uint8Array<ArrayBuffer>;
 type PseudoMoteur = Pick<SalonEngine, "pseudoValide" | "cleUnicite" | "pseudoReserve">;
@@ -404,6 +404,7 @@ export async function terminerInscription(persistante: boolean): Promise<void> {
     inscription = null;
     // Passkey sans PRF : le premier appareil garde K_compte (§5.5).
     if (!avecPrf) await garderCle(h, kCompte);
+    await retenirParcours(c.parcours, c.c.attachement);
     await ouvrirSession({ jeton: r.session, h, kCompte, persistante, credId: c.c.credId, recupere: false, cleLocale: !avecPrf, profil: { blob: blobProfil, gen: 1 }, prive: { valeur: priveVide(), gen: 1 } });
   } finally {
     aR.fill(0);
@@ -428,6 +429,32 @@ async function garderCle(h: Uint8Array, kCompte: Uint8Array): Promise<void> {
   if (idb) await sauverCle(idb, { h, kCompte }).catch(() => undefined);
 }
 
+// --- Chemin de passkey retenu sur ordinateur (décision du 26 novembre, conception du compte §19) ---
+
+/**
+ * Le chemin qui a marché la dernière fois sur cet ordinateur (« hybride » : téléphone par QR ;
+ * « local » : cet ordinateur), lu sur l'appareil seulement (base du compte, persist.ts), ou null.
+ * Téléphone et tablette : toujours null (parcours « defaut », rien n'est retenu).
+ */
+export async function parcoursRetenu(): Promise<ParcoursRetenu | null> {
+  const idb = deps.idb();
+  if (!idb || estMobile()) return null;
+  return lireParcours(idb).catch(() => null);
+}
+
+/**
+ * Retient le chemin d'une cérémonie réussie sur ordinateur : d'après ce que dit le navigateur
+ * (une passkey de plateforme, même demandée « par le téléphone », vaut « local » : passkey
+ * synchronisée sur ce Mac ou ce Chrome), sinon d'après le chemin demandé. Au mieux, jamais envoyé.
+ */
+async function retenirParcours(parcours: Parcours, attachement: "platform" | "cross-platform" | null): Promise<void> {
+  if (parcours === "defaut") return;
+  const idb = deps.idb();
+  if (!idb) return;
+  const p: ParcoursRetenu = attachement === "platform" ? "local" : attachement === "cross-platform" ? "hybride" : parcours;
+  await sauverParcours(idb, p).catch(() => undefined);
+}
+
 // --- Connexion (§3.2, §3.3, §5.3) --------------------------------------------------------------
 
 /** Charge la cérémonie de connexion avant le clic (à l'ouverture de la page). */
@@ -442,13 +469,23 @@ export async function preparerConnexion(): Promise<void> {
  * « cle_requise » : la passkey a connecté le compte mais n'ouvre pas les données sur cet appareil
  * (pas de PRF, ou sortie PRF différente) et l'appareil n'en garde aucune clé : ouvrirAvecCle.
  * `parcours` (§19) : « hybride » sur ordinateur (passkey du téléphone, QR), « local », « defaut ».
+ * `preuve` : la preuve anti-robot, demandée seulement APRÈS la cérémonie (calculée en tâche de
+ * fond depuis l'ouverture de l'écran) et jointe à connexion/fin : rien entre le geste et
+ * navigator.credentials.get.
  */
-export async function seConnecter(persistante: boolean, parcours: Parcours = "defaut"): Promise<"ouvert" | "cle_requise"> {
+export async function seConnecter(persistante: boolean, parcours: Parcours, preuve: () => Promise<Preuve>): Promise<"ouvert" | "cle_requise"> {
   let c = connexionPrete;
   connexionPrete = null;
   if (!fraiche(c)) c = { ...(await api.connexionDebut(deps.net)), recue: deps.maintenant() };
   const a = await obtenir(optionsAssertion(c.options, await ePrf(), parcours));
-  const ouv = await api.connexionFin(deps.net, { etape: c.etape, credential: a.credential, persistante, etiquette: null });
+  let ouv: api.Ouverture;
+  try {
+    ouv = await api.connexionFin(deps.net, { etape: c.etape, credential: a.credential, persistante, etiquette: null }, await preuve());
+  } catch (e) {
+    a.prf?.fill(0);
+    throw e;
+  }
+  await retenirParcours(parcours, a.attachement);
   const parEnveloppe = a.prf ? await ouvrirEnveloppesPrf(a.prf, ouv.h, ouv.credId, ouv.enveloppes) : null;
   let kCompte: Bytes | null = parEnveloppe;
   const idb = deps.idb();
@@ -497,8 +534,17 @@ export async function annulerCle(): Promise<void> {
  * gardée est celle de la clé (marquée « par la clé de récupération » pour les autres appareils).
  * Si aucune enveloppe ne marche après, la clé reste gardée sur l'appareil (§5.5).
  */
-export async function ouvrirAvecCle(saisie: string, persistanteSeule = false): Promise<Resultat | "recup"> {
+export async function ouvrirAvecCle(saisie: string, preuve: () => Promise<Preuve>, persistanteSeule = false): Promise<Resultat | "recup"> {
   const r = await recupCle.lire(saisie);
+  // Preuve anti-robot de recup, demandée après le contrôle local de la clé (une clé mal recopiée
+  // ne consomme pas de défi).
+  let p: Preuve;
+  try {
+    p = await preuve();
+  } catch (e) {
+    r.fill(0);
+    throw e;
+  }
   const att = cleAttendue;
   const persistante = att ? att.persistante : persistanteSeule;
   const { aR, kekR, vR } = await recupCle.derivees(r);
@@ -506,7 +552,10 @@ export async function ouvrirAvecCle(saisie: string, persistanteSeule = false): P
   vR.fill(0);
   let o: api.OuvertureRecup;
   try {
-    o = await api.recup(deps.net, { aR, persistante, etiquette: null });
+    o = await api.recup(deps.net, { aR, persistante, etiquette: null }, p);
+  } catch (e) {
+    kekR.fill(0);
+    throw e;
   } finally {
     aR.fill(0);
   }

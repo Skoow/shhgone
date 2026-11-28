@@ -8,6 +8,10 @@
 // - « cle » : clé locale de l'appareil (h, K_compte), gardée MÊME SANS « Rester connecté » quand
 //   la passkey n'ouvre pas les données ici (pas de PRF, ou sortie PRF sans enveloppe) : sinon chaque
 //   connexion redemanderait la clé de récupération (§5.5). L'écran le dit.
+// - « parcours » (décision du 26 novembre, conception du compte §19) : sur ordinateur seulement,
+//   le dernier chemin de passkey qui a marché (« hybride » : téléphone par QR ; « local » : cet
+//   ordinateur), pour le proposer d'abord la fois suivante. Un seul mot, jamais envoyé ; écrit
+//   même sans « Rester connecté » (il ne connecte à rien), effacé par « Se déconnecter » avec le reste.
 // Honnêtement : la clé de chiffrement est sur le même appareil ; cela ne protège que d'une
 // lecture naïve du stockage. La vraie protection est le verrouillage de l'appareil (R13).
 // « Se déconnecter » supprime la base entière (clé comprise) : la clé de récupération sera
@@ -20,7 +24,9 @@ import { b64u, unb64u, utf8 } from "../engine/pure";
 export const COMPTE_DB = "shhdrop-compte";
 const SESSION = "session";
 const CLE = "cle";
-const AAD = { [SESSION]: utf8("shhdrop-compte/v2/session"), [CLE]: utf8("shhdrop-compte/v2/cle") };
+const PARCOURS = "parcours";
+type Id = typeof SESSION | typeof CLE | typeof PARCOURS;
+const AAD = { [SESSION]: utf8("shhdrop-compte/v2/session"), [CLE]: utf8("shhdrop-compte/v2/cle"), [PARCOURS]: utf8("shhdrop-compte/v2/parcours") };
 
 type Bytes = Uint8Array<ArrayBuffer>;
 export type Sauvegarde = { jeton: string; h: Uint8Array; kCompte: Uint8Array; credId: Uint8Array | null; parRecup: boolean; genProfil: number; genPrive: number };
@@ -38,7 +44,7 @@ export function idbDuNavigateur(): IDBFactory | null {
 const base = (idb: IDBFactory): Backend => idbBackend(idb, COMPTE_DB);
 const cleDeLaBase = (b: Backend) => crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]).then((k) => b.key(k));
 
-async function ecrire(idb: IDBFactory, id: typeof SESSION | typeof CLE, o: Record<string, unknown>): Promise<void> {
+async function ecrire(idb: IDBFactory, id: Id, o: Record<string, unknown>): Promise<void> {
   const b = base(idb);
   const key = await cleDeLaBase(b);
   const pt = utf8(JSON.stringify(o));
@@ -52,7 +58,7 @@ async function ecrire(idb: IDBFactory, id: typeof SESSION | typeof CLE, o: Recor
 }
 
 /** L'enregistrement `id` déchiffré ; null si aucune base (rien n'est créé), absent ou illisible. */
-async function relire(idb: IDBFactory, id: typeof SESSION | typeof CLE): Promise<Record<string, unknown> | null> {
+async function relire(idb: IDBFactory, id: Id): Promise<Record<string, unknown> | null> {
   const b = base(idb);
   try {
     if (!(await b.exists())) return null;
@@ -130,7 +136,20 @@ export async function lireCle(idb: IDBFactory, h: Uint8Array): Promise<Bytes | n
   }
 }
 
-/** Déconnexion : la base entière disparaît (session gardée, clé locale, clé de chiffrement). */
+/** Chemin de passkey retenu sur un ordinateur (§19) : « hybride » (téléphone, QR) ou « local ». */
+export type ParcoursRetenu = "hybride" | "local";
+
+export async function sauverParcours(idb: IDBFactory, p: ParcoursRetenu): Promise<void> {
+  await ecrire(idb, PARCOURS, { p });
+}
+
+/** Le chemin retenu, ou null (aucun, illisible ; aucune base n'est créée par la lecture). */
+export async function lireParcours(idb: IDBFactory): Promise<ParcoursRetenu | null> {
+  const o = await relire(idb, PARCOURS);
+  return o?.p === "hybride" || o?.p === "local" ? o.p : null;
+}
+
+/** Déconnexion : la base entière disparaît (session gardée, clé locale, chemin retenu, clé de chiffrement). */
 export async function effacer(idb: IDBFactory): Promise<void> {
   await base(idb).drop();
 }

@@ -186,8 +186,21 @@ describe("règles de sources", () => {
       const i = corps.search(appel);
       expect(i, nom).toBeGreaterThan(-1);
       const avant = corps.slice(0, i).replace(/if \(!fraiche\(c\)\) c = \{[^\n]*\n/g, "");
-      expect(avant, nom).not.toMatch(/\bapi\.|\bfetch\b|preparer[A-Z]/);
+      // Ni requête, ni preuve anti-robot (décision du 26 novembre : demandée après la cérémonie).
+      expect(avant, nom).not.toMatch(/\bapi\.|\bfetch\b|preparer[A-Z]|\bpreuve\(|[Pp]reuve\(\)/);
     }
+    // seConnecter demande la preuve APRÈS obtenir( et la joint à connexion/fin.
+    const sc = s.slice(s.search(/export async function seConnecter\(/));
+    const corpsSc = sc.slice(0, sc.indexOf("\n}\n"));
+    expect(corpsSc.search(/await preuve\(\)/)).toBeGreaterThan(corpsSc.search(/\bobtenir\(/));
+    expect(corpsSc).toMatch(/api\.connexionFin\([^\n]*await preuve\(\)\)/);
+    // Écran de connexion : la preuve est passée comme fonction, jamais calculée ou attendue avant
+    // seConnecter ; le geste ne fait rien d'autre avant la cérémonie.
+    const cx = files.find((f) => f.rel === "routes/compte/Connexion.svelte")!.text;
+    const geste = cx.slice(cx.search(/async function connecter\(/));
+    const avantSc = geste.slice(0, geste.search(/seConnecter\(/));
+    expect(avantSc.replace(/await $/, "")).not.toMatch(/preuve\(|obtenirPreuve|fetch|preparer[A-Z]|await /);
+    expect(geste).toMatch(/seConnecter\(rester, parcours, preuve\)/);
   });
   it("compte : s_profil et K_compte seulement dans account/", () => {
     expect(offenders(/s_profil|sProfil|kCompte|K_compte/, (r) => !r.startsWith("account/") && !r.startsWith("engine/"))).toEqual([]);

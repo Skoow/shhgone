@@ -70,7 +70,7 @@ func (e envCompte) connexionBrute(t *testing.T, remote string, in inscrit) repon
 	if err != nil {
 		t.Fatal(err)
 	}
-	w = e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: remote, body: mustJSON(map[string]any{
-		"etape": d.Etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""})})
+	w = e.do(req{method: "POST", path: "/api/compte/connexion/fin", remote: remote, body: mustJSON(e.preuve(t, remote, map[string]any{
+		"etape": d.Etape, "credential": json.RawMessage(cred), "persistante": false, "etiquette": ""}))})
 	return reponseBrute{w.Code, w.Body.String()}
 }

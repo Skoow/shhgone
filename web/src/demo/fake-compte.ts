@@ -166,12 +166,16 @@ export function createFauxCompte(opts: FauxCompteOpts = {}): FauxCompte {
     for (const [t, s] of sessions) if (s.h === h) sessions.delete(t);
   };
 
+  /** Champs de la preuve anti-robot (inscription/debut, connexion/fin, recup), comme le serveur. */
+  const preuve = (b: Record<string, unknown>) => {
+    chaine(b.altcha);
+    chaine(b.hp);
+    chaine(b.shown_at);
+  };
   async function route(req: Request, r: string, b: Record<string, unknown>): Promise<unknown> {
     switch (`${req.method} ${r}`) {
       case "POST inscription/debut": {
-        chaine(b.altcha);
-        chaine(b.hp);
-        chaine(b.shown_at);
+        preuve(b);
         const h = b64u(rnd(16));
         return { etape: nouvelleEtape({ sorte: "inscription", h }), options: creation(h, []) };
       }
@@ -201,6 +205,7 @@ export function createFauxCompte(opts: FauxCompteOpts = {}): FauxCompte {
       case "POST connexion/debut":
         return { etape: nouvelleEtape({ sorte: "connexion", h: "" }), options: options([]) };
       case "POST connexion/fin": {
+        preuve(b); // anti-robot, comme le serveur (preuve factice de la démo)
         etape(b.etape, "connexion");
         const cr = credential(b.credential);
         const [c, p] = passkeyDe(cr.rawId);
@@ -208,6 +213,7 @@ export function createFauxCompte(opts: FauxCompteOpts = {}): FauxCompte {
         return { session: ouvrirSession(c.h, booleen(b.persistante), optionnel(b.etiquette, 64), p.credId, false), h: c.h, cred_id: p.credId, enveloppes: p.envs, ...coffres(c) };
       }
       case "POST recup": {
+        preuve(b);
         const vR = b64u(await sha256(unb64u(octetsB64(b.a_r, 32))));
         const c = [...comptes.values()].find((x) => x.vR === vR);
         if (!c) throw new HttpErr(403, "identifiants");

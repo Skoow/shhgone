@@ -5,6 +5,9 @@
   //    d'un refus sous le champ ; réservé à l'étape) ;
   //    la preuve anti-robot et inscription/debut partent dès l'ouverture : le clic sur « Créer
   //    avec une passkey » appelle navigator.credentials.create sans aucune requête avant (Safari).
+  //    Anti-robot invisible (décision du 26 novembre) : le bouton garde son texte ; un clic avant la
+  //    fin du calcul ne lance rien et dit « Vérification en cours… », puis « Vérification terminée »
+  //    (annoncé) : un deuxième clic lance la cérémonie (jamais d'attente entre un clic et la feuille).
   //    La création vaut acceptation des conditions (phrase sous le bouton).
   // 2. (seulement si le gestionnaire annonce PRF sans l'avoir rendu) deuxième confirmation.
   // 3. Clé de récupération : « Copier », « Télécharger (.txt) », « Je l'ai notée » ; rien n'est envoyé.
@@ -15,8 +18,10 @@
   // téléphone (QR du navigateur, parcours « hybride »), avec un repli discret « Garder le compte
   // sur cet ordinateur » ; si elle est restée sur l'ordinateur, « Ajouter mon téléphone » est
   // proposé à la fin (ajout de passkey standard, aucun transfert de clé). Téléphone : inchangé.
+  // Le chemin qui a marché la dernière fois sur cet ordinateur (lu sur l'appareil, jamais envoyé ;
+  // décision du 26 novembre) est proposé d'abord.
   import { tick, untrack } from "svelte";
-  import { abandonnerInscription, account, ajouterPasskey, estMobile, cleAffichee, creerPasskey, deuxiemeGeste, deuxiemeGesteAjout, inscriptionPrete, passkeyCreee, passkeysDisponibles, preparerAjout, preparerInscription, pseudoInviteRetenu, pseudoLibre, terminerInscription, verifierSaisie, type Parcours } from "../../account/session.svelte";
+  import { abandonnerInscription, account, ajouterPasskey, estMobile, cleAffichee, creerPasskey, deuxiemeGeste, deuxiemeGesteAjout, inscriptionPrete, parcoursRetenu, passkeyCreee, passkeysDisponibles, preparerAjout, preparerInscription, pseudoInviteRetenu, pseudoLibre, terminerInscription, verifierSaisie, type Parcours, type ParcoursRetenu } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
   import { getDemo } from "../../app/demo-hooks";
   import { getLang, t } from "../../i18n/i18n.svelte";
@@ -38,6 +43,10 @@
   const apres = suite(location.search);
   const dispo = passkeysDisponibles();
   const mobile = estMobile();
+  /** Sur ordinateur : le chemin proposé d'abord (téléphone par QR, sauf si « cet ordinateur » a marché la dernière fois). */
+  let prefere = $state<ParcoursRetenu>("hybride");
+  const autre = $derived<ParcoursRetenu>(prefere === "local" ? "hybride" : "local");
+  if (!mobile) void parcoursRetenu().then((p) => void (p && etape === "saisie" && (prefere = p)));
   /** Où est la passkey créée (lu sur l'appareil) : sert à proposer « Ajouter mon téléphone ». */
   let ou = $state<"telephone" | "ici">("ici");
   /** « Ajouter mon téléphone » après la création : non proposé, proposé, deuxième geste, fait (avec ou sans PRF). */
@@ -51,6 +60,8 @@
   let verif = $state(false);
   let bandeau = $state("");
   let pret = $state(false);
+  /** Clic avant la fin de la préparation (preuve anti-robot, inscription/debut) : « Vérification en cours… ». */
+  let attentePreuve = $state(false);
   let rester = $state(false);
   let gardee = $state(false);
   /** Clé copiée ou téléchargée (CleRecup) : gardé ici, « Revoir la clé » ne le perd pas. */
@@ -69,8 +80,13 @@
     try {
       await preparerInscription(await obtenirPreuve());
       pret = true;
+      if (attentePreuve) {
+        attentePreuve = false;
+        announce(t("account.robot.ready"));
+      }
       if (pseudo) void verifierPseudo(pseudo);
     } catch (e) {
+      attentePreuve = false;
       bandeau = erreur(e, "inscription").texte;
     } finally {
       enPreparation = false;
@@ -139,8 +155,15 @@
   // Le geste : aucune requête avant navigator.credentials.create. Ordinateur : téléphone d'abord
   // (« hybride ») ; « Garder le compte sur cet ordinateur » : « local ».
   let enCreation = false;
-  async function creer(parcours: Parcours = mobile ? "defaut" : "hybride") {
+  async function creer(parcours: Parcours = mobile ? "defaut" : prefere) {
     if (enCreation) return;
+    // Pas encore prête : rien n'est lancé (une cérémonie après une attente serait refusée par Safari).
+    if (!pret || !inscriptionPrete()) {
+      attentePreuve = true;
+      pret = false;
+      void preparer(); // sans effet si elle est déjà en cours
+      return;
+    }
     bandeau = "";
     if (libre === false) {
       errPseudo = t("account.pseudo.taken");
@@ -252,13 +275,14 @@
       <!-- « Disponible » : la coche dans le champ, et ce texte pour les lecteurs d'écran seulement
            (région présente dès l'affichage, pour être annoncée). -->
       <p class="sr-only" role="status" data-dispo>{etatPseudo === "ok" ? t("account.pseudo.free") : ""}</p>
-      {#if !mobile}<IndiceQr texte={t("account.signup.phone.how")} />{/if}
-      <Button type="submit" busy={!pret} disabled={!pret} onpress={() => creer()}>{pret ? (getDemo()?.signupPasskey ?? (mobile ? t("account.signup.passkey") : t("account.signup.phone"))) : t("account.preparing")}</Button>
+      {#if !mobile && prefere === "hybride"}<IndiceQr texte={t("account.signup.phone.how")} />{/if}
+      <Button type="submit" busy={attentePreuve} onpress={() => creer()}>{attentePreuve ? t("account.robot.wait") : (getDemo()?.signupPasskey ?? (mobile ? t("account.signup.passkey") : prefere === "local" ? t("account.signup.here") : t("account.signup.phone")))}</Button>
+      <p class="sr-only" role="status" data-attente-preuve>{attentePreuve ? t("account.robot.wait") : ""}</p>
       <NoteDemo />
       <p class="legal" data-legal>
         {t("account.signup.legal.a")}<a class="lien-t" href={href("/conditions")} target="_blank" rel="noopener noreferrer">{t("account.signup.legal.link")}</a>{t("account.signup.legal.b")}
       </p>
-      {#if !mobile}<button type="button" class="discret" disabled={!pret} onclick={() => void creer("local")} data-ici>{t("account.signup.here")}</button>{/if}
+      {#if !mobile}<button type="button" class="discret" onclick={() => void creer(autre)} data-autre={autre}>{autre === "local" ? t("account.signup.here") : t("account.signup.phone")}</button>{/if}
     </form>
     <!-- Même forme que les autres chemins de « Se connecter » (séparateur « ou », bouton secondaire). -->
     <p class="ou" aria-hidden="true"><span>{t("account.login.or")}</span></p>

@@ -176,7 +176,7 @@ describe("le serveur ne voit rien : compte par passkey", () => {
     const g = A.auth.obtenir(cd.corps.options, web, A.pk);
     A.sorties.push(g.sortie!);
     const kekEtiq = await cleAes(W.cleAppareil(A.kCompte));
-    const cf = await json("POST", "/api/compte/connexion/fin", { etape: cd.corps.etape, credential: sansSortiePrf(g.credential), persistante: true, etiquette: b64u(await scellerEtiquette(kekEtiq, A.h, ETIQ_APPAREIL)) });
+    const cf = await json("POST", "/api/compte/connexion/fin", { etape: cd.corps.etape, credential: sansSortiePrf(g.credential), persistante: true, etiquette: b64u(await scellerEtiquette(kekEtiq, A.h, ETIQ_APPAREIL)), ...(await preuve()) });
     expect(cf.status).toBe(200);
     jetons.push(cf.corps.session);
     const kekC = W.kekPrf(g.sortie!) as Bytes;
@@ -213,7 +213,7 @@ describe("le serveur ne voit rien : compte par passkey", () => {
     const tapee = W.cleRecupAffichage(A.r).toLowerCase();
     const r = W.cleRecupLire(utf8(tapee));
     expect(r).toEqual(A.r);
-    const rc = await json("POST", "/api/compte/recup", { a_r: b64u(W.cleRecupDerivees(r).aR as Bytes), persistante: false, etiquette: "" });
+    const rc = await json("POST", "/api/compte/recup", { a_r: b64u(W.cleRecupDerivees(r).aR as Bytes), persistante: false, etiquette: "", ...(await preuve()) });
     expect(rc.status).toBe(200);
     jetons.push(rc.corps.session);
     expect(await ouvrirEnv(A.kekR, W.adEnveloppeRecup(A.h), unb64u(rc.corps.env_r))).toEqual(A.kCompte);

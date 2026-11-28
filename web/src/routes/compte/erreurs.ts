@@ -68,6 +68,12 @@ export function erreur(e: unknown, moment: Moment): Erreur {
     case "webauthn_echec":
     case "options_invalides":
       return { texte: t("account.err.passkey") };
+    // Preuve anti-robot (routes/compte/preuve.ts) : calcul impossible sur l'appareil, ou défi refusé.
+    case "pow_indisponible":
+    case "pow_echec":
+      return { texte: t("err.captcha.local") };
+    case "preuve_invalide":
+      return { texte: t("err.captcha") };
   }
   if (ILLISIBLE.has(code)) return { texte: t("account.err.coffre") };
   return { texte: t("account.err.autre") };
