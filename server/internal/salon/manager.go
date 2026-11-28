@@ -98,7 +98,7 @@ type Config struct {
 	// redémarrage).
 	Palier func(h [16]byte) (Palier, error)
 	// CleReprise (facultatif, SHH_SALONS_CLE_FILE, LireCleMaitresse) : clé maîtresse des salons,
-	// qui enveloppe la clé de chaque conversation rangée à un arrêt propre (reprise.go). nil :
+	// qui enveloppe la clé de chaque conversation rangée en continu (persistance.go). nil :
 	// aucun salon n'est repris après un redémarrage (conversations et pièces purgées, comme avant
 	// le 25 novembre).
 	CleReprise *[32]byte
@@ -187,6 +187,11 @@ type Manager struct {
 	// sansLimiteSiege : tests seulement (limites par siège coupées, limites.go) ; jamais posé
 	// en production (NewManager le laisse à false : limites actives).
 	sansLimiteSiege bool
+
+	// persMu : une passe de persistance à la fois (persistance.go) ; jamais pris sous le verrou
+	// d'un salon. persistRatees : passes qui n'ont pas pu tout écrire (sans identifiant).
+	persMu        sync.Mutex
+	persistRatees atomic.Int64
 }
 
 var errConfig = errors.New("salon: configuration incomplète")
@@ -693,6 +698,18 @@ func (m *Manager) Rejoindre(kAcces, kPreuve, sGestion []byte) (Entree, error) {
 	if err != nil {
 		return Entree{}, err
 	}
+	e, err := m.entrer(s, id, createur, now, exp, maxMembers, mcd, piecesBytes)
+	if err == nil {
+		// Jeton rangé avant d'être rendu (persistance.go) : jamais un jeton qu'un plantage
+		// juste après ferait oublier. Échec d'écriture : l'entrée reste (passe suivante).
+		_ = m.persister(s)
+	}
+	return e, err
+}
+
+// entrer : partie mémoire de Rejoindre, sous le verrou du salon.
+func (m *Manager) entrer(s *salon, id string, createur bool, now time.Time, exp int64, maxMembers, mcd int,
+	piecesBytes int64) (Entree, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.fini {
@@ -771,6 +788,10 @@ func (m *Manager) etat(id string, exp int64, maxMembers int) (*salon, error) {
 		conv.lec = m.lec // lectures bornées, hors de tout verrou (Conversation.Lire)
 		conv.compterDans(&m.octetsConv)
 		neuf := nouveauSalon(id, time.Unix(exp, 0), maxMembers, conv, m.now)
+		if m.cfg.CleReprise != nil {
+			neuf.p.actif = true
+			neuf.poserConvLocked(conv, conv.cleCopie()) // pas encore partagé : sans verrou
+		}
 		neuf.flux = &m.flux
 		neuf.glob = &m.tramesGlob
 		if m.cfg.SalonFramesTotal > 0 {

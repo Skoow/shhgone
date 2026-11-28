@@ -231,7 +231,8 @@ func (m *Manager) oublier(s *salon, raison uint8, signaler bool) (fait, premier 
 	s.occ.Store(0)
 	s.appelsFin.Store(0)
 	s.journal = nil
-	s.aEcraser = nil        // la conversation entière est détruite par achever
+	s.viderAEcraserLocked() // la conversation entière est détruite par achever
+	clear(s.p.cle[:])       // ligne effacée par la passe suivante (persistance.go)
 	s.globDec(len(s.index)) // trames en mémoire rendues au compte global avant de vider l'index
 	s.index = nil
 	s.pieces = nil
@@ -522,7 +523,7 @@ func (m *Manager) echuesSansEtat(now int64) {
 // defer ; une fin interrompue reste « à faire » (achever) et est reprise.
 func (m *Manager) Run(ctx context.Context) {
 	var fini sync.WaitGroup
-	for _, passe := range []func(){m.entretienDisque, m.entretienPieces} {
+	for _, passe := range []func(){m.entretienDisque, m.entretienPieces, m.persisterTout} {
 		fini.Go(func() { chaqueSeconde(ctx, func() { m.passeSure(passe) }) })
 	}
 	chaqueSeconde(ctx, func() { m.passeSure(m.entretienMemoire) })
@@ -559,10 +560,12 @@ func (m *Manager) passeSure(passe func()) {
 func (m *Manager) PaniquesTick() int64 { return m.paniquesTick.Load() }
 
 // PurgerAuDemarrage : à appeler une fois, avant toute autre méthode et avant l'écoute.
-// D'abord la reprise (reprise.go, avec une clé maîtresse) : salons rangés par un arrêt propre et
-// encore vivants remis en mémoire (sièges, jetons, journal, index, pièces prêtes), lignes de
-// reprise effacées AVANT (réécrites de zéros puis supprimées : une ligne ne sert jamais deux
-// fois). Puis la purge de tout le reste, comme avant : les clés des autres conversations, les
+// D'abord la reprise (reprise.go, avec une clé maîtresse) : salons rangés (en continu, ou par
+// l'arrêt propre d'un binaire plus ancien) et encore vivants remis en mémoire (sièges, jetons,
+// journal, index, pièces prêtes) ; leur ligne est aussitôt récrite avec une réserve de rangs
+// neuve (persistance.go : aucun rang n'est donné avant ; échec : erreur, le serveur ne démarre
+// pas), les lignes des autres salons réécrites de zéros puis supprimées. Puis la purge de tout le
+// reste, comme avant : les clés des autres conversations, les
 // jetons et les planchers de leurs pièces étaient en mémoire, donc tout fichier de conversation
 // et toute pièce d'un salon non repris sont effacés (fichiers d'abord, puis leurs lignes
 // salon_pieces ; pieces_bytes recalculé : 0, ou la somme des pièces gardées d'un salon repris) ;
@@ -580,14 +583,13 @@ func (m *Manager) PurgerAuDemarrage() error {
 	if err != nil {
 		return err
 	}
-	if err := effacerReprises(m.cfg.DB); err != nil {
-		for i := range l {
-			clear(l[i].cle[:])
-			clear(l[i].clair)
-		}
+	g := m.reprendre(l)
+	if err := m.persister(g.salons...); err != nil {
 		return err
 	}
-	g := m.reprendre(l)
+	if err := m.effacerReprisesSauf(g.conv); err != nil {
+		return err
+	}
 	if err := viderDossier(m.cfg.DossierConversations, g.conv); err != nil {
 		return err
 	}
@@ -640,6 +642,46 @@ func (m *Manager) PurgerAuDemarrage() error {
 		return base(err)
 	}
 	return base(store.Checkpoint(m.cfg.DB))
+}
+
+// effacerReprisesSauf : lignes de reprise de tous les salons hors de garder effacées (réécrites
+// de zéros puis supprimées, une transaction).
+func (m *Manager) effacerReprisesSauf(garder map[string]bool) error {
+	if m.cfg.CleReprise == nil {
+		return effacerReprises(m.cfg.DB)
+	}
+	rows, err := m.cfg.DB.Query(`SELECT salon_id FROM salons_reprise`)
+	if err != nil {
+		return base(err)
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return base(err)
+		}
+		if !garder[id] {
+			ids = append(ids, id)
+		}
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return base(err)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := m.cfg.DB.Begin()
+	if err != nil {
+		return base(err)
+	}
+	defer tx.Rollback()
+	for _, id := range ids {
+		if err := effacerRepriseTx(tx, id); err != nil {
+			return err
+		}
+	}
+	return base(tx.Commit())
 }
 
 // preparerDossier : dossier d créé s'il manque, ramené à 0700.

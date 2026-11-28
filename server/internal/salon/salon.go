@@ -14,9 +14,9 @@ import (
 // État en mémoire d'un salon : sièges, jetons, rangs, journal des annonces et index des
 // trames. Rien de tout cela n'est écrit sur disque (spec §39.3.5, v3
 // §5.1) : seules les trames non volatiles le sont, chiffrées (Conversation), sans rang,
-// siège, heure ni drapeau. En marche, rien de cet état n'est écrit ; un arrêt propre le range,
-// chiffré sous la clé de la conversation, pour le démarrage suivant (reprise.go, salons
-// persistants) ; un arrêt brutal l'oublie.
+// siège, heure ni drapeau. Avec une clé maîtresse, cet état est aussi rangé en continu, chiffré
+// sous la clé de la conversation, pour être repris après un redémarrage propre ou brutal
+// (persistance.go, reprise.go).
 
 const (
 	// nbSieges : sièges 0 à 9 ; le 0 est réservé au créateur.
@@ -155,6 +155,11 @@ type salon struct {
 	// appelsFin : appelsJusqua en secondes Unix, lu sans verrou par Stats (tableau de bord :
 	// nombre de salons aux appels ouverts) ; remis à 0 à la fin du salon.
 	appelsFin atomic.Int64
+	// rotation : numéro de la dernière rotation de l'invitation appliquée (0x09, exclusion.go),
+	// comparé à salons.rotation_r à la reprise (persistance.go).
+	rotation uint32
+	// p : ligne de reprise du salon (persistance.go).
+	p persistance
 }
 
 // globAtteint : ce salon ne peut plus ranger de trame en mémoire (pot nil : sans plafond
@@ -193,6 +198,7 @@ func nouveauSalon(id string, expires time.Time, maxMembers int, conv *Conversati
 		id: id, expires: expires, maxMembers: maxMembers, conv: conv, now: now,
 		jetons: map[[32]byte]uint8{}, revoques: map[[32]byte]struct{}{},
 	}
+	s.p.borne, s.p.borneEcrite = sansBorne, sansBorne
 	for n := range s.limites {
 		s.limites[n] = nouvelleLimite()
 	}
@@ -216,7 +222,7 @@ func (s *salon) occupesLocked() int {
 // (sinon ErrLimit, rien n'est changé) ; un départ ne peut pas échouer (il libère un siège et prend
 // une place).
 func (s *salon) annoncerLocked(enr func(seq uint64) []byte, depart bool) (uint64, error) {
-	if !depart && len(s.journal) >= journalMax-nbSieges {
+	if !depart && (len(s.journal) >= journalMax-nbSieges || !s.rangLibreLocked()) {
 		return 0, ErrLimit
 	}
 	s.seq++

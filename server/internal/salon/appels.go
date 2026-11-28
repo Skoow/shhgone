@@ -61,6 +61,7 @@ func (m *Manager) OuvrirAppels(mb Membre) (reste time.Duration, deja bool, err e
 	if s == nil {
 		return 0, false, ErrNotFound
 	}
+	defer func() { _ = m.persister(s) }() // jeton payant dépensé : rangé avant la réponse
 	now := m.cfg.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()

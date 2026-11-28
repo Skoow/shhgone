@@ -7,9 +7,8 @@ import (
 	"testing"
 )
 
-// Table de reprise des salons (salons persistants, 25 novembre) : ajoutée à une base du schéma 4
-// sans la changer de version (un binaire plus ancien l'ignore, le retour arrière reste possible),
-// salons gardés ; enveloppe de 60 octets exactement ; ligne effacée avec son salon.
+// Tables de reprise des salons (salons persistants, 25 et 26 novembre) : ajoutées à une base
+// qui ne les a pas ; enveloppe de 60 octets, blocs bornés ; tout effacé avec le salon (en chaîne).
 func TestTableReprise(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")
 	db, err := Open(path)
@@ -50,10 +49,21 @@ func TestTableReprise(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO salons_reprise(salon_id,cle,etat) VALUES('a',randomblob(60),randomblob(100))`); err != nil {
 		t.Fatal(err)
 	}
+	for _, q := range []string{`INSERT INTO salons_reprise_blocs VALUES('a',2,0,x'00')`, `INSERT INTO salons_reprise_blocs VALUES('a',0,-1,x'00')`,
+		`INSERT INTO salons_reprise_blocs VALUES('inconnu',0,0,x'00')`, `INSERT INTO salons_reprise_blocs VALUES('a',0,0,'texte')`} {
+		if _, err := db.Exec(q); err == nil {
+			t.Errorf("bloc accepté : %s", q)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO salons_reprise_blocs VALUES('a',1,0,randomblob(100))`); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := db.Exec(`DELETE FROM salons WHERE id='a'`); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRow(`SELECT count(*) FROM salons_reprise`).Scan(&n); err != nil || n != 0 {
-		t.Fatal("ligne de reprise restée après son salon :", n, err)
+	for _, tb := range []string{"salons_reprise", "salons_reprise_blocs"} {
+		if err := db.QueryRow(`SELECT count(*) FROM ` + tb).Scan(&n); err != nil || n != 0 {
+			t.Fatal("ligne de reprise restée après son salon :", tb, n, err)
+		}
 	}
 }

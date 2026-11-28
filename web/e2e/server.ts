@@ -23,6 +23,8 @@ export type TestServer = {
   stderr(): Buffer;
   /** Arrête le processus (SIGTERM, puis SIGKILL après 5 s) ; garde le dossier de données. */
   stop(): Promise<void>;
+  /** Plantage simulé : SIGKILL immédiat (aucun arrêt propre) ; garde le dossier de données. */
+  tuer(): Promise<void>;
   /** stop() puis suppression du dossier de données. */
   dispose(): Promise<void>;
 };
@@ -202,6 +204,10 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
     stdout: () => Buffer.concat(out),
     stderr: () => Buffer.concat(err),
     stop,
+    async tuer() {
+      if (alive()) proc.kill("SIGKILL");
+      await closed;
+    },
     async dispose() {
       await stop();
       rmSync(dataDir, { recursive: true, force: true });

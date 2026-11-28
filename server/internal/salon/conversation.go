@@ -99,6 +99,7 @@ func es(err error) error {
 type fichierEcriture interface {
 	WriteAt([]byte, int64) (int, error)
 	Truncate(int64) error
+	Sync() error
 	Close() error
 }
 
@@ -115,11 +116,14 @@ type Conversation struct {
 	// aead : chiffrement de la clé (tirée dans OuvrirConversation) ; lâché par Detruire. La
 	// bibliothèque standard ne permet pas d'effacer le calendrier de clés d'un chiffrement
 	// AES : la clé est oubliée, pas effacée de la mémoire. cle : la clé elle-même, gardée pour
-	// être enveloppée à un arrêt propre (mettreDeCote, reprise.go) ; mise à zéro par Detruire et
-	// mettreDeCote. Jamais écrite ailleurs qu'enveloppée.
+	// être enveloppée (persistance.go) ; mise à zéro par Detruire. Jamais écrite ailleurs
+	// qu'enveloppée.
 	aead cipher.AEAD
 	cle  [32]byte
 	n    uint32 // emplacements écrits
+	// nA : copie de n lue sans le verrou de la conversation (instantané de persistance.go, pris
+	// sous le verrou du salon, qui n'attend jamais le disque).
+	nA atomic.Uint32
 	// inutilisable : Truncate a échoué après une écriture ratée ; tailleMax borne alors le
 	// fichier réel (Taille ne le sous-compte jamais).
 	inutilisable bool
@@ -261,16 +265,20 @@ func (c *Conversation) poserCle() error {
 	return err
 }
 
-// reouvrirConversation : conversation d'un salon repris après un arrêt propre (reprise.go) :
-// fichier existant dossier/id, clé cle, n emplacements écrits. La taille du fichier doit être
-// exactement celle de n emplacements arrondie au palier (Ajouter : un palier entier écrit d'un
-// coup, ramené à sa taille d'avant en cas d'échec) ; sinon ErrInutilisable, rien n'est gardé
-// ouvert. La clé est copiée : l'appelant met la sienne à zéro.
+// reouvrirConversation : conversation d'un salon repris (reprise.go) : fichier existant
+// dossier/id, clé cle, n emplacements écrits selon la dernière ligne validée. Le fichier doit
+// faire au moins n emplacements arrondis au palier (Ajouter écrit un palier entier d'un coup ;
+// persistance.go synchronise le fichier avant de valider une ligne) ; sinon ErrInutilisable, rien
+// n'est gardé ouvert. Après un plantage, il peut être plus grand (trames écrites après la
+// dernière ligne, que l'index ne connaît pas) : il est ramené à la taille de n, et les
+// emplacements de n à la fin du palier sont écrasés d'aléa (aucune trame orpheline lisible). La
+// clé est copiée : l'appelant met la sienne à zéro.
 func reouvrirConversation(dossier, id string, cle [32]byte, n uint32) (*Conversation, error) {
 	if !idValide(id) || n == math.MaxUint32 {
 		return nil, errIDConv
 	}
 	c := &Conversation{chemin: filepath.Join(dossier, id), cle: cle, n: n}
+	c.nA.Store(n)
 	f, err := os.OpenFile(c.chemin, os.O_RDWR|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		clear(c.cle[:])
@@ -293,8 +301,18 @@ func reouvrirConversation(dossier, id string, cle [32]byte, n uint32) (*Conversa
 		return nil, es(err)
 	}
 	attendue := (int64(n) + emplacementsParPalier - 1) / emplacementsParPalier * TaillePalier
-	if !fi.Mode().IsRegular() || fi.Size() != attendue {
+	if !fi.Mode().IsRegular() || fi.Size() < attendue {
 		return nil, ErrInutilisable
+	}
+	if fi.Size() > attendue {
+		if err := f.Truncate(attendue); err != nil {
+			return nil, es(err)
+		}
+	}
+	for e := n; int64(e) < attendue/TailleEmplacement && decalage(e)+TailleEmplacement <= attendue; e++ {
+		if _, err := f.WriteAt(alea(), decalage(e)); err != nil {
+			return nil, es(err)
+		}
 	}
 	if c.lecteur, err = blob.OpenRead(c.chemin); err != nil {
 		return nil, es(err)
@@ -310,35 +328,40 @@ func reouvrirConversation(dossier, id string, cle [32]byte, n uint32) (*Conversa
 	return c, nil
 }
 
-// mettreDeCote : arrêt propre (reprise.go) : plus rien ne s'écrit ni ne se lit dans la
-// conversation (ErrDetruite), son fichier prend le nom chemin (même dossier) et ses descripteurs
-// sont fermés ; rend une copie de la clé et le nombre d'emplacements écrits, puis met la clé à
-// zéro. Le fichier n'est jamais supprimé ensuite par cette conversation (Detruire ne le touche
-// plus). Conversation détruite ou inutilisable : son erreur, rien n'est changé. Le renommage
-// d'abord : le nom de reprise ne désigne jamais un fichier encore écrit par ce processus, et un
-// ancien serveur qui purge le dossier au démarrage l'efface (aucune reprise sur un fichier qu'il
-// aurait recréé sous le nom du salon).
-func (c *Conversation) mettreDeCote(chemin string) (cle [32]byte, n uint32, err error) {
+// cleCopie : copie de la clé (persistance.go la garde pour sceller l'état du salon). À appeler
+// quand aucune écriture n'est en cours (conversation tout juste ouverte).
+func (c *Conversation) cleCopie() [32]byte {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.cle
+}
+
+// synchroniser : fichier écrit sur le disque (fsync) avant qu'une ligne de reprise qui en dépend
+// soit validée (persistance.go). Conversation détruite : ErrDetruite.
+func (c *Conversation) synchroniser() error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if err := c.etat(); err != nil {
+		return err
+	}
+	return es(c.f.Sync())
+}
+
+// fermer : descripteurs fermés et clé oubliée, fichier laissé en place (reprise abandonnée :
+// la purge du démarrage l'efface).
+func (c *Conversation) fermer() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := c.etat(); err != nil {
-		return cle, 0, err
+	if c.detruite {
+		return
 	}
-	if err := os.Rename(c.chemin, chemin); err != nil {
-		return cle, 0, es(err)
-	}
-	c.chemin = chemin
-	dossierSansDate(chemin)
-	_ = sansDate(chemin)
-	cle, n = c.cle, c.n
+	c.detruite, c.supprime = true, true
 	clear(c.cle[:])
 	c.aead = nil
-	c.detruite, c.supprime = true, true // plus à elle : ni écrite, ni lue, ni supprimée
 	if c.lecteur != nil {
 		c.lecteur.Close()
 	}
 	c.f.Close()
-	return cle, n, nil
 }
 
 // ad : données authentifiées de l'emplacement e.
@@ -374,6 +397,7 @@ func (c *Conversation) Ajouter(trame []byte) (uint32, error) {
 			return 0, err
 		}
 		c.n++
+		c.nA.Store(c.n)
 		return e, nil
 	}
 	palier := make([]byte, TaillePalier)
@@ -384,6 +408,7 @@ func (c *Conversation) Ajouter(trame []byte) (uint32, error) {
 		return 0, err
 	}
 	c.n++
+	c.nA.Store(c.n)
 	c.poserTaille(decalage(e) + TaillePalier)
 	return e, nil
 }

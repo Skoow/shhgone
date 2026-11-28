@@ -151,8 +151,8 @@ func TestRepriseBoutEnBout(t *testing.T) {
 			t.Fatal("fermeture à l'arrêt :", code)
 		}
 		b2 := b.demarrer(t, b.cfg.CleReprise)
-		if n := lignesReprise(t, b2); n != 0 {
-			t.Fatal("lignes de reprise restées après le démarrage :", n)
+		if n := lignesReprise(t, b2); n != 1 {
+			t.Fatal("ligne de reprise non récrite au démarrage :", n)
 		}
 		// Mêmes jetons : Membre les reconnaît, sur les mêmes sièges.
 		g2, a2 := b2.membreDe(t, e0), b2.membreDe(t, ea)
@@ -291,8 +291,8 @@ func TestRepriseEchuPendantArret(t *testing.T) {
 	if n := b.arreter(t); n != 1 {
 		t.Fatal("salons rangés :", n)
 	}
-	if _, err := os.Stat(filepath.Join(b.cfg.DossierConversations, sid+suffixeReprise)); err != nil {
-		t.Fatal("conversation mise de côté absente :", err)
+	if _, err := os.Stat(filepath.Join(b.cfg.DossierConversations, sid)); err != nil {
+		t.Fatal("conversation absente après l'arrêt :", err)
 	}
 	b.h.avancer(25 * time.Hour)
 	b2 := b.demarrer(t, b.cfg.CleReprise)
@@ -371,8 +371,8 @@ func TestRepriseRevoques(t *testing.T) {
 	}
 }
 
-// Aucun octet de la clé d'une conversation en clair sur le disque, ni en marche, ni pendant
-// l'arrêt (enveloppée), ni après la reprise ; aucune trame en clair non plus.
+// Aucun octet de la clé d'une conversation en clair sur le disque, ni en marche (ligne écrite,
+// clé enveloppée), ni à l'arrêt, ni après la reprise ; aucune trame en clair non plus.
 func TestRepriseCleJamaisEnClair(t *testing.T) {
 	b := nouveauBancReprise(t)
 	c := b.creer(t, 4)
@@ -380,6 +380,7 @@ func TestRepriseCleJamaisEnClair(t *testing.T) {
 	for i := range 3 {
 		b.recevoir(t, g, trameD(0, i))
 	}
+	b.passe(t) // ligne écrite en marche (persistance continue) : enveloppée, jamais en clair
 	cle := cleDe(g.salon)
 	verifier := func(quand string) {
 		if p := fichiersContiennent(t, b.dir, cle[:]); p != "" {
@@ -443,7 +444,7 @@ func TestRepriseDestructionEfface(t *testing.T) {
 	}
 }
 
-// Enveloppe effacée sûrement au démarrage : après la reprise, ni la base ni son WAL ne
+// Au démarrage, la ligne est récrite (nouvelle enveloppe, nouvelle tête) : ni la base ni son WAL ne
 // contiennent plus l'enveloppe ni l'état chiffré.
 func TestRepriseLignesEffaceesAuDemarrage(t *testing.T) {
 	b := nouveauBancReprise(t)
@@ -461,8 +462,8 @@ func TestRepriseLignesEffaceesAuDemarrage(t *testing.T) {
 	}
 	db.Close()
 	b2 := b.demarrer(t, b.cfg.CleReprise)
-	if lignesReprise(t, b2) != 0 {
-		t.Fatal("ligne de reprise restée")
+	if lignesReprise(t, b2) != 1 {
+		t.Fatal("ligne de reprise non récrite au démarrage")
 	}
 	for nom, v := range map[string][]byte{"enveloppe": env, "état": etat[:64]} {
 		if p := fichiersContiennent(t, b.dir, v); p != "" {
@@ -541,23 +542,23 @@ func TestRepriseEtatAbime(t *testing.T) {
 	b.recevoir(t, g, trameD(0, 1))
 	s := g.salon
 	s.mu.Lock()
-	corps := s.encoderLocked()
+	corps := s.encoderV1Locked()
 	s.mu.Unlock()
 	for i := range corps {
 		for _, v := range []byte{0xFF, corps[i] ^ 1} {
 			abime := bytes.Clone(corps)
 			abime[i] = v
 			x := nouveauSalon("x", time.Now(), 4, nil, time.Now)
-			_, _ = x.decoder(abime, 1) // jamais de panique
+			_, _ = x.decoderV1(abime, 1) // jamais de panique
 		}
 	}
 	for _, n := range []int{0, 1, len(corps) / 2, len(corps) - 1} {
 		x := nouveauSalon("x", time.Now(), 4, nil, time.Now)
-		if _, err := x.decoder(corps[:n], 1); err == nil {
+		if _, err := x.decoderV1(corps[:n], 1); err == nil {
 			t.Fatal("état tronqué accepté à", n)
 		}
 	}
-	if _, err := nouveauSalon("x", time.Now(), 4, nil, time.Now).decoder(append(bytes.Clone(corps), 0), 1); err == nil {
+	if _, err := nouveauSalon("x", time.Now(), 4, nil, time.Now).decoderV1(append(bytes.Clone(corps), 0), 1); err == nil {
 		t.Fatal("octet de trop accepté")
 	}
 	// Ligne abîmée dans la base : salon non repris.

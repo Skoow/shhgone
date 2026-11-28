@@ -383,6 +383,7 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
       "table:salon_pieces",
       "table:salons",
       "table:salons_reprise",
+      "table:salons_reprise_blocs",
       "table:shares",
     ]);
     expect(s.salonCols).toEqual([
@@ -394,8 +395,8 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
     expect(s.pieceCols).toEqual(["id", "salon_id", "bucket", "state", "segments_mask"]);
     expect(s.salons).toBe(1);
     expect(s.pieces).toBe(3);
-    // Salons persistants (v3 §5.2) : rien n'est rangé en marche ; la table ne se remplit qu'à un arrêt propre.
-    expect(s.reprises).toBe(0);
+    // Salons persistants (v3 §5.2, persistance continue) : la ligne du salon ouvert est là en marche (clé enveloppée, état chiffré).
+    expect(s.reprises).toBe(1);
   });
 
   it("mémoire du processus serveur : aucun repère de contenu ni de clé", async () => {

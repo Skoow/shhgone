@@ -93,25 +93,28 @@ const compteCheck = `CHECK(compte IS NULL OR (typeof(compte)='blob' AND length(c
 // salonsIndexes : après la migration 2 → 3 (la colonne compte doit exister).
 const salonsIndexes = `CREATE INDEX IF NOT EXISTS salons_compte ON salons(compte)`
 
-// repriseSchema : salons repris après un arrêt propre (conception du salon v3 §5.2, décision du
-// 25 novembre). Une ligne par salon ouvert au moment de l'arrêt, écrite par l'arrêt
-// (salon.Manager.Sauvegarder) et effacée (réécrite de zéros, puis supprimée ; secure_delete) au
-// démarrage suivant, avant toute écoute (salon.Manager.PurgerAuDemarrage) : en marche, la table
-// est vide. cle : clé du fichier de conversation enveloppée par la clé maîtresse des salons
-// (SHH_SALONS_CLE_FILE, hors de la base et des sauvegardes) : nonce (12) ‖ AES-256-GCM (32 + 16).
-// etat : état du salon (sièges, journal, index des trames, pièces) chiffré sous la clé de la
-// conversation. Aucune colonne en clair hormis l'identifiant interne, déjà dans salons ; effacée
-// avec la ligne du salon (ON DELETE CASCADE).
-//
-// Sans changement de SchemaVersion (exception assumée à la règle « incrémenter avec toute
-// migration ») : une table neuve, créée si elle manque, qu'un binaire plus ancien ignore sans
-// risque (il purge les conversations au démarrage, dont les fichiers mis de côté sous leur nom
-// de reprise : rien ne peut être repris sur un fichier qu'il aurait recréé), et le retour arrière
-// de deploy.sh reste possible.
+// repriseSchema : salons persistants (conception du salon v3 §5.2 ; arrêt propre le 25 novembre,
+// persistance continue le 26 : un plantage ou une coupure ne perd plus les salons ouverts). Une
+// ligne par salon ouvert, écrite EN MARCHE par salon.Manager (à chaque entrée, départ,
+// exclusion, retrait, renouvellement, ouverture des appels, et au plus une seconde après tout
+// autre changement), relue au démarrage. salons_reprise : cle, clé du fichier de conversation
+// enveloppée par la clé maîtresse des salons (SHH_SALONS_CLE_FILE, hors de la base et des
+// sauvegardes) : nonce (12) ‖ AES-256-GCM (32 + 16) ; etat, tête de l'état du salon (sièges,
+// jetons hachés, compteurs, pièces) chiffrée sous la clé de la conversation.
+// salons_reprise_blocs : journal des annonces (genre 0) et index des trames (genre 1) par blocs
+// de 256 entrées, chacun chiffré sous la clé de la conversation (seuls les blocs changés sont
+// récrits). Aucune colonne en clair hormis l'identifiant interne (déjà dans salons) et le
+// numéro de bloc ; effacées avec la ligne du salon (ON DELETE CASCADE, en chaîne).
 const repriseSchema = `CREATE TABLE IF NOT EXISTS salons_reprise(
   salon_id TEXT PRIMARY KEY REFERENCES salons(id) ON DELETE CASCADE,
   cle BLOB NOT NULL CHECK(typeof(cle)='blob' AND length(cle)=60),
-  etat BLOB NOT NULL CHECK(typeof(etat)='blob')) WITHOUT ROWID`
+  etat BLOB NOT NULL CHECK(typeof(etat)='blob')) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS salons_reprise_blocs(
+  salon_id TEXT NOT NULL REFERENCES salons_reprise(salon_id) ON DELETE CASCADE,
+  genre INTEGER NOT NULL CHECK(genre IN (0,1)),
+  n INTEGER NOT NULL CHECK(n BETWEEN 0 AND 1048575),
+  donnees BLOB NOT NULL CHECK(typeof(donnees)='blob'),
+  PRIMARY KEY(salon_id, genre, n)) WITHOUT ROWID`
 
 // Les PRAGMA passent par le DSN pour s'appliquer à chaque connexion. synchronous(FULL) :
 // valeur par défaut, écrite pour qu'un changement du pilote ne l'abaisse pas en silence
@@ -139,7 +142,9 @@ const busyTimeoutMs = "5000"
 // 3 : colonne salons.compte et index salons_compte (ajout en place, salons gardés, compte NULL) ;
 // 4 : salons.max_members de 2 à 50 (comptes sur mesure, 25 novembre) ; 5 : retour à 2 à 10
 // (comptes sur mesure retirés le 26 novembre ; table salons reconstruite, salons et pièces
-// gardés, places et échéance ramenées aux bornes d'un salon ordinaire : migrerPlaces).
+// gardés, places et échéance ramenées aux bornes d'un salon ordinaire : migrerPlaces), et table
+// salons_reprise_blocs (persistance continue des salons, créée vide). Un binaire du schéma 4 ne
+// rouvre plus la base (ErrNewerSchema) : pas de retour arrière sans effacer shares.db.
 const SchemaVersion = 5
 
 var (

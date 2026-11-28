@@ -3,6 +3,7 @@ package salon
 import (
 	"errors"
 	"math"
+	"slices"
 	"sort"
 	"syscall"
 	"time"
@@ -147,6 +148,12 @@ func (m *Manager) admettre(s *salon, mb Membre, h EnTete, trame []byte, lien *[1
 			return nil, 0, &Attente{Retry: d}
 		}
 	}
+	if !s.rangLibreLocked() {
+		if !m.sansLimiteSiege {
+			s.limites[mb.siege].rendre(!h.Volatile)
+		}
+		return nil, 0, &Attente{Retry: time.Second} // réserve des rangs pas encore écrite (persistance.go)
+	}
 	if h.Volatile {
 		s.seq++
 		s.relayerLocked(mb.siege, now.UnixMilli(), trame)
@@ -189,6 +196,13 @@ func (m *Manager) ranger(s *salon, mb Membre, h EnTete, trame []byte, lien *[16]
 	}
 	// Règles 1 à 3 : lecteurs attendus (sièges occupés, moins l'expéditeur) ; expéditeur seul :
 	// personne à attendre, l'échéance part tout de suite (effacement.go).
+	if !s.rangLibreLocked() {
+		s.aEcraser = append(s.aEcraser, e) // écrite, jamais rangée
+		if !m.sansLimiteSiege {
+			s.limites[mb.siege].rendre(true)
+		}
+		return 0, nil, &Attente{Retry: time.Second}
+	}
 	var attendus uint16
 	_, avecDelai := delaiApresLecture(h.Regle)
 	if avecDelai {
@@ -224,6 +238,11 @@ func (m *Manager) Retirer(mb Membre, seq uint64) error {
 	defer m.purger(s) // pièce liée : fichier et ligne effacés hors du verrou
 	if err := m.retirer(s, mb, seq); err != nil {
 		return err
+	}
+	// Effacement rangé d'abord (persistance.go) : l'emplacement n'est écrasé qu'ensuite, et la
+	// trame retirée ne revient jamais après un plantage.
+	if err := m.persister(s); err != nil {
+		return nil // trame déjà plus servie ; écrasée après une passe réussie
 	}
 	return m.ecraser(s)
 }
@@ -271,11 +290,18 @@ func (m *Manager) ecraser(s *salon) error {
 }
 
 // prendreAEcraser : emplacements à écraser et leur conversation, pris ensemble sous le verrou.
+// Avec la persistance, seulement ceux dont l'effacement est écrit dans une ligne validée
+// (persistance.go) : les autres attendent la passe suivante.
 func (s *salon) prendreAEcraser() (*Conversation, []uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	l := s.aEcraser
-	s.aEcraser = nil
+	k := len(s.aEcraser)
+	if s.p.actif {
+		k = int(min(uint64(k), s.p.aEcraserSurs-min(s.p.aEcraserSurs, s.p.aEcraserBase)))
+	}
+	l := slices.Clone(s.aEcraser[:k])
+	s.aEcraser = s.aEcraser[k:]
+	s.p.aEcraserBase += uint64(k)
 	return s.conv, l
 }
 
@@ -331,6 +357,7 @@ func (m *Manager) quitter(mb Membre, signaler bool, categorie uint8) (premier bo
 	if s == nil {
 		return false, ErrNotFound
 	}
+	defer func() { _ = m.persister(s) }() // départ rangé avant la réponse (après le verrou)
 	defer m.purger(s)
 	now := m.cfg.Now()
 	s.mu.Lock()

@@ -171,17 +171,30 @@ func (m *Manager) Regler(sGestion []byte, r ReglagesReq, avant func() error) (Re
 		}
 		neuve.lec = m.lec // lectures bornées comme à l'ouverture
 		neuve.compterDans(&m.octetsConv)
+		// Ligne de reprise effacée AVANT tout changement (persistance.go) : un plantage pendant le
+		// renouvellement ne reprend jamais l'ancienne conversation.
+		if err := m.suspendre(s); err != nil {
+			_ = neuve.Detruire()
+			m.leverSuspension(s)
+			return Reglages{}, ErrBase
+		}
 	}
 	depart, ancienne, err := m.appliquerReglages(s, places, exp, neuve)
 	if err != nil {
 		if neuve != nil {
 			_ = neuve.Detruire() // jamais installée ; un reste est retiré au prochain renouvellement
+			m.leverSuspension(s)
 		}
 		return Reglages{}, err
 	}
 	if neuve != nil && m.remplacer(s, ancienne, neuve) != nil {
 		_ = m.finir(s, RaisonInterrompu) // partie disque ratée : reprise par l'entretien
 		return Reglages{}, ErrES
+	}
+	if neuve != nil {
+		m.reprendreEcriture(s, neuve, neuve.cleCopie())
+	} else {
+		_ = m.persister(s)
 	}
 	return Reglages{MaxMembers: places, ExpiresIn: secs(exp - now.Unix()), Depuis: depart}, nil
 }
@@ -260,7 +273,7 @@ func (m *Manager) renouvelerLocked(s *salon, neuve *Conversation) *Conversation 
 	}
 	s.globDec(len(s.index)) // trames en mémoire rendues au compte global avant de vider l'index
 	s.index, s.echeances, s.pieces = nil, nil, nil
-	s.aEcraser = nil // emplacements de l'ancienne conversation, détruite par remplacer
+	s.viderAEcraserLocked() // emplacements de l'ancienne conversation, détruite par remplacer
 	s.depart = s.seq
 	s.gen.Add(1)
 	for _, c := range s.conns {
@@ -296,4 +309,12 @@ func (s *salon) enrReglagesLocked(now time.Time) []byte {
 func EnrReglages(seq, depart uint64, secondes uint32, places uint8) []byte {
 	b := binary.BigEndian.AppendUint64(enr(0x10, seq, 8+4+1), depart)
 	return append(binary.BigEndian.AppendUint32(b, secondes), places)
+}
+
+// leverSuspension : renouvellement abandonné avant tout changement : la ligne de la conversation
+// courante est de nouveau écrite (en entier, à la passe suivante).
+func (m *Manager) leverSuspension(s *salon) {
+	s.mu.Lock()
+	s.p.suspendue, s.p.ligne = false, false
+	s.mu.Unlock()
 }

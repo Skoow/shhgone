@@ -20,42 +20,33 @@ import (
 	"github.com/skoow/shhdrop/server/internal/share"
 )
 
-// Salons persistants (conception du salon v3 §5.2, décision du propriétaire du 25 novembre :
-// « oui, salons persistants, à garder l'historique »). Un redémarrage du serveur (donc chaque
-// mise à jour) faisait perdre aux salons ouverts leur conversation (clé en mémoire), leurs
-// sièges et leurs pièces : chaque client refaisait « rejoindre » puis le créateur refondait le
-// groupe MLS. Désormais, à un ARRÊT PROPRE, chaque salon ouvert est rangé (Sauvegarder) puis
-// repris au démarrage suivant (PurgerAuDemarrage) : mêmes sièges et jetons, même journal, même
-// index des trames, mêmes pièces prêtes, même compteur seq. Un client resté ouvert se reconnecte
-// avec son jeton et son `depuis` (1001, comme après toute coupure) et continue dans le même
-// groupe MLS, sans refondation ; un membre absent rattrape l'historique.
+// Salons persistants (conception du salon v3 §5.2) : après un redémarrage, propre (25 novembre)
+// ou brutal (panne, manque de mémoire, SIGKILL, coupure de courant : 26 novembre), chaque salon
+// ouvert reprend avec les mêmes sièges et jetons, le même journal, le même index des trames et
+// les mêmes pièces prêtes. Un client resté ouvert se reconnecte avec son jeton et son `depuis`
+// et continue dans le même groupe MLS ; un membre absent rattrape l'historique.
 //
-// Ce qui est rangé, et où :
-//   - shares.db, table salons_reprise, une ligne par salon : clé du fichier de conversation
-//     enveloppée par la clé maîtresse des salons (AES-256-GCM, bibliothèque standard ; données
-//     authentifiées adCle ‖ identifiant) et état du salon chiffré sous la clé de sa conversation
-//     (adEtat ‖ identifiant) ; aucune colonne en clair hormis l'identifiant interne ;
-//   - le fichier de conversation, renommé {id}.r (suffixeReprise) le temps de l'arrêt ;
-//   - les fichiers et lignes des pièces prêtes, laissés en place.
+// Ce fichier : clé maîtresse (LireCleMaitresse), chiffrement des lignes, lecture et reprise au
+// démarrage (PurgerAuDemarrage, fin.go), format de la version 1 (lignes écrites à l'arrêt propre
+// par le binaire du 25 novembre : lues une fois, à la mise à jour). L'écriture en continu, sa
+// cohérence après un plantage et le format de la version 2 : persistance.go.
 //
-// La clé maîtresse (SHH_SALONS_CLE_FILE, 32 octets, 0400 : LireCleMaitresse) est hors de la base,
-// hors de SHH_DATA_DIR et des sauvegardes. En marche, la table est VIDE : les lignes sont relues
-// puis effacées (réécrites de zéros, puis supprimées ; secure_delete, vidage du WAL) au démarrage,
-// avant toute écoute. La clé d'une conversation n'est donc sur le disque, enveloppée, que pendant
-// le redémarrage (ou tant que le serveur reste arrêté).
+// La clé maîtresse (SHH_SALONS_CLE_FILE, 32 octets, 0400) est hors de la base, hors de
+// SHH_DATA_DIR et des sauvegardes, mais sur le même volume chiffré : la clé enveloppée de chaque
+// conversation ouverte est EN PERMANENCE dans shares.db (v3 §5.2, ce que voit un voleur du
+// disque).
 //
 // Ce qui n'est PAS repris (remis à neuf, comme une connexion neuve) : connexions et présences
 // (tous hors ligne jusqu'à leur retour), seaux des limites de trames, de pièces et réserve
 // vocale, lectures de pièces en cours, pièces encore en envoi ou en finalisation (perdues :
 // l'envoi est à refaire), places des blocs anti-abus (Manager.vivants : la clé de bloc dérive de
-// l'adresse, jamais écrite). Un arrêt BRUTAL (panne, mémoire, coupure de courant, SIGKILL) ne
-// range rien : le démarrage purge alors les conversations et pièces comme avant, et les clients
-// refont « rejoindre » puis refondent le groupe (repli gardé, client.ts).
+// l'adresse, jamais écrite). Après un arrêt brutal, en plus : la dernière seconde au plus
+// (persistance.go).
 
 const (
-	// suffixeReprise : nom du fichier de conversation d'un salon rangé (jamais un identifiant
-	// valide : le brouillage des dates l'ignore, la purge du démarrage l'efface s'il n'est pas
-	// repris, un ancien binaire aussi).
+	// suffixeReprise : nom du fichier de conversation d'un salon rangé à l'arrêt propre par le
+	// binaire du 25 novembre (lignes de version 1 ; jamais un identifiant valide : le brouillage
+	// des dates l'ignore, la purge du démarrage l'efface s'il n'est pas repris).
 	suffixeReprise = ".r"
 	adCle          = "shhdrop/salon/reprise/cle/v1"
 	adEtat         = "shhdrop/salon/reprise/etat/v1"
@@ -179,146 +170,27 @@ func ouvrir(cle []byte, ad, id string, b []byte) ([]byte, error) {
 // n'est pas repris.
 var errReprise = errors.New("salon: état rangé illisible")
 
-// --- Arrêt -----------------------------------------------------------------------------------
+// --- Effacement des lignes ------------------------------------------------------------------
 
-// Sauvegarder range chaque salon ouvert (ni fini, ni échu) pour le démarrage suivant : à appeler
-// une seule fois, à l'arrêt, APRÈS FermerTout, AttendreConnexions et l'arrêt de l'entretien (Run),
-// et avant la fermeture de la base. Chaque salon est d'abord figé sous son verrou (plus rien n'y
-// entre ni n'y change : il est fini pour ce processus, sans partie disque), son état copié, puis
-// sa conversation mise de côté sous le nom {id}.r (plus aucune écriture), et sa ligne de reprise
-// écrite, un salon après l'autre (un arrêt forcé en cours de route garde les salons déjà rangés ;
-// un salon à moitié rangé n'a pas de ligne, son fichier est purgé au démarrage). Sans clé
-// maîtresse (Config.CleReprise nil) : rien n'est rangé, comme avant. Rend le nombre de salons
-// rangés et les erreurs (sans identifiant).
-func (m *Manager) Sauvegarder() (int, error) {
-	if m.cfg.CleReprise == nil {
-		return 0, nil
-	}
-	if err := effacerReprises(m.cfg.DB); err != nil { // vide en marche ; reste d'un arrêt raté
-		return 0, err
-	}
-	now := m.cfg.Now()
-	var errs []error
-	nb := 0
-	for _, s := range m.copieSalons(nil) {
-		corps, conv := s.figer(now)
-		if conv == nil {
-			continue
-		}
-		if err := m.ranger1(s.id, corps, conv); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		nb++
-	}
-	return nb, errors.Join(errs...)
-}
+// errNoRows : sql.ErrNoRows (persistance.go).
+var errNoRows = sql.ErrNoRows
 
-// figer : sous le verrou du salon, état copié (encoderLocked) et salon fini pour ce processus
-// (fini posé sans partie disque : plus aucune entrée, trame, lecture ni pièce n'y change rien).
-// conv nil : salon à ne pas ranger (déjà fini, échu, sans conversation, renouvellement pas
-// terminé).
-func (s *salon) figer(now time.Time) ([]byte, *Conversation) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.fini {
-		return nil, nil
-	}
-	var corps []byte
-	conv := s.conv
-	if !now.Before(s.expires) || conv == nil || s.ancienne != nil {
-		conv = nil
-	} else {
-		corps = s.encoderLocked()
-	}
-	s.fini = true
-	s.finiA.Store(true)
-	return corps, conv
-}
-
-// ranger1 : conversation mise de côté, clé enveloppée, état scellé sous la clé de la
-// conversation, ligne écrite.
-func (m *Manager) ranger1(id string, corps []byte, conv *Conversation) error {
-	cle, n, err := conv.mettreDeCote(filepath.Join(m.cfg.DossierConversations, id+suffixeReprise))
-	defer clear(cle[:])
-	if err != nil {
-		return err
-	}
-	clair := binary.BigEndian.AppendUint32([]byte{versionEtat}, n)
-	clair = append(clair, corps...)
-	etat, err := sceller(cle[:], adEtat, id, clair)
-	clear(clair)
-	if err != nil {
-		return err
-	}
-	env, err := sceller(m.cfg.CleReprise[:], adCle, id, cle[:])
-	if err != nil {
-		return err
-	}
-	_, err = m.cfg.DB.Exec(`INSERT INTO salons_reprise(salon_id,cle,etat) VALUES(?,?,?)`, id, env, etat)
-	return base(err)
-}
-
-// --- Démarrage -------------------------------------------------------------------------------
-
-// aReprendre : ligne de reprise d'un salon vivant, ouverte (clé de conversation et état en clair).
-type aReprendre struct {
-	id     string
-	exp    int64
-	places int
-	cle    [32]byte
-	clair  []byte
-}
-
-// lireReprises : lignes de reprise des salons encore vivants à now (ni échus, ni à 10 essais),
-// ouvertes par la clé maîtresse. Une ligne illisible est ignorée (salon non repris).
-func (m *Manager) lireReprises(now int64) ([]aReprendre, error) {
-	if m.cfg.CleReprise == nil {
-		return nil, nil
-	}
-	rows, err := m.cfg.DB.Query(`SELECT r.salon_id, r.cle, r.etat, s.expires_at, s.max_members FROM salons_reprise r
-		JOIN salons s ON s.id=r.salon_id WHERE s.expires_at>? AND s.failed_attempts<?`, now, maxEssais)
-	if err != nil {
-		return nil, base(err)
-	}
-	defer rows.Close()
-	var out []aReprendre
-	for rows.Next() {
-		var r aReprendre
-		var env, etat []byte
-		if err := rows.Scan(&r.id, &env, &etat, &r.exp, &r.places); err != nil {
-			return nil, base(err)
-		}
-		if !idValide(r.id) || len(env) != tailleEnveloppe {
-			continue
-		}
-		k, err := ouvrir(m.cfg.CleReprise[:], adCle, r.id, env)
-		if err != nil || len(k) != 32 {
-			continue
-		}
-		copy(r.cle[:], k)
-		clear(k)
-		if r.clair, err = ouvrir(r.cle[:], adEtat, r.id, etat); err != nil {
-			clear(r.cle[:])
-			continue
-		}
-		out = append(out, r)
-	}
-	return out, base(rows.Err())
-}
-
-// effacerReprises : toutes les lignes de reprise réécrites de zéros puis supprimées, en une
-// transaction (secure_delete : les pages libérées sont aussi mises à zéro) ; le vidage du WAL
-// suit (appelant). Table absente (base d'un binaire plus ancien, commandes hors du serveur) :
-// rien à faire.
+// effacerReprises : toutes les lignes de reprise (tête et blocs) réécrites de zéros puis
+// supprimées, en une transaction (secure_delete : les pages libérées sont aussi mises à zéro) ;
+// le vidage du WAL suit (appelant). Table absente (base d'un binaire plus ancien, commandes hors
+// du serveur) : rien à faire.
 func effacerReprises(db *sql.DB) error {
 	return effacerReprisesOu(db, "", nil)
 }
 
-// effacerReprisesOu : effacerReprises, limité au salon id s'il est donné.
+// effacerReprise : effacerReprises pour le seul salon id (destruction hors ligne).
+func effacerReprise(db *sql.DB, id string) error {
+	return effacerReprisesOu(db, ` WHERE salon_id=?`, []any{id})
+}
+
 func effacerReprisesOu(db *sql.DB, cond string, args []any) error {
 	var un int
-	switch err := db.QueryRow(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='salons_reprise'`).Scan(&un); {
+	switch err := db.QueryRow(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='salons_reprise_blocs'`).Scan(&un); {
 	case errors.Is(err, sql.ErrNoRows):
 		return nil
 	case err != nil:
@@ -329,18 +201,161 @@ func effacerReprisesOu(db *sql.DB, cond string, args []any) error {
 		return base(err)
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`UPDATE salons_reprise SET cle=zeroblob(length(cle)), etat=zeroblob(length(etat))`+cond, args...); err != nil {
-		return base(err)
-	}
-	if _, err := tx.Exec(`DELETE FROM salons_reprise`+cond, args...); err != nil {
-		return base(err)
+	if err := effacerReprisesTx(tx, cond, args); err != nil {
+		return err
 	}
 	return base(tx.Commit())
 }
 
-// effacerReprise : effacerReprises pour le seul salon id (destruction hors ligne).
-func effacerReprise(db *sql.DB, id string) error {
-	return effacerReprisesOu(db, ` WHERE salon_id=?`, []any{id})
+// effacerRepriseTx : ligne du salon id effacée dans la transaction tx.
+func effacerRepriseTx(tx *sql.Tx, id string) error {
+	return effacerReprisesTx(tx, ` WHERE salon_id=?`, []any{id})
+}
+
+func effacerReprisesTx(tx *sql.Tx, cond string, args []any) error {
+	for _, q := range []string{
+		`UPDATE salons_reprise_blocs SET donnees=zeroblob(length(donnees))` + cond,
+		`UPDATE salons_reprise SET cle=zeroblob(length(cle)), etat=zeroblob(length(etat))` + cond,
+		`DELETE FROM salons_reprise_blocs` + cond,
+		`DELETE FROM salons_reprise` + cond,
+	} {
+		if _, err := tx.Exec(q, args...); err != nil {
+			return base(err)
+		}
+	}
+	return nil
+}
+
+// --- Démarrage -------------------------------------------------------------------------------
+
+// aReprendre : ligne de reprise d'un salon vivant, ouverte (clé de conversation et état en clair).
+// version 1 : ligne d'un arrêt propre d'avant la persistance continue (fichier {id}.r) ;
+// version 2 : tête et blocs (journal, index) de la persistance continue (fichier {id}).
+type aReprendre struct {
+	id              string
+	exp             int64
+	places          int
+	rotation        uint32
+	cle             [32]byte
+	clair           []byte
+	journal, index  []byte
+	version         uint8
+	nJ, nI          int
+	reserve         uint64
+	n, rotationTete uint32
+}
+
+func (r *aReprendre) oublier() {
+	clear(r.cle[:])
+	clear(r.clair)
+	clear(r.journal)
+	clear(r.index)
+}
+
+// lireReprises : lignes de reprise des salons encore vivants à now (ni échus, ni à 10 essais),
+// ouvertes par la clé maîtresse, blocs compris. Une ligne illisible ou incomplète est ignorée
+// (salon non repris).
+func (m *Manager) lireReprises(now int64) ([]aReprendre, error) {
+	if m.cfg.CleReprise == nil {
+		return nil, nil
+	}
+	rows, err := m.cfg.DB.Query(`SELECT r.salon_id, r.cle, r.etat, s.expires_at, s.max_members, s.rotation_r
+		FROM salons_reprise r JOIN salons s ON s.id=r.salon_id WHERE s.expires_at>? AND s.failed_attempts<?`, now, maxEssais)
+	if err != nil {
+		return nil, base(err)
+	}
+	var out []aReprendre
+	for rows.Next() {
+		var r aReprendre
+		var env, etat []byte
+		var rot int64
+		if err := rows.Scan(&r.id, &env, &etat, &r.exp, &r.places, &rot); err != nil {
+			rows.Close()
+			return nil, base(err)
+		}
+		r.rotation = uint32(rot)
+		if !idValide(r.id) || len(env) != tailleEnveloppe {
+			continue
+		}
+		k, err := ouvrir(m.cfg.CleReprise[:], adCle, r.id, env)
+		if err != nil || len(k) != 32 {
+			continue
+		}
+		copy(r.cle[:], k)
+		clear(k)
+		if r.clair, err = ouvrir(r.cle[:], adEtat, r.id, etat); err != nil || len(r.clair) < 5 {
+			clear(r.cle[:])
+			continue
+		}
+		r.version = r.clair[0]
+		out = append(out, r)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return nil, base(err)
+	}
+	// Blocs (version 2) lus après la première requête : une seule connexion à la base.
+	garde := out[:0]
+	for i := range out {
+		r := &out[i]
+		if r.version == versionTete && m.lireBlocs(r) != nil {
+			r.oublier()
+			continue
+		}
+		if r.version != versionTete && r.version != versionEtat {
+			r.oublier()
+			continue
+		}
+		garde = append(garde, *r)
+	}
+	return garde, nil
+}
+
+// lireBlocs : tête de version 2 lue (champs fixes) et blocs du salon ouverts, dans l'ordre et
+// au complet (ni trou, ni bloc en trop).
+func (m *Manager) lireBlocs(r *aReprendre) error {
+	if len(r.clair) < 1+4+8+4+4+4 {
+		return errReprise
+	}
+	l := &lecteurEtat{b: r.clair[1:]}
+	r.n, r.reserve, r.rotationTete = l.u32(), l.u64(), l.u32()
+	r.nJ, r.nI = int(l.u32()), int(l.u32())
+	if r.nJ > nbBlocs(journalMax+nbSieges, blocJournal) || r.nI > nbBlocs(indexMax, blocIndex) {
+		return errReprise
+	}
+	rows, err := m.cfg.DB.Query(`SELECT genre, n, donnees FROM salons_reprise_blocs WHERE salon_id=? ORDER BY genre, n`, r.id)
+	if err != nil {
+		return base(err)
+	}
+	defer rows.Close()
+	attendu := [2]int{}
+	for rows.Next() {
+		var genre, n int
+		var d []byte
+		if err := rows.Scan(&genre, &n, &d); err != nil {
+			return base(err)
+		}
+		if genre < 0 || genre > 1 || n != attendu[genre] || n >= [2]int{r.nJ, r.nI}[genre] {
+			return errReprise
+		}
+		attendu[genre]++
+		c, err := ouvrir(r.cle[:], adBloc, adBlocID(r.id, genre, n), d)
+		if err != nil {
+			return errReprise
+		}
+		if genre == genreJournal {
+			r.journal = append(r.journal, c...)
+		} else {
+			r.index = append(r.index, c...)
+		}
+		clear(c)
+	}
+	if err := rows.Err(); err != nil {
+		return base(err)
+	}
+	if attendu != [2]int{r.nJ, r.nI} {
+		return errReprise
+	}
+	return nil
 }
 
 // garde : ce que la purge du démarrage garde (salons repris) : fichiers de conversation, pièces
@@ -349,24 +364,25 @@ type garde struct {
 	conv   map[string]bool
 	pieces map[string]bool
 	octets map[string]int64
+	salons []*salon
 }
 
-// reprendre : salons rangés remis en mémoire (après l'effacement des lignes de reprise :
-// une ligne ne survit jamais à sa reprise). Un salon dont le fichier manque ou ne correspond
-// pas, ou dont l'état ne se décode pas, n'est pas repris (repli : « rejoindre » et refondation
-// côté client). Une pièce dont le fichier ou la ligne « ready » manque est oubliée (sa trame
-// reste : « pièce indisponible » chez le client). Rend ce que la purge doit garder.
+// reprendre : salons rangés remis en mémoire. Un salon dont le fichier manque ou ne correspond
+// pas, dont l'état ne se décode pas, ou dont la rotation n'est pas celle de la base (exclusion
+// faite après la dernière ligne validée), n'est pas repris (repli : « rejoindre » et
+// refondation côté client). Une pièce dont le fichier ou la ligne « ready » manque est oubliée
+// (sa trame reste : « pièce indisponible » chez le client). Rend ce que la purge doit garder.
 func (m *Manager) reprendre(l []aReprendre) garde {
 	g := garde{conv: map[string]bool{}, pieces: map[string]bool{}, octets: map[string]int64{}}
 	for i := range l {
 		r := &l[i]
 		s := m.reprendre1(r)
-		clear(r.cle[:])
-		clear(r.clair)
+		r.oublier()
 		if s == nil {
 			continue
 		}
 		g.conv[s.id] = true
+		g.salons = append(g.salons, s)
 		for id, p := range s.lesPieces {
 			g.pieces[id] = true
 			if !p.vocal {
@@ -379,11 +395,22 @@ func (m *Manager) reprendre(l []aReprendre) garde {
 
 func (m *Manager) reprendre1(r *aReprendre) *salon {
 	d := m.cfg.DossierConversations
-	if len(r.clair) < 5 || r.clair[0] != versionEtat {
-		return nil
-	}
-	n := binary.BigEndian.Uint32(r.clair[1:5])
-	if err := os.Rename(filepath.Join(d, r.id+suffixeReprise), filepath.Join(d, r.id)); err != nil {
+	var n uint32
+	switch r.version {
+	case versionEtat:
+		n = binary.BigEndian.Uint32(r.clair[1:5])
+		// Arrêt propre d'un binaire d'avant la persistance continue : fichier mis de côté sous
+		// {id}.r (ou déjà rendu à son nom par un démarrage interrompu).
+		if err := os.Rename(filepath.Join(d, r.id+suffixeReprise), filepath.Join(d, r.id)); err != nil &&
+			!errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+	case versionTete:
+		if r.rotationTete != r.rotation {
+			return nil // exclusion écrite en base après la dernière ligne validée
+		}
+		n = r.n
+	default:
 		return nil
 	}
 	conv, err := reouvrirConversation(d, r.id, r.cle, n)
@@ -391,9 +418,17 @@ func (m *Manager) reprendre1(r *aReprendre) *salon {
 		return nil
 	}
 	s := nouveauSalon(r.id, time.Unix(r.exp, 0), r.places, conv, m.now)
-	pieces, err := s.decoder(r.clair[5:], n)
+	var pieces []*piece
+	if r.version == versionEtat {
+		pieces, err = s.decoderV1(r.clair[5:], n)
+	} else {
+		pieces, err = s.decoderV2(r, n)
+	}
+	if err == nil && !s.derniereLisible(conv) {
+		err = errReprise
+	}
 	if err != nil {
-		conv.Detruire()
+		conv.fermer()
 		return nil
 	}
 	s.flux = &m.flux
@@ -411,6 +446,16 @@ func (m *Manager) reprendre1(r *aReprendre) *salon {
 	if s.pot != nil && len(s.index) > s.part {
 		s.pot.Add(int64(len(s.index) - s.part))
 	}
+	// Persistance : la ligne lue est validée ; aucun rang au-delà de sa réserve tant qu'une
+	// nouvelle ligne n'est pas écrite (PurgerAuDemarrage l'écrit avant l'écoute).
+	s.p.actif = true
+	s.poserConvLocked(conv, r.cle)
+	s.p.peutExister = true
+	s.p.borne, s.p.borneEcrite = s.seq, s.seq
+	s.p.aEcraserSurs = uint64(len(s.aEcraser))
+	if r.version == versionTete {
+		s.p.ligne, s.p.journalEcrit, s.p.indexEcrit = true, len(s.journal), len(s.index)
+	}
 	m.mu.Lock()
 	m.salons[s.id] = s
 	m.mu.Unlock()
@@ -426,6 +471,18 @@ func (m *Manager) reprendre1(r *aReprendre) *salon {
 		}
 	})
 	return s
+}
+
+// derniereLisible : la dernière trame encore servie de l'index se lit sous la clé de la
+// conversation (sinon le fichier n'est pas le sien : recréé par un autre binaire, ou abîmé).
+func (s *salon) derniereLisible(conv *Conversation) bool {
+	for i := len(s.index) - 1; i >= 0; i-- {
+		if e := s.index[i]; !e.efface() {
+			_, err := conv.lire(e.emplacement)
+			return err == nil
+		}
+	}
+	return true
 }
 
 // reprendrePieces : pièces rangées gardées si leur fichier (taille exacte du palier) et leur
@@ -464,94 +521,12 @@ func (m *Manager) reprendrePieces(s *salon, l []*piece) {
 	}
 }
 
-// --- Format de l'état (en clair seulement sous la clé de la conversation) ------------------
+// --- Décodage (en clair seulement sous la clé de la conversation) --------------------------
 //
-// version (1) ‖ n emplacements (4) ‖ corps : entiers gros-boutistes ; heures en ms Unix (0 :
-// aucune). Le corps : seq, arrivées, signalé, signalements, départ, gen, réglé, appels jusqu'à ;
-// sièges ; révoqués ; journal ; index ; échéances ; emplacements à écraser ; pièces prêtes.
-
-// encoderLocked : corps de l'état du salon. Appelé sous s.mu.
-func (s *salon) encoderLocked() []byte {
-	b := binary.BigEndian.AppendUint64(nil, s.seq)
-	b = binary.BigEndian.AppendUint32(b, uint32(s.arrivees))
-	b = append(b, bit(s.signale))
-	for _, k := range s.signalements {
-		b = binary.BigEndian.AppendUint32(b, uint32(k))
-	}
-	b = binary.BigEndian.AppendUint64(b, s.depart)
-	b = binary.BigEndian.AppendUint64(b, s.gen.Load())
-	b = append(b, bit(s.regle))
-	b = binary.BigEndian.AppendUint64(b, uint64(ms(s.appelsJusqua)))
-	b = append(b, uint8(s.occupesLocked()))
-	for n, x := range s.sieges {
-		if x == nil {
-			continue
-		}
-		b = append(b, uint8(n))
-		b = append(b, x.nonce[:]...)
-		b = append(b, x.jetonV[:]...)
-		for _, v := range []uint64{x.emis, x.plancher, x.arrivee, x.repris, x.derniere} {
-			b = binary.BigEndian.AppendUint64(b, v)
-		}
-		b = append(b, bit(x.jamaisConnecte))
-		b = binary.BigEndian.AppendUint64(b, uint64(ms(x.entre)))
-		b = append(b, uint8(len(x.reprises)))
-		for _, t := range x.reprises {
-			b = binary.BigEndian.AppendUint64(b, uint64(ms(t)))
-		}
-	}
-	b = binary.BigEndian.AppendUint32(b, uint32(len(s.revoques)))
-	for h := range s.revoques {
-		b = append(b, h[:]...)
-	}
-	b = binary.BigEndian.AppendUint32(b, uint32(len(s.journal)))
-	for _, ev := range s.journal {
-		b = binary.BigEndian.AppendUint64(b, ev.seq)
-		b = append(b, uint8(len(ev.enr)))
-		b = append(b, ev.enr...)
-	}
-	b = binary.BigEndian.AppendUint32(b, uint32(len(s.index)))
-	for _, e := range s.index {
-		b = binary.BigEndian.AppendUint64(b, e.seq)
-		b = binary.BigEndian.AppendUint64(b, uint64(e.recuMs))
-		b = binary.BigEndian.AppendUint64(b, uint64(e.attendus))
-		b = binary.BigEndian.AppendUint32(b, e.emplacement)
-		b = append(b, e.siege, e.drapeaux)
-	}
-	b = binary.BigEndian.AppendUint32(b, uint32(len(s.echeances)))
-	for _, e := range s.echeances {
-		b = binary.BigEndian.AppendUint64(b, uint64(e.ms))
-		b = binary.BigEndian.AppendUint64(b, e.seq)
-	}
-	b = binary.BigEndian.AppendUint32(b, uint32(len(s.aEcraser)))
-	for _, e := range s.aEcraser {
-		b = binary.BigEndian.AppendUint32(b, e)
-	}
-	var pretes []*piece
-	for _, p := range s.lesPieces {
-		if p.etat == prete && !p.efface && p.ecritures == 0 {
-			pretes = append(pretes, p)
-		}
-	}
-	slices.SortFunc(pretes, func(a, c *piece) int { return cmpStr(a.id, c.id) })
-	b = binary.BigEndian.AppendUint32(b, uint32(len(pretes)))
-	for _, p := range pretes {
-		b = append(b, uint8(len(p.id)))
-		b = append(b, p.id...)
-		b = binary.BigEndian.AppendUint32(b, uint32(p.bucket))
-		b = append(b, bit(p.vocal), p.siege)
-		b = append(b, p.auteur[:]...)
-		for _, v := range []uint64{p.rang, p.lien, p.gen, uint64(p.places), uint64(ms(p.activite)), uint64(p.servis)} {
-			b = binary.BigEndian.AppendUint64(b, v)
-		}
-		b = binary.BigEndian.AppendUint32(b, uint32(len(p.lus)))
-		for jv, k := range p.lus {
-			b = append(b, jv[:]...)
-			b = binary.BigEndian.AppendUint64(b, uint64(k))
-		}
-	}
-	return b
-}
+// Version 1 (arrêt propre du 25 novembre, lue pour la mise à jour seulement) : version (1) ‖ n
+// emplacements (4) ‖ corps : seq, arrivées, signalé, signalements, départ, gen, réglé, appels
+// jusqu'à ; sièges ; révoqués ; journal ; index (attendus sur 64 bits) ; échéances ;
+// emplacements à écraser ; pièces prêtes. Version 2 : persistance.go.
 
 func cmpStr(a, b string) int {
 	switch {
@@ -602,6 +577,7 @@ func (l *lecteurEtat) octets(n int) []byte {
 	return v
 }
 func (l *lecteurEtat) u8() uint8   { return l.octets(1)[0] }
+func (l *lecteurEtat) u16() uint16 { return binary.BigEndian.Uint16(l.octets(2)) }
 func (l *lecteurEtat) u32() uint32 { return binary.BigEndian.Uint32(l.octets(4)) }
 func (l *lecteurEtat) u64() uint64 { return binary.BigEndian.Uint64(l.octets(8)) }
 func (l *lecteurEtat) b1() bool {
@@ -638,14 +614,57 @@ func longueurEnr(ty byte) int {
 // indexMax : entrées de l'index au plus dans un état rangé (au-delà de tout plafond réglable).
 const indexMax = 1 << 24
 
-// decoder : corps de l'état (encoderLocked) remis dans s, n emplacements écrits ; rend les
-// pièces rangées (gardées ensuite si leurs fichiers sont là). Chaque valeur est bornée et
-// cohérente (rangs croissants, sièges, emplacements) : un état incohérent n'est pas repris.
-// L'état est authentifié (AES-GCM sous la clé de la conversation) : ces contrôles sont une
-// défense de plus, contre une erreur de ce code.
-func (s *salon) decoder(corps []byte, n uint32) ([]*piece, error) {
+// decoderV1 : corps d'une ligne de version 1 remis dans s, n emplacements écrits.
+func (s *salon) decoderV1(corps []byte, n uint32) ([]*piece, error) {
 	l := &lecteurEtat{b: corps}
 	s.seq = l.u64()
+	s.decoderChamps(l)
+	s.decoderSieges(l)
+	s.decoderRevoques(l)
+	s.decoderJournal(l, l.nombre(journalMax+nbSieges, 9))
+	s.decoderIndex(l, l.nombre(indexMax, 30), n, true)
+	for range l.nombre(len(s.index), 16) {
+		e := echeance{ms: int64(l.u64()), seq: l.u64()}
+		if s.chercherLocked(e.seq) < 0 {
+			l.err = true
+		}
+		s.echeances = append(s.echeances, e)
+	}
+	s.decoderAEcraser(l, n)
+	pieces := s.decoderPieces(l)
+	if l.err || len(l.b) != 0 {
+		return nil, errReprise
+	}
+	heap.Init(&s.echeances)
+	return pieces, nil
+}
+
+// decoderV2 : tête (après ses champs fixes, lus par lireBlocs) et blocs remis dans s.
+func (s *salon) decoderV2(r *aReprendre, n uint32) ([]*piece, error) {
+	s.seq = r.reserve
+	s.rotation = r.rotationTete
+	lj := &lecteurEtat{b: r.journal}
+	s.decoderJournal(lj, len(r.journal)/9)
+	li := &lecteurEtat{b: r.index}
+	if len(r.index)%tailleEntreeV2 != 0 || len(r.index)/tailleEntreeV2 > r.nI*blocIndex {
+		return nil, errReprise
+	}
+	s.decoderIndex(li, len(r.index)/tailleEntreeV2, n, false)
+	l := &lecteurEtat{b: r.clair[1+4+8+4+4+4:]}
+	s.decoderChamps(l)
+	s.decoderSieges(l)
+	s.decoderRevoques(l)
+	s.decoderAEcraser(l, n)
+	pieces := s.decoderPieces(l)
+	if l.err || li.err || len(l.b) != 0 || len(li.b) != 0 || lj.err || nbBlocs(len(s.journal), blocJournal) != r.nJ ||
+		nbBlocs(len(s.index), blocIndex) != r.nI {
+		return nil, errReprise
+	}
+	heap.Init(&s.echeances)
+	return pieces, nil
+}
+
+func (s *salon) decoderChamps(l *lecteurEtat) {
 	s.arrivees = int(l.u32())
 	s.signale = l.b1()
 	for i := range s.signalements {
@@ -658,14 +677,22 @@ func (s *salon) decoder(corps []byte, n uint32) ([]*piece, error) {
 		s.appelsJusqua = t
 		s.appelsFin.Store(t.Unix())
 	}
+	if s.depart > s.seq || s.arrivees > math.MaxInt32 {
+		l.err = true
+	}
+}
+
+func (s *salon) decoderSieges(l *lecteurEtat) {
 	occ := int(l.u8())
-	if occ > nbSieges || s.depart > s.seq || s.arrivees > math.MaxInt32 {
-		return nil, errReprise
+	if occ > nbSieges {
+		l.err = true
+		return
 	}
 	for range occ {
 		k := l.u8()
-		if k >= nbSieges || s.sieges[k] != nil {
-			return nil, errReprise
+		if l.err || k >= nbSieges || s.sieges[k] != nil {
+			l.err = true
+			return
 		}
 		x := &siege{}
 		copy(x.nonce[:], l.octets(16))
@@ -675,69 +702,99 @@ func (s *salon) decoder(corps []byte, n uint32) ([]*piece, error) {
 		x.entre = heure(l.u64())
 		nr := int(l.u8())
 		if nr > repriseMax {
-			return nil, errReprise
+			l.err = true
+			return
 		}
 		for range nr {
 			x.reprises = append(x.reprises, heure(l.u64()))
 		}
 		if x.emis > s.seq || x.plancher > s.seq || x.arrivee > x.emis || x.repris > s.seq {
-			return nil, errReprise
+			l.err = true
+			return
 		}
 		if _, deja := s.jetons[x.jetonV]; deja {
-			return nil, errReprise
+			l.err = true
+			return
 		}
 		s.sieges[k] = x
 		s.jetons[x.jetonV] = k
 		s.occ.Add(1)
 	}
+}
+
+func (s *salon) decoderRevoques(l *lecteurEtat) {
 	for range l.nombre(math.MaxUint16, 32) {
 		var h [32]byte
 		copy(h[:], l.octets(32))
 		if _, ok := s.jetons[h]; ok {
-			return nil, errReprise
+			l.err = true
 		}
 		s.revoques[h] = struct{}{}
 	}
+}
+
+// decoderJournal : k annonces au plus (version 2 : tant qu'il reste des octets).
+func (s *salon) decoderJournal(l *lecteurEtat, k int) {
 	var prec uint64
-	for range l.nombre(journalMax+nbSieges, 9) {
+	for i := 0; i < k && !l.err && len(l.b) > 0; i++ {
 		seq := l.u64()
 		enr := slices.Clone(l.octets(int(l.u8())))
 		if l.err || seq <= prec || seq > s.seq || len(enr) < 10 || longueurEnr(enr[0]) != len(enr) ||
 			binary.BigEndian.Uint64(enr[1:9]) != seq {
-			return nil, errReprise
+			l.err = true
+			return
 		}
 		prec = seq
 		s.journal = append(s.journal, evenement{seq: seq, enr: enr})
 	}
-	prec = 0
-	k := l.nombre(indexMax, 30)
+	if len(s.journal) > journalMax+nbSieges {
+		l.err = true
+	}
+}
+
+// decoderIndex : k entrées (v1 : attendus sur 64 bits, sans échéance ; v2 : 16 bits et échéance).
+func (s *salon) decoderIndex(l *lecteurEtat, k int, n uint32, v1 bool) {
 	if k > 0 {
 		s.index = make([]entree, 0, k)
 	}
+	var prec uint64
 	for range k {
-		seq, recu, att := l.u64(), int64(l.u64()), l.u64()
+		seq, recu := l.u64(), int64(l.u64())
+		var att uint64
+		if v1 {
+			att = l.u64()
+		} else {
+			att = uint64(l.u16())
+		}
 		e := entree{seq: seq, recuMs: recu, attendus: uint16(att), emplacement: l.u32(), siege: l.u8(), drapeaux: l.u8()}
-		if e.seq <= prec || e.seq > s.seq || e.siege >= nbSieges || (!e.efface() && e.emplacement >= n) ||
-			att>>nbSieges != 0 {
-			return nil, errReprise
+		var ech int64
+		if !v1 {
+			ech = int64(l.u64())
+		}
+		if l.err || e.seq <= prec || e.seq > s.seq || e.siege >= nbSieges || (!e.efface() && e.emplacement >= n) ||
+			att>>nbSieges != 0 || ech < 0 {
+			l.err = true
+			return
 		}
 		prec = e.seq
 		s.index = append(s.index, e)
-	}
-	for range l.nombre(len(s.index), 16) {
-		e := echeance{ms: int64(l.u64()), seq: l.u64()}
-		if s.chercherLocked(e.seq) < 0 {
-			return nil, errReprise
+		if ech != 0 {
+			s.echeances = append(s.echeances, echeance{ms: ech, seq: e.seq})
 		}
-		s.echeances = append(s.echeances, e) // ordre du tas gardé tel quel
 	}
+}
+
+func (s *salon) decoderAEcraser(l *lecteurEtat, n uint32) {
 	for range l.nombre(len(s.index)+int(n), 4) {
-		e := l.u32()
-		if e >= n {
-			return nil, errReprise
+		if e := l.u32(); e < n {
+			s.aEcraser = append(s.aEcraser, e)
+		} else {
+			l.err = true
 		}
-		s.aEcraser = append(s.aEcraser, e)
 	}
+}
+
+func (s *salon) decoderPieces(l *lecteurEtat) []*piece {
 	var pieces []*piece
 	vues := map[string]bool{}
 	liens := map[uint64]bool{}
@@ -758,7 +815,8 @@ func (s *salon) decoder(corps []byte, n uint32) ([]*piece, error) {
 		}
 		if l.err || !idValide(p.id) || !PalierValide(p.bucket, p.vocal) || p.siege >= nbSieges || vues[p.id] ||
 			p.rang > s.seq || p.gen != s.gen.Load() || (p.lien != 0 && (liens[p.lien] || s.chercherLocked(p.lien) < 0)) {
-			return nil, errReprise
+			l.err = true
+			return nil
 		}
 		vues[p.id] = true
 		if p.lien != 0 {
@@ -766,13 +824,5 @@ func (s *salon) decoder(corps []byte, n uint32) ([]*piece, error) {
 		}
 		pieces = append(pieces, p)
 	}
-	if l.err || len(l.b) != 0 {
-		return nil, errReprise
-	}
-	s.echeancesEnTas()
-	return pieces, nil
+	return pieces
 }
-
-// echeancesEnTas : le tas d'échéances rétabli (l'ordre rangé est déjà celui d'un tas ;
-// heap.Init le garantit quoi qu'il arrive).
-func (s *salon) echeancesEnTas() { heap.Init(&s.echeances) }

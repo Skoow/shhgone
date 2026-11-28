@@ -113,7 +113,12 @@ func (m *Manager) Exclure(r ExclureReq) error {
 	// requête).
 	m.vidage.Demander()
 	defer m.purger(s) // pièces des trames effacées par le départ : fichier et ligne hors du verrou
-	return m.appliquerExclusion(s, r, cible)
+	err = m.appliquerExclusion(s, r, cible)
+	// Exclusion rangée avant la réponse (persistance.go). Un plantage avant : la rotation, déjà
+	// en base, ne correspond plus à la ligne, qui n'est pas reprise : le jeton exclu ne revient
+	// jamais.
+	_ = m.persister(s)
+	return err
 }
 
 // verifierExclusion : siège et nonce, place au journal, sous le verrou du salon ; rend le
@@ -132,8 +137,8 @@ func (s *salon) verifierExclusion(r ExclureReq) (*siege, error) {
 			return nil, ErrStale
 		}
 	}
-	if cible == nil && len(s.journal) >= journalMax-nbSieges {
-		return nil, ErrLimit // même borne qu'annoncerLocked pour une annonce sans départ
+	if (cible == nil && len(s.journal) >= journalMax-nbSieges) || !s.rangLibreLocked() {
+		return nil, ErrLimit // même bornes qu'annoncerLocked pour une annonce sans départ
 	}
 	return cible, nil
 }
@@ -203,6 +208,7 @@ func (m *Manager) appliquerExclusion(s *salon, r ExclureReq, cible *siege) error
 		}
 	}
 	enr := func(seq uint64) []byte { return EnrExclusion(seq, n, nonce, r.R) }
+	s.rotation = r.R
 	if cible == nil || s.sieges[n] != cible {
 		// Rotation seule, ou exclu parti de lui-même entre-temps : 0x09 quand même (les
 		// membres restants y appliquent la rotation), sans siège à libérer.

@@ -90,6 +90,7 @@ const drapeauLu uint8 = 0x80
 // ancien emplacement à écraser (ok = false si déjà effacée). Appelé sous s.mu.
 func (s *salon) marquerLocked(i int) (emplacement uint32, ok bool) {
 	e := &s.index[i]
+	s.salirIndexLocked(i)
 	e.attendus = 0
 	if e.efface() {
 		return 0, false
@@ -121,6 +122,7 @@ func (s *salon) plusAttenduLocked(n uint8) {
 		if e.efface() || e.attendus&b == 0 {
 			continue
 		}
+		s.salirIndexLocked(i)
 		if e.attendus &^= b; e.attendus == 0 {
 			s.echeanceLocked(e.regle(), e.seq, nowMs)
 		}
@@ -167,6 +169,7 @@ func (m *Manager) Lu(mb Membre, seq uint64) error {
 	if e.efface() || e.attendus&b == 0 {
 		return nil // attendus n'est non nul que pour les règles 1 à 3
 	}
+	s.salirIndexLocked(i)
 	if e.attendus &^= b; e.attendus == 0 {
 		s.echeanceLocked(e.regle(), e.seq, now.UnixMilli())
 	}
