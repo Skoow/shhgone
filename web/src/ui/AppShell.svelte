@@ -4,7 +4,7 @@
   import { chrome } from "../app/chrome.svelte";
   import { getDemo } from "../app/demo-hooks";
   import { currentPath, followLink, href, navigate, router } from "../app/router.svelte";
-  import { SOURCE_URL } from "../routes/pages/content";
+  import { SOURCE_URL } from "../routes/pages/depot";
   import { t } from "../i18n/i18n.svelte";
   import Aurora from "./Aurora.svelte";
   import EnglishLink from "./EnglishLink.svelte";

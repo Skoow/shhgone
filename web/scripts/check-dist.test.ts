@@ -6,8 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { checkDist, findExternalUrls } from "./check-dist.mjs";
-import { addSri, sha384 } from "./sri.mjs";
+import { checkDist, checkSeo, findExternalUrls, INDEXED_FILES } from "./check-dist.mjs";
+import { addSri, checkSri, sha384 } from "./sri.mjs";
+import { seoHead } from "./seo-head.mjs";
 import { DEMO_CSP } from "./demo-meta.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./check-dist.mjs", import.meta.url));
@@ -519,6 +520,64 @@ describe("check-dist.mjs --demo", () => {
     expect(checkDist(site({ ...good(), "index.html": h, "404.html": h }), true)).toEqual([
       "index.html : « /assets/index-a.js » hors de la base /shhgone/",
     ]);
+  });
+});
+
+describe("check-dist.mjs, référencement (checkSeo)", () => {
+  const png = (w: number, h: number) => {
+    const b = Buffer.alloc(24);
+    b.write("\x89PNG\r\n\x1a\n", 0, "latin1");
+    b.writeUInt32BE(13, 8);
+    b.write("IHDR", 12, "latin1");
+    b.writeUInt32BE(w, 16);
+    b.writeUInt32BE(h, 20);
+    return b;
+  };
+  const page = (path: string | undefined, lang: "fr" | "en", title = "T · Shhgone", description = "D") =>
+    `<!doctype html><html lang="${lang}"><head><meta name="description" content="${description}" /><title>${title}</title>${seoHead({ path, lang, title, description })}</head><body></body></html>`;
+  function good(): Map<string, Buffer> {
+    const m = new Map<string, Buffer>();
+    for (const [f, p] of Object.entries(INDEXED_FILES)) {
+      m.set(f, Buffer.from(page(p, "fr")));
+      m.set(f === "index.html" ? "en.html" : "en-" + f, Buffer.from(page(p, "en")));
+    }
+    for (const f of ["app.html", "s.html", "signaler.html", "en-verifier.html"]) m.set(f, Buffer.from(page(undefined, "fr")));
+    m.set("og-image.png", png(1200, 630));
+    return m;
+  }
+  const edit = (f: string, from: string | RegExp, to: string) => {
+    const m = good();
+    m.set(f, Buffer.from(m.get(f)!.toString().replace(from, to)));
+    return checkSeo(m);
+  };
+
+  it("build conforme : aucun problème", () => {
+    expect(checkSeo(good())).toEqual([]);
+  });
+  it("page indexée incomplète, canonique d'une autre langue, image absente ou mal dimensionnée", () => {
+    expect(edit("securite.html", /<meta property="og:url"[^>]*>/, "")).toContain("securite.html : og:url égale à la canonique (0 fois au lieu d'une)");
+    expect(edit("en-securite.html", '<link rel="canonical" href="https://shhgone.com/en/securite" />', '<link rel="canonical" href="https://shhgone.com/securite" />').join("\n")).toMatch(/en-securite\.html : canonique/);
+    expect(edit("contact.html", /<link rel="alternate" hreflang="x-default"[^>]*>/, "")).toContain("contact.html : hreflang x-default (0 fois au lieu d'une)");
+    expect(edit("offres.html", '<meta property="og:title" content="T · Shhgone" />', '<meta property="og:title" content="Autre" />')).toContain("offres.html : og:title différent du titre de la page");
+    const m = good();
+    m.set("og-image.png", png(1200, 600));
+    expect(checkSeo(m)).toContain("index.html : image d'aperçu absente du site ou de dimensions différentes de og:image:width/height");
+  });
+  it("page non indexée : noindex exigé, ni canonique, ni aperçu de lien, ni JSON-LD", () => {
+    expect(edit("s.html", '<meta name="robots" content="noindex" />', "")).toContain("s.html : page non indexée sans « noindex »");
+    expect(edit("s.html", "</head>", '<meta property="og:title" content="x" /></head>')).toContain("s.html : page non indexée avec canonique, aperçu de lien ou JSON-LD");
+  });
+  it("JSON-LD : accueils seulement, JSON valide, aucune autre adresse que la nôtre et schema.org", () => {
+    expect(edit("securite.html", "</head>", `<script type="application/ld+json">{}</script></head>`)).toContain("securite.html : JSON-LD attendu sur l'accueil seulement, une fois");
+    expect(edit("index.html", /<script type="application\/ld\+json">[^<]*<\/script>/, `<script type="application/ld+json">{oups</script>`)).toContain("index.html : JSON-LD illisible (JSON invalide)");
+    expect(edit("en.html", "https://shhgone.com/icon-512.png", "https://pistage.example/p.png")).toContain("en.html : JSON-LD cite « https://pistage.example/p.png »");
+    expect(edit("index.html", '<script type="application/ld+json">', '<script type="application/ld+json" src="/x.js">')).toContain("index.html : bloc JSON-LD mal formé");
+  });
+  it("le bloc JSON-LD n'est pas pris pour un script en ligne ; un autre script en ligne, si", () => {
+    const html = page("/", "fr");
+    expect(checkSri("index.html", html, () => null)).toEqual([]);
+    expect(checkSri("index.html", html.replace("</head>", "<script>alert(1)</script></head>"), () => null)).toEqual(["index.html : script en ligne (aucune empreinte possible, spec §28.3)"]);
+    expect(checkSri("index.html", html.replace('<script type="application/ld+json">', '<script type="application/ld+json" data-x>'), () => null)).toEqual(["index.html : script en ligne (aucune empreinte possible, spec §28.3)"]);
   });
 });
 

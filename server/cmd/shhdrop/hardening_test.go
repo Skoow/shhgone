@@ -168,21 +168,22 @@ func TestServeStaticDir(t *testing.T) {
 		t.Fatalf("/docs/ : %d %q", code, body)
 	}
 	// Repli de l'application monopage : /, et tout chemin sans extension, servent index.html,
-	// mêmes en-têtes, sans X-Robots-Tag (spec §32 : les liens sont à la racine, « /#clé »).
+	// mêmes en-têtes ; « X-Robots-Tag: noindex » hors des pages publiques indexées (indexedPaths ;
+	// barre oblique finale : 301, static_seo_test.go).
 	// Statut réel : 200 pour les routes de l'application, 404 pour tout autre chemin (le
 	// corps reste l'application, qui affiche « introuvable »).
 	for _, c := range []struct {
 		p    string
 		want int
-	}{{"/", 200}, {"/index.html", 200}, {"/securite", 200}, {"/confidentialite", 200}, {"/securite/", 404},
-		{"/conditions", 200}, {"/mentions-legales", 200}, {"/signaler", 200}, {"/verifier", 200}, {"/contact", 200}, {"/offres", 200}, {"/envoyer", 200}, {"/envoyer/", 404}, {"/envois", 200}, {"/mentions", 404},
+	}{{"/", 200}, {"/index.html", 200}, {"/securite", 200}, {"/confidentialite", 200}, {"/securite/x", 404},
+		{"/conditions", 200}, {"/mentions-legales", 200}, {"/signaler", 200}, {"/verifier", 200}, {"/contact", 200}, {"/offres", 200}, {"/envoyer", 200}, {"/envoyer/x", 404}, {"/envois", 200}, {"/mentions", 404},
 		{"/s/AAAAAAAAAAAAAAAAAAAAAA", 404}, {"/m/x/y", 404}, {"/nope", 404}, {"/Securite", 404}} {
 		p := c.p
 		for _, m := range []string{"GET", "HEAD"} {
 			code, body, h := get(m, p)
 			if code != c.want || (m == "GET" && !strings.Contains(body, "<title>Shhdrop</title>")) ||
 				h.Get("Content-Security-Policy") == "" || h.Get("Cache-Control") != "no-store" || h.Get("X-Content-Type-Options") != "nosniff" ||
-				!strings.HasPrefix(h.Get("Content-Type"), "text/html") || len(h.Values("X-Robots-Tag")) != 0 {
+				!strings.HasPrefix(h.Get("Content-Type"), "text/html") || (h.Get("X-Robots-Tag") == "noindex") == indexedPaths[p] {
 				t.Fatalf("%s %s : %d %q %v", m, p, code, body, h)
 			}
 		}

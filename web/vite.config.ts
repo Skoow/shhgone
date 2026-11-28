@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { build, defineConfig, type Plugin } from "vite";
 import { DEMO_BASE, DEMO_META } from "./scripts/demo-meta.mjs";
 import { addSri, sha384 } from "./scripts/sri.mjs";
+import { esc, seoHead, SITE_ORIGIN } from "./scripts/seo-head.mjs";
 
 /**
  * Production : le build échoue si un module de src/demo/ entre dans le bundle (A41 : un faux
@@ -360,7 +361,7 @@ export function demoMeta(): Plugin {
  * ligne ; le script les pose au montage), les images importées pointent vers leurs fichiers
  * construits. À placer AVANT sri : chaque page reçoit ensuite ses empreintes.
  */
-export const SITE_ORIGIN = "https://shhgone.com";
+export { SITE_ORIGIN };
 export const PAGE_PATHS = ["/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/signaler", "/verifier", "/contact"] as const;
 export function infoPages(base: string, demo: boolean): Plugin {
   const here = fileURLToPath(new URL(".", import.meta.url));
@@ -421,17 +422,19 @@ export function infoPages(base: string, demo: boolean): Plugin {
             return body;
           };
           // Pages bilingues (app/langues.ts) : hors démo, chaque page indexée a sa
-          // version anglaise « /en… » ; les deux se citent (hreflang fr, en, x-default = fr).
-          const enPath = (path: string) => (path === "/" ? "/en" : "/en" + path);
-          const robots = (path: string | undefined, lang: "fr" | "en" = "fr") =>
-            demo
-              ? ""
-              : path !== undefined
-                ? `<meta name="robots" content="index, follow" />\n    <link rel="canonical" href="${SITE_ORIGIN}${lang === "en" ? enPath(path) : path}" />\n    ` +
-                  `<link rel="alternate" hreflang="fr" href="${SITE_ORIGIN}${path}" />\n    <link rel="alternate" hreflang="en" href="${SITE_ORIGIN}${enPath(path)}" />\n    ` +
-                  `<link rel="alternate" hreflang="x-default" href="${SITE_ORIGIN}${path}" />\n  `
-                : `<meta name="robots" content="noindex" />\n  `;
-          const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+          // version anglaise « /en… » ; les deux se citent (hreflang fr, en, x-default = fr), avec
+          // leur aperçu de lien (Open Graph) et, pour l'accueil, le JSON-LD (scripts/seo-head.mjs).
+          // Démo : rien (demoMeta pose « noindex »).
+          const robots = (path: string | undefined, lang: "fr" | "en" = "fr", title = "", description = "") => (demo ? "" : seoHead({ path, lang, title, description }));
+          // Rapidité (28 novembre) : une page dont le contenu est déjà écrit au build s'affiche
+          // sans script ; ses scripts sont demandés en priorité basse, après les feuilles de
+          // style, l'image d'ambiance et les polices qui font le premier affichage. Jamais sur
+          // app.html ni s.html, que leur script remplit.
+          const basse = (html: string) => {
+            const out = html.replace(/<script type="module" crossorigin src=/g, '<script type="module" fetchpriority="low" crossorigin src=').replace(/<link rel="modulepreload" crossorigin href=/g, '<link rel="modulepreload" fetchpriority="low" crossorigin href=');
+            if (!out.includes('fetchpriority="low"')) throw new Error("pages séparées : script de la page introuvable (priorité basse)");
+            return out;
+          };
           const inLang = (html: string, lang: "fr" | "en", title: string, description: string) => {
             const out = html
               .replace('<html lang="fr"', `<html lang="${lang}"`)
@@ -459,14 +462,16 @@ export function infoPages(base: string, demo: boolean): Plugin {
             const body = clean(r.body, "index.html");
             const html = readFileSync(indexFile, "utf8");
             if (!html.includes("<!--shh-home-->")) throw new Error("index.html sans repère <!--shh-home-->");
-            writeFileSync(indexFile, html.replace("</head>", robots(r.path) + "</head>").replace("<!--shh-home-->", `<!--shh-home-->${body}<!--/shh-home-->`));
+            // Titre d'onglet inchangé (celui d'index.html, aussi en démo) ; description de la page.
+            const desc = (h: string, d: string) => h.replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, (_m, a: string, b: string) => a + esc(d) + b);
+            writeFileSync(indexFile, basse(desc(html, r.description)).replace("</head>", robots(r.path, "fr", r.title, r.description) + "</head>").replace("<!--shh-home-->", `<!--shh-home-->${body}<!--/shh-home-->`));
             // Version anglaise de l'accueil : en.html, servie sous « /en » (static.go).
             if (!demo) {
               const e = renderHome("en");
               writeFileSync(
                 join(outDir, "en.html"),
-                inLang(html, "en", e.title, e.description)
-                  .replace("</head>", robots(e.path, "en") + "</head>")
+                basse(inLang(html, "en", e.title, e.description))
+                  .replace("</head>", robots(e.path, "en", e.title, e.description) + "</head>")
                   .replace("<!--shh-home-->", `<!--shh-home-->${clean(e.body, "en.html")}<!--/shh-home-->`),
               );
             }
@@ -477,8 +482,8 @@ export function infoPages(base: string, demo: boolean): Plugin {
               const file = lang === "en" ? "en-" + frFile : frFile;
               const r = renderPage(name, lang);
               const body = clean(r.body, file);
-              const html = inLang(template, lang, r.title, r.description)
-                .replace("</head>", robots(r.path, lang) + "</head>")
+              const html = basse(inLang(template, lang, r.title, r.description))
+                .replace("</head>", robots(r.path, lang, r.title, r.description) + "</head>")
                 .replace("<!--shh-page-->", body);
               if (!html.includes(body)) throw new Error(`pages séparées : ${file} sans contenu`);
               writeFileSync(join(outDir, file), html);

@@ -366,8 +366,8 @@ export const fr = {
 
   "seo.home": "Fichiers, photos, vidéos et notes chiffrés de bout en bout, sans compte, par un lien qui s'autodétruit, mot de passe en option. Illisible pour le serveur.",
   "seo.securite": "Comment Shhgone protège vos envois\u202f: chiffrement dans le navigateur, clé jamais envoyée au serveur, mot de passe, destruction automatique.",
-  "seo.confidentialite": "Ce que Shhgone voit\u202f: aucun compte pour partager, aucune adresse IP enregistrée, aucune mesure d'audience ni traceur\u202f; fichiers nettoyables sur votre appareil.",
-  "seo.offres": "Offres Shhgone Plus et Pro, bientôt disponibles\u202f: plus d'espace, durées plus longues et plus d'ouvertures, avec le même chiffrement de bout en bout.",
+  "seo.confidentialite": "Ce que Shhgone voit\u202f: aucun compte pour partager, aucune adresse IP enregistrée, ni mesure d'audience ni traceur\u202f; fichiers nettoyables sur l'appareil.",
+  "seo.offres": "Shhgone gratuit sans compte, ou Plus et Pro\u202f: plus d'espace, des durées plus longues et plus d'ouvertures, avec le même chiffrement de bout en bout.",
   "seo.conditions": "Conditions d'utilisation de Shhgone, service de partage chiffré de bout en bout, sans compte pour partager.",
   "seo.mentions": "Mentions légales de Shhgone\u202f: éditeur, hébergeur et contact.",
   "seo.contact": "Écrire à Shhgone\u202f: questions, contenus illicites, demandes des autorités, droits sur vos données, failles de sécurité.",

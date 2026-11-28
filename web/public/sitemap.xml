@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Pages publiques indexées (app/seo.ts, INDEXED), en français et en anglais (pages bilingues,
-     app/langues.ts, 20 novembre) ; domaine de la spécification (shhgone.com). -->
+<!-- Pages publiques indexées (app/seo.ts, INDEXED), en français et en anglais ; écrit par
+     scripts/seo-head.mjs (sitemapXml), comparé par scripts/seo-head.test.ts. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url><loc>https://shhgone.com/</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/"/></url>
   <url><loc>https://shhgone.com/en</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/"/></url>

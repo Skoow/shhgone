@@ -3,12 +3,13 @@
 //   node scripts/gen-icons.mjs      (PW_LOCAL_CHROMIUM=1 sur le poste de développement)
 // Sorties : public/apple-touch-icon.png (180, plein cadre), public/icon-192.png et public/icon-512.png
 // (marge de sécurité « maskable » : la marque tient dans 80 % du côté), public/favicon.ico (16, variante
-// à trois points, et 32).
+// à trois points, et 32), public/og-image.png (aperçu de lien, 1200 × 630 : le logo sur le fond du site,
+// sans texte d'une langue ; scripts/seo-head.mjs).
 import { chromium } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { iconSvg } from "./gen-logo.mjs";
+import { COLORS, iconSvg, logoSvg } from "./gen-logo.mjs";
 
 const web = join(dirname(fileURLToPath(import.meta.url)), "..");
 const launch = process.env.PW_LOCAL_CHROMIUM === "1" ? { executablePath: "/opt/pw-browsers/chromium" } : {};
@@ -51,11 +52,18 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     await page.addStyleTag({ content: "html,body{margin:0;background:transparent}svg{display:block}" });
     out[name] = await page.locator("#i").screenshot({ omitBackground: true });
   }
+  // Aperçu de lien : logo « Shhgone » centré, 560 px de large (il tient aussi dans le recadrage carré des
+  // messageries, qui gardent le centre).
+  await page.setViewportSize({ width: 1200, height: 630 });
+  await page.setContent(`<div id="og">${logoSvg()}</div>`);
+  await page.addStyleTag({ content: `html,body{margin:0}#og{width:1200px;height:630px;display:grid;place-items:center;background:${COLORS.bg}}#og svg{width:560px;height:auto;display:block}` });
+  const og = await page.locator("#og").screenshot();
   await browser.close();
+  writeFileSync(join(web, "public", "og-image.png"), og);
   for (const name of ["apple-touch-icon.png", "icon-192.png", "icon-512.png"]) writeFileSync(join(web, "public", name), out[name]);
   // PNG 32 px à part : des navigateurs mobiles (Firefox sur iPhone) ne lisent ni
   // l'ICO ni le SVG d'un lien « icon » et montraient une lettre à la place de l'icône.
   writeFileSync(join(web, "public", "favicon-32.png"), out["favicon-32"]);
   writeFileSync(join(web, "public", "favicon.ico"), ico([{ size: 16, data: out["favicon-16"] }, { size: 32, data: out["favicon-32"] }]));
-  console.log("gen-icons : apple-touch-icon.png, icon-192.png, icon-512.png, favicon-32.png, favicon.ico");
+  console.log("gen-icons : apple-touch-icon.png, icon-192.png, icon-512.png, favicon-32.png, favicon.ico, og-image.png");
 }

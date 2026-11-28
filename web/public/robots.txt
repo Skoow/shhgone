@@ -1,5 +1,7 @@
-# Shhgone : seules les pages publiques sont indexées. Les partages (« /#clé ») ne sont jamais
-# envoyés au serveur après le « # » : rien à bloquer ici ; les autres pages portent « noindex ».
+# Shhgone : seules les pages publiques sont indexées (plan du site ci-dessous). Les autres pages
+# (envoi, compte, salon, page d'un partage « /s ») portent « noindex » : elles restent explorables
+# pour que les moteurs lisent cette consigne. Rien de secret n'arrive au serveur : la clé d'un
+# partage suit le « # », que le navigateur n'envoie jamais.
 User-agent: *
 Allow: /
 

@@ -363,10 +363,10 @@ export const en = {
   "seal.retryIn": "Try again in {duration}",
 
 
-  "seo.home": "Send files, photos, videos and notes end-to-end encrypted, no account needed, via a self-destructing link with an optional password. Unreadable to the server.",
+  "seo.home": "Send files, photos, videos and notes end-to-end encrypted, no account needed, via a self-destructing link, optional password. Unreadable to the server.",
   "seo.securite": "How Shhgone protects what you send: end-to-end encryption in the browser, key in the link never sent to the server, password, automatic destruction.",
   "seo.confidentialite": "What Shhgone sees and doesn't: no account to share, no IP address stored, no analytics, no trackers; file metadata cleanable on your device.",
-  "seo.offres": "Shhgone Plus and Pro plans, coming soon: more space, longer durations and more opens, with the same end-to-end encryption.",
+  "seo.offres": "Shhgone, free with no account, or Plus and Pro: more space, longer durations and more opens, with the same end-to-end encryption.",
   "seo.conditions": "Terms of use of Shhgone, an end-to-end encrypted sharing service, with no account needed to share.",
   "seo.mentions": "Legal notice of Shhgone: publisher, host and contact.",
   "seo.contact": "Write to Shhgone: questions, illegal content, requests from authorities, rights over your data, security flaws.",

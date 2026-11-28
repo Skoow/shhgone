@@ -277,11 +277,12 @@ for (const [what, path, frag, at] of [
   });
 }
 
-// Spec §32 : X-Robots-Tag et le repli particulier de /s/ et /m/ ont disparu.
-test("/s : 200, pas de X-Robots-Tag (noindex dans la page) ; /s/<id>. (ancien lien abîmé) → 404 du serveur", async ({ page, shh }) => {
+// Spec §32 : le repli particulier de /s/ et /m/ a disparu ; « /s » porte « noindex » dans la page
+// et dans l'en-tête (audit du 28 novembre : toute page HTML qui n'est pas publique).
+test("/s : 200, X-Robots-Tag: noindex et noindex dans la page ; /s/<id>. (ancien lien abîmé) → 404 du serveur", async ({ page, shh }) => {
   const res = await page.goto(`${shh.origin}/s#${KEY}`);
   expect(res?.status()).toBe(200);
-  expect(res?.headers()["x-robots-tag"]).toBeUndefined();
+  expect(res?.headers()["x-robots-tag"]).toBe("noindex");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex");
   const old = await page.request.get(`${shh.origin}/s/AAAAAAAAAAAAAAAAAAAAAA.`);
   expect(old.status()).toBe(404);

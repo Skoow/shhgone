@@ -10,9 +10,13 @@ const attr = (tag, name) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
 /** Empreinte SRI d'un contenu. */
 export const sha384 = (data) => "sha384-" + createHash("sha384").update(data).digest("base64");
 
-/** Adresse de la ressource d'une balise à protéger ; null si la balise n'en charge pas ; "" : script en ligne. */
+/**
+ * Adresse de la ressource d'une balise à protéger ; null si la balise n'en charge pas ; "" : script en ligne.
+ * Seule exception, le bloc de données JSON-LD des accueils (`type="application/ld+json"`, sans src,
+ * scripts/seo-head.mjs) : aucun navigateur ne l'exécute ; check-dist.mjs vérifie qu'il n'est que du JSON.
+ */
 function target(tag) {
-  if (tag.startsWith("<script")) return attr(tag, "src") ?? "";
+  if (tag.startsWith("<script")) return /^<script type="application\/ld\+json">$/.test(tag) ? null : (attr(tag, "src") ?? "");
   const rel = attr(tag, "rel");
   return rel === "stylesheet" || rel === "modulepreload" ? (attr(tag, "href") ?? null) : null;
 }

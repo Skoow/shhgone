@@ -120,8 +120,81 @@ export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html
 /** Versions anglaises (pages bilingues, src/app/langues.ts), production seulement : accueil et pages d'information. */
 export const EN_PAGES = ["en.html", ...INFO_PAGES.map((p) => "en-" + p)];
 
+/** Bloc JSON-LD des accueils (scripts/seo-head.mjs) : la balise exacte, sans « < » dedans. */
+const JSON_LD = /<script type="application\/ld\+json">([^<]*)<\/script>/g;
+/** Pages indexées (src/app/seo.ts, INDEXED) : fichier → chemin public français. */
+export const INDEXED_FILES = { "index.html": "/", "securite.html": "/securite", "confidentialite.html": "/confidentialite", "offres.html": "/offres", "conditions.html": "/conditions", "mentions-legales.html": "/mentions-legales", "contact.html": "/contact" };
+
+/** Largeur et hauteur d'un PNG (en-tête IHDR), null si ce n'en est pas un. */
+function pngSize(data) {
+  if (!data || data.length < 24 || data.toString("latin1", 1, 4) !== "PNG" || data.toString("latin1", 12, 16) !== "IHDR") return null;
+  return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+}
+
+/**
+ * Référencement du build de production (audit du 28 novembre) : chaque page indexée, française et
+ * anglaise, a sa canonique, ses trois hreflang, son aperçu de lien complet (og:url = canonique,
+ * image du site de 1200 × 630) ; toute autre page HTML porte « noindex », sans aperçu de lien ; le
+ * JSON-LD n'est que sur les deux accueils, du JSON valide qui ne cite que notre domaine et
+ * schema.org.
+ */
+export function checkSeo(byRel) {
+  const problems = [];
+  const indexed = new Map();
+  for (const [f, p] of Object.entries(INDEXED_FILES)) {
+    indexed.set(f, { path: p, lang: "fr" });
+    indexed.set(f === "index.html" ? "en.html" : "en-" + f, { path: p, lang: "en" });
+  }
+  for (const [rel, data] of byRel) {
+    if (!rel.endsWith(".html") || rel.includes("/") || rel === "pdf-frame.html") continue;
+    const html = data.toString("utf8");
+    const page = indexed.get(rel);
+    const og = html.match(/<meta property="og:/g)?.length ?? 0;
+    const ld = [...html.matchAll(JSON_LD)];
+    if ((html.match(/<script type="application\/ld\+json"/g)?.length ?? 0) !== ld.length) problems.push(`${rel} : bloc JSON-LD mal formé`);
+    if (page === undefined) {
+      if (!/<meta name="robots" content="noindex"/.test(html)) problems.push(`${rel} : page non indexée sans « noindex »`);
+      if (og > 0 || /rel="canonical"/.test(html) || ld.length > 0) problems.push(`${rel} : page non indexée avec canonique, aperçu de lien ou JSON-LD`);
+      continue;
+    }
+    const self = "https://shhgone.com" + (page.lang === "en" ? (page.path === "/" ? "/en" : "/en" + page.path) : page.path);
+    const one = (re, what) => {
+      const n = html.match(re)?.length ?? 0;
+      if (n !== 1) problems.push(`${rel} : ${what} (${n} fois au lieu d'une)`);
+    };
+    one(/<meta name="robots" content="index, follow" \/>/g, "« index, follow »");
+    const re = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    one(new RegExp(`<link rel="canonical" href="${re(self)}" />`, "g"), `canonique ${self}`);
+    for (const hl of ["fr", "en", "x-default"]) one(new RegExp(`<link rel="alternate" hreflang="${hl}" href="https://shhgone\\.com[a-z/-]*" />`, "g"), `hreflang ${hl}`);
+    one(new RegExp(`<meta property="og:url" content="${re(self)}" />`, "g"), "og:url égale à la canonique");
+    for (const p of ["og:type", "og:site_name", "og:title", "og:description", "og:locale", "og:image", "og:image:width", "og:image:height", "og:image:alt"]) one(new RegExp(`<meta property="${p}" content="[^"]+" />`, "g"), p);
+    one(/<meta name="twitter:card" content="summary_large_image" \/>/g, "twitter:card");
+    const title = /<title>([^<]*)<\/title>/.exec(html)?.[1];
+    if (!html.includes(`<meta property="og:title" content="${title}" />`)) problems.push(`${rel} : og:title différent du titre de la page`);
+    const desc = /<meta\s+name="description"\s+content="([^"]*)"/.exec(html)?.[1];
+    if (!desc || !html.includes(`<meta property="og:description" content="${desc}" />`)) problems.push(`${rel} : og:description différente de la description`);
+    const img = /<meta property="og:image" content="https:\/\/shhgone\.com\/([^"]+)" \/>/.exec(html)?.[1];
+    const size = img === undefined ? null : pngSize(byRel.get(img));
+    const w = /<meta property="og:image:width" content="(\d+)"/.exec(html)?.[1];
+    const h = /<meta property="og:image:height" content="(\d+)"/.exec(html)?.[1];
+    if (!size || String(size.width) !== w || String(size.height) !== h) problems.push(`${rel} : image d'aperçu absente du site ou de dimensions différentes de og:image:width/height`);
+    if ((page.path === "/") !== (ld.length === 1) || ld.length > 1) problems.push(`${rel} : JSON-LD attendu sur l'accueil seulement, une fois`);
+    for (const [, json] of ld) {
+      try {
+        const d = JSON.parse(json);
+        const urls = JSON.stringify(d).match(/https?:\/\/[^"]*/g) ?? [];
+        for (const u of urls) if (u !== "https://schema.org" && !u.startsWith("https://shhgone.com/")) problems.push(`${rel} : JSON-LD cite « ${u} »`);
+        if (d["@context"] !== "https://schema.org" || d.url !== self) problems.push(`${rel} : JSON-LD sans @context schema.org ou d'une autre adresse que la page`);
+      } catch {
+        problems.push(`${rel} : JSON-LD illisible (JSON invalide)`);
+      }
+    }
+  }
+  return problems;
+}
+
 /** `pages` : pages d'information exigées (le vrai build : INFO_PAGES ; les petits sites des tests : aucune). */
-export function checkDist(dir, demo, comptes = false, pages = []) {
+export function checkDist(dir, demo, comptes = false, pages = [], seo = false) {
   const problems = [];
   if (!existsSync(join(dir, "index.html"))) return [`${dir} : index.html absent (build manquant ?)`];
   const raw = files(dir).map((p) => ({ rel: relative(dir, p), data: readFileSync(p) }));
@@ -220,6 +293,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     }
   }
 
+  // Référencement : le vrai build de production (la ligne de commande) ; les petits sites des tests
+  // appellent checkSeo à part.
+  if (!demo && seo) problems.push(...checkSeo(byRel));
+
   // Page « /s » : ouverture et gestion d'un partage, son propre fichier, ses
   // empreintes SRI, jamais indexée, sans le script de l'application d'envoi (assets/index-*.js).
   if (pages.length > 0) {
@@ -255,7 +332,13 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
         // adresses en texte, dans <pre data-cmd><code>…</code></pre>. Seul un texte sans aucune
         // balise est admis (rien ne s'y charge) ; une balise dedans laisse tout le bloc contrôlé.
         .replace(/<pre\b[^>]*\sdata-cmd(?:="")?(?:\s[^>]*)?><code>[^<]*<\/code><\/pre>/g, "<pre></pre>")
-        .replace(/<link rel="(?:canonical|alternate" hreflang="(?:fr|en|x-default))" href="https:\/\/shhgone\.com\/[a-z/-]*" \/>/g, "");
+        .replace(/<link rel="(?:canonical|alternate" hreflang="(?:fr|en|x-default))" href="https:\/\/shhgone\.com\/[a-z/-]*" \/>/g, "")
+        // Aperçu de lien (scripts/seo-head.mjs) : adresse de la page et de son image, sur notre
+        // domaine ; lues par les robots d'aperçu, jamais chargées par la page.
+        .replace(/<meta property="og:(?:url|image)" content="https:\/\/shhgone\.com\/[a-z/.-]*" \/>/g, "")
+        // JSON-LD des accueils : contrôlé à part (checkSeo) ; ses adresses (schema.org, la nôtre)
+        // sont des identifiants, jamais chargés.
+        .replace(JSON_LD, "");
     for (const url of findExternalUrls(text)) problems.push(`${f.rel} : adresse externe « ${url} » (aucune ressource tierce)`);
   }
 
@@ -404,9 +487,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const web = fileURLToPath(new URL("..", import.meta.url));
   const dir = rest[0] ?? join(web, demo ? "dist-demo" : "dist");
   // Le point d'entrée des pages d'information construit (assets/page-*.js) : ses six pages sont
-  // exigées. Les petits sites des tests, qui n'en ont pas, ne les demandent pas.
+  // exigées. Les petits sites des tests, qui n'en ont pas, ne les demandent pas. Avec elles, en
+  // production, le référencement est contrôlé (checkSeo).
   const hasPages = existsSync(join(dir, "assets")) && readdirSync(join(dir, "assets")).some((n) => /^page-[^/]+\.js$/.test(n));
-  const problems = checkDist(dir, demo, comptes, hasPages ? (demo ? INFO_PAGES : [...INFO_PAGES, ...EN_PAGES]) : []);
+  const problems = checkDist(dir, demo, comptes, hasPages ? (demo ? INFO_PAGES : [...INFO_PAGES, ...EN_PAGES]) : [], hasPages && !demo);
   if (problems.length > 0) {
     for (const p of problems) console.error(`check-dist${demo ? " --demo" : ""} : ${p}`);
     process.exit(1);

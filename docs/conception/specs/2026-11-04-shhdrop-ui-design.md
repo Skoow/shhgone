@@ -1034,6 +1034,7 @@ Clés principales (extrait normatif ; le plan fixe la liste complète) :
 - Test e2e « aucune ressource tierce » : toute requête **du cadre principal** vers une autre origine que le serveur échoue le test. Aucune exception (repli et `VerifFrame` retirés le 24 novembre).
 - `translate="no"` sur `<html>` et `<meta name="google" content="notranslate">`.
 - Le serveur ajoute `X-Robots-Tag: noindex` sur `/s/*` et `/m/*`, `robots.txt` les interdit. `index.html` ne contient aucune balise `og:*`.
+  **Mis à jour le 28 novembre (audit de référencement, demande du propriétaire)** : les liens de partage sont sous `/s#…` (spec §32), plus à la racine. Le serveur pose `X-Robots-Tag: noindex` sur toute page HTML qui n'est pas une page publique indexée (accueil, Sécurité, Confidentialité, Offres, Conditions, Mentions légales, Contact, en français et en anglais : `indexedPaths` de `static.go`, `INDEXED` de `app/seo.ts`) ; `robots.txt` n'interdit rien, pour que les moteurs lisent ces « noindex ». Les pages indexées portent un aperçu de lien (`og:*`, carte X, image du site `og-image.png`) et, pour les deux accueils, un JSON-LD `WebSite`/`Organization` sans donnée personnelle (`web/scripts/seo-head.mjs`) ; `s.html` (page d'un partage) et `app.html` n'en ont jamais.
 
 ### 12.6 Presse-papier
 

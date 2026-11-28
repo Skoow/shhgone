@@ -10,7 +10,7 @@
   import { formatDuration } from "../../i18n/format";
   import { getLang, t, type Key } from "../../i18n/i18n.svelte";
   import { MAX_OPENS, PW_TRIES, TTL_HOURS, TTL_MAX_HOURS } from "../../limits";
-  import { SOURCE_URL } from "../pages/content";
+  import { SOURCE_URL } from "../pages/depot";
   import { reveal } from "../../ui/attach";
   import { reducedMotion } from "../../ui/motion";
   import { ArrowRight, Broom, Eye, EyeOff, FileText, KeyRound, Server, ShieldCheck, Trash2, UserX } from "../../ui/Icon";

@@ -19,6 +19,7 @@
 import { BUILD_ID } from "../../app/build";
 import { CONTENT_MAX, MAX_ITEMS, MAX_OPENS, PAID, PW_TRIES, TTL_MAX_HOURS } from "../../limits";
 import { formatBytes, type Lang } from "../../i18n/format";
+import { SOURCE_URL } from "./depot";
 
 export type InfoName = "securite" | "confidentialite" | "conditions" | "mentions" | "signaler" | "contact";
 /** Partie d'une section, sous un titre de niveau 3 (section « Vérifier cette version » de la page Sécurité). */
@@ -45,8 +46,8 @@ export type Block = {
 export type Tech = { h: string; p?: string[]; list?: string[]; links: { label: string; url: string }[] };
 export type InfoPage = { title: string; lede: string; draft?: boolean; blocks: Block[]; tech?: Tech };
 
-/** Dépôt public du code (lien sortant simple : rien n'est chargé depuis GitHub). */
-export const SOURCE_URL = "https://github.com/Skoow/shhgone";
+/** Dépôt public du code (routes/pages/depot.ts). */
+export { SOURCE_URL };
 export const SPEC_URL = "https://github.com/Skoow/shhgone/blob/main/docs/conception/specs/2026-11-03-shhdrop-design.md";
 /** Releases signées (spec §28.2) et mode d'emploi détaillé (deploy/README.md §3.3). */
 export const RELEASES_URL = "https://github.com/Skoow/shhgone/releases";

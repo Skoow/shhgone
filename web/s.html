@@ -27,11 +27,12 @@
     <link rel="stylesheet" href="/src/ui/fonts.css" />
     <link rel="stylesheet" href="/src/ui/tokens.css" />
     <link rel="stylesheet" href="/src/ui/base.css" />
-    <!-- Référencement (retours CLEAN2) : description par défaut ; app/seo.ts la met à jour par page,
-         avec l'adresse canonique et « noindex » hors des pages publiques. Aucune balise og:* (UI §12). -->
+    <!-- Référencement : description par défaut (fr.ts, seo.home) ; app/seo.ts la met à jour par page,
+         avec l'adresse canonique et « noindex » hors des pages publiques. Aperçu de lien (og:*) écrit
+         au build sur les pages indexées seulement (scripts/seo-head.mjs), jamais sur s.html ni app.html. -->
     <meta
       name="description"
-      content="Envoyez fichiers, photos, vidéos et notes chiffrés de bout en bout, sans compte, par un lien qui s'autodétruit, mot de passe en option. Le serveur ne lit rien."
+      content="Fichiers, photos, vidéos et notes chiffrés de bout en bout, sans compte, par un lien qui s'autodétruit, mot de passe en option. Illisible pour le serveur."
     />
     <!-- Page « /s » : ouverture et gestion d'un partage, jamais indexée. -->
     <meta name="robots" content="noindex" />

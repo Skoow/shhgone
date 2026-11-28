@@ -12,12 +12,12 @@ test("l'accueil se charge sous la CSP, sans violation ni requête tierce", async
 });
 
 // Spec §32 : les liens sont sous « /s#… » ; /s/ et /m/ ne sont pas des routes (404 de
-// l'interface), et X-Robots-Tag a disparu.
+// l'interface), « noindex » comme toute page qui n'est pas publique (audit du 28 novembre).
 for (const p of ["/s/x", "/m/x"]) {
-  test(`${p} : 404 de l'interface, sans X-Robots-Tag`, async ({ page, shh }) => {
+  test(`${p} : 404 de l'interface, X-Robots-Tag: noindex`, async ({ page, shh }) => {
     const res = await page.goto(shh.origin + p);
     expect(res?.status()).toBe(404); // vrai statut
-    expect(res?.headers()["x-robots-tag"]).toBeUndefined();
+    expect(res?.headers()["x-robots-tag"]).toBe("noindex");
     await expect(page.getByRole("heading", { name: /^(Cette page n'existe pas\.|This page does not exist\.)$/ })).toBeVisible();
   });
 }
@@ -121,17 +121,32 @@ test("référencement : robots.txt et sitemap.xml ; pages publiques indexées, p
   // Pages bilingues : chaque page indexée et sa version « /en ».
   expect(locs).toEqual(["/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/contact"].flatMap((p) => [p, p === "/" ? "/en" : "/en" + p]));
   const meta = (n: string) => page.locator(`meta[name="${n}"]`);
+  const og = (n: string) => page.locator(`meta[property="${n}"]`);
   for (const p of locs) {
-    await page.goto(shh.origin + p);
+    const res = await page.goto(shh.origin + p);
+    expect(res?.headers()["x-robots-tag"], p).toBeUndefined();
     await expect(meta("robots"), p).toHaveAttribute("content", "index, follow");
     await expect(page.locator('link[rel="canonical"]'), p).toHaveAttribute("href", shh.origin + p);
+    await expect(page.locator('link[rel="alternate"][hreflang]'), p).toHaveCount(3);
     expect((await meta("description").getAttribute("content"))!.length, p).toBeGreaterThan(40);
+    expect((await meta("description").getAttribute("content"))!.length, p).toBeLessThanOrEqual(155);
+    // Aperçu de lien écrit au build (adresses de production, shhgone.com) ; le script ne le change pas.
+    await expect(og("og:url"), p).toHaveAttribute("content", "https://shhgone.com" + p);
+    await expect(og("og:image"), p).toHaveAttribute("content", "https://shhgone.com/og-image.png");
+    await expect(page.locator('script[type="application/ld+json"]'), p).toHaveCount(p === "/" || p === "/en" ? 1 : 0);
   }
+  const img = await request.get(shh.origin + "/og-image.png");
+  expect([img.status(), img.headers()["content-type"]]).toEqual([200, "image/png"]);
   for (const p of ["/envoyer", "/signaler", "/verifier", "/inconnu"]) {
-    await page.goto(shh.origin + p);
+    const res = await page.goto(shh.origin + p);
+    expect(res?.headers()["x-robots-tag"], p).toBe("noindex");
     await expect(meta("robots"), p).toHaveAttribute("content", "noindex");
     await expect(page.locator('link[rel="canonical"]'), p).toHaveCount(0);
+    await expect(og("og:url"), p).toHaveCount(0);
   }
+  // Barre oblique finale : une seule adresse par page (301).
+  const slash = await request.get(shh.origin + "/securite/", { maxRedirects: 0 });
+  expect([slash.status(), slash.headers()["location"]]).toEqual([301, "/securite"]);
   // Un partage ouvert (« /s#clé ») n'est jamais indexé, et la canonique ne garde aucun fragment.
   await page.goto(shh.origin + "/s#AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
   await expect(meta("robots")).toHaveAttribute("content", "noindex");

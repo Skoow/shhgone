@@ -53,6 +53,17 @@ func staticHandler(dir string, comptes, salons bool) (http.Handler, error) {
 			http.Error(w, "méthode non permise", http.StatusMethodNotAllowed)
 			return
 		}
+		// Barre oblique finale après une page connue (« /securite/ », « /en/ ») : redirection
+		// permanente vers l'adresse sans elle (référencement : une seule adresse par page).
+		// Cible fixe, tirée de nos listes : jamais « //hôte ». Pas pour « /s/ », réservé aux liens
+		// universels (spec §16).
+		if to, ok := sansBarreFinale(r.URL.Path, comptes, salons); ok {
+			if r.URL.RawQuery != "" {
+				to += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, to, http.StatusMovedPermanently)
+			return
+		}
 		name, ok := staticName(r.URL.Path)
 		if !ok {
 			http.NotFound(w, r)
@@ -97,17 +108,36 @@ func staticHandler(dir string, comptes, salons bool) (http.Handler, error) {
 			http.NotFound(w, r)
 			return
 		}
+		h := w.Header()
+		// Référencement : seules les pages publiques (indexedPaths) sont indexables ; toute autre
+		// page HTML (application, partage, 404, « /index.html », « /securite.html »,
+		// « /offres/retour »…) porte aussi « noindex » dans l'en-tête, en plus de sa balise.
+		if path.Ext(name) == ".html" && !indexedPaths[r.URL.Path] {
+			h.Set("X-Robots-Tag", "noindex")
+		}
 		if status == http.StatusNotFound {
 			// ServeContent répondrait 200 : en-têtes posés à la main, corps entier (pas de plage).
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+			// Variante précompressée comme pour un 200 (34 Ko → 5 Ko en brotli).
+			var body io.Reader = rs
+			size := fi.Size()
+			h.Add("Vary", "Accept-Encoding")
+			if ef, enc := encodedVariant(fsys, name, r.Header.Get("Accept-Encoding")); ef != nil {
+				defer ef.Close()
+				if n, err := ef.Seek(0, io.SeekEnd); err == nil {
+					if _, err := ef.Seek(0, io.SeekStart); err == nil {
+						body, size = ef, n
+						h.Set("Content-Encoding", enc)
+					}
+				}
+			}
+			h.Set("Content-Type", "text/html; charset=utf-8")
+			h.Set("Content-Length", strconv.FormatInt(size, 10))
 			w.WriteHeader(http.StatusNotFound)
 			if r.Method != http.MethodHead {
-				io.Copy(w, rs)
+				io.Copy(w, body)
 			}
 			return
 		}
-		h := w.Header()
 		// Cache : no-store partout, posé par api.New, sauf pour un fichier à empreinte de
 		// /assets/ qui existe (jamais pour un 404 ni pour le repli vers index.html) : un an,
 		// immuable.
@@ -143,11 +173,12 @@ var immutableAsset = regexp.MustCompile(`^/assets/.+-[A-Za-z0-9_-]{8,}\.(js|css|
 
 const immutableCache = "public, max-age=31536000, immutable"
 
-// dayAsset : icônes, manifeste, polices et images fixes sans empreinte : un jour de cache au
+// dayAsset : icônes, image d'aperçu de lien (og-image.png), manifeste, polices et images fixes
+// sans empreinte : un jour de cache au
 // lieu de no-store. Rien de secret ni de propre à quelqu'un ; un changement met au plus un jour
 // à être vu. HTML, cadre PDF (intégrité vérifiée), robots.txt et sitemap.xml restent en
 // no-store.
-var dayAsset = regexp.MustCompile(`^/(?:fonts/[a-z0-9-]+\.woff2|assets/[a-z0-9-]+\.(?:png|svg|webp)|favicon\.(?:svg|ico)|favicon-32\.png|apple-touch-icon\.png|icon-(?:192|512)\.png|logo\.svg|manifest\.webmanifest)$`)
+var dayAsset = regexp.MustCompile(`^/(?:fonts/[a-z0-9-]+\.woff2|assets/[a-z0-9-]+\.(?:png|svg|webp)|favicon\.(?:svg|ico)|favicon-32\.png|apple-touch-icon\.png|icon-(?:192|512)\.png|og-image\.png|logo\.svg|manifest\.webmanifest)$`)
 
 const dayCache = "public, max-age=86400"
 
@@ -284,6 +315,28 @@ var compteRoutes = map[string]bool{
 	"/compte/connexion":    true,
 	"/compte/recuperation": true,
 	"/compte/profil":       true, // ancienne page Profil : le client la remplace par « /compte »
+}
+
+// indexedPaths : pages publiques indexées (web/src/app/seo.ts, INDEXED) et leurs versions
+// anglaises (enVersion) ; un test compare les deux listes. Toute autre page HTML reçoit
+// « X-Robots-Tag: noindex ».
+var indexedPaths = func() map[string]bool {
+	m := map[string]bool{}
+	for _, p := range []string{"/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/contact"} {
+		m[p], m[enVersion[p]] = true, true
+	}
+	return m
+}()
+
+// sansBarreFinale : « /page/ » → « /page » si « /page » est une page du site (application,
+// fichier propre, compte ou salon s'ils sont activés), sauf « /s ».
+func sansBarreFinale(p string, comptes, salons bool) (string, bool) {
+	t, ok := strings.CutSuffix(p, "/")
+	if !ok || t == "" || t == "/s" {
+		return "", false
+	}
+	_, page := pageFiles[t]
+	return t, appRoutes[t] || page || comptes && compteRoutes[t] || salons && salonRoutes[t]
 }
 
 // staticName : chemin de l'URL → nom dans le dossier ; refuse les segments cachés.
