@@ -100,7 +100,7 @@ describe("dictionnaires", () => {
       "account.nopasskey": `Ce navigateur ne gère pas les passkeys. Tout Shhgone marche sans compte${N}; seule la création de salon en demande un.`,
       "account.localKey": "Sur cet appareil, vos données s'ouvrent grâce à une clé gardée ici, protégée par le verrouillage de l'appareil.",
       "account.recover.passkey.title": "Créez une passkey sur cet appareil",
-      "account.recovered.banner": "Votre clé de récupération a servi. Si elle a pu être vue, créez-en une nouvelle dans les paramètres.",
+      "account.recovered.banner": "Votre clé de récupération a servi. Si elle a pu être vue, créez-en une nouvelle\u202f: page Compte, section « Clé de récupération ».",
       "account.passkeys.remove.confirm": `Retirer cette passkey${N}? Elle ne pourra plus ouvrir ce compte.`,
       "account.passkeys.last": `Ajoutez d'abord une autre passkey${N}: la dernière ne se retire pas.`,
       "account.passkeys.removed.manual": "Passkey retirée. Supprimez-la aussi de votre gestionnaire.",

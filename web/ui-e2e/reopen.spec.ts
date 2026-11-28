@@ -29,7 +29,7 @@ test("recharger rouvre sans consommer (1 / 3 avant et après), vingt fois (D42-2
   acceptUnload(page);
 
   await page.goto(sent.link);
-  await expect(page.getByText("Ouvrir compte 1\u00a0ouverture sur les 3\u00a0restantes", { exact: false })).toBeVisible();
+  await expect(page.getByText("« Ouvrir » utilise 1\u202fdes 3\u202fouvertures restantes", { exact: false })).toBeVisible();
   await unlock(page, sent.password);
   expect((await shareStatus(sent.manage, shh.origin)).opensUsed).toBe(1);
   // Seule entrée de l'onglet : shh.og, sans mot de passe.
@@ -71,14 +71,14 @@ test("recharger rouvre sans consommer (1 / 3 avant et après), vingt fois (D42-2
   await expect(page.getByText("Trop de retours sur ce partage\u202f: une nouvelle ouverture sera comptée.")).toBeVisible({ timeout: 20_000 });
   expect(await page.evaluate(() => sessionStorage.getItem("shh.og"))).toBeNull();
   expect((await shareStatus(sent.manage, shh.origin)).opensUsed).toBe(1);
-  await expect(page.getByText("Ouvrir compte 1\u00a0ouverture sur les 2\u00a0restantes", { exact: false })).toBeVisible();
+  await expect(page.getByText("« Ouvrir » utilise 1\u202fdes 2\u202fouvertures restantes", { exact: false })).toBeVisible();
 
   // Nouvelle ouverture (comptée) : le pied dit combien d'ouvertures restent (plus de bouton
   // « Terminer et effacer »).
   await page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ }).click();
   await expect(noteRow(page)).toBeVisible({ timeout: 30_000 });
   expect((await shareStatus(sent.manage, shh.origin)).opensUsed).toBe(2);
-  await expect(page.locator("[data-eol] p").first()).toHaveText("Ce lien peut encore être ouvert 1\u202ffois. En général, vous pouvez revenir sur ce partage depuis ce navigateur jusqu'à son échéance sans compter d'ouverture.");
+  await expect(page.locator("[data-eol] p").first()).toHaveText("Ce lien peut encore être ouvert 1\u202ffois. Vous pouvez revenir sur ce partage depuis ce navigateur jusqu'à son échéance sans compter d'ouverture.");
 });
 
 test("deuxième onglet : avec le premier ouvert, même ouverture ; sans premier onglet, une de plus, annoncée", async ({ page, shh, browser }) => {
@@ -105,7 +105,7 @@ test("deuxième onglet : avec le premier ouvert, même ouverture ; sans premier 
   // la consommation, et le déverrouillage en compte une.
   const c = await freshPage(browser);
   await c.page.goto(sent.link);
-  await expect(c.page.getByText("Ouvrir compte 1\u00a0ouverture sur les 2\u00a0restantes", { exact: false })).toBeVisible();
+  await expect(c.page.getByText("« Ouvrir » utilise 1\u202fdes 2\u202fouvertures restantes", { exact: false })).toBeVisible();
   await expect(c.page.getByText(other)).toHaveCount(0);
   await unlock(c.page, sent.password);
   expect((await shareStatus(sent.manage, shh.origin)).opensUsed).toBe(2);

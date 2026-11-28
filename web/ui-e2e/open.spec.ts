@@ -43,7 +43,7 @@ test("mauvais mot de passe deux fois → « 3 essais restants », bon → conten
   // M9 : le geste irréversible annoncé avant, relié au bouton ; textes de confiance.
   // Ouvertures restantes lues par fetchMeta (partage à 3 ouvertures).
   // Une ligne.
-  const cost = "Ouvrir compte 1\u00a0ouverture sur les 3\u00a0restantes\u202f; ensuite, revenir depuis ce navigateur n'en compte en général pas d'autre, jusqu'à l'échéance.";
+  const cost = "« Ouvrir » utilise 1\u202fdes 3\u202fouvertures restantes. Ensuite, vous pourrez y revenir depuis ce navigateur jusqu'à l'échéance.";
   await expect(page.getByText(cost)).toBeVisible();
   await expect(unlockButton(page)).toHaveAccessibleDescription(cost);
   await expect(page.getByText("Le serveur ne reçoit que des données chiffrées, jamais la clé.")).toBeVisible();
@@ -188,7 +188,7 @@ test.describe("navigateur intégré (Instagram)", () => {
     await grantClipboard(context, shh.origin);
     const api = apiPaths(page);
     await page.goto(sent.link);
-    await expect(page.getByText(/^Vous êtes dans le navigateur intégré de Instagram/)).toBeVisible();
+    await expect(page.getByText(/^Vous êtes dans le navigateur intégré d'une application \(Instagram\)/)).toBeVisible();
     await expect(pwField(page)).toHaveCount(0);
     expect(await page.evaluate(() => location.hash)).toBe(new URL(sent.link).hash);
     expect(api).toEqual([]);
