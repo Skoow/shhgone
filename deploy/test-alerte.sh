@@ -13,7 +13,7 @@ ko() {
 	echec=1
 }
 
-NOW=1795000000 # heure fixe des essais
+NOW=1794827200 # heure fixe des essais : lundi 16 novembre 2026, 11:06 UTC (bilan du lundi)
 jour() { date -u -d "@$((NOW + $1 * 86400))" +%Y-%m-%d; }
 
 cat >"$work/env" <<EOF
@@ -23,8 +23,48 @@ SHH_SAUVEGARDE_URL=file:///nulle-part/
 EOF
 mkdir -p "$work/donnees"
 
+# API de GitHub (bilan du lundi) : réponses d'essai selon $work/gh-mode (vert, rouge, panne).
+cat >"$work/gh.sh" <<EOF
+#!/usr/bin/env bash
+mode=\$(cat "$work/gh-mode" 2>/dev/null || echo vert)
+[ "\$mode" = panne ] && exit 22
+case \$1 in
+/actions/workflows/securite.yml/runs*) echo '{"workflow_runs":[{"id":4242,"conclusion":"success","created_at":"$(jour -0)T04:20:00Z"}]}' ;;
+/actions/workflows/verifier-site.yml/runs*) echo '{"workflow_runs":[{"id":77,"conclusion":"success","created_at":"$(jour -0)T10:41:00Z"}]}' ;;
+/actions/runs/4242/jobs*)
+	if [ "\$mode" = rouge ]; then c=failure s=skipped; else c=success s=success; fi
+	echo '{"jobs":[{"name":"go","conclusion":"success"},{"name":"gosec","conclusion":"'\$c'"},{"name":"outils","conclusion":"'\$c'"},{"name":"site","conclusion":"'\$s'"}]}' ;;
+/pulls*)
+	if [ "\$mode" = rouge ]; then
+		echo '[{"title":"build(deps): bump caddy from 2.11.9 to 2.11.10 in /deploy","user":{"login":"dependabot[bot]"}},{"title":"autre","user":{"login":"Skoow"}}]'
+	else
+		echo '[{"title":"autre","user":{"login":"Skoow"}}]'
+	fi ;;
+*) exit 22 ;;
+esac
+EOF
+chmod +x "$work/gh.sh"
+# DNS (dig +short) : tout présent.
+cat >"$work/dig.sh" <<'EOF'
+#!/usr/bin/env bash
+case "$1 $2" in
+"DS exemple.test") echo "2371 13 2 ABCDEF" ;;
+"CAA exemple.test") echo '0 issue "letsencrypt.org; accounturi=https://acme/1"' ;;
+"TXT exemple.test") echo '"v=spf1 include:_spf.exemple.test -all"' ;;
+"TXT _dmarc.exemple.test") echo '"v=DMARC1; p=reject"' ;;
+"TXT default._domainkey.exemple.test") [ -e "${0%/*}/sans-dkim" ] || echo '"v=DKIM1; k=rsa; p=MIIB"' ;;
+esac
+EOF
+chmod +x "$work/dig.sh"
+# Registre des connexions SSH (ssh-connexion.sh) : une cette semaine, une vieille.
+printf '%s debian SHA256:YyVEEg6JAlVene7LI/FZlR/WRtBxP+UbvCD83BdgZWQ\n%s debian SHA256:vieillevieillevieillevieillevieillevieille00\n' \
+	$((NOW - 2 * 86400)) $((NOW - 20 * 86400)) >"$work/ssh"
+
 # Tout va bien : chaque remplacement donne un état sain.
 sain() {
+	export SHH_ALERTE_GITHUB="$work/gh.sh \"\$1\"" SHH_ALERTE_DIG="$work/dig.sh \"\$@\"" SHH_ALERTE_SSH="$work/ssh"
+	export SHH_ALERTE_TEMPS='echo "200 0.123"' SHH_ALERTE_CERT_EMETTEUR="Let's Encrypt"
+	echo vert >"$work/gh-mode"
 	export SHH_ENV_FILE="$work/env" SHH_ALERTE_MAINTENANT=$NOW
 	export SHH_ALERTE_SANTE='echo "{\"ok\":true,\"reports_alert\":false}"'
 	export SHH_ALERTE_DOCKER='true'
@@ -35,7 +75,7 @@ sain() {
 	export SHH_ALERTE_CERT_FIN
 	SHH_ALERTE_CERT_FIN="$(jour 60) 12:00:00 GMT"
 	export SHH_ALERTE_RDAP
-	SHH_ALERTE_RDAP="echo '{\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"2026-01-01T00:00:00Z\"},{\"eventAction\":\"expiration\",\"eventDate\":\"$(jour 300)T00:00:00Z\"}]}'"
+	SHH_ALERTE_RDAP="echo '{\"status\":[\"client transfer prohibited\"],\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"2026-01-01T00:00:00Z\"},{\"eventAction\":\"expiration\",\"eventDate\":\"$(jour 300)T00:00:00Z\"}]}'"
 	# Certificate Transparency (format de crt.sh) : le certificat servi (série 0a:1b, émis hier) et
 	# un ancien de 40 jours (renouvelé depuis) : rien de suspect.
 	export SHH_ALERTE_CERT_SERIE='0A1B' SHH_ALERTE_CT
@@ -49,6 +89,8 @@ sain() {
 	export SHH_ALERTE_APT='echo "Inst libc6 [2.36-9] (2.36-9+deb12u9 Debian:12.9/stable [amd64])"'
 	export SHH_ALERTE_REBOOT="$work/pas-de-redemarrage"
 	export SHH_ALERTE_RETARD='echo 0' SHH_ALERTE_NTP='echo yes' SHH_ALERTE_UNITES='true'
+	export SHH_ALERTE_INTEGRITE="$work/integrite-etat"
+	printf "resultat=ok\ndate=%s\nbase=3f2a-91c0-77de-0b12\nimage=ok\nvolume=vérifié\npaquets=0\necarts=0\n" $((NOW - 8 * 3600)) >"$work/integrite-etat"
 	export SHH_ALERTE_BOOT_ID='echo boot-1' SHH_ALERTE_DEMARRAGE='echo "2026-11-22 03:12:00"' SHH_ALERTE_MONTE='echo oui'
 	unset SHH_SERVEUR_ECHEANCE SHH_ALERTE_A
 }
@@ -71,10 +113,9 @@ attendu() { # <essai> <lignes « niveau sujet » attendues, triées, séparées 
 sain
 lance sain
 attendu sain "Bilan bilan,Rappel restauration"
-grep -q "Rien à signaler." "$work/sain.out" || ko "sain : bilan sans « Rien à signaler »"
-grep -q "Domaine : 299 jour(s)" "$work/sain.out" || ko "sain : échéance RDAP non lue"
-grep -q "Certificat TLS : 60 jour" "$work/sain.out" || ko "sain : jours du certificat"
-grep -q "Location du serveur : non renseignée" "$work/sain.out" || ko "sain : location non renseignée"
+grep -q "^✅ Nom de domaine : échéance le $(jour 300) (299 jours)" "$work/sain.out" || ko "sain : échéance RDAP non lue"
+grep -q "^✅ Certificat HTTPS (Let's Encrypt) : fin le $(jour 60) 12:00 UTC, renouvellement automatique OK" "$work/sain.out" || ko "sain : certificat"
+grep -q "^⚠️ Hébergement : échéance non renseignée" "$work/sain.out" || ko "sain : location non renseignée"
 relance sain
 [ ! -s "$work/sain.out2" ] || ko "sain : deuxième passage bavard : $(cat "$work/sain.out2")"
 # Une semaine plus tard : nouveau bilan.
@@ -214,6 +255,124 @@ printf 'SHH_ALERTE_A=alerte@exemple.test\n' >>"$work/env"
 export SHH_ALERTE_ETAT="$work/etat-smtp"
 if "$here/alerte.sh" >/dev/null 2>"$work/smtp.err"; then ko "smtp : accepté sans SHH_ALERTE_SMTP_HOST"; fi
 grep -q "SHH_ALERTE_SMTP_HOST" "$work/smtp.err" || ko "smtp : message $(cat "$work/smtp.err")"
+
+sed -i '/^SHH_ALERTE_A=/d' "$work/env"
+
+# 7. Bilan du lundi, tout vert : un seul e-mail, quatre sections, « tout va bien ».
+{
+	printf "SHH_SAUVEGARDE_URL=file:///nulle-part/\nSHH_SERVEUR_ECHEANCE=%s\n" "$(jour 200)"
+	printf 'SHH_ALERTE_A=alerte@exemple.test\nSHH_ALERTE_SMTP_HOST=smtp.exemple.test\nSHH_ALERTE_SMTP_USER=u\n'
+	printf "SHH_ALERTE_FROM='Shhgone <a@exemple.test>'\n"
+} >>"$work/env"
+export SHH_COURRIEL_ENVOI="cat >>'$work/courriels'"
+courriel() { # <essai> : lance, puis garde le bilan envoyé dans $work/<essai>.mail
+	: >"$work/courriels"
+	lance "$1"
+	sed -n '/^Subject: Shhgone Bilan du lundi/,$p' "$work/courriels" >"$work/$1.mail"
+}
+propre() { # aucun secret, aucune adresse IP dans le bilan
+	grep -qE '192\.0\.2\.10|203\.0\.113' "$work/$1.mail" && ko "$1 : adresse IP dans le bilan"
+	grep -qF 'jeton-secret-de-test' "$work/$1.mail" && ko "$1 : jeton dans le bilan"
+	return 0
+}
+sain
+export SHH_ALERTE_APT='true'
+courriel vert
+m=$work/vert.mail
+grep -q "^Subject: Shhgone Bilan du lundi : tout va bien" "$m" || ko "vert : objet ($(grep '^Subject' "$work/courriels" | head -3))"
+for s in "1. Intégrité du serveur" "2. Mises à jour à faire" "3. Santé" "4. Connexions SSH de la semaine"; do
+	grep -q "^$s" "$m" || ko "vert : section « $s » absente"
+done
+grep -q '^⚠️\|^❌' "$m" && ko "vert : avertissement dans un bilan tout vert : $(grep '^⚠️\|^❌' "$m" | head -3)"
+for l in "✅ Empreinte du serveur : rien de changé" "✅ Fichiers des paquets Debian conformes" "✅ Image en cours = image signée" \
+	"   Base d'intégrité : 3f2a-91c0-77de-0b12" "✅ Système à jour" "✅ Aucun redémarrage nécessaire" \
+	"✅ analyse de notre code Go (gosec) : rien trouvé" "✅ Dependabot : aucune proposition ouverte" \
+	"✅ DNSSEC : actif" "✅ CAA : présent, lié au compte ACME" "✅ SPF : présent" "✅ DKIM : présent (sélecteur default)" \
+	"✅ DMARC : présent" "✅ Site joignable : https://exemple.test/ répond 200 en 123 ms" "✅ Version servie = Release signée" \
+	"✅ Nom de domaine : verrou de transfert actif" "✅ Hébergement : fin de la location le $(jour 200)" \
+	"✅ Mémoire : 60 % disponible" "✅ Sauvegarde : dernière réussie le" "   Dernier redémarrage de la machine : 2026-11-22 03:12:00" \
+	"   1 connexion(s) ces 7 derniers jours" "     - $(date -u -d "@$((NOW - 2 * 86400))" '+%Y-%m-%d %H:%M UTC'), compte debian, clé SHA256:YyVEEg6J" \
+	"Rien à signaler : tout va bien."; do
+	grep -qF -- "$l" "$m" || ko "vert : « $l » absent"
+done
+grep -qF "vieille" "$m" && ko "vert : connexion de plus de 7 jours listée"
+grep -q "^To: alerte@exemple.test" "$work/courriels" || ko "vert : destinataire"
+propre vert
+# Un autre jour que le lundi : pas de bilan.
+sain
+export SHH_ALERTE_MAINTENANT=$((NOW + 86400))
+lance mardi
+attendu mardi "Rappel restauration"
+
+# 8. Avertissements : mises à jour, Dependabot (dont Caddy), DKIM absent, jeton GitHub absent.
+sain
+export SHH_ALERTE_APT='printf "Inst openssl [3.0.15-1] (3.0.16-1~deb12u1 Debian-Security:12/stable-security [amd64])\nInst vim [9] (9.1 Debian:12/stable [amd64])\n"'
+export SHH_ALERTE_REBOOT="$work/redemarrage"
+: >"$work/redemarrage"
+echo rouge >"$work/gh-mode"
+: >"$work/sans-dkim"
+courriel avert
+m=$work/avert.mail
+grep -q "^Subject: Shhgone Bilan du lundi : [1-9][0-9]* à traiter, [1-9][0-9]* à voir" "$m" || ko "avert : objet $(head -1 "$m")"
+for l in "⚠️ Système : 1 mise(s) à jour de sécurité en attente (sur 2)" "⚠️ Redémarrage nécessaire" \
+	"❌ analyse de notre code Go (gosec) : failure" "❌ outils épinglés à jour (deploy/outils-a-jour.sh) : failure" \
+	"⚠️ contrôle externe du site (ports, TLS, en-têtes) : sauté" "⚠️ Dependabot : 1 proposition(s) ouverte(s)" \
+	"     - build(deps): bump caddy from 2.11.9 to 2.11.10 in /deploy" "⚠️ Image de Caddy : nouvelle version proposée" \
+	"⚠️ DKIM : introuvable"; do
+	grep -qF -- "$l" "$m" || ko "avert : « $l » absent"
+done
+grep -qF "autre" "$m" && ko "avert : proposition qui n'est pas de Dependabot listée"
+propre avert
+rm -f "$work/sans-dkim" "$work/redemarrage"
+# Jeton absent (aucun remplacement, fichier introuvable) : « non configuré », sans échouer.
+sain
+unset SHH_ALERTE_GITHUB
+export SHH_ALERTE_GITHUB_JETON="$work/pas-de-jeton"
+courriel sans-jeton
+grep -qF "⚠️ GitHub : non configuré (jeton en lecture seule absent" "$work/sans-jeton.mail" || ko "sans-jeton : section GitHub"
+grep -qF "Version servie = Release signée" "$work/sans-jeton.mail" && ko "sans-jeton : contrôle GitHub inventé"
+# API en panne : dit, sans échouer.
+sain
+echo panne >"$work/gh-mode"
+courriel panne
+grep -qF "⚠️ GitHub : vérification de sécurité illisible" "$work/panne.mail" || ko "panne : non dit"
+unset SHH_ALERTE_GITHUB_JETON
+
+# 9. Échecs : intégrité en différence, sauvegarde ancienne, certificat non renouvelé, site muet ;
+#    rappel URGENT des différences ; contrôle muet depuis 36 h.
+sain
+printf "resultat=alerte\ndate=%s\nbase=3f2a-91c0-77de-0b12\nimage=conteneur inattendu\npaquets=2\necarts=5\n" $((NOW - 3600)) >"$work/integrite-etat"
+echo $((NOW - 30 * 3600)) >"$work/sauvegarde-ok"
+SHH_ALERTE_CERT_FIN="$(jour 3) 12:00:00 GMT"
+export SHH_ALERTE_TEMPS='false' SHH_ALERTE_DNS='echo "203.0.113.99 STREAM exemple.test"'
+courriel echecs
+m=$work/echecs.mail
+for l in "❌ Empreinte du serveur : 5 différence(s)" "❌ Fichiers des paquets Debian : 2 fichier(s)" "❌ Image : conteneur inattendu" \
+	"❌ Sauvegarde : dernière réussie le" "❌ Certificat HTTPS (Let's Encrypt) : fin le $(jour 3) 12:00 UTC, renouvellement automatique EN ÉCHEC" \
+	"❌ Site : https://exemple.test/ ne répond pas" "Constats en cours"; do
+	grep -qF -- "$l" "$m" || ko "echecs : « $l » absent"
+done
+grep -q "^ALERTE URGENT integrite-differences" "$work/echecs.out" || ko "echecs : pas de rappel URGENT des différences"
+propre echecs
+sain
+printf "resultat=ok\ndate=%s\nbase=3f2a-91c0-77de-0b12\nimage=ok\npaquets=0\necarts=0\n" $((NOW - 40 * 3600)) >"$work/integrite-etat"
+courriel muette
+grep -q "^ALERTE URGENT integrite-muette" "$work/muette.out" || ko "muette : pas d'URGENT"
+grep -qF "❌ Empreinte du serveur : contrôle muet depuis plus de 36 h" "$work/muette.mail" || ko "muette : bilan"
+# Non installée (aucun état) : rien d'urgent, dit dans le bilan.
+sain
+rm -f "$work/integrite-etat"
+courriel sans-integrite
+grep -q "^ALERTE URGENT integrite" "$work/sans-integrite.out" && ko "sans-integrite : URGENT"
+grep -qF "⚠️ Empreinte du serveur : contrôle non installé" "$work/sans-integrite.mail" || ko "sans-integrite : bilan"
+
+# 10. Envoi raté : la date n'est pas retenue, le prochain passage réessaie.
+sain
+export SHH_COURRIEL_ENVOI='cat >/dev/null; false'
+lance courriel-rate
+[ ! -f "$work/etat-courriel-rate/bilan" ] || ko "courriel-rate : date retenue malgré l'échec"
+grep -q "impossible (SMTP)" "$work/courriel-rate.err" || ko "courriel-rate : constat absent"
+unset SHH_COURRIEL_ENVOI
 
 [ "$echec" = 0 ] && printf 'test-alerte : ok\n'
 exit "$echec"

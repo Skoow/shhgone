@@ -149,6 +149,9 @@ format_ko alerte_smtp_mdp 0 'avec"guillemet' "guillemet"
 format_ko alerte_smtp_mdp 0 'avec\barre' "barre oblique"
 format_ko alerte_smtp_mdp 0 'accentué-é' "accents"
 format_ko alerte_smtp_mdp 0 "" "vide"
+format_ok alerte_github_jeton 0 github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234
+format_ko alerte_github_jeton 0 ghp_abcdefghijklmnopqrstuvwxyzABCDEFGHIJ "classique"
+format_ko alerte_github_jeton 0 jeton_court "fine-grained"
 format_ko shh_turn_secret 0 abcdefabcdefabcdef "inconnu"
 
 # fiche_secret : emplacements et droits attendus (README §12.2, §13.2, §14, §15, §4).

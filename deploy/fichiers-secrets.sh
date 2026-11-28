@@ -18,7 +18,7 @@ readonly SECRETS_ETC=/etc/shhdrop
 
 # Secrets que seul le propriétaire possède (deploy/secret.sh), puis ceux que la machine tire
 # elle-même. Ordre de « deploy/secret.sh --liste » et de deploy/etat.sh.
-readonly SECRETS_SAISIS="shh_stripe_cle shh_stripe_webhook shh_paypal_secret shh_nowpayments_cle shh_nowpayments_ipn alerte_smtp_mdp"
+readonly SECRETS_SAISIS="shh_stripe_cle shh_stripe_webhook shh_paypal_secret shh_nowpayments_cle shh_nowpayments_ipn alerte_smtp_mdp alerte_github_jeton"
 readonly SECRETS_TIRES="shh_comptes_cle shh_salons_cle shh_turn_secret preprod-jeton"
 
 # fiche_secret <nom> : pose s_fichier, s_proprio (uid:gid), s_mode (sans le 0 de tête, comme
@@ -32,6 +32,7 @@ fiche_secret() {
 	shh_nowpayments_cle) s_quoi="NOWPayments : clé d'API" ;;
 	shh_nowpayments_ipn) s_quoi="NOWPayments : secret IPN" ;;
 	alerte_smtp_mdp) s_quoi="alertes : mot de passe SMTP" s_proprio=0:0 s_mode=600 s_fichier=$SECRETS_ETC/$1 ;;
+	alerte_github_jeton) s_quoi="bilan du lundi : jeton GitHub en lecture seule (github_pat_…, README §4)" s_proprio=0:0 s_mode=600 s_fichier=$SECRETS_ETC/$1 ;;
 	shh_comptes_cle) s_quoi="compte : clé du serveur (tirée par deploy.sh)" ;;
 	shh_salons_cle) s_quoi="salons : clé maîtresse des salons persistants (tirée par deploy.sh)" ;;
 	shh_turn_secret) s_quoi="appels : secret du relais TURN (tiré par deploy.sh)" ;;
@@ -226,6 +227,18 @@ verifier_format() {
 	shh_nowpayments_cle)
 		[[ $v =~ ^[A-Za-z0-9]+(-[A-Za-z0-9]+)+$ ]] && [ "${#v}" -ge 16 ] || {
 			echo "clé d'API NOWPayments attendue (groupes de lettres et de chiffres séparés par des -)" >&2
+			return 1
+		}
+		;;
+	alerte_github_jeton)
+		# Jeton « fine-grained » seulement : limité au dépôt et à la lecture (README §4). Un jeton
+		# classique (ghp_…) donne accès à tous les dépôts du compte : refusé.
+		if [[ $v == ghp_* ]] || [[ $v == gho_* ]]; then
+			echo "jeton classique (ghp_…) refusé : créer un jeton « Fine-grained » limité au dépôt, en lecture seule (README §4)" >&2
+			return 1
+		fi
+		[[ $v =~ ^github_pat_[A-Za-z0-9_]{20,255}$ ]] || {
+			echo "jeton GitHub « fine-grained » attendu (github_pat_…)" >&2
 			return 1
 		}
 		;;

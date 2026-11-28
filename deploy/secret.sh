@@ -124,6 +124,8 @@ esac
 echo "Enregistré : $nom ($s_fichier, compte ${s_proprio%%:*}, droits 0$s_mode). La valeur n'a été affichée nulle part."
 if [ "$nom" = alerte_smtp_mdp ]; then
 	echo "Pris en compte au prochain passage de l'alerte (15 min au plus)."
+elif [ "$nom" = alerte_github_jeton ]; then
+	echo "Pris en compte au prochain bilan du lundi."
 else
 	r=$(commande_reinstallation)
 	if [ -n "$r" ]; then
@@ -141,4 +143,14 @@ else
 		[ "$(etat_secret "$s_fichier" "$s_proprio" "$s_mode")" = présent ] ||
 			echo "À faire aussi : sudo deploy/secret.sh $a (les deux vont ensemble)."
 	done
+fi
+# Nouvelle base d'intégrité (README, « Intégrité du serveur ») : un secret ajouté est un
+# changement voulu ; l'e-mail « Intégrité : base refaite » le liste (chemin seulement). Seulement
+# si l'intégrité est installée (deploy.sh l'installe).
+if [ -f /var/lib/shhdrop-integrite/systeme.db ] && [ -x "$here/integrite.sh" ]; then
+	if "$here/integrite.sh" refaire "secret.sh $nom" >/dev/null 2>&1; then
+		echo "Base d'intégrité refaite (e-mail « Intégrité : base refaite »)."
+	else
+		echo "AVERTISSEMENT : base d'intégrité non refaite : sudo deploy/integrite.sh refaire \"secret.sh $nom\"" >&2
+	fi
 fi

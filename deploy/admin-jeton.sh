@@ -73,6 +73,12 @@ printf 'SHH_ADMIN_LISTEN=%s\nSHH_ADMIN_TOKEN_SHA256=%s\n' "$ADMIN_ECOUTE" "$empr
 chown --reference=.env -- "$tmp" && chmod --reference=.env -- "$tmp"
 mv -fT -- "$tmp" .env
 trap - EXIT
+# deploy/.env a changé (voulu) : nouvelle base d'intégrité, si elle est installée (README,
+# « Intégrité du serveur ») ; l'e-mail « Intégrité : base refaite » le liste.
+if [ -f /var/lib/shhdrop-integrite/systeme.db ] && [ -x "$here/integrite.sh" ]; then
+	"$here/integrite.sh" refaire "admin-jeton.sh" >/dev/null 2>&1 ||
+		echo "AVERTISSEMENT : base d'intégrité non refaite : sudo deploy/integrite.sh refaire admin-jeton.sh" >&2
+fi
 
 # Adresse de la machine pour le tunnel : celle de la connexion SSH en cours si elle est connue,
 # sinon l'adresse publique de la machine, sinon le nom du site.

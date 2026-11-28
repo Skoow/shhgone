@@ -1,0 +1,11 @@
+# Chaque nuit à 02:43 UTC (hors de la sauvegarde, 03:17 à 03:47) ; rattrapé au démarrage si la
+# machine était arrêtée.
+[Unit]
+Description=Contrôle d'intégrité chaque nuit (Shhgone)
+
+[Timer]
+OnCalendar=*-*-* 02:43:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

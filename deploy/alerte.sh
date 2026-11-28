@@ -18,6 +18,9 @@
 #     dns            le nom de domaine ne pointe plus vers cette machine
 #     sauvegarde     aucune sauvegarde réussie depuis 26 h
 #     smart          un disque annonce une panne (smartctl)
+#     integrite-differences  le contrôle d'intégrité de la nuit a trouvé des différences (rappel ;
+#                    la liste des chemins est dans l'e-mail « URGENT intégrité » d'integrite.sh)
+#     integrite-muette  ce contrôle n'a pas tourné depuis 36 h (coupé ?)
 #   et, une fois par jour :
 #     certificat-inconnu  un certificat émis pour le nom ou pour www.<nom> ces 3 derniers jours
 #                    n'est pas l'un de ceux que sert le site (journaux publics Certificate
@@ -35,7 +38,10 @@
 #     charge         charge moyenne sur 15 min au-dessus de deux fois le nombre de cœurs
 #   rappel (« Rappel ») :
 #     restauration   tous les 30 jours : essayer une restauration (README §12)
-#   bilan            chaque semaine, même sans problème : chiffres du jour et constats en cours.
+#   bilan            chaque lundi, même sans problème : un seul e-mail résumé, en sections
+#                    (intégrité, mises à jour à faire dont résultats de securite.yml et Dependabot,
+#                    santé avec dates et états réels, connexions SSH de la semaine), un verdict
+#                    ✅ ⚠️ ❌ par ligne.
 #                    S'il n'arrive pas le lundi, c'est l'alerte elle-même qui ne marche plus.
 #
 # Aucune donnée d'utilisateur, aucune adresse IP : les e-mails ne contiennent que des sujets,
@@ -65,7 +71,10 @@
 # SHH_ALERTE_NPROC, SHH_ALERTE_DOCKER, SHH_ALERTE_CERT_FIN, SHH_ALERTE_CERT_DEBUT, SHH_ALERTE_CERT_SERIE, SHH_ALERTE_CERT_WWW (sortie « serial=… » du certificat de www), SHH_ALERTE_CT, SHH_ALERTE_CT_WWW, SHH_ALERTE_RDAP, SHH_ALERTE_DNS,
 # SHH_ALERTE_IPS, SHH_ALERTE_SAUVEGARDE_OK, SHH_ALERTE_SMART, SHH_ALERTE_APT,
 # SHH_ALERTE_REBOOT, SHH_ALERTE_RETARD, SHH_ALERTE_NTP, SHH_ALERTE_UNITES, SHH_ALERTE_BOOT_ID,
-# SHH_ALERTE_DEMARRAGE, SHH_ALERTE_MONTE (« oui » ou « non »), SHH_ALERTE_MDP_FICHIER.
+# SHH_ALERTE_DEMARRAGE, SHH_ALERTE_MONTE (« oui » ou « non »), SHH_ALERTE_MDP_FICHIER,
+# SHH_ALERTE_INTEGRITE, SHH_ALERTE_SSH, SHH_ALERTE_GITHUB (commande, chemin de l'API en $1),
+# SHH_ALERTE_GITHUB_JETON, SHH_ALERTE_DIG (commande, arguments de dig), SHH_ALERTE_TEMPS,
+# SHH_ALERTE_CERT_EMETTEUR ; SHH_COURRIEL_ENVOI (courriel.sh).
 set -euo pipefail
 export LC_ALL=C
 here=$(cd "$(dirname "$0")" && pwd)
@@ -77,6 +86,8 @@ env_file=${SHH_ENV_FILE:-$here/.env}
 # shellcheck source=deploy/lire-env.sh
 . "$here/lire-env.sh"
 lire_env "$env_file" 0 || die "$env_file refusé (voir ci-dessus)"
+# shellcheck source=deploy/courriel.sh
+. "$here/courriel.sh"
 root=${SHH_DATA_ROOT:-/srv/shhdrop}
 etat=${SHH_ALERTE_ETAT:-/var/lib/shhdrop-alerte}
 mkdir -p "$etat" && chmod 0700 "$etat"
@@ -104,8 +115,8 @@ jours_jusqua() {
 	printf '%s' $(((fin - now) / JOUR))
 }
 
-envoyer() { # $1 : sujet (nom du fichier d'état), $2 : période en secondes, $3 : texte
-	local cle=$1 periode=$2 texte=$3 last=0 niveau="À prévoir"
+envoyer() { # $1 : sujet (nom du fichier d'état), $2 : période en secondes, $3 : texte, [$4 : objet de l'e-mail]
+	local cle=$1 periode=$2 texte=$3 objet=${4:-} last=0 niveau="À prévoir"
 	case $cle in
 	*-bientot | maj-* | redemarrage | horloge | unites | charge | domaine-illisible) ;;
 	bilan) niveau="Bilan" ;;
@@ -117,36 +128,14 @@ envoyer() { # $1 : sujet (nom du fichier d'état), $2 : période en secondes, $3
 	[[ $last =~ ^[0-9]+$ ]] || last=0
 	if [ $((now - last)) -lt "$periode" ]; then return 0; fi
 	printf 'ALERTE %s %s : %s\n' "$niveau" "$cle" "$texte"
-	if [ -z "${SHH_ALERTE_A:-}" ]; then
-		printf '%s\n' "$now" >"$etat/$cle"
-		return 0
-	fi
-	if [ -z "${SHH_ALERTE_SMTP_HOST:-}" ] || [ -z "${SHH_ALERTE_SMTP_USER:-}" ] || [ -z "${SHH_ALERTE_FROM:-}" ]; then
-		die "SHH_ALERTE_A sans SHH_ALERTE_SMTP_HOST, SHH_ALERTE_SMTP_USER et SHH_ALERTE_FROM"
-	fi
-	# Mot de passe d'envoi des alertes : celui de /etc/shhdrop (disque système, lisible juste
-	# après un redémarrage, quand le volume chiffré est encore verrouillé). Illisible : constat
-	# sur la sortie, nouvel essai plus tard.
-	local utilisateur=$SHH_ALERTE_SMTP_USER de
-	local mdp=${SHH_ALERTE_MDP_FICHIER:-/etc/shhdrop/alerte_smtp_mdp}
-	if [ ! -r "$mdp" ]; then
-		printf 'alerte : aucun mot de passe SMTP lisible (/etc/shhdrop/alerte_smtp_mdp absent) : « %s » non envoyée\n' "$cle" >&2
-		return 0
-	fi
-	de=$(printf '%s' "$SHH_ALERTE_FROM" | sed -n 's/.*<\(.*\)>.*/\1/p')
-	[ -n "$de" ] || de=$SHH_ALERTE_FROM
-	# Mot de passe lu par curl depuis un fichier de configuration (jamais sur la ligne de commande).
-	# Envoi raté : la date n'est pas écrite, l'essai reprend au passage suivant.
-	if {
-		printf 'From: %s\r\nTo: %s\r\nSubject: Shhgone %s : %s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n' \
-			"$SHH_ALERTE_FROM" "$SHH_ALERTE_A" "$niveau" "$cle" "$texte"
-	} | curl -sS --fail --max-time 60 --ssl-reqd --url "smtps://$SHH_ALERTE_SMTP_HOST:465" \
-		--mail-from "$de" --mail-rcpt "$SHH_ALERTE_A" --upload-file - \
-		-K <(printf 'user = "%s:%s"\n' "$utilisateur" "$(cat "$mdp")") >/dev/null; then
-		printf '%s\n' "$now" >"$etat/$cle"
-	else
-		printf 'alerte : envoi de « %s » impossible (SMTP), nouvel essai au prochain passage\n' "$cle" >&2
-	fi
+	# Envoi (courriel.sh). Raté, ou mot de passe illisible : la date n'est pas écrite, l'essai
+	# reprend au passage suivant. Sans SHH_ALERTE_A : constat sur la sortie seulement.
+	local code=0
+	courriel_envoyer "$niveau" "$cle" "$texte" "$objet" || code=$?
+	case $code in
+	0 | 2) printf '%s\n' "$now" >"$etat/$cle" ;;
+	3) die "SHH_ALERTE_A sans SHH_ALERTE_SMTP_HOST, SHH_ALERTE_SMTP_USER et SHH_ALERTE_FROM" ;;
+	esac
 }
 
 # --- Redémarrage, volume ------------------------------------------------------------------------
@@ -230,6 +219,8 @@ done
 meminfo=$(lire SHH_ALERTE_MEMINFO cat /proc/meminfo)
 total=$(printf '%s\n' "$meminfo" | awk '/^MemTotal:/{print $2}')
 dispo=$(printf '%s\n' "$meminfo" | awk '/^MemAvailable:/{print $2}')
+mem_pct=""
+if [[ ${total:-} =~ ^[0-9]+$ ]] && [[ ${dispo:-} =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then mem_pct=$((dispo * 100 / total)); fi
 if [[ ${total:-} =~ ^[0-9]+$ ]] && [[ ${dispo:-} =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ] && [ $((dispo * 100 / total)) -lt 10 ]; then
 	envoyer memoire $HEURE "mémoire disponible : $((dispo * 100 / total)) % seulement"
 fi
@@ -245,11 +236,13 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 	cert_servi=""
 	if [ -z "${SHH_ALERTE_CERT_FIN:-}" ] || [ -z "${SHH_ALERTE_CERT_SERIE:-}" ]; then
 		cert_servi=$(openssl s_client -connect "$SHH_DOMAIN:443" -servername "$SHH_DOMAIN" </dev/null 2>/dev/null |
-			openssl x509 -noout -startdate -enddate -serial 2>/dev/null || true)
+			openssl x509 -noout -startdate -enddate -serial -issuer 2>/dev/null || true)
 	fi
 	fin_cert=${SHH_ALERTE_CERT_FIN:-$(printf '%s\n' "$cert_servi" | sed -n 's/^notAfter=//p')}
 	debut_cert=${SHH_ALERTE_CERT_DEBUT:-$(printf '%s\n' "$cert_servi" | sed -n 's/^notBefore=//p')}
 	serie_servie=${SHH_ALERTE_CERT_SERIE:-$(printf '%s\n' "$cert_servi" | sed -n 's/^serial=//p')}
+	# Émetteur (bilan du lundi) : organisation de l'autorité, sinon son nom commun.
+	emetteur=${SHH_ALERTE_CERT_EMETTEUR:-$(printf '%s\n' "$cert_servi" | sed -n 's/^issuer=//p' | sed -nE 's/(^|.*, )O ?= ?([^,]+).*/\2/p; t; s/(^|.*, )CN ?= ?([^,]+).*/\2/p')}
 	# www.<nom> (redirection 308 vers le site, Caddyfile) : son propre certificat, demandé par
 	# le même Caddy avec le même compte ACME ; sa série est connue comme celle du site. Lu sur
 	# la même adresse (le nom du site) : aucun enregistrement www n'est nécessaire pour le lire.
@@ -291,7 +284,13 @@ if [ -n "${SHH_DOMAIN:-}" ]; then
 		fin_dom=$(printf '%s' "$rdap" | tr '{' '\n' | tr '}' '\n' | grep '"eventAction" *: *"expiration"' |
 			sed -n 's/.*"eventDate" *: *"\([^"]*\)".*/\1/p' | head -1 || true)
 		[ -n "$fin_dom" ] && printf '%s' "$fin_dom" >"$rdap_cache"
+		# Verrou de transfert chez le registraire (statut RDAP « client transfer prohibited »),
+		# pour le bilan du lundi : oui, non, ou rien si RDAP n'a pas répondu.
+		if [ -n "$rdap" ]; then
+			if printf '%s' "$rdap" | grep -qi '"client transfer prohibited"'; then echo oui; else echo non; fi >"$etat/domaine-verrou"
+		fi
 	fi
+	dom_verrou=$(cat "$etat/domaine-verrou" 2>/dev/null || true)
 	[ -n "$fin_dom" ] || fin_dom=${SHH_DOMAINE_ECHEANCE:-}
 	jours_dom=""
 	if [ -n "$fin_dom" ]; then jours_dom=$(jours_jusqua "$fin_dom"); fi
@@ -376,9 +375,15 @@ apt_cache="$etat/maj-securite-nombre"
 if [ -f "$apt_cache" ] && [ $((now - $(stat -c %Y "$apt_cache"))) -lt $JOUR ] && [ -z "${SHH_ALERTE_APT:-}" ]; then
 	n_secu=$(cat "$apt_cache")
 else
-	n_secu=$(lire SHH_ALERTE_APT apt-get -s -o Debug::NoLocking=1 upgrade | grep '^Inst ' | grep -ci 'security' || true)
+	simu=$(lire SHH_ALERTE_APT apt-get -s -o Debug::NoLocking=1 upgrade | grep '^Inst ' || true)
+	n_secu=$(printf '%s\n' "$simu" | grep -ci 'security' || true)
+	n_maj=$(printf '%s\n' "$simu" | grep -c . || true)
+	printf '%s' "${n_maj:-0}" >"$etat/maj-total-nombre"
 	printf '%s' "${n_secu:-0}" >"$apt_cache"
 fi
+n_maj=$(cat "$etat/maj-total-nombre" 2>/dev/null || echo "?")
+redemarrage_demande=non
+if [ -e "${SHH_ALERTE_REBOOT:-/var/run/reboot-required}" ]; then redemarrage_demande=oui; fi
 if [[ ${n_secu:-} =~ ^[0-9]+$ ]] && [ "$n_secu" -gt 0 ]; then
 	envoyer maj-securite $JOUR "$n_secu mise(s) à jour de sécurité du système en attente (apt upgrade, ou vérifier unattended-upgrades)"
 fi
@@ -411,18 +416,331 @@ if [ "${unites:-0}" -gt 0 ]; then
 	envoyer unites $JOUR "$unites unité(s) systemd en échec (systemctl --failed)"
 fi
 
-# --- Bilan de la semaine (preuve que l'alerte fonctionne) ---------------------------------------
-bilan="Bilan de la machine (deploy/alerte.sh), chaque semaine même sans problème.
-Disque des données : ${pct_donnees:-?} %
-Certificat TLS : ${jours_cert:-?} jour(s) restant(s)
-Domaine : ${jours_dom:-?} jour(s) avant l'échéance
-Location du serveur : ${jours_serv:+$jours_serv jour(s)}${jours_serv:-non renseignée (SHH_SERVEUR_ECHEANCE)}
-Mises à jour de sécurité en attente : ${n_secu:-?}
-Commits de retard sur GitHub : ${retard:-?}"
-if [ ${#constats[@]} -eq 0 ]; then
-	bilan+=$'\n\nRien à signaler.'
-else
-	bilan+=$'\n\nConstats en cours :'
-	for c in "${constats[@]}"; do bilan+=$'\n- '"$c"; done
+# --- Intégrité (deploy/integrite.sh, chaque nuit) -----------------------------------------------
+# Son état (aucun chemin, aucune valeur : des résultats, des nombres, des dates et l'empreinte de
+# la base) est lu ici. Installée (état présent) mais muette depuis 36 h : quelqu'un a pu couper le
+# contrôle (minuteur arrêté, AIDE retiré) ; URGENT. Différences : rappel URGENT une fois par jour
+# (la liste des chemins est dans l'e-mail de la nuit).
+integ_etat=${SHH_ALERTE_INTEGRITE:-/var/lib/shhdrop-integrite/etat}
+integ_resultat="" integ_date="" integ_base="" integ_image="" integ_volume="" integ_paquets="" integ_ecarts=""
+if [ -f "$integ_etat" ]; then
+	while IFS='=' read -r k v; do
+		case $k in
+		resultat) integ_resultat=$v ;;
+		date) integ_date=$v ;;
+		base) integ_base=$v ;;
+		image) integ_image=$v ;;
+		volume) integ_volume=$v ;;
+		paquets) integ_paquets=$v ;;
+		ecarts) integ_ecarts=$v ;;
+		esac
+	done <"$integ_etat"
 fi
-envoyer bilan $SEMAINE "$bilan"
+integ_muette=0
+if [ -f "$integ_etat" ] && { ! [[ $integ_date =~ ^[0-9]+$ ]] || [ $((now - integ_date)) -gt $((36 * HEURE)) ]; }; then
+	integ_muette=1
+	envoyer integrite-muette $HEURE "le contrôle d'intégrité de la nuit n'a pas tourné depuis plus de 36 h (systemctl status shhdrop-integrite.timer) : il a pu être coupé. Suivre README, « Que faire si une alerte d'intégrité arrive »"
+fi
+if [ "$integ_resultat" = alerte ]; then
+	envoyer integrite-differences $JOUR "le contrôle d'intégrité de la nuit a trouvé ${integ_ecarts:-des} différence(s) (liste dans l'e-mail « URGENT intégrité » ; sinon : sudo deploy/integrite.sh verifier). Suivre README, « Que faire si une alerte d'intégrité arrive »"
+fi
+
+# --- Bilan du lundi (un seul e-mail, résumé ; preuve que l'alerte fonctionne) -------------------
+# Chaque lundi (heure UTC), même sans problème, en sections, une ligne par point, avec un verdict :
+# ✅ bon, ⚠️ à voir, ❌ à traiter. Pas d'e-mail le lundi = l'alerte, ou la machine, ne marche plus
+# (README §4). La partie GitHub (dernier passage de securite.yml, propositions Dependabot) est
+# lue par l'API de GitHub avec un jeton en LECTURE SEULE (/etc/shhdrop/alerte_github_jeton,
+# deploy/secret.sh) ; sans lui : « non configuré ». Connexions SSH de la semaine : registre de
+# ssh-connexion.sh (heure, compte, clé ; jamais d'adresse).
+v() { # <ok|av|ko> <texte> : une ligne et son verdict (comptés ensuite dans le texte)
+	case $1 in
+	ok) printf '✅ %s\n' "$2" ;;
+	av) printf '⚠️ %s\n' "$2" ;;
+	ko) printf '❌ %s\n' "$2" ;;
+	esac
+}
+quand() { date -u -d "@$1" '+%Y-%m-%d %H:%M UTC'; }
+# Texte venu de GitHub (titres) : une ligne imprimable, 120 caractères au plus.
+net() { sed 's/[^[:print:]]/ /g' | cut -c1-120; }
+
+github() { # <chemin sous /repos/<dépôt>> : JSON sur la sortie ; code non nul si illisible
+	if [ -n "${SHH_ALERTE_GITHUB:-}" ]; then
+		bash -c "$SHH_ALERTE_GITHUB" _ "$1"
+		return
+	fi
+	# Jeton lu par curl depuis un fichier de configuration (jamais sur la ligne de commande).
+	curl -sS --fail --max-time 30 --proto '=https' -H 'Accept: application/vnd.github+json' \
+		-H 'X-GitHub-Api-Version: 2022-11-28' \
+		-K <(printf 'header = "Authorization: Bearer %s"\n' "$(cat "$jeton_gh")") \
+		"https://api.github.com/repos/${SHH_ALERTE_GITHUB_DEPOT:-Skoow/shhgone}$1"
+}
+# Noms lisibles des jobs de .github/workflows/securite.yml.
+nom_job() {
+	case $1 in
+	go) echo "failles des dépendances Go (govulncheck : serveur, relais)" ;;
+	caddy) echo "failles du binaire de Caddy (govulncheck)" ;;
+	outils) echo "outils épinglés à jour (deploy/outils-a-jour.sh)" ;;
+	fuzz) echo "fuzzing des analyseurs" ;;
+	web) echo "failles des dépendances du site (npm audit)" ;;
+	engine) echo "failles du moteur Rust (cargo audit)" ;;
+	gosec) echo "analyse de notre code Go (gosec)" ;;
+	semgrep) echo "analyse de notre code Go et TypeScript (Semgrep)" ;;
+	site) echo "contrôle externe du site (ports, TLS, en-têtes)" ;;
+	*) printf '%s\n' "$1" | net ;;
+	esac
+}
+
+jeton_gh=${SHH_ALERTE_GITHUB_JETON:-/etc/shhdrop/alerte_github_jeton}
+gh_pret() { { [ -n "${SHH_ALERTE_GITHUB:-}" ] || [ -r "$jeton_gh" ]; } && command -v jq >/dev/null 2>&1; }
+bilan_dernier=$(cat "$etat/bilan" 2>/dev/null || echo 0)
+[[ $bilan_dernier =~ ^[0-9]+$ ]] || bilan_dernier=0
+if [ "$(date -u -d "@$now" +%u)" = 1 ] && [ $((now - bilan_dernier)) -ge $((3 * JOUR)) ]; then
+	# 1. Intégrité.
+	s1=$(
+		if [ -z "$integ_resultat" ]; then
+			v av "Empreinte du serveur : contrôle non installé (deploy.sh l'installe)"
+		elif [ "$integ_muette" = 1 ]; then
+			v ko "Empreinte du serveur : contrôle muet depuis plus de 36 h (coupé ?)"
+		elif [ "$integ_resultat" = ok ]; then
+			v ok "Empreinte du serveur : rien de changé (dernière vérification le $(quand "$integ_date"))"
+		else
+			v ko "Empreinte du serveur : ${integ_ecarts:-des} différence(s) (e-mail « URGENT intégrité »)"
+		fi
+		case $integ_paquets in
+		0) v ok "Fichiers des paquets Debian conformes aux paquets officiels (dpkg --verify)" ;;
+		"") v av "Fichiers des paquets Debian : pas encore vérifiés" ;;
+		*) v ko "Fichiers des paquets Debian : $integ_paquets fichier(s) différent(s) des paquets officiels" ;;
+		esac
+		case $integ_image in
+		ok) v ok "Image en cours = image signée vérifiée par deploy.sh (et Caddy épinglé)" ;;
+		"serveur arrêté" | "aucune version installée") v av "Image : $integ_image" ;;
+		"") v av "Image : pas encore vérifiée" ;;
+		*) v ko "Image : $integ_image" ;;
+		esac
+		printf '   Base d%sintégrité : %s%s (doit être celle du dernier e-mail « Intégrité : base »)\n' "'" "${integ_base:-?}" "${integ_volume:+ ; volume : $integ_volume}"
+	)
+	# 2. Mises à jour à faire.
+	s2=$(
+		if [[ ${n_secu:-} =~ ^[0-9]+$ ]] && [ "$n_secu" -gt 0 ]; then
+			v av "Système : $n_secu mise(s) à jour de sécurité en attente (sur ${n_maj:-?}) : vérifier unattended-upgrades"
+		elif [[ ${n_maj:-} =~ ^[0-9]+$ ]] && [ "$n_maj" -gt 0 ]; then
+			v av "Système : $n_maj mise(s) à jour en attente, aucune de sécurité"
+		else
+			v ok "Système à jour"
+		fi
+		if [ "$redemarrage_demande" = oui ]; then
+			v av "Redémarrage nécessaire (noyau ou bibliothèques) : le prévoir, puis déverrouiller le volume"
+		else
+			v ok "Aucun redémarrage nécessaire"
+		fi
+		if [[ ${retard:-} =~ ^[0-9]+$ ]] && [ "$retard" -gt 0 ]; then
+			v av "Service : $retard commit(s) de retard sur GitHub (à déployer après la CI)"
+		elif [[ ${retard:-} =~ ^[0-9]+$ ]]; then
+			v ok "Service : à jour avec GitHub"
+		fi
+		if [ -z "${SHH_ALERTE_GITHUB:-}" ] && [ ! -r "$jeton_gh" ]; then
+			v av "GitHub : non configuré (jeton en lecture seule absent : README §4, sudo deploy/secret.sh alerte_github_jeton)"
+		elif ! command -v jq >/dev/null 2>&1; then
+			v av "GitHub : jq absent (deploy.sh l'installe)"
+		else
+			runs=$(github "/actions/workflows/securite.yml/runs?per_page=1&status=completed" 2>/dev/null) || runs=
+			run_id=$(printf '%s' "$runs" | jq -r '.workflow_runs[0].id // empty' 2>/dev/null) || run_id=
+			if [[ ! $run_id =~ ^[0-9]+$ ]]; then
+				v av "GitHub : vérification de sécurité illisible (réseau, jeton expiré ou sans droit Actions)"
+			else
+				run_date=$(printf '%s' "$runs" | jq -r '.workflow_runs[0].created_at // empty' | net)
+				t_run=$(date -u -d "$run_date" +%s 2>/dev/null || echo 0)
+				if [ $((now - t_run)) -gt $((8 * JOUR)) ]; then
+					v av "Vérification de sécurité : aucun passage depuis le ${run_date%%T*} (workflows planifiés désactivés par GitHub ? les réactiver dans l'onglet Actions)"
+				fi
+				jobs=$(github "/actions/runs/$run_id/jobs?per_page=50" 2>/dev/null | jq -r '.jobs[] | "\(.conclusion // "en cours") \(.name)"' 2>/dev/null) || jobs=
+				if [ -z "$jobs" ]; then
+					v av "Vérification de sécurité du ${run_date%%T*} : jobs illisibles"
+				fi
+				while read -r c j; do
+					[ -n "$j" ] || continue
+					case $c in
+					success) v ok "$(nom_job "$j") : rien trouvé (${run_date%%T*})" ;;
+					skipped) v av "$(nom_job "$j") : sauté (${run_date%%T*})" ;;
+					*) v ko "$(nom_job "$j") : $(printf '%s' "$c" | net) (${run_date%%T*}) : lire le journal du job (onglet Actions)" ;;
+					esac
+				done <<<"$jobs"
+			fi
+			prs=$(github "/pulls?state=open&per_page=100" 2>/dev/null | jq -r '.[] | select(.user.login == "dependabot[bot]") | .title' 2>/dev/null) || prs="?"
+			if [ "$prs" = "?" ]; then
+				v av "Dependabot : propositions illisibles (jeton sans droit Pull requests ?)"
+			elif [ -z "$prs" ]; then
+				v ok "Dependabot : aucune proposition ouverte (dont l'image de Caddy)"
+			else
+				n=$(printf '%s\n' "$prs" | grep -c .)
+				v av "Dependabot : $n proposition(s) ouverte(s), à relire puis fusionner :"
+				printf '%s\n' "$prs" | net | head -n 15 | sed 's/^/     - /'
+				if printf '%s\n' "$prs" | grep -qi 'caddy'; then
+					v av "Image de Caddy : nouvelle version proposée (ci-dessus)"
+				fi
+			fi
+		fi
+	)
+	# 3. Santé : dates et état réels (ce que ce script a déjà lu plus haut ; DNS par dig).
+	s3=$(
+		# Certificat HTTPS.
+		fin_txt=""
+		if [ -n "${fin_cert:-}" ]; then fin_txt=$(date -u -d "$fin_cert" '+%Y-%m-%d %H:%M UTC' 2>/dev/null || true); fi
+		emet=$(printf '%s' "${emetteur:-?}" | net)
+		if ! [[ ${jours_cert:-} =~ ^-?[0-9]+$ ]]; then
+			v ko "Certificat HTTPS : illisible sur ${SHH_DOMAIN:-?}:443"
+		elif [ "${court:-0}" = 1 ]; then
+			if [ "${heures_cert:-0}" -lt 36 ]; then
+				v ko "Certificat HTTPS ($emet, 6 jours) : fin le $fin_txt, renouvellement automatique EN ÉCHEC"
+			else
+				v ok "Certificat HTTPS ($emet, 6 jours) : fin le $fin_txt, renouvellement automatique OK"
+			fi
+		elif [ "$jours_cert" -lt 7 ]; then
+			v ko "Certificat HTTPS ($emet) : fin le $fin_txt, renouvellement automatique EN ÉCHEC"
+		elif [ "$jours_cert" -lt 21 ]; then
+			v av "Certificat HTTPS ($emet) : fin le $fin_txt, renouvellement automatique en retard"
+		else
+			v ok "Certificat HTTPS ($emet) : fin le $fin_txt, renouvellement automatique OK"
+		fi
+		# Domaine, hébergement.
+		if ! [[ ${jours_dom:-} =~ ^-?[0-9]+$ ]]; then
+			v av "Nom de domaine : échéance illisible (RDAP) et non notée (SHH_DOMAINE_ECHEANCE)"
+		else
+			t="Nom de domaine : échéance le ${fin_dom%%T*} ($jours_dom jours)"
+			if [ "$jours_dom" -lt 7 ]; then v ko "$t"; elif [ "$jours_dom" -lt 45 ]; then v av "$t"; else v ok "$t"; fi
+		fi
+		case ${dom_verrou:-} in
+		oui) v ok "Nom de domaine : verrou de transfert actif chez le registraire" ;;
+		non) v av "Nom de domaine : verrou de transfert NON actif (l'activer chez le registraire, §15.4)" ;;
+		*) v av "Nom de domaine : verrou de transfert illisible (RDAP)" ;;
+		esac
+		if ! [[ ${jours_serv:-} =~ ^-?[0-9]+$ ]]; then
+			v av "Hébergement : échéance non renseignée (SHH_SERVEUR_ECHEANCE dans deploy/.env)"
+		else
+			t="Hébergement : fin de la location le $SHH_SERVEUR_ECHEANCE ($jours_serv jours)"
+			if [ "$jours_serv" -lt 7 ]; then v ko "$t"; elif [ "$jours_serv" -lt 45 ]; then v av "$t"; else v ok "$t"; fi
+		fi
+		# DNS : DNSSEC (délégation signée : enregistrement DS chez le parent), CAA, SPF, DKIM, DMARC.
+		if [ -n "${SHH_DOMAIN:-}" ] && { [ -n "${SHH_ALERTE_DIG:-}" ] || command -v dig >/dev/null 2>&1; }; then
+			dg() {
+				if [ -n "${SHH_ALERTE_DIG:-}" ]; then bash -c "$SHH_ALERTE_DIG" _ "$@" 2>/dev/null || true; else dig +short +time=5 +tries=2 "$@" 2>/dev/null || true; fi
+			}
+			if [ -n "$(dg DS "$SHH_DOMAIN")" ]; then v ok "DNSSEC : actif (délégation signée)"; else v ko "DNSSEC : absent (aucun enregistrement DS)"; fi
+			caa=$(dg CAA "$SHH_DOMAIN")
+			if printf '%s' "$caa" | grep -q 'accounturi='; then
+				v ok "CAA : présent, lié au compte ACME"
+			elif [ -n "$caa" ]; then
+				v av "CAA : présent, pas encore lié au compte ACME (accounturi, §1)"
+			else
+				v ko "CAA : absent"
+			fi
+			if dg TXT "$SHH_DOMAIN" | grep -q 'v=spf1'; then v ok "SPF : présent"; else v av "SPF : absent"; fi
+			if dg TXT "_dmarc.$SHH_DOMAIN" | grep -q 'v=DMARC1'; then v ok "DMARC : présent"; else v av "DMARC : absent"; fi
+			dkim=""
+			for sel in ${SHH_ALERTE_DKIM_SELECTEURS:-default google selector1 selector2 k1 mail dkim protonmail s1 s2}; do
+				[[ $sel =~ ^[A-Za-z0-9._-]+$ ]] || continue
+				if dg TXT "$sel._domainkey.$SHH_DOMAIN" | grep -q 'p='; then dkim=$sel && break; fi
+			done
+			if [ -n "$dkim" ]; then v ok "DKIM : présent (sélecteur $dkim)"; else v av "DKIM : introuvable (sélecteur de votre fournisseur dans SHH_ALERTE_DKIM_SELECTEURS)"; fi
+		else
+			v av "DNS (DNSSEC, CAA, SPF, DKIM, DMARC) : non vérifié (dig absent ; deploy.sh l'installe)"
+		fi
+		# Site joignable, version servie.
+		if [ -n "${SHH_DOMAIN:-}" ]; then
+			rep=$(lire SHH_ALERTE_TEMPS curl -sS -o /dev/null --max-time 20 --proto '=https' -w '%{http_code} %{time_total}' "https://$SHH_DOMAIN/")
+			read -r code_site temps <<<"$rep"
+			if [ "${code_site:-}" = 200 ] || [ "${code_site:-}" = 503 ]; then
+				ms=$(awk -v t="${temps:-0}" 'BEGIN{printf "%d", t * 1000}')
+				t="Site joignable : https://$SHH_DOMAIN/ répond $code_site en $ms ms"
+				[ "$code_site" = 503 ] && t+=" (préproduction : page de maintenance)"
+				if [ "$ms" -gt 3000 ]; then v av "$t (lent)"; else v ok "$t"; fi
+			else
+				v ko "Site : https://$SHH_DOMAIN/ ne répond pas (${code_site:-aucune réponse})"
+			fi
+		fi
+		version=$(cat "$here/.release.version" 2>/dev/null || true)
+		case $integ_image in
+		ok) v ok "Version servie : ${version:+web-v$version, }image signée vérifiée par deploy.sh, en cours d'exécution" ;;
+		*) v av "Version servie : ${version:+web-v$version, }image ${integ_image:-pas encore vérifiée}" ;;
+		esac
+		# Contrôle horaire de GitHub (verifier-site.yml) : site en ligne = une Release signée.
+		if gh_pret; then
+			vs=$(github "/actions/workflows/verifier-site.yml/runs?per_page=1&status=completed" 2>/dev/null |
+				jq -r '.workflow_runs[0] | "\(.conclusion) \(.created_at)"' 2>/dev/null | net) || vs=
+			case $vs in
+			"success "*) v ok "Version servie = Release signée (contrôle de GitHub du ${vs#success })" ;;
+			"failure "*) v ko "Version servie : le contrôle de GitHub du ${vs#failure } a ÉCHOUÉ (verifier-site.yml)" ;;
+			*) v av "Version servie : contrôle de GitHub illisible ou pas encore lancé (verifier-site.yml)" ;;
+			esac
+		fi
+		# Machine.
+		if ! [[ ${pct_donnees:-} =~ ^[0-9]+$ ]]; then
+			v av "Disque des données : illisible"
+		elif [ "$pct_donnees" -ge 90 ]; then
+			v ko "Disque des données : $pct_donnees % occupé"
+		elif [ "$pct_donnees" -ge 75 ]; then
+			v av "Disque des données : $pct_donnees % occupé"
+		else
+			v ok "Disque des données : $pct_donnees % occupé"
+		fi
+		if ! [[ ${mem_pct:-} =~ ^[0-9]+$ ]]; then
+			v av "Mémoire : illisible"
+		elif [ "$mem_pct" -lt 10 ]; then
+			v ko "Mémoire : $mem_pct % disponible"
+		else
+			v ok "Mémoire : $mem_pct % disponible"
+		fi
+		if [ -z "${SHH_SAUVEGARDE_URL:-}" ]; then
+			v av "Sauvegarde : non surveillée (SHH_SAUVEGARDE_URL absente)"
+		elif [[ ${derniere:-} =~ ^[0-9]+$ ]] && [ $((now - derniere)) -le $((26 * HEURE)) ]; then
+			v ok "Sauvegarde : dernière réussie le $(quand "$derniere")"
+		elif [[ ${derniere:-} =~ ^[0-9]+$ ]]; then
+			v ko "Sauvegarde : dernière réussie le $(quand "$derniere") (plus de 26 h)"
+		else
+			v ko "Sauvegarde : aucune réussie"
+		fi
+		demarrage=$(lire SHH_ALERTE_DEMARRAGE uptime -s)
+		printf '   Dernier redémarrage de la machine : %s\n' "$(printf '%s' "${demarrage:-?}" | net)"
+		printf '   Mises à jour en attente : %s (dont sécurité : %s) ; redémarrage nécessaire : %s (section 2)\n' "${n_maj:-?}" "${n_secu:-?}" "$redemarrage_demande"
+	)
+	# 4. Connexions SSH de la semaine (registre de ssh-connexion.sh).
+	registre_ssh=${SHH_ALERTE_SSH:-/var/lib/shhdrop-ssh/connexions}
+	semaine=$(awk -v lim=$((now - 7 * JOUR)) '$1 ~ /^[0-9]+$/ && $1 >= lim' "$registre_ssh" 2>/dev/null || true)
+	s4=$(
+		if [ -z "$semaine" ]; then
+			printf '   Aucune connexion SSH ces 7 derniers jours.\n'
+		else
+			printf '   %s connexion(s) ces 7 derniers jours (vérifier que ce sont bien les vôtres) :\n' "$(printf '%s\n' "$semaine" | grep -c .)"
+			printf '%s\n' "$semaine" | tail -n 30 | while read -r t c k; do
+				printf '     - %s, compte %s, clé %s\n' "$(quand "$t")" "$(printf '%s' "$c" | net)" "$(printf '%s' "$k" | net)"
+			done
+		fi
+	)
+	n_ko=$(printf '%s\n%s\n%s\n' "$s1" "$s2" "$s3" | grep -c '^❌' || true)
+	n_av=$(printf '%s\n%s\n%s\n' "$s1" "$s2" "$s3" | grep -c '^⚠️' || true)
+	bilan="Bilan du lundi de la machine (deploy/alerte.sh). ✅ bon, ⚠️ à voir, ❌ à traiter.
+
+1. Intégrité du serveur
+$s1
+
+2. Mises à jour à faire
+$s2
+
+3. Santé
+$s3
+
+4. Connexions SSH de la semaine (jamais d'adresse IP)
+$s4"
+	if [ ${#constats[@]} -gt 0 ]; then
+		bilan+=$'\n\nConstats en cours (alertes de la semaine encore vraies) :'
+		for c in "${constats[@]}"; do bilan+=$'\n- '"$c"; done
+	fi
+	if [ "$n_ko" = 0 ] && [ "$n_av" = 0 ] && [ ${#constats[@]} -eq 0 ]; then
+		bilan+=$'\n\nRien à signaler : tout va bien.'
+		objet_bilan="Shhgone Bilan du lundi : tout va bien"
+	else
+		objet_bilan="Shhgone Bilan du lundi : $n_ko à traiter, $n_av à voir"
+	fi
+	bilan+=$'\n\nPas d\'e-mail un lundi = alerte : la machine ou son alerte ne marche plus (README §4).'
+	envoyer bilan $((3 * JOUR)) "$bilan" "$objet_bilan"
+fi

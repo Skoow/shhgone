@@ -349,6 +349,11 @@ preflight() {
 				die "$secrets/$f absent ou mal réglé : fichier du compte 65532, droits 0400 (README §13)"
 		done
 	fi
+	# Surveillance de la machine (README, « Intégrité du serveur ») : AIDE, minuteurs (alerte,
+	# purge du journal, intégrité), alerte de connexion SSH, SFTP coupé. Avant le contrôle des
+	# journaux (qui exige le minuteur de purge). Un échec est dit, sans bloquer l'installation.
+	"$here/installer-surveillance.sh" ||
+		echo "AVERTISSEMENT : surveillance incomplète (ci-dessus) ; l'intégrité de la nuit et le bilan du lundi le diront." >&2
 	# Journaux de la machine (README §1, journaux.sh) :
 	# aucun syslog ni ancien journal sur le disque, journald en mémoire une heure au plus, sshd
 	# silencieux, ufw sans journal, suivi des connexions ramené à 30 min, registres des connexions
@@ -474,6 +479,7 @@ verrous() {
 	if [ "$mode" = retour ]; then
 		copie_verifiee "$depot" "$VERROUS_SIGNATAIRES" "$installe" ||
 			die "refusé : la copie du dépôt doit être sur le commit installé $installe (ou un descendant vérifié), sans modification (README §3.5)"
+		integrite_apres "$relance $c (réinstallation)"
 		return 0
 	fi
 	if ! copie_au_commit "$depot" "$VERROUS_SIGNATAIRES" "$c" 2>/dev/null; then
@@ -488,6 +494,28 @@ verrous() {
 		exec env -u SHH_PREPROD_JETON -u SHH_PAIEMENT_SERVI -u SHH_PAIEMENT_ESSAI_SERVI "$here/$relance" "${args[@]}"
 	fi
 	resume_changements "$depot" "$VERROUS_SIGNATAIRES" "$installe" "$c"
+	integrite_apres "$relance $c"
+}
+
+# integrite_apres <raison> : à la sortie de ce script (réussite ou échec), nouvelle base
+# d'intégrité (integrite.sh refaire, README « Intégrité du serveur ») : après les verrous, la
+# copie du dépôt, les unités, la configuration de sshd et les secrets tirés ont pu changer
+# légitimement. L'e-mail « Intégrité : base refaite » liste ce que la base accepte. preprod.sh,
+# qui pose son propre « trap EXIT », y rappelle integrite_fin.
+integrite_raison=""
+integrite_apres() {
+	integrite_raison=$1
+	trap integrite_fin EXIT
+}
+integrite_fin() {
+	[ -n "$integrite_raison" ] || return 0
+	local sortie
+	if sortie=$("$here/integrite.sh" refaire "$integrite_raison" 2>&1); then
+		printf '%s\n' "$sortie" | grep -m1 "^Base d'intégrité :" | sed 's/^/intégrité : /' || true
+	else
+		printf 'AVERTISSEMENT : base d'"'"'intégrité non refaite (%s) : sudo deploy/integrite.sh refaire\n' \
+			"$(printf '%s' "$sortie" | tail -n 1)" >&2
+	fi
 }
 
 # mettre_en_service <état> <version> <commit> <suite|retour> : démarre l'image de cet état, la

@@ -65,7 +65,7 @@ build_id=$(git_sur "$depot" "$VERROUS_SIGNATAIRES" rev-parse --short=7 "$c")
 date_commit=$(git_sur "$depot" "$VERROUS_SIGNATAIRES" log -1 --format=%ct "$c")
 image=$(ref_image "$etat")
 ctx=$(mktemp -d)
-trap 'rm -rf -- "$ctx"' EXIT
+trap 'rm -rf -- "$ctx"; integrite_fin' EXIT # integrite_fin : nouvelle base d'intégrité (commun.sh)
 contexte_du_commit "$depot" "$VERROUS_SIGNATAIRES" "$c" "$ctx" || die "contexte de construction illisible (git archive $c)"
 echo "construction de $image (SHH_BUILD_ID=$build_id, fichiers suivis du commit $c)"
 SHH_BUILD_ID=$build_id SOURCE_DATE_EPOCH=$date_commit docker build -f "$ctx/deploy/Dockerfile" \

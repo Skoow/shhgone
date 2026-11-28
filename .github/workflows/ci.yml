@@ -308,4 +308,7 @@ jobs:
           echo "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198  $RUNNER_TEMP/shellcheck.tar.xz" | sha256sum -c -
           tar -xJf "$RUNNER_TEMP/shellcheck.tar.xz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/shellcheck-v0.11.0" >> "$GITHUB_PATH"
+      # AIDE (paquet de la distribution, comme sur le serveur) pour deploy/test-integrite.sh.
+      - name: AIDE
+        run: sudo apt-get install -y --no-install-recommends aide
       - run: make lint-deploy

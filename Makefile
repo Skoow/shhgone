@@ -34,12 +34,15 @@ test-repro:
 	web/scripts/repro.sh
 
 # Scripts de déploiement et de build : syntaxe, ShellCheck (0.11.0 en CI, job deploy-lint),
-# bancs de l'alerte et de la provenance (deploy/test-alerte.sh, deploy/test-provenance.sh : sans réseau, Node exigé), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais de sortie,
+# bancs de l'alerte, de l'intégrité (AIDE exigé), de l'alerte SSH et de la provenance (deploy/test-alerte.sh, deploy/test-integrite.sh, deploy/test-ssh-connexion.sh, deploy/test-provenance.sh : sans réseau, Node exigé), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais de sortie,
 # contrôle « joindre » ; les essais de banc, sans leurs variables, sont sautés).
 lint-deploy:
 	for f in deploy/*.sh web/scripts/*.sh; do bash -n "$$f" || exit 1; done
 	shellcheck deploy/*.sh web/scripts/*.sh
 	deploy/test-alerte.sh
+	deploy/test-integrite.sh
+	deploy/test-ssh-connexion.sh
+	deploy/test-analyse.sh
 	deploy/test-journaux.sh
 	deploy/test-provenance.sh
 	deploy/test-verrous.sh

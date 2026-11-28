@@ -1,0 +1,20 @@
+# Empreinte du serveur sain (deploy/integrite.sh ; README, « Intégrité du serveur ») : chaque nuit,
+# fichiers des paquets (dpkg --verify), AIDE, bases de données, conteneurs, conformité ; e-mail
+# « URGENT intégrité » à la moindre différence. Installé et tenu à jour par deploy.sh et
+# preprod.sh (installer-surveillance.sh, /opt/shhdrop remplacé par le chemin de la copie du dépôt).
+[Unit]
+Description=Contrôle d'intégrité de la nuit (Shhgone)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/shhdrop/deploy/integrite.sh verifier
+UMask=0077
+# Base d'AIDE, sommes acceptées et état (aucun contenu, aucune adresse).
+StateDirectory=shhdrop-integrite
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=45min
