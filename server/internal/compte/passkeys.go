@@ -332,6 +332,18 @@ func (s *Service) PasskeysRetirer(c Courante, credID []byte) error {
 	return err
 }
 
+// EnveloppeRecup : recup/enveloppe (session ouverte) : Env_r du compte, pour que l'appareil
+// vérifie lui-même une clé retapée (rappel des 6 mois). Rien de la clé n'est reçu ; Env_r ne
+// s'ouvre qu'avec R (128 bits), comme à la route recup qui la rend déjà.
+func (s *Service) EnveloppeRecup(c Courante) ([]byte, error) {
+	var env []byte
+	err := s.db.QueryRow(`SELECT env_r FROM comptes WHERE h=?`, c.H[:]).Scan(&env)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrSession
+	}
+	return env, err
+}
+
 // RecupRenouveler : recup/renouveler (session récente) : nouvelle clé de récupération (v_r, Env_r
 // de la nouvelle R) ; l'ancienne ne sert plus. v_r déjà pris : ErrRequete.
 func (s *Service) RecupRenouveler(c Courante, vr [32]byte, envR [60]byte) error {

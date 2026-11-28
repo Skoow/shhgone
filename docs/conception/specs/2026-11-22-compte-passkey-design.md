@@ -110,6 +110,7 @@ Sans passkey **ni** clé : compte **irrécupérable** (aucun e-mail, aucun séqu
 - **Ajouter** : session récente (sinon geste de passkey d'abord), « Ajouter une passkey » → feuille du système → geste → libellé proposé (modifiable) → enveloppe téléversée si PRF. **3 actions.** `excludeCredentials` = passkeys du compte (10 au plus).
 - **Retirer** : session récente ; `InlineConfirm` « Retirer cette passkey ? Elle ne pourra plus ouvrir ce compte. » ; **la dernière ne se retire pas** (« Ajoutez d'abord une autre passkey ») ; puis `signalUnknownCredential` sur cet appareil si l'API existe, sinon « Supprimez-la aussi de votre gestionnaire ».
 - **Nouvelle clé de récupération** : session récente → nouvelle clé (écrans 3 et 4 de §3.1) → l'ancienne ne sert plus.
+- **Vérifier ma clé, rappel tous les 6 mois** (décision du propriétaire, 28 novembre ; spec D42-35) : la personne retape sa clé ; l'appareil lit `Env_r` (`GET recup/enveloppe`, session ouverte) et l'ouvre avec `KEK_r` de la clé saisie : juste si elle rend `K_compte` (comparaison sans sortie anticipée). **Rien de la clé ne part** (ni `R`, ni `A_r`, ni `v_r`). Le mois de la dernière preuve (`cle_verifiee`, « AAAA-MM », coffre **privé**, écrit seulement s'il est connu) est posé à l'inscription, à chaque clé vérifiée ou renouvelée, après une ouverture par la clé, et à la première ouverture d'un compte d'avant. Six mois après : bandeau dans la section « Clé de récupération » et sur l'accueil, « Mes partages » et « Mes salons », bouton « Vérifier » ; « Vous ne l'avez plus ? » mène à « Créer une nouvelle clé ». Apps : même champ et même route.
 
 ### 3.6 Suppression du compte et export
 
@@ -264,6 +265,7 @@ Les objets WebAuthn suivent les formats JSON de WebAuthn niveau 3 (`PublicKeyCre
 | `POST passkeys/nommer` | session | `{ cred_id, etiquette }` | `{}` |
 | `POST passkeys/retirer` | session récente | `{ cred_id }` | `{}` ; `derniere` (409) pour la dernière |
 | `POST recup/renouveler` | session récente | `{ v_r, env_r }` | `{}` |
+| `GET recup/enveloppe` | session | — | `{ env_r }` (vérification de la clé sur l'appareil, rappel des 6 mois ; `Env_r` ne s'ouvre qu'avec `R`) |
 | `GET /api/compte` | session | — | comme aujourd'hui, **sans** `totp`, `recup_jusqu`, `retrait_totp_le` |
 | `sessions`, `sessions/fermer`, `sessions/etiquette`, `deconnexion`, `coffre/*`, `pseudo`, `pseudo/libre`, `export`, `salons`, `salons/detruire` | inchangées | | |
 | `POST supprimer` | session récente | `{}` | `{ salons_fermes }` (plus d'attente `attente`) |

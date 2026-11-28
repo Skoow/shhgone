@@ -4,11 +4,12 @@
   import { inAppBrowser, isStandalone, isSupported } from "./app/env";
   import { guardFileDrop, reloadIfRestored } from "./app/lifecycle";
   import { scrubAddressBar } from "./app/link";
-  import { href, LINK_ROUTES, moveToLinkPage, PAGE_ROUTES, router } from "./app/router.svelte";
+  import { href, LINK_ROUTES, moveToLinkPage, navigate, PAGE_ROUTES, router } from "./app/router.svelte";
   import { accountFlag } from "./app/account-flag.svelte";
   import { applySeo } from "./app/seo";
   import { setScreenTitle } from "./app/title";
-  import { getLang } from "./i18n/i18n.svelte";
+  import { getLang, t } from "./i18n/i18n.svelte";
+  import Banner from "./ui/Banner.svelte";
   import { watchKeyboard } from "./app/viewport";
   import { watchOpenGrant } from "./session/open-grant";
   import Partages from "./routes/Partages.svelte";
@@ -23,7 +24,7 @@
   // Pages du compte : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Compte, Connexion, Inscription, Recuperation, connecte, ecouterAutresOnglets, rangerPassDansCompte, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
+  import { Compte, Connexion, Inscription, Recuperation, connecte, rappelCle, ecouterAutresOnglets, rangerPassDansCompte, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
   // Écrans du salon : seulement si __SALONS__ (site avec compte, hors démo) ; sans lui,
   // le greffon shh-salons remplace ce module par pages.off.ts (aucun écran, aucun client).
   import { Salon, SalonNouveau } from "./routes/salon/pages";
@@ -46,6 +47,15 @@
   // Téléphone : barre d'onglets sur les écrans racine de l'expéditeur seulement (app/tabbar.ts),
   // avec __COMPTES__ et une session ouverte seulement.
   const connected = $derived(__COMPTES__ && connecte());
+  // Rappel des 6 mois de la clé de récupération : sur les écrans d'accueil d'une personne
+  // connectée seulement (jamais pendant un envoi ni sur « Lien prêt ») ; la page Compte le montre
+  // dans sa section.
+  // L'écran est lu d'abord : le rappel est ainsi recalculé à chaque changement d'écran (l'heure,
+  // elle, n'est pas suivie par Svelte).
+  const rappel = $derived.by(() => {
+    const ecran = router.current.name;
+    return __COMPTES__ && (ecran === "home" || ecran === "envois" || ecran === "salons") && rappelCle();
+  });
   const tabs = $derived(tabBarVisible({ supported, route: router.current.name, sending, composing: chrome.composing, connected }));
 
   // « Tirer pour actualiser » (téléphone) bloqué seulement quand il ferait perdre la liste en
@@ -125,13 +135,14 @@
 
 <svelte:window onhashchange={onHashChange} />
 
-{#snippet demoBanner()}
+{#snippet appBanner()}
   {#if demo}<demo.Banner />{/if}
+  {#if rappel}<div data-rappel-cle-app><Banner kind="info" action={{ label: t("account.reminder.go"), onpress: () => navigate("/compte") }}>{t("account.reminder.banner")}</Banner></div>{/if}
 {/snippet}
 
 <!-- Pied de page sur toutes les pages ; pendant le scellement, ses liens et
      réglages sont désactivés (busy). Ordinateur : le composeur tient dans l'écran, le pied dessous. -->
-<AppShell banner={demo ? demoBanner : undefined} busy={locked} {tabs}>
+<AppShell banner={demo || rappel ? appBanner : undefined} busy={locked} {tabs}>
   {#if !supported}
     <Unsupported />
   {:else if router.current.name === "notfound"}

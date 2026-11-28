@@ -285,3 +285,26 @@ func TestEnveloppesHTTP(t *testing.T) {
 		t.Fatal("passkey retirée :", code, body)
 	}
 }
+
+// GET /api/compte/recup/enveloppe (rappel des 6 mois, 28 novembre) : l'enveloppe Env_r du compte de
+// la session, pour vérifier SUR L'APPAREIL une clé retapée (rien de la clé n'est envoyé) ; après un
+// renouvellement, la nouvelle ; sans session : 401 ; jamais celle d'un autre compte.
+func TestRecupEnveloppeHTTP(t *testing.T) {
+	e := newEnvCompte(t)
+	in := e.inscrire(t, "203.0.113.150:1", "lea")
+	autre := e.inscrire(t, "203.0.113.151:1", "leo")
+	expect(t, e.do(req{method: "GET", path: "/api/compte/recup/enveloppe"}), 401, `{"error":"session"}`)
+	aR2 := rnd(32)
+	vr2 := sha256.Sum256(aR2)
+	env2 := rnd(60)
+	expect(t, e.do(req{method: "POST", path: "/api/compte/recup/renouveler", hdr: sess(in.session), body: mustJSON(map[string]any{
+		"v_r": enc.EncodeToString(vr2[:]), "env_r": enc.EncodeToString(env2)})}), 200, `{}`)
+	expect(t, e.do(req{method: "GET", path: "/api/compte/recup/enveloppe", hdr: sess(in.session)}), 200, `{"env_r":"`+enc.EncodeToString(env2)+`"}`)
+	w := e.do(req{method: "GET", path: "/api/compte/recup/enveloppe", hdr: sess(autre.session)})
+	if w.Code != 200 || jsonOf(t, w)["env_r"] == enc.EncodeToString(env2) {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	if w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("Cache-Control :", w.Header().Get("Cache-Control"))
+	}
+}

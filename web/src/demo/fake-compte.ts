@@ -306,6 +306,8 @@ export function createFauxCompte(opts: FauxCompteOpts = {}): FauxCompte {
         c.vR = octetsB64(b.v_r, 32);
         c.envR = octetsB64(b.env_r, 60);
         return {};
+      case "GET recup/enveloppe":
+        return { env_r: c.envR };
       case "GET coffre/profil":
       case "GET coffre/prive": {
         const v = r.endsWith("profil") ? c.profil : c.prive;

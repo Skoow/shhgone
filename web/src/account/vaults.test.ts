@@ -125,6 +125,17 @@ describe("contenu du coffre privé", () => {
     expect(() => priveDeJson(enc({ v: 1, salons: [{ id: "a" }, { id: "a" }], recus: [], rejoints: [], envois: [] }))).toThrow("coffre_illisible");
     expect(() => priveDeJson(enc({ v: 3, salons: [], recus: [], rejoints: [], envois: [] }))).toThrow("coffre_version");
   });
+
+  it("cle_verifiee : mois « AAAA-MM » seulement, écrit s'il est connu ; coffre sans lui inchangé", () => {
+    const enc = (o: unknown) => new TextEncoder().encode(JSON.stringify(o));
+    const p: CoffrePrive = { ...priveVide(), cleVerifiee: "2026-11" };
+    expect(new TextDecoder().decode(priveEnJson(p))).toBe('{"v":1,"salons":[],"recus":[],"rejoints":[],"envois":[],"cle_verifiee":"2026-11"}');
+    expect(priveDeJson(priveEnJson(p))).toEqual(p);
+    expect(priveDeJson(priveEnJson(priveVide()))).not.toHaveProperty("cleVerifiee");
+    for (const m of ["2026-13", "2026-1", "26-11", "2026-11-28", 202611])
+      expect(() => priveDeJson(enc({ v: 1, salons: [], recus: [], rejoints: [], envois: [], cle_verifiee: m }))).toThrow("coffre_illisible");
+    expect(() => priveEnJson({ ...priveVide(), cleVerifiee: "novembre" })).toThrow("coffre_invalide");
+  });
 });
 
 /** Serveur de coffre en mémoire : if_gen, 409 avec le gen du serveur (§37.2). */

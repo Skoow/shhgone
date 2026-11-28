@@ -48,6 +48,7 @@ func (a compteAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/compte/passkeys/nommer", a.passkeysNommer)
 	mux.HandleFunc("POST /api/compte/passkeys/retirer", a.passkeysRetirer)
 	mux.HandleFunc("POST /api/compte/recup/renouveler", a.recupRenouveler)
+	mux.HandleFunc("GET /api/compte/recup/enveloppe", a.recupEnveloppe)
 	mux.HandleFunc("GET /api/compte/sessions", a.sessions)
 	mux.HandleFunc("POST /api/compte/sessions/fermer", a.fermer)
 	mux.HandleFunc("POST /api/compte/sessions/etiquette", a.etiquette)
@@ -383,6 +384,24 @@ func (a compteAPI) deconnexion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, struct{}{})
+}
+
+// recupEnveloppe : GET /api/compte/recup/enveloppe (session) → {"env_r"} : vérification de la clé
+// de récupération sur l'appareil (rappel des 6 mois), sans rien envoyer de la clé.
+func (a compteAPI) recupEnveloppe(w http.ResponseWriter, r *http.Request) {
+	c, err := a.session(r)
+	if err != nil {
+		failCompte(w, err)
+		return
+	}
+	env, err := a.c.EnveloppeRecup(c)
+	if err != nil {
+		failCompte(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		EnvR string `json:"env_r"`
+	}{b64.EncodeToString(env)})
 }
 
 func (a compteAPI) lireCoffre(sorte compte.Coffre) http.HandlerFunc {

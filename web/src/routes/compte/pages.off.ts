@@ -17,3 +17,4 @@ export const connecte = (): boolean => false;
 export const ouvertureEnCours = (): boolean => false;
 export const rangerPassDansCompte = async (): Promise<boolean> => false;
 export const supprime = (): boolean => false;
+export const rappelCle = (): boolean => false;

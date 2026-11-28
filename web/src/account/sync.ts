@@ -75,7 +75,8 @@ export function retirerEntree(c: CoffrePrive, p: Partage): CoffrePrive {
 export function fusionner(local: readonly Partage[], coffre: CoffrePrive, now: number): { coffre: CoffrePrive | null; importer: Partage[]; retirer: string[] } {
   // Listes plus gardées (liens reçus, salons rejoints) : vidées.
   let change = coffre.recus.length > 0 || coffre.rejoints.length > 0;
-  const garde: CoffrePrive = { salons: [], recus: [], rejoints: [], envois: [], ...(coffre.pass !== undefined ? { pass: coffre.pass } : {}) };
+  // Tout ce qui n'est pas une des quatre listes (pass, mois de la clé vérifiée) est gardé tel quel.
+  const garde: CoffrePrive = { ...coffre, salons: [], recus: [], rejoints: [], envois: [] };
   const duCoffre: Partage[] = [];
   for (const l of ["envois", "salons"] as const)
     for (const v of coffre[l]) {

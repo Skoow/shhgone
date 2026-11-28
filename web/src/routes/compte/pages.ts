@@ -9,6 +9,8 @@ export { default as Compte } from "./Compte.svelte";
 import { account } from "../../account/session.svelte";
 /** Session en cours d'ouverture (« Rester connecté » relu au démarrage) : attendre avant de conclure. */
 export const ouvertureEnCours = (): boolean => account.etat === "verrouille";
+/** Rappel des 6 mois de la clé de récupération dû (compte ouvert). */
+export { rappelCle } from "../../account/session.svelte";
 /** Session ouverte sur cet appareil (page Compte, onglets) ; lu dans un effet ou le gabarit. */
 export const connecte = (): boolean => account.etat === "ouvert";
 /** Compte supprimé depuis cette page : l'écran de fin de la page Compte reste affiché sans session. */

@@ -17,7 +17,7 @@ import { randomBytes } from "node:crypto";
 import type { BrowserContext, CDPSession, Page, Request } from "@playwright/test";
 import { findIn, needle, scanDir, type Needle } from "../e2e/scan";
 import { siteComptes } from "./comptes-site";
-import { expect, test as base } from "./fixtures";
+import { capture, expect, test as base } from "./fixtures";
 
 const test = base.extend<{ requetes: { url: string; body: string }[] }, { site: string }>({
   site: [async ({}, use) => use(await siteComptes()), { scope: "worker", timeout: 360_000 }],
@@ -132,6 +132,9 @@ async function deconnecter(page: Page, origin: string): Promise<void> {
   await parametres(page, origin);
   await page.locator("main").getByRole("button", { name: "Se déconnecter", exact: true }).click(); // aussi dans l'en-tête depuis le 26 novembre (D42-30)
   await expect(titre(page, "Se connecter")).toBeVisible();
+  // La page ne passe à « /compte/connexion » qu'après la révocation : naviguer avant, c'était être
+  // ramené sur la connexion (instable sous charge, comme compte.demo.spec.ts).
+  await expect(page).toHaveURL(/\/compte\/connexion$/);
 }
 
 /** Toutes les formes de la clé de récupération (affichée, collée, minuscules). */
@@ -158,6 +161,48 @@ test("inscription, déconnexion, connexion en un clic ; session oubliée au rech
     expect(r.body, r.url).not.toMatch(/"results"|hmacGetSecret/);
     expect(findIn(Buffer.from(r.body), [...prf, ...formesCle(cle), needle("pseudo affiché", pseudo)]), r.url).toEqual([]);
   }
+});
+
+test("rappel des 6 mois : clé vérifiée sur l'appareil (jamais envoyée), mal recopiée refusée ; rappel dû 6 mois après, bandeau, puis plus après vérification", async ({ page, shh, requetes }) => {
+  await crochetPrf(page.context());
+  await authentificateur(page, true);
+  const pseudo = `Rap${randomBytes(3).toString("hex")}`;
+  const cle = await inscrire(page, shh.origin, pseudo);
+  await parametres(page, shh.origin);
+  // Juste après l'inscription : aucun rappel.
+  await expect(page.locator("[data-rappel-cle]")).toHaveCount(0);
+  // Mal recopiée (un caractère changé) : refusée sur l'appareil.
+  await bouton(page, "Vérifier ma clé").click();
+  const faux = (cle[0] === "A" ? "B" : "A") + cle.slice(1);
+  await champ(page, "Clé de récupération").fill(faux);
+  await bouton(page, "Vérifier").click();
+  await expect(page.locator("main [role=alert], main .err, main [aria-invalid=true]").first()).toBeVisible();
+  await expect(page.locator("[data-cle-verifiee]")).toHaveCount(0);
+  // Six mois plus tard (horloge de l'appareil avancée) : bandeau sur l'accueil et dans la section.
+  await page.evaluate(() => {
+    const vrai = Date.now.bind(Date);
+    Date.now = () => vrai() + 200 * 86_400_000;
+    history.pushState(null, "", "/envois");
+    dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page.locator("[data-rappel-cle-app]")).toContainText("Vérifiez que vous avez toujours votre clé de récupération");
+  await page.waitForTimeout(800); // fin de la transition d'écran
+  await capture(page, "rappel-cle-bandeau");
+  await page.locator("[data-rappel-cle-app]").getByRole("button", { name: "Vérifier" }).click();
+  await expect(titre(page, "Compte")).toBeVisible();
+  await expect(page.locator("[data-rappel-cle]")).toBeVisible();
+  await page.locator("#sec-recovery").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(800);
+  await capture(page, "rappel-cle-section");
+  // La bonne clé, en minuscules : vérifiée, le rappel disparaît (mois noté dans le coffre privé).
+  await bouton(page, "Vérifier ma clé").click();
+  await champ(page, "Clé de récupération").fill(cle.toLowerCase());
+  await bouton(page, "Vérifier").click();
+  await expect(page.locator("[data-cle-verifiee]")).toHaveText("Clé vérifiée\u202f: elle ouvre bien votre compte. Prochain rappel dans 6\u202fmois.", { timeout: 30_000 });
+  await expect(page.locator("[data-rappel-cle]")).toHaveCount(0);
+  // Rien de la clé n'est parti : seule l'enveloppe chiffrée a été lue.
+  expect(requetes.some((r) => r.url.endsWith("/api/compte/recup/enveloppe"))).toBe(true);
+  for (const r of requetes) expect(findIn(Buffer.from(r.body), formesCle(cle)), r.url).toEqual([]);
 });
 
 test("nouvel appareil par la clé de récupération : passkey créée ici, ancienne retirée, nouvelle clé ; l'ancienne clé ne sert plus", async ({ page, shh, browser }, info) => {

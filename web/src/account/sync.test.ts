@@ -38,7 +38,7 @@ describe("Mes partages ↔ coffre privé", () => {
 
   it("fusion : l'appareil reçoit le coffre, le coffre reçoit l'appareil ; retiré ailleurs → retiré ici ; recus/rejoints vidés ; pass gardé", () => {
     const local = [envoi("a"), { ...envoi("c"), origine: "compte" as const }];
-    const coffre: CoffrePrive = { ...priveVide(), envois: [versCoffre(envoi("b"))], salons: [versCoffre(salon("d"))], recus: [{ id: "r" }], rejoints: [{ id: "j" }], pass: [{ id: "p" }] };
+    const coffre: CoffrePrive = { ...priveVide(), envois: [versCoffre(envoi("b"))], salons: [versCoffre(salon("d"))], recus: [{ id: "r" }], rejoints: [{ id: "j" }], pass: [{ id: "p" }], cleVerifiee: "2026-11" };
     const r = fusionner(local, coffre, T0);
     expect(r.importer.map((p) => p.gestion)).toEqual([G("b"), salon("d").gestion]);
     expect(r.retirer).toEqual(["c".repeat(22)]);
@@ -46,6 +46,7 @@ describe("Mes partages ↔ coffre privé", () => {
     expect(r.coffre!.recus).toEqual([]);
     expect(r.coffre!.rejoints).toEqual([]);
     expect(r.coffre!.pass).toEqual([{ id: "p" }]);
+    expect(r.coffre!.cleVerifiee).toBe("2026-11"); // mois de la clé vérifiée gardé (rappel des 6 mois)
     // Rien de changé : pas d'écriture.
     expect(fusionner([envoi("a")], { ...priveVide(), envois: [versCoffre(envoi("a"))] }, T0).coffre).toBeNull();
   });

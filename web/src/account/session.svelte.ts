@@ -350,6 +350,8 @@ async function ouvrirSession(s: { jeton: string; h: Bytes; kCompte: Bytes; persi
   const o = ouverte;
   await memoriser(o);
   await synchroniser(o);
+  // Compte d'avant le rappel (aucun mois connu) : le compte à rebours des 6 mois part d'ici.
+  if (o.prive.valeur.cleVerifiee === undefined && ouverte === o) void noterCleVerifiee({ differe: false }).catch(() => undefined);
 }
 
 async function etiquette(cle: CryptoKey, h: Uint8Array, nom?: string): Promise<Bytes> {
@@ -478,7 +480,9 @@ export async function terminerInscription(persistante: boolean): Promise<void> {
     const env = c.prf ? await enveloppePrf(c.prf, h, c.c.credId, c.kCompte) : null;
     const envR = await enveloppeRecup(kekR, h, c.kCompte);
     const blobProfil = await sceller("profil", cles.profil, h, 1, profilEnJson(c.profil));
-    const blobPrive = await sceller("prive", cles.prive, h, 1, priveEnJson(priveVide()));
+    // La clé vient d'être notée (un groupe retapé) : le compte à rebours des 6 mois part d'ici.
+    const premierPrive: CoffrePrive = { ...priveVide(), cleVerifiee: moisDe(deps.maintenant()) };
+    const blobPrive = await sceller("prive", cles.prive, h, 1, priveEnJson(premierPrive));
     const etiquetteSession = await etiquette(cles.etiquette, h);
     const credEtiquette = await etiquette(cles.etiquette, h);
     const r = await sansIssue(c, () =>
@@ -506,7 +510,7 @@ export async function terminerInscription(persistante: boolean): Promise<void> {
     // Passkey sans PRF : le premier appareil garde K_compte (§5.5).
     if (!avecPrf) await garderCle(h, kCompte);
     await retenirParcours(c.parcours, c.c.attachement);
-    await ouvrirSession({ jeton: r.session, h, kCompte, persistante, credId: c.c.credId, recupere: false, cleLocale: !avecPrf, profil: { blob: blobProfil, gen: 1 }, prive: { valeur: priveVide(), gen: 1 } });
+    await ouvrirSession({ jeton: r.session, h, kCompte, persistante, credId: c.c.credId, recupere: false, cleLocale: !avecPrf, profil: { blob: blobProfil, gen: 1 }, prive: { valeur: premierPrive, gen: 1 } });
   } finally {
     aR.fill(0);
     kekR.fill(0);
@@ -701,6 +705,8 @@ export async function ouvrirAvecCle(saisie: string, preuve: () => Promise<Preuve
     throw e;
   }
   await nommerSession(ouverte!);
+  // La clé vient de servir : elle est donc en main (rappel des 6 mois).
+  void noterCleVerifiee({ differe: false }).catch(() => undefined);
   return res;
 }
 
@@ -871,6 +877,66 @@ export async function enregistrerNouvelleCle(): Promise<void> {
   nouvelleCle = null;
   account.recupere = false;
   await memoriser(o);
+  await noterCleVerifiee({ differe: false }).catch(() => undefined);
+}
+
+// --- Rappel des 6 mois : la clé de récupération est-elle encore en main ? -----------------------
+
+/** Mois entre deux rappels. */
+export const RAPPEL_CLE_MOIS = 6;
+
+/** Mois « AAAA-MM » (UTC) d'un instant en millisecondes. */
+export function moisDe(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Rappel dû : 6 mois ou plus depuis le mois noté ; aucun mois noté : non (il est posé à l'ouverture). */
+export function rappelCleDu(mois: string | undefined, maintenant: number): boolean {
+  const m = mois === undefined ? null : /^(\d{4})-(\d{2})$/.exec(mois);
+  if (!m) return false;
+  const d = new Date(maintenant);
+  const ecart = (d.getUTCFullYear() - Number(m[1])) * 12 + (d.getUTCMonth() + 1 - Number(m[2]));
+  return ecart >= RAPPEL_CLE_MOIS;
+}
+
+/** Rappel dû pour le compte ouvert (lu dans un effet ou le gabarit). */
+export const rappelCle = (): boolean => account.etat === "ouvert" && rappelCleDu(account.prive?.cleVerifiee, deps.maintenant());
+
+/** Note le mois courant comme dernière preuve que la clé est en main (coffre privé). */
+async function noterCleVerifiee(opts: { differe: boolean }): Promise<void> {
+  const mois = moisDe(deps.maintenant());
+  if (account.prive?.cleVerifiee === mois) return;
+  await ecrirePrive((p) => ({ ...p, cleVerifiee: mois }), opts);
+}
+
+/**
+ * Vérifie une clé retapée SUR L'APPAREIL : l'enveloppe Env_r du compte est lue (session ouverte),
+ * puis ouverte par la clé saisie ; juste si elle rend K_compte. Rien de la clé n'est envoyé.
+ * Saisie mal formée : erreurs cle_recup_* du moteur. Juste : mois noté dans le coffre privé.
+ */
+export async function verifierCle(saisie: string): Promise<boolean> {
+  const o = ouverteOuErreur();
+  const envR = await garde(() => api.recupEnveloppe(deps.net, o.jeton));
+  const r = await recupCle.lire(saisie);
+  const { aR, vR, kekR } = await recupCle.derivees(r);
+  r.fill(0);
+  aR.fill(0);
+  vR.fill(0);
+  let k: Uint8Array | null = null;
+  try {
+    k = await ouvrirRecup(kekR, o.h, envR);
+  } catch {
+    return false; // une autre clé : l'enveloppe ne s'ouvre pas
+  } finally {
+    kekR.fill(0);
+  }
+  let diff = k.length ^ o.kCompte.length;
+  for (let i = 0; i < Math.min(k.length, o.kCompte.length); i++) diff |= k[i]! ^ o.kCompte[i]!;
+  k.fill(0);
+  if (diff !== 0) return false;
+  await noterCleVerifiee({ differe: false });
+  return true;
 }
 
 export { groupeAVerifier, groupeJuste, fichierTexte } from "./recup";

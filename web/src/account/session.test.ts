@@ -595,6 +595,22 @@ describe("coffres", () => {
   // Mes partages (spec §33, D42-30) : fusion de l'appareil et du coffre privé à l'ouverture ;
   // `recus` et `rejoints` (plus gardés) vidés ; ajout ou retrait ici : écriture différée ;
   // déconnexion : les entrées venues du compte quittent l'appareil, celles créées ici restent.
+  // Rappel des 6 mois (28 novembre) : un compte créé maintenant porte le mois de la clé notée ; un
+  // compte d'avant (coffre sans ce mois) le reçoit à l'ouverture (le compte à rebours part de là).
+  it("rappel de la clé : mois noté à l'inscription ; compte d'avant : noté à l'ouverture", async () => {
+    const texte = await inscription("Lea", true);
+    const c = compte();
+    const k = await ouvrirRecup((await cleRecupDerivees(await cleRecupLire(texte))).kekR, c.h, unb64u(c.envR));
+    const cles = await clesDuCompte(k);
+    expect(priveDeJson(await ouvrir("prive", cles.prive, c.h, c.coffres.prive.blob, 1)).cleVerifiee).toBe(C.moisDe(Date.now()));
+    expect(C.rappelCle()).toBe(false);
+    c.coffres.prive = { blob: await sceller("prive", cles.prive, c.h, 2, priveEnJson(priveVide())), gen: 2 };
+    recharger();
+    await C.restaurer();
+    await vi.waitFor(() => expect(c.coffres.prive.gen).toBe(3));
+    expect(priveDeJson(await ouvrir("prive", cles.prive, c.h, c.coffres.prive.blob, 3)).cleVerifiee).toBe(C.moisDe(Date.now()));
+  });
+
   it("Mes partages : fusion à l'ouverture, recus et rejoints vidés, pass gardé ; écriture différée ; déconnexion", async () => {
     configurerPartages(memoryBackend());
     let planifie: (() => void) | null = null;
@@ -608,7 +624,7 @@ describe("coffres", () => {
       const ailleurs = "https://shh.test/s#m" + "G".repeat(43);
       const tard = Date.now() + 86_400_000;
       await garderPartage({ sorte: "envoi", gestion: ici, creeLe: Date.now(), echeance: tard, ouverturesMax: 1, taille: 5, elements: 1 });
-      const ancien = { ...priveVide(), envois: [{ id: "E".repeat(22), cree: Date.now(), expire: tard, gestion: ailleurs, taille: 9, elements: 2, ouvertures_max: 3, libelle: "Devis" }], recus: [{ id: "r1" }], rejoints: [{ id: "j1" }], pass: [{ id: "p1", x: 1 }] };
+      const ancien = { ...priveVide(), envois: [{ id: "E".repeat(22), cree: Date.now(), expire: tard, gestion: ailleurs, taille: 9, elements: 2, ouvertures_max: 3, libelle: "Devis" }], recus: [{ id: "r1" }], rejoints: [{ id: "j1" }], pass: [{ id: "p1", x: 1 }], cleVerifiee: C.moisDe(Date.now()) };
       c.coffres.prive = { blob: await sceller("prive", cles.prive, c.h, 2, priveEnJson(ancien)), gen: 2 };
       recharger();
       await C.restaurer();

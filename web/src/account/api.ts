@@ -292,6 +292,15 @@ export async function passkeysRetirer(n: Net, session: string, credId: Bytes): P
   await appel(n, "POST", "passkeys/retirer", { session, body: { cred_id: b64u(credId) } });
 }
 
+/**
+ * Env_r du compte (session ouverte ; rappel des 6 mois) : l'appareil y vérifie une clé retapée en
+ * l'ouvrant lui-même ; rien de la clé n'est envoyé.
+ */
+export async function recupEnveloppe(n: Net, session: string): Promise<Bytes> {
+  const o = await appel(n, "GET", "recup/enveloppe", { session });
+  return octets(o, "env_r", 60);
+}
+
 /** Nouvelle clé de récupération (session récente) : v_r et Env_r seulement ; l'ancienne ne sert plus. */
 export async function recupRenouveler(n: Net, session: string, vR: Bytes, envR: Bytes): Promise<void> {
   await appel(n, "POST", "recup/renouveler", { session, body: { v_r: b64u(vR), env_r: b64u(envR) } });

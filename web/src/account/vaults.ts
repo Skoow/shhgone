@@ -96,7 +96,15 @@ export type EntreePrivee = { id: string } & Record<string, unknown>;
  * (ouvert par une passkey ou la clé de récupération, comme le profil) ; écrit seulement s'il
  * en existe (un coffre sans pass garde exactement sa forme d'avant, vecteurs compte-v3.json).
  */
-export type CoffrePrive = { salons: EntreePrivee[]; recus: EntreePrivee[]; rejoints: EntreePrivee[]; envois: EntreePrivee[]; pass?: EntreePrivee[] };
+/**
+ * `cleVerifiee` (rappel des 6 mois, 28 novembre) : mois (« AAAA-MM ») de la dernière preuve que la
+ * personne a sa clé de récupération (inscription, clé retapée, nouvelle clé). Au mois près, dans
+ * le coffre PRIVÉ (illisible par le serveur), écrit seulement s'il est connu : un coffre sans lui
+ * garde sa forme d'avant (vecteurs compte-v3.json).
+ */
+export type CoffrePrive = { salons: EntreePrivee[]; recus: EntreePrivee[]; rejoints: EntreePrivee[]; envois: EntreePrivee[]; pass?: EntreePrivee[]; cleVerifiee?: string };
+/** Mois « AAAA-MM » valide (2000 à 2999). */
+export const MOIS_CLE = /^2\d{3}-(0[1-9]|1[0-2])$/;
 const LISTES = ["salons", "recus", "rejoints", "envois"] as const;
 
 export const priveVide = (): CoffrePrive => ({ salons: [], recus: [], rejoints: [], envois: [] });
@@ -176,6 +184,10 @@ function liste(v: unknown): EntreePrivee[] {
 export function priveEnJson(p: CoffrePrive): Bytes {
   const o: Record<string, unknown> = { v: 1, salons: liste(p.salons), recus: liste(p.recus), rejoints: liste(p.rejoints), envois: liste(p.envois) };
   if (p.pass !== undefined && p.pass.length > 0) o.pass = liste(p.pass);
+  if (p.cleVerifiee !== undefined) {
+    if (!MOIS_CLE.test(p.cleVerifiee)) throw new Error("coffre_invalide");
+    o.cle_verifiee = p.cleVerifiee;
+  }
   return enc(o);
 }
 
@@ -184,6 +196,10 @@ export function priveDeJson(b: Uint8Array): CoffrePrive {
   const out = priveVide();
   for (const k of LISTES) out[k] = liste(o[k]);
   if (o.pass !== undefined) out.pass = liste(o.pass);
+  if (o.cle_verifiee !== undefined) {
+    if (typeof o.cle_verifiee !== "string" || !MOIS_CLE.test(o.cle_verifiee)) throw illisible();
+    out.cleVerifiee = o.cle_verifiee;
+  }
   return out;
 }
 
