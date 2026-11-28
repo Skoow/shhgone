@@ -116,7 +116,7 @@ const ACCOUNT_TRACES = ["/api/compte", "shhdrop-compte"];
 
 /** Rend la liste des problèmes (vide si tout va bien). `comptes` : build de production avec __COMPTES__ (la démo l'a toujours). */
 /** Pages d'information servies par leur propre fichier (vite.config.ts, PAGE_PATHS). */
-export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html", "conditions.html", "mentions-legales.html", "signaler.html", "verifier.html", "contact.html"];
+export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html", "conditions.html", "mentions-legales.html", "signaler.html", "verifier.html", "contact.html", "etat.html"];
 /** Versions anglaises (pages bilingues, src/app/langues.ts), production seulement : accueil et pages d'information. */
 export const EN_PAGES = ["en.html", ...INFO_PAGES.map((p) => "en-" + p)];
 

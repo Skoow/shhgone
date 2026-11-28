@@ -107,6 +107,7 @@
         { label: t("foot.terms"), path: "/conditions" },
         { label: t("foot.notice"), path: "/mentions-legales" },
         { label: t("foot.contact"), path: "/contact" },
+        { label: t("foot.etat"), path: "/etat" },
       ],
     },
   ]);

@@ -13,6 +13,7 @@
   import { setScreenTitle } from "../app/title";
   import { getLang } from "../i18n/i18n.svelte";
   import InfoPage from "../routes/InfoPage.svelte";
+  import Etat from "../routes/Etat.svelte";
   import Offres from "../routes/Offres.svelte";
   import type { InfoName } from "../routes/pages/content";
   import AppShell from "../ui/AppShell.svelte";
@@ -45,6 +46,8 @@
 <AppShell banner={demo ? demoBanner : undefined}>
   {#if name === "offres"}
     <Offres />
+  {:else if name === "etat"}
+    <Etat />
   {:else if name === "verifier"}
     <!-- « /verifier » (ancienne page, citée par les Releases, le README et la spec §28.4) : la page
          Sécurité, ouverte à sa section « Vérifier cette version ». -->

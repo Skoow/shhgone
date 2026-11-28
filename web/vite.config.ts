@@ -362,7 +362,7 @@ export function demoMeta(): Plugin {
  * construits. À placer AVANT sri : chaque page reçoit ensuite ses empreintes.
  */
 export { SITE_ORIGIN };
-export const PAGE_PATHS = ["/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/signaler", "/verifier", "/contact"] as const;
+export const PAGE_PATHS = ["/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/signaler", "/verifier", "/contact", "/etat"] as const;
 export function infoPages(base: string, demo: boolean): Plugin {
   const here = fileURLToPath(new URL(".", import.meta.url));
   let outDir = "";

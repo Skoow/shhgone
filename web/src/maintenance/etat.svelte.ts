@@ -10,8 +10,32 @@ import { ecouterMaintenance } from "./signal";
 
 export type Annonce = { debut: number; dureeMin: number; retour: number; imminente: boolean };
 
-/** État lu (null : aucune maintenance annoncée). */
-export const maintenance = $state<{ annonce: Annonce | null }>({ annonce: null });
+/** Services décrits par GET /api/etat-service (page « État du service »). */
+export const SERVICES = ["partages", "salons", "appels", "compte", "paiement"] as const;
+export type Service = (typeof SERVICES)[number];
+/** « ok », « maintenance » (créations fermées avant un redémarrage), « suspendu » (créations gelées), « ferme » (pas ouvert). */
+export type EtatService = "ok" | "maintenance" | "suspendu" | "ferme";
+const ETATS: readonly string[] = ["ok", "maintenance", "suspendu", "ferme"];
+
+/**
+ * État lu (annonce null : aucune maintenance annoncée ; services null : pas encore lus, ou
+ * réponse refusée ; `lu` : heure de la dernière lecture réussie, en millisecondes).
+ */
+export const maintenance = $state<{ annonce: Annonce | null; services: Record<Service, EtatService> | null; lu: number | null }>({ annonce: null, services: null, lu: null });
+
+/** États des services d'une réponse, vérifiés un par un (null : absents ou invalides). */
+export function lireServices(o: unknown): Record<Service, EtatService> | null {
+  if (typeof o !== "object" || o === null) return null;
+  const v = (o as { services?: unknown }).services;
+  if (typeof v !== "object" || v === null) return null;
+  const out = {} as Record<Service, EtatService>;
+  for (const k of SERVICES) {
+    const e = (v as Record<string, unknown>)[k];
+    if (typeof e !== "string" || !ETATS.includes(e)) return null;
+    out[k] = e as EtatService;
+  }
+  return out;
+}
 
 /** Lecture toutes les 5 min ; toutes les 2 min quand une maintenance est annoncée. */
 export const PERIODE_MS = 5 * 60_000;
@@ -29,14 +53,19 @@ export function lireEtat(o: unknown): Annonce | null {
   return { debut, dureeMin, retour, imminente };
 }
 
-/** Lit l'état du service ; une erreur (réseau, serveur ancien) laisse l'état connu tel quel. */
-export async function rafraichir(f: typeof fetch = (i, o) => globalThis.fetch(i, o)): Promise<void> {
+/** Lit l'état du service ; une erreur (réseau, serveur ancien) laisse l'état connu tel quel. Vrai : lu. */
+export async function rafraichir(f: typeof fetch = (i, o) => globalThis.fetch(i, o)): Promise<boolean> {
   try {
     const r = await f("/api/etat-service", { method: "GET", credentials: "same-origin", redirect: "error", cache: "no-store" });
-    if (!r.ok) return;
-    maintenance.annonce = lireEtat(await r.json());
+    if (!r.ok) return false;
+    const o: unknown = await r.json();
+    maintenance.annonce = lireEtat(o);
+    maintenance.services = lireServices(o);
+    maintenance.lu = Date.now();
+    return true;
   } catch {
     // Hors ligne ou serveur qui redémarre : rien à changer.
+    return false;
   }
 }
 

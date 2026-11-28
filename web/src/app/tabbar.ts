@@ -31,7 +31,7 @@ export function tabPath(id: TabId): string {
   return "/envoyer";
 }
 
-const ROOTS: ReadonlySet<Route["name"]> = new Set(["home", "envoyer", "envois", "salons", "compte", "securite", "confidentialite", "conditions", "mentions", "signaler", "verifier", "contact", "offres", "notfound"]);
+const ROOTS: ReadonlySet<Route["name"]> = new Set(["home", "envoyer", "envois", "salons", "compte", "securite", "confidentialite", "conditions", "mentions", "signaler", "verifier", "contact", "etat", "offres", "notfound"]);
 
 /** Une barre d'onglets n'a de sens qu'avec au moins deux onglets qui fonctionnent. */
 export function tabBarUseful(tabs: readonly { id?: TabId; soon: boolean }[]): boolean {

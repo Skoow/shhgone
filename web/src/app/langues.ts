@@ -11,7 +11,7 @@ import type { Lang } from "../i18n/format";
 export const BILINGUE: boolean = typeof __BILINGUE__ === "boolean" && __BILINGUE__;
 
 /** Chemins français des pages bilingues (sans la base). */
-export const PAGES_BILINGUES: readonly string[] = ["/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/signaler", "/verifier", "/contact"];
+export const PAGES_BILINGUES: readonly string[] = ["/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/signaler", "/verifier", "/contact", "/etat"];
 
 /** Adresse d'une page bilingue dans une langue : « /securite » → « /en/securite », « / » → « /en ». */
 export function cheminEn(lang: Lang, chemin: string): string {

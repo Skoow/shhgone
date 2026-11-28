@@ -7,7 +7,7 @@
 - Dernière version poussée : voir `git log` (tous les travaux du 28 novembre fusionnés).
 - Mise à jour de la préproduction (session sur le serveur) : `git fetch origin puis deploy/preprod.sh <commit complet>` ; le commit complet se lit par `git rev-parse <court>` après le `git fetch`.
 - `shares.db` est au schéma 7 ; le retour arrière restaure désormais une copie des bases (§ 2.2).
-- Prochain numéro de décision libre au registre : **D42-34**.
+- Prochain numéro de décision libre au registre : **D42-35**.
 
 ## 2. Travaux du 28 novembre
 
@@ -32,6 +32,7 @@ Suite du 28 novembre (après-midi) :
 - **Tests navigateur revus** (fait) : textes périmés (`pages.spec`, `home.spec` K8, `audit-1111`, `no-preview`, `send` interruption et 429, `icons-demo`, `drop` filigrane), boutons d'inscription sur ordinateur (`salon4`), course après « Se déconnecter » (`compte.demo`). Cause réelle trouvée : `drop.spec`, `send.spec` et 8 autres specs ne se chargeaient plus depuis D42-32 (`src/index.ts` → `transfer/api.ts` → `maintenance/etat.svelte.ts`, runes Svelte hors du site) ; relais sans Svelte `maintenance/signal.ts`, et règle `source-rules.test.ts` « src/index.ts sans Svelte ».
 - `close.spec.ts:76` (feuille « Partager le lien » sans mot de passe, D42-28) et `ready.spec.ts:159` (adresse lue avant la fin de la navigation) corrigés ; ils étaient cachés, leurs fichiers ne se chargeaient plus. Instables sous charge (réussissent seuls) : `salon4`, `partages.spec.ts:259`, `appel.spec.ts:193`, `salon.spec.ts` (album).
 - **Search Console et Bing** : marche à suivre écrite, `deploy/README.md` §15.5.1 (à faire par le propriétaire, ses comptes).
+- **État du service** (D42-34, fait) : page `/etat`, lien dans le pied de page, cinq services lus de `/api/etat-service`.
 - **Barrière de préproduction** : non levée (voir § 4, « Par le propriétaire » ; demande du 28 novembre en attente des conditions du `deploy/README.md` §15.5).
 
 Restes à décider :
@@ -52,7 +53,7 @@ Points de conception à trancher avant de coder (proposer au propriétaire) :
 2. **Nom d'un partage** : il existe déjà (§29.3), chiffré dans le manifeste, posé à la création et vu par le destinataire. Le changer après coup **pour le destinataire** demande une nouveauté (étiquette chiffrée modifiable par le lien de gestion, que le serveur garde sans pouvoir la lire). Le renommer **seulement dans sa propre liste** est simple (coffre local / compte).
 3. **Les membres n'ont pas de liste de leurs salons** : « Mes salons » ne liste que ceux qu'on a créés (D42-30, liste `rejoints` vidée). Pour qu'un membre voie ses salons avec leur nom, il faut une liste « salons rejoints » (appareil + coffre du compte), à décider (confidentialité : lien d'invitation gardé, jamais le mot de passe).
 4. **Ordre, épingle, couleur** : préférences de chaque personne, gardées sur l'appareil et dans le coffre du compte ; rien sur le serveur.
-5. Prochain numéro de décision libre : D42-34.
+5. Prochain numéro de décision libre : D42-35.
 
 ### 2.5 À lancer ensuite : listes du créateur, du destinataire et du membre (demande du 28 novembre)
 
@@ -67,7 +68,7 @@ Conception proposée (à valider avec le propriétaire avant de coder) :
 3. **Avec compte** : ce secret de retour est gardé dans le **coffre privé chiffré** du compte (comme « Mes partages », D42-30), sur tous ses appareils ; jamais le mot de passe en clair, rien de lisible par le serveur.
 4. **Sans compte** : le garder sur l'appareil, chiffré par une **clé non extractible** du navigateur (comme la session « Rester connecté »), avec un choix explicite « Se souvenir de ce salon sur cet appareil ». Le serveur n'y gagne rien. Limite à dire honnêtement : quelqu'un qui utilise l'appareil déverrouillé peut rentrer dans le salon ; effacer les données du site l'oublie. C'est faisable et sûr dans ces limites.
 5. **Listes « reçus » et « salons rejoints »** : elles avaient été retirées (D42-27, liste `rejoints` vidée en D42-30) ; les rétablir, simplifiées, avec ces seules actions. Confidentialité : lien gardé chiffré, jamais le mot de passe.
-6. À combiner avec le § 2.4 (noms, images, ordre, couleurs). Prochain numéro de décision libre : D42-34.
+6. À combiner avec le § 2.4 (noms, images, ordre, couleurs). Prochain numéro de décision libre : D42-35.
 
 ## 3. Décisions déjà prises (rappel)
 

@@ -21,6 +21,7 @@ export const PAGE_FILES: Readonly<Partial<Record<Route["name"], string>>> = {
   signaler: "signaler.html",
   verifier: "verifier.html",
   contact: "contact.html",
+  etat: "etat.html",
 };
 
 export type Rendered = { body: string; title: string; description: string; path: string | undefined };

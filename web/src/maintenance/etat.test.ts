@@ -3,7 +3,7 @@
 // passage en mode imminent par un refus 503 « maintenance », boutons de création désactivés.
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { creationsFermees, lireEtat, maintenance, rafraichir, surveiller, texteBandeau, PERIODE_ANNONCE_MS, PERIODE_MS } from "./etat.svelte";
+import { creationsFermees, lireEtat, lireServices, maintenance, rafraichir, surveiller, texteBandeau, PERIODE_ANNONCE_MS, PERIODE_MS } from "./etat.svelte";
 // Comme les clients d'API : par le relais sans Svelte (signal.ts), auquel l'état s'abonne.
 import { signalerMaintenance } from "./signal";
 import { setLang } from "../i18n/i18n.svelte";
@@ -16,6 +16,8 @@ const repondre = (v: unknown, status = 200) => vi.fn(async () => new Response(JS
 
 afterEach(async () => {
   maintenance.annonce = null;
+  maintenance.services = null;
+  maintenance.lu = null;
   await setLang("fr");
   document.body.innerHTML = "";
   vi.useRealTimers();
@@ -27,6 +29,18 @@ describe("état du service", () => {
     expect(lireEtat({ maintenance: annonce })).toEqual({ debut, dureeMin: 30, retour: debut + 1800, imminente: false });
     for (const faux of [{}, null, "x", { maintenance: { ...annonce, retour: debut } }, { maintenance: { ...annonce, duree_min: 0 } }, { maintenance: { ...annonce, duree_min: 2000, retour: debut + 120000 } }, { maintenance: { ...annonce, imminente: "oui" } }, { maintenance: { ...annonce, debut: -1 } }])
       expect(lireEtat(faux)).toBeNull();
+  });
+
+  it("états des services : les cinq, valeurs connues seulement ; ancienne réponse sans services : null", async () => {
+    const services = { partages: "ok", salons: "suspendu", appels: "ferme", compte: "maintenance", paiement: "ferme" };
+    expect(lireServices({ maintenance: null, services })).toEqual(services);
+    expect(lireServices({ maintenance: null })).toBeNull();
+    expect(lireServices({ services: { ...services, salons: "panne" } })).toBeNull();
+    expect(lireServices({ services: { ...services, appels: undefined } })).toBeNull();
+    expect(lireServices({ services: [] })).toBeNull();
+    await rafraichir(repondre({ maintenance: null, services }));
+    expect(maintenance.services).toEqual(services);
+    expect(maintenance.lu).toBeTypeOf("number");
   });
 
   it("rafraichir : GET /api/etat-service sans rien envoyer ; une erreur garde l'état connu", async () => {

@@ -254,6 +254,8 @@ type server struct {
 	jetons *paiement.Jetons
 	// maint : maintenance annoncée (deploy/maintenance.sh, D42-32) ; nil : jamais de maintenance.
 	maint *maintenance.Suivi
+	// offres : services ouverts (GET /api/etat-service), fixés par newHandler.
+	offres offres
 }
 
 // reportCounter : signalements de l'heure en cours, un seul entier sans identifiant, remis à
@@ -355,6 +357,8 @@ type Salons struct {
 func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 	api := http.NewServeMux()
 	s.maint = sal.Maintenance
+	s.offres = offres{salons: sal.M != nil, compte: sal.Comptes != nil, paiement: sal.Paiement != nil,
+		appels: sal.M != nil && sal.Turn.actif() && sal.Paiement != nil}
 	api.HandleFunc("GET /api/etat-service", s.etatService)
 	api.HandleFunc("GET /api/captcha", s.captcha)
 	api.HandleFunc("POST /api/shares", s.create)

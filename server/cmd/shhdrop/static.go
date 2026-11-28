@@ -247,6 +247,7 @@ var appRoutes = map[string]bool{
 	"/signaler":         true,
 	"/verifier":         true,
 	"/contact":          true,
+	"/etat":             true,
 	"/offres":           true,
 	"/envoyer":          true,
 	"/envois":           true, // « Mes partages » (spec §33, D42-30) : liste de l'appareil, aucun secret
@@ -272,6 +273,7 @@ var pageFiles = map[string]string{
 	"/signaler":         "signaler.html",
 	"/verifier":         "verifier.html",
 	"/contact":          "contact.html",
+	"/etat":             "etat.html",
 	// Liens de partage et de gestion sous « /s » : page d'ouverture seule.
 	"/s": "s.html",
 	// Versions anglaises des pages bilingues (web/vite.config.ts, infoPages).
@@ -284,6 +286,7 @@ var pageFiles = map[string]string{
 	"/en/signaler":         "en-signaler.html",
 	"/en/verifier":         "en-verifier.html",
 	"/en/contact":          "en-contact.html",
+	"/en/etat":             "en-etat.html",
 }
 
 // enVersion : page française → sa version anglaise (web/src/app/langues.ts, PAGES_BILINGUES).
@@ -299,6 +302,7 @@ var enVersion = map[string]string{
 	"/signaler":         "/en/signaler",
 	"/verifier":         "/en/verifier",
 	"/contact":          "/en/contact",
+	"/etat":             "/en/etat",
 }
 
 // salonRoutes : pages du salon (table SALON_PATHS de web/src/app/router.svelte.ts),

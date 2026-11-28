@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,21 +34,27 @@ func (e *env) annoncer(t *testing.T, dans time.Duration, duree, avance int) time
 	return debut
 }
 
+// États des services d'un serveur de test sans salon, compte ni paiement (fermés : « ferme »).
+const (
+	partagesSeuls         = `"services":{"partages":"ok","salons":"ferme","appels":"ferme","compte":"ferme","paiement":"ferme"}`
+	partagesEnMaintenance = `"services":{"partages":"maintenance","salons":"ferme","appels":"ferme","compte":"ferme","paiement":"ferme"}`
+)
+
 // GET /api/etat-service : rien sans annonce ; l'horaire annoncé seulement, puis imminente.
 func TestEtatService(t *testing.T) {
 	e := newEnv(t, false, nil)
-	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null}`)
+	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null,`+partagesSeuls+`}`)
 	e.srv.maint = maintenance.Nouveau(filepath.Join(e.dir, "maintenance"), e.clk.Now)
-	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null}`)
+	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null,`+partagesSeuls+`}`)
 	debut := e.annoncer(t, time.Hour, 30, 10)
 	w := e.do(req{method: "GET", path: "/api/etat-service"})
-	expect(t, w, 200, fmt.Sprintf(`{"maintenance":{"debut":%d,"duree_min":30,"retour":%d,"imminente":false}}`,
+	expect(t, w, 200, fmt.Sprintf(`{"maintenance":{"debut":%d,"duree_min":30,"retour":%d,"imminente":false},`+partagesSeuls+`}`,
 		debut.Unix(), debut.Add(30*time.Minute).Unix()))
 	if w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("Cache-Control :", w.Header().Get("Cache-Control"))
 	}
 	e.clk.Add(50 * time.Minute)
-	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, fmt.Sprintf(`{"maintenance":{"debut":%d,"duree_min":30,"retour":%d,"imminente":true}}`,
+	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, fmt.Sprintf(`{"maintenance":{"debut":%d,"duree_min":30,"retour":%d,"imminente":true},`+partagesEnMaintenance+`}`,
 		debut.Unix(), debut.Add(30*time.Minute).Unix()))
 }
 
@@ -55,6 +62,29 @@ func TestEtatService(t *testing.T) {
 // de retour), ce qui est en cours continue : segments d'un envoi commencé, finalisation, lecture
 // d'un partage, entrée dans un salon, segments d'une pièce commencée. Annoncée seulement (avant
 // le seuil) : rien n'est refusé.
+// Créations suspendues par l'administrateur (gel) : partages et salons « suspendu » ; un
+// service ouvert est « ok » ; la maintenance imminente l'emporte sur le gel.
+func TestEtatServiceServices(t *testing.T) {
+	e, _ := salonEnv(t)
+	w := e.do(req{method: "GET", path: "/api/etat-service"})
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"partages":"ok","salons":"ok"`) {
+		t.Fatalf("salon ouvert : %d %s", w.Code, w.Body)
+	}
+	if err := os.WriteFile(e.srv.svc.FrozenFile, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	w = e.do(req{method: "GET", path: "/api/etat-service"})
+	if !strings.Contains(w.Body.String(), `"partages":"suspendu","salons":"suspendu"`) {
+		t.Fatalf("gel : %s", w.Body)
+	}
+	e.annoncer(t, time.Hour, 30, 10)
+	e.clk.Add(55 * time.Minute)
+	w = e.do(req{method: "GET", path: "/api/etat-service"})
+	if !strings.Contains(w.Body.String(), `"partages":"maintenance","salons":"maintenance"`) {
+		t.Fatalf("imminente : %s", w.Body)
+	}
+}
+
 func TestMaintenanceImminente(t *testing.T) {
 	e, _ := salonEnv(t)
 	j := salonMembres(t, e, 2)
@@ -105,9 +135,9 @@ func TestMaintenanceApresRedemarrage(t *testing.T) {
 	p := filepath.Join(e.dir, "maintenance")
 	e.srv.maint = maintenance.Nouveau(p, e.clk.Now) // redémarré
 	e.create(t, "", newKeys(), 1, 1)
-	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null}`)
+	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null,`+partagesSeuls+`}`)
 	e.clk.Add(debut.Add(10*time.Minute).Sub(e.clk.Now()) + time.Minute)
-	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null}`)
+	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null,`+partagesSeuls+`}`)
 	if _, err := os.Stat(p); !os.IsNotExist(err) {
 		t.Fatal("annonce non effacée après la maintenance :", err)
 	}
