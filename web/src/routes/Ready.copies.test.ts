@@ -118,9 +118,14 @@ afterEach(() => {
 });
 
 describe("Lien prêt : copié ou non", () => {
-  it("à l'arrivée : la phrase « le lien marche déjà », avertissement armé, aucune coche ; « Nouveau partage » discret, pas d'action principale", async () => {
+  it("à l'arrivée : plus de phrase au-dessus des boutons, « Copier » avant « Partager », mot de passe visible, temps restant ; avertissement armé, aucune coche ; « Nouveau partage » discret", async () => {
     await show();
-    expect(document.querySelector("[data-ready-works]")!.textContent).toBe("Le lien marche déjà. Gardez le lien et le mot de passe : ils ne seront plus affichés après.");
+    expect(document.querySelector("[data-ready-works]")).toBeNull();
+    const send = [...document.querySelectorAll(".send .btn")].map((b) => b.textContent!.trim());
+    expect(send[0]).toMatch(/^Copier le lien et le mot de passe/);
+    expect(send[1]).toMatch(/^Partager/);
+    expect(document.querySelector("[data-masked]")).toBeNull(); // mot de passe visible dès l'arrivée
+    expect(document.querySelector("[data-ready-left]")!.textContent).toMatch(/^\(dans \d+\u202f(h|min)\)$/);
     expect(armed()).toBe(true);
     expect(marks()).toEqual([]);
     expect(newShare().className).toMatch(/\bghost\b/);

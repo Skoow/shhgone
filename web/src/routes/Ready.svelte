@@ -25,7 +25,7 @@
   import { copyText } from "../ui/clipboard";
   import CopyField from "../ui/CopyField.svelte";
   import Deadline from "../ui/Deadline.svelte";
-  import { Check, Copy, Eye, Lock, Plus, QrCode as QrIcon, Send, Share2, Trash2 } from "../ui/Icon";
+  import { Copy, Eye, Lock, Plus, QrCode as QrIcon, Send, Share2, Trash2 } from "../ui/Icon";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import Logo from "../ui/Logo.svelte";
   import QrCode from "../ui/QrCode.svelte";
@@ -62,6 +62,12 @@
   const lang = $derived(getLang());
   const demo = getDemo();
 
+  // Temps restant après l'heure de fin (28 novembre) : en heures, arrondi ; en minutes sous 1 h.
+  const restant = $derived.by(() => {
+    const sec = Math.max(0, result?.expiresInS ?? 0);
+    const d = sec >= 3600 ? t("ready.left.h", { n: Math.round(sec / 3600) }) : t("ready.left.min", { n: Math.max(1, Math.round(sec / 60)) });
+    return t("ready.left", { d });
+  });
   const selfDestruct = $derived(
     t("ready.selfdestruct", { opens: t("ready.opens", { n: maxOpens }), ttl: formatDuration(ttlHours * 3600, lang) }),
   );
@@ -233,26 +239,27 @@
             <!-- Coche menthe discrète, à hauteur du libellé : cette valeur a été copiée (ou partagée). -->
             <div class="cell lien" role="group" aria-label={t("ready.link.title")}>
               <CopyField label={t("ready.link.label")} value={result.link} oncopied={() => copied("link")} />
-              {#if copies.link}<span class="kept" data-ready-copied><Check size={16} strokeWidth={2.25} aria-hidden="true" /><span class="sr-only">{t("ready.copied")}</span></span>{/if}
+              {#if copies.link}<span class="sr-only" data-ready-copied>{t("ready.copied")}</span>{/if}
             </div>
             {#if result.password !== null}
               <div class="perfo" aria-hidden="true"></div>
               <div class="cell mdp" role="group" aria-label={t("ready.pw.title")}>
-                <CopyField label={t("ready.pw.title")} value={result.password} whole secret oncopied={() => copied("password")} />
-                {#if copies.password}<span class="kept" data-ready-copied><Check size={16} strokeWidth={2.25} aria-hidden="true" /><span class="sr-only">{t("ready.copied")}</span></span>{/if}
+                <!-- Visible dès l'arrivée (demande du propriétaire, 28 novembre) ; l'œil le masque. -->
+                <CopyField label={t("ready.pw.title")} value={result.password} whole secret revealed oncopied={() => copied("password")} />
+                {#if copies.password}<span class="sr-only" data-ready-copied>{t("ready.copied")}</span>{/if}
               </div>
             {/if}
           </div>
-          <p class="works" data-ready-works>{t(noPw ? "ready.works.link" : "ready.works")}</p>
-
+          <!-- « Copier le lien et le mot de passe » d'abord, puis « Partager » (28 novembre) ; plus de
+               phrase au-dessus : la mise en garde reste dans la confirmation de sortie. -->
           <div class="send" data-fan>
-            <Button variant="primary" onpress={openSheet} aria-haspopup="dialog">
-              {#snippet icon()}<Share2 size={20} strokeWidth={1.75} />{/snippet}
-              {t("ready.share")}
-            </Button>
-            <Button variant="secondary" onpress={copyBoth}>
+            <Button variant="primary" onpress={copyBoth}>
               {#snippet icon()}<Copy size={20} strokeWidth={1.75} />{/snippet}
               {t(noPw ? "ready.share.link" : "ready.share.both")}
+            </Button>
+            <Button variant="secondary" onpress={openSheet} aria-haspopup="dialog">
+              {#snippet icon()}<Share2 size={20} strokeWidth={1.75} />{/snippet}
+              {t("ready.share")}
             </Button>
             {#if copyNote && !sheet}<p class="note" role="status">{copyNote}</p>{/if}
           </div>
@@ -276,7 +283,7 @@
             <p class="active num"><span class="dot" aria-hidden="true"></span>{t("ready.active")}</p>
             <!-- Heure de fin seule : le serveur l'arrondit au quart d'heure supérieur ;
                  un décompte « 12 h 12 min » à côté de « 12 h » semblait faux. La phrase dit l'arrondi. -->
-            <p class="when"><Deadline expiresInS={result?.expiresInS ?? 0} countdown={false} /></p>
+            <p class="when"><Deadline expiresInS={result?.expiresInS ?? 0} countdown={false} /> <span class="reste num" data-ready-left>{restant}</span></p>
             <p class="self">{selfDestruct}</p>
           </div>
 
@@ -492,39 +499,13 @@
     }
   }
 
-  /* Copiée : petite coche menthe à hauteur du libellé, en haut à droite. */
-  .kept {
-    position: absolute;
-    top: var(--sp-4);
-    inset-inline-end: var(--sp-5);
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--accent-tint);
-    color: var(--accent);
-    animation: kept-in var(--dur-base) var(--ease-out) both;
-  }
-  @keyframes kept-in {
-    from {
-      opacity: 0;
-      transform: scale(0.6);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .kept {
-      animation: none;
-    }
-  }
-  .works {
-    margin: 0;
-    font-size: var(--fs-small);
-    color: var(--text-2);
-  }
 
   /* Valeurs : une ligne nette par valeur, sans boîte de plus, « Copier » à droite ; police à chasse
      fixe, chiffres tabulaires, zéro barré. Un trait sous la valeur, menthe une fois copiée. */
+  .reste {
+    color: var(--text-2);
+    font-weight: 500;
+  }
   .ticket :global(.cf) {
     gap: var(--sp-2);
   }
@@ -740,21 +721,11 @@
       width: 56px;
       height: 56px;
     }
-    .ticket .lien {
+    .ticket .cell {
       padding: var(--sp-4);
-      border-radius: var(--r-lg) var(--r-lg) 0 0;
     }
     .ticket .mdp {
-      padding: var(--sp-4);
-      border-radius: 0 0 var(--r-lg) var(--r-lg);
-    }
-    .ticket.seul .lien {
-      border-radius: var(--r-lg);
-    }
-    .ticket .kept,
-    .ticket .mdp .kept {
-      top: var(--sp-4);
-      inset-inline-end: var(--sp-4);
+      padding-top: 0;
     }
     .send {
       display: grid;

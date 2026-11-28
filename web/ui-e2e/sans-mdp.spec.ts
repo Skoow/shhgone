@@ -44,7 +44,7 @@ test("création sans mot de passe (défaut) : interrupteur désactivé, avertiss
   expect(sent.password).toBe("");
   expect(sent.link).toMatch(/\/s#l[A-Za-z0-9_-]{43}$/);
   await expect(page.getByRole("group", { name: "Mot de passe", exact: true })).toHaveCount(0);
-  await expect(page.locator("[data-ready-works]")).toContainText("Sans mot de passe, quiconque a ce lien peut ouvrir le partage.");
+  await expect(page.locator("[data-ready-works]")).toHaveCount(0); // phrase retirée (28 novembre)
   await expect(page.getByRole("button", { name: "Copier le lien", exact: true })).toBeVisible();
   await shot(page, "2-lien-pret-sans-mdp");
   // Feuille « Partager » : QR du lien seul.
@@ -110,8 +110,7 @@ test("création avec mot de passe : interrupteur activé, mot de passe généré
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const pw = page.getByRole("group", { name: "Mot de passe", exact: true });
   await expect(pw).toBeVisible();
-  await pw.locator("[data-reveal]").click();
-  // Le mot de passe de « Lien prêt » est celui choisi dans le composeur.
+  // Visible dès l'arrivée (28 novembre) : le mot de passe de « Lien prêt » est celui choisi dans le composeur.
   await expect(pw.locator(".sr-only").first()).toHaveText(shown);
   await pw.locator("[data-reveal]").click();
   await shot(page, "6-lien-pret-avec-mdp");

@@ -117,9 +117,8 @@ export async function sendShare(
   const pw = page.getByRole("group", { name: "Mot de passe", exact: true });
   let password = "";
   if (protect) {
-    await pw.locator("[data-reveal]").click();
+    // Visible dès l'arrivée (28 novembre) : lu tel quel.
     password = await read(pw);
-    await pw.locator("[data-reveal]").click();
   } else await expect(pw).toHaveCount(0);
   expect(link).toMatch(protect ? /#[A-Za-z0-9_-]{43}$/ : /#l[A-Za-z0-9_-]{43}$/);
   return { link, password, manage };

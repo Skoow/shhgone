@@ -15,9 +15,11 @@
    * lue par les lecteurs d'écran non plus (le bouton dit qu'elle est masquée).
    * `oncopied` : appelé après une copie réussie seulement (pas après le repli de copie à la main).
    */
-  type Props = { label: string; value: string; whole?: boolean; secret?: boolean; oncopied?: () => void };
-  let { label, value, whole = false, secret = false, oncopied }: Props = $props();
-  let shown = $state(false);
+  /** `revealed` : valeur secrète montrée dès l'arrivée (l'œil la masque ; mot de passe de « Lien prêt »). */
+  type Props = { label: string; value: string; whole?: boolean; secret?: boolean; revealed?: boolean; oncopied?: () => void };
+  let { label, value, whole = false, secret = false, revealed = false, oncopied }: Props = $props();
+  // svelte-ignore state_referenced_locally
+  let shown = $state(revealed);
   const hidden = $derived(secret && !shown);
   // Autant de points que de caractères : la longueur n'est pas un secret (elle est fixe).
   const dots = $derived("•".repeat(value.length));

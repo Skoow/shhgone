@@ -63,13 +63,16 @@ test.describe("fr-FR", () => {
     await expect(newShare(page)).toHaveClass(/\bghost\b/);
     await expect(page.locator(".ready .done .btn.primary")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Supprimer ce partage" })).not.toHaveClass(/\bprimary\b/);
-    await expect(page.locator("[data-ready-works]")).toHaveText("Le lien marche déjà. Gardez le lien et le mot de passe\u202f: ils ne seront plus affichés après.");
+    // Plus de phrase au-dessus des boutons ; « Copier le lien et le mot de passe » avant « Partager » (28 novembre).
+    await expect(page.locator("[data-ready-works]")).toHaveCount(0);
+    await expect(page.locator(".send .btn").first()).toHaveText(/Copier le lien et le mot de passe/);
     // Rien de copié : aucune coche, avertissement à la fermeture armé.
     await expect(page.locator("[data-ready-copied]")).toHaveCount(0);
     expect(await armed(page)).toBe(true);
-    // Mot de passe masqué à l'arrivée ; « Copier » donne la vraie valeur, même masquée.
-    await expect(pwCard(page).locator("[data-masked]")).toBeVisible();
-    await expect(pwCard(page).locator("[data-reveal]")).toHaveAttribute("aria-pressed", "false");
+    // Mot de passe visible dès l'arrivée (28 novembre) ; l'œil le masque ; « Copier » donne la vraie valeur, même masquée.
+    await expect(pwCard(page).locator("[data-masked]")).toHaveCount(0);
+    await expect(pwCard(page).locator("[data-reveal]")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("[data-ready-left]")).toHaveText(/^\(dans \d+\u202f(h|min)\)$/);
     // D42-30 : gardé d'office dans « Mes partages » ; plus de lien de gestion affiché ni d'interrupteur.
     await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveCount(0);
     await expect(page.locator("[data-manage]")).toHaveCount(0);
