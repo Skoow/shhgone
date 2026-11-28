@@ -1096,6 +1096,30 @@ Sur le PC et sur l'iPhone, après le lien d'accès : l'accueil dans une fenêtre
 6. Après vérification de l'ouverture : `docker rmi $(docker image ls -q shhdrop-preprod)`, `rm -rf deploy/.preprod`, `docker builder prune`.
 7. Depuis un autre réseau : `curl -sI https://shhgone.com/` rend 200, sans `X-Shhdrop-Etat`.
 
+### 15.5.1 Référencement : Google Search Console et Bing (le propriétaire, par ses comptes)
+
+Rien à installer sur le site : ni balise, ni fichier de vérification, ni script (aucune ressource tierce). La propriété du domaine se prouve par **un enregistrement DNS TXT chez OVH**, qui ne contient qu'un jeton sans donnée personnelle (il est public, comme tout le DNS).
+
+**Avant** : utiliser de préférence un compte Google et un compte Microsoft **dédiés au site** (pas le compte personnel), protégés par passkey. Ces deux entreprises sauront quel compte gère `shhgone.com` (rien n'est publié, mais l'éditeur du site reste anonyme pour le public seulement s'il l'est aussi pour elles).
+
+**Google Search Console**
+
+1. https://search.google.com/search-console, « Ajouter une propriété », type **Domaine** (pas « Préfixe d'URL »), saisir `shhgone.com`.
+2. Google affiche une valeur `google-site-verification=…` : la copier.
+3. OVH, espace client : Noms de domaine, `shhgone.com`, onglet **Zone DNS**, « Ajouter une entrée », type **TXT**, sous-domaine **vide** (le domaine lui-même), TTL par défaut, valeur = celle de Google. Valider. Ne pas toucher aux autres entrées (A, AAAA, CAA, MX…).
+4. Attendre quelques minutes (jusqu'à quelques heures), puis « Valider » dans Search Console. Vérifier soi-même : `dig +short TXT shhgone.com` affiche la valeur.
+5. **Une fois la barrière levée** (§15.5) : Search Console, « Sitemaps », saisir `sitemap.xml` (adresse complète `https://shhgone.com/sitemap.xml`), « Envoyer ». Tant que la barrière est en place, le site répond 503 et `noindex` : Google ne peut ni lire le plan du site ni indexer quoi que ce soit (envoyer le plan avant ne sert à rien, il le relira plus tard).
+6. Laisser l'enregistrement TXT en place : le retirer fait perdre la propriété.
+
+**Bing Webmaster Tools** (sert aussi DuckDuckGo, Ecosia, Qwant en partie)
+
+1. https://www.bing.com/webmasters, se connecter.
+2. Le plus simple : « **Importer depuis Google Search Console** » (domaine et plan du site repris, aucune entrée DNS de plus). Il faut autoriser Bing à lire Search Console ; sinon :
+3. « Ajouter un site » `https://shhgone.com/`, vérification **par DNS** : Bing donne un enregistrement **CNAME** (un nom au hasard qui pointe vers `verify.bing.com`). OVH, Zone DNS, « Ajouter une entrée », type CNAME, sous-domaine = le nom donné par Bing, cible = `verify.bing.com.` (avec le point final). Puis « Vérifier » dans Bing.
+4. Une fois la barrière levée : « Sitemaps », `https://shhgone.com/sitemap.xml`, « Envoyer ».
+
+**Contrôle après l'ouverture** : dans Search Console, « Inspection de l'URL » sur `https://shhgone.com/` et `https://shhgone.com/en` : « L'URL est sur Google » ou « peut être indexée ». Les pages d'envoi, de compte, de salon et `/s` doivent rester « Exclue par la balise noindex » (voulu).
+
 ### 15.6 Risques et limites (à relire avant l'ouverture)
 
 | # | Gravité | Endroit | Problème | Correction |

@@ -23,13 +23,20 @@ Deux pages `/envois` et `/salons`, dates « Se termine le … (heure) », étiqu
 
 ### 2.3 Référencement et rapidité — fusionné le 28 novembre
 
-Fait : référencement complet (aperçus de lien Open Graph locaux, JSON-LD sans donnée personnelle, `X-Robots-Tag: noindex` côté serveur, redirection des barres obliques finales) ; premier affichage mobile de l'accueil 3,75 s → 2,10 s. Restes à décider :
-- titre de l'accueil sans mot-clé recherché (proposition « Shhgone · Partage chiffré de bout en bout, sans compte ») ;
-- décalage d'affichage de l'accueil anglais sur téléphone (boutons « Photo or video » pendant la police de secours) ;
-- poids JS de l'accueil (≈ 612 Ko non compressés, dont salon et compte) : leur donner leurs propres pages HTML (chantier) ;
+Fait : référencement complet (aperçus de lien Open Graph locaux, JSON-LD sans donnée personnelle, `X-Robots-Tag: noindex` côté serveur, redirection des barres obliques finales) ; premier affichage mobile de l'accueil 3,75 s → 2,10 s.
+
+Suite du 28 novembre (après-midi) :
+- **Titre de l'accueil** : « Shhgone · Partage chiffré de bout en bout, sans compte » ; anglais « Shhgone · End-to-end encrypted sharing, no account needed » (fait).
+- **Décalage à l'arrivée de la police** (fait) : CLS de l'accueil 0,18 à 0,35 → ≤ 0,003 de 320 à 1440 px, en français et en anglais. Causes : largeurs maximales en `ch` (le « ch » dépend de la police affichée : 293 px dans la police de repli contre 374 px en Mona Sans), titre anglais trop large pour 320 à 405 px, `html lang` remis un instant à « fr » sur `/en` le temps du dictionnaire anglais, légende de l'animation « Comment ça marche » qui changeait de hauteur d'une étape à l'autre, libellé « Photo or video » au bord de la coupure à 412 px. Test permanent : `home.spec.ts`, « police tardive ».
+- **Poids JS de l'accueil : non fait, volontairement.** Mesure : script principal de 620 Ko (192 Ko en gzip), dont environ 164 Ko de salon et 82 Ko de compte. Les sortir demande soit un `import()` dynamique, interdit par la spec §28.3 (l'empreinte SRI de `index.html` doit fixer tous les scripts ; `check-dist` le refuse), soit des pages HTML séparées pour le compte et le salon, qui déconnecteraient à chaque changement de page une personne sans « Rester connecté » (session gardée en mémoire seulement). Gain estimé (≈ 80 Ko gzip, pas de changement du premier affichage, qui vient du HTML écrit au build) trop faible pour l'un ou l'autre. À reprendre seulement si les cartes d'import avec `integrity` deviennent disponibles partout (Chrome 127, Safari et Firefox récents) : chargement à la demande sans perdre la SRI.
+- **Tests navigateur revus** (fait) : textes périmés (`pages.spec`, `home.spec` K8, `audit-1111`, `no-preview`, `send` interruption et 429, `icons-demo`, `drop` filigrane), boutons d'inscription sur ordinateur (`salon4`), course après « Se déconnecter » (`compte.demo`). Cause réelle trouvée : `drop.spec`, `send.spec` et 8 autres specs ne se chargeaient plus depuis D42-32 (`src/index.ts` → `transfer/api.ts` → `maintenance/etat.svelte.ts`, runes Svelte hors du site) ; relais sans Svelte `maintenance/signal.ts`, et règle `source-rules.test.ts` « src/index.ts sans Svelte ».
+- **Encore en échec** (cachés jusqu'ici, leurs fichiers ne se chargeaient plus) : `close.spec.ts:76` (téléphone : la feuille « Partager le lien et le mot de passe » ne s'ouvre pas) et `ready.spec.ts:159` (téléphone : le logo mène à `/envoyer` au lieu de `/` après « tout copié »). Instables sous charge (réussissent seuls) : `salon4`, `partages.spec.ts:259`, `appel.spec.ts:193`, `salon.spec.ts` (album).
+- **Search Console et Bing** : marche à suivre écrite, `deploy/README.md` §15.5.1 (à faire par le propriétaire, ses comptes).
+- **Barrière de préproduction** : non levée (voir § 4, « Par le propriétaire » ; demande du 28 novembre en attente des conditions du `deploy/README.md` §15.5).
+
+Restes à décider :
 - `/salon` pourrait être écrite au build et indexée à l'ouverture ;
 - spec UI §12.5 assouplie (balises `og:*` sur les pages publiques) : à confirmer.
-Tests Playwright dont le texte attendu ne correspond plus au contenu : `pages.spec.ts:83`, `home.spec.ts:178` (K8) ; échecs non analysés lors d'une série complète : audit-1111, drop, no-preview, send 429, appel, salon4 — à passer en revue.
 
 Audit SEO initial (titres, descriptions, `hreflang`, `canonical`, `noindex` des écrans d'application, sitemap, `robots.txt`, Open Graph, JSON-LD sans donnée personnelle, préproduction non indexée) et mesures Lighthouse avant/après (mobile et ordinateur) avec améliorations (poids JS, chargement différé du moteur, images, police, compression, cache en production seulement ; préproduction gardée en `no-store`). Liste de ce que le propriétaire fera à l'ouverture (Search Console et Bing par enregistrement DNS TXT, sitemap).
 
