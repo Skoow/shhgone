@@ -317,9 +317,9 @@ test.describe("fr-FR : envoi (–18)", () => {
     expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhgone/s#[A-Za-z0-9_-]{43}$`));
     // Le bandeau n'est plus qu'une ligne : l'avertissement est redit sous le lien.
     await expect(page.locator("[data-demo-note]")).toHaveText("Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.");
-    // Lien de gestion : toujours montré (historique des liens retiré).
-    const manage = (await page.locator(".manage .sr-only").first().textContent()) ?? "";
-    expect(manage).toMatch(/\/shhgone\/s#m[A-Za-z0-9_-]{43}$/);
+    // Gestion gardée dans « Mes partages » (D42-30 ; en mémoire dans la démo) : plus de lien affiché.
+    await expect(page.locator("[data-kept]")).toContainText("Retrouvez ce partage dans Mes partages");
+    await expect(page.locator("[data-manage]")).toHaveCount(0);
     expect(await storage(page)).toBe(0);
     await capture(page, "demo-ready");
     await page.getByRole("group", { name: "Mot de passe", exact: true }).locator("[data-reveal]").click();

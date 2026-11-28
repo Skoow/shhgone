@@ -130,7 +130,7 @@ async function parametres(page: Page, origin: string): Promise<void> {
 
 async function deconnecter(page: Page, origin: string): Promise<void> {
   await parametres(page, origin);
-  await bouton(page, "Se déconnecter").click();
+  await page.locator("main").getByRole("button", { name: "Se déconnecter", exact: true }).click(); // aussi dans l'en-tête depuis le 26 novembre (D42-30)
   await expect(titre(page, "Se connecter")).toBeVisible();
 }
 
@@ -255,7 +255,7 @@ test("passkey sans PRF : clé locale gardée (dit à l'écran), connexion sans c
   expect(await connecter(page, shh.origin)).toBe("ouvert");
   await parametres(page, shh.origin);
   await expect(page.locator("[data-deconnexion-cle]")).toBeVisible();
-  await bouton(page, "Se déconnecter").click();
+  await page.locator("main").getByRole("button", { name: "Se déconnecter", exact: true }).click();
   expect(await connecter(page, shh.origin)).toBe("cle");
   await champ(page, "Clé de récupération").fill(cle);
   await bouton(page, "Ouvrir").click();
@@ -276,7 +276,7 @@ test("suppression du compte par un geste de passkey ; ensuite la passkey ne conn
   await bouton(page, "Supprimer le compte").click();
   await expect(page.getByText("Une confirmation par passkey vous sera demandée.")).toBeVisible();
   await bouton(page, "Supprimer définitivement").click();
-  await bouton(page, "Supprimer").click();
+  await bouton(page, "Oui, supprimer").click(); // fenêtre Oui / Non (D42-30)
   await expect(titre(page, "Compte supprimé.")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("[data-passkey-gestionnaire]")).toContainText(`Supprimez aussi la passkey « ${pseudo} »`);
   await page.goto(shh.origin + "/compte/connexion");

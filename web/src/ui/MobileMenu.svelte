@@ -10,7 +10,7 @@
   import { presence } from "../downloads/presence.svelte";
   import { t } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
-  import { ChevronDown, ChevronRight, Compass, Download, MessagesSquare, Server, ShieldCheck, Tag, User } from "./Icon";
+  import { ChevronDown, ChevronRight, Clock, Compass, Download, MessagesSquare, Server, ShieldCheck, Tag, User } from "./Icon";
   import { allerSection } from "./section";
   import type { Component } from "svelte";
 
@@ -26,13 +26,15 @@
   // Les écrans du site, chacun avec son icône ; puis le compte (seulement avec __COMPTES__) :
   // « Se connecter » et « Créer un compte », ou, connecté, « Mon compte » seul (25 novembre :
   // plus de « Nouveau partage » ici, c'est le bouton du bas ; plus d'« Accueil », c'est le logo ;
-  // « Se déconnecter » n'est que sur la page Compte). Confidentialité, Conditions, Signaler…
+  // connecté, « Se déconnecter » est dans la barre du bas, 26 novembre). « Mes partages » en tête
+  // (D42-30), avec ou sans compte. Confidentialité, Conditions, Signaler…
   // restent dans le pied de page.
   // `subs` : sections de l'accueil sous une entrée (Sécurité : « Comment ça marche », « Ce que voit
   // le serveur », comme le menu Sécurité de l'ordinateur, TopNav.svelte ; ui/section.ts).
   type Sub = { id: string; label: string; icon: Component; section: string; faq?: boolean };
   type Link = { label: string; path: string; icon: Component; soon?: string; subs?: Sub[]; page?: string };
   const links = $derived<Link[]>([
+    { label: t("nav.shares"), path: "/envois", icon: Clock },
     // « Téléchargements » sans compte seulement si l'historique est activé ici.
     ...(accountFlag.connected || presence.downloads ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
     // Salon : la création ; « bientôt » seulement sans __SALONS__ (démo, site sans compte).

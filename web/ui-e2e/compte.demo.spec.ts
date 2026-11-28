@@ -85,7 +85,7 @@ test.describe("compte de la démo", () => {
     await aller(page, demo.url, "compte");
     await page.getByRole("button", { name: "Supprimer le compte" }).click();
     await page.getByRole("button", { name: "Supprimer définitivement" }).click();
-    await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await page.getByRole("button", { name: "Oui, supprimer", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Compte supprimé." })).toBeVisible({ timeout: 30_000 });
     await aller(page, demo.url, "compte/recuperation");
     await page.getByLabel("Clé de récupération", { exact: true }).and(page.locator("input")).fill(cle);

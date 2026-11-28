@@ -1,6 +1,9 @@
 <script lang="ts">
   // Barre d'onglets du téléphone (< 768 px), façon app, avec un compte ouvert seulement :
-  // « Nouveau » (le bouton « Nouveau partage » du bas), Téléchargements, Compte (25 novembre).
+  // « Nouveau » (le bouton « Nouveau partage » du bas), Partages, Fichiers, Compte, et à droite
+  // « Déconnexion » (bouton, confirmation légère : un appui au bord de l'écran se fait vite ;
+  // décision du propriétaire, 26 novembre). Après la déconnexion, on reste sur la page (la page
+  // Compte montre alors la connexion).
   // Visibilité décidée par app/tabbar.ts ; masquée sur ordinateur par la CSS seule.
   // Libellés courts (tabs.*) : tiennent sur 320 px sans « … ».
   import { currentTab, tabPath, tabsFor, type TabId } from "../app/tabbar";
@@ -9,6 +12,7 @@
   import { t, type Key } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
   import TabIcon from "./TabIcon.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
 
   // Le compte ouvert est dit par accountFlag (posé par la session) : aucun code du compte ici.
   const tabs = $derived(tabsFor(accountFlag.connected));
@@ -16,6 +20,12 @@
 
   function soon(id: TabId) {
     announce(t(`tabs.soon.${id}` as Key));
+  }
+
+  let confirmer = $state(false);
+  async function deconnecter() {
+    await accountFlag.logout?.();
+    announce(t("account.logout.done"));
   }
 </script>
 
@@ -36,8 +46,16 @@
         {/if}
       </li>
     {/each}
+    {#if accountFlag.connected && accountFlag.logout}
+      <li>
+        <button type="button" class="tab out" aria-haspopup="dialog" onclick={() => (confirmer = true)} data-tab-logout>
+          <TabIcon id="logout" /><span class="lb">{t("tabs.logout")}</span>
+        </button>
+      </li>
+    {/if}
   </ul>
 </nav>
+<ConfirmDialog bind:open={confirmer} title={t("account.logout.confirm.title")} message={t("account.logout.confirm")} yesLabel={t("account.logout")} noLabel={t("common.cancel")} onyes={deconnecter} />
 
 <style>
   .tabbar {
@@ -73,7 +91,7 @@
     padding: 0;
     max-width: 560px;
     display: grid;
-    /* Trois onglets sans compte, quatre connecté (conception compte §21.15.1). */
+    /* Connecté : quatre onglets et « Déconnexion » (26 novembre). */
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
   }
@@ -109,6 +127,11 @@
   }
   .tab[aria-current="page"] {
     color: var(--accent);
+  }
+  /* « Déconnexion » : le libellé le plus long (11 lettres) tient sans « … » dès 360 px. */
+  .tab.out .lb {
+    font-size: 0.6875rem;
+    letter-spacing: -0.01em;
   }
   .tab.soon {
     color: var(--text-disabled);

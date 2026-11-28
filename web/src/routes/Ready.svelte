@@ -4,7 +4,8 @@
   // (masqué à l'arrivée), chacun avec sa copie ; ordinateur : l'échéance et la gestion dans une
   // colonne à droite (audit design, lot 2) ; puis « Partager » (feuille : envoyer vers une app, copier le lien et le mot
   // de passe, QR code du lien et du mot de passe, D41-29) et « Copier le lien et le mot de
-  // passe » ; lien de gestion replié ; Supprimer ce partage ; « Nouveau partage », discret (rien
+  // passe » ; la gestion gardée d'office dans « Mes partages » (D42-30 : plus de lien de gestion
+  // affiché, sauf si l'appareil ne peut rien garder) ; Supprimer ce partage ; « Nouveau partage », discret (rien
   // à valider : le lien marche déjà ; confirmation seulement tant que le lien et le mot de passe
   // n'ont pas été copiés, ready-copies.ts). Les valeurs ne viennent que des props (Copier lit l'état, jamais le
   // DOM) ; rien n'est écrit dans la console, le titre, l'URL ou un stockage. Sans mot de passe
@@ -12,6 +13,9 @@
   // Partager et QR du lien seul), et la phrase « quiconque a ce lien peut ouvrir ».
   import { tick, untrack } from "svelte";
   import { getDemo } from "../app/demo-hooks";
+  import { accountFlag } from "../app/account-flag.svelte";
+  import { followLink, href } from "../app/router.svelte";
+  import { garderPartage, noterDetruit } from "../storage/partages.svelte";
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { NotFoundError, destroyShare, shareLinkWithPassword } from "../index";
@@ -40,6 +44,11 @@
     summary: string;
     ttlHours: number;
     maxOpens: number;
+    /** Pour « Mes partages » (D42-30) : nombre d'éléments et taille, jamais leurs noms. */
+    itemsCount: number;
+    sizeBytes: number;
+    /** Gestion gardée dans « Mes partages » (vrai) ou non, stockage refusé (faux : lien de gestion à copier). */
+    onmanagekept?: (kept: boolean) => void;
     /** Nouveau partage : retour au composeur vide. */
     ondone: () => void;
     /** Le lien et le mot de passe ont été copiés ou partagés : le Retour ne demande plus rien. */
@@ -49,7 +58,7 @@
     /** « Nouvel envoi » après la suppression. */
     onnew: () => void;
   };
-  let { result, summary, ttlHours, maxOpens, ondone, onsecured, onforget, onnew }: Props = $props();
+  let { result, summary, ttlHours, maxOpens, itemsCount, sizeBytes, onmanagekept, ondone, onsecured, onforget, onnew }: Props = $props();
   const lang = $derived(getLang());
   const demo = getDemo();
 
@@ -70,6 +79,28 @@
   }
   // Écouteur posé par <svelte:window> ; l'état est lu au moment de l'événement : une sortie déjà
   // confirmée par la garde du routeur (secrets oubliés, `result` à null) ne redemande rien.
+
+  // ---------- « Mes partages » (spec §33, D42-30) ----------
+  // Gardé d'office, dès l'affichage (fermer l'onglet ne le perd pas) : le lien de gestion, l'heure
+  // locale, la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures et le nom du
+  // partage ; jamais le lien de partage, le mot de passe ni les noms des éléments. Stockage refusé
+  // (navigation privée stricte) : le lien de gestion est montré, et la garde de sortie l'attend.
+  let keptId: string | null = null;
+  let kept = $state<"attente" | "oui" | "non">("attente");
+  $effect(() => {
+    untrack(() => {
+      const r = result;
+      if (!r) return;
+      const creeLe = Date.now();
+      void garderPartage({ sorte: "envoi", gestion: r.manage, creeLe, echeance: creeLe + r.expiresInS * 1000, ouverturesMax: maxOpens, taille: sizeBytes, elements: itemsCount, ...(r.title ? { nom: r.title } : {}) }).then((id) => {
+        keptId = id;
+        kept = id ? "oui" : "non";
+        if (id) copied("manage");
+        onmanagekept?.(id !== null);
+      });
+    });
+  });
+
   function warnUnload(e: BeforeUnloadEvent) {
     if (!result || !warnOnUnload(copies, finished)) return;
     e.preventDefault();
@@ -145,6 +176,7 @@
     }
     // Après la réponse du serveur seulement : dissolution, puis message (UI §7.4).
     finished = true;
+    if (keptId) void noterDetruit(keptId);
     if (panel && typeof panel.animate === "function") {
       const reduce = reducedMotion();
       const a = panel.animate(
@@ -248,13 +280,22 @@
             <p class="self">{selfDestruct}</p>
           </div>
 
-          <!-- Le lien de gestion est le seul moyen de suivre ou de supprimer le partage une fois
-               cette page fermée (rien n'est gardé sur l'appareil ni dans le compte, spec §33). -->
+          <!-- Gestion gardée dans « Mes partages » (D42-30) : une phrase et le lien de la page ; le
+               lien de gestion n'est montré que si l'appareil n'a rien pu garder. -->
           <h2 class="col-t sep">{t("ready.col.manage")}</h2>
-          <div class="manage" data-manage>
-            <CopyField label={t("ready.manage.label")} value={result.manage} />
-            <p class="hint">{t("ready.manage.hint")}</p>
-          </div>
+          {#if kept === "non"}
+            <div class="manage" data-manage>
+              <CopyField label={t("ready.manage.label")} value={result.manage} oncopied={() => copied("manage")} />
+              <p class="hint">{t("ready.manage.unkept")}</p>
+            </div>
+          {:else}
+            <div class="manage" data-kept={kept === "oui" ? "" : undefined}>
+              <p class="kept-line">
+                {t("ready.kept.before")}<a href={href("/envois")} onclick={(e) => followLink(e, "/envois")} data-shares-link>{t("nav.shares")}</a>{t("ready.kept.after")}
+              </p>
+              {#if !accountFlag.connected}<p class="hint" data-kept-device>{t("ready.kept.device")}</p>{/if}
+            </div>
+          {/if}
 
           <div class="danger-zone">
             <InlineConfirm
@@ -275,7 +316,7 @@
             {#if confirmLeave(copies)}
               <InlineConfirm
                 label={t("ready.done")}
-                message={t(noPw ? "ready.done.confirm.link" : "ready.done.confirm")}
+                message={t(kept === "non" && !copies.manage ? "ready.done.confirm.manage" : noPw ? "ready.done.confirm.link" : "ready.done.confirm")}
                 confirmLabel={t("ready.done.yes")}
                 kind="warn"
                 triggerVariant="ghost"
@@ -737,6 +778,15 @@
   .manage {
     display: grid;
     gap: var(--sp-2);
+  }
+  .kept-line {
+    margin: 0;
+    color: var(--text);
+  }
+  .kept-line a {
+    color: var(--accent);
+    font-weight: 600;
+    text-underline-offset: 0.2em;
   }
   .done {
     display: grid;

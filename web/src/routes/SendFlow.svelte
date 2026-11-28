@@ -183,11 +183,14 @@
   let disarm: (() => void) | undefined;
   /** « Lien prêt » : lien et mot de passe déjà copiés ou partagés, le Retour ne demande plus rien. */
   let readySecured = false;
+  /** « Lien prêt » : la gestion du partage est gardée dans « Mes partages » (D42-30) ; sinon le lien de gestion est à copier aussi. */
+  let readyManageKept = true;
   function guard() {
     disarm?.();
     readySecured = false;
+    readyManageKept = true;
     disarm = leaveGuard?.arm({
-      confirm: () => (view === "ready" ? readySecured || window.confirm(t(sender?.result?.password === null ? "leave.ready.link" : "leave.ready")) : window.confirm(t("leave.sending"))),
+      confirm: () => (view === "ready" ? readySecured || window.confirm(t(!readyManageKept ? "leave.ready.manage" : sender?.result?.password === null ? "leave.ready.link" : "leave.ready")) : window.confirm(t("leave.sending"))),
       onleave: () => {
         disarm = undefined;
         unloadArmed = false;
@@ -392,6 +395,9 @@
     {summary}
     ttlHours={sent.ttlHours}
     maxOpens={sent.maxOpens}
+    itemsCount={sent.names.length}
+    sizeBytes={sent.bytes}
+    onmanagekept={(k) => (readyManageKept = k)}
     ondone={reset}
     onsecured={() => (readySecured = true)}
     onforget={forget}

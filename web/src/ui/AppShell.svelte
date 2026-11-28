@@ -78,7 +78,7 @@
   // fois défilé (titre marqué data-large-title, sinon le h1 de l'écran). Sur ordinateur, rien ne change.
   // Pages d'information : leur propre fichier HTML (pages séparées) ; en-tête ordinaire (logo,
   // menu), pas de « Retour » comme un écran de l'application.
-  const BACK: ReadonlySet<string> = new Set(["notfound", "manage", "telechargements"]);
+  const BACK: ReadonlySet<string> = new Set(["notfound", "manage", "envois", "telechargements"]);
   // Pied de page sur toutes les pages, ordinateur et téléphone, composeur compris ; sur ordinateur, le composeur tient dans l'écran et le pied est juste dessous.
   type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean };
   const footCols = $derived<{ id: string; title: string; links: FootLink[] }[]>([
@@ -110,8 +110,8 @@
   ]);
   // « Envoyer » (/) n'est la page courante que sur l'accueil : un partage ouvert a aussi « / » pour chemin.
   const pathHere = (p: string) => (router.current.name !== "notfound" && currentPath() === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
-  // « Téléchargements » est un onglet racine quand la barre d'onglets est là : pas de Retour.
-  const back = $derived(BACK.has(router.current.name) && !(tabs && router.current.name === "telechargements"));
+  // « Mes partages » et « Téléchargements » sont des onglets racine quand la barre d'onglets est là : pas de Retour.
+  const back = $derived(BACK.has(router.current.name) && !(tabs && (router.current.name === "envois" || router.current.name === "telechargements")));
   let small = $state("");
   let raf = 0;
   function measure() {

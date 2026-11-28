@@ -218,7 +218,7 @@ var appRoutes = map[string]bool{
 	"/contact":          true,
 	"/offres":           true,
 	"/envoyer":          true,
-	"/envois":           true, // ancienne adresse (historique des liens retiré) : le client la remplace par « / »
+	"/envois":           true, // « Mes partages » (spec §33, D42-30) : liste de l'appareil, aucun secret
 	"/telechargements":  true,
 	// Accès offert (conception du paiement, « Accès offerts ») : écran de l'application ; le pass
 	// suit « # », jamais envoyé au serveur.

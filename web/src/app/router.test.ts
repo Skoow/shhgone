@@ -25,8 +25,8 @@ describe("match", () => {
     // Page d'envoi vide (retours DROP) : « Commencer » y mène ; un « # » n'y ouvre rien.
     expect(match("/envoyer")).toEqual({ name: "envoyer" });
     expect(match("/envoyer", `#${KEY}`)).toEqual({ name: "envoyer" });
-    // Ancien tableau de bord « Mes partages » (historique des liens retiré, spec §33) : l'accueil.
-    expect(match("/envois")).toEqual({ name: "home" });
+    // « Mes partages » (spec §33, D42-30).
+    expect(match("/envois")).toEqual({ name: "envois" });
     expect(match("/telechargements")).toEqual({ name: "telechargements" });
   });
 
@@ -71,7 +71,7 @@ describe("match", () => {
     expect(match("/shhdrop", "", base)).toEqual({ name: "home" });
     expect(match("/shhdrop/securite", "", base)).toEqual({ name: "securite" });
     expect(match("/shhdrop/envoyer", "", base)).toEqual({ name: "envoyer" });
-    expect(match("/shhdrop/envois", "", base)).toEqual({ name: "home" });
+    expect(match("/shhdrop/envois", "", base)).toEqual({ name: "envois" });
     expect(match("/shhdrop/telechargements", "", base)).toEqual({ name: "telechargements" });
     expect(match("/", `#${KEY}`, base)).toEqual({ name: "notfound" });
     expect(match("/shhdropx/", `#${KEY}`, base)).toEqual({ name: "notfound" });
@@ -122,10 +122,9 @@ describe("navigate", () => {
     navigate("/telechargements");
     expect(location.pathname).toBe("/telechargements");
     expect(router.current).toEqual({ name: "telechargements" });
-    // Anciennes adresses (25 novembre) : remplacées dans la barre d'adresse.
     navigate("/envois");
-    expect(location.pathname).toBe("/");
-    expect(router.current).toEqual({ name: "home" });
+    expect(location.pathname).toBe("/envois");
+    expect(router.current).toEqual({ name: "envois" });
     navigate("/");
     expect(router.current).toEqual({ name: "home" });
   });
@@ -202,7 +201,7 @@ describe("navigate", () => {
   });
 
   it("popstate resynchronise la route, fragment compris (lien collé dans la barre)", () => {
-    navigate("/envois");
+    navigate("/telechargements");
     history.replaceState(null, "", `/s#m${KEY}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(router.current).toEqual({ name: "manage" });
@@ -214,6 +213,7 @@ describe("navigate", () => {
   it("popstate sans changement de route : router.current n'est pas réaffecté (ni focus volé)", () => {
     navigate("/envois");
     const before = router.current;
+    expect(before).toEqual({ name: "envois" });
     history.replaceState(null, "", "/envois#ancre");
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(router.current).toBe(before);

@@ -83,7 +83,7 @@ describe("règles de sources", () => {
   });
   it("aucun stockage navigateur (hors exceptions écrites, ci-dessous)", () =>
     expect(
-      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "storage/returns.ts" && r !== "storage/ancien-historique.ts" && r !== "downloads/live.svelte.ts" && r !== "downloads/probe.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
+      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "storage/returns.ts" && r !== "storage/ancien-historique.ts" && r !== "storage/partages.svelte.ts" && r !== "downloads/live.svelte.ts" && r !== "downloads/probe.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
     ).toEqual([]));
   // Spec §33 : historique local des liens retiré (D42-27). Plus de module history/ ; l'ancienne
   // base n'est que supprimée (storage/ancien-historique.ts, deleteDatabase seulement, aucune
@@ -95,6 +95,23 @@ describe("règles de sources", () => {
     expect(a).not.toMatch(/\.open\(|localStorage|sessionStorage|document\.cookie/);
     expect(offenders(/shhdrop-history/, (r) => r !== "storage/ancien-historique.ts")).toEqual([]);
     expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("storage/") && !r.startsWith("downloads/") && !r.startsWith("account/") && !r.startsWith("paiement/") && r !== "salon/preuve.ts")).toEqual([]);
+  });
+  // Spec §33, D42-30 : exception écrite, « Mes partages » (partages envoyés et salons créés,
+  // gardés d'office). Seul storage/partages.svelte.ts lit `indexedDB` (base `shhdrop-partages`,
+  // chiffrée par storage/partages.ts) ; jamais localStorage, sessionStorage ni cookie. Liste
+  // fermée des champs d'une entrée : lien de gestion et, pour un salon, d'invitation ; jamais le
+  // lien de partage (K_lien d'un envoi), un mot de passe, un nom d'élément ni un contenu.
+  it("Mes partages : indexedDB lu par storage/partages.svelte.ts seulement, liste fermée des champs, ni mot de passe ni lien de partage", () => {
+    const live = files.find((f) => f.rel === "storage/partages.svelte.ts")!;
+    expect(live.text).toMatch(/indexedDB/);
+    expect(live.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
+    expect(offenders(/shhdrop-partages/, (r) => r !== "storage/partages.ts")).toEqual([]);
+    const store = files.find((f) => f.rel === "storage/partages.ts")!.text;
+    expect(store).not.toMatch(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket/);
+    const type = store.match(/export type Partage = \{([\s\S]*?)\n\};/)![1]!;
+    const fields = [...type.matchAll(/^\s+(\w+):/gm)].map((m) => m[1]);
+    expect(fields).toEqual(["id", "sorte", "origine", "gestion", "invitation", "nom", "taille", "elements", "creeLe", "echeance", "ouvertures", "ouverturesMax", "etat", "vuLe", "finLe", "detruitIci"]);
+    expect(fields.join(" ")).not.toMatch(/password|motDePasse|mdp|link\b|lien\b|items\b|contenu|content/i);
   });
   // D42-22 : exception écrite, l'octroi d'ouverture gardé chiffré pour revenir jusqu'à
   // l'échéance (storage/returns.ts, mécanisme de storage/idb.ts : AES-GCM, clé non

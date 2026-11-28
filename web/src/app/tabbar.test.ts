@@ -15,8 +15,8 @@ describe("barre d'onglets (téléphone)", () => {
     expect(tabsFor(false)).toEqual([]);
     for (const route of ["home", "envoyer", "telechargements", "securite", "confidentialite", "notfound"] as const) expect(tabBarVisible({ ...base, route })).toBe(false);
   });
-  it("connecté : visible sur l'accueil, la page d'envoi, Téléchargements, Compte, Sécurité, Confidentialité et la 404", () => {
-    for (const route of ["home", "envoyer", "telechargements", "compte", "securite", "confidentialite", "notfound"] as const) expect(tabBarVisible({ ...base, route, connected: true })).toBe(true);
+  it("connecté : visible sur l'accueil, la page d'envoi, Mes partages, Téléchargements, Compte, Sécurité, Confidentialité et la 404", () => {
+    for (const route of ["home", "envoyer", "envois", "telechargements", "compte", "securite", "confidentialite", "notfound"] as const) expect(tabBarVisible({ ...base, route, connected: true })).toBe(true);
   });
   it("masquée chez le destinataire (ouverture, contenu) et sur la gestion", () => {
     expect(tabBarVisible({ ...base, route: "open", connected: true })).toBe(false);
@@ -28,10 +28,11 @@ describe("barre d'onglets (téléphone)", () => {
     expect(tabBarVisible({ ...base, route: "home", connected: true, supported: false })).toBe(false);
   });
 
-  // 25 novembre : historique des liens retiré, Profil et Paramètres réunis (page Compte).
-  it("connecté : trois onglets (Nouveau, Téléchargements, Compte), chemins et onglet courant", () => {
-    expect(tabsFor(true).map((t) => `${t.id}${t.soon ? "*" : ""}`)).toEqual(["send", "downloads", "profile"]);
-    expect(tabsFor(true).map((t) => tabPath(t.id))).toEqual(["/envoyer", "/telechargements", "/compte"]);
+  // 26 novembre (D42-30) : Mes partages revient ; « Se déconnecter » à droite (bouton, TabBar.svelte).
+  it("connecté : quatre onglets (Nouveau, Partages, Téléchargements, Compte), chemins et onglet courant", () => {
+    expect(tabsFor(true).map((t) => `${t.id}${t.soon ? "*" : ""}`)).toEqual(["send", "shares", "downloads", "profile"]);
+    expect(tabsFor(true).map((t) => tabPath(t.id))).toEqual(["/envoyer", "/envois", "/telechargements", "/compte"]);
+    expect(currentTab("envois")).toBe("shares");
     expect(currentTab("home")).toBe("send");
     expect(currentTab("envoyer")).toBe("send");
     expect(currentTab("telechargements")).toBe("downloads");
@@ -40,10 +41,12 @@ describe("barre d'onglets (téléphone)", () => {
     expect(currentTab("notfound")).toBeNull();
   });
 
-  // Audit du 25 novembre : libellés jamais tronqués sur 320 px (10 caractères au plus).
-  it("libellés courts, jamais tronqués (10 caractères au plus)", () => {
-    for (const d of [fr, en] as Record<string, string>[]) for (const t of tabsFor(true)) expect(d[`tabs.${t.id}`]!.length).toBeLessThanOrEqual(10);
+  // Audit du 25 novembre : libellés jamais tronqués sur 320 px (11 caractères au plus, cinq cases).
+  it("libellés courts, jamais tronqués (11 caractères au plus)", () => {
+    for (const d of [fr, en] as Record<string, string>[]) for (const t of [...tabsFor(true), { id: "logout" }]) expect(d[`tabs.${t.id}`]!.length).toBeLessThanOrEqual(11);
     expect(fr["tabs.send"]).toBe("Nouveau");
+    expect(fr["tabs.shares"]).toBe("Partages");
+    expect(fr["tabs.logout"]).toBe("Déconnexion");
     expect(fr["tabs.downloads"]).toBe("Fichiers");
     expect(fr["tabs.profile"]).toBe("Compte");
   });

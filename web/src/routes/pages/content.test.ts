@@ -131,16 +131,18 @@ describe("textes publics et compte par passkey", () => {
     expect(texte("confidentialite", "en", false)).toMatch(/turning it off erases it all/u);
   });
 
-  // 25 novembre : historique local des liens retiré (spec §33) ; le lien de gestion se garde à la main.
-  test("Confidentialité, « Sur votre appareil » : aucune liste des partages ni des liens reçus ; lien de gestion à garder soi-même", () => {
+  // 26 novembre (spec §33, D42-30) : « Mes partages » gardé d'office, ce qui y est (et jamais), la
+  // perte sans compte ; aucune liste des liens reçus.
+  test("Confidentialité, « Sur votre appareil » : Mes partages (texte exact), jamais le lien d'un partage ni un mot de passe", () => {
     for (const comptes of [false, true]) {
       const fr = infoPage("confidentialite", "fr", comptes).blocks.find((b) => b.h === "Sur votre appareil")!.list!;
-      expect(fr).toContain("Aucune liste de vos partages ni des liens reçus n'est gardée, sur l'appareil comme dans un compte. « Lien prêt » et « Salon prêt » vous montrent le lien de gestion : gardez-le vous-même, c'est le seul moyen de suivre ou de supprimer le partage plus tard.");
-      expect(fr.join(" ")).not.toMatch(/Mes partages|Garder dans mon historique|Garder ce partage/u);
+      expect(fr).toContain("Mes partages : chaque partage que vous envoyez et chaque salon que vous créez sont gardés chiffrés sur cet appareil, pour les suivre et les supprimer : le lien de gestion, le nom du partage, sa taille, son nombre d'éléments, son échéance et ses ouvertures ; pour un salon, son lien de gestion et son lien d'invitation. Jamais le lien d'un partage, ni un mot de passe, ni le nom d'un fichier. Une entrée s'efface 7 jours après la fin du partage, et vous pouvez la retirer à tout moment. Sans compte, effacer les données de ce navigateur efface la liste, et avec elle la gestion de ces partages. Aucune liste des liens reçus n'est gardée.");
+      expect(fr.join(" ")).not.toMatch(/Garder dans mon historique|Garder ce partage/u);
       const en = infoPage("confidentialite", "en", comptes).blocks.find((b) => b.h === "On your device")!.list!;
-      expect(en.join(" ")).toMatch(/No list of your shares or of the links you receive is kept/u);
-      expect(en.join(" ")).not.toMatch(/My shares|Keep in my history|Keep this share/u);
+      expect(en.join(" ")).toMatch(/My shares: every share you send and every room you create are kept encrypted on this device/u);
+      expect(en.join(" ")).toMatch(/No list of the links you receive is kept/u);
     }
+    expect(texte("confidentialite", "fr", true)).toMatch(/Ce second coffre garde aussi « Mes partages »/u);
     expect(texte("confidentialite", "fr", true)).not.toMatch(/exporter vos données/u);
     expect(texte("confidentialite", "en", true)).not.toMatch(/export your data/u);
   });

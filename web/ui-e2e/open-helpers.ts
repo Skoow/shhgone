@@ -53,6 +53,18 @@ export async function sendShare(
   } = {},
 ): Promise<Sent> {
   const protect = o.protect !== false;
+  // Lien de gestion : plus affiché sur « Lien prêt » (gardé dans « Mes partages », D42-30) ; le
+  // test le déduit de l'en-tête X-Shh-Manage de la création (S_gestion), comme send.spec.ts. La
+  // création part dès l'ajout du premier élément (envoi anticipé, D41-19) : écoute posée avant.
+  let manage = "";
+  const onRequest = (r: import("@playwright/test").Request) => {
+    const u = new URL(r.url());
+    if (r.method() === "POST" && u.pathname === "/api/shares")
+      void r.allHeaders().then((h) => {
+        if (h["x-shh-manage"]) manage = `${u.origin}/s#m${h["x-shh-manage"]}`;
+      });
+  };
+  page.on("request", onRequest);
   await page.goto(url);
   if (o.text !== undefined) await addText(page, o.text);
   if (o.files?.length) {
@@ -95,6 +107,10 @@ export async function sendShare(
   }
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
+  page.off("request", onRequest);
+  await expect.poll(() => manage).toMatch(/#m[A-Za-z0-9_-]{43}$/);
+  await expect(page.locator("[data-kept]")).toBeVisible();
+  await expect(page.locator("[data-manage]")).toHaveCount(0);
   const read = async (l: ReturnType<Page["locator"]>) => (await l.locator(".sr-only").first().textContent()) ?? "";
   const link = await read(page.getByRole("group", { name: "Lien", exact: true }));
   // Mot de passe masqué à l'arrivée : l'œil l'affiche, puis le remasque. Sans mot de passe : aucun.
@@ -105,8 +121,6 @@ export async function sendShare(
     password = await read(pw);
     await pw.locator("[data-reveal]").click();
   } else await expect(pw).toHaveCount(0);
-  // Lien de gestion : toujours montré (historique des liens retiré, spec §33).
-  const manage = await read(page.locator("[data-manage]"));
   expect(link).toMatch(protect ? /#[A-Za-z0-9_-]{43}$/ : /#l[A-Za-z0-9_-]{43}$/);
   return { link, password, manage };
 }

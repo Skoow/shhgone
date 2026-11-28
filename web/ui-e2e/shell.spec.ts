@@ -40,7 +40,7 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   // Sans compte, pas de « Téléchargements » tant que l'historique n'est pas activé sur cet appareil
   // (désactivé par défaut ; qui change celle).
   await expect(foot.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
-  // Plus d'« Envoyer », de « Mes partages » ni de « Salon » : le logo et le menu y mènent.
+  // Plus d'« Envoyer », de « Mes partages » ni de « Salon » dans le pied : le logo, l'en-tête et le menu y mènent.
   for (const l of ["Envoyer", "Mes partages"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}$`) })).toHaveCount(0);
   await expect(foot.getByText(/^Salon/)).toHaveCount(0);
   // Phrase de l'hébergeur de la démo : dans la démo seulement.

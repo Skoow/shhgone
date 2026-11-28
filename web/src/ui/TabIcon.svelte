@@ -10,6 +10,15 @@
     <!-- « Nouveau » : un plus (nouveau partage). -->
     <path d="M12 5v14" />
     <path d="M5 12h14" />
+  {:else if id === "shares"}
+    <!-- « Partages » : une horloge (ce qui s'efface à son heure). -->
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  {:else if id === "logout"}
+    <!-- log-out -->
+    <path d="M9.5 20H6.5A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4h3" />
+    <path d="m16 16.5 4.5-4.5L16 7.5" />
+    <path d="M20.5 12H9.5" />
   {:else if id === "profile"}
     <circle cx="12" cy="8.5" r="3.75" />
     <path d="M5 20a7 7 0 0 1 14 0" />

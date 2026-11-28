@@ -20,17 +20,28 @@ describe("ready-copies : logique", () => {
       expect(warnOnUnload(c, false)).toBe(true);
       expect(confirmLeave(c)).toBe(true);
     }
-    expect(noteCopy(NOTHING_COPIED, "link")).toEqual({ link: true, password: false });
-    expect(noteCopy(NOTHING_COPIED, "password")).toEqual({ link: false, password: true });
+    expect(noteCopy(NOTHING_COPIED, "link")).toEqual({ link: true, password: false, manage: false });
+    expect(noteCopy(NOTHING_COPIED, "password")).toEqual({ link: false, password: true, manage: false });
   });
-  it("les deux (l'un puis l'autre, ou ensemble) : plus rien ; une copie ne s'oublie pas", () => {
-    const one = noteCopy(noteCopy(NOTHING_COPIED, "password"), "link");
-    const both = noteCopy(NOTHING_COPIED, "both");
+  it("les deux (l'un puis l'autre, ou ensemble), gestion gardée : plus rien ; une copie ne s'oublie pas", () => {
+    const kept = noteCopy(NOTHING_COPIED, "manage");
+    const one = noteCopy(noteCopy(kept, "password"), "link");
+    const both = noteCopy(kept, "both");
     for (const c of [one, both, noteCopy(both, "link"), noteCopy(both, "password")]) {
-      expect(c).toEqual({ link: true, password: true });
+      expect(c).toEqual({ link: true, password: true, manage: true });
       expect(warnOnUnload(c, false)).toBe(false);
       expect(confirmLeave(c)).toBe(false);
     }
+  });
+  // D42-30 : la gestion gardée dans « Mes partages » compte ; sans elle (stockage refusé), le
+  // lien de gestion est à copier comme le lien et le mot de passe.
+  it("lien et mot de passe copiés, gestion ni gardée ni copiée : toujours avertissement et confirmation", () => {
+    const c = noteCopy(NOTHING_COPIED, "both");
+    expect(c).toEqual({ link: true, password: true, manage: false });
+    expect(secured(c)).toBe(false);
+    expect(warnOnUnload(c, false)).toBe(true);
+    expect(confirmLeave(c)).toBe(true);
+    expect(secured(noteCopy(c, "manage"))).toBe(true);
   });
   it("fini (Nouveau partage, Supprimer) : plus d'avertissement, même sans copie", () => {
     expect(warnOnUnload(NOTHING_COPIED, true)).toBe(false);
@@ -187,6 +198,60 @@ describe("Lien prêt : copié ou non", () => {
     p.result = null;
     await settle();
     expect(armed()).toBe(false);
+  });
+});
+
+// D42-30 : le partage est gardé d'office dans « Mes partages » ; plus de lien de gestion affiché.
+describe("Lien prêt : Mes partages", () => {
+  const MANAGE = "https://x.example/s#m" + "m".repeat(43);
+  it("gardé : « Retrouvez ce partage dans Mes partages », lien vers /envois, aucun lien de gestion ; l'entrée n'a ni lien ni mot de passe", async () => {
+    await show(props({ result: { link: LINK, manage: MANAGE, expiresInS: 3600, password: PW, title: "Devis" }, maxOpens: 2, itemsCount: 3, sizeBytes: 4096 }));
+    expect(document.querySelector("[data-manage]")).toBeNull();
+    expect(document.body.textContent).not.toContain(MANAGE);
+    const k = document.querySelector("[data-kept]")!;
+    expect(k.textContent!.replace(/\s+/g, " ")).toContain("Retrouvez ce partage dans Mes partages.");
+    expect(k.querySelector("a[data-shares-link]")!.getAttribute("href")).toBe("/envois");
+    expect(k.querySelector("[data-kept-device]")!.textContent).toContain("effacer les données du site fait perdre sa gestion");
+    const { tousLesPartages } = await import("../storage/partages.svelte");
+    const [p] = await tousLesPartages();
+    expect(p).toMatchObject({ sorte: "envoi", gestion: MANAGE, nom: "Devis", elements: 3, taille: 4096, ouverturesMax: 2 });
+    expect(JSON.stringify(p)).not.toContain(PW);
+    expect(JSON.stringify(p)).not.toContain("k".repeat(43));
+  });
+
+  it("stockage refusé : lien de gestion montré, et la garde de sortie l'attend aussi", async () => {
+    vi.stubGlobal("indexedDB", undefined);
+    const ondone = vi.fn();
+    const onsecured = vi.fn();
+    await show(props({ ondone, onsecured }));
+    const m = document.querySelector("[data-manage]")!;
+    expect(m.textContent).toContain("Ce navigateur ne peut rien garder");
+    await click(button(/^Copier le lien et le mot de passe$/, document.querySelector(".ready .send")!));
+    expect(armed()).toBe(true);
+    expect(onsecured).not.toHaveBeenCalled();
+    await click(newShare());
+    expect(document.body.textContent).toContain("Vous n'avez pas encore copié le lien, le mot de passe et le lien de gestion.");
+    await click(button(/^Annuler$/));
+    await click(button(/^Copi/, m as HTMLElement));
+    expect(armed()).toBe(false);
+    expect(onsecured).toHaveBeenCalledTimes(1);
+  });
+
+  it("Supprimer : l'entrée de Mes partages est notée détruite", async () => {
+    vi.doMock("../index", async (orig) => ({ ...(await orig<typeof import("../index")>()), destroyShare: async () => undefined }));
+    try {
+      vi.resetModules();
+      svelte = await import("svelte");
+      (await import("../i18n/i18n.svelte")).setLang("fr");
+      Ready = (await import("./Ready.svelte")).default;
+      await show();
+      await click(button(/^Supprimer ce partage/));
+      await click(button(/^Supprimer$/));
+      const { tousLesPartages } = await import("../storage/partages.svelte");
+      await vi.waitFor(async () => expect((await tousLesPartages())[0]).toMatchObject({ etat: "detruit", detruitIci: true }));
+    } finally {
+      vi.doUnmock("../index");
+    }
   });
 });
 

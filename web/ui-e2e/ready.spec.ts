@@ -65,11 +65,12 @@ test.describe("fr-FR", () => {
     // Mot de passe masqué à l'arrivée ; « Copier » donne la vraie valeur, même masquée.
     await expect(pwCard(page).locator("[data-masked]")).toBeVisible();
     await expect(pwCard(page).locator("[data-reveal]")).toHaveAttribute("aria-pressed", "false");
-    // Lien de gestion : toujours montré, seul moyen de suivre ou supprimer le partage une fois la
-    // page fermée (historique des liens retiré, spec §33) ; plus d'interrupteur.
+    // D42-30 : gardé d'office dans « Mes partages » ; plus de lien de gestion affiché ni d'interrupteur.
     await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveCount(0);
-    await expect(page.locator("[data-manage] .sr-only").first()).toHaveText(/#m[A-Za-z0-9_-]{43}$/);
-    await expect(page.locator("[data-manage]")).toContainText("une fois cette page fermée");
+    await expect(page.locator("[data-manage]")).toHaveCount(0);
+    await expect(page.locator("[data-kept]")).toContainText("Retrouvez ce partage dans Mes partages.");
+    await expect(page.locator("[data-kept] a[data-shares-link]")).toHaveAttribute("href", "/envois");
+    await expect(page.locator("[data-kept-device]")).toContainText("effacer les données du site fait perdre sa gestion");
     // Plus d'avertissement « par un autre moyen ».
     await expect(page.locator(".ready").getByText("autre moyen", { exact: false })).toHaveCount(0);
 

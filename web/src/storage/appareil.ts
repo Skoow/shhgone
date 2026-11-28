@@ -3,15 +3,18 @@
 // - les retours gardés sur les partages ouverts (storage/returns.ts, D42-22) ;
 // - les preuves de membre des salons et leur réglage « silencieux » (salon/preuve.ts) ;
 // - l'historique des téléchargements (downloads/), réglage gardé ;
+// - « Mes partages » (storage/partages.svelte.ts) : les liens de gestion gardés ici partent ;
+//   sans compte, la gestion de ces partages est alors perdue (l'écran le dit) ;
 // - l'ancien historique des liens, s'il restait (storage/ancien-historique.ts).
 // Chaque part au mieux, au plus 2 s : une base tenue par un autre onglet ne bloque jamais le reste.
 import { clearDownloads } from "../downloads/live.svelte";
 import { effacerTout as effacerPreuves } from "../salon/preuve";
 import { effacerAncienHistorique } from "./ancien-historique";
+import { effacerPartages } from "./partages.svelte";
 import { pageReturns } from "./returns";
 
 const auPlus = (p: Promise<unknown>, ms = 2000) => Promise.race([p.then(() => undefined, () => undefined), new Promise<void>((ok) => setTimeout(ok, ms))]);
 
 export async function effacerDonneesAppareil(): Promise<void> {
-  await Promise.all([auPlus(pageReturns().clear()), auPlus(effacerPreuves()), auPlus(clearDownloads()), auPlus(effacerAncienHistorique())]);
+  await Promise.all([auPlus(pageReturns().clear()), auPlus(effacerPreuves()), auPlus(clearDownloads()), auPlus(effacerAncienHistorique()), auPlus(effacerPartages())]);
 }

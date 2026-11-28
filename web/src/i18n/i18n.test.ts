@@ -131,7 +131,7 @@ describe("dictionnaires", () => {
       "account.recovery.body": "Elle remplace vos passkeys si vous les perdez toutes. Sans passkey ni clé, le compte ne peut pas être récupéré.",
       "account.data.inactive": `Sans connexion pendant 13${N}mois, ce compte est effacé, sans préavis${N}: nous n'avons aucun moyen de vous joindre.`,
       "account.delete.done": "Compte supprimé.",
-      "account.delete.pass": "Votre abonnement Plus sera perdu avec le compte.",
+      "account.delete.sub.refund": "Rien n'est remboursé automatiquement.",
       "account.delete.device": "Effacer aussi les données de cet appareil",
       "report.question": `Que se passe-t-il${N}?`,
       "report.share.body": "Chaque personne qui a ouvert ce partage compte pour une voix. Il est supprimé pour tout le monde quand la moitié des ouvertures permises l'ont signalé. Nous ne voyons pas le contenu et ne gardons que la catégorie, sans rien qui vous identifie.",

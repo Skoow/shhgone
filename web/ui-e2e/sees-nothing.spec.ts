@@ -30,6 +30,11 @@ test.describe("fr-FR", () => {
         .join("\n");
       sent.push({ label: `${r.method()} ${new URL(r.url()).pathname}`, data: Buffer.concat([Buffer.from(r.url() + "\n" + head + "\n"), r.postDataBuffer() ?? Buffer.alloc(0)]) });
     });
+    // Lien de gestion : plus affiché sur « Lien prêt » (D42-30) ; S_gestion relu dans l'en-tête complet de la création.
+    let manageHdr = "";
+    page.on("request", (r) => {
+      if (r.method() === "POST" && new URL(r.url()).pathname === "/api/shares") void r.allHeaders().then((h) => (manageHdr = h["x-shh-manage"] ?? manageHdr));
+    });
     // Corps des PUT (Blob depuis A1) : relus dans la page, mêmes octets (send-helpers.ts).
     const putBodies = await capturePutBodies(page);
     const answers: { label: string; data: Buffer }[] = [];
@@ -74,9 +79,9 @@ test.describe("fr-FR", () => {
     ];
 
     // Témoin : la capture voit bien les en-têtes et les corps (S_gestion part, par conception, en en-tête).
-    // Lien de gestion : toujours montré (historique des liens retiré).
-    const manage = (await page.locator("[data-manage] .sr-only").first().textContent()) ?? "";
-    const sGestion = new Uint8Array(Buffer.from(manage.slice(manage.indexOf("#m") + 2), "base64url"));
+    await expect.poll(() => manageHdr).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    await expect(page.locator("[data-manage]")).toHaveCount(0);
+    const sGestion = new Uint8Array(Buffer.from(manageHdr, "base64url"));
     expect(findIn(Buffer.concat(sent.map((s) => s.data)), [needle("témoin S_gestion", sGestion as Uint8Array<ArrayBuffer>)])).toEqual(["témoin S_gestion"]);
     // Chemin d'ouverture : le destinataire ouvre le lien dans cet onglet,
     // tape le mot de passe (une fois faux, puis juste), lit le texte et enregistre le fichier

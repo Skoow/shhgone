@@ -76,7 +76,7 @@ const COMPTE_PATHS: Readonly<Record<string, CompteRoute>> = {
 
 export type Route = {
   /** envoyer : page d'envoi (composeur, même vide), où mène « Commencer » (retours DROP). */
-  name: "home" | "envoyer" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | "offert" | CompteRoute | SalonRoute | "notfound";
+  name: "home" | "envoyer" | "envois" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | "offert" | CompteRoute | SalonRoute | "notfound";
 };
 
 /**
@@ -129,9 +129,8 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
   // l'adresse (ui/OffersGift.svelte).
   if (p === "/offres/offert") return { name: "offert" };
   if (p === "/envoyer") return { name: "envoyer" };
-  // Ancien tableau de bord « Vos envois » (historique local des liens, retiré le 25 novembre,
-  // spec §33) : l'accueil, adresse remplacée (ANCIENNES).
-  if (p === "/envois") return { name: "home" };
+  // « Mes partages » (spec §33, D42-30) : liste locale, aucun secret dans l'adresse.
+  if (p === "/envois") return { name: "envois" };
   // Historique des téléchargements (conception compte §21.15.5) : sur l'appareil, aucun secret dans l'adresse.
   if (p === "/telechargements") return { name: "telechargements" };
   // Pages du compte : sans __COMPTES__ (défaut, démo), la même 404 qu'une adresse inconnue.
@@ -149,11 +148,11 @@ export const router = $state<{ current: Route }>({
 });
 
 /**
- * Anciennes adresses (25 novembre) : « /envois » (historique local des liens retiré, spec §33)
- * et « /compte/profil » (Profil réuni à la page Compte). Remplacées dans la barre d'adresse, sans
+ * Anciennes adresses (25 novembre) : « /compte/profil » (Profil réuni à la page Compte ;
+ * « /envois » est de nouveau « Mes partages » depuis le 26 novembre, D42-30). Remplacées dans la barre d'adresse, sans
  * nouvelle entrée d'historique du navigateur ; la route est déjà la bonne (match).
  */
-export const ANCIENNES: Readonly<Record<string, string>> = { "/envois": "/", "/compte/profil": "/compte" };
+export const ANCIENNES: Readonly<Record<string, string>> = { "/compte/profil": "/compte" };
 function remplacerAncienne(): void {
   if (typeof location === "undefined" || typeof history === "undefined") return;
   const prefix = import.meta.env.BASE_URL.replace(/\/$/, "");

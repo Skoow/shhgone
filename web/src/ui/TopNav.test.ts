@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("TopNav", () => {
-  it("menus, Salon bientôt, Offres ; plus de « Mes partages » (historique des liens retiré) ni de bouton « Partager »", () => {
+  it("menus, Salon bientôt, Offres, « Mes partages » ; pas de bouton « Partager »", () => {
     show();
     const nav = document.querySelector("nav")!;
     expect(nav.getAttribute("aria-label")).toBe("Menu principal");
@@ -44,7 +44,8 @@ describe("TopNav", () => {
     expect(room.textContent).toContain("bientôt");
     const links = [...document.querySelectorAll("a")].map((a) => [a.textContent!.trim(), a.getAttribute("href")]);
     expect(links).toEqual(expect.arrayContaining([["Offres", "/offres"]]));
-    expect(links.map(([n]) => n)).not.toContain("Mes partages");
+    // « Mes partages » revient (26 novembre, D42-30), avec ou sans compte.
+    expect(links).toEqual(expect.arrayContaining([["Mes partages", "/envois"]]));
     const named = (n: string) => [...nav.querySelectorAll("a, button")].filter((e) => e.textContent!.trim() === n);
     expect(named("Partager")).toHaveLength(0);
   });
@@ -317,15 +318,17 @@ describe("TopNav au survol", () => {
   });
 });
 
-// 25 novembre : connecté, plus d'« Accueil » dans l'en-tête (le logo y mène) ni de « Mes partages ».
+// 25 novembre : connecté, plus d'« Accueil » dans l'en-tête (le logo y mène) ; « Mes partages »
+// revient le 26 novembre (D42-30). « Se déconnecter » n'existe qu'avec __COMPTES__ (faux ici).
 describe("TopNav connecté", () => {
-  it("ni « Accueil » ni « Mes partages », compte ouvert ou non", () => {
+  it("pas d'« Accueil » ; « Mes partages », compte ouvert ou non", () => {
     const noms = () => [...document.querySelectorAll<HTMLAnchorElement>(".acts a")].map((a) => a.textContent!.trim());
     accountFlag.connected = true;
     try {
       show();
       expect(noms()).not.toContain("Accueil");
-      expect(noms()).not.toContain("Mes partages");
+      expect(noms()).toContain("Mes partages");
+      expect(document.querySelector("[data-nav-logout]")).toBeNull();
     } finally {
       accountFlag.connected = false;
     }

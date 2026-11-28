@@ -1,8 +1,9 @@
 <script lang="ts">
   // Barre du haut, ordinateur et tablette : menus « Partager » et
   // « Sécurité » en motif disclosure (bouton aria-expanded qui montre une liste de liens ou de
-  // boutons, pas un role="menu"), « Salon » bientôt, « Offres » ; à droite le compte
-  // (« Se connecter » ou « Mon compte »). Clavier : Entrée et Espace ouvrent, flèches haut et bas parcourent, Échap ferme
+  // boutons, pas un role="menu"), « Salon » bientôt, « Offres » ; à droite « Mes partages »
+  // (D42-30) puis le compte : « Se connecter », ou, connecté, « Mon compte » et « Se déconnecter »
+  // à la place de « Se connecter » (confirmation Oui / Non ; décision du propriétaire, 26 novembre). Clavier : Entrée et Espace ouvrent, flèches haut et bas parcourent, Échap ferme
   // et rend le focus au bouton, Tab hors du menu le ferme ; un clic ailleurs le ferme aussi.
   // Souris (pointeur fin qui survole) : le survol ouvre après un court délai d'intention et
   // referme après un délai de grâce (pour glisser du bouton au panneau) ; d'un menu ouvert à
@@ -17,11 +18,18 @@
   import { CONTENT_MAX } from "../limits";
   import { announce } from "./announce";
   import AddIcon from "./AddIcon.svelte";
-  import { ChevronDown, Compass, EyeOff, Flag, Server, ShieldCheck, Upload } from "./Icon";
+  import { ChevronDown, Compass, EyeOff, Flag, LogOut, Server, ShieldCheck, Upload } from "./Icon";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import { allerSection } from "./section";
   import { accountFlag } from "../app/account-flag.svelte";
 
   let { busy = false }: { busy?: boolean } = $props();
+
+  let confirmerSortie = $state(false);
+  async function deconnecter() {
+    await accountFlag.logout?.();
+    announce(t("account.logout.done"));
+  }
 
   type MenuId = "share" | "security";
   let open = $state<MenuId | null>(null);
@@ -269,10 +277,16 @@
     </li>
   </ul>
   <div class="acts">
+    <a class="btn ghost" href={href("/envois")} aria-current={here("/envois")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/envois"))} {...off} data-nav-shares>{t("nav.shares")}</a>
     {#if __COMPTES__}
-      <!-- Compte : « Se connecter », ou « Mon compte » une fois connecté. -->
+      <!-- Compte : « Se connecter », ou « Mon compte » et « Se déconnecter » une fois connecté. -->
       {#if accountFlag.connected}
         <a class="btn ghost" href={href("/compte")} aria-current={here("/compte")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte"))} {...off}>{t("nav.menu.myAccount")}</a>
+        {#if accountFlag.logout}
+          <button type="button" class="btn ghost out" aria-haspopup="dialog" onclick={() => (busy ? undefined : (confirmerSortie = true))} {...off} data-nav-logout>
+            <LogOut size={18} strokeWidth={1.8} aria-hidden="true" />{t("account.logout")}
+          </button>
+        {/if}
       {:else}
         <a class="btn ghost" href={href("/compte/connexion")} aria-current={here("/compte/connexion")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte/connexion"))} {...off}>{t("account.login.title")}</a>
       {/if}
@@ -288,6 +302,9 @@
          depuis « Lien prêt », où il est créé ; la page d'envoi reste dans « Envoyer ». -->
   </div>
 </nav>
+{#if __COMPTES__}
+  <ConfirmDialog bind:open={confirmerSortie} title={t("account.logout.confirm.title")} message={t("account.logout.confirm")} yesLabel={t("account.logout")} noLabel={t("common.cancel")} onyes={deconnecter} />
+{/if}
 
 <style>
   .topnav {
@@ -519,6 +536,12 @@
   .btn.ghost {
     border: 1px solid rgb(150 175 255 / 0.26);
     color: #fff;
+  }
+  .btn.out {
+    gap: 6px;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
   }
   .btn.ghost:hover {
     border-color: rgb(150 175 255 / 0.5);

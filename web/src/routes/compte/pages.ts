@@ -4,7 +4,7 @@
 export { default as Connexion } from "./Connexion.svelte";
 export { default as Inscription } from "./Inscription.svelte";
 export { default as Recuperation } from "./Recuperation.svelte";
-export { ecouterAutresOnglets, rangerPassDansCompte, restaurer, verifierAuRetour } from "../../account/session.svelte";
+export { ecouterAutresOnglets, rangerPassDansCompte, restaurer, seDeconnecter, verifierAuRetour } from "../../account/session.svelte";
 export { default as Compte } from "./Compte.svelte";
 import { account } from "../../account/session.svelte";
 /** Session en cours d'ouverture (« Rester connecté » relu au démarrage) : attendre avant de conclure. */

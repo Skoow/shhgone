@@ -202,10 +202,9 @@ test("appel vidéo à trois : tout passe par le relais, qui parle, micro, camér
   await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
-  // Historique désactivé par défaut, même avec un compte : le lien de gestion est
-  // montré d'emblée, pour être gardé à la main.
-  await expect(page.locator("[data-manage]")).toContainText("Il n'est pas gardé dans l'historique de cet appareil");
-  await expect(bouton(page, "Afficher le lien de gestion")).toHaveCount(0);
+  // Salon gardé d'office dans « Mes partages » (D42-30) : plus de lien de gestion affiché.
+  await expect(page.locator("[data-kept]")).toContainText("Retrouvez ce salon dans Mes partages");
+  await expect(page.locator("[data-manage]")).toHaveCount(0);
   const lien =(await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
   const mdp = (await page.locator(".cf").filter({ hasText: "Mot de passe" }).locator(".val").textContent())!.trim();
   await bouton(page, "Entrer dans le salon").click();

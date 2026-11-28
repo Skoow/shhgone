@@ -5,6 +5,7 @@
   import { guardFileDrop, reloadIfRestored } from "./app/lifecycle";
   import { scrubAddressBar } from "./app/link";
   import { href, LINK_ROUTES, moveToLinkPage, PAGE_ROUTES, router } from "./app/router.svelte";
+  import { accountFlag } from "./app/account-flag.svelte";
   import { applySeo } from "./app/seo";
   import { setScreenTitle } from "./app/title";
   import { getLang } from "./i18n/i18n.svelte";
@@ -12,6 +13,7 @@
   import { watchOpenGrant } from "./session/open-grant";
   import { loadDownloads } from "./downloads/live.svelte";
   import Downloads from "./routes/Downloads.svelte";
+  import Partages from "./routes/Partages.svelte";
   import NotFound from "./routes/NotFound.svelte";
   import Offert from "./routes/Offert.svelte";
   import SendFlow from "./routes/SendFlow.svelte";
@@ -23,7 +25,7 @@
   // Pages du compte : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Compte, Connexion, Inscription, Recuperation, connecte, ecouterAutresOnglets, rangerPassDansCompte, restaurer, supprime, verifierAuRetour } from "./routes/compte/pages";
+  import { Compte, Connexion, Inscription, Recuperation, connecte, ecouterAutresOnglets, rangerPassDansCompte, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
   // Écrans du salon : seulement si __SALONS__ (site avec compte, hors démo) ; sans lui,
   // le greffon shh-salons remplace ce module par pages.off.ts (aucun écran, aucun client).
   import { Salon, SalonNouveau } from "./routes/salon/pages";
@@ -120,6 +122,10 @@
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") void verifierAuRetour();
     });
+    // « Se déconnecter » de la barre du bas et de la ligne du haut (26 novembre) : la coque
+    // n'importe rien du compte, elle appelle ceci. On reste sur la page (la page Compte montre
+    // alors la connexion).
+    accountFlag.logout = seDeconnecter;
   }
 </script>
 
@@ -143,6 +149,8 @@
     <SendFlow sendPage={router.current.name === "envoyer"} onbusy={(b) => (sending = b)} onlock={(l) => (locked = l)} />
   {:else if LINK_ROUTES.has(router.current.name)}
     <!-- Ouverture rechargée sous « / » : la page part vers « /s » (onRoute), rien n'est affiché ici. -->
+  {:else if router.current.name === "envois"}
+    <Partages />
   {:else if router.current.name === "telechargements"}
     <Downloads />
   {:else if router.current.name === "inscription"}

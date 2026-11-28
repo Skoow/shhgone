@@ -83,8 +83,8 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   await expect(page).toHaveURL(/\/salon\/nouveau$/);
   // Compte récent : 4 places au plus (conception du compte §11) ; « Ouvert » les prend toutes.
   await expect(page.getByText("Ouvert, 4 au plus")).toBeVisible();
-  // Plus de « Garder dans mon historique » (historique des liens retiré, spec §33) : « Salon prêt »
-  // montre toujours le lien de gestion d'emblée.
+  // Plus de « Garder dans mon historique » : le salon est gardé d'office dans « Mes partages »
+  // (D42-30) ; « Salon prêt » ne montre plus le lien de gestion.
   await expect(page.getByRole("switch", { name: "Garder dans mon historique" })).toHaveCount(0);
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
@@ -96,7 +96,13 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   expect(lien).toMatch(new RegExp(`^${shh.origin.replace(/[.]/g, "\\.")}/salon#c[A-Za-z0-9_-]{43}$`));
   expect(mdp).toMatch(/^.{11}$/);
   expect(page.url()).not.toContain("#");
-  const gestion = (await page.locator(".cf").filter({ hasText: "Lien de gestion" }).locator(".val").textContent())!.trim();
+  await expect(page.locator("[data-manage]")).toHaveCount(0);
+  await expect(page.locator("[data-kept]")).toContainText("Retrouvez ce salon dans Mes partages");
+  // Lien de gestion relu dans « Mes partages » (autre onglet du même navigateur : « Gérer le salon »).
+  const liste = await page.context().newPage();
+  await liste.goto(shh.origin + "/envois");
+  const gestion = (await liste.locator("[data-share-card][data-sorte=salon] a[data-room-manage]").getAttribute("href"))!;
+  await liste.close();
   expect(gestion).toMatch(/\/salon#s[A-Za-z0-9_-]{43}$/);
   await bouton(page, "Entrer dans le salon").click();
   await expect(titre(page, "Un salon qui s'efface")).toBeVisible();

@@ -11,6 +11,7 @@ export const Recuperation = absente;
 export const restaurer = async (): Promise<void> => undefined;
 export const ecouterAutresOnglets = (): (() => void) => () => undefined;
 export const verifierAuRetour = async (): Promise<void> => undefined;
+export const seDeconnecter = async (): Promise<void> => undefined;
 export const Compte = absente;
 export const connecte = (): boolean => false;
 export const ouvertureEnCours = (): boolean => false;

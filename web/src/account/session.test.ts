@@ -17,6 +17,8 @@ import { FauxAuthentificateur, fauxServeur } from "./passkey.test-helper";
 import * as C from "./session.svelte";
 import { garder, lirePasses, nouvelId, tirerPass } from "../paiement/pass";
 import { formulesDisponibles } from "../paiement/jetons";
+import { memoryBackend } from "../storage/idb";
+import { configurerPartages, garderPartage, retirerPartage, tousLesPartages } from "../storage/partages.svelte";
 
 const PREUVE = { altcha: "preuve", hp: "", shown_at: "t" };
 /** Preuve anti-robot de connexion/fin et de recup : comptée, pour savoir QUAND elle est demandée. */
@@ -589,28 +591,60 @@ describe("coffres", () => {
     expect(C.account.erreur).toBe("coffre_illisible");
   });
 
-  it("historique des liens retiré : un coffre privé ancien qui porte des listes est vidé à l'ouverture ; le pass reste", async () => {
-    const texte = await inscription("Lea", true);
-    const c = compte();
-    const k = await ouvrirRecup((await cleRecupDerivees(await cleRecupLire(texte))).kekR, c.h, unb64u(c.envR));
-    const cles = await clesDuCompte(k);
-    const lien = "https://shh.test/#m" + "G".repeat(43);
-    const ancien = { ...priveVide(), envois: [{ id: "e1", gestion: lien }], recus: [{ id: "r1" }], salons: [{ id: "s1" }], rejoints: [{ id: "j1" }], pass: [{ id: "p1", x: 1 }] };
-    c.coffres.prive = { blob: await sceller("prive", cles.prive, c.h, 2, priveEnJson(ancien)), gen: 2 };
-    recharger();
-    await C.restaurer();
-    expect(C.account.etat).toBe("ouvert");
-    expect(accountFlag.connected).toBe(true);
-    expect(c.coffres.prive.gen).toBe(3);
-    const relu = priveDeJson(await ouvrir("prive", cles.prive, c.h, c.coffres.prive.blob, 3));
-    expect(relu).toMatchObject({ salons: [], recus: [], rejoints: [], envois: [] });
-    expect(relu.pass).toEqual([{ id: "p1", x: 1 }]);
-    // Coffre déjà vide : aucune écriture à l'ouverture suivante.
-    recharger();
-    await C.restaurer();
-    expect(c.coffres.prive.gen).toBe(3);
-    await C.seDeconnecter();
-    expect(accountFlag.connected).toBe(false);
+  // Mes partages (spec §33, D42-30) : fusion de l'appareil et du coffre privé à l'ouverture ;
+  // `recus` et `rejoints` (plus gardés) vidés ; ajout ou retrait ici : écriture différée ;
+  // déconnexion : les entrées venues du compte quittent l'appareil, celles créées ici restent.
+  it("Mes partages : fusion à l'ouverture, recus et rejoints vidés, pass gardé ; écriture différée ; déconnexion", async () => {
+    configurerPartages(memoryBackend());
+    let planifie: (() => void) | null = null;
+    C.configurerCompte({ planifier: (_ms, f) => ((planifie = f), () => (planifie = null)) });
+    try {
+      const texte = await inscription("Lea", true);
+      const c = compte();
+      const k = await ouvrirRecup((await cleRecupDerivees(await cleRecupLire(texte))).kekR, c.h, unb64u(c.envR));
+      const cles = await clesDuCompte(k);
+      const ici = "https://shh.test/s#m" + "L".repeat(43);
+      const ailleurs = "https://shh.test/s#m" + "G".repeat(43);
+      const tard = Date.now() + 86_400_000;
+      await garderPartage({ sorte: "envoi", gestion: ici, creeLe: Date.now(), echeance: tard, ouverturesMax: 1, taille: 5, elements: 1 });
+      const ancien = { ...priveVide(), envois: [{ id: "E".repeat(22), cree: Date.now(), expire: tard, gestion: ailleurs, taille: 9, elements: 2, ouvertures_max: 3, libelle: "Devis" }], recus: [{ id: "r1" }], rejoints: [{ id: "j1" }], pass: [{ id: "p1", x: 1 }] };
+      c.coffres.prive = { blob: await sceller("prive", cles.prive, c.h, 2, priveEnJson(ancien)), gen: 2 };
+      recharger();
+      await C.restaurer();
+      expect(C.account.etat).toBe("ouvert");
+      expect(accountFlag.connected).toBe(true);
+      expect(c.coffres.prive.gen).toBe(3);
+      const relu = priveDeJson(await ouvrir("prive", cles.prive, c.h, c.coffres.prive.blob, 3));
+      expect(relu.recus).toEqual([]);
+      expect(relu.rejoints).toEqual([]);
+      expect(relu.envois.map((v) => v.gestion).sort()).toEqual([ailleurs, ici].sort());
+      expect(JSON.stringify(relu)).not.toMatch(/#[A-Za-z0-9_-]{43}"/); // aucun lien de partage
+      expect(relu.pass).toEqual([{ id: "p1", x: 1 }]);
+      const surAppareil = await tousLesPartages();
+      expect(surAppareil.map((p) => [p.gestion, p.origine]).sort()).toEqual([[ailleurs, "compte"], [ici, "local"]].sort());
+      expect(surAppareil.find((p) => p.origine === "compte")).toMatchObject({ nom: "Devis", taille: 9, elements: 2, ouverturesMax: 3 });
+      // Ouverture suivante, rien de changé : aucune écriture.
+      recharger();
+      await C.restaurer();
+      expect(c.coffres.prive.gen).toBe(3);
+      // Retrait ici : différé (2 à 12 min), puis écrit.
+      await retirerPartage(surAppareil.find((p) => p.gestion === ailleurs)!.id);
+      expect(c.coffres.prive.gen).toBe(3);
+      expect(planifie).not.toBeNull();
+      planifie!();
+      await vi.waitFor(() => expect(c.coffres.prive.gen).toBe(4));
+      expect(priveDeJson(await ouvrir("prive", cles.prive, c.h, c.coffres.prive.blob, 4)).envois.map((v) => v.gestion)).toEqual([ici]);
+      // Déconnexion : l'entrée locale reste.
+      await C.seDeconnecter();
+      expect(accountFlag.connected).toBe(false);
+      expect((await tousLesPartages()).map((p) => p.gestion)).toEqual([ici]);
+    } finally {
+      configurerPartages(undefined);
+      C.configurerCompte({ planifier: (ms, f) => {
+        const t = setTimeout(f, ms);
+        return () => clearTimeout(t);
+      } });
+    }
   });
 
   it("changerPseudo : p_canon envoyé, puis le profil chiffré porte le nouveau pseudo", async () => {

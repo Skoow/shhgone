@@ -87,6 +87,13 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible({ timeout: 20_000 });
   await shot(page, "16-erreur-lien-invalide");
 
+  // Lien de gestion : plus affiché sur « Lien prêt » (D42-30) ; relu dans l'en-tête de la création
+  // (envoi anticipé : la création part dès le premier élément).
+  let manage = "";
+  page.on("request", (q) => {
+    const u = new URL(q.url());
+    if (q.method() === "POST" && u.pathname === "/api/shares") void q.allHeaders().then((h) => (manage = h["x-shh-manage"] ? `${u.origin}/s#m${h["x-shh-manage"]}` : manage));
+  });
   await page.goto(shh.origin + "/");
   await addText(page, "Le code de la porte est 4471. Le digicode change lundi, je te renvoie le nouveau.");
   await addLongFiles(page);
@@ -120,8 +127,6 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   };
   const link = await read("Lien");
   const password = await read("Mot de passe");
-  // Lien de gestion : toujours montré (historique des liens retiré).
-  const manage = (await page.locator("[data-manage] .sr-only").first().textContent()) ?? "";
 
   const rc = await browser.newContext(ctxOpts);
   const r = await rc.newPage();
