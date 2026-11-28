@@ -36,7 +36,7 @@ describe("nom affiché : Shhgone", () => {
 
   it("index.html : titre, nom d'app iOS et texte sans JavaScript", () => {
     const html = code(read("index.html"));
-    expect(html).toContain("<title>Shhgone · Partage chiffré de bout en bout, sans compte</title>");
+    expect(html).toContain("<title>Shhgone · Partage et messagerie chiffrés de bout en bout</title>");
     expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Shhgone" />');
     // Sans JavaScript : un paragraphe, pas un second h1 (l'accueil écrit au build porte le seul h1, audit SEO).
     expect(html).toContain("<p><strong>Shhgone : ");

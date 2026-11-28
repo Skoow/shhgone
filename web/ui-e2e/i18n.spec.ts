@@ -51,11 +51,11 @@ test.describe("français par défaut", () => {
     await en.page.goto(shh.origin + "/");
     await en.page.locator("[data-english-link]").click();
     await expect(en.page).toHaveURL(shh.origin + "/en");
-    await expect(en.page).toHaveTitle("Shhgone · End-to-end encrypted sharing, no account needed");
+    await expect(en.page).toHaveTitle("Shhgone · End-to-end encrypted file sharing and chat");
     await en.ctx.close();
     // Accueil : titre descriptif (référencement, retours CLEAN2) ; page d'envoi : « Envoyer ».
     await page.goto(shh.origin + "/");
-    await expect(page).toHaveTitle("Shhgone · Partage chiffré de bout en bout, sans compte");
+    await expect(page).toHaveTitle("Shhgone · Partage et messagerie chiffrés de bout en bout");
     await page.goto(shh.origin + "/envoyer");
     await expect(page).toHaveTitle("Envoyer · Shhgone");
 

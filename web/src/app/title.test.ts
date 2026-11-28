@@ -10,7 +10,7 @@ describe("titre de l'onglet", () => {
   it("par route, en français et en anglais", () => {
     setLang("fr");
     expect(routeTitle("home")).toBe("Envoyer · Shhgone");
-    expect(routeTitle("landing")).toBe("Shhgone · Partage chiffré de bout en bout, sans compte");
+    expect(routeTitle("landing")).toBe("Shhgone · Partage et messagerie chiffrés de bout en bout");
     expect(routeTitle("ready")).toBe("Lien prêt · Shhgone");
     expect(routeTitle("open")).toBe("Ouvrir un partage · Shhgone");
     expect(routeTitle("manage")).toBe("Gérer un partage · Shhgone");
