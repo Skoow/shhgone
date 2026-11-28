@@ -26,7 +26,7 @@ func TestTablesReprisePartages(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if v := pragma(t, db, "user_version"); v != "6" {
+	if v := pragma(t, db, "user_version"); v != strconv.Itoa(SchemaVersion) {
 		t.Fatal("user_version", v)
 	}
 	for _, q := range []string{

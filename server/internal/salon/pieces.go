@@ -126,6 +126,10 @@ type piece struct {
 	// présents. Les lecteurs d'une pièce sont les membres présents à son rang de référence.
 	places int
 	efface bool
+	// masque : une écriture du masque des segments reçus à la fois (persistance des envois,
+	// noterSegment) ; l'instantané est pris sous ce verrou, donc jamais un plus ancien écrit
+	// après un plus récent.
+	masque sync.Mutex
 }
 
 // purge : pièce à effacer hors du verrou du salon (fichier, puis ligne et budget).
@@ -268,7 +272,14 @@ func (m *Manager) CreerPieceID(mb Membre, id string, bucket int, vocal bool) (er
 		return base(err)
 	}
 	ligne = true
-	return m.inscrirePiece(s, mb, p)
+	if err := m.inscrirePiece(s, mb, p); err != nil {
+		return err
+	}
+	// Envoi repris après un redémarrage (D42-32) : la pièce est rangée dans la tête de l'état
+	// avant la réponse (échec : la pièce vit, mais un plantage avant la passe suivante la perd ;
+	// le client recrée alors la pièce).
+	_ = m.persister(s)
+	return nil
 }
 
 // debuterPiece : membre vérifié, rang et auteur de p posés, réserve vocale débitée ; rend le
@@ -398,12 +409,60 @@ func (m *Manager) PutSegment(id string, n int, body []byte) error {
 	if err != nil {
 		return err
 	}
-	err = m.cfg.Pieces.WriteAt(id, share.SegOffset(p.bucket, n), body)
+	if m.cfg.CleReprise == nil {
+		err = m.cfg.Pieces.WriteAt(id, share.SegOffset(p.bucket, n), body)
+	} else {
+		// Salons persistants : segment sur le disque (fdatasync), puis noté en base, avant
+		// l'accusé ; un envoi repris après un redémarrage ou un plantage ne renvoie que ce qui
+		// n'a pas été acquitté (D42-32).
+		err = m.cfg.Pieces.WriteAtSync(id, share.SegOffset(p.bucket, n), body)
+		if err == nil {
+			err = m.noterSegment(s, p, n)
+		}
+	}
 	m.finirEcriture(s, p, n, err == nil)
 	if errors.Is(err, fs.ErrNotExist) {
 		return ErrNotFound // effacée pendant l'écriture
 	}
+	if errors.Is(err, ErrBase) || errors.Is(err, ErrNotFound) {
+		return err
+	}
 	return es(err)
+}
+
+// noterSegment : le segment n de p (écrit et synchronisé) est noté dans salon_pieces.segments_mask
+// avant l'accusé. Appelé pendant l'écriture (p.ecritures compté : aucune finalisation ne commence
+// avant la fin de la note), hors du verrou du salon.
+func (m *Manager) noterSegment(s *salon, p *piece, n int) error {
+	p.masque.Lock()
+	defer p.masque.Unlock()
+	s.mu.Lock()
+	if p.efface || p.recus == nil {
+		s.mu.Unlock()
+		return ErrNotFound
+	}
+	p.recus[n] = true
+	masque := masqueDe(p.recus)
+	s.mu.Unlock()
+	res, err := m.cfg.DB.Exec(`UPDATE salon_pieces SET segments_mask=? WHERE id=? AND state='uploading'`, masque, p.id)
+	if err != nil {
+		return base(err)
+	}
+	if k, _ := res.RowsAffected(); k != 1 {
+		return ErrNotFound // effacée entre-temps
+	}
+	return nil
+}
+
+// masqueDe : un bit par segment reçu (bit n % 8 de l'octet n / 8).
+func masqueDe(recus []bool) []byte {
+	b := make([]byte, (len(recus)+7)/8)
+	for n, ok := range recus {
+		if ok {
+			b[n/8] |= 1 << (n % 8)
+		}
+	}
+	return b
 }
 
 func (m *Manager) debuterEcriture(s *salon, id string, n, longueur int) (*piece, error) {
@@ -433,6 +492,35 @@ func (m *Manager) finirEcriture(s *salon, p *piece, n int, ok bool) {
 		p.recus[n] = true
 		p.activite = m.cfg.Now()
 	}
+}
+
+// RepriseEnvoi : l'auteur mb reprend l'envoi de sa pièce id après un redémarrage du serveur
+// (jeton d'envoi neuf, D42-32) : rend son palier, s'il s'agit d'un vocal, et si elle est déjà
+// prête (finalisée avant le redémarrage : rien à renvoyer). Pièce inconnue, effacée, d'un autre
+// auteur, salon fini : ErrNotFound ; finalisation en cours : ErrBusy ; jeton révoqué :
+// ErrExcluded. Le délai PieceSansSegment repart (la reprise compte comme une activité).
+func (m *Manager) RepriseEnvoi(mb Membre, id string) (bucket int, vocal, deja bool, err error) {
+	s := mb.salon
+	if s == nil {
+		return 0, false, false, ErrNotFound
+	}
+	now := m.cfg.Now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.membrePieceLocked(mb, now); err != nil {
+		return 0, false, false, err
+	}
+	p := s.lesPieces[id]
+	if p == nil || p.efface || s.fini || !now.Before(s.expires) || !s.auteurDeLocked(mb, p) || p.auteur != s.sieges[mb.siege].jetonV {
+		return 0, false, false, ErrNotFound
+	}
+	switch p.etat {
+	case finalisation:
+		return 0, false, false, ErrBusy
+	case envoi:
+		p.activite = now
+	}
+	return p.bucket, p.vocal, p.etat == prete, nil
 }
 
 // FinalizePiece termine l'envoi de la pièce id : tous les segments reçus sauf le bourrage

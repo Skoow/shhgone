@@ -141,6 +141,9 @@ type creerBody struct {
 // lecture de cet en-tête hors des routes /api/compte/*) ; la ligne du salon garde le compte.
 // SHH_COMPTES=0 : l'en-tête n'est pas lu, création sans compte comme avant.
 func (a salonAPI) creer(w http.ResponseWriter, r *http.Request) {
+	if a.refusMaintenance(w) { // nouvelle création : refusée avant un redémarrage annoncé
+		return
+	}
 	var b creerBody
 	if err := readJSON(w, r, &b); err != nil || b.MembersCanDestroy == nil {
 		failSalon(w, errBadRequest)

@@ -435,13 +435,25 @@ func (m *Manager) Sauvegarder() (int, error) {
 
 // --- Format (en clair seulement sous la clé de la conversation) ------------------------------
 //
-// Tête, version 2 : version (1) ‖ n emplacements (4) ‖ réserve des rangs (8) ‖ rotation (4) ‖
+// Tête, version 3 : version (1) ‖ n emplacements (4) ‖ réserve des rangs (8) ‖ rotation (4) ‖
 // blocs du journal (4) ‖ blocs de l'index (4) ‖ arrivées ‖ signalé ‖ signalements ‖ départ ‖ gen
-// ‖ réglé ‖ appels jusqu'à ‖ sièges ‖ révoqués ‖ emplacements à écraser ‖ pièces prêtes.
+// ‖ réglé ‖ appels jusqu'à ‖ sièges ‖ révoqués ‖ emplacements à écraser ‖ pièces (prêtes, et en
+// envoi depuis D42-32 : un octet d'état de plus par pièce ; les segments reçus d'une pièce en
+// envoi sont dans salon_pieces.segments_mask, noté avant chaque accusé). Version 2 (pièces
+// prêtes seules, sans octet d'état) : relue à la mise à jour.
 // Bloc du journal : annonces (rang 8, longueur 1, enregistrement). Bloc de l'index : entrées
 // (rang 8, reçu 8, attendus 2, emplacement 4, siège 1, drapeaux 1, échéance 8 ; 0 : aucune).
 
-const versionTete = 2
+const (
+	versionTete  = 3
+	versionTete2 = 2
+)
+
+// etatPieceRangee : octet d'état d'une pièce dans une tête de version 3.
+const (
+	rangeeEnvoi = 0
+	rangeePrete = 1
+)
 
 func (s *salon) encoderTeteLocked(reserve uint64, n uint32, nJ, nI int) []byte {
 	b := binary.BigEndian.AppendUint32([]byte{versionTete}, n)
@@ -536,9 +548,12 @@ func (s *salon) encoderAEcraserLocked(b []byte) []byte {
 }
 
 func (s *salon) encoderPiecesLocked(b []byte) []byte {
+	// Pièces prêtes (sans écriture en cours) et pièces en envoi ou en finalisation (rangées
+	// « en envoi » : une finalisation interrompue est refaite par le client, ou reprise
+	// « prête » si sa ligne l'est déjà, reprendrePieces).
 	var pretes []*piece
 	for _, p := range s.lesPieces {
-		if p.etat == prete && !p.efface && p.ecritures == 0 {
+		if !p.efface && (p.etat != prete || p.ecritures == 0) {
 			pretes = append(pretes, p)
 		}
 	}
@@ -547,6 +562,11 @@ func (s *salon) encoderPiecesLocked(b []byte) []byte {
 	for _, p := range pretes {
 		b = append(b, uint8(len(p.id)))
 		b = append(b, p.id...)
+		if p.etat == prete {
+			b = append(b, rangeePrete)
+		} else {
+			b = append(b, rangeeEnvoi)
+		}
 		b = binary.BigEndian.AppendUint32(b, uint32(p.bucket))
 		b = append(b, bit(p.vocal), p.siege)
 		b = append(b, p.auteur[:]...)

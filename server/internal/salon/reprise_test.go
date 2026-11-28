@@ -320,7 +320,7 @@ func TestRepriseEchuPendantArret(t *testing.T) {
 }
 
 // Pièces : une pièce prête liée à une trame est reprise (lisible, budget recompté) ; une pièce
-// encore en envoi est effacée ; un salon sans pièce garde un budget nul.
+// encore en envoi est reprise aussi depuis D42-32 (pieces_reprise_test.go), son budget compris.
 func TestReprisePieces(t *testing.T) {
 	b := nouveauBancReprise(t)
 	c := b.creer(t, 4)
@@ -333,8 +333,8 @@ func TestReprisePieces(t *testing.T) {
 	if f, l := b2.surDisque(t, id); !f || !l {
 		t.Fatal("pièce prête perdue :", f, l)
 	}
-	if f, l := b2.surDisque(t, enCours); f || l {
-		t.Fatal("pièce en envoi gardée :", f, l)
+	if f, l := b2.surDisque(t, enCours); !f || !l {
+		t.Fatal("pièce en envoi perdue :", f, l)
 	}
 	lec, err := b2.m.OuvrirSegment(t.Context(), g2, id, 0)
 	if err != nil {
@@ -343,7 +343,7 @@ func TestReprisePieces(t *testing.T) {
 	lec.Close()
 	var octets int64
 	b2.db.QueryRow(`SELECT pieces_bytes FROM salons WHERE id=?`, g2.salon.id).Scan(&octets)
-	if octets != share.TotalSize(1) {
+	if octets != 2*share.TotalSize(1) {
 		t.Fatal("budget recompté :", octets)
 	}
 	// La pièce suit toujours sa trame : retirée avec elle.

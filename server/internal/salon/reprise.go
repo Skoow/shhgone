@@ -230,7 +230,8 @@ func effacerReprisesTx(tx *sql.Tx, cond string, args []any) error {
 
 // aReprendre : ligne de reprise d'un salon vivant, ouverte (clé de conversation et état en clair).
 // version 1 : ligne d'un arrêt propre d'avant la persistance continue (fichier {id}.r) ;
-// version 2 : tête et blocs (journal, index) de la persistance continue (fichier {id}).
+// versions 2 et 3 : tête et blocs (journal, index) de la persistance continue (fichier {id} ;
+// 3 : pièces en envoi comprises, D42-32).
 type aReprendre struct {
 	id              string
 	exp             int64
@@ -297,11 +298,11 @@ func (m *Manager) lireReprises(now int64) ([]aReprendre, error) {
 	garde := out[:0]
 	for i := range out {
 		r := &out[i]
-		if r.version == versionTete && m.lireBlocs(r) != nil {
+		if estTete(r.version) && m.lireBlocs(r) != nil {
 			r.oublier()
 			continue
 		}
-		if r.version != versionTete && r.version != versionEtat {
+		if !estTete(r.version) && r.version != versionEtat {
 			r.oublier()
 			continue
 		}
@@ -405,7 +406,7 @@ func (m *Manager) reprendre1(r *aReprendre) *salon {
 			!errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
-	case versionTete:
+	case versionTete, versionTete2:
 		if r.rotationTete != r.rotation {
 			return nil // exclusion écrite en base après la dernière ligne validée
 		}
@@ -453,7 +454,7 @@ func (m *Manager) reprendre1(r *aReprendre) *salon {
 	s.p.peutExister = true
 	s.p.borne, s.p.borneEcrite = s.seq, s.seq
 	s.p.aEcraserSurs = uint64(len(s.aEcraser))
-	if r.version == versionTete {
+	if estTete(r.version) {
 		s.p.ligne, s.p.journalEcrit, s.p.indexEcrit = true, len(s.journal), len(s.index)
 	}
 	m.mu.Lock()
@@ -486,25 +487,52 @@ func (s *salon) derniereLisible(conv *Conversation) bool {
 }
 
 // reprendrePieces : pièces rangées gardées si leur fichier (taille exacte du palier) et leur
-// ligne « ready » de ce salon sont là.
+// ligne de ce salon sont là : « ready » pour une pièce prête ; pour une pièce en envoi (D42-32),
+// « uploading » (segments reçus : ceux de la ligne, notés avant chaque accusé ; le délai
+// PieceSansSegment repart de la reprise) ou « ready » (finalisée après la dernière passe : prête).
 func (m *Manager) reprendrePieces(s *salon, l []*piece) {
-	pretes := map[string]bool{}
-	if rows, err := m.cfg.DB.Query(`SELECT id FROM salon_pieces WHERE salon_id=? AND state='ready'`, s.id); err == nil {
+	type ligne struct {
+		prete  bool
+		masque []byte
+	}
+	lignes := map[string]ligne{}
+	if rows, err := m.cfg.DB.Query(`SELECT id, state, segments_mask FROM salon_pieces WHERE salon_id=?`, s.id); err == nil {
 		for rows.Next() {
-			var id string
-			if rows.Scan(&id) == nil {
-				pretes[id] = true
+			var id, st string
+			var masque []byte
+			if rows.Scan(&id, &st, &masque) == nil && (st == "ready" || st == "uploading") {
+				lignes[id] = ligne{st == "ready", masque}
 			}
 		}
 		if rows.Err() != nil {
-			clear(pretes)
+			clear(lignes)
 		}
 		rows.Close()
 	}
+	now := m.cfg.Now()
 	for _, p := range l {
+		lg, ok := lignes[p.id]
 		fi, err := os.Lstat(filepath.Join(m.cfg.Pieces.Dir, p.id))
-		if !pretes[p.id] || err != nil || !fi.Mode().IsRegular() || fi.Size() != share.TotalSize(p.bucket) {
+		if !ok || err != nil || !fi.Mode().IsRegular() || fi.Size() != share.TotalSize(p.bucket) {
 			continue
+		}
+		switch {
+		case p.etat == prete && !lg.prete:
+			continue // jamais une pièce prête dont la ligne ne l'est pas
+		case p.etat == envoi && lg.prete:
+			p.etat, p.activite = prete, now
+		case p.etat == envoi:
+			segs := share.SegmentCount(p.bucket)
+			if len(lg.masque) != (segs+7)/8 {
+				continue
+			}
+			p.recus, p.activite = make([]bool, segs), now
+			for n := range segs {
+				if lg.masque[n/8]&(1<<(n%8)) != 0 {
+					p.recus[n] = true
+					p.ecrit += int64(share.SegmentSize(p.bucket, n))
+				}
+			}
 		}
 		if s.lesPieces == nil {
 			s.lesPieces, s.libres = map[string]*piece{}, map[string]*piece{}
@@ -598,6 +626,9 @@ func (l *lecteurEtat) nombre(max, taille int) int {
 	return k
 }
 
+// estTete : version d'une ligne de la persistance continue (tête et blocs).
+func estTete(v uint8) bool { return v == versionTete || v == versionTete2 }
+
 // longueurEnr : longueur exacte d'une annonce du journal de type ty (0 : type inconnu).
 func longueurEnr(ty byte) int {
 	switch ty {
@@ -631,7 +662,7 @@ func (s *salon) decoderV1(corps []byte, n uint32) ([]*piece, error) {
 		s.echeances = append(s.echeances, e)
 	}
 	s.decoderAEcraser(l, n)
-	pieces := s.decoderPieces(l)
+	pieces := s.decoderPieces(l, false)
 	if l.err || len(l.b) != 0 {
 		return nil, errReprise
 	}
@@ -655,7 +686,7 @@ func (s *salon) decoderV2(r *aReprendre, n uint32) ([]*piece, error) {
 	s.decoderSieges(l)
 	s.decoderRevoques(l)
 	s.decoderAEcraser(l, n)
-	pieces := s.decoderPieces(l)
+	pieces := s.decoderPieces(l, r.version == versionTete)
 	if l.err || li.err || len(l.b) != 0 || len(li.b) != 0 || lj.err || nbBlocs(len(s.journal), blocJournal) != r.nJ ||
 		nbBlocs(len(s.index), blocIndex) != r.nI {
 		return nil, errReprise
@@ -794,13 +825,24 @@ func (s *salon) decoderAEcraser(l *lecteurEtat, n uint32) {
 	}
 }
 
-func (s *salon) decoderPieces(l *lecteurEtat) []*piece {
+// decoderPieces : pièces de la tête ; avecEtat (version 3) : un octet d'état par pièce (prête ou
+// en envoi ; segments reçus relus en base par reprendrePieces).
+func (s *salon) decoderPieces(l *lecteurEtat, avecEtat bool) []*piece {
 	var pieces []*piece
 	vues := map[string]bool{}
 	liens := map[uint64]bool{}
 	for range l.nombre(math.MaxUint16, 1) {
 		p := &piece{etat: prete, lus: map[[32]byte]int64{}}
 		p.id = string(l.octets(int(l.u8())))
+		if avecEtat {
+			switch l.u8() {
+			case rangeePrete:
+			case rangeeEnvoi:
+				p.etat = envoi
+			default:
+				l.err = true
+			}
+		}
 		p.bucket = int(l.u32())
 		p.vocal = l.b1()
 		p.siege = l.u8()
@@ -814,7 +856,8 @@ func (s *salon) decoderPieces(l *lecteurEtat) []*piece {
 			p.lus[jv] = int64(min(l.u64(), math.MaxInt64))
 		}
 		if l.err || !idValide(p.id) || !PalierValide(p.bucket, p.vocal) || p.siege >= nbSieges || vues[p.id] ||
-			p.rang > s.seq || p.gen != s.gen.Load() || (p.lien != 0 && (liens[p.lien] || s.chercherLocked(p.lien) < 0)) {
+			p.rang > s.seq || p.gen != s.gen.Load() || (p.lien != 0 && (liens[p.lien] || s.chercherLocked(p.lien) < 0)) ||
+			(p.etat == envoi && (p.lien != 0 || len(p.lus) != 0 || p.servis != 0)) {
 			l.err = true
 			return nil
 		}

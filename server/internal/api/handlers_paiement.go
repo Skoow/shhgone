@@ -208,6 +208,9 @@ func failPaiement(w http.ResponseWriter, err error) {
 }
 
 func (a paiementAPI) commande(w http.ResponseWriter, r *http.Request) {
+	if a.refusMaintenance(w) { // nouvelle création : refusée avant un redémarrage annoncé
+		return
+	}
 	p, err := lirePass(r)
 	if err != nil {
 		failPaiement(w, err)

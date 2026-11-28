@@ -55,6 +55,9 @@ func ecrireEtapeOptions(w http.ResponseWriter, e [32]byte, opts json.RawMessage)
 
 // inscriptionDebut : { altcha, hp, shown_at } → { etape, options } (user.id = h, 16 octets).
 func (a compteAPI) inscriptionDebut(w http.ResponseWriter, r *http.Request) {
+	if a.refusMaintenance(w) { // nouvelle création : refusée avant un redémarrage annoncé
+		return
+	}
 	var b struct {
 		Altcha  string `json:"altcha"`
 		HP      string `json:"hp"`

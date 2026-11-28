@@ -386,8 +386,8 @@ func TestSchemaVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v := pragma(t, db, "user_version"); v != "6" {
-		t.Fatalf("user_version = %s, attendu 6 (envois et ouvertures repris, D42-31)", v)
+	if v := pragma(t, db, "user_version"); v != "7" {
+		t.Fatalf("user_version = %s, attendu 7 (pièces de salon reprises, D42-32)", v)
 	}
 	if _, err := db.Exec(`PRAGMA user_version=0`); err != nil { // base d'avant la version
 		t.Fatal(err)
@@ -627,24 +627,24 @@ func TestMigreV1VersV2(t *testing.T) {
 	}
 }
 
-// Une base du schéma 7 (binaire plus récent) est refusée sans rien toucher : ni tables du
+// Une base du schéma 8 (binaire plus récent) est refusée sans rien toucher : ni tables du
 // salon créées, ni version réécrite.
-func TestRefuseV7(t *testing.T) {
+func TestRefuseV8(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")
-	baseV1(t, path, 7)
+	baseV1(t, path, 8)
 	db, err := Open(path)
 	if !errors.Is(err, ErrNewerSchema) {
 		if db != nil {
 			db.Close()
 		}
-		t.Fatal("base du schéma 7 acceptée :", err)
+		t.Fatal("base du schéma 8 acceptée :", err)
 	}
 	raw, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer raw.Close()
-	if v := pragma(t, raw, "user_version"); v != "7" {
+	if v := pragma(t, raw, "user_version"); v != "8" {
 		t.Fatal("version touchée", v)
 	}
 	if got := strings.Join(masterNames(t, raw), ","); got != "index:shares_access_v,index:shares_manage_v,table:shares" {
@@ -852,7 +852,7 @@ func TestMigreV4VersV5(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if v := pragma(t, db, "user_version"); v != "6" {
+	if v := pragma(t, db, "user_version"); v != strconv.Itoa(SchemaVersion) {
 		t.Fatal("user_version", v)
 	}
 	var places int

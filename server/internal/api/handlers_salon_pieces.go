@@ -27,6 +27,7 @@ func (a salonAPI) routesPieces(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/salons/pieces", a.creerPiece)
 	mux.HandleFunc("PUT /api/salons/pieces/segments/{n}", a.envoyerSegmentPiece)
 	mux.HandleFunc("POST /api/salons/pieces/finalize", a.finaliserPiece)
+	mux.HandleFunc("POST /api/salons/pieces/reprendre", a.reprendrePiece)
 	mux.HandleFunc("GET /api/salons/pieces/segments/{n}", a.lireSegmentPiece)
 	mux.HandleFunc("/api/salons/pieces/segments/{n}", methodNotAllowed)
 }
@@ -92,6 +93,9 @@ func pieceID(r *http.Request) (string, error) {
 // 429 limit). Un vocal ne passe par aucun des deux (réserve du siège, v3 §5.1). Jeton
 // d'envoi valable min(6 h, fin du salon).
 func (a salonAPI) creerPiece(w http.ResponseWriter, r *http.Request) {
+	if a.refusMaintenance(w) { // nouvelle création : refusée avant un redémarrage annoncé
+		return
+	}
 	var b struct {
 		Bucket *int  `json:"bucket"`
 		Vocal  *bool `json:"vocal"`
@@ -221,6 +225,43 @@ func (a salonAPI) finaliserPiece(w http.ResponseWriter, r *http.Request) {
 	}
 	a.lim.FinishUpload(id, ipOf(r))
 	writeJSON(w, http.StatusOK, struct{}{})
+}
+
+// reprendrePiece : POST /api/salons/pieces/reprendre (X-Shh-Membre, X-Shh-Piece, corps vide) :
+// l'auteur reprend l'envoi de sa pièce après un redémarrage du serveur (D42-32), comme
+// POST /api/manage/resume pour un partage : jeton d'envoi neuf (min(6 h, fin du salon)) ; les
+// segments déjà acquittés sont gardés, le client renvoie le reste. « prete » : la pièce a été
+// finalisée avant le redémarrage, rien à renvoyer ni à finaliser. Pièce inconnue, effacée ou
+// d'un autre auteur : 404 (le client recrée la pièce). L'envoi d'un fichier rejoint les quotas
+// du jour sans refus (ni création, ni nouvelle réservation : limits.ResumeUpload). Jamais
+// refusée par une maintenance annoncée : ce n'est pas une création.
+func (a salonAPI) reprendrePiece(w http.ResponseWriter, r *http.Request) {
+	mb, _, err := a.membre(r)
+	if err != nil {
+		failSalon(w, err)
+		return
+	}
+	id, err := pieceID(r)
+	if err != nil {
+		failSalon(w, err)
+		return
+	}
+	bucket, vocal, prete, err := a.m.RepriseEnvoi(mb, id)
+	if err != nil {
+		failSalon(w, err)
+		return
+	}
+	if !vocal && !prete {
+		a.lim.ResumeUpload(ipOf(r), id, share.ContentBytes(bucket), 0)
+	}
+	exp := a.svc.Now().Add(pieceTTL)
+	if fin := mb.Echeance(); fin.Before(exp) {
+		exp = fin
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Token string `json:"upload_token"`
+		Prete bool   `json:"prete"`
+	}{a.sig.Issue(token.SalonPiece, id, 0, exp), prete})
 }
 
 // lireSegmentPiece : GET /api/salons/pieces/segments/{n} (X-Shh-Membre, X-Shh-Piece), en flux

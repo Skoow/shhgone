@@ -25,6 +25,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/captcha"
 	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/limits"
+	"github.com/skoow/shhdrop/server/internal/maintenance"
 	"github.com/skoow/shhdrop/server/internal/paiement"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
@@ -251,6 +252,8 @@ type server struct {
 	// jetons : jetons anonymes des partages payants (SHH_PAIEMENT=1), sinon nil : un en-tête
 	// PrivateToken est alors refusé (400).
 	jetons *paiement.Jetons
+	// maint : maintenance annoncée (deploy/maintenance.sh, D42-32) ; nil : jamais de maintenance.
+	maint *maintenance.Suivi
 }
 
 // reportCounter : signalements de l'heure en cours, un seul entier sans identifiant, remis à
@@ -344,10 +347,15 @@ type Salons struct {
 	Paiement *paiement.Service
 	// Apps : fichiers d'association des apps natives (apps.go) ; vides : non servis.
 	Apps Apps
+	// Maintenance : annonce d'une maintenance programmée (maintenance.go de ce paquet) ; nil :
+	// aucune (GET /api/etat-service répond toujours, sans maintenance).
+	Maintenance *maintenance.Suivi
 }
 
 func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 	api := http.NewServeMux()
+	s.maint = sal.Maintenance
+	api.HandleFunc("GET /api/etat-service", s.etatService)
 	api.HandleFunc("GET /api/captcha", s.captcha)
 	api.HandleFunc("POST /api/shares", s.create)
 	// Aucun identifiant dans les chemins (spec §29.8, §32) : le partage est désigné par un

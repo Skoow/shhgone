@@ -25,6 +25,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/config"
 	"github.com/skoow/shhdrop/server/internal/janitor"
 	"github.com/skoow/shhdrop/server/internal/limits"
+	"github.com/skoow/shhdrop/server/internal/maintenance"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
 	"github.com/skoow/shhdrop/server/internal/store"
@@ -507,6 +508,9 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if pai != nil {
 		sal.Paiement = pai.svc // SHH_PAIEMENT=0 : nil, aucune route /api/paiement/*
 	}
+	// Maintenance annoncée par deploy/maintenance.sh (D42-32) : fichier du dossier de données,
+	// relu à chaque démarrage (l'annonce survit au redémarrage du conteneur).
+	sal.Maintenance = maintenance.Nouveau(filepath.Join(cfg.DataDir, "maintenance"), cfg.Now)
 	handler, probes := api.NewWithProbes(svc, token.New(tokKey, cfg.Now), lim,
 		captcha.New(capKey, cfg.Now), static, cfg.BehindProxy, cfg.TrustedProxies, sal, capacityOf(cfg))
 	srv := newHTTPServer(handler)

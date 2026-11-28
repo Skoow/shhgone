@@ -180,7 +180,11 @@ const busyTimeoutMs = "5000"
 // rouvre plus la base (ErrNewerSchema) : pas de retour arrière sans effacer shares.db.
 // 6 : tables shares_envoi et shares_ouvertures (envois et ouvertures repris après un
 // redémarrage, D42-31 ; tables neuves, créées vides). Un binaire du schéma 5 ne rouvre plus la base.
-const SchemaVersion = 6
+// 7 : aucune table changée ; les lignes de salons_reprise passent à la tête de version 3 (pièces
+// en envoi comprises, D42-32), qu'un binaire du schéma 6 ne saurait pas lire (il perdrait les
+// salons ouverts) : il refuse donc la base, et le retour arrière de deploy.sh remet la copie des
+// bases prise avant la mise à jour (deploy/bases.sh).
+const SchemaVersion = 7
 
 var (
 	// ErrNewerSchema : message fixe, sans chemin.

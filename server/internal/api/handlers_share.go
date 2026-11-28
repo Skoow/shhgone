@@ -90,6 +90,9 @@ type createBody struct {
 // lu dans la base) ne peut donc pas savoir si un partage existe. L'id
 // interne est tiré ici (share.NewID), jamais choisi par le client.
 func (s *server) create(w http.ResponseWriter, r *http.Request) {
+	if s.refusMaintenance(w) { // nouvelle création : refusée avant un redémarrage annoncé
+		return
+	}
 	var b createBody
 	if err := readJSON(w, r, &b); err != nil {
 		fail(w, err)
