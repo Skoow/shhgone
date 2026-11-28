@@ -9,7 +9,7 @@
 // - l'adresse de la page hébergée rendue par le serveur est revérifiée ici contre la liste fermée
 //   des prestataires (adresseSure) avant toute redirection.
 import { b64u, unb64u } from "../engine/pure";
-import { signalerMaintenance } from "../maintenance/etat.svelte";
+import { signalerMaintenance } from "../maintenance/signal";
 
 export type Net = { origin: string; fetch: typeof fetch };
 

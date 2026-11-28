@@ -9,7 +9,7 @@
 // - erreurs : SalonError (statut, code du serveur, essais restants, délai) ; coupure réseau :
 //   Error("reseau") ; réponse 2xx mal formée : Error("reponse_invalide").
 import { b64u, unb64u } from "../engine/pure";
-import { signalerMaintenance } from "../maintenance/etat.svelte";
+import { signalerMaintenance } from "../maintenance/signal";
 
 export type Net = { origin: string; fetch: typeof fetch };
 

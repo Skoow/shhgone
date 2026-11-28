@@ -3,7 +3,9 @@
 // passage en mode imminent par un refus 503 « maintenance », boutons de création désactivés.
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { creationsFermees, lireEtat, maintenance, rafraichir, signalerMaintenance, surveiller, texteBandeau, PERIODE_ANNONCE_MS, PERIODE_MS } from "./etat.svelte";
+import { creationsFermees, lireEtat, maintenance, rafraichir, surveiller, texteBandeau, PERIODE_ANNONCE_MS, PERIODE_MS } from "./etat.svelte";
+// Comme les clients d'API : par le relais sans Svelte (signal.ts), auquel l'état s'abonne.
+import { signalerMaintenance } from "./signal";
 import { setLang } from "../i18n/i18n.svelte";
 import MaintenanceBanner from "../ui/MaintenanceBanner.svelte";
 

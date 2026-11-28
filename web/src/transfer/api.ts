@@ -5,7 +5,7 @@
 // Les secrets ont des types marqués (engine/pure.ts) : K_lien ne peut pas être envoyé.
 // Module interne : l'interface publique est src/index.ts, sans ce module.
 import { b64u, checkOrigin, unb64u, type KAcces, type KPreuve, type SGestion } from "../engine/pure";
-import { signalerMaintenance } from "../maintenance/etat.svelte";
+import { signalerMaintenance } from "../maintenance/signal";
 import { fetchUploader, xhrUploader, type Uploader } from "./upload";
 import { OPENS_SEEN_MAX, TTL_MAX_HOURS } from "../limits";
 

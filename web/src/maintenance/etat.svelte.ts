@@ -6,6 +6,7 @@
 // Les apps liront la même route.
 import { formatClock } from "../i18n/format";
 import { getLang, t } from "../i18n/i18n.svelte";
+import { ecouterMaintenance } from "./signal";
 
 export type Annonce = { debut: number; dureeMin: number; retour: number; imminente: boolean };
 
@@ -83,6 +84,8 @@ export function signalerMaintenance(status: number, corps: unknown): void {
   const r = retourDe(status, corps);
   if (r !== null) noterRefus(r);
 }
+// Les clients d'API passent par maintenance/signal.ts (sans Svelte) : l'état s'y abonne ici.
+ecouterMaintenance(signalerMaintenance);
 
 /** Créations fermées (mode « redémarrage imminent ») : les boutons concernés sont désactivés. */
 export function creationsFermees(): boolean {

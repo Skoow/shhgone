@@ -510,3 +510,30 @@ describe("vite.config.ts résolu", () => {
     expect(() => hook.call(ctx, {}, chunk(["C:\\w\\src\\demo\\install.ts"]))).toThrow(/code de démo/);
   });
 });
+
+// Le client de transfert (interface publique src/index.ts) reste sans interface : aucun module
+// Svelte (« .svelte » ou runes « .svelte.ts ») n'est atteint depuis lui. Sinon il ne se charge plus
+// hors du site (tests ui-e2e sous Node : « $state is not defined », D42-32).
+describe("src/index.ts sans Svelte", () => {
+  it("aucun import (hors « import type ») ne mène à un module Svelte", () => {
+    const vus = new Map<string, string | null>();
+    const file = [[join(srcDir, "index.ts"), null]] as [string, string | null][];
+    const resoudre = (de: string, spec: string): string | null => {
+      if (!spec.startsWith(".")) return null;
+      const b = join(dirname(de), spec);
+      for (const c of [b, b + ".ts", b + "/index.ts"]) if (statSync(c, { throwIfNoEntry: false })?.isFile()) return c;
+      return null;
+    };
+    while (file.length) {
+      const [f, parent] = file.shift()!;
+      if (vus.has(f)) continue;
+      vus.set(f, parent);
+      for (const m of readFileSync(f, "utf8").matchAll(/(?:^|\n)\s*(?:import|export)\s(?!type\s)[^;]*?from\s+"([^"]+)"/g)) {
+        const r = resoudre(f, m[1]!);
+        if (r) file.push([r, f]);
+      }
+    }
+    const svelte = [...vus.keys()].filter((f) => /\.svelte(\.ts)?$/.test(f)).map((f) => relative(srcDir, f));
+    expect(svelte).toEqual([]);
+  });
+});
