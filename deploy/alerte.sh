@@ -71,7 +71,7 @@
 # SHH_ALERTE_NPROC, SHH_ALERTE_DOCKER, SHH_ALERTE_CERT_FIN, SHH_ALERTE_CERT_DEBUT, SHH_ALERTE_CERT_SERIE, SHH_ALERTE_CERT_WWW (sortie « serial=… » du certificat de www), SHH_ALERTE_CT, SHH_ALERTE_CT_WWW, SHH_ALERTE_RDAP, SHH_ALERTE_DNS,
 # SHH_ALERTE_IPS, SHH_ALERTE_SAUVEGARDE_OK, SHH_ALERTE_SMART, SHH_ALERTE_APT,
 # SHH_ALERTE_REBOOT, SHH_ALERTE_RETARD, SHH_ALERTE_NTP, SHH_ALERTE_UNITES, SHH_ALERTE_BOOT_ID,
-# SHH_ALERTE_DEMARRAGE, SHH_ALERTE_MONTE (« oui » ou « non »), SHH_ALERTE_MDP_FICHIER,
+# SHH_ALERTE_DEMARRAGE, SHH_ALERTE_DEMARRAGE_SERVEUR (heure Unix du démarrage du serveur), SHH_ALERTE_MONTE (« oui » ou « non »), SHH_ALERTE_MDP_FICHIER,
 # SHH_ALERTE_INTEGRITE, SHH_ALERTE_SSH, SHH_ALERTE_GITHUB (commande, chemin de l'API en $1),
 # SHH_ALERTE_GITHUB_JETON, SHH_ALERTE_DIG (commande, arguments de dig), SHH_ALERTE_TEMPS,
 # SHH_ALERTE_CERT_EMETTEUR ; SHH_COURRIEL_ENVOI (courriel.sh).
@@ -88,6 +88,8 @@ env_file=${SHH_ENV_FILE:-$here/.env}
 lire_env "$env_file" 0 || die "$env_file refusé (voir ci-dessus)"
 # shellcheck source=deploy/courriel.sh
 . "$here/courriel.sh"
+# shellcheck source=deploy/annonce.sh
+. "$here/annonce.sh"
 root=${SHH_DATA_ROOT:-/srv/shhdrop}
 etat=${SHH_ALERTE_ETAT:-/var/lib/shhdrop-alerte}
 mkdir -p "$etat" && chmod 0700 "$etat"
@@ -699,6 +701,14 @@ if [ "$(date -u -d "@$now" +%u)" = 1 ] && [ $((now - bilan_dernier)) -ge $((3 * 
 		else
 			v ko "Sauvegarde : aucune réussie"
 		fi
+		# Maintenance programmée (deploy/maintenance.sh, D42-32).
+		if [ -n "${SHH_ALERTE_DEMARRAGE_SERVEUR+x}" ]; then dem_serveur=$SHH_ALERTE_DEMARRAGE_SERVEUR; else dem_serveur=$(annonce_demarrage); fi
+		m_code=0
+		m_texte=$(annonce_etat "$root/data/maintenance" "$now" "$dem_serveur") || m_code=$?
+		case $m_code in
+		0 | 1 | 3) v ok "Maintenance programmée : $m_texte" ;;
+		*) v av "Maintenance programmée : $m_texte" ;;
+		esac
 		demarrage=$(lire SHH_ALERTE_DEMARRAGE uptime -s)
 		printf '   Dernier redémarrage de la machine : %s\n' "$(printf '%s' "${demarrage:-?}" | net)"
 		printf '   Mises à jour en attente : %s (dont sécurité : %s) ; redémarrage nécessaire : %s (section 2)\n' "${n_maj:-?}" "${n_secu:-?}" "$redemarrage_demande"

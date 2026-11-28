@@ -22,6 +22,8 @@ fi
 jeton_preprod=sans
 # shellcheck source=deploy/commun.sh
 . ./commun.sh
+# shellcheck source=deploy/annonce.sh
+. ./annonce.sh
 
 titre() { printf '\n%s\n' "$1"; }
 
@@ -56,6 +58,13 @@ if mountpoint -q "$SHH_DATA_ROOT"; then
 else
 	echo "  FERMÉ : le site est arrêté. L'ouvrir (README §5) :"
 	echo "    sudo cryptsetup open <disque> shhdrop && sudo mount -o noatime,nodev,nosuid,noexec /dev/mapper/shhdrop $SHH_DATA_ROOT"
+fi
+
+titre "Maintenance programmée (deploy/maintenance.sh)"
+if [ "$volume" = 1 ]; then
+	echo "  $(annonce_etat "$SHH_DATA_ROOT/data/maintenance" "$(date +%s)" "$(annonce_demarrage)")"
+else
+	echo "  illisible : volume fermé"
 fi
 
 titre "Conteneurs"

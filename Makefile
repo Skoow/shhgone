@@ -34,7 +34,8 @@ test-repro:
 	web/scripts/repro.sh
 
 # Scripts de déploiement et de build : syntaxe, ShellCheck (0.11.0 en CI, job deploy-lint),
-# bancs de l'alerte, de l'intégrité (AIDE exigé), de l'alerte SSH et de la provenance (deploy/test-alerte.sh, deploy/test-integrite.sh, deploy/test-ssh-connexion.sh, deploy/test-provenance.sh : sans réseau, Node exigé), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais de sortie,
+# bancs de l'alerte, de l'intégrité (AIDE exigé), de l'alerte SSH et de la provenance (deploy/test-alerte.sh, deploy/test-integrite.sh, deploy/test-ssh-connexion.sh, deploy/test-provenance.sh : sans réseau, Node exigé),
+# de la copie des bases et du retour arrière (deploy/test-bases.sh, sqlite3 exigé) et de la maintenance programmée (deploy/test-maintenance.sh), go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais de sortie,
 # contrôle « joindre » ; les essais de banc, sans leurs variables, sont sautés).
 lint-deploy:
 	for f in deploy/*.sh web/scripts/*.sh; do bash -n "$$f" || exit 1; done
@@ -47,6 +48,8 @@ lint-deploy:
 	deploy/test-provenance.sh
 	deploy/test-verrous.sh
 	deploy/test-outils.sh
+	deploy/test-bases.sh
+	deploy/test-maintenance.sh
 	cd deploy/shhcheck && go vet ./... && go test -race -count=1 ./...
 
 # Test du proxy (deploy/test-proxy.sh) : Caddy 2.10 ou plus dans le PATH (ou CADDY=…), site

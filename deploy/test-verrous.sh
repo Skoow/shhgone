@@ -490,7 +490,7 @@ chmod 0755 "$jd"
 # dans un dépôt git aux commits signés : deploy.sh et preprod.sh y tournent pour de vrai.
 pp=$work/pp
 mkdir -p "$pp/deploy"
-cp -- "$here"/{deploy,commun,preprod,verrous,provenance,journaux,lire-env,fichiers-secrets}.sh "$here"/{compose.yaml,Caddyfile,maintenance.html} "$pp/deploy/"
+cp -- "$here"/{deploy,commun,preprod,verrous,provenance,journaux,lire-env,fichiers-secrets,bases}.sh "$here"/{compose.yaml,Caddyfile,maintenance.html} "$pp/deploy/"
 git init -q -b main "$pp"
 git -C "$pp" add -A
 git -C "$pp" "${ident[@]}" -c gpg.format=ssh -c "user.signingkey=$work/k-dev" commit -q -S -m "copie d'essai"

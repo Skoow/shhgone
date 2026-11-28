@@ -49,6 +49,8 @@ depot_image_valide "$SHH_IMAGE_REPO" || exit 1
 . ./verrous.sh
 # shellcheck source=deploy/fichiers-secrets.sh
 . ./fichiers-secrets.sh
+# shellcheck source=deploy/bases.sh
+. ./bases.sh
 # Copie du dépôt vérifiée par les verrous : celle de ce script (ses Caddyfile, compose.yaml et
 # verify-site.mjs sont ceux qu'utilise l'installation), jamais une autre.
 depot=$(cd "$here/.." && pwd)
@@ -299,6 +301,11 @@ need_current() { etat_valide "$cur" || die "aucune version installée (deploy/.r
 preflight() {
 	local opts src
 	docker compose version >/dev/null 2>&1 || die "docker compose introuvable"
+	# Copie des bases avant une mise à jour (bases.sh) : sqlite3 et setpriv, vérifiés avant
+	# d'arrêter quoi que ce soit.
+	if ! command -v sqlite3 >/dev/null 2>&1 || ! command -v setpriv >/dev/null 2>&1; then
+		die "sqlite3 et setpriv exigés (copie des bases avant une mise à jour) : apt install sqlite3 util-linux (README §1)"
+	fi
 	mountpoint -q "$SHH_DATA_ROOT" ||
 		die "$SHH_DATA_ROOT n'est pas un point de montage : volume chiffré non déverrouillé ?"
 	opts=$(findmnt -no OPTIONS -T "$SHH_DATA_ROOT")
@@ -522,8 +529,21 @@ integrite_fin() {
 # contrôle (check), puis note l'état ; si le contrôle échoue, remet la version en service avant.
 # Appelé seulement après les verrous et les vérifications propres à chaque chemin (provenance et
 # V3 pour deploy.sh ; construction depuis le commit vérifié pour preprod.sh).
+# Bases (D42-32, bases.sh) : avant de changer d'image, le serveur en service est arrêté
+# proprement et ses bases copiées (copie cohérente, volume chiffré) ; si le contrôle échoue, les
+# bases dont le schéma a changé sont remises à cette copie avant de relancer l'ancienne image
+# (qui refuserait une base plus récente) ; la copie est effacée dès que l'issue est connue.
 mettre_en_service() {
-	local new=$1 new_v=$2 new_c=$3 mode=$4
+	local new=$1 new_v=$2 new_c=$3 mode=$4 copie=0 donnees=$SHH_DATA_ROOT/data retour=$SHH_DATA_ROOT/retour
+	if [ "$new" != "$cur" ] && etat_valide "$cur"; then
+		echo "arrêt de $cur et copie des bases (retour arrière possible même après une migration de schéma)"
+		dc "$cur" stop shhdrop || true
+		if ! copie_bases "$donnees" "$retour"; then
+			dc "$cur" up -d --remove-orphans || true
+			die "copie des bases impossible : mise à jour annulée, $cur relancée"
+		fi
+		copie=1
+	fi
 	echo "installation de $new"
 	dc "$new" up -d --remove-orphans || true # l'échec éventuel est constaté par check
 	# Relais des prestataires absents ou paiement désactivé : ceux d'une activation précédente ne
@@ -555,11 +575,21 @@ mettre_en_service() {
 		else
 			echo "en service : $new (web-v$new_v, commit $new_c)"
 		fi
+		if [ "$copie" = 1 ]; then effacer_copie "$retour"; fi
 		return 0
 	fi
 
 	if etat_valide "$cur" && [ "$cur" != "$new" ]; then
 		echo "ÉCHEC du contrôle : retour à $cur" >&2
+		if [ "$copie" = 1 ]; then
+			# Serveur de la nouvelle image arrêté, puis bases remises si leur schéma a changé.
+			dc "$new" stop shhdrop || true
+			if restaurer_bases "$donnees" "$retour" >&2; then
+				effacer_copie "$retour"
+			else
+				echo "ATTENTION : une base n'a pas pu être remise (copie gardée dans $retour) : l'ancienne image peut refuser de démarrer." >&2
+			fi
+		fi
 		dc "$cur" up -d --remove-orphans || true
 		if check "$cur" "$cur_v"; then
 			echo "retour arrière fait : $cur est en service" >&2

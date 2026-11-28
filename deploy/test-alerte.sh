@@ -65,7 +65,8 @@ sain() {
 	export SHH_ALERTE_GITHUB="$work/gh.sh \"\$1\"" SHH_ALERTE_DIG="$work/dig.sh \"\$@\"" SHH_ALERTE_SSH="$work/ssh"
 	export SHH_ALERTE_TEMPS='echo "200 0.123"' SHH_ALERTE_CERT_EMETTEUR="Let's Encrypt"
 	echo vert >"$work/gh-mode"
-	export SHH_ENV_FILE="$work/env" SHH_ALERTE_MAINTENANT=$NOW
+	export SHH_ENV_FILE="$work/env" SHH_ALERTE_MAINTENANT=$NOW SHH_ALERTE_DEMARRAGE_SERVEUR=$((NOW - 86400))
+	rm -f "$work/donnees/data/maintenance"
 	export SHH_ALERTE_SANTE='echo "{\"ok\":true,\"reports_alert\":false}"'
 	export SHH_ALERTE_DOCKER='true'
 	export SHH_ALERTE_DF='printf "Use%% IUse%%\n 40%%  2%%\n"'
@@ -298,6 +299,20 @@ done
 grep -qF "vieille" "$m" && ko "vert : connexion de plus de 7 jours listée"
 grep -q "^To: alerte@exemple.test" "$work/courriels" || ko "vert : destinataire"
 propre vert
+grep -qF "✅ Maintenance programmée : aucune maintenance annoncée" "$m" || ko "vert : maintenance programmée absente du bilan"
+# Maintenance programmée (deploy/maintenance.sh, D42-32) : annoncée (✅, avec son heure),
+# dépassée sans redémarrage du serveur (⚠️), faite (✅).
+mkdir -p "$work/donnees/data"
+for cas in "annoncee $((NOW - 3600)) $((NOW + 2 * 86400)) ✅ Maintenance programmée : annoncée : " \
+	"depassee $((NOW - 7200)) $((NOW - 3600)) ⚠️ Maintenance programmée : DÉPASSÉE sans redémarrage" \
+	"faite $((NOW - 7200 - 86400)) $((NOW - 3600 - 86400)) ✅ Maintenance programmée : faite : serveur redémarré"; do
+	read -r nom annonce debut attendu <<<"$cas"
+	sain
+	printf 'v1 %s %s 30 10\n' "$annonce" "$debut" >"$work/donnees/data/maintenance"
+	courriel "maint-$nom"
+	grep -qF -- "$attendu" "$work/maint-$nom.mail" || ko "maintenance $nom : « $attendu » absent ($(grep -F 'Maintenance' "$work/maint-$nom.mail"))"
+done
+rm -f "$work/donnees/data/maintenance"
 # Un autre jour que le lundi : pas de bilan.
 sain
 export SHH_ALERTE_MAINTENANT=$((NOW + 86400))
