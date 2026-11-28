@@ -1,11 +1,11 @@
 package share
 
 import (
-	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/binary"
 	"errors"
-	"time"
 )
 
 // Octroi d'ouverture (spec §41.4, D41-5 ; D42-22) : recharger la page, ouvrir le même partage
@@ -13,11 +13,14 @@ import (
 // ouverture. L'octroi vaut jusqu'à l'échéance du partage (D42-22, au lieu de 30 min) ; une
 // ouverture ne se termine plus quand il expire : seulement par done, destruction ou échéance.
 //
-// Octroi = b64u(n (4 octets) ‖ exp (4 octets, secondes Unix) ‖ HMAC-SHA-256(clé, étiquette ‖
-// id ‖ n ‖ exp)), 40 octets, 54 caractères. L'id interne n'est pas dans l'octroi : le serveur
-// le retrouve par K_accès et vérifie le MAC avec lui. La clé est tirée à chaque démarrage
-// (NewService) : un redémarrage invalide tous les octrois. L'état (échéance, rechargements)
-// vit en mémoire seulement (goneState.grants) ; rien en base, aucune adresse, aucun cookie.
+// Octroi = b64u(n (4 octets) ‖ exp (4 octets, secondes Unix) ‖ 32 octets aléatoires), 40
+// octets, 54 caractères (même forme qu'avant le 28 novembre). L'id interne n'est pas dans
+// l'octroi : le serveur le retrouve par K_accès. Depuis D42-31 (« rien ne se perd après un
+// redémarrage »), le serveur ne garde que SHA-256 de l'octroi, en mémoire et dans
+// shares_ouvertures (avec les retours, les octets lus et la voix de signalement) : un
+// redémarrage, propre ou brutal, ne rend plus aucun octroi invalide. Aucune clé n'est écrite
+// (l'ancien HMAC demandait une clé tirée à chaque démarrage) ; rien sur l'appareil, aucune
+// adresse, aucun cookie.
 
 const (
 	// MaxReopens : retours (rechargements, autres onglets, retours plus tard) acceptés par
@@ -35,58 +38,60 @@ var (
 	ErrReopenLimit = errors.New("trop de rechargements")
 )
 
-var grantLabel = []byte("shhdrop-open-grant-v1")
-
-// grantEntry : ouverture qui peut revenir (en mémoire jusqu'à sa fin ou celle du partage) et
-// retours acceptés.
+// grantEntry : ouverture émise d'un partage vivant (en mémoire, et rangée dans
+// shares_ouvertures) : empreinte de son octroi, retours acceptés.
 type grantEntry struct {
+	h       [32]byte
 	reopens int
-	// exp : échéance du partage ; l'entrée est oubliée au plus tard à exp + grâce (sweepGone),
+	// exp : échéance du partage ; l'entrée est oubliée au plus tard à exp + grâce (sweepGrantsLocked),
 	// même si le partage a été effacé hors de ce processus.
 	exp int64
+	// done : l'ouverture est terminée (done) ; son octroi ne rouvre plus rien, mais prouve
+	// encore l'ouverture pour un signalement ou la destruction par le dernier destinataire.
+	done bool
 }
 
-func grantMAC(secret [32]byte, id [16]byte, head []byte) []byte {
-	h := hmac.New(sha256.New, secret[:])
-	h.Write(grantLabel)
-	h.Write(id[:])
-	h.Write(head)
-	return h.Sum(nil)
-}
-
-// IssueGrant signe l'octroi de l'ouverture n du partage id, valable jusqu'à exp.
-func IssueGrant(secret [32]byte, id [16]byte, n uint32, exp time.Time) string {
-	b := make([]byte, 8, grantLen)
+// newGrant tire l'octroi de l'ouverture n, valable jusqu'à exp, et rend son empreinte.
+func newGrant(n uint32, exp int64) (string, [32]byte) {
+	b := make([]byte, grantLen)
 	binary.BigEndian.PutUint32(b, n)
-	binary.BigEndian.PutUint32(b[4:], uint32(exp.Unix()))
-	return b64.EncodeToString(append(b, grantMAC(secret, id, b)...))
+	binary.BigEndian.PutUint32(b[4:], uint32(exp))
+	rand.Read(b[8:]) // ne renvoie jamais d'erreur (Go ≥ 1.24)
+	return b64.EncodeToString(b), sha256.Sum256(b)
 }
 
-// VerifyGrant vérifie le MAC (temps constant) et l'échéance ; rend le n° d'ouverture.
-func VerifyGrant(secret [32]byte, id [16]byte, g string, now time.Time) (n uint32, ok bool) {
+// parseGrant lit un octroi bien formé : n° d'ouverture, échéance et empreinte.
+func parseGrant(g string) (n uint32, exp int64, h [32]byte, ok bool) {
 	raw, err := DecodeB64(g, grantLen)
 	if err != nil {
-		return 0, false
-	}
-	if !hmac.Equal(raw[8:], grantMAC(secret, id, raw[:8])) {
-		return 0, false
+		return 0, 0, h, false
 	}
 	n = binary.BigEndian.Uint32(raw)
-	exp := int64(binary.BigEndian.Uint32(raw[4:]))
-	if n < 1 || n > maxOpenN || exp <= now.Unix() {
-		return 0, false
-	}
-	return n, true
+	exp = int64(binary.BigEndian.Uint32(raw[4:]))
+	return n, exp, sha256.Sum256(raw), n >= 1 && n <= maxOpenN
 }
 
-func idBytes(id string) ([16]byte, bool) {
-	var a [16]byte
-	b, err := DecodeB64(id, 16)
-	if err != nil {
-		return a, false
+// checkGrantLocked : l'octroi g est celui d'une ouverture émise du partage id (empreinte comparée
+// en temps constant), non échu ; rend son entrée (terminée ou non). Sous gone.mu.
+func (s *Service) checkGrantLocked(id, g string, now int64) (uint32, *grantEntry, bool) {
+	n, exp, h, ok := parseGrant(g)
+	if !ok || exp <= now {
+		return 0, nil, false
 	}
-	copy(a[:], b)
-	return a, true
+	s.gone.init()
+	e := s.gone.grants[openKey{id, int(n)}]
+	if e == nil || subtle.ConstantTimeCompare(h[:], e.h[:]) != 1 {
+		return 0, nil, false
+	}
+	return n, e, true
+}
+
+// verifyGrant : checkGrantLocked hors du verrou (signalement, destruction par un destinataire).
+func (s *Service) verifyGrant(id, g string) (uint32, bool) {
+	s.gone.mu.Lock()
+	defer s.gone.unlock()
+	n, _, ok := s.checkGrantLocked(id, g, s.now())
+	return n, ok
 }
 
 // Opened : résultat d'un déverrouillage (numéro d'ouverture, enveloppe E, octroi).
@@ -102,40 +107,42 @@ type Opened struct {
 	LastOpen bool
 }
 
-// grantLocked inscrit l'ouverture k en mémoire et signe son octroi, valable jusqu'à exp
+// grantLocked inscrit en mémoire l'ouverture k, d'octroi d'empreinte h, valable jusqu'à exp
 // (échéance du partage, D42-22). Le budget de lecture de k vit aussi jusque-là : un retour
 // après plus de 6 h ne le remet pas à zéro. Sous gone.mu.
-func (s *Service) grantLocked(k openKey, exp int64) string {
+func (s *Service) grantLocked(k openKey, h [32]byte, exp int64) {
 	s.gone.init()
 	e := s.gone.grants[k]
 	if e == nil {
-		e = &grantEntry{}
+		e = &grantEntry{h: h}
 		s.gone.grants[k] = e
 	}
 	e.exp = max(e.exp, exp)
 	// Le budget vit jusqu'à la fin de grâce de l'échéance : il ne repart pas à zéro pendant
 	// qu'une lecture active finit (spec §41.8).
 	s.budget.keep(k, max(exp+graceWindow, s.now()+purgeWindow))
-	id, _ := idBytes(k.id)
-	return IssueGrant(s.grantKey, id, uint32(k.openN), time.Unix(exp, 0))
 }
 
 // liveGrantLocked : l'ouverture k a un octroi en mémoire (ni terminée, ni balayée).
 func (s *Service) liveGrantLocked(k openKey) *grantEntry {
 	s.gone.init()
-	return s.gone.grants[k]
+	if e := s.gone.grants[k]; e != nil && !e.done {
+		return e
+	}
+	return nil
 }
 
 // reopen : unlock avec un octroi (UnlockGrant). Octroi invalide ou ouverture terminée :
 // ErrGrantInvalid, sans essai ; mot de passe faux : un essai ; juste : même ouverture, aucune
 // ouverture consommée, au plus MaxReopens fois sur la vie du lien.
 func (s *Service) reopen(id string, kAcces, kPreuve []byte, grant string) (Opened, error) {
-	idb, ok := idBytes(id)
-	if !ok {
+	if !validID(id) {
 		return Opened{}, ErrNotFound
 	}
 	now := s.now()
-	n, ok := VerifyGrant(s.grantKey, idb, grant, s.Now())
+	s.gone.mu.Lock()
+	n, _, ok := s.checkGrantLocked(id, grant, now)
+	s.gone.unlock()
 	if !ok {
 		return Opened{}, ErrGrantInvalid
 	}
@@ -172,11 +179,23 @@ func (s *Service) reopen(id string, kAcces, kPreuve []byte, grant string) (Opene
 	if e == nil || s.gone.dead[id] != nil || s.gone.retiringLocked(id) {
 		return Opened{}, ErrGrantInvalid
 	}
+	if _, _, same := s.checkGrantLocked(id, grant, now); !same {
+		return Opened{}, ErrGrantInvalid
+	}
 	if e.reopens >= MaxReopens {
 		return Opened{}, ErrReopenLimit
 	}
 	e.reopens++
-	return Opened{N: int(n), Envelope: envelope, Grant: s.grantLocked(k, exp), OpensLeft: left, LastOpen: left == 0 && int(n) == issued}, nil
+	reopens := e.reopens
+	s.grantLocked(k, e.h, exp)
+	// Rangé avant la réponse (sous le verrou des essais du partage, hors de gone.mu) : un
+	// redémarrage ne rend aucun retour (D42-31). Échec : le retour est rendu en mémoire aussi.
+	if err := s.rangerRetours(k, reopens); err != nil {
+		e.reopens--
+		return Opened{}, err
+	}
+	// Même octroi rendu : le serveur n'en garde que l'empreinte.
+	return Opened{N: int(n), Envelope: envelope, Grant: grant, OpensLeft: left, LastOpen: left == 0 && int(n) == issued}, nil
 }
 
 // BudgetCount : compteurs de budget de lecture en mémoire (tests).
@@ -240,13 +259,9 @@ func (s *Service) MetaGrant(kAcces []byte, grant string) (Meta, error) {
 	if err != nil {
 		return Meta{}, notFound(err)
 	}
-	idb, _ := idBytes(m.ID)
-	n, ok := VerifyGrant(s.grantKey, idb, grant, s.Now())
-	if !ok {
-		return Meta{}, ErrNotFound
-	}
 	s.gone.mu.Lock()
-	live := s.liveGrantLocked(openKey{m.ID, int(n)}) != nil
+	n, _, ok := s.checkGrantLocked(m.ID, grant, now)
+	live := ok && s.liveGrantLocked(openKey{m.ID, int(n)}) != nil
 	s.gone.unlock()
 	if !live {
 		return Meta{}, ErrNotFound

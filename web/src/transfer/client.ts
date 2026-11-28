@@ -105,7 +105,7 @@ export class EgressLimitError extends Error {
 }
 
 /**
- * Octroi d'ouverture refusé (409 grant_invalid : expiré, redémarrage du serveur, ouverture
+ * Octroi d'ouverture refusé (409 grant_invalid : expiré, ouverture
  * terminée, spec §41.4) : ni ouverture ni essai consommé ; déverrouiller sans octroi en
  * consommera une nouvelle (à dire avant).
  */
@@ -378,6 +378,9 @@ const retryable = (e: unknown) =>
  * part avant l'échéance `deadline` (dernier segment acquitté + SERVER_STALL_MS). Un essai en
  * cours à l'échéance est interrompu. Au-delà : Error("reseau"). Les autres erreurs passent.
  */
+/** Jetons de lecture repris au plus par ouverture après un redémarrage du serveur (D42-31). */
+export const REFRESH_MAX = 3;
+
 export async function withBudget<T>(deadline: number, o: Pick<CreateOpts, "signal" | "onRetry">, step: (signal: AbortSignal, attempt: number) => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     throwIfAborted(o.signal);
@@ -684,11 +687,47 @@ async function openWith(
 
     let src: SegmentSource | undefined;
     let finished = false;
+    // D42-31 : un jeton de lecture ne survit pas à un redémarrage du serveur (clé tirée au
+    // démarrage), l'octroi si : un 404 sur un appel porteur du jeton est suivi d'un
+    // déverrouillage avec l'octroi (même ouverture, aucune consommée ; un retour compté), une
+    // seule fois pour tous les appels en cours, puis l'appel est refait avec le jeton neuf.
+    // Au plus REFRESH_MAX par ouverture (un serveur qui rendrait 404 en boucle n'use pas les retours).
+    let refreshing: Promise<boolean> | undefined;
+    let refreshes = 0;
+    const refresh = (used: string): Promise<boolean> => {
+      if (u.downloadToken !== used) return Promise.resolve(true);
+      if (wiped || refreshes >= REFRESH_MAX) return Promise.resolve(false);
+      refreshing ??= (refreshes++, api.unlock(c, kAcces, kPreuve, u.grant))
+        .then(
+          (n) => {
+            if (n.segments !== u.segments) return false;
+            u = { ...u, downloadToken: n.downloadToken, grant: n.grant };
+            return true;
+          },
+          (e: unknown) => {
+            if (e instanceof api.HttpError && e.status < 500 && e.status !== 429) return false; // ouverture terminée, partage disparu
+            throw e;
+          },
+        )
+        .finally(() => {
+          refreshing = undefined;
+        });
+      return refreshing;
+    };
+    const withToken = async <T>(f: (token: string) => Promise<T>): Promise<T> => {
+      const used = u.downloadToken;
+      try {
+        return await f(used);
+      } catch (e) {
+        if (!(e instanceof api.HttpError && e.status === 404) || !(await refresh(used))) throw e;
+        return f(u.downloadToken);
+      }
+    };
     const done = async () => {
       if (finished) return;
       finished = true;
       try {
-        await api.done(c, u.downloadToken);
+        await withToken((t) => api.done(c, t));
       } catch (e) {
         // 404 ou 410 « gone » (spec §41.8) : partage déjà effacé (expiré ou détruit) ; le
         // contenu est déjà lu.
@@ -699,7 +738,7 @@ async function openWith(
       if (u.segments !== m.segments) throw new api.BadResponse();
       const get = async (n: number) => {
         // Segment de mauvaise taille (tronqué ou allongé, après les nouveaux essais) : modifié en route.
-        const s = await api.getSegment(c, u.downloadToken, n, segmentSize(m.bucket, n)).catch((e: unknown) => {
+        const s = await withToken((t) => api.getSegment(c, t, n, segmentSize(m.bucket, n))).catch((e: unknown) => {
           throw e instanceof api.BadResponse ? new Error("paquet_corrompu") : e;
         });
         onProgress?.(n + 1, m.segments);
@@ -784,7 +823,10 @@ async function openWith(
         // ce « gone » est le nôtre, l'écran de fin vient de destroy() ou de done() ; la
         // surveillance s'arrête simplement.
         watch: async (signal) => {
-          const r = await api.watch(c, u.downloadToken, signal);
+          const used = u.downloadToken;
+          let r = await api.watch(c, used, signal);
+          // 404 : jeton d'un autre démarrage du serveur (D42-31) ; jeton neuf, puis nouvel essai.
+          if (r === "stop" && !finished && !destroying && (await refresh(used).catch(() => false))) r = "retry";
           return r === "gone" && (destroying || finished) ? "stop" : r;
         },
         destroy: () =>

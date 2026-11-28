@@ -426,8 +426,9 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// Envois, « draining » et partages échus effacés (leurs échéances étaient en mémoire, aucun
-	// jeton ne survit : spec §36 S12, §41.8), puis fichiers sans ligne et lignes sans fichier.
+	// Envois en cours, « draining » et ouvertures des partages vivants repris (D42-31 : rien ne
+	// se perd après un redémarrage) ; envois sans ligne de reprise ou échus et partages échus
+	// effacés (spec §36 S12, §41.8) ; puis fichiers sans ligne et lignes sans fichier.
 	if _, err := svc.PurgeAtStart(); err != nil {
 		return err
 	}

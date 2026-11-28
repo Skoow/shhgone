@@ -128,6 +128,11 @@ export type FakeServer = {
   snapshot(): Snapshot;
   /** Tests : état, palier et segments présents de chaque partage. */
   inspect(): { state: State; bucket: number; present: number[] }[];
+  /**
+   * Redémarrage du serveur (D42-31) : jetons d'envoi et de lecture oubliés (clé neuve), lectures
+   * en cours coupées ; brouillons, segments acquittés, octrois et partages gardés.
+   */
+  restart(): void;
 };
 
 class HttpFail {
@@ -529,6 +534,11 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     const [, s] = uploading(req);
     const b = await readJSON(req, ["bucket"]);
     const bucket = int(b.bucket);
+    // Même palier : grow déjà fait, rejoué après une réponse perdue (D42-31) ; rien ne change.
+    if (b.bucket !== undefined && bucket === s.bucket) {
+      s.progressAt = minute(now());
+      return empty(204);
+    }
     if (b.bucket === undefined || !(BUCKETS as readonly number[]).includes(bucket) || bucket <= s.bucket || bucket > growLimit(s.top ?? 0)) throw badRequest();
     const old = s.bucket;
     const next: (Uint8Array | undefined)[] = new Array(segmentCount(bucket)).fill(undefined);
@@ -692,7 +702,8 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
         download_token: issue("download", id, openN, exp),
         segments: segmentCount(s.bucket),
         envelope: b64(s.envelope!),
-        grant: grant(id, openN, s.expiresAt),
+        // Retour : le même octroi (le serveur n'en garde que l'empreinte, D42-31).
+        grant: reopenN !== null ? g! : grant(id, openN, s.expiresAt),
         opens_left: s.opensLeft,
         // Entier 0 ou 1, comme le vrai serveur (même longueur de réponse).
         last_open: s.opensLeft === 0 && openN === s.opensIssued ? 1 : 0,
@@ -867,6 +878,14 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     return empty(204);
   }
 
+  /** Reprise d'un envoi après un redémarrage (D42-31) : jeton neuf jusqu'à l'échéance de l'envoi. */
+  async function resume(req: Request): Promise<Response> {
+    const [id, s] = await managed(req);
+    if (s.state !== "uploading" || s.uploadDeadline <= now()) throw notFound();
+    s.progressAt = minute(now());
+    return json(200, { upload_token: issue("upload", id, 0, s.uploadDeadline), bucket: s.bucket, segments: segmentCount(s.bucket) });
+  }
+
   async function status(req: Request): Promise<Response> {
     const [, s] = await managed(req);
     return json(200, {
@@ -884,6 +903,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     if (path === "/api/shares") return m === "POST" ? create(req) : json(404, { error: "not_found" });
     if (path === "/api/manage/status") return m === "GET" ? status(req) : json(404, { error: "not_found" });
     if (path === "/api/manage/destroy") return m === "POST" ? manageDestroy(req) : json(404, { error: "not_found" });
+    if (path === "/api/manage/resume") return m === "POST" ? resume(req) : json(404, { error: "not_found" });
     // Aucun id dans les chemins (spec §29.8, §32).
     const seg = /^\/api\/shares\/segments\/([^/]+)$/.exec(path);
     if (seg !== null) {
@@ -938,5 +958,9 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
         bucket: x.bucket,
         present: x.segments.flatMap((v, n) => (v ? [n] : [])),
       })),
+    restart: () => {
+      tokens.clear();
+      active.clear();
+    },
   };
 }

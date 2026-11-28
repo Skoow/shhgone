@@ -29,7 +29,9 @@ import (
 const (
 	activeWindow = 120      // secondes sans segment au-delà desquelles une ouverture n'est plus active
 	graceWindow  = 2 * 3600 // grâce maximale après l'événement
-	maxOpenN     = 10       // ouvertures par partage (spec §4)
+	// maxOpenN : ouvertures au plus d'un partage, toutes formules (Pro : 20, Tier.MaxOpensOf ;
+	// 10 jusqu'au 28 novembre : les ouvertures 11 à 20 d'un partage Pro ne lisaient rien).
+	maxOpenN = 20
 )
 
 // ErrGone : le partage a disparu, ou cette ouverture n'a plus de droit. Rendu seulement à

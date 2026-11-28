@@ -220,7 +220,7 @@ func masterNames(t *testing.T, db *sql.DB) []string {
 // compte ↔ salons, conception du compte §8.2 ; table de reprise des salons, vide en marche,
 // conception du salon v3 §5.2), rien d'autre.
 const wantMaster = "index:salon_pieces_salon,index:salons_access_v,index:salons_compte,index:salons_manage_v," +
-	"index:shares_access_v,index:shares_manage_v,table:salon_pieces,table:salons,table:salons_reprise,table:salons_reprise_blocs,table:shares"
+	"index:shares_access_v,index:shares_manage_v,table:salon_pieces,table:salons,table:salons_reprise,table:salons_reprise_blocs,table:shares,table:shares_envoi,table:shares_ouvertures"
 
 // Spec §36 S5, S12 : progress_at, upload_deadline et purge_at vivent en
 // mémoire ; la base ne garde qu'une date (expires_at). sqlite_master : shares et ses index.
@@ -386,8 +386,8 @@ func TestSchemaVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v := pragma(t, db, "user_version"); v != "5" {
-		t.Fatalf("user_version = %s, attendu 5 (salons.max_members revenu à 10)", v)
+	if v := pragma(t, db, "user_version"); v != "6" {
+		t.Fatalf("user_version = %s, attendu 6 (envois et ouvertures repris, D42-31)", v)
 	}
 	if _, err := db.Exec(`PRAGMA user_version=0`); err != nil { // base d'avant la version
 		t.Fatal(err)
@@ -627,24 +627,24 @@ func TestMigreV1VersV2(t *testing.T) {
 	}
 }
 
-// Une base du schéma 6 (binaire plus récent) est refusée sans rien toucher : ni tables du
+// Une base du schéma 7 (binaire plus récent) est refusée sans rien toucher : ni tables du
 // salon créées, ni version réécrite.
-func TestRefuseV6(t *testing.T) {
+func TestRefuseV7(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shares.db")
-	baseV1(t, path, 6)
+	baseV1(t, path, 7)
 	db, err := Open(path)
 	if !errors.Is(err, ErrNewerSchema) {
 		if db != nil {
 			db.Close()
 		}
-		t.Fatal("base du schéma 6 acceptée :", err)
+		t.Fatal("base du schéma 7 acceptée :", err)
 	}
 	raw, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer raw.Close()
-	if v := pragma(t, raw, "user_version"); v != "6" {
+	if v := pragma(t, raw, "user_version"); v != "7" {
 		t.Fatal("version touchée", v)
 	}
 	if got := strings.Join(masterNames(t, raw), ","); got != "index:shares_access_v,index:shares_manage_v,table:shares" {
@@ -852,7 +852,7 @@ func TestMigreV4VersV5(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if v := pragma(t, db, "user_version"); v != "5" {
+	if v := pragma(t, db, "user_version"); v != "6" {
 		t.Fatal("user_version", v)
 	}
 	var places int

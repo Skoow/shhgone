@@ -65,7 +65,8 @@ func (s *Service) PutChunks(id string, n, from int, body []byte) error {
 		return ErrBadSegment
 	}
 	start := chunkOffset(bucket, n, from) - int64(pre)
-	if err := s.Blobs.WriteAt(id, start, body); err != nil {
+	// Sur le disque avant la réponse (D42-31), comme PutSegment.
+	if err := writeSegment(s.Blobs, id, start, body); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return ErrNotFound // détruit pendant l'envoi
 		}
@@ -90,10 +91,15 @@ func (s *Service) PutChunks(id string, n, from int, body []byte) error {
 	}
 	s.mem.mu.Unlock()
 	if full {
-		return s.markReceived(id, n)
+		if err := s.markReceived(id, n); err != nil {
+			return err
+		}
+	} else {
+		s.touchUpload(id, s.now())
 	}
-	s.touchUpload(id, s.now())
-	return nil
+	// Morceaux reçus rangés avant la réponse : après un redémarrage, le client ne renvoie
+	// jamais une plage acquittée (il ne peut plus la rechiffrer).
+	return s.rangerEnvoi(id)
 }
 
 // clearPart oublie les morceaux reçus en partie des segments [from, to).
@@ -183,6 +189,12 @@ func (s *Service) GrowCharged(id string, bucket int, charge func(bucket int) err
 	}
 	_, top := s.received(id)
 	t := s.tierOf(id)
+	if bucket == old && bucketAllowed(bucket, t) {
+		// Déjà à ce palier : un grow fait dont la réponse s'est perdue (coupure, redémarrage,
+		// D42-31) est rejoué ; rien n'est débité ni changé.
+		s.touchUpload(id, s.now())
+		return nil
+	}
 	if !bucketAllowed(bucket, t) || bucket <= old || bucket > growLimit(top, t) {
 		return ErrBadRequest
 	}
@@ -211,6 +223,11 @@ func (s *Service) GrowCharged(id string, bucket int, charge func(bucket int) err
 		if errors.Is(err, fs.ErrNotExist) {
 			return ErrNotFound
 		}
+		return err
+	}
+	// Nouvelle taille sur le disque avant le palier en base (D42-31) : la reprise ne trouve
+	// jamais un palier plus grand que le fichier.
+	if err := s.syncFile(id); err != nil {
 		return err
 	}
 	next := make([]byte, (SegmentCount(bucket)+7)/8)
@@ -274,7 +291,7 @@ func (s *Service) Erase(id string, from, to int) error {
 	}
 	s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé
 	s.touchUpload(id, s.now())
-	return nil
+	return s.rangerEnvoi(id)
 }
 
 // Keep : signe de vie de la page qui compose (spec §41.14) ; l'envoi n'est pas effacé tant
@@ -397,13 +414,25 @@ func (s *Service) finalizeDraft(id string, reserved int, r FinalizeReq) (time.Du
 	}
 	exp := ceil15(now + int64(r.TTLHours)*3600)
 	var got int64
-	err = s.DB.QueryRow(`UPDATE shares SET state='ready', bucket=?, expires_at=?, ttl_hours=NULL,
+	// « ready » et ligne de reprise de l'envoi effacée dans une même transaction (D42-31).
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	err = tx.QueryRow(`UPDATE shares SET state='ready', bucket=?, expires_at=?, ttl_hours=NULL,
 		max_opens=?, opens_left=?, salt=?, kdf_ops=?, kdf_mem=?, proof_v=?, envelope=?, segments_mask=?
 		WHERE id=? AND state='uploading' AND bucket=? RETURNING expires_at`,
 		b, exp, r.MaxOpens, r.MaxOpens, r.Salt, r.KdfOps, r.KdfMem, r.ProofV, r.Envelope, fullMask(segs),
 		id, reserved).Scan(&got)
 	if err != nil {
 		return 0, notFound(err)
+	}
+	if _, err := tx.Exec(`DELETE FROM shares_envoi WHERE share_id=?`, id); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
 	}
 	s.Vidage.Demander() // ttl_hours retiré de la ligne : l'ancienne valeur ne reste pas dans le WAL
 	s.forget(id)

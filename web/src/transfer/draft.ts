@@ -147,7 +147,14 @@ type El = {
 
 type Hold = { from: number; to: number; bytes: number }; // segments [from, to)
 
-type Created = { kLien: KLien; sGestion: SGestion; token: string; bucket: number };
+type Created = {
+  kLien: KLien;
+  sGestion: SGestion;
+  token: string;
+  bucket: number;
+  /** Reprise en cours après un redémarrage du serveur (resumeDraft), commune à tous les appels. */
+  resuming?: Promise<boolean>;
+};
 
 type Hooks = Pick<CreateOpts, "pause" | "onRetry">;
 
@@ -354,13 +361,59 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     const cr = created;
     if (!cr || closed) return;
     try {
-      await api.keep(c, cr.token);
+      await authed(cr, (t) => api.keep(c, t));
     } catch (e) {
       if (e instanceof api.HttpError && e.status === 404) lost(cr);
     }
   }
 
-  /** Brouillon effacé par le serveur (échéance, redémarrage) : tout repartira sous un nouveau. */
+  // --- reprise après un redémarrage du serveur (D42-31) ----------------------------------
+  // Le serveur garde le brouillon, ses segments acquittés et sa réservation, mais un jeton
+  // d'envoi ne survit pas à son redémarrage (clé tirée au démarrage) : le 404 qu'il rend est
+  // suivi d'une reprise par S_gestion (POST /api/manage/resume), une seule pour tous les appels
+  // en cours, puis l'appel est refait avec le jeton neuf. Rien d'acquitté n'est renvoyé (le
+  // moteur ne rechiffre pas une plage déjà produite) ; ce qui ne l'était pas l'est par les
+  // nouveaux essais habituels. Brouillon inconnu du serveur (échu, effacé) : le 404 d'origine,
+  // et le repli d'avant (lost : tout repart sous un nouveau brouillon).
+
+  /** Appel porteur du jeton d'envoi, repris après un redémarrage du serveur (resumeDraft). */
+  async function authed<T>(cr: Created, f: (token: string) => Promise<T>): Promise<T> {
+    const used = cr.token;
+    try {
+      return await f(used);
+    } catch (e) {
+      if (!(e instanceof api.HttpError && e.status === 404) || closed || created !== cr) throw e;
+      if (!(await resumeDraft(cr, used))) throw e;
+      return f(cr.token);
+    }
+  }
+
+  /**
+   * Jeton neuf pour le brouillon cr (vrai), ou brouillon inconnu du serveur (faux). Déjà repris
+   * depuis le jeton `used` : vrai tout de suite. Coupure : l'erreur passe (nouvel essai de l'appelant).
+   */
+  function resumeDraft(cr: Created, used: string): Promise<boolean> {
+    if (cr.token !== used) return Promise.resolve(true);
+    cr.resuming ??= api
+      .resume(c, cr.sGestion)
+      .then(
+        (r) => {
+          cr.token = r.uploadToken;
+          cr.bucket = Math.max(cr.bucket, r.bucket);
+          return true;
+        },
+        (e: unknown) => {
+          if (e instanceof api.HttpError && e.status === 404) return false;
+          throw e;
+        },
+      )
+      .finally(() => {
+        cr.resuming = undefined;
+      });
+    return cr.resuming;
+  }
+
+  /** Brouillon effacé par le serveur (échéance, ou inconnu après un redémarrage) : tout repartira sous un nouveau. */
   function lost(cr: Created) {
     if (created !== cr) return;
     created = null;
@@ -494,7 +547,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
           const n = p.seg;
           if ((n + 1) * SEG_CHUNKS + 1 > cr.bucket) {
             const need = reservationFor(n + 1, palier);
-            await withBudget(Date.now() + SERVER_STALL_MS, { signal }, (s) => api.grow(c, cr.token, need, s));
+            await withBudget(Date.now() + SERVER_STALL_MS, { signal }, (s) => authed(cr, (t) => api.grow(c, t, need, s)));
             cr.bucket = need;
           }
           const data = await sealer.piece(j);
@@ -509,10 +562,12 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
           // Segment entier : envoi simple ; sinon, plage de morceaux (?from).
           const from = p.from === 0 && p.chunks === SEG_CHUNKS ? undefined : p.from;
           const put = withBudget(deadline, { signal, onRetry: (r) => hooks.onRetry?.(r) }, (s) =>
-            api.putSegment(c, cr.token, n, data, (b) => {
-              sending.set(j, Math.min(b, data.length));
-              show();
-            }, s, from),
+            authed(cr, (t) =>
+              api.putSegment(c, t, n, data, (b) => {
+                sending.set(j, Math.min(b, data.length));
+                show();
+              }, s, from),
+            ),
           ).then(
             () => {
               sending.delete(j);
@@ -559,7 +614,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   function eraseOnServer(cr: Created, h: Hold): Promise<boolean> {
     const run = eraseChain.then(async () => {
       try {
-        await withBudget(Date.now() + SERVER_STALL_MS, {}, (s) => api.erase(c, cr.token, h.from, h.to, s));
+        await withBudget(Date.now() + SERVER_STALL_MS, {}, (s) => authed(cr, (t) => api.erase(c, t, h.from, h.to, s)));
         return true;
       } catch (e) {
         return e instanceof api.HttpError && e.status === 404;
@@ -922,7 +977,9 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       if (v.length > 0) body.void = v;
       const expiresInS = await withBudget(deadline, f, async (s, attempt) => {
         try {
-          return await api.finalize(c, cr.token, body, s);
+          // Reprise après un redémarrage (authed) ; si le brouillon est déjà « ready » (essai
+          // précédent abouti sans réponse), la reprise rend 404 et status tranche ci-dessous.
+          return await authed(cr, (t) => api.finalize(c, t, body, s));
         } catch (e) {
           // Essai précédent abouti sans réponse : status (S_gestion) tranche.
           if (attempt > 1 && e instanceof api.HttpError && e.status === 404) {

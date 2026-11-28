@@ -74,8 +74,13 @@ type CreateReq struct {
 	// couche HTTP, jamais lu du client.
 	Returning bool
 	// Tier : formule fixée par un jeton anonyme dépensé (couche HTTP) ; 0 sans jeton. Gardé en
-	// mémoire avec l'envoi (tier.go), jamais en base.
+	// mémoire avec l'envoi (tier.go), et en base seulement chiffré sous une clé tirée de
+	// S_gestion (shares_envoi.formule, reprise.go).
 	Tier Tier
+	// Manage : S_gestion reçu (32 octets), dont ManageV est l'empreinte ; sert seulement à
+	// chiffrer la formule pour la reprise après un redémarrage (D42-31), jamais gardé. Absent
+	// (tests, outils) : l'envoi n'est pas repris après un redémarrage (purgé, comme avant).
+	Manage []byte
 }
 
 // StorageReserve : 1/StorageReserve de StorageMax n'est ouvert qu'aux nouveaux venus
@@ -186,7 +191,6 @@ func NewService(c Config) (*Service, error) {
 	if s.Vidage == nil {
 		s.Vidage = store.NewVidage(c.DB)
 	}
-	rand.Read(s.grantKey[:]) // clé des octrois d'ouverture, propre à ce processus (spec §41.4)
 	return s, nil
 }
 
@@ -220,11 +224,13 @@ type Service struct {
 	// la fin de Finalize et sweepOne en écriture, pour attendre la fin des écritures en
 	// vol de cet envoi. Jamais deux à la fois : aucun ordre à tenir.
 	uploadMus [256]sync.RWMutex
-	budget    readBudget // octets lus par ouverture et par partage, en mémoire seulement
+	budget    readBudget // octets lus par ouverture et par partage (rangés chaque seconde, RangerLectures)
 	egressMax int64      // plafond de sortie par partage (Config.EgressMax)
-	// mem : échéances d'envoi, minute du dernier segment reçu et purge des « draining », en
-	// mémoire seulement (spec §36 S5) : un redémarrage efface de toute façon ces partages
-	// (PurgeAtStart), aucun jeton n'y survivant.
+	// mem : échéances d'envoi, minute du dernier segment reçu et purge des « draining ».
+	// Depuis D42-31, l'échéance, la formule (chiffrée), les morceaux reçus et les segments
+	// incomplets d'un envoi sont aussi rangés dans shares_envoi (reprise.go) ; la minute du
+	// dernier segment reste en mémoire seulement (spec §36 S5) ; la purge d'un « draining »
+	// est son échéance (expires_at), relue au démarrage.
 	mem struct {
 		mu    sync.Mutex
 		up    map[string]upload
@@ -236,8 +242,11 @@ type Service struct {
 	bgSync  sync.WaitGroup // synchronisations de fond en cours (syncInBackground)
 	gone    goneState      // ouvertures actives, descripteurs détachés, surveillances, octrois (spec §41.4, §41.8)
 	kill    killKey        // clé des noms de demandes de coupure (kill.go)
-	// grantKey : clé HMAC des octrois d'ouverture, tirée au démarrage, jamais écrite.
-	grantKey [32]byte
+	// envoiMu : rangement de l'état d'un envoi (rangerEnvoi), rayé par id : deux rangements
+	// du même envoi se suivent, le dernier écrit l'état le plus récent.
+	envoiMu [64]sync.Mutex
+	// lecturesMu : un seul rangement des octets lus à la fois (RangerLectures).
+	lecturesMu sync.Mutex
 	// reports : voix de signalement par partage, en mémoire seulement (report.go).
 	reports reportBox
 	// finalizing : envois dont un Finalize est en cours ; un seul à la fois par id, pour
@@ -275,9 +284,14 @@ type upload struct {
 	deadline, progress int64
 	recv               int64
 	top                int
-	// tier et window : formule de l'envoi et sa fenêtre d'envoi (secondes), en mémoire seulement.
+	// tier et window : formule de l'envoi et sa fenêtre d'envoi (secondes).
 	tier   Tier
 	window int64
+	// rangé : l'envoi a sa ligne dans shares_envoi (repris après un redémarrage) ; scelle :
+	// formule chiffrée d'un envoi relu au démarrage et pas encore repris par son expéditeur
+	// (Resume, S_gestion) : tant qu'elle n'est pas ouverte, l'envoi n'accepte rien (uploadOpen).
+	range_ bool
+	scelle []byte
 	// dirty : octets écrits depuis la dernière synchronisation de fond ; syncing : une
 	// synchronisation de fond est en cours.
 	dirty   int64
@@ -304,7 +318,7 @@ func (s *Service) uploadOpen(id string, now int64) bool {
 	s.mem.mu.Lock()
 	defer s.mem.mu.Unlock()
 	u, ok := s.mem.up[id]
-	return ok && u.deadline > now
+	return ok && u.deadline > now && u.scelle == nil
 }
 
 // syncInBackground synchronise le fichier de l'envoi id (hors de tout verrou), puis permet la
@@ -651,13 +665,16 @@ func (s *Service) create(r CreateReq, valid func(CreateReq) error) (string, int,
 		}
 		return "", 0, err
 	}
-	// proof_v, salt, kdf_*, max_opens et envelope restent NULL jusqu'à Finalize ; aucune date
-	// en base (l'échéance de l'envoi vit en mémoire, spec §36 S12).
-	s.setUpload(id, upload{deadline: ceil15(s.now() + r.Tier.UploadWindow()), tier: r.Tier, window: r.Tier.UploadWindow()})
-	_, err = s.DB.Exec(`INSERT INTO shares(id,state,bucket,opens_left,segments_mask,access_v,manage_v)
-		VALUES(?,'uploading',?,0,?,?,?)`,
-		id, r.Bucket, make([]byte, (segs+7)/8), r.AccessV, r.ManageV)
-	if err != nil {
+	// proof_v, salt, kdf_*, max_opens et envelope restent NULL jusqu'à Finalize. Pour la
+	// reprise après un redémarrage (D42-31) : échéance de l'envoi (au quart d'heure, comme
+	// expires_at) et formule chiffrée sous S_gestion, dans shares_envoi (insertUpload).
+	deadline := ceil15(s.now() + r.Tier.UploadWindow())
+	var scelle []byte
+	if len(r.Manage) == 32 && subtle.ConstantTimeCompare(Verifier(r.Manage), r.ManageV) == 1 {
+		scelle = scellerFormule(r.Manage, id, r.Tier)
+	}
+	s.setUpload(id, upload{deadline: deadline, tier: r.Tier, window: r.Tier.UploadWindow(), range_: scelle != nil})
+	if err = s.insertUpload(id, r, segs, deadline, scelle); err != nil {
 		s.forget(id)
 		return "", 0, errors.Join(err, s.Blobs.Delete(id))
 	}
@@ -688,7 +705,10 @@ func (s *Service) PutSegment(id string, n int, body []byte) error {
 	if n < 0 || n >= SegmentCount(bucket) || len(body) != SegmentSize(bucket, n) {
 		return ErrBadSegment
 	}
-	if err := s.Blobs.WriteAt(id, segOffset(bucket, n), body); err != nil {
+	// Sur le disque avant le masque et la réponse (D42-31) : un segment acquitté survit à un
+	// plantage ou à une coupure de courant, le client ne le renvoie jamais (il ne peut plus le
+	// rechiffrer : une seule production par plage, moteur).
+	if err := writeSegment(s.Blobs, id, segOffset(bucket, n), body); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return ErrNotFound // détruit pendant l'envoi
 		}
@@ -696,8 +716,14 @@ func (s *Service) PutSegment(id string, n int, body []byte) error {
 	}
 	s.noteReceived(id, n, chunksIn(bucket, n))
 	s.clearPart(id, n, n+1)
-	return s.markReceived(id, n)
+	if err := s.markReceived(id, n); err != nil {
+		return err
+	}
+	return s.rangerEnvoi(id)
 }
+
+// writeSegment : écriture d'un segment ou d'une plage, synchronisée (variable pour les tests).
+var writeSegment = func(b *blob.Store, id string, off int64, p []byte) error { return b.WriteAtSync(id, off, p) }
 
 // markReceived pose le bit du segment n (reçu en entier).
 func (s *Service) markReceived(id string, n int) error {
@@ -930,25 +956,18 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 			s.RefusSortie.Add(1)
 			return Opened{}, ErrEgressLimit
 		}
-		var openN, left int
-		var state string
-		var exp int64
-		err := s.DB.QueryRow(`UPDATE shares SET opens_left=opens_left-1, opens_issued=opens_issued+1,
-			state=CASE WHEN opens_left-1=0 THEN 'draining' ELSE state END
-			WHERE id=? AND state='ready' AND opens_left>0 AND expires_at>? AND failed_attempts<?
-			RETURNING opens_issued, opens_left, state, expires_at`, id, now, maxAttempts).Scan(&openN, &left, &state, &exp)
+		openN, left, state, exp, g, h, err := s.consumeOpen(id, now)
 		if err != nil {
-			return Opened{}, notFound(err)
+			return Opened{}, err
 		}
 		s.Vidage.Demander() // ligne récrite : vidage du WAL regroupé
 		if state == "draining" {
 			// D42-22 : toutes les ouvertures sont prises ; le partage reste jusqu'à son échéance
-			// pour que leurs détentrices y reviennent (purge en mémoire : un redémarrage, qui
-			// invalide les octrois, l'efface, PurgeAtStart).
+			// pour que leurs détentrices y reviennent (purge à expires_at, relue au démarrage :
+			// les octrois survivent à un redémarrage, D42-31).
 			s.setPurge(id, exp)
 		}
-		g, err := s.grantIfLive(id, openN, exp)
-		if err != nil {
+		if err := s.grantIfLive(id, openN, exp, h); err != nil {
 			return Opened{}, err
 		}
 		return Opened{N: openN, Envelope: envelope, Grant: g, OpensLeft: left, LastOpen: left == 0}, nil
@@ -960,6 +979,37 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 	return Opened{}, &BadPassword{AttemptsLeft: left}
 }
 
+// consumeOpen consomme une ouverture du partage id et range l'empreinte de son octroi, dans une
+// seule transaction (D42-31) : jamais une ouverture consommée dont l'octroi serait perdu par un
+// plantage. Rend le n° d'ouverture, les ouvertures restantes, l'état, l'échéance, l'octroi et
+// son empreinte.
+func (s *Service) consumeOpen(id string, now int64) (openN, left int, state string, exp int64, g string, h [32]byte, err error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, 0, "", 0, "", h, err
+	}
+	defer tx.Rollback()
+	err = tx.QueryRow(`UPDATE shares SET opens_left=opens_left-1, opens_issued=opens_issued+1,
+		state=CASE WHEN opens_left-1=0 THEN 'draining' ELSE state END
+		WHERE id=? AND state='ready' AND opens_left>0 AND expires_at>? AND failed_attempts<?
+		RETURNING opens_issued, opens_left, state, expires_at`, id, now, maxAttempts).Scan(&openN, &left, &state, &exp)
+	if err != nil {
+		return 0, 0, "", 0, "", h, notFound(err)
+	}
+	if openN < 1 || openN > maxOpenN {
+		return 0, 0, "", 0, "", h, ErrNotFound // jamais : opens_issued ≤ max_opens ≤ maxOpenN
+	}
+	g, h = newGrant(uint32(openN), exp)
+	if _, err := tx.Exec(`INSERT INTO shares_ouvertures(share_id,n,octroi) VALUES(?,?,?)
+		ON CONFLICT(share_id,n) DO UPDATE SET octroi=excluded.octroi, retours=0, lus=0, voix=0`, id, openN, h[:]); err != nil {
+		return 0, 0, "", 0, "", h, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, 0, "", 0, "", h, err
+	}
+	return openN, left, state, exp, g, h, nil
+}
+
 // grantIfLive inscrit l'octroi de l'ouverture openN (grantLocked) si le partage existe
 // encore : une destruction passée entre l'UPDATE qui consomme l'ouverture et ce point a déjà
 // oublié octrois et budgets (retire), qui ne doivent pas être recréés pour un partage effacé.
@@ -967,17 +1017,18 @@ func (s *Service) UnlockGrant(id string, kAcces, kPreuve []byte, grant string) (
 // prend gone.mu pour son oubli final : une ligne encore là sera oubliée après nous) ; absente
 // → ErrNotFound.
 // La ligne est relue hors de gone.mu, époque revérifiée sous le verrou (liveRead).
-func (s *Service) grantIfLive(id string, openN int, exp int64) (string, error) {
+func (s *Service) grantIfLive(id string, openN int, exp int64, h [32]byte) error {
 	var one int
 	gone, err := s.liveRead(id, func() error { return s.DB.QueryRow(`SELECT 1 FROM shares WHERE id=?`, id).Scan(&one) })
 	defer s.gone.unlock()
 	if gone {
-		return "", ErrNotFound
+		return ErrNotFound
 	}
 	if err != nil {
-		return "", notFound(err)
+		return notFound(err)
 	}
-	return s.grantLocked(openKey{id, openN}, exp), nil
+	s.grantLocked(openKey{id, openN}, h, exp)
+	return nil
 }
 
 // countFailure compte un mauvais K_preuve (Unlock et Destroy partagent le compteur)
@@ -1009,7 +1060,9 @@ func (s *Service) Done(id string, openN int) error {
 	}
 	s.gone.mu.Lock()
 	s.gone.init()
-	delete(s.gone.grants, openKey{id, openN}) // l'ouverture finit : son octroi ne rouvre plus rien
+	if e := s.gone.grants[openKey{id, openN}]; e != nil {
+		e.done = true // l'ouverture finit : son octroi ne rouvre plus rien (done_mask en base)
+	}
 	s.gone.unlock()
 	if handled, err := s.doneDetached(id, openN); handled {
 		return err
@@ -1080,9 +1133,16 @@ func (s *Service) doneDetached(id string, openN int) (handled bool, err error) {
 // introuvable, et aucun essai n'y est compté ; Sweep l'effacera.
 const alive = `(state='uploading' OR expires_at>?1)`
 
-// aliveUpload : un envoi n'est vivant que si ce processus en connaît l'échéance, non passée.
+// aliveUpload : un envoi n'est vivant que si ce processus en connaît l'échéance, non passée
+// (envoi relu au démarrage et pas encore repris compris : son expéditeur peut le détruire).
 func (s *Service) aliveUpload(id, state string, now int64) bool {
-	return state != "uploading" || s.uploadOpen(id, now)
+	if state != "uploading" {
+		return true
+	}
+	s.mem.mu.Lock()
+	defer s.mem.mu.Unlock()
+	u, ok := s.mem.up[id]
+	return ok && u.deadline > now
 }
 
 // DestroyWithProof : destruction par le destinataire (K_accès, K_preuve et l'octroi de son
@@ -1124,11 +1184,7 @@ func (s *Service) DestroyWithProof(kAcces, kPreuve []byte, grant string) error {
 		}
 		return ErrNotFound
 	}
-	idb, ok := idBytes(id)
-	if !ok {
-		return ErrNotFound
-	}
-	n, ok := VerifyGrant(s.grantKey, idb, grant, s.Now())
+	n, ok := s.verifyGrant(id, grant)
 	if !ok {
 		return ErrGrantInvalid
 	}
@@ -1333,42 +1389,6 @@ func (s *Service) sweepOne(id string, now int64) (bool, error) {
 		return false, nil
 	}
 	return s.retire(id, true, event)
-}
-
-// PurgeAtStart, à appeler au démarrage du serveur (jamais par une commande
-// d'administration, qui partage la base d'un serveur en marche) : efface tout envoi en cours
-// et tout partage « draining » (leurs échéances étaient en mémoire, et aucun jeton ne survit
-// à un redémarrage : ni envoi ni lecture n'y sont plus possibles), expiré ou détruit au 5ᵉ
-// essai (spec §36 S12, §41.8). Rend le nombre de partages effacés.
-func (s *Service) PurgeAtStart() (int, error) {
-	rows, err := s.DB.Query(`SELECT id FROM shares WHERE state<>'ready' OR expires_at<=? OR failed_attempts>=?`, s.now(), maxAttempts)
-	if err != nil {
-		return 0, err
-	}
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return 0, err
-		}
-		ids = append(ids, id)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return 0, err
-	}
-	n := 0
-	var errs []error
-	for _, id := range ids {
-		ok, err := s.destroy(id)
-		if err != nil {
-			errs = append(errs, err)
-		} else if ok {
-			n++
-		}
-	}
-	return n, errors.Join(errs...)
 }
 
 // destroy efface le fichier d'abord, puis la ligne ; renvoie si une ligne existait. Un

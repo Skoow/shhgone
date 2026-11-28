@@ -217,6 +217,45 @@ func TestRunResyncsUsedBytes(t *testing.T) {
 	<-done
 }
 
+// D42-31 : Watch range les octets lus chaque seconde et une dernière fois à l'arrêt (aucune
+// lecture perdue par un arrêt propre).
+func TestWatchRangeLesLectures(t *testing.T) {
+	s, _ := newSvc(t)
+	ka, kp := rnd(32), rnd(32)
+	id, segs, err := s.Create(share.CreateReq{ID: base64.RawURLEncoding.EncodeToString(rnd(16)), Bucket: 1,
+		AccessV: sum(ka), ManageV: sum(rnd(8))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n := 0; n < segs; n++ {
+		if err := s.PutSegment(id, n, bytes.Repeat([]byte{1}, share.SegmentSize(1, n))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.Finalize(id, share.FinalizeReq{TTLHours: 1, MaxOpens: 1, KdfOps: 3, KdfMem: 67108864,
+		Salt: rnd(16), ProofV: sum(kp), Envelope: rnd(share.EnvelopeLen),
+		Bucket: 1, Header: rnd(share.Header), Tail: rnd(share.ChunkCT)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Unlock(id, ka, kp); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { Watch(ctx, s, time.Hour); close(done) }() // aucun tour avant l'arrêt
+	g, err := s.OpenSegment(id, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.Close()
+	cancel()
+	<-done
+	var lus int64
+	if err := s.DB.QueryRow(`SELECT lus FROM shares_ouvertures WHERE share_id=? AND n=1`, id).Scan(&lus); err != nil || lus != int64(share.SegmentSize(1, 0)) {
+		t.Fatal("octets lus non rangés à l'arrêt :", lus, err)
+	}
+}
+
 // Une panique dans un tour (ici, un service nil) ne fait plus
 // tomber le processus ; la boucle continue et s'arrête avec son contexte.
 func TestRunWatchRecuperentLesPaniques(t *testing.T) {

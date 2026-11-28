@@ -673,6 +673,31 @@ func (l *Limiter) Reserve(id string, bytes int64) (time.Duration, error) {
 	return l.debitLocked(id, u, next, now)
 }
 
+// ResumeUpload : l'envoi id, repris après un redémarrage (D42-31, les limites en mémoire
+// repartent à neuf), rejoint les envois en cours sous la clé du jour de ip, avec sa réservation
+// (bytes, données utiles du palier) comptée aux octets du jour, sans refus : ce n'est ni une
+// création ni une nouvelle réservation. Déjà connu (aucun redémarrage) : rien.
+func (l *Limiter) ResumeUpload(ip netip.Addr, id string, bytes int64, tier int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	l.rotateLocked(now)
+	if _, ok := l.uploads[id]; ok || bytes < 0 {
+		return
+	}
+	if tier != 1 && tier != 2 {
+		tier = 0
+	}
+	k64, k48 := l.keyLocked(ip)
+	u := upload{k64: k64, k48: k48, bytes: bytes, born: now.Unix(), tier: tier}
+	m64, m48, _, _ := l.octets(u)
+	m64[k64] += bytes
+	m48[k48] += bytes
+	l.pend64[k64]++
+	l.pend48[k48]++
+	l.uploads[id] = u
+}
+
 // FinishUpload : l'envoi id est finalisé par ip ; sa création et ses octets restent comptés.
 // Un envoi de la veille passe dans les quotas du jour, sous la clé du jour de ip.
 func (l *Limiter) FinishUpload(id string, ip netip.Addr) {

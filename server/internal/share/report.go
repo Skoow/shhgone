@@ -17,9 +17,10 @@ import (
 // qui a le lien et le mot de passe peut ouvrir lui-même plusieurs fois et voter avec chacune
 // (il pourrait aussi bien prendre toutes les ouvertures).
 //
-// Les voix vivent en mémoire seulement : ni adresse, ni catégorie, ni identité ; seulement
-// le numéro d'ouverture, oublié quand le partage est effacé (destroy) ou, au plus tard, par le
-// balayage après son échéance (Sweep). Un redémarrage les efface, comme les octrois.
+// Les voix vivent en mémoire, et dans shares_ouvertures.voix (D42-31 : un redémarrage ne les
+// efface plus) : ni adresse, ni catégorie, ni identité ; seulement le numéro d'ouverture,
+// oublié quand le partage est effacé (destroy, ON DELETE CASCADE) ou, au plus tard, par le
+// balayage après son échéance (Sweep).
 
 // ErrStillOpen : destruction par un destinataire alors que d'autres ouvertures restent
 // possibles, ou par un autre que le dernier (409 still_open) ; seul le dernier destinataire
@@ -71,6 +72,15 @@ func (b *reportBox) purge(now int64) {
 	}
 }
 
+// unvote retire la voix de l'ouverture n (rangement en base échoué).
+func (b *reportBox) unvote(id string, n int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if e := b.m[id]; e != nil {
+		delete(e.votes, n)
+	}
+}
+
 func (b *reportBox) forget(id string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -115,15 +125,18 @@ func (s *Service) Report(kAcces, kPreuve []byte, grant string) (gone, nouvelle b
 		}
 		return false, false, ErrNotFound
 	}
-	idb, ok := idBytes(id)
-	if !ok {
-		return false, false, ErrNotFound
-	}
-	n, ok := VerifyGrant(s.grantKey, idb, grant, s.Now())
+	n, ok := s.verifyGrant(id, grant)
 	if !ok {
 		return false, false, ErrGrantInvalid
 	}
 	voix, nouvelle := s.reports.vote(id, int(n), exp.Int64)
+	if nouvelle {
+		// Rangée avant la réponse (D42-31) : un redémarrage ne remet pas les voix à zéro.
+		if err := s.rangerVoix(id, int(n)); err != nil {
+			s.reports.unvote(id, int(n))
+			return false, false, err
+		}
+	}
 	if voix < ReportsNeeded(int(maxOpens.Int64)) {
 		return false, nouvelle, nil
 	}

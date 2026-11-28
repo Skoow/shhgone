@@ -1,6 +1,8 @@
 package share
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"errors"
 	"os"
 	"path/filepath"
@@ -22,29 +24,52 @@ func opensOf(t *testing.T, s *Service, id string) (left, issued, failed int) {
 	return
 }
 
+// Forme de l'octroi (D42-31) : 54 caractères, n et échéance lisibles, 32 octets aléatoires ;
+// seule son empreinte est gardée, comparée en temps constant ; un octroi falsifié, d'un autre
+// partage, échu, vide ou mal formé est refusé.
 func TestGrantFormat(t *testing.T) {
-	var key, other [32]byte
-	other[0] = 1
-	var id, id2 [16]byte
-	id2[0] = 1
-	now := time.Unix(1_800_000_000, 0)
-	g := IssueGrant(key, id, 3, now.Add(time.Hour))
+	s, c := newSvc(t)
+	k := newKeys()
+	id := ready(t, s, k, 1, 24, 3)
+	id2 := ready(t, s, newKeys(), 1, 24, 3)
+	o, err := s.UnlockGrant(id, k.acces, k.preuve, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := o.Grant
 	if len(g) != 54 {
 		t.Fatal("54 caractères attendus", len(g))
 	}
-	if n, ok := VerifyGrant(key, id, g, now); !ok || n != 3 {
+	n, exp, _, ok := parseGrant(g)
+	var expires int64
+	s.DB.QueryRow(`SELECT expires_at FROM shares WHERE id=?`, id).Scan(&expires)
+	if !ok || n != 1 || exp != expires {
+		t.Fatal(n, exp, expires, ok)
+	}
+	if n, ok := s.verifyGrant(id, g); !ok || n != 1 {
 		t.Fatal(n, ok)
 	}
+	// La base ne garde que SHA-256 de l'octroi, jamais l'octroi.
 	raw, _ := DecodeB64(g, 40)
-	raw[3] = 4 // autre ouverture
-	forged := b64.EncodeToString(raw)
+	var h []byte
+	if err := s.DB.QueryRow(`SELECT octroi FROM shares_ouvertures WHERE share_id=? AND n=1`, id).Scan(&h); err != nil {
+		t.Fatal(err)
+	}
+	if want := sha256.Sum256(raw); !bytes.Equal(h, want[:]) {
+		t.Fatal("empreinte de l'octroi attendue")
+	}
+	forged := append([]byte(nil), raw...)
+	forged[39] ^= 1
+	other := append([]byte(nil), raw...)
+	other[3] = 2 // autre ouverture
+	expired, _ := newGrant(1, c.Now().Unix())
 	for name, c := range map[string]func() bool{
-		"falsifié":       func() bool { _, ok := VerifyGrant(key, id, forged, now); return ok },
-		"autre partage":  func() bool { _, ok := VerifyGrant(key, id2, g, now); return ok },
-		"autre clé":      func() bool { _, ok := VerifyGrant(other, id, g, now); return ok },
-		"expiré":         func() bool { _, ok := VerifyGrant(key, id, g, now.Add(time.Hour)); return ok },
-		"vide":           func() bool { _, ok := VerifyGrant(key, id, "", now); return ok },
-		"mauvaise forme": func() bool { _, ok := VerifyGrant(key, id, g[:53]+"=", now); return ok },
+		"falsifié":        func() bool { _, ok := s.verifyGrant(id, b64.EncodeToString(forged)); return ok },
+		"autre ouverture": func() bool { _, ok := s.verifyGrant(id, b64.EncodeToString(other)); return ok },
+		"autre partage":   func() bool { _, ok := s.verifyGrant(id2, g); return ok },
+		"expiré":          func() bool { _, ok := s.verifyGrant(id, expired); return ok },
+		"vide":            func() bool { _, ok := s.verifyGrant(id, ""); return ok },
+		"mauvaise forme":  func() bool { _, ok := s.verifyGrant(id, g[:53]+"="); return ok },
 	} {
 		if c() {
 			t.Error(name, ": accepté")
@@ -155,8 +180,8 @@ func TestReopenInvalidGrant(t *testing.T) {
 	check("falsifié", b64.EncodeToString(raw), k.preuve)
 	check("autre partage", o2.Grant, k.preuve)
 	check("autre partage, mauvais mot de passe", o2.Grant, rnd(32))
-	idb, _ := idBytes(id)
-	check("expiré", IssueGrant(s.grantKey, idb, uint32(o.N), c.Now()), k.preuve)
+	expired, _ := newGrant(uint32(o.N), c.Now().Unix())
+	check("expiré", expired, k.preuve)
 	if err := s.Done(id, o.N); err != nil {
 		t.Fatal(err)
 	}

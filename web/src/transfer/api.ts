@@ -262,6 +262,17 @@ export async function create(
 const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 /**
+ * Reprise d'un envoi en cours (D42-31) : après un redémarrage du serveur, le jeton d'envoi
+ * n'est plus reconnu (404) ; S_gestion, en en-tête, en obtient un neuf pour le même brouillon,
+ * avec son palier réservé. Tout ce que le serveur a acquitté est gardé. 404 : brouillon inconnu
+ * (échu, effacé), à recommencer. Rejouable (aucun effet de plus).
+ */
+export async function resume(c: Ctx, sGestion: SGestion): Promise<{ uploadToken: string; bucket: number; segments: number }> {
+  const o = await send(c, { method: "POST", path: "/api/manage/resume", headers: { "X-Shh-Manage": b64u(sGestion) }, retry: true }, readJSON);
+  return { uploadToken: str(o, "upload_token"), bucket: num(o, "bucket"), segments: num(o, "segments") };
+}
+
+/**
  * Un seul essai (le budget de coupure de createShare réessaie ; renvoyer un segment le
  * remplace, spec §7.4). Erreur HTTP → HttpError ; coupure et annulation transmises telles quelles.
  */

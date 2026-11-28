@@ -56,7 +56,8 @@ func Run(ctx context.Context, svc *share.Service, every time.Duration) {
 // Watch appelle PollRemoved à chaque période (une seconde en production), jusqu'à
 // l'annulation de ctx : un partage effacé par « shhdrop admin destroy » (autre processus)
 // voit ses flux coupés et ses surveillances prévenues (spec §41.8). Aucune requête quand
-// rien n'est surveillé ni en cours de lecture.
+// rien n'est surveillé ni en cours de lecture. Range aussi les octets lus par les ouvertures
+// (RangerLectures, D42-31 : aucune requête quand rien n'a été lu), une dernière fois à l'arrêt.
 func Watch(ctx context.Context, svc *share.Service, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()
@@ -64,11 +65,14 @@ func Watch(ctx context.Context, svc *share.Service, every time.Duration) {
 	for {
 		select {
 		case <-ctx.Done():
+			if protect(svc.RangerLectures) != nil {
+				fmt.Fprintln(os.Stderr, "janitor: erreur de surveillance")
+			}
 			return
 		case <-t.C:
 		}
 		// Au plus une ligne fixe par série d'erreurs (jamais d'identifiant).
-		err := protect(svc.PollRemoved)
+		err := protect(func() error { return errors.Join(svc.PollRemoved(), svc.RangerLectures()) })
 		if err != nil && !failed {
 			fmt.Fprintln(os.Stderr, "janitor: erreur de surveillance")
 			failed = true

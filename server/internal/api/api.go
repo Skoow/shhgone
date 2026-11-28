@@ -366,6 +366,7 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 	api.HandleFunc("GET /api/shares/watch", s.watch)
 	api.HandleFunc("GET /api/manage/status", s.manageStatus)
 	api.HandleFunc("POST /api/manage/destroy", s.manageDestroy)
+	api.HandleFunc("POST /api/manage/resume", s.manageResume)
 	// Salon (SHH_SALONS=1) : sans gestionnaire, aucune route /api/salons/* (404 uniforme).
 	s.salons = sal.M
 	// Jetons anonymes posés avant les routes du salon : les appels en dépendent (réservés aux

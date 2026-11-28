@@ -4,7 +4,9 @@ package share
 // le niveau (`tier`) d'un partage est fixé à sa création par un jeton anonyme dépensé (couche
 // HTTP) et gardé EN MÉMOIRE avec l'envoi, jusqu'à la finalisation : il ne change que le plus
 // grand palier, les durées et les ouvertures permises, et la fenêtre d'envoi. Aucune colonne ne
-// le garde : la ligne d'un partage payant n'a rien de plus qu'un partage gratuit, sinon un palier
+// le garde en clair (pendant l'envoi seulement, chiffré sous une clé tirée de S_gestion pour la
+// reprise après un redémarrage, D42-31, reprise.go) : la ligne d'un partage payant n'a rien de
+// plus qu'un partage gratuit, sinon un palier
 // plus grand, une durée ou des ouvertures que seule une formule permet (déjà visibles, §36 S30).
 // Aucune sécurité de plus ni de moins (§38.9.0).
 

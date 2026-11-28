@@ -83,9 +83,9 @@ func TestOnlyExpiresAtInDB(t *testing.T) {
 	}
 }
 
-// Redémarrage simulé (nouveau Service sur la même base) : tout partage « uploading » ou
-// « draining », ou expiré, est effacé, fichier compris (aucun jeton ne survit) ; un « ready »
-// vivant reste.
+// Redémarrage simulé (nouveau Service sur la même base) : un envoi sans ligne de reprise
+// (créé sans S_gestion) et un partage expiré sont effacés, fichier compris ; un « ready » et un
+// « draining » vivants restent (D42-31 : les ouvertures sont reprises).
 func TestPurgeAtStart(t *testing.T) {
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "shares.db"))
@@ -112,14 +112,14 @@ func TestPurgeAtStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n, err := s2.PurgeAtStart(); err != nil || n != 3 {
+	if n, err := s2.PurgeAtStart(); err != nil || n != 2 {
 		t.Fatal(n, err)
 	}
-	for _, id := range []string{up, draining, expired} {
+	for _, id := range []string{up, expired} {
 		gone(t, s2, id)
 	}
-	if rowCount(t, s2, alive) != 1 {
-		t.Fatal("partage prêt effacé")
+	if rowCount(t, s2, alive) != 1 || rowCount(t, s2, draining) != 1 {
+		t.Fatal("partage prêt ou « draining » vivant effacé")
 	}
 	if _, err := os.Stat(filepath.Join(dir, "blobs", alive)); err != nil {
 		t.Fatal(err)

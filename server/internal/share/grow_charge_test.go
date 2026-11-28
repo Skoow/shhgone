@@ -36,11 +36,18 @@ func TestGrowChargedChargesUnderClaim(t *testing.T) {
 	})
 	t.Run("demande refusée d'avance : aucun débit", func(t *testing.T) {
 		s, id := newDraft(t)
-		for _, b := range []int{16, 80, 81, 400, 32769} { // plus petit, égal, hors paliers, au-delà de la marge
+		for _, b := range []int{16, 81, 400, 32769} { // plus petit, hors paliers, au-delà de la marge
 			calls := 0
 			if err := s.GrowCharged(id, b, func(int) error { calls++; return nil }); !errors.Is(err, ErrBadRequest) || calls != 0 {
 				t.Fatal(b, err, calls)
 			}
+		}
+	})
+	t.Run("égal : grow rejoué, aucun débit (D42-31)", func(t *testing.T) {
+		s, id := newDraft(t)
+		calls := 0
+		if err := s.GrowCharged(id, 80, func(int) error { calls++; return nil }); err != nil || calls != 0 || bucketOf(t, s, id) != 80 {
+			t.Fatal(err, calls)
 		}
 	})
 	t.Run("quota refusé : rien ne change", func(t *testing.T) {

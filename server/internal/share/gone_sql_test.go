@@ -16,7 +16,7 @@ func TestAucunSQLSousGoneMu(t *testing.T) {
 	cas := map[string]func(s *Service, id string){
 		"retire":      func(s *Service, id string) { s.retire(id, true, s.now()) },
 		"Watch":       func(s *Service, id string) { s.Watch(id, 1) },
-		"grantIfLive": func(s *Service, id string) { s.grantIfLive(id, 1, s.now()+3600) },
+		"grantIfLive": func(s *Service, id string) { s.grantIfLive(id, 1, s.now()+3600, [32]byte{}) },
 		"OpenSegment": func(s *Service, id string) {
 			if g, err := s.OpenSegmentCtx(context.Background(), id, 0, 1); err == nil {
 				g.Close()

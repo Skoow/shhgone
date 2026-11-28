@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitError, NotFoundError, SERVER_STALL_MS, type CaptchaProof, type CreateOpts, type Item } from "../index";
 import { markElementFailure } from "../transfer/draft";
-import { PAUSE_MAX_MS, STALL_MS, UPLOAD_WINDOW_MS, createSender, type SendDeps, type Step } from "./send.svelte";
+import { PAUSE_MAX_MS, RETRY_SHOWN, STALL_MS, UPLOAD_WINDOW_MS, createSender, type SendDeps, type Step } from "./send.svelte";
 
 type Res = { link: string; manage: string; expiresInS: number };
 type Call = { opts: CreateOpts; resolve(r: Res): void; reject(e: unknown): void; items: Item[] };
@@ -127,7 +127,13 @@ describe("createSender : coupure (UI §9.4.3)", () => {
     void t.s.start(ITEMS, OPTS);
     const o = await toUpload(t);
     o.onBytes!(50, 300);
-    o.onRetry!({ attempt: 1, inMs: 8000, offline: false });
+    // D42-31 : les premiers essais (coupure brève, redémarrage du serveur) ne montrent rien.
+    for (let a = 1; a < RETRY_SHOWN; a++) {
+      o.onRetry!({ attempt: a, inMs: 1000 * a, offline: false });
+      expect(t.s.phase).toBe("upload");
+      expect(t.s.netRetry).toBeUndefined();
+    }
+    o.onRetry!({ attempt: RETRY_SHOWN, inMs: 8000, offline: false });
     expect(t.s.phase).toBe("offline");
     expect(t.s.netRetry).toMatchObject({ inMs: 8000, offline: false });
     expect(t.s.steps).toEqual([]);

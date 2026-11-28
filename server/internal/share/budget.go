@@ -38,28 +38,29 @@ type budgetEntry struct {
 }
 
 // readBudget compte les octets lus par ouverture, et par partage toutes ouvertures confondues
-// (plafond de sortie, DefaultEgressMax), en mémoire seulement (perdu au redémarrage, comme la
-// clé des jetons : aucun ancien jeton n'est alors valable, et chaque lecteur doit consommer
-// une nouvelle ouverture). Aucune adresse n'y figure : la clé est (identifiant, n° d'ouverture)
-// ou l'identifiant du partage ; rien n'est écrit sur le disque.
+// (plafond de sortie, DefaultEgressMax), en mémoire, et rangés chaque seconde dans
+// shares_ouvertures.lus (D42-31, Service.RangerLectures : un redémarrage ne remet plus les
+// budgets à zéro ; au pire la dernière seconde de lecture est oubliée, en faveur du lecteur).
+// Aucune adresse n'y figure : la clé est (identifiant, n° d'ouverture) ou l'identifiant du
+// partage ; le compteur d'un partage est la somme de ceux de ses ouvertures.
 type readBudget struct {
 	mu        sync.Mutex
 	m         map[openKey]budgetEntry
 	shares    map[string]budgetEntry
 	lastSweep int64
+	// stored : dernière valeur rangée en base par ouverture (RangerLectures).
+	stored map[openKey]int64
 }
 
 // init et balayage des entrées échues (au plus une fois par minute). Sous b.mu.
 func (b *readBudget) initLocked(now int64) {
-	if b.m == nil {
-		b.m = map[openKey]budgetEntry{}
-		b.shares = map[string]budgetEntry{}
-	}
+	b.initMapsLocked()
 	if now-b.lastSweep >= 60 {
 		b.lastSweep = now
 		for key, e := range b.m {
 			if e.until <= now {
 				delete(b.m, key)
+				delete(b.stored, key)
 			}
 		}
 		for id, e := range b.shares {
@@ -82,6 +83,7 @@ func (b *readBudget) chargeAll(k openKey, n, limit, shareLimit, now int64) error
 	e, ok := b.m[k]
 	if !ok || e.until <= now {
 		e = budgetEntry{until: now + purgeWindow}
+		delete(b.stored, k)
 	}
 	se, ok := b.shares[k.id]
 	if !ok || se.until <= now {
@@ -118,10 +120,7 @@ func (b *readBudget) shareUsed(id string, now int64) int64 {
 func (b *readBudget) keep(k openKey, until int64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.m == nil {
-		b.m = map[openKey]budgetEntry{}
-		b.shares = map[string]budgetEntry{}
-	}
+	b.initMapsLocked()
 	e := b.m[k]
 	e.until = max(e.until, until)
 	b.m[k] = e
@@ -135,6 +134,59 @@ func (b *readBudget) forget(k openKey) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.m, k)
+	delete(b.stored, k)
+}
+
+func (b *readBudget) initMapsLocked() {
+	if b.m == nil {
+		b.m = map[openKey]budgetEntry{}
+		b.shares = map[string]budgetEntry{}
+	}
+	if b.stored == nil {
+		b.stored = map[openKey]int64{}
+	}
+}
+
+// lu : octets lus d'une ouverture, à ranger.
+type lu struct {
+	k    openKey
+	used int64
+}
+
+// pending : ouvertures dont le compteur a avancé depuis son dernier rangement.
+func (b *readBudget) pending() []lu {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var out []lu
+	for k, e := range b.m {
+		if e.used > b.stored[k] {
+			out = append(out, lu{k, e.used})
+		}
+	}
+	return out
+}
+
+// markStored : used est rangé pour k (jamais en arrière).
+func (b *readBudget) markStored(k openKey, used int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, ok := b.m[k]; ok {
+		b.stored[k] = max(b.stored[k], used)
+	}
+}
+
+// load : compteur de k relu au démarrage (used octets lus, vivant jusqu'à until), ajouté à
+// celui de son partage.
+func (b *readBudget) load(k openKey, used, until int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.initMapsLocked()
+	b.m[k] = budgetEntry{used: used, until: until}
+	b.stored[k] = used
+	se := b.shares[k.id]
+	se.used += used
+	se.until = max(se.until, until)
+	b.shares[k.id] = se
 }
 
 // count : entrées en mémoire (tests).

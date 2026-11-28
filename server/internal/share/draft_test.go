@@ -41,10 +41,14 @@ func TestGrowExtendsReservationAndKeepsSegments(t *testing.T) {
 	if err := s.PutSegment(id, 0, segBody(80, 0, 7)); err != nil {
 		t.Fatal(err)
 	}
-	for _, b := range []int{80, 16, 81, 0} {
+	for _, b := range []int{16, 81, 0} {
 		if err := s.Grow(id, b); !errors.Is(err, ErrBadRequest) {
 			t.Fatalf("Grow(%d) : %v", b, err)
 		}
+	}
+	// Même palier : un grow déjà fait, rejoué après une réponse perdue (D42-31) : accepté, rien ne change.
+	if err := s.Grow(id, 80); err != nil {
+		t.Fatal("Grow(80) rejoué :", err)
 	}
 	if err := s.Grow(id, 160); err != nil {
 		t.Fatal(err)

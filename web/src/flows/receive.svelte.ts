@@ -332,8 +332,8 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     } catch (e) {
       if (disposed) return;
       // Octroi présenté (rechargement, retour gardé, autre onglet) et partage introuvable : la
-      // personne l'avait ouvert, mais ne peut plus y revenir (détruit, expiré, ou serveur
-      // redémarré alors que toutes les ouvertures sont prises) : écran dédié (D42-22).
+      // personne l'avait ouvert, mais ne peut plus y revenir (détruit ou expiré ; un redémarrage
+      // du serveur garde les octrois depuis D42-31) : écran dédié (D42-22).
       if (e instanceof NotFoundError && grant !== null) end("return_lost");
       else if (e instanceof NotFoundError || isCode(e, "lien_invalide") || isCode(e, "origine_invalide")) end("invalid");
       else if (e instanceof LimitError) {

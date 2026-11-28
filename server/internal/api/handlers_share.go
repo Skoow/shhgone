@@ -97,7 +97,7 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	}
 	ka, err1 := headerSecret(r, "X-Shh-Access")
 	sg, err2 := headerSecret(r, "X-Shh-Manage")
-	req := share.CreateReq{ID: share.NewID(), Bucket: b.Bucket, AccessV: share.Verifier(ka), ManageV: share.Verifier(sg)}
+	req := share.CreateReq{ID: share.NewID(), Bucket: b.Bucket, AccessV: share.Verifier(ka), ManageV: share.Verifier(sg), Manage: sg}
 	if err1 != nil || err2 != nil || share.Validate(req) != nil {
 		fail(w, errBadRequest)
 		return

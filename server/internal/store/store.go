@@ -116,6 +116,39 @@ CREATE TABLE IF NOT EXISTS salons_reprise_blocs(
   donnees BLOB NOT NULL CHECK(typeof(donnees)='blob'),
   PRIMARY KEY(salon_id, genre, n)) WITHOUT ROWID`
 
+// partagesRepriseSchema (schéma 6, D42-31 : « rien ne se perd après un redémarrage ») : ce qu'un
+// partage en cours d'envoi ou ouvert ne doit pas perdre à un arrêt, propre ou brutal, écrit EN
+// MARCHE par share.Service avant chaque réponse qui en dépend. Seulement ce que le serveur
+// gardait déjà en mémoire ; ni contenu, ni clé, ni adresse, ni secret en clair.
+//
+// shares_envoi : un envoi en cours (state 'uploading'), effacé à la finalisation.
+// echeance : échéance de l'envoi, arrondie au quart d'heure (comme expires_at) ; formule :
+// formule payante (0, 1, 2) chiffrée sous une clé tirée de S_gestion (que seul l'expéditeur
+// détient : HKDF-SHA-256 puis AES-256-GCM, share/reprise.go), 12 + 1 + 16 octets ; recus, haut :
+// morceaux reçus et 1 + plus haut segment touché (bornes de l'aléa et de grow, D42-6) ;
+// partiels : morceaux reçus des segments incomplets, 12 octets par segment (numéro sur 4,
+// bits sur 8). Le masque des segments complets reste dans shares.segments_mask.
+//
+// shares_ouvertures : une ouverture émise d'un partage prêt. octroi : SHA-256 de l'octroi
+// d'ouverture rendu au destinataire (jamais l'octroi), retours acceptés (au plus 20), octets
+// lus (budget de lecture, plafond de sortie du partage), voix de signalement (0 ou 1).
+// Effacées avec le partage (ON DELETE CASCADE).
+const partagesRepriseSchema = `CREATE TABLE IF NOT EXISTS shares_envoi(
+  share_id TEXT PRIMARY KEY REFERENCES shares(id) ON DELETE CASCADE,
+  echeance INTEGER NOT NULL CHECK(echeance > 0 AND echeance % 900 = 0),
+  formule BLOB NOT NULL CHECK(typeof(formule)='blob' AND length(formule)=29),
+  recus INTEGER NOT NULL DEFAULT 0 CHECK(recus >= 0),
+  haut INTEGER NOT NULL DEFAULT 0 CHECK(haut BETWEEN 0 AND 1048576),
+  partiels BLOB NOT NULL DEFAULT x'' CHECK(typeof(partiels)='blob' AND length(partiels) % 12 = 0)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS shares_ouvertures(
+  share_id TEXT NOT NULL REFERENCES shares(id) ON DELETE CASCADE,
+  n INTEGER NOT NULL CHECK(n BETWEEN 1 AND 64),
+  octroi BLOB NOT NULL CHECK(typeof(octroi)='blob' AND length(octroi)=32),
+  retours INTEGER NOT NULL DEFAULT 0 CHECK(retours >= 0),
+  lus INTEGER NOT NULL DEFAULT 0 CHECK(lus >= 0),
+  voix INTEGER NOT NULL DEFAULT 0 CHECK(voix IN (0,1)),
+  PRIMARY KEY(share_id, n)) WITHOUT ROWID`
+
 // Les PRAGMA passent par le DSN pour s'appliquer à chaque connexion. synchronous(FULL) :
 // valeur par défaut, écrite pour qu'un changement du pilote ne l'abaisse pas en silence
 // (NORMAL perdrait les dernières transactions à une coupure de courant).
@@ -145,7 +178,9 @@ const busyTimeoutMs = "5000"
 // gardés, places et échéance ramenées aux bornes d'un salon ordinaire : migrerPlaces), et table
 // salons_reprise_blocs (persistance continue des salons, créée vide). Un binaire du schéma 4 ne
 // rouvre plus la base (ErrNewerSchema) : pas de retour arrière sans effacer shares.db.
-const SchemaVersion = 5
+// 6 : tables shares_envoi et shares_ouvertures (envois et ouvertures repris après un
+// redémarrage, D42-31 ; tables neuves, créées vides). Un binaire du schéma 5 ne rouvre plus la base.
+const SchemaVersion = 6
 
 var (
 	// ErrNewerSchema : message fixe, sans chemin.
@@ -284,6 +319,10 @@ func Open(path string) (*sql.DB, error) {
 	if _, err := db.Exec(repriseSchema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("création de la table de reprise des salons : %w", err)
+	}
+	if _, err := db.Exec(partagesRepriseSchema); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("création des tables de reprise des partages : %w", err)
 	}
 	if version < SchemaVersion {
 		if _, err := db.Exec(fmt.Sprintf(`PRAGMA user_version=%d`, SchemaVersion)); err != nil {

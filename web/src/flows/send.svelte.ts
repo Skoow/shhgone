@@ -21,6 +21,12 @@ export const PAUSE_MAX_MS = 600_000;
 export const UPLOAD_WINDOW_MS = 6 * 3600_000;
 /** Aucun octet depuis 10 s pendant l'envoi → coupure affichée (sans rapport avec SERVER_STALL_MS). */
 export const STALL_MS = 10_000;
+/**
+ * Nouvel essai annoncé (« Connexion perdue… ») à partir du RETRY_SHOWN-ième seulement (D42-31) :
+ * une coupure de quelques secondes (mise à jour ou redémarrage du serveur, repris sans rien
+ * perdre) passe sans rien montrer ; au-delà (≈ 3 s d'échecs, ou STALL_MS sans octet), elle s'affiche.
+ */
+export const RETRY_SHOWN = 3;
 /** La pause est refusée s'il reste moins de 15 min avant la limite de 6 h. */
 export const PAUSE_MIN_LEFT_MS = 15 * 60_000;
 const TICK_MS = 250;
@@ -294,7 +300,7 @@ export function createSender(deps: SendDeps) {
             }
           },
           onRetry: (r) => {
-            if (!live() || phase === "paused") return;
+            if (!live() || phase === "paused" || r.attempt < RETRY_SHOWN) return;
             phase = "offline";
             retry = { inMs: r.inMs, offline: r.offline, at: now() };
           },

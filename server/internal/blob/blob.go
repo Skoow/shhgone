@@ -243,10 +243,21 @@ func (s *Store) WriteAt(id string, off int64, p []byte) error {
 	if err != nil {
 		return err
 	}
-	return s.Gate.do(func() error { return writeAt(path, off, p) })
+	return s.Gate.do(func() error { return writeAt(path, off, p, false) })
 }
 
-func writeAt(path string, off int64, p []byte) (err error) {
+// WriteAtSync : WriteAt, puis fdatasync avant de rendre la main : les octets écrits survivent
+// à un plantage ou à une coupure de courant (segments d'un envoi repris après un redémarrage,
+// D42-31).
+func (s *Store) WriteAtSync(id string, off int64, p []byte) error {
+	path, err := s.path(id)
+	if err != nil {
+		return err
+	}
+	return s.Gate.do(func() error { return writeAt(path, off, p, true) })
+}
+
+func writeAt(path string, off int64, p []byte, sync bool) (err error) {
 	f, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
 		return err
@@ -270,8 +281,10 @@ func writeAt(path string, off int64, p []byte) (err error) {
 	if off < 0 || off > fi.Size() || int64(len(p)) > fi.Size()-off {
 		return errors.New("blob : écriture hors de la réservation")
 	}
-	_, err = f.WriteAt(p, off)
-	return err
+	if _, err = f.WriteAt(p, off); err != nil || !sync {
+		return err
+	}
+	return datasync(f)
 }
 
 // Section : n octets d'un fichier, lus en flux (sans tampon de la taille du segment).

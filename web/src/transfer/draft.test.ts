@@ -458,10 +458,17 @@ describe("brouillon perdu pendant le chiffrement", { timeout: 60_000 }, () => {
   it("keep répond 404 pendant qu'un segment se chiffre : l'élément ne reste pas en « envoi », le clic aboutit", async () => {
     const { fake, net } = setup(400 * 1048576);
     let lose = false;
+    let unknown = false; // brouillon inconnu du serveur : la reprise (D42-31) répond 404 aussi
     const fetch = (async (u: RequestInfo | URL, i?: RequestInit) => {
       const req = new Request(u, i);
-      if (lose && new URL(req.url).pathname === "/api/shares/keep") {
+      const path = new URL(req.url).pathname;
+      if (lose && path === "/api/shares/keep") {
         lose = false;
+        unknown = true;
+        return new Response('{"error":"not_found"}', { status: 404 });
+      }
+      if (unknown && path === "/api/manage/resume") {
+        unknown = false;
         return new Response('{"error":"not_found"}', { status: 404 });
       }
       return fake.handle(req);
@@ -591,5 +598,86 @@ describe("Finalisation", { timeout: 60_000 }, () => {
     const e = await d.finalize([{ id: "ok", item: fileItem("ok", ok) }, { id: "b", item: fileItem("b", bad) }], { ttlHours: 1, maxOpens: 1, password: PW, solveCaptcha }).catch((x: unknown) => x);
     expect(failedElement(e)).toBe(1); // ligne en cause : jamais prise pour un refus anti-robot
     expect(e).toEqual(new Error("bad_request"));
+  });
+});
+
+// D42-31 : « rien ne se perd après un redémarrage ». Le serveur garde le brouillon et ses
+// segments acquittés ; seuls les jetons changent. Le client reprend par S_gestion, sans rien
+// renvoyer de ce qui a été acquitté, sans repartir de zéro ; brouillon inconnu : repli d'avant.
+describe("brouillon : redémarrage du serveur (D42-31)", { timeout: 60_000 }, () => {
+  /** fetch du faux serveur, redémarré après `after` segments acquittés puis injoignable `down` requêtes. */
+  function restarting(after: number, down: number, resume?: () => Response | undefined) {
+    const s = setup(16 * 1048576);
+    const acked = new Set<string>();
+    let resent = 0, puts = 0, left = -1, resumes = 0;
+    const fetch = (async (u: RequestInfo | URL, i?: RequestInit) => {
+      const req = new Request(u, i);
+      const url = new URL(req.url);
+      if (left > 0) {
+        left--;
+        throw new TypeError("fetch failed"); // serveur arrêté
+      }
+      if (url.pathname === "/api/manage/resume") {
+        resumes++;
+        const r = resume?.();
+        if (r) return r;
+      }
+      const key = `${url.pathname}${url.search}`;
+      if (req.method === "PUT" && acked.has(key)) resent++;
+      const r = await s.net.fetch(u, i);
+      if (req.method === "PUT" && r.status === 204) {
+        acked.add(key);
+        if (++puts === after) {
+          s.fake.restart();
+          left = down;
+        }
+      }
+      return r;
+    }) as typeof globalThis.fetch;
+    return { ...s, fetch, stats: () => ({ resent, resumes, acked: acked.size }) };
+  }
+
+  it("redémarrage au milieu d'un gros fichier : reprise au premier segment manquant, rien de renvoyé, contenu ouvert intact", async () => {
+    const r = restarting(2, 2);
+    const data = file(18 * 1048576, 7); // 5 segments
+    const d = createDraft(ORIGIN, { fetch: r.fetch, retryDelayMs: 1, solveCaptcha, auto: true });
+    d.sync([{ id: "a", data }]);
+    const res = await d.finalize([{ id: "a", item: fileItem("gros.bin", data) }], { ttlHours: 1, maxOpens: 1, password: PW, solveCaptcha });
+    const st = r.stats();
+    expect(st.resumes).toBe(1); // une seule reprise pour tous les appels en cours
+    expect(st.resent).toBe(0); // aucun segment acquitté renvoyé
+    expect(r.seen.filter((x) => x.method === "POST" && x.path === "/api/shares")).toHaveLength(1); // jamais recréé
+    expect(r.seen.filter((x) => x.path === "/api/manage/destroy")).toHaveLength(0);
+    const o = await openShare(res.link, PW, ORIGIN, undefined, r.net);
+    const got = Buffer.from(await o.item(0));
+    expect(createHash("sha256").update(got).digest("hex")).toBe(createHash("sha256").update(Buffer.from(await data.arrayBuffer())).digest("hex"));
+  });
+
+  it("lecteur pendant un redémarrage : jeton de lecture repris par l'octroi, même ouverture, contenu intact", async () => {
+    const { fake, seen, net } = setup();
+    const data = file(9 * 1048576, 5); // 3 segments : la lecture de l'élément en demande après l'ouverture
+    const d = createDraft(ORIGIN, { ...net, solveCaptcha, auto: true });
+    d.sync([{ id: "a", data }]);
+    const res = await d.finalize([{ id: "a", item: fileItem("a.bin", data) }], { ttlHours: 1, maxOpens: 2, password: PW, solveCaptcha });
+    const o = await openShare(res.link, PW, ORIGIN, undefined, net);
+    fake.restart(); // jetons de lecture oubliés, octroi gardé
+    expect(Buffer.from(await o.item(0)).equals(Buffer.from(await data.arrayBuffer()))).toBe(true);
+    await o.done();
+    const unlocks = seen.filter((x) => x.path === "/api/shares/unlock");
+    expect(unlocks).toHaveLength(2);
+    expect(unlocks[1]!.headers).toContain(o.grant); // même ouverture : aucune consommée de plus
+    expect(unlocks[0]!.headers).not.toContain("x-shh-grant");
+  });
+
+  it("le serveur ne connaît plus le brouillon (404 à la reprise) : repli d'avant, nouveau brouillon, partage correct", async () => {
+    const r = restarting(1, 0, () => new Response('{"error":"not_found"}', { status: 404, headers: { "Content-Type": "application/json" } }));
+    const data = file(9 * 1048576, 3);
+    const d = createDraft(ORIGIN, { fetch: r.fetch, retryDelayMs: 1, solveCaptcha, auto: true });
+    d.sync([{ id: "a", data }]);
+    await until(() => r.stats().resumes > 0 && !d.created); // brouillon oublié (lost), rien n'est montré
+    const res = await d.finalize([{ id: "a", item: fileItem("x.bin", data) }], { ttlHours: 1, maxOpens: 1, password: PW, solveCaptcha });
+    expect(r.seen.filter((x) => x.method === "POST" && x.path === "/api/shares").length).toBe(2);
+    const o = await openShare(res.link, PW, ORIGIN, undefined, r.net);
+    expect(Buffer.from(await o.item(0)).equals(Buffer.from(await data.arrayBuffer()))).toBe(true);
   });
 });

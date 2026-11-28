@@ -394,7 +394,11 @@ describe("le serveur ne voit rien : repères de requête, base minimale (spec §
     return captured(input, { ...init, headers: h });
   };
   type Row = Record<string, unknown>;
-  const snapshots: Record<string, { cols: string[]; rows: Row[]; master: string[]; salonCols: string[]; pieceCols: string[]; salonRows: number }> = {};
+  const snapshots: Record<
+    string,
+    { cols: string[]; rows: Row[]; master: string[]; salonCols: string[]; pieceCols: string[]; salonRows: number; envoiCols: string[]; envois: number; ouvCols: string[]; ouvertures: Row[] }
+  > = {};
+  let openedGrant = "";
   async function dbSnapshot(label: string) {
     const { DatabaseSync } = await import("node:sqlite");
     const db = new DatabaseSync(join(srv.dataDir, "shares.db"), { readOnly: true });
@@ -411,6 +415,10 @@ describe("le serveur ne voit rien : repères de requête, base minimale (spec §
         salonCols: colsOf("salons"),
         pieceCols: colsOf("salon_pieces"),
         salonRows: count("salons") + count("salon_pieces"),
+        envoiCols: colsOf("shares_envoi"),
+        envois: count("shares_envoi"),
+        ouvCols: colsOf("shares_ouvertures"),
+        ouvertures: db.prepare("SELECT * FROM shares_ouvertures").all() as Row[],
       };
     } finally {
       db.close();
@@ -428,6 +436,7 @@ describe("le serveur ne voit rien : repères de requête, base minimale (spec §
     });
     await dbSnapshot("après finalize");
     const o = await openShare(r.link, GENERATED, srv.origin, undefined, { fetch: marked });
+    openedGrant = o.grant;
     await dbSnapshot("pendant la lecture");
     // Identifiant repère dans des routes inconnues ; motif repère refusé (400, partage intact).
     for (const path of [`/api/${R.id}`, `/api/shares/${R.idLong}`, `/API/${R.id}`, `/api/shares/segments/${R.id}`]) await marked(srv.origin + path);
@@ -469,7 +478,13 @@ describe("le serveur ne voit rien : repères de requête, base minimale (spec §
         "table:salons_reprise",
         "table:salons_reprise_blocs",
         "table:shares",
+        // D42-31 : reprise après un redémarrage (envoi en cours, ouvertures), effacées avec le partage.
+        "table:shares_envoi",
+        "table:shares_ouvertures",
       ]);
+      expect(s.envoiCols, label).toEqual(["share_id", "echeance", "formule", "recus", "haut", "partiels"]);
+      expect(s.envois, label).toBe(0); // envoi fini : sa ligne de reprise est effacée par finalize
+      expect(s.ouvCols, label).toEqual(["share_id", "n", "octroi", "retours", "lus", "voix"]);
       expect(s.salonCols, label).toEqual([
         "id", "access_v", "manage_v", "proof_v", "salt", "kdf_ops", "kdf_mem", "expires_at",
         "max_members", "members_can_destroy", "failed_attempts", "pieces_bytes", "rotation_r",
@@ -485,6 +500,15 @@ describe("le serveur ne voit rien : repères de requête, base minimale (spec §
     }
     expect(snapshots["après finalize"]!.rows).toHaveLength(1);
     expect(snapshots["après suppression"]!.rows).toHaveLength(0);
+    // Une ouverture : seulement SHA-256 de son octroi (jamais l'octroi), effacée avec le partage.
+    expect(snapshots["après finalize"]!.ouvertures).toHaveLength(0);
+    const ouv = snapshots["pendant la lecture"]!.ouvertures;
+    expect(ouv).toHaveLength(1);
+    expect(ouv[0]!.n).toBe(1);
+    expect((ouv[0]!.octroi as Uint8Array).length).toBe(32);
+    const raw = unb64u(openedGrant);
+    expect(Buffer.from(ouv[0]!.octroi as Uint8Array).equals(createHash("sha256").update(raw).digest())).toBe(true);
+    expect(snapshots["après suppression"]!.ouvertures).toHaveLength(0);
   });
 
   it("aucun repère sur disque (base, WAL, fichiers), dans stdout, stderr ni dans une réponse", () => {
