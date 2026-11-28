@@ -8,7 +8,7 @@
   import { getLang, t } from "../i18n/i18n.svelte";
   import { lireEtat, lireOffre, resilier, type EtatPaiement } from "../paiement/api";
   import { telechargerNote } from "../paiement/note";
-  import { garder, idbDuNavigateur, lirePasses, oublier, oublierEtat, type PassGarde } from "../paiement/pass";
+  import { garder, garderEtat, idbDuNavigateur, lirePasses, oublier, oublierEtat, type PassGarde } from "../paiement/pass";
 
   let { rapide = 3000, lent = 30000 }: { rapide?: number; lent?: number } = $props();
   const lang = $derived(getLang());
@@ -39,12 +39,14 @@
         const r = await lireEtat(cible.pass);
         if (!vivant) return;
         if (r !== null) e = r;
-        // Retour de paiement : l'état gardé pour l'écran d'envoi (jetons.ts) est relu au prochain chargement.
-        if (r !== null) await oublierEtat(idb, cible.id).catch(() => {});
         if (r !== null && r.etat === "payee" && enAttente) {
           enAttente = false;
           await garder(idb, { ...cible, enAttente: false }).catch(() => {});
         }
+        // Retour de paiement : l'état lu est gardé pour la journée, comme jetons.ts (date de fin
+        // connue ensuite sur la page Compte sans autre requête) ; tout autre état est oublié (relu).
+        if (r !== null && r.etat === "payee") await garderEtat(idb, cible.id, { ...r, jour: new Date().toISOString().slice(0, 10) }).catch(() => {});
+        else if (r !== null) await oublierEtat(idb, cible.id).catch(() => {});
         if (r !== null && FINAUX.includes(r.etat)) return;
         essais++;
         minuterie = setTimeout(tour, essais < 40 ? rapide : lent);
@@ -109,6 +111,9 @@
     {#if e.renouvelle}
       <p class="body">{t("offers.ret.renew")}</p>
       <button type="button" class="act" onclick={arreter} data-stop>{t("offers.ret.stop")}</button>
+      <!-- Avec un compte, l'abonnement se gère aussi dans la page Compte (28 novembre) ; ce bouton
+           reste pour qui a payé sans compte (le pass n'est alors que sur cet appareil). -->
+      {#if __COMPTES__}<p class="body" data-stop-account><a href={href("/compte")}>{t("offers.ret.account")}</a></p>{/if}
     {/if}
     {#if arret === "ok"}<p class="body" data-stopped>{t("offers.ret.stopped")}</p>{/if}
     {#if arret === "erreur"}<p class="err" role="alert">{t("offers.ret.stop.err")}</p>{/if}

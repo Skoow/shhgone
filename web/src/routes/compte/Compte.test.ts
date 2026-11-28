@@ -33,6 +33,8 @@ const C = vi.hoisted(() => ({
   pseudoLibre: vi.fn(),
   changerPseudo: vi.fn(),
   verifierSaisie: vi.fn(),
+  abonnements: vi.fn(),
+  arreterAbonnement: vi.fn(),
 }));
 vi.mock("../../account/session.svelte", async (orig) => ({ ...(await orig<object>()), ...C }));
 // L'illustration de fin ne s'anime pas ici (happy-dom rejette les animations annulées au démontage).
@@ -60,6 +62,7 @@ beforeEach(() => {
   C.ecrireProfil.mockImplementation(async (p: object) => void (account.profil = { ...account.profil!, ...p }));
   C.pseudoLibre.mockResolvedValue(true);
   C.verifierSaisie.mockResolvedValue({});
+  C.abonnements.mockResolvedValue([]);
   account.etat = "ouvert";
   account.profil = { pseudo: "Lea", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null };
 });
@@ -136,6 +139,72 @@ describe("carte « Votre compte »", () => {
     await monter(Compte);
     expect(texte()).toContain("Confirmé : 3 salons à la fois, 10 places.");
     expect(texte()).toContain("Ce compte ne peut plus créer de salon jusqu'au 14 novembre 2029. Motif : Harcèlement.");
+  });
+});
+
+// Bug du 28 novembre : la carte disait toujours « Gratuit » (elle lisait `profil.pass`, que rien
+// n'écrit). Elle lit l'abonnement comme la suppression du compte (abonnements() : coffre privé et
+// appareil, lecture locale). Gestion dans la carte : « Arrêter l'abonnement » s'il se renouvelle.
+describe("carte « Votre compte » : abonnement", () => {
+  const AB = (o: object = {}) => ({ id: "p1", offre: "plus", fin: "2026-12-27", renouvelle: true, arrete: false, offert: false, ...o });
+  const offre = () => document.querySelector("[data-carte-offre-texte]")!.textContent!.replace(/\s+/g, " ").trim();
+
+  it("abonnement rangé dans le coffre, profil.pass vide : l'offre et sa date, plus « Gratuit »", async () => {
+    C.abonnements.mockResolvedValue([AB()]);
+    account.profil = { ...account.profil!, pass: null };
+    await monter(Compte);
+    expect(offre()).toBe("Plus jusqu'au 26 décembre 2026 · renouvelé automatiquement");
+    expect(document.querySelector("[data-carte-compte]")!.textContent).not.toContain("Gratuit");
+    expect(document.querySelector("[data-carte-offre]")!.getAttribute("data-carte-offre")).toBe("plus");
+    // Une seule mention de l'abonnement dans la page : la carte.
+    expect(texte().match(/Voir les offres/g)).toHaveLength(1);
+  });
+
+  it("accès offert : « Pro offert jusqu'au… », sans bouton ; paiement unique : sans bouton", async () => {
+    C.abonnements.mockResolvedValue([AB({ offre: "pro", renouvelle: false, offert: true })]);
+    await monter(Compte);
+    expect(offre()).toBe("Pro offert jusqu'au 26 décembre 2026");
+    expect(document.querySelector("[data-carte-arret]")).toBeNull();
+    demonter();
+    C.abonnements.mockResolvedValue([AB({ renouvelle: false })]);
+    await monter(Compte);
+    expect(offre()).toBe("Plus jusqu'au 26 décembre 2026");
+    expect(document.querySelector("[data-carte-arret]")).toBeNull();
+  });
+
+  it("« Arrêter l'abonnement » : fenêtre Oui / Non, puis arrêt ; la carte dit « ne sera pas renouvelé »", async () => {
+    C.abonnements.mockResolvedValue([AB()]);
+    C.arreterAbonnement.mockImplementation(async () => {
+      C.abonnements.mockResolvedValue([AB({ renouvelle: false, arrete: true })]);
+      return "ok";
+    });
+    await monter(Compte);
+    await presser("Arrêter l'abonnement");
+    const d = document.querySelector("[data-confirm-dialog]")!.textContent!.replace(/\s+/g, " ");
+    expect(d).toContain("Votre abonnement Plus ne sera pas renouvelé. Vous le gardez jusqu'au 26 décembre 2026, puis votre compte repasse en Gratuit. Rien n'est remboursé pour la période en cours.");
+    // « Non » : rien.
+    await presser("Non");
+    expect(C.arreterAbonnement).not.toHaveBeenCalled();
+    await presser("Arrêter l'abonnement");
+    await presser("Oui, arrêter");
+    expect(C.arreterAbonnement).toHaveBeenCalledWith("p1");
+    expect(offre()).toBe("Plus jusqu'au 26 décembre 2026 · ne sera pas renouvelé");
+    expect(document.querySelector("[data-carte-arret]")).toBeNull();
+    expect(document.querySelector("[data-carte-arret-fait]")!.textContent).toContain("Abonnement arrêté");
+  });
+
+  it("arrêt impossible (réseau) : message clair, « Réessayer »", async () => {
+    C.abonnements.mockResolvedValue([AB()]);
+    C.arreterAbonnement.mockResolvedValueOnce("erreur").mockResolvedValueOnce("ok");
+    await monter(Compte);
+    await presser("Arrêter l'abonnement");
+    await presser("Oui, arrêter");
+    expect(document.querySelector("[data-carte-arret-erreur]")!.textContent).toContain("L'abonnement n'a pas pu être arrêté");
+    expect(offre()).toContain("renouvelé automatiquement");
+    document.querySelector<HTMLButtonElement>("[data-carte-arret-reessayer]")!.click();
+    await attendre();
+    expect(C.arreterAbonnement).toHaveBeenCalledTimes(2);
+    expect(document.querySelector("[data-carte-arret-erreur]")).toBeNull();
   });
 });
 

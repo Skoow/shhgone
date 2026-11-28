@@ -35,7 +35,7 @@ const C = vi.hoisted(() => ({
 vi.mock("../../account/session.svelte", async (orig) => ({ ...(await orig<object>()), ...C }));
 // L'illustration de fin ne s'anime pas ici (happy-dom rejette les animations annulées au démontage).
 vi.mock("../../ui/motion", async (orig) => ({ ...(await orig<object>()), reducedMotion: () => true }));
-const { CompteError, account, REGLAGES_DEFAUT } = await import("../../account/session.svelte");
+const { CompteError, ErreurAbonnement, account, REGLAGES_DEFAUT } = await import("../../account/session.svelte");
 const { default: Compte } = await import("./Compte.svelte");
 const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salonsActifs: 1, banniId: null, banniJusqu: null, banniMotif: null };
 
@@ -150,24 +150,30 @@ describe("paramètres", () => {
 
 describe("suppression du compte", () => {
   async function* fin() {
-    yield { etape: "partages" as const, fait: 0, total: 0, echecs: 0 };
-    yield { etape: "fini" as const, salonsFermes: 1, partagesDetruits: 0, partagesEchoues: 0 };
+    yield { etape: "compte" as const };
+    yield { etape: "fini" as const, salonsFermes: 1 };
   }
+  const AB = (o: object = {}) => ({ id: "p1", offre: "plus", fin: "2026-12-27", renouvelle: true, arrete: false, offert: false, ...o });
 
-  it("geste de passkey (session récente), puis suppression ; fin : supprimer la passkey du gestionnaire", async () => {
+  it("geste de passkey (session récente), puis suppression ; « Êtes-vous sûr ? » ; données de l'appareil toujours effacées, sans case ; fin : supprimer la passkey du gestionnaire", async () => {
     C.supprimerTout.mockImplementation(() => fin());
     await monter(Compte);
     await presser("Supprimer le compte");
     expect(texte()).toContain("Une confirmation par passkey vous sera demandée.");
     expect(texte()).not.toMatch(/Mot de passe|adresse bannie|service d'envoi des codes/);
+    // Plus de case « Effacer aussi les données de cet appareil » (28 novembre) : toujours effacées.
+    expect(document.querySelector("input[type=checkbox]")).toBeNull();
     await presser("Supprimer définitivement");
-    // Fenêtre Oui / Non (26 novembre) : sans abonnement, rien sur une offre.
-    expect(document.querySelector("[data-confirm-dialog]")!.textContent).toContain("Cette action ne peut pas être annulée.");
+    const d = document.querySelector("[data-confirm-dialog]")!.textContent!.replace(/\s+/g, " ");
+    expect(d).toContain("Êtes-vous sûr ?");
+    expect(d).toContain("Cette action ne peut pas être annulée.");
+    expect(d).toContain("Toutes les données du site sur cet appareil sont aussi effacées (Mes partages, même ceux créés sans compte");
+    // Sans abonnement, rien sur une offre.
     expect(document.querySelector("[data-delete-sub]")).toBeNull();
     expect(C.confirmerParPasskey).not.toHaveBeenCalled();
     await presser("Oui, supprimer");
     expect(C.confirmerParPasskey).toHaveBeenCalled();
-    expect(C.supprimerTout).toHaveBeenCalledWith({ effacerAppareil: true });
+    expect(C.supprimerTout).toHaveBeenCalledWith();
     expect(texte()).toContain("Compte supprimé.");
     expect(texte()).toContain("Supprimez aussi la passkey « Lea » de votre gestionnaire");
   });
@@ -191,29 +197,54 @@ describe("suppression du compte", () => {
     expect(C.supprimerTout).not.toHaveBeenCalled();
   });
 
-  // Abonnement rangé dans le coffre (conception du paiement §5.5, §5.6) : perdu pour le compte, date
-  // de fin (veille de `fin`, exclue), rien de remboursé, renouvellement non arrêté par la suppression.
-  it("abonnement : la fenêtre dit l'offre perdue, sa date de fin, aucun remboursement, le renouvellement à arrêter", async () => {
-    C.abonnements.mockResolvedValue([{ offre: "plus", fin: "2026-12-27", renouvelle: true, offert: false }]);
+  // Décision du 28 novembre : l'abonnement part toujours avec le compte (renouvellement arrêté, pass
+  // révoqué) ; date de fin = veille de `fin` (exclue) ; un mois commencé est dû (rien remboursé).
+  it("abonnement : « Vous allez perdre votre abonnement Plus, valable jusqu'au… », renouvellement arrêté d'abord, rien remboursé", async () => {
+    C.abonnements.mockResolvedValue([AB()]);
     await monter(Compte);
     await presser("Supprimer le compte");
-    expect(document.querySelector("[data-delete-subs]")!.textContent).toContain("Votre offre Plus, valable jusqu'au 26 décembre 2026, sera perdue pour ce compte");
+    expect(document.querySelector("[data-delete-sub-item]")!.textContent).toContain("Votre abonnement Plus\u202f: son renouvellement est arrêté");
+    // Plus de bloc « Votre abonnement » à part sur la page.
+    expect(document.querySelector("[data-delete-subs]")).toBeNull();
     await presser("Supprimer définitivement");
     const d = document.querySelector("[data-confirm-dialog]")!.textContent!.replace(/\s+/g, " ");
-    expect(d).toContain("Votre offre Plus, valable jusqu'au 26 décembre 2026, sera perdue pour ce compte");
+    expect(d).toContain("Êtes-vous sûr ? Vous allez perdre votre abonnement Plus, valable jusqu'au 26 décembre 2026.");
+    expect(d).toContain("Son renouvellement automatique est arrêté d'abord.");
     expect(d).toContain("Rien n'est remboursé automatiquement.");
-    expect(d).toContain("La suppression n'arrête pas le renouvellement automatique");
   });
 
   it("accès offert sans date connue ici : perdu, ni remboursement ni renouvellement", async () => {
-    C.abonnements.mockResolvedValue([{ offre: "pro", fin: null, renouvelle: false, offert: true }]);
+    C.abonnements.mockResolvedValue([AB({ offre: "pro", fin: null, renouvelle: false, offert: true })]);
     await monter(Compte);
     await presser("Supprimer le compte");
     await presser("Supprimer définitivement");
-    const d = document.querySelector("[data-confirm-dialog]")!.textContent!;
-    expect(d).toContain("Votre accès offert Pro (date de fin inconnue sur cet appareil) sera perdu pour ce compte");
+    const d = document.querySelector("[data-confirm-dialog]")!.textContent!.replace(/\s+/g, " ");
+    expect(d).toContain("Vous allez perdre votre accès offert Pro (date de fin inconnue sur cet appareil).");
     expect(d).not.toContain("remboursé");
     expect(d).not.toContain("renouvellement");
+  });
+
+  it("abonnement impossible à arrêter (réseau) : rien n'est supprimé, message clair, « Réessayer » reprend sans nouveau geste", async () => {
+    C.abonnements.mockResolvedValue([AB()]);
+    let essai = 0;
+    C.supprimerTout.mockImplementation(async function* () {
+      essai++;
+      yield { etape: "abonnement" as const };
+      if (essai === 1) throw new ErreurAbonnement();
+      yield { etape: "compte" as const };
+      yield { etape: "fini" as const, salonsFermes: 0 };
+    });
+    await monter(Compte);
+    await presser("Supprimer le compte");
+    await presser("Supprimer définitivement");
+    await presser("Oui, supprimer");
+    expect(document.querySelector("[data-delete-error]")!.textContent).toContain("Votre abonnement n'a pas pu être arrêté");
+    expect(document.querySelector("[data-delete-error]")!.textContent).toContain("Rien n'a été supprimé");
+    expect(texte()).not.toContain("Compte supprimé.");
+    await presser("Réessayer");
+    expect(C.confirmerParPasskey).toHaveBeenCalledTimes(1);
+    expect(C.supprimerTout).toHaveBeenCalledTimes(2);
+    expect(texte()).toContain("Compte supprimé.");
   });
 });
 

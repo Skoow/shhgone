@@ -421,6 +421,40 @@ func (s *Service) Resilier(ctx context.Context, p Pass) error {
 	return err
 }
 
+// ErrRenouvellement : révocation par le porteur refusée tant qu'un renouvellement est en cours
+// chez le prestataire (Resilier d'abord : sinon la personne resterait prélevée pour un pass mort).
+var ErrRenouvellement = errors.New("paiement : renouvellement en cours (l'arrêter d'abord chez le prestataire)")
+
+// RevoquerPorteur : le porteur de p révoque son pass (suppression du compte, conception §5.6) :
+// `revoque` = 1, réserve vidée, `fin_jour` ramenée à aujourd'hui ; sa commande payée passe
+// « révoquée » (un renouvellement arrivé ensuite n'est pas crédité). Pass inconnu ou déjà
+// révoqué : rien, sans erreur (réponse neutre). Aucun remboursement. Rien ne relie ce pass à un
+// compte.
+func (s *Service) RevoquerPorteur(p Pass) error {
+	q := p.Empreinte()
+	auj := jourDe(s.now())
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var n int
+	if err := tx.QueryRow(`SELECT count(*) FROM commandes WHERE q=? AND renouvelle=1 AND abonnement IS NOT NULL`, q[:]).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return ErrRenouvellement
+	}
+	if _, err := tx.Exec(`UPDATE passes SET revoque=1, jetons=0, fin_jour=MIN(fin_jour, ?) WHERE q=? AND revoque=0`, auj, q[:]); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE commandes SET etat=?, renouvelle=0, garde_jour=MAX(garde_jour, ?) WHERE q=? AND etat=?`,
+		etatRevoquee, auj+gardeLitiges, q[:], etatPayee); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // Webhook : vérifie et applique un webhook du prestataire pr. Chaque événement est appliqué
 // dans sa propre transaction ; un événement déjà appliqué ne change rien (idempotence).
 func (s *Service) Webhook(ctx context.Context, pr Prestataire, h http.Header, corps []byte) error {
@@ -445,8 +479,54 @@ func (s *Service) Webhook(ctx context.Context, pr Prestataire, h http.Header, co
 		if err := s.appliquer(pr, ev); err != nil {
 			return err
 		}
+		if ev.Sorte == Revoque {
+			// Pass révoqué (remboursement total, litige) : plus aucun prélèvement sans accès.
+			if err := s.arreterRevoquee(ctx, pr.Nom(), ev); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// arreterRevoquee : la commande révoquée de ev dont le renouvellement court encore chez le
+// prestataire (abonnement connu) le voit arrêté (Resilier du prestataire), puis `renouvelle` = 0.
+// Échec : rendu (le webhook est réessayé par le prestataire, la révocation est idempotente).
+func (s *Service) arreterRevoquee(ctx context.Context, nom string, ev Evenement) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	l, ok, err := trouver(tx, nom, ev)
+	tx.Rollback()
+	if err != nil || !ok {
+		return err
+	}
+	return s.arreterCommande(ctx, l.id)
+}
+
+// arreterCommande : arrête chez son prestataire le renouvellement de la commande révoquée id
+// (rien s'il ne court pas). Prestataire absent (révocation hors du serveur, shhdrop admin) :
+// ErrRenouvellement.
+func (s *Service) arreterCommande(ctx context.Context, id []byte) error {
+	var abo []byte
+	var moyen int
+	err := s.db.QueryRow(`SELECT abonnement, moyen FROM commandes WHERE id=? AND etat=? AND renouvelle=1 AND abonnement IS NOT NULL`, id, etatRevoquee).
+		Scan(&abo, &moyen)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if moyen < 0 || moyen >= len(s.prest) || s.prest[moyen] == nil {
+		return ErrRenouvellement
+	}
+	if err := s.prest[moyen].Resilier(ctx, string(abo)); err != nil && !errors.Is(err, ErrAucunAbonnement) {
+		return err
+	}
+	_, err = s.db.Exec(`UPDATE commandes SET renouvelle=0 WHERE id=?`, id)
+	return err
 }
 
 // cibleur : prestataire dont la vérification d'un webhook coûte un appel sortant authentifié
@@ -605,7 +685,9 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 		if _, err := tx.Exec(`UPDATE passes SET revoque=1, jetons=0, fin_jour=MIN(fin_jour, ?) WHERE q=?`, auj, l.q); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE commandes SET etat=?, renouvelle=0, garde_jour=MAX(garde_jour, ?) WHERE id=?`,
+		// `renouvelle` reste à 1 si un abonnement court chez le prestataire : arreterCommande
+		// l'arrête après la transaction, puis le remet à 0 (sinon, prélevé sans accès).
+		if _, err := tx.Exec(`UPDATE commandes SET etat=?, renouvelle=CASE WHEN abonnement IS NULL THEN 0 ELSE renouvelle END, garde_jour=MAX(garde_jour, ?) WHERE id=?`,
 			etatRevoquee, auj+gardeLitiges, l.id); err != nil {
 			return err
 		}
@@ -742,8 +824,27 @@ func (s *Service) Revoquer(c Commande) (bool, error) {
 	} else if err != nil {
 		return false, err
 	}
+	var renouv int
+	if err := tx.QueryRow(`SELECT count(*) FROM commandes WHERE id=? AND renouvelle=1 AND abonnement IS NOT NULL`, c[:]).Scan(&renouv); err != nil {
+		return false, err
+	}
 	tx.Commit()
-	return true, s.appliquer(revocateur{}, Evenement{Sorte: Revoque, Commande: c, AvecCommande: true})
+	if renouv > 0 {
+		// Renouvellement en cours : arrêté chez le prestataire AVANT la révocation (sinon la
+		// personne resterait prélevée pour un pass mort) ; hors du serveur (shhdrop admin, aucun
+		// prestataire) : refus, rien n'est révoqué.
+		var moyen int
+		if err := s.db.QueryRow(`SELECT moyen FROM commandes WHERE id=?`, c[:]).Scan(&moyen); err != nil {
+			return false, err
+		}
+		if moyen < 0 || moyen >= len(s.prest) || s.prest[moyen] == nil {
+			return true, ErrRenouvellement
+		}
+	}
+	if err := s.appliquer(revocateur{}, Evenement{Sorte: Revoque, Commande: c, AvecCommande: true}); err != nil {
+		return true, err
+	}
+	return true, s.arreterCommande(context.Background(), c[:])
 }
 
 // revocateur : prestataire fictif d'une révocation à la main (seul Nom sert).

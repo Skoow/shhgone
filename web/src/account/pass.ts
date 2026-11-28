@@ -47,7 +47,8 @@ const meme = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every(
 export async function synchroniserPass(idb: IDBFactory, prive: CoffrePrive): Promise<((p: CoffrePrive) => CoffrePrive) | null> {
   const ici = await lirePasses(idb);
   const ducoffre = (prive.pass ?? []).map(passDeEntree).filter((x): x is PassGarde => x !== null);
-  for (const g of ducoffre) if (!ici.some((x) => meme(x.pass, g.pass))) await garder(idb, g);
+  for (const g of ducoffre) if (!ici.some((x) => meme(x.pass, g.pass))) await garder(idb, { ...g, compte: true });
+  await marquerRanges(idb, prive);
   const nouveaux = ici.filter((x) => !x.enAttente && !ducoffre.some((g) => meme(g.pass, x.pass)));
   if (nouveaux.length === 0) return null;
   return (p) => {
@@ -55,4 +56,36 @@ export async function synchroniserPass(idb: IDBFactory, prive: CoffrePrive): Pro
     const ajout = nouveaux.filter((x) => !deja.some((g) => meme(g.pass, x.pass)) && !(p.pass ?? []).some((e) => e.id === x.id));
     return ajout.length === 0 ? p : { ...p, pass: [...(p.pass ?? []), ...ajout.map(passEnEntree)] };
   };
+}
+
+/**
+ * Pass de l'appareil présents (mêmes octets) dans le coffre `prive` tel que le serveur l'a
+ * confirmé : marqués `compte` (ils suivent le compte, paiement/pass.ts retirerPassDuCompte).
+ * Rend le nombre de pass utilisables (ni en attente) qui ne sont pas encore dans le coffre : à
+ * réessayer.
+ */
+export async function marquerRanges(idb: IDBFactory, prive: CoffrePrive): Promise<number> {
+  const ducoffre = (prive.pass ?? []).map(passDeEntree).filter((x): x is PassGarde => x !== null);
+  let manquent = 0;
+  for (const g of await lirePasses(idb)) {
+    const dedans = ducoffre.some((x) => meme(x.pass, g.pass));
+    if (dedans && g.compte !== true) await garder(idb, { ...g, compte: true }, { garderEtat: true });
+    if (!dedans && !g.enAttente) manquent++;
+  }
+  return manquent;
+}
+
+/** Arrêt du renouvellement : l'entrée du coffre (mêmes octets) ne se dit plus renouvelée. */
+export function sansRenouvellement(pass: Uint8Array): (p: CoffrePrive) => CoffrePrive {
+  return (p) => ({
+    ...p,
+    ...(p.pass ? { pass: p.pass.map((e) => (memeEntree(e, pass) ? { ...e, renouvelle: false } : e)) } : {}),
+  });
+}
+function memeEntree(e: EntreePrivee, pass: Uint8Array): boolean {
+  try {
+    return typeof e.p === "string" && meme(unb64u(e.p), pass);
+  } catch {
+    return false;
+  }
 }

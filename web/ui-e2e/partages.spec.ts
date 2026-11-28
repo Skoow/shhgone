@@ -61,7 +61,12 @@ async function inscrire(page: Page, origin: string, pseudo: string): Promise<voi
 test("sans compte : Lien prêt sans lien de gestion, Mes partages (vide puis plein), Supprimer et Retirer", async ({ page, shh, isMobile }) => {
   await page.goto(shh.origin + "/envois");
   await expect(titre(page, "Mes partages")).toBeVisible();
-  await expect(page.locator("[data-shares-empty]")).toBeVisible();
+  // Deux parties, chacune avec son état vide (28 novembre) : « Partages de fichiers » puis « Salons ».
+  await expect(page.locator("[data-shares-part]")).toHaveCount(2);
+  await expect(page.locator("[data-shares-part]").nth(0).getByRole("heading", { level: 2 })).toHaveText("Partages de fichiers");
+  await expect(page.locator("[data-shares-part]").nth(1).getByRole("heading", { level: 2 })).toHaveText("Salons");
+  await expect(page.locator("[data-shares-empty=envoi]")).toBeVisible();
+  await expect(page.locator("[data-shares-empty=salon]")).toBeVisible();
   await expect(page.locator("[data-shares-device]")).toContainText("Sans compte, cette liste n'existe que dans ce navigateur");
   expect(await axe(page)).toEqual([]);
   await shot(page, "mes-partages-vide", isMobile);
@@ -82,7 +87,11 @@ test("sans compte : Lien prêt sans lien de gestion, Mes partages (vide puis ple
   await expect(cartes.filter({ hasText: "Code de la porte" })).toContainText("Ouvert 0 / 3");
   await expect(page.locator("main")).not.toContainText(sent.manage.slice(sent.manage.indexOf("#") + 2));
   expect(await axe(page)).toEqual([]);
-  await shot(page, "mes-partages-plein", isMobile);
+  // Partages seuls : deux cartes dans « Partages de fichiers », icône fichier ; « Salons » vide.
+  await expect(page.locator("[data-shares-part=envoi] [data-share-card]")).toHaveCount(2);
+  await expect(page.locator("[data-shares-part=envoi] [data-share-icon=fichier]")).toHaveCount(2);
+  await expect(page.locator("[data-shares-empty=salon]")).toBeVisible();
+  await shot(page, "mes-partages-partages-seuls", isMobile);
   // Supprimer : pour tout le monde (par le lien de gestion) ; la carte dit « Détruit ».
   const c = cartes.filter({ hasText: "Code de la porte" });
   await c.getByRole("button", { name: "Supprimer", exact: true }).click();
@@ -111,6 +120,11 @@ test("connecté : Salon prêt, Mes partages avec le salon, Se déconnecter (barr
 
   await aller(page, "/envois");
   await expect(page.locator("[data-share-card][data-sorte=salon]")).toBeVisible();
+  // Salons seuls : le salon dans sa partie, icône des bulles ; « Partages de fichiers » vide.
+  await expect(page.locator("[data-shares-part=salon] [data-share-icon=salon]")).toHaveCount(1);
+  await expect(page.locator("[data-shares-empty=envoi]")).toBeVisible();
+  expect(await axe(page)).toEqual([]);
+  await shot(page, "mes-partages-salons-seuls", isMobile);
   await expect(page.locator("[data-share-card][data-sorte=salon] a[data-room-manage]")).toHaveAttribute("href", /\/salon#s[A-Za-z0-9_-]{43}$/);
   await expect(page.locator("[data-shares-device]")).toContainText("Avec votre compte");
   const tab = page.getByRole("navigation", { name: "Navigation principale" });
@@ -127,22 +141,26 @@ test("connecté : Salon prêt, Mes partages avec le salon, Se déconnecter (barr
     await shot(page, "ligne-du-haut-connecte", isMobile);
   }
 
-  // La page d'envoi lit l'état du pass (au plus une fois par jour, gardé chiffré sur l'appareil) :
-  // la date de fin est alors connue ici, sans requête à la suppression.
-  await aller(page, "/envoyer");
-  await expect(page.locator("[data-current-offer]").filter({ visible: true }).or(page.getByRole("button", { name: /^Ajouter$/ })).first()).toBeVisible();
-  await page.waitForTimeout(2000);
-  // Suppression : fenêtre Oui / Non avec l'abonnement Plus perdu, sa date, aucun remboursement.
+  // Carte « Votre compte » (bug du 28 novembre : toujours « Gratuit ») : l'offre et sa date, lues
+  // sur l'appareil (l'état gardé au retour de paiement), sans requête.
   await aller(page, "/compte");
+  const carte = page.locator("[data-carte-compte]");
+  await expect(carte.locator("[data-carte-offre-texte]")).toHaveText(/^Plus jusqu'au \d{1,2} \S+ \d{4}( · ne sera pas renouvelé)?$/);
+  await expect(carte).not.toContainText("Gratuit");
+  await carte.scrollIntoViewIfNeeded();
+  await shot(page, "carte-votre-compte-abonnement", isMobile);
+  // Suppression : fenêtre Oui / Non, « Êtes-vous sûr ? », l'abonnement perdu avec sa date, rien remboursé.
   await bouton(page, "Supprimer le compte").click();
-  await expect(page.locator("[data-delete-subs]")).toContainText("Votre offre Plus, valable jusqu'au");
+  await expect(page.locator("[data-delete-sub-item]")).toContainText("Votre abonnement Plus");
+  await expect(page.locator("input[type=checkbox]")).toHaveCount(0);
   await bouton(page, "Supprimer définitivement").click();
   const d = page.getByRole("dialog");
   await expect(d).toContainText("Supprimer définitivement votre compte");
-  await expect(d).toContainText("sera perdue pour ce compte");
+  await expect(d).toContainText("Êtes-vous sûr");
+  await expect(d).toContainText(/Vous allez perdre votre abonnement Plus, valable jusqu'au \d{1,2} \S+ \d{4}\./);
   await expect(d).toContainText("Rien n'est remboursé automatiquement.");
-  // Pass de 30 jours sans renouvellement (pass-helpers.ts) : rien sur le renouvellement (vitest couvre l'autre cas).
-  await expect(d).toContainText("valable jusqu'au");
+  await expect(d).toContainText("Toutes les données du site sur cet appareil sont aussi effacées");
+  expect(await axe(page)).toEqual([]);
   await shot(page, "confirmation-suppression-abonnement", isMobile);
   await d.getByRole("button", { name: "Non", exact: true }).click();
   await expect(d).toBeHidden();
@@ -154,4 +172,61 @@ test("connecté : Salon prêt, Mes partages avec le salon, Se déconnecter (barr
   await page.getByRole("dialog").getByRole("button", { name: "Se déconnecter" }).click();
   await expect(page.locator("[data-nav-logout], [data-tab-logout]")).toHaveCount(0);
   await expect(page.locator("[data-share-card][data-sorte=salon]")).toBeVisible();
+  // Les deux (après la déconnexion : l'envoi recharge la page) : un partage envoyé rejoint sa partie, le salon reste dans la sienne.
+  await sendShare(page, shh.origin + "/envoyer", { text: "Note du salon.", title: "Ordre du jour", isMobile });
+  page.once("dialog", (d) => void d.accept());
+  await aller(page, "/envois");
+  await expect(page.locator("[data-shares-part=envoi] [data-share-card]")).toHaveCount(1);
+  await expect(page.locator("[data-shares-part=salon] [data-share-card]")).toHaveCount(1);
+  await expect(page.locator("[data-shares-empty]")).toHaveCount(0);
+  expect(await axe(page)).toEqual([]);
+  await shot(page, "mes-partages-les-deux", isMobile);
+});
+
+test("abonnement qui se renouvelle : « Arrêter l'abonnement » dans la carte, puis suppression du compte qui révoque le pass", async ({ page, shh, isMobile }) => {
+  await passPaye(page, shh, { renouvelle: true });
+  await inscrire(page, shh.origin, `Max${randomBytes(3).toString("hex")}`);
+  await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
+  await aller(page, "/compte");
+  const carte = page.locator("[data-carte-compte]");
+  await expect(carte.locator("[data-carte-offre-texte]")).toHaveText(/^Plus jusqu'au .+ · renouvelé automatiquement$/);
+  await carte.scrollIntoViewIfNeeded();
+  await shot(page, "carte-votre-compte-renouvele", isMobile);
+  // Arrêter : fenêtre Oui / Non, puis la route d'arrêt (interceptée : le faux paiement n'a pas
+  // d'abonnement chez un prestataire) ; la carte dit « ne sera pas renouvelé ».
+  let arrets = 0;
+  await page.route("**/api/paiement/resilier", (route) => {
+    arrets++;
+    expect(route.request().headers()["x-shh-pass"]).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(route.request().headers()["x-shh-session"]).toBeUndefined();
+    return arrets === 1 ? route.abort("failed") : route.fulfill({ status: 204 });
+  });
+  await bouton(page, "Arrêter l'abonnement").click();
+  const d = page.getByRole("dialog");
+  await expect(d).toContainText(/Votre abonnement Plus ne sera pas renouvelé\. Vous le gardez jusqu'au .+, puis votre compte repasse en Gratuit\. Rien n'est remboursé pour la période en cours\./);
+  expect(await axe(page)).toEqual([]);
+  await shot(page, "arreter-abonnement", isMobile);
+  await d.getByRole("button", { name: "Oui, arrêter" }).click();
+  // Premier essai sans réseau : message clair, « Réessayer ».
+  await expect(carte.locator("[data-carte-arret-erreur]")).toContainText("L'abonnement n'a pas pu être arrêté");
+  await shot(page, "arreter-abonnement-erreur", isMobile);
+  await carte.getByRole("button", { name: "Réessayer" }).click();
+  await expect(carte.locator("[data-carte-offre-texte]")).toHaveText(/^Plus jusqu'au .+ · ne sera pas renouvelé$/);
+  await expect(carte.locator("[data-carte-arret]")).toHaveCount(0);
+  await shot(page, "carte-votre-compte-arrete", isMobile);
+  await page.unroute("**/api/paiement/resilier");
+
+  // Suppression du compte : le pass est révoqué au vrai serveur, puis le compte supprimé.
+  const revocations: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().endsWith("/api/paiement/revoquer")) revocations.push(r.headers()["x-shh-pass"] ?? "");
+  });
+  await bouton(page, "Supprimer le compte").click();
+  await bouton(page, "Supprimer définitivement").click();
+  await expect(page.getByRole("dialog")).toContainText("Vous allez perdre votre abonnement Plus");
+  await bouton(page, "Oui, supprimer").click();
+  await expect(titre(page, "Compte supprimé.")).toBeVisible({ timeout: 30_000 });
+  expect(revocations).toHaveLength(1);
+  const etat = await fetch(shh.origin + "/api/paiement/etat", { method: "POST", headers: { "X-Shh-Pass": revocations[0]! } });
+  expect(((await etat.json()) as { etat: string }).etat).toBe("revoquee");
 });

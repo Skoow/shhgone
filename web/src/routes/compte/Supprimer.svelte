@@ -1,31 +1,35 @@
 <script lang="ts">
   // Supprimer le compte (conception compte §21.12, §21.15.4 point 12 ; suppression simplifiée). Monté seulement avec __COMPTES__, depuis
-  // la page Compte. Avant de confirmer, l'écran dit ce qui sera supprimé (salons créés, compte),
-  // honnêtement, ce qui ne peut pas être garanti (messages dans les salons d'autrui, partages en
-  // cours qui s'effacent à leur échéance, ce que d'autres ont reçu, copies de sauvegarde) ; une offre
-  // rangée dans le coffre (pass Plus ou Pro, accès offert : account/abonnements.ts) est annoncée
-  // perdue pour le compte, avec sa date de fin, sans remboursement automatique, et un renouvellement
-  // en cours n'est pas arrêté par la suppression (conception du paiement §5.5, §5.6 : le pass n'est
-  // pas lié au compte côté serveur). Fenêtre de confirmation Oui / Non (26 novembre), puis geste de
-  // passkey (session « récente », conception du compte par passkey §3.6), progression annoncée, puis la
-  // fin : chaque passkey est signalée inconnue au gestionnaire là où c'est possible, et l'écran dit
-  // de la supprimer aussi du gestionnaire.
+  // la page Compte. Avant de confirmer, l'écran dit ce qui sera supprimé (salons créés, compte, et
+  // l'abonnement s'il y en a un), honnêtement, ce qui ne peut pas être garanti (messages dans les
+  // salons d'autrui, partages en cours qui s'effacent à leur échéance, ce que d'autres ont reçu,
+  // copies de sauvegarde). Décision du propriétaire du 28 novembre : supprimer le compte supprime
+  // TOUJOURS l'abonnement aussi (pass Plus ou Pro, accès offert, trouvé dans le coffre privé ou sur
+  // l'appareil : account/abonnements.ts), et efface toutes les données du site sur cet appareil
+  // (plus de case : l'appareil revient à zéro, Mes partages créés sans compte compris). Fenêtre Oui / Non : « Êtes-vous sûr ? », et avec un abonnement « Vous allez perdre
+  // votre abonnement {offre}, valable jusqu'au {date} » (rien n'est remboursé automatiquement : les
+  // remboursements se font à la main, conception du paiement §5.5). Puis geste de passkey (session
+  // « récente », conception du compte par passkey §3.6), et suppression.ts : renouvellement arrêté,
+  // pass révoqué, compte supprimé, pass effacé. Abonnement impossible à arrêter (réseau) : rien
+  // n'est supprimé, le message le dit, « Réessayer » reprend sans nouveau geste. Fin : chaque
+  // passkey est signalée inconnue au gestionnaire là où c'est possible, et l'écran dit de la
+  // supprimer aussi du gestionnaire.
   import { untrack } from "svelte";
-  import { abonnements as abonnementsDuCompte, account, confirmerParPasskey, preparerReauth, supprimerTout, type Abonnement, type EtatServeur, type Progres } from "../../account/session.svelte";
-  import { followLink, href, navigate } from "../../app/router.svelte";
+  import { abonnements as abonnementsDuCompte, account, confirmerParPasskey, ErreurAbonnement, preparerReauth, supprimerTout, type Abonnement, type EtatServeur, type Progres } from "../../account/session.svelte";
+  import { navigate } from "../../app/router.svelte";
   import { getLang, t } from "../../i18n/i18n.svelte";
   import ConfirmDialog from "../../ui/ConfirmDialog.svelte";
   import { announce } from "../../ui/announce";
   import Button from "../../ui/Button.svelte";
   import DestroyedArt from "../../ui/DestroyedArt.svelte";
   import Cadre from "./Cadre.svelte";
-  import Case from "./Case.svelte";
   import { annulee, erreur } from "./erreurs";
 
   type Props = { etat: EtatServeur | null; onretour: () => void };
   let { etat, onretour }: Props = $props();
-  let appareil = $state(true);
   let global = $state("");
+  /** L'abonnement n'a pas pu être arrêté : « Réessayer » reprend sans nouveau geste. */
+  let reessayer = $state(false);
   let progres = $state.raw<Progres | null>(null);
   let fini = $state.raw<Extract<Progres, { etape: "fini" }> | null>(null);
   const pseudo = account.profil?.pseudo ?? "";
@@ -40,7 +44,7 @@
     }),
   );
 
-  // Offres rangées dans le coffre privé : lecture locale (aucune requête).
+  // Offres du compte (coffre privé et appareil) : lecture locale (aucune requête).
   let abonnements = $state.raw<Abonnement[]>([]);
   $effect(() =>
     untrack(() => void abonnementsDuCompte().then((l) => (abonnements = l)).catch(() => undefined)),
@@ -49,29 +53,42 @@
   const jusqua = (fin: string) => new Intl.DateTimeFormat(getLang(), { dateStyle: "long", timeZone: "UTC" }).format(new Date(Date.parse(fin + "T00:00:00Z") - 86_400_000));
   const nomOffre = (a: Abonnement) => t(a.offre === "pro" ? "paid.badge.pro" : "paid.badge.plus");
   const perte = (a: Abonnement) =>
-    t(a.offert ? (a.fin ? "account.delete.sub.gift" : "account.delete.sub.gift.nodate") : a.fin ? "account.delete.sub.paid" : "account.delete.sub.paid.nodate", { offre: nomOffre(a), date: a.fin ? jusqua(a.fin) : "" });
+    t(a.offert ? (a.fin ? "account.delete.sub.lose.gift" : "account.delete.sub.lose.gift.nodate") : a.fin ? "account.delete.sub.lose" : "account.delete.sub.lose.nodate", { offre: nomOffre(a), date: a.fin ? jusqua(a.fin) : "" });
   let confirmer = $state(false);
 
-  const enCours = $derived(progres?.etape === "compte" ? t("account.delete.progressAccount") : "");
+  const enCours = $derived(progres?.etape === "abonnement" ? t("account.delete.progressSub") : progres?.etape === "compte" ? t("account.delete.progressAccount") : "");
 
   async function supprimer() {
     global = "";
+    reessayer = false;
     try {
       await confirmerParPasskey();
     } catch (e) {
       preparerReauth().catch(() => undefined);
       return montrer(e);
     }
+    await suite();
+  }
+  /** Après le geste : abonnement arrêté, puis compte supprimé (suppression.ts). */
+  async function suite() {
+    global = "";
+    reessayer = false;
     try {
-      for await (const p of supprimerTout({ effacerAppareil: appareil })) {
+      for await (const p of supprimerTout()) {
         if (p.etape === "fini") fini = p;
         else {
           progres = p;
-          announce(t("account.delete.progressAccount"));
+          announce(p.etape === "abonnement" ? t("account.delete.progressSub") : t("account.delete.progressAccount"));
         }
       }
     } catch (e) {
       progres = null;
+      if (e instanceof ErreurAbonnement) {
+        reessayer = true;
+        global = t("account.delete.sub.error");
+        announce(global);
+        return;
+      }
       return montrer(e);
     }
     progres = null;
@@ -97,6 +114,10 @@
       <ul>
         <li>{t("account.delete.salons", { n: salons })}</li>
         <li>{t("account.delete.account")}</li>
+        <li>{t("account.delete.device.all")}</li>
+        {#each abonnements as a, i (i)}
+          <li data-delete-sub-item>{t("account.delete.sub.item", { offre: nomOffre(a) })}</li>
+        {/each}
       </ul>
     </div>
     <div class="bloc">
@@ -108,43 +129,34 @@
         <li>{t("account.delete.stays.kept")}</li>
       </ul>
     </div>
-    {#if abonnements.length > 0}
-      <div class="bloc" data-delete-subs>
-        <h2>{t("account.delete.subs")}</h2>
-        {#each abonnements as a, i (i)}
-          {@render abonnement(a)}
-        {/each}
-      </div>
-    {/if}
 
     <form novalidate onsubmit={(e) => e.preventDefault()}>
-      <Case label={t("account.delete.device")} hint={t("account.delete.device.hint")} bind:checked={appareil} />
       <p class="note">{t("account.delete.gesture")}</p>
-      {#if global}<p class="err" role="alert">{global}</p>{/if}
+      {#if global}<p class="err" role="alert" data-delete-error>{global}</p>{/if}
       {#if enCours}<p class="note" aria-busy="true">{enCours}</p>{/if}
       <div class="actions">
-        <Button variant="danger" disabled={etat === null || progres !== null} aria-haspopup="dialog" onpress={() => void (confirmer = true)} data-delete-open>{t("account.delete.button")}</Button>
+        {#if reessayer}
+          <Button variant="danger" disabled={progres !== null} onpress={suite} data-delete-retry>{t("account.delete.retry")}</Button>
+        {:else}
+          <Button variant="danger" disabled={etat === null || progres !== null} aria-haspopup="dialog" onpress={() => void (confirmer = true)} data-delete-open>{t("account.delete.button")}</Button>
+        {/if}
         <Button variant="ghost" onpress={onretour}>{t("account.delete.back")}</Button>
       </div>
     </form>
   </Cadre>
   <ConfirmDialog bind:open={confirmer} title={t("account.delete.confirm.title")} yesLabel={t("account.delete.yes")} noLabel={t("account.delete.no")} danger onyes={supprimer}>
-    <p class="msg">{t("account.delete.confirm", { salons })}</p>
+    <p class="msg sur">{t("account.delete.sure")}</p>
     {#each abonnements as a, i (i)}
-      {@render abonnement(a)}
+      <div class="perte" data-delete-sub>
+        <p class="warn">{perte(a)}</p>
+        {#if a.renouvelle}<p class="note">{t("account.delete.sub.renew")}</p>{/if}
+        {#if !a.offert}<p class="note">{t("account.delete.sub.refund")}</p>{/if}
+      </div>
     {/each}
+    <p class="msg">{t("account.delete.confirm", { salons })}</p>
+    <p class="msg" data-delete-device>{t("account.delete.device.all")}</p>
   </ConfirmDialog>
 {/if}
-
-{#snippet abonnement(a: Abonnement)}
-  <div class="perte" data-delete-sub>
-    <p class="warn">{perte(a)}</p>
-    {#if !a.offert}<p class="note">{t("account.delete.sub.refund")}</p>{/if}
-    {#if a.renouvelle}
-      <p class="note">{t("account.delete.sub.renew.before")}<a href={href("/offres")} onclick={(e) => followLink(e, "/offres")}>{t("account.delete.sub.renew.link")}</a>{t("account.delete.sub.renew.after")}</p>
-    {/if}
-  </div>
-{/snippet}
 
 <style>
   .bloc {
@@ -171,16 +183,15 @@
   .perte .note {
     margin: 0;
   }
+  .sur {
+    font-weight: 600;
+  }
   .perte {
     display: grid;
     gap: var(--sp-1);
     padding: var(--sp-3);
     border-radius: var(--r-md, 12px);
     background: var(--warn-tint);
-  }
-  .perte a {
-    color: var(--accent);
-    text-underline-offset: 0.2em;
   }
   .err {
     margin: 0;

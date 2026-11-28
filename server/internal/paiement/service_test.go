@@ -24,6 +24,7 @@ type faux struct {
 	evs     []Evenement
 	vu      []Demande
 	resilie []string
+	errRes  error // erreur de Resilier seule
 }
 
 func (f *faux) Moyen() Moyen { return f.moyen }
@@ -35,6 +36,9 @@ func (f *faux) Creer(_ context.Context, d Demande) (Session, error) {
 func (f *faux) Lire(context.Context, http.Header, []byte) ([]Evenement, error) { return f.evs, f.err }
 func (f *faux) Resilier(_ context.Context, a string) error {
 	f.resilie = append(f.resilie, a)
+	if f.errRes != nil {
+		return f.errRes
+	}
 	return f.err
 }
 func (f *faux) Origines() []string { return []string{"https://paie.example/"} }

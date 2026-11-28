@@ -40,6 +40,12 @@ export type PassGarde = {
   cree: number;
   /** Pays déclaré à la commande (ISO, deux majuscules), pour la note de vente ; jamais envoyé ensuite. */
   pays?: string;
+  /**
+   * Rangé dans le coffre privé du compte (écriture confirmée par le serveur du compte, ou venu du
+   * coffre) : ce pass suit le compte sur cet appareil et le quitte à la déconnexion (« Pass et
+   * compte », conception du paiement §6.4). Absent : pas (encore) dans un compte.
+   */
+  compte?: boolean;
 };
 
 /** Pays au bon format, ou undefined. */
@@ -63,10 +69,11 @@ export function tirerPass(): Uint8Array<ArrayBuffer> {
 
 const nouvelleCle = () => crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 
-export async function garder(idb: IDBFactory, g: PassGarde): Promise<void> {
+/** `garderEtat` : l'état gardé reste (simple marque « rangé dans le compte ») ; sinon il est à relire. */
+export async function garder(idb: IDBFactory, g: PassGarde, o: { garderEtat?: boolean } = {}): Promise<void> {
   const b = base(idb);
   const key = await b.key(await nouvelleCle());
-  const pt = utf8(JSON.stringify({ p: b64u(g.pass), offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, en_attente: g.enAttente, cree: g.cree, pays: paysDe(g.pays) }));
+  const pt = utf8(JSON.stringify({ p: b64u(g.pass), offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, en_attente: g.enAttente, cree: g.cree, pays: paysDe(g.pays), ...(g.compte === true ? { compte: true } : {}) }));
   try {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: utf8(AAD + g.id) }, key, pt));
@@ -75,7 +82,7 @@ export async function garder(idb: IDBFactory, g: PassGarde): Promise<void> {
     pt.fill(0);
   }
   // Pass rangé de nouveau (retour de paiement, compte) : son état gardé est à relire.
-  await oublierEtat(idb, g.id);
+  if (!o.garderEtat) await oublierEtat(idb, g.id);
 }
 
 /** Pass gardés, le plus récent d'abord ; [] si aucune base (rien n'est créé). Un enregistrement illisible est ignoré. */
@@ -105,7 +112,7 @@ export async function lirePasses(idb: IDBFactory): Promise<PassGarde[]> {
         )
           continue;
         const pays = paysDe(o.pays);
-        out.push({ id, pass, offre: o.offre, jours: o.jours, renouvelle: o.renouvelle, moyen: o.moyen as OriginePass, enAttente: o.en_attente, cree: o.cree as number, ...(pays ? { pays } : {}) });
+        out.push({ id, pass, offre: o.offre, jours: o.jours, renouvelle: o.renouvelle, moyen: o.moyen as OriginePass, enAttente: o.en_attente, cree: o.cree as number, ...(pays ? { pays } : {}), ...(o.compte === true ? { compte: true } : {}) });
       } catch {
         // enregistrement abîmé : ignoré
       }
@@ -244,6 +251,36 @@ export async function lireJetons(idb: IDBFactory): Promise<JetonGarde[]> {
 
 export async function retirerJeton(idb: IDBFactory, id: string): Promise<void> {
   await base(idb).del(id);
+}
+
+/**
+ * Suppression du compte (abonnement perdu) : les pass `ids` (et leur état gardé) quittent cet
+ * appareil, avec tous les jetons gardés (rien ne dit de quel pass vient un jeton ; seuls des pass
+ * payés en donnent). Une commande en attente, absente de `ids`, reste. Sans base : rien.
+ */
+export async function oublierAbonnements(idb: IDBFactory, ids: readonly string[]): Promise<void> {
+  const b = base(idb);
+  if (!(await b.exists().catch(() => false))) return;
+  for (const id of ids) await oublier(idb, id);
+  for (const [id] of await b.all()) if (id.startsWith("j:")) await b.del(id);
+}
+
+/**
+ * Le compte quitte cet appareil (déconnexion, démarrage sans session gardée) : les pass rangés
+ * dans son coffre (`compte`) partent avec lui ; il les rend à la prochaine connexion. Un pass pas
+ * encore rangé (écriture du coffre en échec) ou une commande en attente restent : rien n'est
+ * perdu. Plus aucun pass utilisable ici : les jetons partent aussi. Rend le nombre retiré.
+ */
+export async function retirerPassDuCompte(idb: IDBFactory): Promise<number> {
+  const tous = await lirePasses(idb);
+  const partent = tous.filter((g) => g.compte === true);
+  if (partent.length === 0) return 0;
+  for (const g of partent) await oublier(idb, g.id);
+  if (!tous.some((g) => g.compte !== true && !g.enAttente)) {
+    const b = base(idb);
+    for (const [id] of await b.all()) if (id.startsWith("j:")) await b.del(id);
+  }
+  return partent.length;
 }
 
 // --- Clés d'émission vues (S17, conception du paiement §7) -------------------------------------

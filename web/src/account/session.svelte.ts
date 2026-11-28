@@ -23,7 +23,7 @@
 //   démarrage sans session gardée : les entrées venues du compte sont retirées de l'appareil
 //   (§37.11 A-G8) ; celles créées ici restent.
 import * as api from "./api";
-import { synchroniserPass } from "./pass";
+import { marquerRanges, sansRenouvellement, synchroniserPass } from "./pass";
 import { netParDefaut, type Ceremonie, type Net, type Preuve } from "./api";
 import { aleatoire32, clesDuCompte, enveloppePrf, enveloppeRecup, ouvrirEnveloppesPrf, ouvrirRecup, type ClesCompte } from "./keys";
 import { creerCoffre, ouvrir, priveDeJson, priveEnJson, priveVide, profilDeJson, profilEnJson, sceller, type Coffre, type CoffrePrive, type Profil, type Sorte } from "./vaults";
@@ -37,17 +37,19 @@ import { entreePrf } from "../engine/index";
 import { loadSalonEngine, type SalonEngine } from "../salon/engine";
 import { accountFlag } from "../app/account-flag.svelte";
 import { supprimerTout as suppression, type Progres } from "./suppression";
+import { lireEtat as lireEtatPass, resilier as resilierPass, revoquer as revoquerPass, type EtatPaiement } from "../paiement/api";
 import { effacerDonneesAppareil } from "../storage/appareil";
 import { importerPartages, retirerPartages, retirerPartagesDuCompte, surChangement, tousLesPartages, type Changement } from "../storage/partages.svelte";
 import type { Partage } from "../storage/partages";
 import { ajouterEntree, fusionner, retirerEntree } from "./sync";
-import { abonnementsDuCompte, type Abonnement } from "./abonnements";
-import { lireEtatGarde } from "../paiement/pass";
+import { abonnementsDe, passConnus, type Abonnement } from "./abonnements";
+import { garderEtat, lireEtatGarde, lirePasses, oublierAbonnements, retirerPassDuCompte, type PassGarde } from "../paiement/pass";
 
 export type { Profil, Reglages, CoffrePrive } from "./vaults";
 export { REGLAGES_DEFAUT } from "./vaults";
 export { CompteError, type Preuve, type EtatServeur } from "./api";
 export type { Progres } from "./suppression";
+export { ErreurAbonnement } from "./suppression";
 export type { Abonnement } from "./abonnements";
 export { passkeysDisponibles };
 export { estMobile } from "./device";
@@ -71,6 +73,14 @@ type Deps = {
   partages: PartagesAppareil;
   /** Suppression du compte : effacement des données de l'appareil, si demandé. */
   effacerAppareil: () => Promise<void>;
+  /** Suppression du compte : arrêt du renouvellement et révocation de chaque pass (paiement/api.ts, sans session). */
+  paiement: {
+    resilier: (p: Uint8Array<ArrayBuffer>) => Promise<"ok" | "aucun" | "erreur">;
+    revoquer: (p: Uint8Array<ArrayBuffer>) => Promise<"ok" | "renouvellement" | "erreur">;
+    etat: (p: Uint8Array<ArrayBuffer>) => Promise<EtatPaiement | null>;
+  };
+  /** Veille des pass pas encore rangés dans le coffre (« Pass et compte ») : lance `f` dans `ms`. */
+  planifierPass: (ms: number, f: () => void) => () => void;
   maintenant: () => number;
   /** RP ID des passkeys (hôte du site) : signalUnknownCredential. */
   rpId: () => string;
@@ -98,6 +108,11 @@ const defaut = (): Deps => ({
   },
   partages: { lister: tousLesPartages, importer: importerPartages, retirer: retirerPartages, retirerCompte: retirerPartagesDuCompte, ecouter: surChangement },
   effacerAppareil: effacerDonneesAppareil,
+  paiement: { resilier: (p) => resilierPass(p), revoquer: (p) => revoquerPass(p), etat: (p) => lireEtatPass(p) },
+  planifierPass: (ms, f) => {
+    const t = setTimeout(f, ms);
+    return () => clearTimeout(t);
+  },
   maintenant: () => Date.now(),
   rpId: () => globalThis.location?.hostname ?? "",
 });
@@ -165,6 +180,8 @@ let nouvelleCle: { r: Bytes; texte: string } | null = null;
 /** Écriture différée du coffre privé (§37.11 A-G2) et écoute de « Mes partages ». */
 let attente: { patches: ((p: CoffrePrive) => CoffrePrive)[]; annuler: () => void } | null = null;
 let arreterEcoute: (() => void) | null = null;
+/** Veille des pass (veillerPass) : annulation. */
+let arreterVeille: (() => void) | null = null;
 
 
 const fraiche = (p: Prete | null): p is Prete => p !== null && deps.maintenant() - p.recue < VALIDITE_MS;
@@ -185,6 +202,8 @@ function oublierMemoire(): void {
   attente = null;
   arreterEcoute?.();
   arreterEcoute = null;
+  arreterVeille?.();
+  arreterVeille = null;
   ouverte?.kCompte.fill(0);
   ouverte = null;
   oublierEtapes();
@@ -216,6 +235,7 @@ async function oublierAppareil(): Promise<void> {
   if (idb) await effacer(idb).catch(() => undefined);
   deps.signalerOuvert(false);
   await deps.partages.retirerCompte().catch(() => undefined);
+  if (idb) await retirerPassDuCompte(idb).catch(() => 0);
 }
 
 /**
@@ -244,16 +264,47 @@ async function synchroniser(o: Ouverte): Promise<void> {
   } catch {
     // Liste illisible ou coffre refusé : la prochaine connexion refusionne.
   }
-  // Pass des offres payantes (conception du paiement §6.2) : appareil ↔ coffre privé.
+  // Pass des offres payantes (conception du paiement §6.2, §6.4) : appareil ↔ coffre privé ; un
+  // pass pas encore rangé (écriture refusée, réseau) est réessayé par veillerPass.
+  let manquent = 0;
   try {
-    const idb = deps.idb();
-    if (idb && ouverte === o) {
-      const patch = await synchroniserPass(idb, o.prive.valeur);
-      if (patch && ouverte === o) await ecrireTout(o, [patch]);
-    }
+    manquent = await rangerPass(o);
   } catch {
-    // Au mieux : la prochaine connexion recommence.
+    manquent = 1;
   }
+  veillerPass(o, manquent > 0 ? VEILLE_ECHEC_MS : VEILLE_MS);
+}
+
+/** Pass : 1 min après un échec, sinon toutes les 5 min tant que la session est ouverte. */
+const VEILLE_ECHEC_MS = 60_000;
+const VEILLE_MS = 300_000;
+
+/**
+ * Range dans le coffre les pass utilisables de l'appareil qui n'y sont pas, range ici ceux du
+ * coffre, puis marque `compte` ceux que le coffre confirme. Rend le nombre encore à ranger.
+ */
+async function rangerPass(o: Ouverte): Promise<number> {
+  const idb = deps.idb();
+  if (!idb || ouverte !== o) return 0;
+  const patch = await synchroniserPass(idb, o.prive.valeur);
+  if (patch && ouverte === o) await ecrireTout(o, [patch]);
+  return ouverte === o ? marquerRanges(idb, o.prive.valeur) : 0;
+}
+
+/**
+ * Veille (lecture locale seulement tant qu'il n'y a rien à ranger) : un pass payé pendant la
+ * session (retour de paiement, commande confirmée plus tard) ou dont l'écriture a échoué est rangé
+ * dans le compte dès que possible, jusqu'à ce qu'il y soit : jamais d'abonnement hors du compte
+ * pendant qu'il est ouvert.
+ */
+function veillerPass(o: Ouverte, ms: number): void {
+  arreterVeille?.();
+  arreterVeille = deps.planifierPass(ms, () => {
+    if (ouverte !== o) return;
+    void rangerPass(o)
+      .then((n) => n, () => 1)
+      .then((n) => ouverte === o && veillerPass(o, n > 0 ? VEILLE_ECHEC_MS : VEILLE_MS));
+  });
 }
 
 async function memoriser(o: Ouverte): Promise<void> {
@@ -932,13 +983,20 @@ async function vider(): Promise<void> {
   if (o && ps.length > 0) await ecrireTout(o, ps);
 }
 
-/**
- * Offres rangées dans le coffre privé (pass Plus ou Pro, accès offert), pour la confirmation de la
- * suppression du compte : lecture locale seulement (abonnements.ts), aucune requête.
- */
-export function abonnements(): Promise<Abonnement[]> {
+/** Pass connus : coffre privé du compte et appareil (abonnements.ts), lecture locale. */
+async function passDuCompte(): Promise<PassGarde[]> {
   const idb = deps.idb();
-  return abonnementsDuCompte(account.prive, (id) => (idb ? lireEtatGarde(idb, id) : Promise.resolve(null)), new Date(deps.maintenant()).toISOString().slice(0, 10));
+  return passConnus(account.prive, idb ? await lirePasses(idb) : []);
+}
+
+/**
+ * Offres du compte (pass Plus ou Pro, accès offert ; coffre privé et appareil), pour la carte
+ * « Votre compte » et la confirmation de la suppression : lecture locale seulement
+ * (abonnements.ts), aucune requête.
+ */
+export async function abonnements(): Promise<Abonnement[]> {
+  const idb = deps.idb();
+  return abonnementsDe(await passDuCompte(), (id) => (idb ? lireEtatGarde(idb, id) : Promise.resolve(null)), new Date(deps.maintenant()).toISOString().slice(0, 10));
 }
 
 async function ecrireTout(o: Ouverte, ps: ((p: CoffrePrive) => CoffrePrive)[]): Promise<void> {
@@ -957,9 +1015,39 @@ export async function rangerPassDansCompte(): Promise<boolean> {
   const o = ouverte;
   const idb = deps.idb();
   if (!o || !idb) return false;
-  const patch = await synchroniserPass(idb, o.prive.valeur);
-  if (patch && ouverte === o) await ecrireTout(o, [patch]);
+  try {
+    await rangerPass(o);
+  } catch (e) {
+    veillerPass(o, VEILLE_ECHEC_MS); // réessayé jusqu'à être rangé
+    throw e;
+  }
   return ouverte === o;
+}
+
+/**
+ * « Arrêter l'abonnement » (carte « Votre compte », 28 novembre) : le renouvellement du pass `id`
+ * est arrêté chez le prestataire (POST /api/paiement/resilier, en-tête du pass, sans session :
+ * conception du paiement §5.6 ; Stripe en fin de période, PayPal tout de suite, l'accès restant
+ * jusqu'à la fin payée chez nous). Puis l'état est relu (date de fin) et gardé chiffré ici, et
+ * l'entrée du coffre ne se dit plus renouvelée. « erreur » : rien n'est changé ici.
+ */
+export async function arreterAbonnement(id: string): Promise<"ok" | "erreur"> {
+  const idb = deps.idb();
+  const g = (await passDuCompte()).find((x) => x.id === id);
+  if (!g || g.moyen === "offert") return "erreur";
+  if ((await deps.paiement.resilier(g.pass)) === "erreur") return "erreur";
+  if (idb) {
+    const e = await deps.paiement.etat(g.pass).catch(() => null);
+    const jour = new Date(deps.maintenant()).toISOString().slice(0, 10);
+    if (e !== null) await garderEtat(idb, g.id, { etat: e.etat, offre: e.offre, fin: e.fin, renouvelle: false, droits: e.droits, jour }).catch(() => undefined);
+    else {
+      const avant = await lireEtatGarde(idb, g.id);
+      if (avant) await garderEtat(idb, g.id, { ...avant, renouvelle: false }).catch(() => undefined);
+    }
+  }
+  const o = ouverte;
+  if (o) await ecrireTout(o, [sansRenouvellement(g.pass)]).catch(() => undefined);
+  return "ok";
 }
 
 // --- Rechargement, déconnexion ----------------------------------------------------------------
@@ -971,7 +1059,11 @@ export async function restaurer(): Promise<void> {
   const s = idb ? await lire(idb) : null;
   // Aucune session gardée : rien d'un compte ne reste dans « Mes partages » de l'appareil (onglet
   // fermé sans se déconnecter, session en mémoire seulement).
-  if (!s) return void (await deps.partages.retirerCompte().catch(() => undefined));
+  if (!s) {
+    // De même, les pass rangés dans le compte suivent le compte : ils reviennent à la connexion.
+    if (idb) await retirerPassDuCompte(idb).catch(() => 0);
+    return void (await deps.partages.retirerCompte().catch(() => undefined));
+  }
   account.etat = "verrouille";
   const local = idb ? await lireCle(idb, s.h) : null;
   const cleLocale = local !== null;
@@ -1093,18 +1185,28 @@ export async function arreterResterConnecte(): Promise<void> {
  * pour l'écran ; à la fin, chaque passkey du compte est signalée inconnue au gestionnaire là où
  * l'API existe.
  */
-export function supprimerTout(opts: { effacerAppareil: boolean }): AsyncGenerator<Progres> {
+export function supprimerTout(): AsyncGenerator<Progres> {
   const o = ouverteOuErreur();
   let ids: Bytes[] = [];
-  return suppression(opts, {
+  return suppression({
     avant: async () => {
       ids = (await garde(() => api.passkeys(deps.net, o.jeton))).map((p) => p.credId);
+      // Coffre privé relu : un pass rangé depuis un autre appareil pendant la session est révoqué aussi.
+      const relu = await garde(() => o.prive.relire());
+      if (ouverte === o) account.prive = relu;
     },
+    passes: passDuCompte,
+    resilier: (p) => deps.paiement.resilier(p),
+    revoquer: (p) => deps.paiement.revoquer(p),
     supprimerCompte: async () => (await garde(() => api.supprimer(deps.net, o.jeton))).salonsFermes,
     oublierCompte: async () => {
       account.supprime = true; // avant que la session disparaisse : l'écran de fin reste monté
       await oublierAppareil();
       for (const id of ids) await signalerInconnue(deps.rpId(), id);
+    },
+    oublierPass: async (ids) => {
+      const idb = deps.idb();
+      if (idb) await oublierAbonnements(idb, ids);
     },
     effacerAppareil: () => deps.effacerAppareil(),
   });

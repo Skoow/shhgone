@@ -17,6 +17,11 @@ async function toReady(page: Page, context: BrowserContext, origin: string, text
   await protectOn(page); // D42-28 : mot de passe désactivé par défaut
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
+  // La gestion est gardée dans Mes partages (IndexedDB, chiffrement) peu après l'affichage : tant
+  // que ce n'est pas fait, la garde de sortie l'attend encore. Attendre cet état (et non un délai) :
+  // sous charge (série complète, téléphone), un test qui copiait tout puis vérifiait la garde
+  // tombait avant la fin de l'écriture.
+  await expect(page.locator("[data-kept]")).toBeAttached({ timeout: 30_000 });
 }
 const clip = (page: Page) => readClipboard(page);
 const newShare = (page: Page) => page.locator(".ready .done").getByRole("button", { name: "Nouveau partage", exact: true });

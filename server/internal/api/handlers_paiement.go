@@ -31,6 +31,7 @@ func (a paiementAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/paiement/commande", a.commande)
 	mux.HandleFunc("POST /api/paiement/etat", a.etat)
 	mux.HandleFunc("POST /api/paiement/resilier", a.resilier)
+	mux.HandleFunc("POST /api/paiement/revoquer", a.revoquer)
 	mux.HandleFunc("POST /api/paiement/webhook/{nom}", a.webhook)
 	if a.p.Jetons() != nil {
 		mux.HandleFunc("GET /api/paiement/jetons/cles", a.cles)
@@ -192,6 +193,8 @@ func failPaiement(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusConflict, "conflit")
 	case errors.Is(err, paiement.ErrAucunAbonnement):
 		writeErr(w, http.StatusConflict, "aucun_abonnement")
+	case errors.Is(err, paiement.ErrRenouvellement):
+		writeErr(w, http.StatusConflict, "renouvellement")
 	case errors.Is(err, paiement.ErrOccupe), errors.Is(err, paiement.ErrSuspendu):
 		// Ventes suspendues par l'exploitant (tableau de bord) : la même réponse qu'un serveur
 		// occupé, que le site sait déjà dire (« réessayer plus tard »).
@@ -311,6 +314,34 @@ func (a paiementAPI) resilier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.p.Resilier(r.Context(), p); err != nil {
+		failPaiement(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// revoquer : le porteur révoque son pass (suppression du compte ; conception du paiement §5.6).
+// 204 dans tous les cas où rien ne s'y oppose (pass révoqué maintenant, déjà révoqué ou inconnu :
+// réponse neutre, qui ne dit pas si le pass existait) ; 409 renouvellement : arrêter d'abord le
+// renouvellement (resilier). Limite : celle des commandes (même compteur, par connexion et par
+// /48), en plus de la limite générale.
+func (a paiementAPI) revoquer(w http.ResponseWriter, r *http.Request) {
+	p, err := lirePass(r)
+	if err == nil {
+		err = sansCorps(w, r)
+	}
+	if err != nil {
+		failPaiement(w, err)
+		return
+	}
+	if !a.lim.AllowCommande(ipOf(r)) {
+		writeLimit(w, a.lim.JoinRetry())
+		return
+	}
+	if err := a.p.RevoquerPorteur(p); err != nil {
+		if !errors.Is(err, paiement.ErrRenouvellement) {
+			err = errInterne
+		}
 		failPaiement(w, err)
 		return
 	}

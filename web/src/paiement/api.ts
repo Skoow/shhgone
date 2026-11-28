@@ -179,6 +179,18 @@ export async function resilier(pass: Uint8Array<ArrayBuffer>, n: Net = netParDef
   return "erreur";
 }
 
+/**
+ * Révocation par le porteur (suppression du compte, conception du paiement §5.6) : « ok » (révoqué,
+ * déjà révoqué ou inconnu : le serveur répond pareil), « renouvellement » (arrêter d'abord le
+ * renouvellement : resilier) ou « erreur » (réseau, limite, serveur).
+ */
+export async function revoquer(pass: Uint8Array<ArrayBuffer>, n: Net = netParDefaut()): Promise<"ok" | "renouvellement" | "erreur"> {
+  const r = await appel(n, "/revoquer", { method: "POST", headers: entetePass(pass) });
+  if (r?.status === 204) return "ok";
+  if (r?.status === 409) return "renouvellement";
+  return "erreur";
+}
+
 // --- Jetons anonymes (conception du paiement §7) ---------------------------------------------
 
 export type CleJetons = { jour: string; offre: OffrePayante; spki: Uint8Array<ArrayBuffer> };

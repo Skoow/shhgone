@@ -53,8 +53,12 @@ describe("Mes partages", () => {
   it("vide : explication, lien d'envoi, phrase sur la perte sans compte ; aucune base créée", async () => {
     const idb = globalThis.indexedDB as unknown as ReturnType<typeof fakeIndexedDB>;
     await page();
-    expect(document.querySelector("[data-shares-empty]")).not.toBeNull();
-    expect(texte()).toContain("Aucun partage pour l'instant");
+    // Partie « Partages de fichiers » et son état vide ; pas de partie « Salons » sur un site sans
+    // salons (__SALONS__ faux ici) tant qu'aucun salon n'est dans la liste.
+    expect([...document.querySelectorAll("[data-shares-part]")].map((x) => x.getAttribute("data-shares-part"))).toEqual(["envoi"]);
+    expect(document.querySelector("[data-shares-empty=envoi]")).not.toBeNull();
+    expect(texte()).toContain("Aucun partage de fichiers");
+    expect(document.querySelector<HTMLAnchorElement>("[data-shares-empty=envoi] a")!.getAttribute("href")).toBe("/envoyer");
     expect(document.querySelector("[data-shares-device]")!.textContent).toContain("Sans compte, cette liste n'existe que dans ce navigateur");
     expect([...idb.raw().keys()]).toEqual([]);
   });
@@ -67,13 +71,25 @@ describe("Mes partages", () => {
     await page();
     const cards = [...document.querySelectorAll("[data-share-card]")];
     expect(cards.map((c) => c.getAttribute("data-sorte"))).toEqual(["envoi", "salon"]);
+    // Deux parties, dans cet ordre, rien de mélangé : titre, compteur ; chaque carte dans la sienne.
+    const parties = [...document.querySelectorAll<HTMLElement>("[data-shares-part]")];
+    expect(parties.map((x) => x.querySelector("h2")!.textContent!.replace(/\s+/g, " ").trim())).toEqual(["Partages de fichiers 1", "Salons 1"]);
+    expect(parties[0]!.querySelectorAll("[data-share-card]")).toHaveLength(1);
+    expect(parties[0]!.querySelector("[data-share-card]")!.getAttribute("data-sorte")).toBe("envoi");
+    expect(parties[1]!.querySelector("[data-share-card]")!.getAttribute("data-sorte")).toBe("salon");
+    expect(parties[0]!.querySelector("[data-counts]")!.textContent).toContain("1\u202factif · 0\u202fterminé");
+    // Icône du type (bulles : salon ; fichier : partage), et le type dit en texte.
+    expect(cards.map((c) => c.querySelector("[data-share-icon]")!.getAttribute("data-share-icon"))).toEqual(["fichier", "salon"]);
+    for (const c of cards) expect(c.querySelector("[data-share-icon]")!.getAttribute("aria-hidden")).toBe("true");
+    expect(cards[0]!.querySelector("h3")!.textContent).toBe("Partage de fichiers\u202f: Devis");
+    expect(cards[1]!.querySelector("h3")!.textContent).toBe("Salon");
     const [e, s] = cards as HTMLElement[];
     expect(e!.textContent).toContain("Devis");
     expect(e!.textContent).toContain("Ouvert 0 / 3");
     expect(e!.textContent).toContain("2 éléments");
     expect(e!.textContent).toContain("S'efface dans");
     expect(e!.textContent).toContain("Actif");
-    expect(texte()).toContain("2 actifs · 0 terminé");
+
     // Jamais affiché : le lien de gestion d'un envoi.
     expect(document.body.textContent).not.toContain("m".repeat(43));
     // Salon : sa page de gestion, et l'invitation copiée.
@@ -90,6 +106,17 @@ describe("Mes partages", () => {
     // Fini : « Retirer de la liste » sans confirmation.
     await click(bouton(/^Retirer de la liste$/, document.querySelector("[data-share-card][data-sorte=envoi]")!));
     expect((await tousLesPartages()).map((p) => p.sorte)).toEqual(["salon"]);
+  });
+
+  it("salons seuls : la partie « Partages de fichiers » dit son état vide, la partie « Salons » liste le salon", async () => {
+    const { garderPartage } = await import("../storage/partages.svelte");
+    const now = Date.now();
+    await garderPartage({ sorte: "salon", gestion: SALON_G, invitation: SALON_I, creeLe: now, echeance: now + 3600_000 });
+    await page();
+    expect([...document.querySelectorAll("[data-shares-part]")].map((x) => x.getAttribute("data-shares-part"))).toEqual(["envoi", "salon"]);
+    expect(document.querySelector("[data-shares-part=envoi] [data-shares-empty=envoi]")).not.toBeNull();
+    expect(document.querySelector("[data-shares-part=salon] [data-share-card][data-sorte=salon]")).not.toBeNull();
+    expect(document.querySelector("[data-shares-part=salon] [data-shares-empty]")).toBeNull();
   });
 
   it("Supprimer sans réseau : l'erreur est dite, l'état reste", async () => {

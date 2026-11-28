@@ -15,7 +15,8 @@ import { ouvrirEtiquette } from "./device";
 import { configurerNavigateur } from "./webauthn";
 import { FauxAuthentificateur, fauxServeur } from "./passkey.test-helper";
 import * as C from "./session.svelte";
-import { garder, lirePasses, nouvelId, tirerPass } from "../paiement/pass";
+import { garder, lirePasses, nouvelId, tirerPass, type PassGarde } from "../paiement/pass";
+import { passEnEntree } from "./pass";
 import { formulesDisponibles } from "../paiement/jetons";
 import { memoryBackend } from "../storage/idb";
 import { configurerPartages, garderPartage, retirerPartage, tousLesPartages } from "../storage/partages.svelte";
@@ -731,7 +732,7 @@ describe("session et déconnexion", () => {
     srv.vieillir();
     await C.confirmerParPasskey();
     const etapes: string[] = [];
-    for await (const p of C.supprimerTout({ effacerAppareil: true })) etapes.push(p.etape);
+    for await (const p of C.supprimerTout()) etapes.push(p.etape);
     expect(etapes).toEqual(["compte", "fini"]);
     expect(effacerAppareil).toHaveBeenCalledOnce();
     expect(srv.comptes.size).toBe(0);
@@ -971,5 +972,157 @@ describe("preuve anti-robot de la connexion et de la récupération", () => {
     expect(preuvesDemandees).toBe(p0 + 1);
     const r = srv.requetes.filter((x) => x.path === "/api/compte/recup").at(-1)!;
     expect(r.body).toMatchObject({ altcha: `preuve-${p0 + 1}`, hp: "", shown_at: "t" });
+  });
+});
+
+// « Pass et compte » (conception du paiement §6.4, décision du propriétaire du 28 novembre) : le
+// serveur ne relie jamais pass et compte, mais sur l'appareil ils se comportent comme liés. Un test
+// par parcours du tableau de §6.4 qui touche l'appareil ; garantie : ni abonnement perdu ou
+// orphelin, ni prélèvement sans accès.
+describe("pass et compte : jamais divergents (conception du paiement §6.4)", () => {
+  const paye = (o: Partial<PassGarde> = {}): PassGarde => ({ id: nouvelId(), pass: tirerPass(), offre: "plus", jours: 30, renouvelle: true, moyen: "carte", enAttente: false, cree: 5, ...o });
+  const memes = (a: Uint8Array, b: Uint8Array) => Buffer.from(a).equals(Buffer.from(b));
+  const dansCoffre = (p: Uint8Array) => (C.account.prive?.pass ?? []).some((e) => typeof e.p === "string" && memes(unb64u(e.p), p));
+  const ici = async () => (await lirePasses(idb)).map((g) => ({ b: b64u(g.pass), compte: g.compte === true, attente: g.enAttente }));
+  let veille: (() => void) | null;
+  let log: string[];
+  let paiement: { resilier: ReturnType<typeof vi.fn>; revoquer: ReturnType<typeof vi.fn>; etat: ReturnType<typeof vi.fn> };
+  beforeEach(() => {
+    veille = null;
+    log = [];
+    paiement = {
+      resilier: vi.fn(async (p: Uint8Array<ArrayBuffer>) => (log.push(`resilier ${b64u(p)}`), "ok")),
+      revoquer: vi.fn(async (p: Uint8Array<ArrayBuffer>) => (log.push(`revoquer ${b64u(p)}`), "ok")),
+      etat: vi.fn(async () => ({ etat: "payee", offre: "plus", fin: "2026-12-29", renouvelle: false, droits: ["partage_plus"] })),
+    };
+    C.configurerCompte({ paiement: paiement as never, planifierPass: (_ms, f) => ((veille = f), () => (veille = null)) });
+  });
+  const tourDeVeille = async () => {
+    const f = veille;
+    expect(f).not.toBeNull();
+    f!();
+    await vi.waitFor(() => expect(veille).not.toBe(f));
+  };
+
+  it("achat sans compte, puis compte créé : rangé dans le coffre et marqué ; déconnexion : il quitte l'appareil ; reconnexion : il revient", async () => {
+    const g = paye();
+    await garder(idb, g);
+    await inscription();
+    expect(dansCoffre(g.pass)).toBe(true);
+    expect(await ici()).toEqual([{ b: b64u(g.pass), compte: true, attente: false }]);
+    await C.seDeconnecter();
+    expect(await ici()).toEqual([]);
+    await C.preparerConnexion();
+    expect(await C.seConnecter(false, "defaut", P)).toBe("ouvert");
+    expect(await ici()).toEqual([{ b: b64u(g.pass), compte: true, attente: false }]);
+  });
+
+  it("démarrage sans session gardée : les pass du compte quittent l'appareil ; une commande en attente et un pass pas encore rangé restent", async () => {
+    const g = paye();
+    await garder(idb, g);
+    await inscription(); // sans « Rester connecté »
+    recharger(); // onglet fermé
+    const attente = paye({ enAttente: true });
+    const horsCompte = paye({ renouvelle: false });
+    await garder(idb, attente);
+    await garder(idb, horsCompte);
+    await C.restaurer();
+    expect((await ici()).map((x) => x.b).sort()).toEqual([b64u(attente.pass), b64u(horsCompte.pass)].sort());
+  });
+
+  it("écriture du coffre en échec à l'ouverture : le pass reste sur l'appareil, non marqué, et la veille le range dès que possible", async () => {
+    let panne = true;
+    C.configurerCompte({
+      net: {
+        origin: "https://shh.test",
+        fetch: (async (u: string, init?: RequestInit) => (panne && init?.method === "PUT" && String(u).includes("/coffre/prive") ? Promise.reject(new TypeError("réseau")) : srv.fetch(u as never, init as never))) as typeof fetch,
+      },
+    });
+    const g = paye();
+    await garder(idb, g);
+    await inscription();
+    expect(dansCoffre(g.pass)).toBe(false);
+    expect(await ici()).toEqual([{ b: b64u(g.pass), compte: false, attente: false }]);
+    // Déconnexion à ce moment : le pass pas encore rangé reste (rien n'est perdu).
+    // Réseau revenu : la veille le range, puis le marque.
+    await tourDeVeille(); // encore en panne
+    expect(dansCoffre(g.pass)).toBe(false);
+    panne = false;
+    await tourDeVeille();
+    expect(dansCoffre(g.pass)).toBe(true);
+    expect(await ici()).toEqual([{ b: b64u(g.pass), compte: true, attente: false }]);
+    C.configurerCompte({ net: { origin: "https://shh.test", fetch: srv.fetch } });
+  });
+
+  it("achat pendant la session (commande confirmée plus tard) : la veille le range sans attendre une nouvelle connexion", async () => {
+    await inscription();
+    const g = paye({ enAttente: true });
+    await garder(idb, g);
+    await tourDeVeille();
+    expect(dansCoffre(g.pass)).toBe(false); // un paiement non confirmé n'a rien à retrouver
+    await garder(idb, { ...g, enAttente: false }); // confirmé (jetons.ts, OffersReturn)
+    await tourDeVeille();
+    expect(dansCoffre(g.pass)).toBe(true);
+    expect((await ici())[0]!.compte).toBe(true);
+  });
+
+  it("deux appareils : un pass rangé par l'autre appareil pendant la session est révoqué aussi à la suppression (coffre relu)", async () => {
+    const texte = await inscription();
+    const c = compte();
+    const k = await ouvrirRecup((await cleRecupDerivees(await cleRecupLire(texte))).kekR, c.h, unb64u(c.envR));
+    const cles = await clesDuCompte(k);
+    // L'autre appareil range un pass Pro offert dans le coffre (gen + 1) ; cet appareil ne l'a pas lu.
+    const ailleurs = paye({ offre: "pro", moyen: "offert", renouvelle: false, jours: 365 });
+    const v = priveDeJson(await ouvrir("prive", cles.prive, c.h, c.coffres.prive.blob, c.coffres.prive.gen));
+    const gen = c.coffres.prive.gen + 1;
+    c.coffres.prive = { blob: await sceller("prive", cles.prive, c.h, gen, priveEnJson({ ...v, pass: [passEnEntree(ailleurs)] })), gen };
+    expect(dansCoffre(ailleurs.pass)).toBe(false);
+    srv.vieillir();
+    await C.confirmerParPasskey();
+    for await (const _ of C.supprimerTout()) void _;
+    expect(log).toEqual([`revoquer ${b64u(ailleurs.pass)}`]); // accès offert : rien à résilier
+    expect(srv.comptes.size).toBe(0);
+  });
+
+  it("suppression : renouvellement arrêté puis pass révoqués, AVANT le compte ; échec réseau : rien supprimé ; réessai : tout part, appareil à zéro", async () => {
+    const g = paye();
+    const offert = paye({ offre: "pro", moyen: "offert", renouvelle: false });
+    await garder(idb, g);
+    await garder(idb, offert);
+    await inscription();
+    srv.vieillir();
+    await C.confirmerParPasskey();
+    paiement.revoquer.mockImplementationOnce(async () => "erreur");
+    await expect((async () => {
+      for await (const _ of C.supprimerTout()) void _;
+    })()).rejects.toBeInstanceOf(C.ErreurAbonnement);
+    expect(srv.comptes.size).toBe(1);
+    expect(C.account.etat).toBe("ouvert");
+    expect(await ici()).toHaveLength(2);
+    log.length = 0;
+    for await (const _ of C.supprimerTout()) void _;
+    expect(log.slice(0, 2)).toEqual([`resilier ${b64u(g.pass)}`, `revoquer ${b64u(g.pass)}`]);
+    expect(log).toContain(`revoquer ${b64u(offert.pass)}`);
+    expect(log).not.toContain(`resilier ${b64u(offert.pass)}`);
+    expect(srv.comptes.size).toBe(0);
+    expect(await ici()).toEqual([]);
+  });
+
+  it("arrêter l'abonnement : résiliation par le pass (sans session), état relu gardé ici, coffre « non renouvelé » ; la carte dit « ne sera pas renouvelé »", async () => {
+    const g = paye();
+    await garder(idb, g);
+    await inscription();
+    const [a] = await C.abonnements();
+    expect(a).toMatchObject({ offre: "plus", renouvelle: true, arrete: false });
+    expect(await C.arreterAbonnement(a!.id)).toBe("ok");
+    expect(paiement.resilier).toHaveBeenCalledWith(g.pass);
+    const [b] = await C.abonnements();
+    expect(b).toMatchObject({ renouvelle: false, arrete: true, fin: "2026-12-29" });
+    expect((C.account.prive?.pass ?? []).find((e) => typeof e.p === "string" && memes(unb64u(e.p), g.pass))).toMatchObject({ renouvelle: false });
+    // La résiliation part sans en-tête de session (requêtes du paiement à part).
+    expect(srv.requetes.some((r) => r.path.includes("paiement"))).toBe(false);
+    // Échec réseau : « erreur », rien de changé.
+    paiement.resilier.mockImplementationOnce(async () => "erreur");
+    expect(await C.arreterAbonnement(a!.id)).toBe("erreur");
   });
 });
