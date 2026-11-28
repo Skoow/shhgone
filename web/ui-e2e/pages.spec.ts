@@ -138,9 +138,9 @@ test("pied de page : colonnes équilibrées (ordinateur), groupes enchaînés sa
     const foot = page.locator("footer[data-foot]");
     await foot.scrollIntoViewIfNeeded();
     const lists = foot.getByRole("list");
-    // Confiance : Sécurité, Confidentialité, Open source, Signaler ; Légal : Conditions, Mentions, Contact.
+    // Confiance : Sécurité, Confidentialité, Open source, Signaler ; Légal : Conditions, Mentions, Contact, État du service.
     await expect(foot.getByRole("list", { name: "Confiance" }).getByRole("listitem")).toHaveCount(4);
-    await expect(foot.getByRole("list", { name: "Légal" }).getByRole("listitem")).toHaveCount(3);
+    await expect(foot.getByRole("list", { name: "Légal" }).getByRole("listitem")).toHaveCount(4);
     const rows = await lists.evaluateAll((uls) =>
       uls.flatMap((ul) => [...ul.querySelectorAll("li")].map((li) => {
         const r = li.getBoundingClientRect();
@@ -152,13 +152,12 @@ test("pied de page : colonnes équilibrées (ordinateur), groupes enchaînés sa
       const tops = [...new Set(rows.map((r) => r.top))].sort((a, b) => a - b);
       const steps = tops.slice(1).map((t, i) => t - tops[i]!);
       expect(Math.max(...steps) - Math.min(...steps), `${width} : ${steps.join(", ")}`).toBeLessThanOrEqual(1);
-      // Le lien seul sur sa ligne (Contact) est centré.
-      const last = rows.at(-1)!;
-      const fb = (await foot.locator(".cols").boundingBox())!;
-      expect(Math.abs((last.left + last.right) / 2 - (fb.x + fb.width / 2))).toBeLessThanOrEqual(2);
+      // Huit liens, deux par ligne : la dernière ligne est pleine (aucun lien seul).
+      const derniere = rows.filter((r) => r.top === rows.at(-1)!.top);
+      expect(derniere).toHaveLength(2);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     } else {
-      // Ordinateur : deux colonnes titrées, de hauteur proche (4 et 3 liens).
+      // Ordinateur : deux colonnes titrées, de même hauteur (4 et 4 liens).
       const cols = await foot.locator(".col").evaluateAll((c) => c.map((e) => e.getBoundingClientRect().height));
       expect(cols).toHaveLength(2);
       expect(Math.abs(cols[0]! - cols[1]!)).toBeLessThanOrEqual(48);

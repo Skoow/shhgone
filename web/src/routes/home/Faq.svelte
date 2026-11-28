@@ -6,7 +6,8 @@
   import { reveal } from "../../ui/attach";
   import { ChevronDown } from "../../ui/Icon";
 
-  const qs = ["lost", "copy"] as const;
+  // « J'ai perdu l'accès à mon compte » : seulement avec le compte (__COMPTES__ ; ni démo, ni site sans compte).
+  const qs = __COMPTES__ ? (["lost", "copy", "compte"] as const) : (["lost", "copy"] as const);
 </script>
 
 <!-- Fond raccordé (.fondu, ui/base.css) ; titre centré, questions centrées dessous. -->

@@ -1113,7 +1113,13 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
   }),
   contact: (p) => ({
     ...p,
-    blocks: p.blocks.map((b) => (b.id === "jamais" ? { ...b, p: [b.p![0]!, "Nous ne vous demanderons jamais un mot de passe ni votre clé de récupération de compte."] } : b)),
+    blocks: p.blocks.map((b) =>
+      b.id === "jamais"
+        ? { ...b, p: [b.p![0]!, "Nous ne vous demanderons jamais un mot de passe ni votre clé de récupération de compte."] }
+        : b.id === "pourquoi"
+          ? { ...b, list: [...b.list!, "Un abonnement à arrêter après avoir perdu l'accès à votre compte (passkey et clé de récupération perdues)\u202f: joignez le numéro du reçu de paiement, jamais votre clé."] }
+          : b,
+    ),
   }),
 };
 
@@ -1182,6 +1188,12 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
   }),
   contact: (p) => ({
     ...p,
-    blocks: p.blocks.map((b) => (b.id === "jamais" ? { ...b, p: [b.p![0]!, "We will never ask you for a password or for your account recovery key."] } : b)),
+    blocks: p.blocks.map((b) =>
+      b.id === "jamais"
+        ? { ...b, p: [b.p![0]!, "We will never ask you for a password or for your account recovery key."] }
+        : b.id === "pourquoi"
+          ? { ...b, list: [...b.list!, "A subscription to stop after losing access to your account (passkey and recovery key lost): include the payment receipt number, never your key."] }
+          : b,
+    ),
   }),
 };

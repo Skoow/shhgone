@@ -111,6 +111,8 @@ export const fr = {
   "home.faq.title": "Vos questions",
   "home.faq.lost.q": "Que se passe-t-il si je perds le lien\u202f?",
   "home.faq.lost.a": "Personne ne peut le retrouver, pas même nous\u202f: la clé n'existe que dans le lien. Faites un nouveau partage.",
+  "home.faq.compte.q": "J'ai perdu l'accès à mon compte et ma clé de récupération\u202f: que faire\u202f?",
+  "home.faq.compte.a": "Sans passkey ni clé de récupération, personne ne peut rouvrir le compte, pas même nous\u202f: nous ne gardons aucun moyen de vous joindre ni aucune copie lisible de vos données. Votre abonnement, lui, s'arrête. PayPal\u202f: dans votre compte PayPal, rubrique Paiements automatiques, arrêtez Shhgone. Carte bancaire\u202f: suivez le lien de gestion de l'abonnement dans l'e-mail de reçu de Stripe, ou écrivez à contact@shhgone.com avec le numéro du reçu\u202f; nous arrêtons le renouvellement et voyons avec vous le temps déjà payé. Ne nous envoyez jamais votre clé ni un mot de passe.",
   "home.faq.copy.q": "Le destinataire peut-il garder une copie\u202f?",
   "home.faq.copy.a": "Oui, s'il enregistre un élément ou fait une capture d'écran\u202f: ce qu'il garde lui appartient. Shhgone efface le partage, pas ce qu'il a enregistré. Un partage effacé, lui, ne peut plus être ouvert ni récupéré.",
   "home.sees.keep.t": "Voit et garde jusqu'à l'échéance",

@@ -441,6 +441,10 @@ describe("page Contact et adresses e-mail", () => {
     // Avec le compte : la clé de récupération ne s'envoie jamais non plus.
     expect(pageTexte(infoPage("contact", "fr", true))).toMatch(/jamais un mot de passe ni votre clé de récupération/u);
     expect(pageTexte(infoPage("contact", "fr", false))).not.toMatch(/clé de récupération/u);
+    // Avec le compte : un abonnement à arrêter après la perte du compte (numéro du reçu, jamais la clé).
+    expect(pageTexte(infoPage("contact", "fr", true))).toMatch(/joignez le numéro du reçu de paiement, jamais votre clé/u);
+    expect(pageTexte(infoPage("contact", "en", true))).toMatch(/include the payment receipt number, never your key/u);
+    expect(pageTexte(infoPage("contact", "fr", false))).not.toMatch(/reçu de paiement/u);
   });
 
   test("les autres pages renvoient vers la page Contact, plus vers « le contact des mentions légales »", () => {

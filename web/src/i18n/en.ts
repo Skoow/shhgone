@@ -111,6 +111,8 @@ export const en = {
   "home.faq.title": "Your questions",
   "home.faq.lost.q": "What if I lose the link?",
   "home.faq.lost.a": "No one can recover it, not even us: the key only exists in the link. Make a new share.",
+  "home.faq.compte.q": "I've lost access to my account and my recovery key: what can I do?",
+  "home.faq.compte.a": "Without a passkey or the recovery key, nobody can reopen the account, not even us: we keep no way to reach you and no readable copy of your data. Your subscription, however, can be stopped. PayPal: in your PayPal account, under Automatic payments, stop Shhgone. Card: follow the subscription management link in Stripe's receipt email, or write to contact@shhgone.com with the receipt number; we stop the renewal and sort out the time already paid with you. Never send us your key or a password.",
   "home.faq.copy.q": "Can the recipient keep a copy?",
   "home.faq.copy.a": "Yes, if they save an item or take a screenshot: what they keep is theirs. Shhgone erases the share, not what they saved. An erased share can't be opened or recovered.",
   "home.sees.keep.t": "Sees and keeps until expiry",

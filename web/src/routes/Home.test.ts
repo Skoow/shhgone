@@ -101,7 +101,7 @@ describe("Home (UI §9.1)", () => {
     expect(priv).toHaveLength(3);
     expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Aucune identité demandée", "Fichiers nettoyés", "Salon éphémère bientôt"]);
     // Questions : seulement ce qui n'est dit nulle part ailleurs sur la page.
-    expect([...document.querySelectorAll("#faq details")].map((d) => d.id)).toEqual(["faq-lost", "faq-copy"]);
+    expect([...document.querySelectorAll("#faq details")].map((d) => d.id)).toEqual(["faq-lost", "faq-copy"]); // sans __COMPTES__ (tests) : pas la question du compte
     expect(document.getElementById("serveur")!.querySelector("h2")!.id).toBe("priv-title");
     for (const c of [...document.querySelectorAll("[data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
 
