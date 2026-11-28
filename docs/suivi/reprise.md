@@ -50,6 +50,21 @@ Points de conception à trancher avant de coder (proposer au propriétaire) :
 4. **Ordre, épingle, couleur** : préférences de chaque personne, gardées sur l'appareil et dans le coffre du compte ; rien sur le serveur.
 5. Prochain numéro de décision libre : D42-34.
 
+### 2.5 À lancer ensuite : listes du créateur, du destinataire et du membre (demande du 28 novembre)
+
+Demande du propriétaire :
+- **Créateur** (partages et salons) : tout voir dans son compte. Partage : combien de personnes l'ont ouvert, le supprimer en avance. Salon : combien de personnes sont entrées, et y **revenir** d'un clic.
+- **Destinataire d'un partage** : une liste « reçus ». Aucune action, sauf : le **dernier** qui ouvre peut le supprimer une fois ses fichiers récupérés (existe déjà, D42-22) ; les autres peuvent le **retirer de leur liste** une fois fini.
+- **Membre d'un salon** : il retrouve le salon dans « Mes salons » et **y revient d'un clic** pendant toute sa durée (ex. salon de 7 jours, parti après 1 h), sans qu'on lui renvoie le lien. Le mot de passe du salon reste exigé à la première entrée. **Avec un compte**, on se souvient de lui : pas de mot de passe à retaper. **Sans compte** : trouver un moyen sûr de ne pas le retaper.
+
+Conception proposée (à valider avec le propriétaire avant de coder) :
+1. **Comptage, pas identité** : le créateur voit le **nombre** d'ouvertures et de membres, jamais qui (le service est anonyme ; le serveur ne connaît pas les personnes). Ouvertures : déjà connues par le lien de gestion. Membres d'un salon : nombre de sièges occupés, lisible par le créateur.
+2. **Retour au salon** : le serveur garde déjà la place de chaque membre et son jeton (persistance continue, D42-31) ; le site sait déjà reprendre une place avec son jeton. Il manque seulement de **garder ce jeton et le lien d'invitation** dans la liste du membre.
+3. **Avec compte** : ce secret de retour est gardé dans le **coffre privé chiffré** du compte (comme « Mes partages », D42-30), sur tous ses appareils ; jamais le mot de passe en clair, rien de lisible par le serveur.
+4. **Sans compte** : le garder sur l'appareil, chiffré par une **clé non extractible** du navigateur (comme la session « Rester connecté »), avec un choix explicite « Se souvenir de ce salon sur cet appareil ». Le serveur n'y gagne rien. Limite à dire honnêtement : quelqu'un qui utilise l'appareil déverrouillé peut rentrer dans le salon ; effacer les données du site l'oublie. C'est faisable et sûr dans ces limites.
+5. **Listes « reçus » et « salons rejoints »** : elles avaient été retirées (D42-27, liste `rejoints` vidée en D42-30) ; les rétablir, simplifiées, avec ces seules actions. Confidentialité : lien gardé chiffré, jamais le mot de passe.
+6. À combiner avec le § 2.4 (noms, images, ordre, couleurs). Prochain numéro de décision libre : D42-34.
+
 ## 3. Décisions déjà prises (rappel)
 
 - Mot de passe des partages facultatif, désactivé par défaut (D42-28). Anti-robot ALTCHA partout, chemin de passkey retenu sur ordinateur (D42-29). « Mes partages » automatique, lien de gestion retiré de « Lien prêt » (D42-30). Rien perdu au redémarrage (D42-31).
