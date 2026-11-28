@@ -9,6 +9,7 @@
 // - erreurs : SalonError (statut, code du serveur, essais restants, délai) ; coupure réseau :
 //   Error("reseau") ; réponse 2xx mal formée : Error("reponse_invalide").
 import { b64u, unb64u } from "../engine/pure";
+import { signalerMaintenance } from "../maintenance/etat.svelte";
 
 export type Net = { origin: string; fetch: typeof fetch };
 
@@ -59,6 +60,7 @@ export async function lireReponse(r: Response): Promise<Obj> {
     o = null;
   }
   if (!r.ok) {
+    signalerMaintenance(r.status, o);
     const e = (o ?? {}) as Obj;
     const code = typeof e.error === "string" ? e.error : "erreur";
     const left = Number.isSafeInteger(e.attempts_left) ? (e.attempts_left as number) : undefined;
@@ -232,6 +234,18 @@ export async function envoyerSegment(n: Net, envoi: string, seg: number, corps: 
 /** POST /api/salons/pieces/finalize : la pièce est prête (aucun bourrage demandé au serveur). */
 export async function finaliserPiece(n: Net, envoi: string): Promise<void> {
   await lireReponse(await brut(n, "POST", "/pieces/finalize", { Authorization: `Bearer ${envoi}`, "Content-Type": "application/json" }, JSON.stringify({ fill_from: 0, fill_to: 0 })));
+}
+
+/**
+ * POST /api/salons/pieces/reprendre : après un redémarrage du serveur (ancien jeton d'envoi
+ * refusé en 404), l'auteur reprend l'envoi de sa pièce par son jeton de membre (D42-32) : jeton
+ * d'envoi neuf ; `prete` : finalisée avant le redémarrage, rien à renvoyer. 404 : pièce perdue.
+ */
+export async function reprendrePiece(n: Net, jeton: string, piece: Uint8Array): Promise<{ envoi: string; prete: boolean }> {
+  const o = await lireReponse(await brut(n, "POST", "/pieces/reprendre", { "X-Shh-Membre": jeton, "X-Shh-Piece": b64u(piece as Bytes) }));
+  const t = o.upload_token;
+  if (typeof t !== "string" || t.length < 20 || /\s/.test(t) || typeof o.prete !== "boolean") throw invalide();
+  return { envoi: t, prete: o.prete };
 }
 
 /** GET /api/salons/pieces/segments/{n} : segment chiffré d'une pièce (404 : pièce indisponible). */

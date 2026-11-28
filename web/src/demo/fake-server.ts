@@ -900,6 +900,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     const path = new URL(req.url).pathname;
     const m = req.method;
     if (path === "/api/captcha") return m === "GET" ? captcha() : json(404, { error: "not_found" });
+    if (path === "/api/etat-service") return m === "GET" ? json(200, { maintenance: null }) : json(404, { error: "not_found" });
     if (path === "/api/shares") return m === "POST" ? create(req) : json(404, { error: "not_found" });
     if (path === "/api/manage/status") return m === "GET" ? status(req) : json(404, { error: "not_found" });
     if (path === "/api/manage/destroy") return m === "POST" ? manageDestroy(req) : json(404, { error: "not_found" });

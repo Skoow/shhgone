@@ -21,6 +21,7 @@
   // Le chemin qui a marché la dernière fois sur cet ordinateur (lu sur l'appareil, jamais envoyé ;
   // décision du 26 novembre) est proposé d'abord.
   import { tick, untrack } from "svelte";
+  import { creationsFermees, texteBandeau } from "../../maintenance/etat.svelte";
   import { abandonnerInscription, account, ajouterPasskey, estMobile, cleAffichee, creerPasskey, deuxiemeGeste, deuxiemeGesteAjout, inscriptionPrete, parcoursRetenu, passkeyCreee, passkeysDisponibles, preparerAjout, preparerInscription, pseudoInviteRetenu, pseudoLibre, terminerInscription, verifierSaisie, type Parcours, type ParcoursRetenu } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
   import { getDemo } from "../../app/demo-hooks";
@@ -276,7 +277,9 @@
            (région présente dès l'affichage, pour être annoncée). -->
       <p class="sr-only" role="status" data-dispo>{etatPseudo === "ok" ? t("account.pseudo.free") : ""}</p>
       {#if !mobile && prefere === "hybride"}<IndiceQr texte={t("account.signup.phone.how")} />{/if}
-      <Button type="submit" busy={attentePreuve} onpress={() => creer()}>{attentePreuve ? t("account.robot.wait") : (getDemo()?.signupPasskey ?? (mobile ? t("account.signup.passkey") : prefere === "local" ? t("account.signup.here") : t("account.signup.phone")))}</Button>
+      <!-- Redémarrage annoncé (D42-32) : aucune inscription d'ici la fin de la maintenance (la passkey resterait orpheline). -->
+      {#if creationsFermees()}<p class="note" id="inscription-fermee" data-maintenance>{texteBandeau()}</p>{/if}
+      <Button type="submit" busy={attentePreuve} disabled={creationsFermees()} aria-describedby={creationsFermees() ? "inscription-fermee" : undefined} onpress={() => creer()}>{attentePreuve ? t("account.robot.wait") : (getDemo()?.signupPasskey ?? (mobile ? t("account.signup.passkey") : prefere === "local" ? t("account.signup.here") : t("account.signup.phone")))}</Button>
       <p class="sr-only" role="status" data-attente-preuve>{attentePreuve ? t("account.robot.wait") : ""}</p>
       <NoteDemo />
       <p class="legal" data-legal>

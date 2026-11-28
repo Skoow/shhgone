@@ -375,7 +375,7 @@ function deps(eng: SalonEngine) {
 export type ErreurCreation =
   | { code: "palier"; salons: number; places: number; heures: number }
   | { code: "banni"; jusqu: string }
-  | { code: "compte_requis" | "limite" | "reseau" | "serveur" | "occupe" | "robot"; retryS?: number };
+  | { code: "compte_requis" | "limite" | "reseau" | "serveur" | "occupe" | "robot" | "maintenance"; retryS?: number };
 
 /**
  * Crée le salon (compte exigé, conception §10.4) : clés et mot de passe tirés ici, preuve
@@ -420,6 +420,7 @@ export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCan
       if (e.code === "compte_requis" || e.code === "aucune_session") return { code: "compte_requis" };
       if (e.code === "limit") return { code: "limite", retryS: e.retryAfterS };
       if (e.code === "busy") return { code: "occupe", retryS: e.retryAfterS };
+      if (e.code === "maintenance") return { code: "maintenance" };
       if (e.code === "bad_request") return { code: "robot" };
       return { code: e.status >= 500 ? "serveur" : "reseau" };
     }

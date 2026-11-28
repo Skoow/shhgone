@@ -33,7 +33,7 @@ const TICK_MS = 250;
 
 export type Phase = "idle" | "keys" | "captcha" | "upload" | "paused" | "offline" | "finalize" | "sealed" | "cancelled" | "error";
 /** `element` : un élément n'a pas pu être envoyé (refus du serveur), sa ligne est `failedItem`. */
-export type SendError = "reseau" | "interrompu" | "limite" | "plein" | "gele" | "captcha" | "fichier_modifie" | "element" | "inclus" | "inattendu";
+export type SendError = "reseau" | "interrompu" | "limite" | "plein" | "gele" | "maintenance" | "captcha" | "fichier_modifie" | "element" | "inclus" | "inattendu";
 /** Coches sous la capsule (benchmark M3) : chacune seulement après un progrès réel. */
 export type Step = "chiffre" | "envoye" | "scelle";
 
@@ -195,7 +195,7 @@ export function createSender(deps: SendDeps) {
     const line = failedElement(e);
     if (line !== undefined) {
       failedItem = line;
-      if (!(e instanceof LimitError || e instanceof NotFoundError || e instanceof DOMException || ["reseau", "full", "frozen"].includes(errMsg(e)))) code = "element";
+      if (!(e instanceof LimitError || e instanceof NotFoundError || e instanceof DOMException || ["reseau", "full", "frozen", "maintenance"].includes(errMsg(e)))) code = "element";
     }
     if (e instanceof LimitError) {
       code = "limite";
@@ -211,6 +211,8 @@ export function createSender(deps: SendDeps) {
     } else if (errMsg(e) === "reseau") code = "reseau";
     else if (errMsg(e) === "full") code = "plein";
     else if (errMsg(e) === "frozen") code = "gele";
+    // Redémarrage annoncé (D42-32) : création refusée jusqu'à la fin de la maintenance.
+    else if (errMsg(e) === "maintenance") code = "maintenance";
     else if (errMsg(e) === "aucun_jeton") code = "inclus";
     error = code;
     phase = "error";

@@ -3,6 +3,7 @@
   // honnêtes (M3), bandeaux de coupure, de pause et de lenteur, Pause/Reprendre, Annuler.
   // « Lien prêt » n'est jamais monté ici : l'écran parent l'affiche après onsealed(), c'est-à-
   // dire après la résolution de createShare puis la fermeture du sceau.
+  import { texteBandeau } from "../maintenance/etat.svelte";
   import { tick } from "svelte";
   import { setProgressTitle, setScreenTitle } from "../app/title";
   import { UPLOAD_WINDOW_MS, type Sender, type Step } from "../flows/send.svelte";
@@ -175,6 +176,8 @@
         return t("err.full");
       case "gele":
         return t("err.frozen");
+      case "maintenance":
+        return texteBandeau() || t("err.frozen");
       case "captcha":
         return s.captchaLocal ? t("err.captcha.local") : t("err.captcha");
       case "fichier_modifie":
@@ -187,7 +190,7 @@
         return t("err.unexpected");
     }
   });
-  const canRetry = $derived(s.error !== undefined && s.error !== "gele" && s.error !== "fichier_modifie");
+  const canRetry = $derived(s.error !== undefined && s.error !== "gele" && s.error !== "maintenance" && s.error !== "fichier_modifie");
   let alertEl: HTMLParagraphElement | undefined = $state();
   $effect(() => {
     if (phase === "error") void tick().then(() => alertEl?.focus());

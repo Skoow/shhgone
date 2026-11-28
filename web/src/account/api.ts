@@ -12,6 +12,7 @@
 // Erreurs : CompteError (code du serveur, date, gen, Retry-After) ; coupure
 // réseau : Error("reseau") ; réponse 2xx mal formée : Error("reponse_invalide").
 import { b64u, unb64u } from "../engine/pure";
+import { signalerMaintenance } from "../maintenance/etat.svelte";
 import { sansSortiePrf } from "./webauthn";
 
 export type Net = { origin: string; fetch: typeof fetch };
@@ -73,6 +74,7 @@ async function erreur(r: Response): Promise<CompteError> {
   } catch {
     // corps absent ou non JSON
   }
+  signalerMaintenance(r.status, j);
   const int = (x: unknown) => (Number.isSafeInteger(x) ? (x as number) : undefined);
   const ra = r.headers.get("Retry-After")?.trim() ?? "";
   return new CompteError(r.status, typeof j.error === "string" ? j.error : `http_${r.status}`, {

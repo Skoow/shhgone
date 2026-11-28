@@ -1126,3 +1126,52 @@ describe("pass et compte : jamais divergents (conception du paiement §6.4)", ()
     expect(await C.arreterAbonnement(a!.id)).toBe("erreur");
   });
 });
+
+describe("redémarrage du serveur pendant une cérémonie (D42-32)", () => {
+  it("ajout : étape perdue au redémarrage → 404, la passkey neuve est signalée inconnue au gestionnaire", async () => {
+    await inscription();
+    brancher(new FauxAuthentificateur({ prf: "creation" }));
+    expect(await C.preparerAjout()).toBe("pret");
+    srv.redemarrer();
+    await expect(C.ajouterPasskey("Téléphone")).rejects.toMatchObject({ status: 404, code: "not_found" });
+    expect(signalees).toEqual([{ rpId: "shh.test", credentialId: b64u(auth.passkeys[0]!.id) }]);
+    expect(compte().passkeys).toHaveLength(1);
+  });
+
+  it("inscription : réponse perdue (le compte existe peut-être), puis étape inconnue → jamais signalée", async () => {
+    await C.preparerInscription(PREUVE);
+    await C.creerPasskey("Lea", "fr");
+    const vrai = srv.fetch;
+    let coupe = true;
+    C.configurerCompte({
+      net: {
+        origin: "https://shh.test",
+        fetch: (async (u: string, i: RequestInit) => {
+          const r = await vrai(u, i);
+          if (coupe && new URL(u).pathname === "/api/compte/inscription/fin") {
+            coupe = false;
+            throw new TypeError("Failed to fetch"); // enregistré, réponse perdue
+          }
+          return r;
+        }) as unknown as typeof fetch,
+      },
+      idb: () => idb,
+      agent: () => UA,
+      rpId: () => "shh.test",
+    });
+    await expect(C.terminerInscription(false)).rejects.toThrow();
+    expect(srv.comptes.size).toBe(1);
+    await expect(C.terminerInscription(false)).rejects.toMatchObject({ code: "not_found" });
+    expect(await C.abandonnerInscription()).toBe(false);
+    expect(signalees).toEqual([]);
+  });
+
+  it("inscription : étape perdue au redémarrage (aucun essai incertain) → signalée", async () => {
+    await C.preparerInscription(PREUVE);
+    await C.creerPasskey("Lea", "fr");
+    srv.redemarrer();
+    await expect(C.terminerInscription(false)).rejects.toMatchObject({ code: "not_found" });
+    expect(await C.abandonnerInscription()).toBe(true);
+    expect(signalees).toHaveLength(1);
+  });
+});

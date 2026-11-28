@@ -5,6 +5,7 @@
 // Les secrets ont des types marqués (engine/pure.ts) : K_lien ne peut pas être envoyé.
 // Module interne : l'interface publique est src/index.ts, sans ce module.
 import { b64u, checkOrigin, unb64u, type KAcces, type KPreuve, type SGestion } from "../engine/pure";
+import { signalerMaintenance } from "../maintenance/etat.svelte";
 import { fetchUploader, xhrUploader, type Uploader } from "./upload";
 import { OPENS_SEEN_MAX, TTL_MAX_HOURS } from "../limits";
 
@@ -76,6 +77,7 @@ type Req = {
 };
 
 function httpErrorOf(status: number, v: unknown): HttpError {
+  signalerMaintenance(status, v);
   const j = typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
   const int = (x: unknown) => (Number.isSafeInteger(x) ? (x as number) : undefined);
   return new HttpError(status, typeof j.error === "string" ? j.error : `http_${status}`, int(j.attempts_left), int(j.retry_after_s));

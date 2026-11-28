@@ -19,6 +19,7 @@
   // aucun repli tiers ici (le pass est sur cette page).
   import { formatBytes, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
+  import { creationsFermees, texteBandeau } from "../maintenance/etat.svelte";
   import { CONTENT_MAX, CREATES_PER_DAY, MAX_OPENS, PAID, TTL_MAX_HOURS, type PaidTier } from "../limits";
   import { commander, lireOffre, type ErreurCommande, type Moyen, type OffreServeur, type Preuve } from "../paiement/api";
   import { garder, idbDuNavigateur, lirePasses, nouvelId, oublier, tirerPass } from "../paiement/pass";
@@ -333,11 +334,14 @@
         <p class="tot"><span>{t("offers.summary.total")}</span><span class="num">{eur(price(chosen))} <small>{per}</small></span></p>
         <p class="sn">{means === "crypto" ? t("offers.summary.crypto") : billing === "month" ? t("offers.summary.month") : t("offers.summary.year")}</p>
       {/if}
-      <button type="button" class="go" disabled={chosen === null || blocage !== null || busy || going} aria-describedby="{uid}-wait" onclick={payer} data-pay>
+      <!-- Redémarrage annoncé (D42-32) : aucune nouvelle commande d'ici la fin de la maintenance. -->
+      <button type="button" class="go" disabled={chosen === null || blocage !== null || busy || going || creationsFermees()} aria-describedby="{uid}-wait" onclick={payer} data-pay>
         {ferme ? t("offers.soon") : going ? t("offers.going", { who }) : t("offers.continue", { who })}
       </button>
       {#if erreur}
-        <p class="err" role="alert" data-pay-error>{t(`offers.err.${erreur}`)}</p>
+        <p class="err" role="alert" data-pay-error>{erreur === "maintenance" ? texteBandeau() || t("offers.err.maintenance") : t(`offers.err.${erreur}`)}</p>
+      {:else if creationsFermees()}
+        <p class="err" data-pay-maintenance>{texteBandeau()}</p>
       {/if}
       <p id="{uid}-wait" class={["wait", { warn: chosen !== null && blocage !== null && !ferme }]} data-wait>{pourquoi ?? ""}</p>
       <p class="dev">{t("offers.device")} <a href={href("/conditions")}>{t("offers.terms")}</a></p>

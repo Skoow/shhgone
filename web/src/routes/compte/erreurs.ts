@@ -5,6 +5,7 @@
 // Annulation de la feuille de passkey (« annule ») : AUCUN message (conception §3).
 import { formatDuration } from "../../i18n/format";
 import { getLang, t } from "../../i18n/i18n.svelte";
+import { texteBandeau } from "../../maintenance/etat.svelte";
 
 export type Champ = "pseudo" | "cle" | "photo" | "nom";
 export type Erreur = { champ?: Champ; texte: string };
@@ -54,6 +55,8 @@ export function erreur(e: unknown, moment: Moment): Erreur {
       return { texte: t(moment === "inscription" ? "account.err.busy" : "account.err.busyAutre") };
     case "reseau":
       return { texte: t("account.err.reseau") };
+    case "maintenance":
+      return { texte: texteBandeau() || t("account.err.busy") };
     case "recent":
     case "sans_passkey":
       return { texte: t("account.reauth.needed") };

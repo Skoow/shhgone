@@ -55,6 +55,76 @@ export async function avecReprise<T>(f: () => Promise<T>, attendre: (ms: number)
   }
 }
 
+/**
+ * Attentes avant chaque nouvel essai d'un envoi de pièce coupé (réseau, 5xx : serveur qui
+ * redémarre) ; la dernière se répète, jusqu'à ENVOI_PATIENCE_MS d'attente en tout.
+ */
+export const ENVOI_REPRISES_MS = [1000, 3000, 8000, 15000, 30000] as const;
+export const ENVOI_PATIENCE_MS = 10 * 60_000;
+
+/**
+ * Un appel d'envoi (segment, finalisation) avec son jeton, repris après une coupure ou un
+ * redémarrage du serveur (D42-32) : coupure réseau ou 5xx → même appel après une attente ; 404
+ * (jeton d'envoi d'avant le redémarrage) → reprise par le jeton de membre (jeton neuf), une fois
+ * par appel, puis le même appel ; « prête » (finalisée avant le redémarrage) : rend "prete" sans
+ * refaire l'appel. Tout autre refus (4xx) est relancé tel quel. Chaque segment acquitté est sur le
+ * disque du serveur : rien d'acquitté n'est renvoyé.
+ */
+export class EnvoiRepris {
+  private attendu = 0;
+  constructor(
+    private readonly n: api.Net,
+    private readonly jeton: string,
+    private readonly piece: Uint8Array,
+    private envoi: string,
+    private readonly attendre: (ms: number) => Promise<void> = (ms) => new Promise((ok) => setTimeout(ok, ms)),
+    private readonly signal?: AbortSignal,
+  ) {}
+
+  async appel(f: (envoi: string) => Promise<void>): Promise<"fait" | "prete"> {
+    let repris = false;
+    for (let i = 0; ; i++) {
+      if (this.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      try {
+        await f(this.envoi);
+        return "fait";
+      } catch (e) {
+        if (e instanceof api.SalonError && e.status === 404 && !repris) {
+          repris = true;
+          const r = await this.avecPatience(() => api.reprendrePiece(this.n, this.jeton, this.piece));
+          if (r.prete) return "prete";
+          this.envoi = r.envoi;
+          i = -1;
+          continue;
+        }
+        const coupure = (e instanceof Error && e.message === "reseau") || (e instanceof api.SalonError && e.status >= 500);
+        if (!coupure) throw e;
+        await this.pause(i, e);
+      }
+    }
+  }
+
+  /** La reprise elle-même, patiente comme un appel (serveur encore en train de démarrer). */
+  private async avecPatience<T>(f: () => Promise<T>): Promise<T> {
+    for (let i = 0; ; i++) {
+      try {
+        return await f();
+      } catch (e) {
+        const coupure = (e instanceof Error && e.message === "reseau") || (e instanceof api.SalonError && e.status >= 500);
+        if (!coupure) throw e;
+        await this.pause(i, e);
+      }
+    }
+  }
+
+  private async pause(i: number, e: unknown): Promise<void> {
+    const ms = ENVOI_REPRISES_MS[Math.min(i, ENVOI_REPRISES_MS.length - 1)]!;
+    if (this.attendu + ms > ENVOI_PATIENCE_MS) throw e;
+    this.attendu += ms;
+    await this.attendre(ms);
+  }
+}
+
 const segments = (bucket: number) => Math.ceil(bucket / SEG_CHUNKS);
 const chunksDuSegment = (bucket: number, n: number) => Math.min(SEG_CHUNKS, bucket - n * SEG_CHUNKS);
 
@@ -67,7 +137,12 @@ function alea(b: Uint8Array<ArrayBuffer>): void {
  * le message `piece` puis à effacer par l'appelant). `vocal` : palier vocal (1, 16 ou 80), hors
  * du budget de 2 Go, au rythme d'une voix (serveur). `progres` : fraction envoyée.
  */
-export async function envoyerPiece(n: api.Net, jeton: string, blob: Blob, o: { nom: string; mime: string; vocal: boolean; progres?: (f: number) => void; signal?: AbortSignal }): Promise<RefPiece> {
+export async function envoyerPiece(
+  n: api.Net,
+  jeton: string,
+  blob: Blob,
+  o: { nom: string; mime: string; vocal: boolean; progres?: (f: number) => void; signal?: AbortSignal; attendre?: (ms: number) => Promise<void> },
+): Promise<RefPiece> {
   if (blob.size > PIECE_MAX) throw new Error("trop_gros");
   const seed = await newSeed();
   let r: Uint8Array | undefined;
@@ -78,8 +153,10 @@ export async function envoyerPiece(n: api.Net, jeton: string, blob: Blob, o: { n
       const fin = await sealFinal([{ kind: "file", name: o.nom, mime: o.mime, size: blob.size, first: 0, sealer }], keys, {});
       if (o.vocal && !(PALIERS_VOCAUX as readonly number[]).includes(fin.bucket)) throw new Error("vocal_trop_long");
       const { piece, envoi } = await api.creerPiece(n, jeton, fin.bucket, o.vocal);
+      const reprise = new EnvoiRepris(n, jeton, piece, envoi, o.attendre, o.signal);
+      let prete = false;
       const total = segments(fin.bucket);
-      for (let s = 0; s < total; s++) {
+      for (let s = 0; s < total && !prete; s++) {
         if (o.signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const base = s === 0 ? HEADER : 0;
         const buf = new Uint8Array(base + chunksDuSegment(fin.bucket, s) * CHUNK_CT);
@@ -90,10 +167,11 @@ export async function envoyerPiece(n: api.Net, jeton: string, blob: Blob, o: { n
         if (s === 0) buf.set(fin.header, 0);
         const dernier = fin.bucket - 1;
         if (Math.floor(dernier / SEG_CHUNKS) === s) buf.set(fin.tail, base + (dernier - s * SEG_CHUNKS) * CHUNK_CT);
-        await api.envoyerSegment(n, envoi, s, buf);
+        prete = (await reprise.appel((t) => api.envoyerSegment(n, t, s, buf))) === "prete";
         o.progres?.((s + 1) / total);
       }
-      await api.finaliserPiece(n, envoi);
+      if (!prete) await reprise.appel((t) => api.finaliserPiece(n, t));
+      o.progres?.(1);
       r = await seedBytes(seed);
       return { r, piece, palier: fin.bucket };
     } finally {

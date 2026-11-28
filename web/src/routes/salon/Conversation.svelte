@@ -4,6 +4,7 @@
   // réactions, modifier, retirer, coches envoyé / reçu / vu, « écrit », participants, saisie.
   // Tout le texte affiché vient du fil local (conversation.ts) : aucune interpolation HTML, liens
   // https? seulement, sans aperçu.
+  import { creationsFermees, texteBandeau } from "../../maintenance/etat.svelte";
   import { onMount, tick, untrack } from "svelte";
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatClock, formatDayTime, formatDuration } from "../../i18n/format";
@@ -881,7 +882,8 @@
       <!-- Saisie : pièce jointe, champ arrondi qui grandit (émojis au bout), puis le bouton rond :
            « Envoyer » dès qu'il y a du texte, « Message vocal » sinon. -->
       <div class="ligne">
-        <button type="button" class="rond outil" aria-label={t("salon.piece.joindre")} onclick={() => joindre?.click()}><Paperclip size={22} aria-hidden="true" /></button>
+        <!-- Redémarrage annoncé (D42-32) : aucune nouvelle pièce d'ici la fin de la maintenance (les messages passent). -->
+        <button type="button" class="rond outil" aria-label={t("salon.piece.joindre")} disabled={creationsFermees()} title={creationsFermees() ? texteBandeau() : undefined} onclick={() => joindre?.click()}><Paperclip size={22} aria-hidden="true" /></button>
         <input bind:this={joindre} type="file" multiple hidden onchange={choisis} />
         <div class="champ">
           <label class="sr-only" for="salon-saisie">{t("salon.room.input")}</label>
@@ -904,7 +906,7 @@
         {#if envoiPossible}
           <button type="button" class="rond envoi" aria-label={t("salon.room.send")} onclick={envoyer}><Send size={20} strokeWidth={2} aria-hidden="true" /></button>
         {:else}
-          <button type="button" class="rond vocal" aria-label={t("salon.piece.vocal")} onclick={() => (vocal = true)}><Mic size={22} aria-hidden="true" /></button>
+          <button type="button" class="rond vocal" aria-label={t("salon.piece.vocal")} disabled={creationsFermees()} title={creationsFermees() ? texteBandeau() : undefined} onclick={() => (vocal = true)}><Mic size={22} aria-hidden="true" /></button>
         {/if}
       </div>
     </div>

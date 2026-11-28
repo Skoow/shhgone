@@ -114,4 +114,22 @@ describe("Salon, avec une session : l'écran de création", () => {
     expect([...document.querySelectorAll("button")].some((b) => b.textContent!.includes(fr["salon.new.create"]))).toBe(true);
     expect(C.etatCompte).toHaveBeenCalled();
   });
+
+  it("redémarrage annoncé imminent (D42-32) : « Créer le salon » désactivé, avec la raison et l'heure de retour", async () => {
+    vi.stubGlobal("__COMPTES__", true);
+    account.etat = "ouvert";
+    const { maintenance } = await import("../../maintenance/etat.svelte");
+    const retour = Math.floor(new Date(2026, 11, 2, 6, 30).getTime() / 1000);
+    maintenance.annonce = { debut: retour - 1800, dureeMin: 30, retour, imminente: true };
+    try {
+      await monter(Nouveau);
+      const b = [...document.querySelectorAll("button")].find((x) => x.textContent!.includes(fr["salon.new.create"]))!;
+      expect(b.disabled).toBe(true);
+      const note = document.querySelector("[data-maintenance]")!;
+      expect(b.getAttribute("aria-describedby")).toBe(note.id);
+      expect(note.textContent).toBe("Le serveur va redémarrer\u202f: réessayez après la maintenance (vers 6\u202fh\u202f30).");
+    } finally {
+      maintenance.annonce = null;
+    }
+  });
 });

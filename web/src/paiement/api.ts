@@ -9,6 +9,7 @@
 // - l'adresse de la page hébergée rendue par le serveur est revérifiée ici contre la liste fermée
 //   des prestataires (adresseSure) avant toute redirection.
 import { b64u, unb64u } from "../engine/pure";
+import { signalerMaintenance } from "../maintenance/etat.svelte";
 
 export type Net = { origin: string; fetch: typeof fetch };
 
@@ -97,7 +98,7 @@ export async function lireOffre(n: Net = netParDefaut()): Promise<OffreServeur |
 }
 
 export type Demande = { offre: OffrePayante; jours: 30 | 365; renouvelle: boolean; moyen: Moyen; pays: string; renonciation: boolean };
-export type ErreurCommande = "refus" | "conflit" | "limite" | "occupe" | "prestataire" | "reseau";
+export type ErreurCommande = "refus" | "conflit" | "limite" | "occupe" | "maintenance" | "prestataire" | "reseau";
 /** Preuve anti-robot ALTCHA (GET /api/captcha résolu), exigée par la commande. */
 export type Preuve = { altcha: string; hp: string; shown_at: string };
 
@@ -136,8 +137,12 @@ export async function commander(pass: Uint8Array<ArrayBuffer>, d: Demande, preuv
       return { erreur: "conflit" };
     case 429:
       return { erreur: "limite" };
-    case 503:
-      return { erreur: "occupe" };
+    case 503: {
+      // Redémarrage annoncé (D42-32) : aucune nouvelle commande d'ici la fin de la maintenance.
+      const o = await json(r);
+      signalerMaintenance(503, o);
+      return { erreur: o?.error === "maintenance" ? "maintenance" : "occupe" };
+    }
     default:
       return { erreur: "prestataire" };
   }

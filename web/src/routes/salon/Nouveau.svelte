@@ -10,6 +10,7 @@
   import { followLink, href, navigate } from "../../app/router.svelte";
   import { account, etatCompte } from "../../account/session.svelte";
   import { creer, type ErreurCreation } from "../../salon/salon.svelte";
+  import { creationsFermees, texteBandeau } from "../../maintenance/etat.svelte";
   import { DUREES, PLACES_MAX, PLACES_MIN, type Duree } from "../../salon/creation";
   import Cadre from "../compte/Cadre.svelte";
   import Segmented from "../../ui/Segmented.svelte";
@@ -77,6 +78,8 @@
         return t("salon.new.err.banni", { date: e.jusqu ? formatDayTime(Date.parse(e.jusqu), getLang()) : "" });
       case "compte_requis":
         return t("salon.new.err.compte");
+      case "maintenance":
+        return texteBandeau() || t("salon.new.err.serveur");
       default:
         return t(`salon.new.err.${e.code}`);
     }
@@ -131,9 +134,12 @@
       <p class="note">{t("salon.new.password")}</p>
       {#if erreur}
         <Banner kind="danger">{texteErreur(erreur)}</Banner>
+      {:else if creationsFermees()}
+        <!-- Redémarrage annoncé (D42-32) : aucune création d'ici la fin de la maintenance. -->
+        <p class="note" id="salon-ferme" data-maintenance>{texteBandeau()}</p>
       {/if}
       <div class="actions">
-        <Button onpress={lancer} busy={etape !== null}>{etape ? t(`salon.new.step.${etape}`) : t("salon.new.create")}</Button>
+        <Button onpress={lancer} busy={etape !== null} disabled={creationsFermees()} aria-describedby={creationsFermees() ? "salon-ferme" : undefined}>{etape ? t(`salon.new.step.${etape}`) : t("salon.new.create")}</Button>
       </div>
     </div>
   </Cadre>

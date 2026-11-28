@@ -389,5 +389,7 @@ export function fauxServeur() {
   const vieillir = () => {
     for (const x of sessions.values()) x.recente = false;
   };
-  return { comptes, sessions, pseudos, requetes, fetch, vieillir, reglages, FAUSSE_ENTREE };
+  /** Redémarrage du serveur : les étapes en cours (en mémoire) sont perdues, le reste est en base. */
+  const redemarrer = () => etapes.clear();
+  return { comptes, sessions, pseudos, requetes, fetch, vieillir, redemarrer, reglages, FAUSSE_ENTREE };
 }

@@ -169,10 +169,13 @@ let ePrfCache: Uint8Array | null = null;
 let salonCharge: PseudoMoteur | null = null;
 
 /** Inscription en cours, passkey créée : rien n'existe encore côté serveur. */
-type Creee = { etape: string; h: Bytes; c: Creation; parcours: Parcours; prf: Bytes | null; affiche: string; pCanon: string; profil: Profil; kCompte: Bytes; r: Bytes; texte: string };
+// incertaine : un essai d'inscription/fin s'est fini sans réponse lisible (coupure, 5xx) : le
+// compte existe peut-être déjà avec cette passkey ; elle n'est alors jamais signalée inconnue
+// au gestionnaire (abandonnerInscription), qui la supprimerait.
+type Creee = { etape: string; h: Bytes; c: Creation; parcours: Parcours; prf: Bytes | null; affiche: string; pCanon: string; profil: Profil; kCompte: Bytes; r: Bytes; texte: string; incertaine?: boolean };
 let creee: Creee | null = null;
 /** Ajout de passkey en cours (deuxième geste attendu pour la sortie PRF). */
-let ajoutEnCours: { etape: string; c: Creation; nom: string; parcours: Parcours } | null = null;
+let ajoutEnCours: { etape: string; c: Creation; nom: string; parcours: Parcours; incertain?: boolean } | null = null;
 /** Connexion par passkey dont les données ne s'ouvrent pas ici : clé de récupération attendue. */
 let cleAttendue: { ouv: api.Ouverture; prf: Bytes | null; persistante: boolean } | null = null;
 /** Nouvelle clé de récupération montrée, pas encore enregistrée. */
@@ -476,19 +479,23 @@ export async function terminerInscription(persistante: boolean): Promise<void> {
     const envR = await enveloppeRecup(kekR, h, c.kCompte);
     const blobProfil = await sceller("profil", cles.profil, h, 1, profilEnJson(c.profil));
     const blobPrive = await sceller("prive", cles.prive, h, 1, priveEnJson(priveVide()));
-    const r = await api.inscriptionFin(deps.net, {
-      etape: c.etape,
-      credential: c.c.credential,
-      pCanon: c.pCanon,
-      env,
-      vR,
-      envR,
-      blobProfil,
-      blobPrive,
-      persistante,
-      etiquette: await etiquette(cles.etiquette, h),
-      credEtiquette: await etiquette(cles.etiquette, h),
-    });
+    const etiquetteSession = await etiquette(cles.etiquette, h);
+    const credEtiquette = await etiquette(cles.etiquette, h);
+    const r = await sansIssue(c, () =>
+      api.inscriptionFin(deps.net, {
+        etape: c.etape,
+        credential: c.c.credential,
+        pCanon: c.pCanon,
+        env,
+        vR,
+        envR,
+        blobProfil,
+        blobPrive,
+        persistante,
+        etiquette: etiquetteSession,
+        credEtiquette,
+      }),
+    );
     if (r.h.some((x, i) => x !== h[i])) throw new Error("reponse_invalide");
     const kCompte = c.kCompte;
     const avecPrf = c.prf !== null;
@@ -515,7 +522,22 @@ export async function abandonnerInscription(): Promise<boolean> {
   const c = creee;
   oublierEtapes();
   if (!c) return true;
+  if (c.incertaine) return false; // peut-être enregistrée : jamais retirée du gestionnaire
   return signalerInconnue(c.c.rpId, c.c.credId);
+}
+
+/**
+ * f, l'envoi d'une passkey au serveur (inscription/fin, passkeys/fin) : une fin sans réponse
+ * lisible (coupure, 5xx, réponse invalide) rend l'issue incertaine (o.incertaine, o.incertain) ;
+ * un refus explicite (4xx) ne change rien.
+ */
+async function sansIssue<T>(o: { incertaine?: boolean; incertain?: boolean }, f: () => Promise<T>): Promise<T> {
+  try {
+    return await f();
+  } catch (e) {
+    if (!(e instanceof api.CompteError) || e.status >= 500) o.incertaine = o.incertain = true;
+    throw e;
+  }
 }
 
 async function garderCle(h: Uint8Array, kCompte: Uint8Array): Promise<void> {
@@ -774,7 +796,18 @@ async function finirAjout(prf: Bytes | null): Promise<void> {
     const env = prf ? await enveloppePrf(prf, o.h, a.c.credId, o.kCompte) : null;
     const nom = a.nom.trim() === "" ? nomAppareil(deps.agent()) : a.nom.trim();
     const et = await scellerEtiquette(o.cles.etiquette, o.h, nom);
-    await garde(() => api.passkeysFin(deps.net, o.jeton, { etape: a.etape, credential: a.c.credential, env, etiquette: et }));
+    try {
+      await sansIssue(a, () => garde(() => api.passkeysFin(deps.net, o.jeton, { etape: a.etape, credential: a.c.credential, env, etiquette: et })));
+    } catch (e) {
+      // Étape inconnue (redémarrage du serveur, délai passé) : la passkey vient d'être créée
+      // mais n'est enregistrée nulle part ; le gestionnaire l'oublie là où c'est possible
+      // (D42-32), sauf si un essai précédent a pu l'enregistrer.
+      if (e instanceof api.CompteError && e.status === 404 && !a.incertain) {
+        ajoutEnCours = null;
+        await signalerInconnue(a.c.rpId, a.c.credId);
+      }
+      throw e;
+    }
     ajoutEnCours = null;
   } finally {
     prf?.fill(0);

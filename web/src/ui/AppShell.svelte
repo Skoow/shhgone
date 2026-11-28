@@ -16,6 +16,8 @@
   import MobileMenu from "./MobileMenu.svelte";
   import { accountFlag } from "../app/account-flag.svelte";
   import { presence } from "../downloads/presence.svelte";
+  import { maintenance, surveiller } from "../maintenance/etat.svelte";
+  import MaintenanceBanner from "./MaintenanceBanner.svelte";
 
   type Props = {
     children: Snippet;
@@ -30,6 +32,10 @@
   let { children, banner, busy = false, tabs = false }: Props = $props();
   // Démo GitHub Pages seulement (null en production) : phrase de l'hébergeur au pied de page.
   const demo = getDemo();
+  // Maintenance programmée (D42-32) : état lu au chargement puis toutes les quelques minutes,
+  // une fois par page (la coque est montée une fois).
+  $effect(() => surveiller(window));
+  const bandeau = $derived(!!banner || maintenance.annonce !== null);
 
   // Téléphone : la page réserve la hauteur de la barre d'onglets (base.css, html.has-tabbar).
   $effect(() => {
@@ -144,15 +150,18 @@
 
 <EnglishLink />
 
-{#if banner}
-  <div class="banner-slot" bind:clientHeight={bannerH}>{@render banner()}</div>
+{#if bandeau}
+  <div class="banner-slot" bind:clientHeight={bannerH}>
+    <MaintenanceBanner />
+    {#if banner}{@render banner()}{/if}
+  </div>
 {/if}
 
 <div bind:this={sentinel} class="sentinel" aria-hidden="true"></div>
 
 <svelte:window onscroll={queue} onresize={queue} />
 
-<header class={["top", { scrolled, tabs, "has-back": back }]} style:--banner-h={banner ? `${bannerH}px` : undefined}>
+<header class={["top", { scrolled, tabs, "has-back": back }]} style:--banner-h={bandeau ? `${bannerH}px` : undefined}>
   <div class="bar wrap">
     {#if back}
       <button type="button" class="back" onclick={goBack}><ChevronLeft size={24} strokeWidth={2} aria-hidden="true" /><span class="back-t">{t("shell.back")}</span></button>
