@@ -536,6 +536,28 @@ export async function report(c: Ctx, a: { kAcces: KAcces; kPreuve: KPreuve }, ca
 
 export type Status = { opensUsed: number; maxOpens: number; expiresInS: number; state: string };
 
+/** État d'un partage suivi par « Mes partages » ; « absent » : supprimé, échu ou effacé. */
+export type Suivi = { opensUsed: number; maxOpens: number; expiresInS: number; state: string };
+/** 40 partages au plus par surveillance (serveur : surveillerMax). */
+export const SURVEILLER_MAX = 40;
+
+/**
+ * POST /api/manage/surveiller (« Mes partages » en direct) : rend tout de suite si l'état d'un
+ * des partages diffère de `connus`, sinon au premier changement ou après 25 s au plus. Les
+ * secrets de gestion vont dans le corps, jamais dans l'adresse. Sans nouvel essai : la page
+ * relance elle-même.
+ */
+export async function surveiller(c: Ctx, suivis: { sGestion: SGestion; opensUsed: number; state: string }[], signal?: AbortSignal): Promise<Suivi[]> {
+  const body = JSON.stringify({ suivis: suivis.map((x) => ({ gestion: b64u(x.sGestion), opens_used: x.opensUsed, state: x.state })) });
+  const o = await send(c, { method: "POST", path: "/api/manage/surveiller", headers: { "Content-Type": "application/json" }, body, signal }, readJSON);
+  const etats = (o as { etats?: unknown }).etats;
+  if (!Array.isArray(etats) || etats.length !== suivis.length) throw new BadResponse();
+  return etats.map((e) => {
+    const x = e as Record<string, unknown>;
+    return { opensUsed: num(x, "opens_used"), maxOpens: num(x, "max_opens"), expiresInS: num(x, "expires_in_s"), state: str(x, "state") };
+  });
+}
+
 export async function status(c: Ctx, sGestion: SGestion): Promise<Status> {
   const o = await send(
     c,

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"io"
 	"net/http"
 
@@ -80,4 +81,105 @@ func (s *server) manageDestroy(w http.ResponseWriter, r *http.Request) {
 	}
 	s.usage.Destruction()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// surveillerMax : partages suivis par une même surveillance (« Mes partages »).
+const surveillerMax = 40
+
+// suiviEtat : état d'un partage tel que le client le connaît, et tel que le serveur le rend.
+// Introuvable (supprimé, échu, épuisé puis effacé) : State « absent », le reste à zéro.
+type suiviEtat struct {
+	OpensUsed int    `json:"opens_used"`
+	MaxOpens  int    `json:"max_opens"`
+	ExpiresIn int64  `json:"expires_in_s"`
+	State     string `json:"state"`
+}
+
+// POST /api/manage/surveiller (décision du propriétaire, 28 novembre : « Mes partages » en
+// direct) : corps {"suivis":[{"gestion":<S_gestion>, "opens_used":n, "state":"…"}]} (40 au plus).
+// Répond tout de suite si l'état d'un des partages diffère de celui donné ; sinon attend un
+// changement (ouverture consommée, disparition) jusqu'à 25 s, puis répond l'état présent de
+// tous, dans l'ordre (le client compare et relance). Les secrets restent dans le corps (jamais
+// dans l'adresse). Une seule place de surveillance par page (watchSlots : 2 par connexion).
+func (s *server) manageSurveiller(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Suivis []struct {
+			Gestion   string `json:"gestion"`
+			OpensUsed int    `json:"opens_used"`
+			State     string `json:"state"`
+		} `json:"suivis"`
+	}
+	if err := readJSONMax(w, r, &b, 8<<10); err != nil {
+		fail(w, err)
+		return
+	}
+	if len(b.Suivis) == 0 || len(b.Suivis) > surveillerMax {
+		fail(w, errBadRequest)
+		return
+	}
+	sgs := make([][]byte, len(b.Suivis))
+	for i, x := range b.Suivis {
+		sg, err := secret(x.Gestion, 32)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		sgs[i] = sg
+	}
+	release, ok := s.slot(w, r, s.watchSlots)
+	if !ok {
+		return
+	}
+	defer release()
+	lire := func() ([]suiviEtat, error) {
+		out := make([]suiviEtat, len(sgs))
+		for i, sg := range sgs {
+			st, err := s.svc.Status(sg)
+			switch {
+			case errors.Is(err, share.ErrNotFound):
+				out[i] = suiviEtat{State: "absent"}
+			case err != nil:
+				return nil, err
+			default:
+				out[i] = suiviEtat{st.OpensUsed, st.MaxOpens, secs(st.ExpiresIn), st.State}
+			}
+		}
+		return out, nil
+	}
+	differe := func(etats []suiviEtat) bool {
+		for i, e := range etats {
+			if e.OpensUsed != b.Suivis[i].OpensUsed || e.State != b.Suivis[i].State {
+				return true
+			}
+		}
+		return false
+	}
+	repondre := func(etats []suiviEtat) {
+		writeJSON(w, http.StatusOK, struct {
+			Etats []suiviEtat `json:"etats"`
+		}{etats})
+	}
+	fin, stop := s.wait(watchHold)
+	defer stop()
+	for {
+		// Canal pris AVANT la lecture : un changement entre les deux réveille quand même.
+		chg := s.svc.Changement()
+		etats, err := lire()
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if differe(etats) {
+			repondre(etats)
+			return
+		}
+		select {
+		case <-chg:
+		case <-fin:
+			repondre(etats)
+			return
+		case <-r.Context().Done():
+			return
+		}
+	}
 }

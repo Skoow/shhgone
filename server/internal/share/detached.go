@@ -508,6 +508,7 @@ func (s *Service) revokeAllLocked(id string) {
 }
 
 func (s *Service) notifyLocked(id string) {
+	s.signalerChangement() // disparition : « Mes partages » en direct
 	if w := s.gone.watch[id]; w != nil {
 		close(w.ch)
 		delete(s.gone.watch, id)

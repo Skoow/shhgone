@@ -84,6 +84,7 @@ describe("interface publique", () => {
         "PREPARED_MIN_LEFT_MS",
         "shareLink",
         "shareStatus",
+        "watchShares",
       ].sort(),
     );
   });

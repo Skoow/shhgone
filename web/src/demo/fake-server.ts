@@ -896,6 +896,40 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     });
   }
 
+  /**
+   * POST /api/manage/surveiller (« Mes partages » en direct) : comme le serveur, réponse
+   * immédiate si un état diffère de celui donné, sinon au premier changement (ouverture ou
+   * disparition dans cet onglet) ou après 25 s.
+   */
+  async function surveiller(req: Request): Promise<Response> {
+    let b: unknown;
+    try {
+      b = JSON.parse(await req.text());
+    } catch {
+      throw badRequest();
+    }
+    const suivis = (b as { suivis?: unknown }).suivis;
+    if (!Array.isArray(suivis) || suivis.length === 0 || suivis.length > 40) throw badRequest();
+    const lire = async () =>
+      Promise.all(
+        suivis.map(async (x: { gestion?: unknown }) => {
+          if (typeof x.gestion !== "string") throw badRequest();
+          const e = await find(decodeB64(x.gestion, 32), "manageV");
+          if (e === undefined || !isAlive(e[1])) return { opens_used: 0, max_opens: 0, expires_in_s: 0, state: "absent" };
+          const sh = e[1];
+          return { opens_used: sh.maxOpens === null ? 0 : sh.maxOpens - sh.opensLeft, max_opens: sh.maxOpens ?? 0, expires_in_s: sh.state === "uploading" ? 0 : sh.expiresAt - now(), state: sh.state };
+        }),
+      );
+    const differe = (etats: { opens_used: number; state: string }[]) => etats.some((e, i) => e.opens_used !== suivis[i].opens_used || e.state !== suivis[i].state);
+    const fin = nowMs() + (opts.watchHoldMs ?? WATCH_HOLD_MS);
+    for (;;) {
+      const etats = await lire();
+      if (differe(etats) || nowMs() >= fin) return json(200, { etats });
+      await new Promise((r) => setTimeout(r, 500));
+      if (req.signal.aborted) throw new DOMException("Aborted", "AbortError");
+    }
+  }
+
   async function route(req: Request): Promise<Response> {
     const path = new URL(req.url).pathname;
     const m = req.method;
@@ -905,6 +939,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
       return m === "GET" ? json(200, { maintenance: null, services: { partages: "ok", salons: "ferme", appels: "ferme", compte: "ok", paiement: "ferme" } }) : json(404, { error: "not_found" });
     if (path === "/api/shares") return m === "POST" ? create(req) : json(404, { error: "not_found" });
     if (path === "/api/manage/status") return m === "GET" ? status(req) : json(404, { error: "not_found" });
+    if (path === "/api/manage/surveiller") return m === "POST" ? surveiller(req) : json(404, { error: "not_found" });
     if (path === "/api/manage/destroy") return m === "POST" ? manageDestroy(req) : json(404, { error: "not_found" });
     if (path === "/api/manage/resume") return m === "POST" ? resume(req) : json(404, { error: "not_found" });
     // Aucun id dans les chemins (spec §29.8, §32).

@@ -3,10 +3,10 @@
 // IndexedDB en production (base PARTAGES_DB), mémoire dans la démo (origine partagée de
 // GitHub Pages : rien n'y est écrit) ; indisponible → `statut: "indisponible"`, et « Lien prêt »
 // montre alors le lien de gestion. Une simple visite de « Mes partages » ne crée rien ; le premier
-// envoi (ou salon) crée la base. Lire la liste ne fait aucune requête ; les relectures passent
-// par partages-relecture.ts (page visible, 5 min, gigue).
+// envoi (ou salon) crée la base. Lire la liste ne fait aucune requête ; le suivi en direct passe
+// par partages-relecture.ts (page affichée et visible).
 import { getDemo } from "../app/demo-hooks";
-import { destroyShare, shareStatus } from "../index";
+import { destroyShare, watchShares } from "../index";
 import { idbBackend, memoryBackend, type Backend } from "./idb";
 import { PARTAGES_DB, estActif, ouvrirPartages, type NouveauPartage, type Partage, type Partages, type Sorte } from "./partages";
 import { patchDetruit, relecteur, type ErreurRelecture, type Relecteur } from "./partages-relecture";
@@ -167,24 +167,26 @@ async function relecteurPret(): Promise<Relecteur | null> {
   const s = await stock();
   if (!s) return null;
   return (relect ??= relecteur(s, {
-    etat: (g) => shareStatus(g, location.origin),
+    surveiller: (suivis, signal) => watchShares(suivis.map((x) => ({ manage: x.gestion, opensUsed: x.opensUsed, state: x.state })), location.origin, signal),
     detruire: (g) => destroyShare(g, location.origin),
     now: () => Date.now(),
     visible: () => document.visibilityState === "visible",
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-    random: () => crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32,
+    change: () => {
+      void stock().then((st) => {
+        if (st && relect) mesPartages.erreurs = relect.erreurs();
+        return st ? recharger(st) : undefined;
+      });
+    },
   }));
 }
 
-/** Affichage de « Mes partages » : relit les envois actifs dont l'état date de plus de 5 min. */
+/** Affichage de « Mes partages » (page visible) : suit les envois actifs en direct jusqu'à arreterRelecture. */
 export async function relirePartages(): Promise<void> {
-  if (mesPartages.liste.length === 0) return; // rien à relire : aucune base ouverte ni créée
+  if (mesPartages.liste.length === 0) return; // rien à suivre : aucune base ouverte ni créée
   const r = await relecteurPret();
-  const s = await stock();
-  if (!r || !s) return;
-  const erreurs = await r.relire();
-  mesPartages.erreurs = erreurs;
-  await recharger(s).catch(() => undefined);
+  if (!r) return;
+  await r.suivre();
 }
 export function arreterRelecture(): void {
   relect?.arreter();

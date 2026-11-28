@@ -936,6 +936,26 @@ export async function destroyShare(link: string, expectedOrigin: string, opts: {
   }, destroyError);
 }
 
+/**
+ * « Mes partages » en direct : surveillance de plusieurs liens de gestion (même origine) ; rend
+ * leur état dès qu'il diffère de celui connu, sinon après 25 s au plus.
+ */
+export async function watchShares(
+  suivis: { manage: string; opensUsed: number; state: string }[],
+  expectedOrigin: string,
+  signal?: AbortSignal,
+  net?: api.Net,
+): Promise<api.Suivi[]> {
+  const ps: (Parameters<typeof api.surveiller>[1][number] & { origin: string })[] = [];
+  for (const x of suivis) {
+    const p = await parseFor(x.manage, expectedOrigin);
+    if (p.kind !== "m") throw new Error("lien_invalide");
+    ps.push({ sGestion: p.sGestion, opensUsed: x.opensUsed, state: x.state, origin: p.origin });
+  }
+  if (ps.length === 0) return [];
+  return guarded(() => api.surveiller(api.ctx(ps[0]!.origin, net), ps, signal), destroyError);
+}
+
 export async function shareStatus(
   manage: string,
   expectedOrigin: string,

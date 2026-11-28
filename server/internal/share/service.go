@@ -213,7 +213,8 @@ type Service struct {
 	ExtraUsed  func() int64
 	Vidage     *store.Vidage // jamais nil après NewService
 
-	createMu sync.Mutex // rend atomiques « place libre ? » et la réservation
+	chg      changements // « Mes partages » en direct (changements.go)
+	createMu sync.Mutex  // rend atomiques « place libre ? » et la réservation
 	// attemptMu : rend atomiques, par partage, la lecture du compteur, la vérification de
 	// K_preuve et son décompte : jamais plus de 5 essais évalués, même en parallèle.
 	// Verrous rayés (id haché) : mémoire bornée, aucune donnée retenue.
@@ -1007,6 +1008,7 @@ func (s *Service) consumeOpen(id string, now int64) (openN, left int, state stri
 	if err := tx.Commit(); err != nil {
 		return 0, 0, "", 0, "", h, err
 	}
+	s.signalerChangement() // une ouverture de plus : « Mes partages » en direct
 	return openN, left, state, exp, g, h, nil
 }
 

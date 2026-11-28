@@ -46,8 +46,12 @@
       }),
     );
     const id = setInterval(() => (now = Date.now()), 30_000);
+    // Suivi en direct : coupé quand la page est cachée, repris à son retour.
     const retour = () => {
-      if (document.visibilityState === "visible") now = Date.now();
+      if (document.visibilityState === "visible") {
+        now = Date.now();
+        void relirePartages().catch(() => undefined);
+      } else arreterRelecture();
     };
     document.addEventListener("visibilitychange", retour);
     return () => {

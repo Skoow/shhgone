@@ -23,6 +23,7 @@ export {
   fetchMeta,
   openShare,
   shareStatus,
+  watchShares,
   type Categorie,
   type CaptchaProof,
   type CreateOpts,

@@ -1,28 +1,32 @@
-// Relecture de l'état des envois de « Mes partages » (spec §33.1). Ce que voit le serveur : un
-// GET /api/manage/status par relecture, avec le seul secret de gestion. Pour que la page ne soit pas
-// une salve de requêtes qui relierait en direct les partages d'une même connexion :
-// - seulement à l'affichage de « Mes partages », page visible, jamais en arrière-plan ;
-// - au plus une fois toutes les 5 min par partage (la création compte comme un état connu) ;
-// - l'un après l'autre, chacun après une gigue de 0,5 à 4 s.
-// Reste visible au serveur, en direct : une même connexion interroge plusieurs partages (§18.18).
-// Salons : pas relus (il faudrait le moteur du salon) ; leur échéance gardée fait foi, et leur
+// Suivi en direct de l'état des envois de « Mes partages » (décision du propriétaire, 28 novembre :
+// le compteur d'ouvertures se met à jour tout de suite, sans attendre ni recharger ; remplace la
+// relecture « au plus toutes les 5 min, avec gigue » de la spec §33.1). Tant que la page est
+// affichée et visible : une seule surveillance (POST /api/manage/surveiller) pour tous les envois
+// actifs (40 au plus, les plus récents), relancée dès sa réponse. Le serveur répond dès qu'une
+// ouverture est consommée ou qu'un partage disparaît, sinon après 25 s. Page cachée ou quittée :
+// la surveillance est coupée. Ce que voit le serveur : une même connexion suit ses partages
+// ensemble (§18.18), accepté par le propriétaire.
+// Salons : pas suivis (il faudrait le moteur du salon) ; leur échéance gardée fait foi, et leur
 // page de gestion (« #s ») dit l'état réel.
 import { LimitError, NotFoundError } from "../index";
 import { estActif, etatVu, type Partage, type Partages, type Patch } from "./partages";
 
-export const RELECTURE_MIN_MS = 5 * 60_000;
-export const GIGUE_MIN_MS = 500;
-export const GIGUE_MAX_MS = 4000;
+/** Envois suivis ensemble (serveur : surveillerMax). */
+export const SUIVI_MAX = 40;
+/** Pause après une erreur réseau ou serveur, avant de relancer la surveillance. */
+export const PAUSE_ERREUR_MS = 5000;
 
 export type Etat = { opensUsed: number; maxOpens: number; expiresInS: number; state: string };
 export type ErreurRelecture = "reseau" | "limite" | "serveur";
 export type DepsRelecture = {
-  etat: (gestion: string) => Promise<Etat>;
+  /** Surveillance : rend les états, dans l'ordre, dès qu'un diffère de celui donné (ou après 25 s). */
+  surveiller: (suivis: { gestion: string; opensUsed: number; state: string }[], signal: AbortSignal) => Promise<Etat[]>;
   detruire: (gestion: string) => Promise<void>;
   now: () => number;
   visible: () => boolean;
   sleep: (ms: number) => Promise<void>;
-  random: () => number;
+  /** Appelé après chaque changement écrit (la page relit la liste). */
+  change?: () => void;
 };
 
 export function erreurDe(e: unknown): ErreurRelecture {
@@ -30,9 +34,8 @@ export function erreurDe(e: unknown): ErreurRelecture {
   if (e instanceof Error && e.message === "reseau") return "reseau";
   return "serveur";
 }
-const introuvable = (e: unknown) => e instanceof NotFoundError || (e instanceof Error && e.message === "lien_invalide");
 
-/** Relecture réussie à l'heure `t`. */
+/** État lu à l'heure `t`. */
 export const patchEtat = (s: Etat, t: number): Patch => ({
   ouvertures: s.opensUsed,
   ouverturesMax: Math.max(1, s.maxOpens),
@@ -47,57 +50,64 @@ export function patchAbsent(p: Partage, t: number): Patch {
 }
 export const patchDetruit = (t: number): Patch => ({ etat: "detruit", detruitIci: true, finLe: t, vuLe: t });
 
-export function relecteur(s: Pick<Partages, "get" | "liste" | "modifier">, d: DepsRelecture) {
-  const tente = new Map<string, number>();
-  const pauseJusqua = new Map<string, number>();
-  let passe: { off: boolean } | null = null;
+/** État connu d'une entrée, tel que le serveur l'écrit. */
+const connu = (p: Partage) => ({ gestion: p.gestion, opensUsed: p.ouvertures, state: p.etat === "epuise" ? "draining" : "ready" });
 
-  async function une(p: Partage, jeton: { off: boolean }): Promise<ErreurRelecture | null> {
-    if (jeton.off || !d.visible()) return null;
-    const t0 = d.now();
-    if (p.sorte !== "envoi" || !estActif(p, t0)) return null;
-    if (t0 < Math.max(p.vuLe, tente.get(p.id) ?? 0) + RELECTURE_MIN_MS || t0 < (pauseJusqua.get(p.id) ?? 0)) return null;
-    await d.sleep(Math.round(GIGUE_MIN_MS + d.random() * (GIGUE_MAX_MS - GIGUE_MIN_MS)));
-    if (jeton.off || !d.visible()) return null;
-    let e: Etat;
-    try {
-      e = await d.etat(p.gestion);
-    } catch (err) {
-      const t = d.now();
-      if (introuvable(err)) {
-        tente.set(p.id, t);
-        await s.modifier(p.id, patchAbsent(p, t));
-        return null;
-      }
-      const m = erreurDe(err);
-      // Une coupure réseau n'a pas atteint le serveur : un nouvel essai reste permis.
-      if (m !== "reseau") tente.set(p.id, t);
-      if (err instanceof LimitError) pauseJusqua.set(p.id, t + err.retryAfterS * 1000);
-      return m;
-    }
+export function relecteur(s: Pick<Partages, "get" | "liste" | "modifier">, d: DepsRelecture) {
+  let passe: AbortController | null = null;
+  const erreurs: Record<string, ErreurRelecture> = {};
+
+  /** Une réponse : chaque état qui diffère est écrit (le dernier état connu reste sinon). */
+  async function appliquer(suivis: Partage[], etats: Etat[]): Promise<boolean> {
     const t = d.now();
-    tente.set(p.id, t);
-    const cur = (await s.get(p.id)) ?? p;
-    if (etatVu(cur, t) === "detruit") return null; // détruit pendant la relecture
-    await s.modifier(p.id, patchEtat(e, t));
-    return null;
+    let ecrit = false;
+    for (let i = 0; i < suivis.length; i++) {
+      const p = suivis[i]!;
+      const e = etats[i]!;
+      delete erreurs[p.id];
+      const cur = (await s.get(p.id)) ?? p;
+      if (etatVu(cur, t) === "detruit") continue; // supprimé ici entre-temps
+      if (e.state === "absent") {
+        await s.modifier(p.id, patchAbsent(cur, t));
+        ecrit = true;
+      } else if (e.opensUsed !== cur.ouvertures || (e.state === "draining") !== (cur.etat === "epuise") || Math.max(1, e.maxOpens) !== cur.ouverturesMax) {
+        await s.modifier(p.id, patchEtat(e, t));
+        ecrit = true;
+      }
+    }
+    return ecrit;
+  }
+
+  async function boucle(ctl: AbortController): Promise<void> {
+    while (!ctl.signal.aborted && d.visible()) {
+      const t = d.now();
+      const suivis = (await s.liste()).filter((p) => p.sorte === "envoi" && estActif(p, t)).slice(0, SUIVI_MAX);
+      if (suivis.length === 0) return;
+      try {
+        const etats = await d.surveiller(suivis.map(connu), ctl.signal);
+        if (ctl.signal.aborted) return;
+        if (await appliquer(suivis, etats)) d.change?.();
+      } catch (err) {
+        if (ctl.signal.aborted) return;
+        const m = erreurDe(err);
+        for (const p of suivis) erreurs[p.id] = m;
+        d.change?.();
+        await d.sleep(err instanceof LimitError ? Math.max(PAUSE_ERREUR_MS, err.retryAfterS * 1000) : PAUSE_ERREUR_MS);
+      }
+    }
   }
 
   return {
-    /** Relit les envois actifs, l'un après l'autre ; rend les erreurs par identifiant. */
-    async relire(): Promise<Record<string, ErreurRelecture>> {
-      if (passe) passe.off = true;
-      const jeton = (passe = { off: false });
-      const erreurs: Record<string, ErreurRelecture> = {};
-      for (const p of await s.liste()) {
-        if (jeton.off) break;
-        const e = await une(p, jeton);
-        if (e) erreurs[p.id] = e;
-      }
-      return erreurs;
+    /** Erreurs de la dernière surveillance, par identifiant (l'entrée garde son dernier état connu). */
+    erreurs: (): Record<string, ErreurRelecture> => ({ ...erreurs }),
+    /** Suit les envois actifs tant que la page est visible ; une seule boucle à la fois. */
+    suivre(): Promise<void> {
+      passe?.abort();
+      const ctl = (passe = new AbortController());
+      return boucle(ctl);
     },
     arreter(): void {
-      if (passe) passe.off = true;
+      passe?.abort();
       passe = null;
     },
     /** « Supprimer » : geste de la personne (ni gigue ni limite). Rend l'erreur, ou null. */
