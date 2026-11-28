@@ -48,14 +48,14 @@ func TestEtatService(t *testing.T) {
 	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, `{"maintenance":null,`+partagesSeuls+`}`)
 	debut := e.annoncer(t, time.Hour, 30, 10)
 	w := e.do(req{method: "GET", path: "/api/etat-service"})
-	expect(t, w, 200, fmt.Sprintf(`{"maintenance":{"debut":%d,"duree_min":30,"retour":%d,"imminente":false},`+partagesSeuls+`}`,
-		debut.Unix(), debut.Add(30*time.Minute).Unix()))
+	expect(t, w, 200, fmt.Sprintf(`{"maintenance":{"debut":%d,"duree_min":30,"retour":%d,"imminente":false,"fermeture":%d},`+partagesSeuls+`}`,
+		debut.Unix(), debut.Add(30*time.Minute).Unix(), debut.Add(-10*time.Minute).Unix()))
 	if w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("Cache-Control :", w.Header().Get("Cache-Control"))
 	}
 	e.clk.Add(50 * time.Minute)
-	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, fmt.Sprintf(`{"maintenance":{"debut":%d,"duree_min":30,"retour":%d,"imminente":true},`+partagesEnMaintenance+`}`,
-		debut.Unix(), debut.Add(30*time.Minute).Unix()))
+	expect(t, e.do(req{method: "GET", path: "/api/etat-service"}), 200, fmt.Sprintf(`{"maintenance":{"debut":%d,"duree_min":30,"retour":%d,"imminente":true,"fermeture":%d},`+partagesEnMaintenance+`}`,
+		debut.Unix(), debut.Add(30*time.Minute).Unix(), debut.Add(-10*time.Minute).Unix()))
 }
 
 // Mode « redémarrage imminent » : toute NOUVELLE création est refusée (503 maintenance, heure

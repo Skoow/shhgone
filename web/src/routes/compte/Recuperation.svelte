@@ -104,7 +104,7 @@
     vue = "fini";
     announce(t("account.passkeys.added"));
   }
-  const continuer = () => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/");
+  const continuer = () => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/compte");
 </script>
 
 <Cadre forme="panneaux" titre={vue === "cle" ? t("account.recover.title") : vue === "fini" ? t("account.connected.title") : t("account.recover.passkey.title")} sous={vue === "cle" ? t("account.recover.sub") : undefined}>

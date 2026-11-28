@@ -94,8 +94,9 @@
 
 <Section id="sec-recovery" titre={t("account.section.recovery")}>
   {#if account.recupere && vue !== "fini"}<Banner kind="warn">{t("account.recovered.banner")}</Banner>{/if}
-  {#if rappelCle() && vue !== "controlee" && vue !== "fini"}<div data-rappel-cle><Banner kind="warn">{t("account.recovery.reminder")}</Banner></div>{/if}
-  <p class="note">{t("account.recovery.body")}</p>
+  {#if rappelCle() && (vue === "ferme" || vue === "controle")}<div data-rappel-cle><Banner kind="warn">{t("account.recovery.reminder")}</Banner></div>{/if}
+  <!-- Pendant la création d'une clé, l'écran de la clé dit déjà ce qu'elle permet (pas de doublon). -->
+  {#if vue !== "cle" && vue !== "verif"}<p class="note">{t("account.recovery.body")}</p>{/if}
   {#if vue === "ferme" || vue === "fini" || vue === "controlee"}
     {#if vue === "fini"}<p class="ok" role="status">{t("account.recovery.done")}</p>{/if}
     {#if vue === "controlee"}<p class="ok" role="status" data-cle-verifiee>{t("account.recovery.check.ok")}</p>{/if}

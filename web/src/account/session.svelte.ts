@@ -815,6 +815,12 @@ async function finirAjout(prf: Bytes | null): Promise<void> {
       throw e;
     }
     ajoutEnCours = null;
+    // Session ouverte par la clé de récupération (aucune passkey liée) : une passkey créée sur CET
+    // appareil devient « cette passkey » (essais du 28 novembre : l'ordinateur ne marquait aucune).
+    if (o.credId === null && a.c.attachement === "platform" && ouverte === o) {
+      o.credId = a.c.credId;
+      await memoriser(o).catch(() => undefined);
+    }
   } finally {
     prf?.fill(0);
   }

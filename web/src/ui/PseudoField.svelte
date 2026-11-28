@@ -65,6 +65,16 @@
   const dispo = $derived<Marque>(statut === "verif" ? "verif" : libre ? "ok" : statut === "pris" || statut === "pseudo_reserve" || statut === "pseudo_ecritures" ? "ko" : "neutre");
   const ETAT_REGLE: Record<Marque, Parameters<typeof t>[0]> = { ok: "account.pseudo.rule.ok", ko: "account.pseudo.rule.ko", neutre: "account.pseudo.rule.wait", verif: "account.pseudo.rule.checking" };
 
+  // Accents (essais du 28 novembre : « Léa » refusé, il fallait tout retaper) : la même chose sans
+  // accent proposée d'un geste, si elle respecte les règles de caractères.
+  const sansAccent = $derived(value.normalize("NFD").replace(/\p{M}/gu, ""));
+  const proposer = $derived(!vide && !regles.caracteres && sansAccent !== value && reglesPseudo(sansAccent).caracteres);
+  function prendreSansAccent() {
+    value = sansAccent;
+    onsaisie?.();
+    planifier();
+    el?.focus();
+  }
   function poser(s: string) {
     statut = s;
     onstatut?.(s);
@@ -120,6 +130,7 @@
     </span>
   </div>
   {#if shown}<p id="{uid}-err" class="err" role="alert">{shown}</p>{/if}
+  {#if proposer}<p class="proposition"><button type="button" class="lien-bouton" onclick={prendreSansAccent} data-sans-accent>{t("account.pseudo.noAccent", { pseudo: sansAccent })}</button></p>{/if}
   <!-- Région polie, sobre : elle ne dit que « Disponible » (ou « vérifié plus tard »). -->
   <p class="sr-only" role="status" data-dispo data-pseudo-status>{libre && !shown ? t("account.pseudo.free") : statut === "plus_tard" ? t("account.pseudo.later") : ""}</p>
   <ul id="{uid}-regles" class="regles" aria-label={t("account.pseudo.rules")} data-pseudo-regles>
@@ -146,6 +157,24 @@
   .field {
     display: grid;
     gap: var(--sp-2);
+  }
+  .proposition {
+    margin: 0;
+  }
+  .lien-bouton {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--fs-small);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .lien-bouton:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
   }
   label {
     font-size: var(--fs-small);

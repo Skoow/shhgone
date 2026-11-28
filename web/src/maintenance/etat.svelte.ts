@@ -8,7 +8,8 @@ import { formatClock } from "../i18n/format";
 import { getLang, t } from "../i18n/i18n.svelte";
 import { ecouterMaintenance } from "./signal";
 
-export type Annonce = { debut: number; dureeMin: number; retour: number; imminente: boolean };
+/** `fermeture` : heure où les nouvelles créations ferment (serveur récent) ; absente d'un serveur ancien. */
+export type Annonce = { debut: number; dureeMin: number; retour: number; imminente: boolean; fermeture?: number };
 
 /** Services décrits par GET /api/etat-service (page « État du service »). */
 export const SERVICES = ["partages", "salons", "appels", "compte", "paiement"] as const;
@@ -50,7 +51,8 @@ export function lireEtat(o: unknown): Annonce | null {
   if (typeof m !== "object" || m === null) return null;
   const { debut, duree_min: dureeMin, retour, imminente } = m as Record<string, unknown>;
   if (!entier(debut) || !entier(dureeMin) || dureeMin > 1440 || !entier(retour) || retour !== debut + dureeMin * 60 || typeof imminente !== "boolean") return null;
-  return { debut, dureeMin, retour, imminente };
+  const f = (m as Record<string, unknown>).fermeture;
+  return entier(f) && f <= debut ? { debut, dureeMin, retour, imminente, fermeture: f } : { debut, dureeMin, retour, imminente };
 }
 
 /** Lit l'état du service ; une erreur (réseau, serveur ancien) laisse l'état connu tel quel. Vrai : lu. */
@@ -134,7 +136,9 @@ const jour = (s: number) => new Intl.DateTimeFormat(getLang(), { weekday: "long"
 export function texteBandeau(a: Annonce | null = maintenance.annonce): string {
   if (!a) return "";
   if (a.imminente) return texteRefus(a.retour);
-  return t("maintenance.annonce", { date: jour(a.debut), heure: formatClock(a.debut * 1000, getLang()), duree: a.dureeMin });
+  const texte = t("maintenance.annonce", { date: jour(a.debut), heure: formatClock(a.debut * 1000, getLang()), duree: a.dureeMin });
+  // Heure où les nouveaux envois ferment (essais du 28 novembre), si le serveur la donne.
+  return a.fermeture !== undefined && a.fermeture < a.debut ? `${texte} ${t("maintenance.fermeture", { heure: formatClock(a.fermeture * 1000, getLang()) })}` : texte;
 }
 
 /** « Le serveur va redémarrer : réessayez après la maintenance (vers {heure}) ». */

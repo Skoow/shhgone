@@ -297,7 +297,7 @@
       {#if tel === "sans_prf"}<p class="note" data-telephone-sans-prf>{t("account.phone.noprf")}</p>{/if}
     {/if}
     <div class="actions">
-      <Button variant={tel === "propose" ? "secondary" : "primary"} onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{tel === "propose" ? t("account.phone.later") : t("account.continue")}</Button>
+      <Button variant={tel === "propose" ? "secondary" : "primary"} onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/compte")}>{tel === "propose" ? t("account.phone.later") : t("account.continue")}</Button>
     </div>
   {/if}
 </Cadre>

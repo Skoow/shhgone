@@ -223,6 +223,8 @@
         <div class="hd-tx">
           <!-- Titre de niveau 1 : le composeur (et son h1) est masqué pendant cet écran. -->
           <h1 id="ready-title" class="title" tabindex="-1" data-large-title bind:this={heading}>{t("ready.title")}</h1>
+          <!-- Nom du partage sous le titre (essais du 28 novembre : il était sous « Échéance »). -->
+          {#if result.title}<p class="name" data-ready-name><span class="sr-only">{t("ready.name")} </span><bdi>{result.title}</bdi></p>{/if}
           <p class="meta num">{summary}</p>
         </div>
       </header>
@@ -279,7 +281,6 @@
           <h2 class="col-t">{t("ready.col.when")}</h2>
           <div class="facts" data-ready-facts>
             <!-- Nom du partage : texte de l'expéditeur, en texte brut, isolé (bdi). -->
-            {#if result.title}<p class="name" data-ready-name><span class="sr-only">{t("ready.name")} </span><bdi>{result.title}</bdi></p>{/if}
             <p class="active num"><span class="dot" aria-hidden="true"></span>{t("ready.active")}</p>
             <!-- Heure de fin seule : le serveur l'arrondit au quart d'heure supérieur ;
                  un décompte « 12 h 12 min » à côté de « 12 h » semblait faux. La phrase dit l'arrondi. -->

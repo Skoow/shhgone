@@ -129,3 +129,21 @@ describe("PseudoField", () => {
     expect(input.getAttribute("aria-invalid")).toBeNull();
   });
 });
+
+describe("pseudo avec accents (essais du 28 novembre)", () => {
+  it("« Léa » : « Utiliser « Lea » » proposé ; un geste le pose et le vérifie", async () => {
+    const { input, v } = show(async () => "libre");
+    type(input, "Léa");
+    const b = document.querySelector<HTMLButtonElement>("[data-sans-accent]")!;
+    expect(b.textContent).toBe("Utiliser « Lea » (sans accent)");
+    b.click();
+    flushSync();
+    expect(input.value).toBe("Lea");
+    await settle(400);
+    expect(v).toHaveBeenCalledWith("Lea");
+    expect(document.querySelector("[data-sans-accent]")).toBeNull();
+    // Un caractère qui n'a pas d'équivalent sans accent : rien de proposé.
+    type(input, "Lea_!");
+    expect(document.querySelector("[data-sans-accent]")).toBeNull();
+  });
+});

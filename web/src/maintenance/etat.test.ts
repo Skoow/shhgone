@@ -79,6 +79,10 @@ describe("état du service", () => {
     await setLang("en");
     expect(texteBandeau()).toBe("Maintenance planned on Wednesday, December 2 at 6:00 AM, about 30 min.");
     await setLang("fr");
+    // Serveur récent : l'heure où les nouveaux envois ferment ; incohérente (après le début) : ignorée.
+    maintenance.annonce = lireEtat({ maintenance: { ...annonce, fermeture: debut - 600 } });
+    expect(texteBandeau()).toMatch(/^Maintenance prévue le mercredi 2 décembre à 6\sh\s00, environ 30\smin\. Les nouveaux envois seront fermés à partir de 5\sh\s50\.$/);
+    expect(lireEtat({ maintenance: { ...annonce, fermeture: debut + 600 } })).not.toHaveProperty("fermeture");
     expect(creationsFermees()).toBe(false);
     maintenance.annonce = lireEtat({ maintenance: { ...annonce, imminente: true } });
     expect(creationsFermees()).toBe(true);

@@ -13,7 +13,7 @@
   let { label, variant = "ghost", onpress, children, el = $bindable(), ...rest }: Props = $props();
 </script>
 
-<button bind:this={el} {...rest} type="button" class={["ib", variant]} aria-label={label} onclick={() => onpress?.()}>
+<button bind:this={el} title={label} {...rest} type="button" class={["ib", variant]} aria-label={label} onclick={() => onpress?.()}>
   <span aria-hidden="true" class="ic">{@render children()}</span>
 </button>
 

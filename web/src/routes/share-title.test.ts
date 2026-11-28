@@ -102,11 +102,10 @@ const readyProps = (title?: string) => ({
 });
 
 describe("Lien prêt : nom du partage", () => {
-  it("en tête du bloc d'informations, en texte brut isolé (bdi), jamais dans le titre de l'onglet", () => {
+  it("sous le titre « Lien prêt » (28 novembre), en texte brut isolé (bdi), jamais dans le titre de l'onglet", () => {
     show(Ready, readyProps(HOSTILE));
-    const facts = document.querySelector("[data-ready-card] [data-ready-facts]")!;
-    const name = facts.querySelector("[data-ready-name]")!;
-    expect(facts.firstElementChild).toBe(name);
+    const name = document.querySelector(".hd-tx [data-ready-name]")!;
+    expect(name.previousElementSibling!.id).toBe("ready-title");
     const bdi = name.querySelector("bdi")!;
     expect(bdi.textContent).toBe(HOSTILE);
     expect(name.querySelector("img")).toBeNull();

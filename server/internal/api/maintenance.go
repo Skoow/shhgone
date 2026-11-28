@@ -36,6 +36,8 @@ func (s *server) etatService(w http.ResponseWriter, _ *http.Request) {
 		DureeMin  int64 `json:"duree_min"`
 		Retour    int64 `json:"retour"`
 		Imminente bool  `json:"imminente"`
+		// Fermeture : heure (secondes Unix) où les nouvelles créations ferment (bandeau).
+		Fermeture int64 `json:"fermeture"`
 	}
 	type services struct {
 		Partages string `json:"partages"`
@@ -47,7 +49,7 @@ func (s *server) etatService(w http.ResponseWriter, _ *http.Request) {
 	var a *annonce
 	imminente := false
 	if e := s.maint.Etat(); e.Annonce != nil {
-		a = &annonce{e.Annonce.Debut.Unix(), int64(e.Annonce.Duree / time.Minute), e.Annonce.Fin().Unix(), e.Imminente}
+		a = &annonce{e.Annonce.Debut.Unix(), int64(e.Annonce.Duree / time.Minute), e.Annonce.Fin().Unix(), e.Imminente, e.Annonce.Seuil().Unix()}
 		imminente = e.Imminente
 	}
 	gel := s.svc.Frozen()

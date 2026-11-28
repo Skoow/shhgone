@@ -16,7 +16,7 @@
   {#if item.duplicate}<span class="badge warn">{t("compose.duplicate")}</span>{/if}
 </span>{/if}
 {#if !badgesOnly}
-  {#if item.risky}<span class="line danger"><TriangleAlert size={14} strokeWidth={2} aria-hidden="true" />{t(item.mismatch ? "compose.mismatch" : "compose.risky")}</span>{/if}
+  {#if item.risky}<span class="line danger"><TriangleAlert size={14} strokeWidth={2} aria-hidden="true" />{t(item.mismatch ? "compose.mismatch" : /^\.?svgz?$/i.test(item.ext) ? "compose.risky.svg" : "compose.risky")}</span>{/if}
   {#if cannotOpen}<span class="line warn"><TriangleAlert size={14} strokeWidth={2} aria-hidden="true" />{t("compose.cannotOpen")}</span>{/if}
 {/if}
 
