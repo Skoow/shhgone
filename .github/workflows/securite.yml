@@ -23,16 +23,53 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache: false
-      # govulncheck v1.9.0, publié le 11 octobre 2026 (proxy.golang.org), donc plus de 7 jours
+      # govulncheck v1.10.0, publié le 17 novembre 2026 (proxy.golang.org), donc plus de 7 jours
       # avant son épinglage (règle des dépendances, spec §24). Même version que le job go de ci.yml : en
       # changer ici, c'est le changer là-bas.
       - name: govulncheck
         working-directory: server
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
       # Relais TURN des appels (deploy/shhcheck : pion/turn et ses dépendances).
       - name: govulncheck (relais)
         working-directory: deploy/shhcheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
+  # Binaire de Caddy (image épinglée de deploy/compose.yaml, ni compilé ni vérifié ailleurs) :
+  # govulncheck en mode binaire lit les modules et la version de Go qu'il embarque. Une faille
+  # trouvée = monter l'image de Caddy (Dependabot docker-compose la propose).
+  caddy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      - name: govulncheck (binaire de Caddy)
+        run: |
+          image=$(grep -m1 -oE 'caddy:[0-9.]+@sha256:[0-9a-f]{64}' deploy/compose.yaml)
+          test -n "$image"
+          docker pull --quiet "$image"
+          id=$(docker create "$image")
+          docker cp "$id:/usr/bin/caddy" "$RUNNER_TEMP/caddy"
+          docker rm "$id"
+          go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 -mode binary "$RUNNER_TEMP/caddy"
+  # Outils épinglés à la main, hors de portée de Dependabot (BuildKit, cosign, crane,
+  # govulncheck, cargo-audit) : deploy/outils-a-jour.sh échoue si une version plus récente est
+  # publiée depuis au moins 7 jours.
+  outils:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: versions des outils
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: deploy/outils-a-jour.sh
   # Fuzzing hebdomadaire des analyseurs d'entrées hostiles : 2 minutes
   # chacun ; une entrée qui fait paniquer est gardée par Go dans testdata/fuzz et le job échoue.
   fuzz:
