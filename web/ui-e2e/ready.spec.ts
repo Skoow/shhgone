@@ -179,7 +179,7 @@ test.describe("fr-FR", () => {
     answer = true;
     await home();
     await expect(readyHeading(page)).toHaveCount(0);
-    expect(new URL(page.url()).pathname).toBe("/");
+    await expect(page).toHaveURL(/^[^?#]*:\/\/[^/]+\/$/); // la navigation suit la fin de l'écran
     expect(dialogs).toHaveLength(2);
 
     // Page d'information (autre fichier HTML, chargement complet) : une seule question aussi.
@@ -199,7 +199,7 @@ test.describe("fr-FR", () => {
     await shot(page, "ready2-copie", isMobile);
     await home();
     await expect(readyHeading(page)).toHaveCount(0);
-    expect(new URL(page.url()).pathname).toBe("/");
+    await expect(page).toHaveURL(/^[^?#]*:\/\/[^/]+\/$/); // la navigation suit la fin de l'écran
     await page.goBack();
     await page.waitForTimeout(300);
     expect(dialogs).toHaveLength(3);

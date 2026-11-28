@@ -108,10 +108,11 @@ test("expéditeur : chaque fenêtre a « Fermer » en haut à droite", async ({ 
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   // Partager, puis le QR dans la même feuille.
   await page.locator("main").getByRole("button", { name: "Partager", exact: true }).click();
-  const share = page.getByRole("dialog", { name: "Partager le lien et le mot de passe" });
+  // Mot de passe désactivé par défaut (D42-28) : la feuille ne partage que le lien.
+  const share = page.getByRole("dialog", { name: "Partager le lien" });
   await closeTopRight(share);
   await share.getByRole("button", { name: "Afficher le QR code" }).click();
-  await expect(share.getByRole("img", { name: "QR code du lien et du mot de passe" })).toBeVisible();
+  await expect(share.getByRole("img", { name: "QR code du lien" })).toBeVisible();
   await checkAndClose(page, share);
 
   // Confirmation (feuille du bas).
