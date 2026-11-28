@@ -260,6 +260,9 @@ test("abonnement qui se renouvelle : fenêtre « Arrêter votre abonnement ? »,
   await passPaye(page, shh, { renouvelle: true });
   await inscrire(page, shh.origin, `Max${randomBytes(3).toString("hex")}`);
   await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
+  // Attendre la page de suite (création d'un salon) : sinon elle remplace la page Compte.
+  await expect(page).not.toHaveURL(/\/compte\/inscription/);
+  await expect(page.getByRole("heading", { level: 1 })).not.toHaveText("Compte créé.");
   await aller(page, "/compte");
   const carte = page.locator("[data-carte-compte]");
   await expect(carte.locator("[data-carte-offre-texte]")).toHaveText(/^Plus jusqu'au .+ · renouvelé automatiquement$/);

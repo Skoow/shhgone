@@ -4,33 +4,22 @@
 
 ## 1. État de `main`
 
-- Dernière version poussée : voir `git log` (référencement et rapidité fusionnés le 28 novembre, après `8849d21`).
+- Dernière version poussée : voir `git log` (tous les travaux du 28 novembre fusionnés).
 - Mise à jour de la préproduction (session sur le serveur) : `git fetch origin puis deploy/preprod.sh <commit complet>` ; le commit complet se lit par `git rev-parse <court>` après le `git fetch`.
-- `shares.db` est au schéma 6 : une image d'avant le 28 novembre ne l'ouvre plus (le retour arrière sûr est en cours, § 2.2).
-- Prochain numéro de décision libre au registre : **D42-34** (D42-32 et D42-33 sont réservés aux travaux du § 2).
+- `shares.db` est au schéma 7 ; le retour arrière restaure désormais une copie des bases (§ 2.2).
+- Prochain numéro de décision libre au registre : **D42-34**.
 
-## 2. Travaux en cours, pas encore fusionnés
+## 2. Travaux du 28 novembre
 
-Ils ont été lancés le 28 novembre dans des copies de travail locales (`git worktree list`). Si la machine a été réinitialisée et qu'elles ont disparu, les refaire à partir des descriptions ci-dessous. Après fusion : tests complets (voir § 5), push, puis donner au propriétaire la commande de mise à jour.
+Tous fusionnés dans `main` le 28 novembre (plus aucune copie de travail en attente).
 
-### 2.1 Pages « Mes partages » / « Mes salons », pseudo, fenêtres (D42-33)
+### 2.1 Mes partages / Mes salons, pseudo, fenêtres (D42-33) — fusionné
 
-1. Deux pages séparées : « Mes partages » (`/envois`, partages de fichiers seulement) et « Mes salons » (salons seulement), chacune dans le menu, la ligne du haut et la barre du bas (lisible à 390 et 320 px).
-2. Lignes : « Se termine le 29 nov. (12 h 14) », puis « Terminé le 29 nov. (12 h 14) ». Icône fichier ou salon (rien selon le contenu).
-3. Étiquette « En cours » (vert) / « Terminé » (gris).
-4. Terminés : « Retirer » un par un, et « Effacer l'historique » en haut (confirmation), qui garde les actifs.
-5. Sous-titre « Les partages que vous avez envoyés » ; « Supprimer le partage » = détruit pour tout le monde ; « Retirer de la liste » = seulement de la liste ; « Gérer le salon » = créateur.
-6. Pseudo (création de compte et page Compte) : liste de règles interactive (croix rouge / coche verte, mise à jour pendant la saisie : caractères, longueur, disponible ; info « 3 changements par an au plus ») et indicateur dans le champ (carré, coche blanche sur fond vert si valide et libre, spinner pendant la vérification, croix si pris).
-7. Fenêtre « Arrêter l'abonnement » : « Votre abonnement {offre} ne sera pas renouvelé. Vous en profitez jusqu'au {date}, puis votre compte repasse en Gratuit. Aucun remboursement possible. »
-8. Fenêtre « Supprimer votre compte » : disposition plus claire (liste courte, abonnement mis en évidence, « Aucun remboursement possible. »), sans mention des téléchargements ; « rien n'est remboursé automatiquement » remplacé partout.
-9. Page « Téléchargements » (onglet « Fichiers », historique des fichiers reçus) retirée ; base locale effacée au démarrage.
-10. Renouvellement arrêté automatiquement : pass sans aucun jeton émis depuis 12 mois (tâche quotidienne du serveur) ; compte banni : arrêt à sa connexion (le serveur ne relie pas compte et pass), et la règle des 12 mois s'applique aussi.
+Deux pages `/envois` et `/salons`, dates « Se termine le … (heure) », étiquettes En cours / Terminé, « Effacer l'historique », pseudo avec règles interactives (`PseudoField.svelte`), fenêtres « Arrêter votre abonnement ? » et « Supprimer définitivement votre compte ? » (« Aucun remboursement possible. »), page Téléchargements retirée, renouvellement arrêté d'office (pass sans jeton émis depuis 365 jours ; compte banni à sa connexion). À décider : seuils de la règle des 12 mois (mensuel : 330 jours éviterait le 13e prélèvement ; annuel : course possible le jour même ; « sans jeton » n'est pas « sans usage »). Playwright `salon`, `appel`, `finition` adaptés mais pas relancés.
 
-### 2.2 Maintenance, reprise restante, retour arrière (D42-32)
+### 2.2 Maintenance, reprise restante, retour arrière (D42-32) — fusionné
 
-1. `deploy/maintenance.sh annoncer <date-heure> <durée>` / `annuler` / `etat` : bandeau sur le site ; 10 min avant, nouvelles créations refusées (503 `maintenance`, heure de retour), ce qui est en cours continue ; état qui survit au redémarrage ; dans `etat.sh` et l'e-mail du lundi ; procédure de redémarrage pas à pas dans `deploy/README.md` (annoncer, `reboot`, déverrouiller LUKS par SSH, `etat.sh`).
-2. Reprise après redémarrage encore à faire : pièces de salon en cours d'envoi ; étapes d'inscription (pas de passkey orpheline) ; lien session ↔ passkey. Corriger aussi `deploy/README.md` « Sortie par partage » et le texte `salon.intro.2`.
-3. Retour arrière sûr : copie cohérente des bases avant toute mise à jour qui change un `user_version`, restaurée en cas de retour arrière.
+`deploy/maintenance.sh annoncer|annuler|etat` (bandeau, créations refusées 10 min avant, procédure de redémarrage dans `deploy/README.md` §5), pièces de salon reprenables, passkey orpheline signalée (`signalUnknownCredential`), copie et restauration des bases au retour arrière (`deploy/bases.sh`). `shares.db` au schéma 7. Non fait, volontairement : lien session ↔ passkey (n'épargnerait aucun geste). Pas encore essayé sur le vrai serveur (Docker) : le premier `deploy/preprod.sh` le fera.
 
 ### 2.3 Référencement et rapidité — fusionné le 28 novembre
 
