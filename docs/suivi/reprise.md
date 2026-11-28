@@ -34,6 +34,7 @@ Suite du 28 novembre (après-midi) :
 - **Search Console et Bing** : marche à suivre écrite, `deploy/README.md` §15.5.1 (à faire par le propriétaire, ses comptes).
 - **État du service** (D42-34, fait) : page `/etat`, lien dans le pied de page, cinq services lus de `/api/etat-service`.
 - **Compte perdu, rappel de la clé** (D42-35, fait) : question de l'accueil, ligne de Contact, portail client Stripe à régler (README §13.5), « Vérifier ma clé » et rappel tous les 6 mois (vérification sur l'appareil, rien de la clé envoyé).
+- **Essais « utilisateur réel » hors salon** (28 novembre) : compte rendu `docs/suivi/2026-11-28-essais-utilisateur-partages.md`, 23 constats classés, à trancher avec le propriétaire ; prochain essai : le salon.
 - **Barrière de préproduction** : non levée (voir § 4, « Par le propriétaire » ; demande du 28 novembre en attente des conditions du `deploy/README.md` §15.5).
 
 Restes à décider :
