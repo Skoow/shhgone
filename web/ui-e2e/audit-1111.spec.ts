@@ -33,7 +33,7 @@ test("I2 : Retour sur « Lien prêt » : confirmation ; refus → on reste, lien
     void d.dismiss();
   });
   await page.goBack();
-  await expect.poll(() => msg).toContain("ne seront plus jamais affichés");
+  await expect.poll(() => msg).toContain("ne sera plus jamais affiché");
   await expect(readyHeading(page)).toBeVisible();
   expect(page.url()).toBe(url);
   // Un second Retour redemande (l'entrée de garde a été remise).

@@ -2,7 +2,7 @@
 // l'envoi, texte brut, image depuis une URL blob révoquée au chargement, audio et vidéo natifs,
 // fichiers piégés jamais affichés, échec de décodage, expiration, destruction pendant la lecture.
 import { destroyShare } from "../src/index";
-import { axe, capture, expect, test } from "./fixtures";
+import { apiComptee, axe, capture, expect, test } from "./fixtures";
 import { file, freshPage, goSecurity, sendShare, settle, unlock, type Sent } from "./open-helpers";
 
 const TEXT = "Le code de la porte est 4471.\nالطابق الثالث — escalier B.";
@@ -104,7 +104,7 @@ test("expiration pendant la lecture, rien en cours → l'interface se ferme auss
   await page.goto(sent.link);
   await unlock(page, sent.password);
   const api: string[] = [];
-  page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/api/") && api.push(r.url())));
+  page.on("request", (r) => void (apiComptee(r.url(), r.method()) && api.push(r.url())));
   await page.clock.fastForward("12:30:00");
   await expect(page.getByRole("heading", { name: "Ce partage a expiré." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Contenu", exact: true })).toHaveCount(0);

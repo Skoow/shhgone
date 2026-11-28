@@ -3,7 +3,7 @@
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { axe, capture, expect, test } from "./fixtures";
+import { apiComptee, axe, capture, expect, test } from "./fixtures";
 import { freshPage, goSecurity, pwField, sendShare, unlock } from "./open-helpers";
 import { startPagesServer } from "./pages-server";
 
@@ -17,7 +17,7 @@ const INSTAGRAM =
 function apiRequests(page: Page): string[] {
   const urls: string[] = [];
   page.on("request", (r) => {
-    if (new URL(r.url()).pathname.startsWith("/api/")) urls.push(r.url());
+    if (apiComptee(r.url(), r.method())) urls.push(r.url());
   });
   return urls;
 }
@@ -477,7 +477,7 @@ test("vrai parcours d'ouverture : .wasm modifié d'un octet en route : aucun dé
   };
   await page.route("**/assets/engine-*.wasm", trap);
   const api: string[] = [];
-  page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/api/") && api.push(new URL(r.url()).pathname)));
+  page.on("request", (r) => void (apiComptee(r.url(), r.method()) && api.push(new URL(r.url()).pathname)));
   await page.goto(sent.link);
   await expect(page.getByRole("heading", { name: "Vous êtes hors ligne." })).toBeVisible({ timeout: 30_000 });
   // Lu au moins une fois (l'écran peut relire le fichier, chaque lecture est refusée de même).

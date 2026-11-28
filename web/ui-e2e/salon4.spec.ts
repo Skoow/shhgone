@@ -63,9 +63,10 @@ async function inscrire(page: Page, origin: string, pseudo: string): Promise<voi
   await page.goto(origin + "/compte/inscription?suite=salon");
   await champ(page, "Pseudo").fill(pseudo);
   await expect(page.locator("[data-dispo]")).toHaveText("Disponible", { timeout: 30_000 });
-  await bouton(page, "Créer avec une passkey").click();
+  await bouton(page, "Créer avec une passkey").or(bouton(page, "Garder le compte sur cet ordinateur")).click();
   await expect(titre(page, "Votre clé de récupération")).toBeVisible({ timeout: 30_000 });
   const cle = (await page.locator("[data-cle] .g").allTextContents()).join("-");
+  await bouton(page, "Copier").click(); // « Je l'ai notée » attend la clé copiée ou téléchargée
   await bouton(page, "Je l'ai notée").click();
   const label = (await page.locator("label").filter({ hasText: "Tapez le groupe" }).textContent())!;
   await page.getByLabel(label.trim(), { exact: true }).fill(cle.split("-")[Number(/n°\s*(\d)/u.exec(label)![1]) - 1]!);
@@ -80,7 +81,7 @@ async function envoyer(page: Page, texte: string): Promise<void> {
 async function rejoindre(page: Page, lien: string, mdp: string, pseudo: string, image?: string): Promise<void> {
   await page.goto(lien);
   await champ(page, "Mot de passe du salon").fill(mdp);
-  await bouton(page, "Continuer").click();
+  await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
   await expect(titre(page, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
   await champ(page, "Pseudonyme pour ce salon").fill(pseudo);
   if (image) {
@@ -115,7 +116,7 @@ test("salon façon application : en-tête et saisie fixes, séries, jour, appels
 
   // --- Créatrice, invité sur téléphone, troisième personne ---------------------------------------
   await inscrire(page, shh.origin, pseudoA);
-  await bouton(page, "Continuer").click();
+  await bouton(page, "Continuer").or(bouton(page, "Plus tard")).click();
   await bouton(page, "Créer le salon").click();
   await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
   const lien = (await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();

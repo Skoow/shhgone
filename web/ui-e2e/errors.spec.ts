@@ -3,7 +3,7 @@
 // non pris en charge. Chacune : titre d'onglet, aucun secret dans l'adresse, axe sans violation,
 // captures fr-FR (1440 et 390 de large).
 import type { Page } from "@playwright/test";
-import { axe, capture, expect, test } from "./fixtures";
+import { apiComptee, axe, capture, expect, test } from "./fixtures";
 import { addText, sendButton } from "./send-helpers";
 
 const KEY = Buffer.from(Uint8Array.from({ length: 32 }, (_, i) => 255 - i * 3)).toString("base64url");
@@ -38,7 +38,7 @@ test.describe("pages d'erreur", () => {
 
   test("hors ligne : aucune requête, puis relance d'office au retour du réseau", async ({ page, shh, context }) => {
     const api: string[] = [];
-    page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/api/") && api.push(r.url())));
+    page.on("request", (r) => void (apiComptee(r.url(), r.method()) && api.push(r.url())));
     // Page d'ouverture « /s » déjà chargée ; le lien y est collé hors ligne.
     await page.goto(shh.origin + "/s");
     await context.setOffline(true);

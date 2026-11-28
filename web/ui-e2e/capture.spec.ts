@@ -242,9 +242,10 @@ test("API absente : « Photo ou vidéo » ouvre directement la galerie ; pas de 
 
 test("en-têtes : caméra et micro permis à la page, jamais au cadre PDF", async ({ page, shh }) => {
   const r = await page.request.get(shh.origin + "/");
-  expect(r.headers()["permissions-policy"]).toMatch(/^microphone=\(self\), camera=\(self\), geolocation=\(\), /);
+  // Passkeys du compte posées à self (22 novembre, conception du compte §6.5), géolocalisation refusée.
+  expect(r.headers()["permissions-policy"]).toMatch(/^microphone=\(self\), camera=\(self\), publickey-credentials-create=\(self\), publickey-credentials-get=\(self\), geolocation=\(\), /);
   const f = await page.request.get(shh.origin + "/pdf-frame.html");
-  expect(f.headers()["permissions-policy"]).toMatch(/^microphone=\(\), camera=\(\), geolocation=\(\), /);
+  expect(f.headers()["permissions-policy"]).toMatch(/^microphone=\(\), camera=\(\), publickey-credentials-create=\(\), publickey-credentials-get=\(\), geolocation=\(\), /);
 });
 
 // Un format que le nettoyage ne reconnaît pas ne part plus en silence. Le premier

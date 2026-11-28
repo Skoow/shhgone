@@ -99,7 +99,7 @@ test("image de plus de 50 mégapixels : jamais décodée, « pas d'aperçu », T
   await unlock(page, sent.password);
   const viewer = page.getByRole("dialog");
   await page.getByRole("button", { name: "Voir bombe.jpg" }).click();
-  await expect(viewer.getByRole("alert")).toHaveText(/^\s*Ce fichier ne peut pas être lu sur cet appareil\. Enregistrez-le pour l'ouvrir avec une autre application\.\s*$/, { timeout: 20_000 });
+  await expect(viewer.getByRole("alert")).toHaveText(/^\s*Cette image ne peut pas être affichée ici\s: ses dimensions sont trop grandes ou illisibles\. Enregistrez-la pour l'ouvrir avec une autre application\.\s*$/, { timeout: 20_000 });
   await expect(viewer.getByRole("button", { name: "Télécharger bombe.jpg" })).toBeVisible();
   // Image ordinaire juste après : toujours affichée.
   await page.keyboard.press("ArrowRight");

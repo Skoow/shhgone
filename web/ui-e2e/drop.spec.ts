@@ -90,7 +90,10 @@ test("ordinateur : filigrane de dépôt dans la liste (texte entier, clic → ch
   // Sous la liste, dans l'espace vide ; texte plus clair que les noms des lignes.
   const [rows, zone] = [await page.locator(".groups").boundingBox(), await dz.boundingBox()];
   expect(zone!.y).toBeGreaterThanOrEqual(rows!.y + rows!.height);
-  expect(zone!.height).toBeGreaterThan(200);
+  // Une ligne de 64 px au moins dès qu'un élément est ajouté (audit du 25 novembre : plus de grand
+  // cadre vide sous la liste).
+  expect(zone!.height).toBeGreaterThanOrEqual(64);
+  expect(zone!.height).toBeLessThan(120);
   const light = (sel: string) => page.locator(sel).first().evaluate((n) => getComputedStyle(n).color);
   expect(await light(".lc-scroll .dropzone .dz-t")).not.toBe(await light("[data-row] .nm"));
   const chooser = page.waitForEvent("filechooser");

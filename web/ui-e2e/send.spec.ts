@@ -328,7 +328,7 @@ test.describe("fr-FR", () => {
     await addFile(page, "disparu.bin", 1000);
     await sendButton(page).click();
     const alert = page.getByRole("alert");
-    await expect(alert).toHaveText("Le transfert a été interrompu (le serveur a peut-être redémarré). Réessayez.", { timeout: 30_000 });
+    await expect(alert).toHaveText("Le transfert a été interrompu. Réessayez.", { timeout: 30_000 });
     await expect(alert).toBeFocused();
     await expect(page.getByRole("button", { name: "Réessayer" })).toBeVisible();
     await page.getByRole("button", { name: "Modifier l'envoi" }).click();
@@ -362,7 +362,7 @@ test.describe("fr-FR", () => {
     );
     await sendButton(page).click();
     // La règle d'abord : refus à la création au-delà de 60 s → quota du jour.
-    await expect(page.getByRole("alert")).toHaveText(/^Limite du jour atteinte\s: 3\spartages gratuits par jour depuis votre connexion\. Réessayez dans 2\smin\.$/, { timeout: 30_000 });
+    await expect(page.getByRole("alert")).toHaveText(/^Limite du jour atteinte\s: 3\spartages gratuits par jour et par connexion, 10\spour tout un réseau\. .* Réessayez dans 2\smin\.$/, { timeout: 30_000 });
     const retry = page.getByRole("button", { name: /^Réessayer dans \d/ });
     await expect(retry).toBeDisabled();
   });

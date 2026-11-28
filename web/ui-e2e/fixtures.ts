@@ -55,6 +55,16 @@ function swallowHarnessStyle(page: Page, channel: "event" | "console", text: str
  * « le port est ouvert » ne dit pas que la boucle d'acceptation et le gestionnaire répondent.
  * Écarte aussi toute cause serveur d'un blocage du navigateur.
  */
+/**
+ * Requête d'API comptée par les tests « aucune requête /api/ ». Exclue : GET /api/etat-service,
+ * lecture de l'horaire de maintenance (D42-32) faite par chaque page au chargement, sans aucune
+ * donnée (ni clé, ni identifiant, ni témoin) : elle ne dit rien de plus que le chargement de la page.
+ */
+export function apiComptee(url: string, method = "GET"): boolean {
+  const p = new URL(url).pathname;
+  return p.startsWith("/api/") && !(method === "GET" && p === "/api/etat-service");
+}
+
 export async function probe(url: string, timeoutMs = 10_000): Promise<number> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {

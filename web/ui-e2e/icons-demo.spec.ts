@@ -6,8 +6,8 @@ test("démo : liens d'icônes sous la base /shhgone/, fichiers servis (200)", as
   const links = await page.$$eval("link[rel~='icon'], link[rel='apple-touch-icon']", (ls) =>
     ls.map((l) => (l as HTMLLinkElement).getAttribute("href")!),
   );
-  expect(links.sort()).toEqual(["/shhgone/apple-touch-icon.png", "/shhgone/favicon.ico", "/shhgone/favicon.svg"]);
-  for (const p of [...links, "/shhgone/icon-192.png", "/shhgone/icon-512.png"]) {
+  expect(links.sort()).toEqual(["/shhgone/apple-touch-icon.png", "/shhgone/favicon-32.png", "/shhgone/favicon.ico", "/shhgone/favicon.svg", "/shhgone/icon-192.png"]);
+  for (const p of [...links, "/shhgone/icon-512.png"]) {
     const res = await request.get(demo.origin + p);
     expect(res.status(), p).toBe(200);
   }

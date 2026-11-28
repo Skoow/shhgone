@@ -95,7 +95,7 @@ test("Contact : adresse en lien mailto, « Copier l'adresse », pour quoi écrir
   // Un lien mailto n'ouvre pas de nouvel onglet et ne charge rien.
   await expect(addr).not.toHaveAttribute("target");
   await expect(main).toContainText("En français ou en anglais");
-  await expect(main).toContainText("Le lien complet d'un partage avec son mot de passe");
+  await expect(main).toContainText("Le lien complet d'un partage, avec son mot de passe s'il en a un");
   await expect(main.getByRole("link", { name: "Signaler un abus" })).toHaveAttribute("href", "/signaler");
   const text = await main.innerText();
   expect(text).not.toMatch(/\b\d{5}\b|rue |cedex|délai|sous \d|\d+\s?(h|heures?|jours?)\b/i);

@@ -47,6 +47,9 @@ async function deconnecter(page: Page, url: string) {
   await aller(page, url, "compte");
   await page.locator("main").getByRole("button", { name: "Se déconnecter" }).click();
   await expect(page.getByRole("banner").getByRole("link", { name: "Se connecter" })).toBeVisible();
+  // L'en-tête change dès l'appareil oublié ; la page ne passe à « /compte/connexion » qu'après la
+  // révocation de la session : naviguer avant, c'était être ramené sur la connexion (test instable).
+  await expect(page).toHaveURL(/\/compte\/connexion$/);
 }
 
 test.describe("compte de la démo", () => {

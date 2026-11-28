@@ -2,7 +2,7 @@
 // la page /s ne charge pas le script de l'application d'envoi ; l'ancienne forme à la racine est
 // refusée (l'accueil, la clé retirée de l'adresse) ; la clé est retirée de l'adresse
 // après lecture, comme avant.
-import { expect, test } from "./fixtures";
+import { apiComptee, expect, test } from "./fixtures";
 import { file, freshPage, sendShare, unlock } from "./open-helpers";
 
 test.use({ locale: "fr-FR" });
@@ -40,7 +40,7 @@ test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancienne
   const b = await freshPage(browser);
   const api: string[] = [];
   b.page.on("request", (r) => {
-    if (new URL(r.url()).pathname.startsWith("/api/")) api.push(r.url());
+    if (apiComptee(r.url(), r.method())) api.push(r.url());
   });
   await b.page.goto(sent.link.replace("/s#", "/#"));
   await expect(b.page.locator("[data-pick]")).toBeVisible({ timeout: 30_000 });

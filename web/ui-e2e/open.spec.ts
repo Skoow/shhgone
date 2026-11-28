@@ -3,7 +3,7 @@
 // aucune requête hors de l'origine).
 import type { Page } from "@playwright/test";
 import { NotFoundError, PW_TRIES, fetchMeta, shareStatus } from "../src/index";
-import { axe, capture, expect, grantClipboard, readClipboard, test } from "./fixtures";
+import { apiComptee, axe, capture, expect, grantClipboard, readClipboard, test } from "./fixtures";
 import { freshPage, noteRow, pwField, sendShare, settle, unlock, unlockButton } from "./open-helpers";
 import { armed } from "./send-helpers";
 
@@ -15,7 +15,7 @@ function apiPaths(page: Page): string[] {
   const out: string[] = [];
   page.on("request", (r) => {
     const p = new URL(r.url()).pathname;
-    if (p.startsWith("/api/")) out.push(`${r.method()} ${p}`);
+    if (apiComptee(r.url(), r.method())) out.push(`${r.method()} ${p}`);
   });
   return out;
 }
